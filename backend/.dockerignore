@@ -1,0 +1,11 @@
+.git
+.codex-run
+.env
+.env.*
+!.env.example
+!.env.production.example
+tmp
+bin
+.gocache
+coverage.out
+*.log

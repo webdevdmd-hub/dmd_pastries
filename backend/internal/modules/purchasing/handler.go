@@ -1,0 +1,233 @@
+package purchasing
+
+import (
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
+	apperrors "pastries-pos/internal/shared/errors"
+	"pastries-pos/internal/shared/response"
+	"pastries-pos/internal/shared/utils"
+)
+
+type Handler struct {
+	service *Service
+}
+
+func NewHandler(service *Service) *Handler {
+	return &Handler{service: service}
+}
+
+func (h *Handler) ListOrders(c *gin.Context) {
+	result, err := h.service.ListOrders(utils.MustAuthContext(c), parseListQuery(c))
+	respond(c, "purchase orders fetched successfully", result, err)
+}
+
+func (h *Handler) CreateOrder(c *gin.Context) {
+	var req CreatePurchaseOrderRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.CreateOrder(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "purchase order created successfully", result, err)
+}
+
+func (h *Handler) GetOrder(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.GetOrder(utils.MustAuthContext(c), c.Param("id"))
+	respond(c, "purchase order fetched successfully", result, err)
+}
+
+func (h *Handler) UpdateOrder(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	var req UpdatePurchaseOrderRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.UpdateOrder(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase order updated successfully", result, err)
+}
+
+func (h *Handler) UpdateOrderStatus(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	var req UpdateStatusRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.UpdateOrderStatus(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase order status updated successfully", result, err)
+}
+
+func (h *Handler) DeleteOrder(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	err := h.service.DeleteOrder(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase order deleted successfully", gin.H{"deleted": true}, err)
+}
+
+func (h *Handler) ListInvoices(c *gin.Context) {
+	result, err := h.service.ListInvoices(utils.MustAuthContext(c), parseListQuery(c))
+	respond(c, "purchase invoices fetched successfully", result, err)
+}
+
+func (h *Handler) CreateInvoice(c *gin.Context) {
+	var req CreatePurchaseInvoiceRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.CreateInvoice(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "purchase invoice created successfully", result, err)
+}
+
+func (h *Handler) GetInvoice(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.GetInvoice(utils.MustAuthContext(c), c.Param("id"))
+	respond(c, "purchase invoice fetched successfully", result, err)
+}
+
+func (h *Handler) UpdateInvoice(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	var req UpdatePurchaseInvoiceRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.UpdateInvoice(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase invoice updated successfully", result, err)
+}
+
+func (h *Handler) PostInvoice(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.PostInvoice(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase invoice posted successfully", result, err)
+}
+
+func (h *Handler) CancelInvoice(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.CancelInvoice(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase invoice cancelled successfully", result, err)
+}
+
+func (h *Handler) Receive(c *gin.Context) {
+	var req ReceivePurchaseRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.Receive(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "purchase received successfully", result, err)
+}
+
+func (h *Handler) ListReceipts(c *gin.Context) {
+	result, err := h.service.ListReceipts(utils.MustAuthContext(c), parseListQuery(c))
+	respond(c, "purchase receipts fetched successfully", result, err)
+}
+
+func (h *Handler) GetReceipt(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.GetReceipt(utils.MustAuthContext(c), c.Param("id"))
+	respond(c, "purchase receipt fetched successfully", result, err)
+}
+
+func (h *Handler) PostReceipt(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.PostReceipt(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase receipt posted successfully", result, err)
+}
+
+func (h *Handler) CancelReceipt(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.CancelReceipt(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase receipt cancelled successfully", result, err)
+}
+
+func (h *Handler) Summary(c *gin.Context) {
+	result, err := h.service.Summary(utils.MustAuthContext(c))
+	respond(c, "purchasing summary fetched successfully", result, err)
+}
+
+func (h *Handler) SupplierHistory(c *gin.Context) {
+	if !validParam(c, "supplierId") {
+		return
+	}
+	result, err := h.service.SupplierHistory(utils.MustAuthContext(c), c.Param("supplierId"))
+	respond(c, "supplier purchase history fetched successfully", result, err)
+}
+
+func parseListQuery(c *gin.Context) ListQuery {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	return ListQuery{
+		Search:        c.Query("search"),
+		BranchID:      c.Query("branch_id"),
+		SupplierID:    c.Query("supplier_id"),
+		Status:        c.Query("status"),
+		PaymentStatus: c.Query("payment_status"),
+		DateFrom:      c.Query("date_from"),
+		DateTo:        c.Query("date_to"),
+		Page:          page,
+		Limit:         limit,
+		SortBy:        c.DefaultQuery("sort_by", "created_at"),
+		SortOrder:     c.DefaultQuery("sort_order", "desc"),
+	}
+}
+
+func bindJSON(c *gin.Context, target interface{}) bool {
+	if err := c.ShouldBindJSON(target); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return false
+	}
+	return true
+}
+
+func validParam(c *gin.Context, name string) bool {
+	if _, err := uuid.Parse(c.Param(name)); err != nil {
+		handleError(c, apperrors.BadRequest(name+" must be a valid UUID", nil))
+		return false
+	}
+	return true
+}
+
+func respond(c *gin.Context, message string, data interface{}, err error) {
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, message, data)
+}
+
+func respondCreated(c *gin.Context, message string, data interface{}, err error) {
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 201, message, data)
+}
+
+func handleError(c *gin.Context, err error) {
+	if appErr, ok := err.(*apperrors.AppError); ok {
+		response.Error(c, appErr.StatusCode, appErr.Message, appErr.Details)
+		return
+	}
+	response.Error(c, 500, "internal server error", err.Error())
+}

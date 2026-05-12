@@ -1,0 +1,398 @@
+package dashboard
+
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
+
+type Repository struct {
+	db *gorm.DB
+}
+
+type Scope struct {
+	BusinessID  string
+	BranchID    string
+	AllBranches bool
+	TodayStart  time.Time
+	TodayEnd    time.Time
+	MonthStart  time.Time
+	MonthEnd    time.Time
+	TodayDate   string
+	MonthDate   string
+}
+
+func NewRepository(db *gorm.DB) *Repository {
+	return &Repository{db: db}
+}
+
+func (r *Repository) AdminDashboard(scope Scope) (*AdminDashboardResponse, error) {
+	sales, err := r.adminSales(scope)
+	if err != nil {
+		return nil, err
+	}
+	inventory, err := r.adminInventory(scope)
+	if err != nil {
+		return nil, err
+	}
+	orders, err := r.adminOrders(scope)
+	if err != nil {
+		return nil, err
+	}
+	manufacturing, err := r.adminManufacturing(scope)
+	if err != nil {
+		return nil, err
+	}
+	financial, err := r.adminFinancial(scope)
+	if err != nil {
+		return nil, err
+	}
+	customers, err := r.adminCustomers(scope)
+	if err != nil {
+		return nil, err
+	}
+	return &AdminDashboardResponse{Sales: *sales, Inventory: *inventory, Orders: *orders, Manufacturing: *manufacturing, Financial: *financial, Customers: *customers}, nil
+}
+
+func (r *Repository) CashierDashboard(scope Scope, userID string) (*CashierDashboardResponse, error) {
+	sales := CashierSalesWidget{}
+	query := "SELECT COALESCE(SUM(total_amount),0) AS today_sales, COUNT(*) AS sales_count FROM sales WHERE business_id = ? AND cashier_user_id = ? AND sold_at >= ? AND sold_at < ? AND sale_status <> 'voided' AND deleted_at IS NULL"
+	args := []interface{}{scope.BusinessID, userID, scope.TodayStart, scope.TodayEnd}
+	query, args = addScopedBranch(query, args, "branch_id", scope)
+	if err := r.db.Raw(query, args...).Scan(&sales).Error; err != nil {
+		return nil, err
+	}
+	refundQuery := "SELECT COUNT(*) FROM payment_refunds WHERE business_id = ? AND created_by_user_id = ? AND refunded_at >= ? AND refunded_at < ? AND refund_status = 'completed' AND deleted_at IS NULL"
+	refundArgs := []interface{}{scope.BusinessID, userID, scope.TodayStart, scope.TodayEnd}
+	refundQuery, refundArgs = addScopedBranch(refundQuery, refundArgs, "branch_id", scope)
+	if err := r.db.Raw(refundQuery, refundArgs...).Scan(&sales.RefundCount).Error; err != nil {
+		return nil, err
+	}
+	orders := CashierOrdersWidget{}
+	orderQuery := "SELECT COUNT(*) FILTER (WHERE order_type = 'pickup') AS pickup_ready, COUNT(*) FILTER (WHERE order_type = 'delivery') AS delivery_ready FROM bakery_orders WHERE business_id = ? AND order_status = 'ready' AND deleted_at IS NULL"
+	orderArgs := []interface{}{scope.BusinessID}
+	orderQuery, orderArgs = addScopedBranch(orderQuery, orderArgs, "branch_id", scope)
+	if err := r.db.Raw(orderQuery, orderArgs...).Scan(&orders).Error; err != nil {
+		return nil, err
+	}
+	payments := CashierPaymentsWidget{}
+	paymentQuery := "SELECT COALESCE(SUM(amount) FILTER (WHERE payment_method_type_snapshot = 'cash'),0) AS cash_collected, COALESCE(SUM(amount) FILTER (WHERE payment_method_type_snapshot = 'card'),0) AS card_collected FROM sale_payments WHERE business_id = ? AND paid_by_user_id = ? AND paid_at >= ? AND paid_at < ? AND payment_status IN ('completed','partially_refunded','refunded') AND deleted_at IS NULL"
+	paymentArgs := []interface{}{scope.BusinessID, userID, scope.TodayStart, scope.TodayEnd}
+	paymentQuery, paymentArgs = addScopedBranch(paymentQuery, paymentArgs, "branch_id", scope)
+	if err := r.db.Raw(paymentQuery, paymentArgs...).Scan(&payments).Error; err != nil {
+		return nil, err
+	}
+	bakeryPaymentQuery := `
+		SELECT COALESCE(SUM(bop.amount) FILTER (WHERE pm.method_type = 'cash'),0) AS cash_collected,
+			COALESCE(SUM(bop.amount) FILTER (WHERE pm.method_type = 'card'),0) AS card_collected
+		FROM bakery_order_payments bop
+		JOIN bakery_orders bo ON bo.id = bop.bakery_order_id
+		JOIN payment_methods pm ON pm.id = bop.payment_method_id
+		WHERE bop.business_id = ? AND bop.paid_by_user_id = ? AND bop.paid_at >= ? AND bop.paid_at < ? AND bo.deleted_at IS NULL`
+	bakeryPaymentArgs := []interface{}{scope.BusinessID, userID, scope.TodayStart, scope.TodayEnd}
+	bakeryPaymentQuery, bakeryPaymentArgs = addScopedBranch(bakeryPaymentQuery, bakeryPaymentArgs, "bo.branch_id", scope)
+	var bakeryPayments CashierPaymentsWidget
+	if err := r.db.Raw(bakeryPaymentQuery, bakeryPaymentArgs...).Scan(&bakeryPayments).Error; err != nil {
+		return nil, err
+	}
+	payments.CashCollected += bakeryPayments.CashCollected
+	payments.CardCollected += bakeryPayments.CardCollected
+	return &CashierDashboardResponse{Sales: sales, Orders: orders, Payments: payments, ShiftSummary: CashierShiftSummaryWidget{CurrentCollected: payments.CashCollected + payments.CardCollected}}, nil
+}
+
+func (r *Repository) ProductionDashboard(scope Scope) (*ProductionDashboardResponse, error) {
+	batches := ProductionBatchesWidget{}
+	batchQuery := "SELECT COUNT(*) FILTER (WHERE status IN ('draft','planned','in_progress')) AS active_batches, COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= ? AND completed_at < ?) AS completed_today, COUNT(*) FILTER (WHERE status IN ('draft','planned')) AS pending_batches FROM production_batches WHERE business_id = ? AND deleted_at IS NULL"
+	batchArgs := []interface{}{scope.TodayStart, scope.TodayEnd, scope.BusinessID}
+	batchQuery, batchArgs = addScopedBranch(batchQuery, batchArgs, "branch_id", scope)
+	if err := r.db.Raw(batchQuery, batchArgs...).Scan(&batches).Error; err != nil {
+		return nil, err
+	}
+	ingredients := ProductionIngredientsWidget{}
+	ingredientQuery := "SELECT COUNT(*) FILTER (WHERE item_type = 'ingredient' AND available_quantity <= reorder_level) AS low_stock_ingredients FROM inventory_items WHERE business_id = ? AND deleted_at IS NULL"
+	ingredientArgs := []interface{}{scope.BusinessID}
+	ingredientQuery, ingredientArgs = addScopedBranch(ingredientQuery, ingredientArgs, "branch_id", scope)
+	if err := r.db.Raw(ingredientQuery, ingredientArgs...).Scan(&ingredients).Error; err != nil {
+		return nil, err
+	}
+	expiryQuery := "SELECT COUNT(*) FROM expiry_batches eb JOIN inventory_items ii ON ii.id = eb.inventory_item_id WHERE eb.business_id = ? AND ii.item_type = 'ingredient' AND eb.status = 'active' AND eb.deleted_at IS NULL AND eb.expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'"
+	expiryArgs := []interface{}{scope.BusinessID}
+	expiryQuery, expiryArgs = addScopedBranch(expiryQuery, expiryArgs, "eb.branch_id", scope)
+	if err := r.db.Raw(expiryQuery, expiryArgs...).Scan(&ingredients.ExpiringIngredients).Error; err != nil {
+		return nil, err
+	}
+	orders := ProductionOrdersWidget{}
+	orderQuery := "SELECT COUNT(*) FILTER (WHERE order_status = 'confirmed') AS orders_waiting_production, COUNT(*) FILTER (WHERE event_date = ?) AS orders_due_today FROM bakery_orders WHERE business_id = ? AND order_status IN ('confirmed','in_production') AND deleted_at IS NULL"
+	orderArgs := []interface{}{scope.TodayDate, scope.BusinessID}
+	orderQuery, orderArgs = addScopedBranch(orderQuery, orderArgs, "branch_id", scope)
+	if err := r.db.Raw(orderQuery, orderArgs...).Scan(&orders).Error; err != nil {
+		return nil, err
+	}
+	wastage := ProductionWastageWidget{}
+	wastageQuery := "SELECT COALESCE(SUM(wastage_quantity),0) AS today_wastage_quantity FROM production_batches WHERE business_id = ? AND production_date = ? AND deleted_at IS NULL"
+	wastageArgs := []interface{}{scope.BusinessID, scope.TodayDate}
+	wastageQuery, wastageArgs = addScopedBranch(wastageQuery, wastageArgs, "branch_id", scope)
+	if err := r.db.Raw(wastageQuery, wastageArgs...).Scan(&wastage).Error; err != nil {
+		return nil, err
+	}
+	return &ProductionDashboardResponse{Batches: batches, Ingredients: ingredients, Orders: orders, Wastage: wastage}, nil
+}
+
+func (r *Repository) PurchasingDashboard(scope Scope) (*PurchasingDashboardResponse, error) {
+	purchasing := PurchasingWidget{}
+	query := "SELECT COUNT(*) FILTER (WHERE po.status IN ('draft','ordered','partially_received')) AS open_purchase_orders FROM purchase_orders po WHERE po.business_id = ? AND po.deleted_at IS NULL"
+	args := []interface{}{scope.BusinessID}
+	query, args = addScopedBranch(query, args, "po.branch_id", scope)
+	if err := r.db.Raw(query, args...).Scan(&purchasing).Error; err != nil {
+		return nil, err
+	}
+	receiptQuery := "SELECT COUNT(*) FROM purchase_receipts pr WHERE pr.business_id = ? AND pr.status = 'draft' AND pr.deleted_at IS NULL"
+	receiptArgs := []interface{}{scope.BusinessID}
+	receiptQuery, receiptArgs = addScopedBranch(receiptQuery, receiptArgs, "pr.branch_id", scope)
+	if err := r.db.Raw(receiptQuery, receiptArgs...).Scan(&purchasing.PendingReceipts).Error; err != nil {
+		return nil, err
+	}
+	payableQuery := "SELECT COALESCE(SUM(balance_amount),0) FROM purchase_invoices pi WHERE pi.business_id = ? AND pi.status <> 'cancelled' AND pi.payment_status IN ('unpaid','partial','overdue') AND pi.deleted_at IS NULL"
+	payableArgs := []interface{}{scope.BusinessID}
+	payableQuery, payableArgs = addScopedBranch(payableQuery, payableArgs, "pi.branch_id", scope)
+	if err := r.db.Raw(payableQuery, payableArgs...).Scan(&purchasing.SupplierPayables).Error; err != nil {
+		return nil, err
+	}
+	inventory := PurchasingInventoryWidget{}
+	inventoryQuery := "SELECT COUNT(*) FILTER (WHERE available_quantity <= reorder_level) AS low_stock_items, COUNT(*) FILTER (WHERE available_quantity <= 0) AS critical_low_stock_items FROM inventory_items WHERE business_id = ? AND deleted_at IS NULL"
+	inventoryArgs := []interface{}{scope.BusinessID}
+	inventoryQuery, inventoryArgs = addScopedBranch(inventoryQuery, inventoryArgs, "branch_id", scope)
+	if err := r.db.Raw(inventoryQuery, inventoryArgs...).Scan(&inventory).Error; err != nil {
+		return nil, err
+	}
+	suppliers := PurchasingSuppliersWidget{}
+	supplierQuery := "SELECT COUNT(*) FROM suppliers WHERE business_id = ? AND status = 'active' AND deleted_at IS NULL"
+	supplierArgs := []interface{}{scope.BusinessID}
+	supplierQuery, supplierArgs = addScopedBranch(supplierQuery, supplierArgs, "branch_id", scope)
+	if err := r.db.Raw(supplierQuery, supplierArgs...).Scan(&suppliers.ActiveSuppliers).Error; err != nil {
+		return nil, err
+	}
+	return &PurchasingDashboardResponse{Purchasing: purchasing, Inventory: inventory, Suppliers: suppliers}, nil
+}
+
+func (r *Repository) KPISummary(scope Scope) (*KPISummaryResponse, error) {
+	var row KPISummaryResponse
+	query := "SELECT COALESCE(SUM(total_amount),0) AS today_sales, COUNT(*) AS today_orders FROM sales WHERE business_id = ? AND sold_at >= ? AND sold_at < ? AND sale_status <> 'voided' AND deleted_at IS NULL"
+	args := []interface{}{scope.BusinessID, scope.TodayStart, scope.TodayEnd}
+	query, args = addScopedBranch(query, args, "branch_id", scope)
+	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
+		return nil, err
+	}
+	collectedQuery := "SELECT COALESCE(SUM(amount),0) FROM sale_payments WHERE business_id = ? AND paid_at >= ? AND paid_at < ? AND payment_status IN ('completed','partially_refunded','refunded') AND deleted_at IS NULL"
+	collectedArgs := []interface{}{scope.BusinessID, scope.TodayStart, scope.TodayEnd}
+	collectedQuery, collectedArgs = addScopedBranch(collectedQuery, collectedArgs, "branch_id", scope)
+	if err := r.db.Raw(collectedQuery, collectedArgs...).Scan(&row.TodayCollected).Error; err != nil {
+		return nil, err
+	}
+	bakeryCollectedQuery := "SELECT COALESCE(SUM(bop.amount),0) FROM bakery_order_payments bop JOIN bakery_orders bo ON bo.id = bop.bakery_order_id WHERE bop.business_id = ? AND bop.paid_at >= ? AND bop.paid_at < ? AND bo.deleted_at IS NULL"
+	bakeryCollectedArgs := []interface{}{scope.BusinessID, scope.TodayStart, scope.TodayEnd}
+	bakeryCollectedQuery, bakeryCollectedArgs = addScopedBranch(bakeryCollectedQuery, bakeryCollectedArgs, "bo.branch_id", scope)
+	var bakeryCollected float64
+	if err := r.db.Raw(bakeryCollectedQuery, bakeryCollectedArgs...).Scan(&bakeryCollected).Error; err != nil {
+		return nil, err
+	}
+	row.TodayCollected += bakeryCollected
+	lowQuery := "SELECT COUNT(*) FROM inventory_items WHERE business_id = ? AND available_quantity <= reorder_level AND deleted_at IS NULL"
+	lowArgs := []interface{}{scope.BusinessID}
+	lowQuery, lowArgs = addScopedBranch(lowQuery, lowArgs, "branch_id", scope)
+	if err := r.db.Raw(lowQuery, lowArgs...).Scan(&row.LowStockCount).Error; err != nil {
+		return nil, err
+	}
+	activeQuery := "SELECT COUNT(*) FROM production_batches WHERE business_id = ? AND status IN ('draft','planned','in_progress') AND deleted_at IS NULL"
+	activeArgs := []interface{}{scope.BusinessID}
+	activeQuery, activeArgs = addScopedBranch(activeQuery, activeArgs, "branch_id", scope)
+	if err := r.db.Raw(activeQuery, activeArgs...).Scan(&row.ActiveBatches).Error; err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *Repository) RecentActivity(scope Scope, limit int) ([]ActivityFeedItem, error) {
+	items := []ActivityFeedItem{}
+	query := `
+		SELECT COALESCE(NULLIF(event_type,''), action_type) AS activity_type,
+			COALESCE(NULLIF(summary,''), action_type) AS title,
+			COALESCE(NULLIF(summary,''), action_type) AS description,
+			reference_id AS reference_number,
+			COALESCE(u.full_name,'System') AS created_by,
+			a.created_at::text AS created_at
+		FROM audit_logs a
+		LEFT JOIN users u ON u.id = a.actor_user_id
+		WHERE a.business_id = ?
+		ORDER BY a.created_at DESC
+		LIMIT ?`
+	if err := r.db.Raw(query, scope.BusinessID, limit).Scan(&items).Error; err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *Repository) Alerts(scope Scope) (*AlertsResponse, error) {
+	response := &AlertsResponse{}
+	lowQuery := `
+		SELECT COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') AS item_name,
+			ii.available_quantity,
+			ii.reorder_level
+		FROM inventory_items ii
+		LEFT JOIN products p ON p.id = ii.product_id
+		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
+		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
+		WHERE ii.business_id = ? AND ii.available_quantity <= ii.reorder_level AND ii.deleted_at IS NULL`
+	lowArgs := []interface{}{scope.BusinessID}
+	lowQuery, lowArgs = addScopedBranch(lowQuery, lowArgs, "ii.branch_id", scope)
+	lowQuery += " ORDER BY ii.available_quantity ASC LIMIT 10"
+	if err := r.db.Raw(lowQuery, lowArgs...).Scan(&response.LowStockAlerts).Error; err != nil {
+		return nil, err
+	}
+	expiryQuery := `
+		SELECT COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') AS item_name,
+			eb.expiry_date::text AS expiry_date,
+			(eb.expiry_date - CURRENT_DATE)::int AS days_remaining
+		FROM expiry_batches eb
+		JOIN inventory_items ii ON ii.id = eb.inventory_item_id
+		LEFT JOIN products p ON p.id = ii.product_id
+		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
+		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
+		WHERE eb.business_id = ? AND eb.status = 'active' AND eb.deleted_at IS NULL AND eb.expiry_date <= CURRENT_DATE + INTERVAL '7 days'`
+	expiryArgs := []interface{}{scope.BusinessID}
+	expiryQuery, expiryArgs = addScopedBranch(expiryQuery, expiryArgs, "eb.branch_id", scope)
+	expiryQuery += " ORDER BY eb.expiry_date ASC LIMIT 10"
+	if err := r.db.Raw(expiryQuery, expiryArgs...).Scan(&response.ExpiryAlerts).Error; err != nil {
+		return nil, err
+	}
+	orderQuery := "SELECT order_number, event_date::text AS event_date, order_status FROM bakery_orders WHERE business_id = ? AND order_status IN ('new','confirmed','in_production') AND deleted_at IS NULL"
+	orderArgs := []interface{}{scope.BusinessID}
+	orderQuery, orderArgs = addScopedBranch(orderQuery, orderArgs, "branch_id", scope)
+	orderQuery += " ORDER BY event_date ASC LIMIT 10"
+	if err := r.db.Raw(orderQuery, orderArgs...).Scan(&response.PendingOrderAlerts).Error; err != nil {
+		return nil, err
+	}
+	paymentQuery := "SELECT order_number, balance_amount FROM bakery_orders WHERE business_id = ? AND payment_status IN ('unpaid','partial') AND balance_amount > 0 AND deleted_at IS NULL"
+	paymentArgs := []interface{}{scope.BusinessID}
+	paymentQuery, paymentArgs = addScopedBranch(paymentQuery, paymentArgs, "branch_id", scope)
+	paymentQuery += " ORDER BY balance_amount DESC LIMIT 10"
+	if err := r.db.Raw(paymentQuery, paymentArgs...).Scan(&response.OutstandingPaymentAlerts).Error; err != nil {
+		return nil, err
+	}
+	delayQuery := "SELECT production_batch_number AS batch_number, completed_at::text AS expected_end_time, status FROM production_batches WHERE business_id = ? AND status = 'in_progress' AND production_date < ? AND deleted_at IS NULL"
+	delayArgs := []interface{}{scope.BusinessID, scope.TodayDate}
+	delayQuery, delayArgs = addScopedBranch(delayQuery, delayArgs, "branch_id", scope)
+	delayQuery += " ORDER BY production_date ASC LIMIT 10"
+	if err := r.db.Raw(delayQuery, delayArgs...).Scan(&response.ProductionDelayAlerts).Error; err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (r *Repository) adminSales(scope Scope) (*AdminSalesWidget, error) {
+	var row AdminSalesWidget
+	query := "SELECT COALESCE(SUM(total_amount),0) AS today_sales, COUNT(*) AS sales_count_today, COALESCE(AVG(total_amount),0) AS average_order_value FROM sales WHERE business_id = ? AND sold_at >= ? AND sold_at < ? AND sale_status <> 'voided' AND deleted_at IS NULL"
+	args := []interface{}{scope.BusinessID, scope.TodayStart, scope.TodayEnd}
+	query, args = addScopedBranch(query, args, "branch_id", scope)
+	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
+		return nil, err
+	}
+	monthQuery := "SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE business_id = ? AND sold_at >= ? AND sold_at < ? AND sale_status <> 'voided' AND deleted_at IS NULL"
+	monthArgs := []interface{}{scope.BusinessID, scope.MonthStart, scope.MonthEnd}
+	monthQuery, monthArgs = addScopedBranch(monthQuery, monthArgs, "branch_id", scope)
+	if err := r.db.Raw(monthQuery, monthArgs...).Scan(&row.MonthlySales).Error; err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *Repository) adminInventory(scope Scope) (*AdminInventoryWidget, error) {
+	var row AdminInventoryWidget
+	query := "SELECT COUNT(*) FILTER (WHERE available_quantity <= reorder_level) AS low_stock_count, COUNT(*) FILTER (WHERE available_quantity <= 0) AS out_of_stock_count FROM inventory_items WHERE business_id = ? AND deleted_at IS NULL"
+	args := []interface{}{scope.BusinessID}
+	query, args = addScopedBranch(query, args, "branch_id", scope)
+	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
+		return nil, err
+	}
+	expiryQuery := "SELECT COUNT(*) FROM expiry_batches WHERE business_id = ? AND status = 'active' AND deleted_at IS NULL AND expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'"
+	expiryArgs := []interface{}{scope.BusinessID}
+	expiryQuery, expiryArgs = addScopedBranch(expiryQuery, expiryArgs, "branch_id", scope)
+	if err := r.db.Raw(expiryQuery, expiryArgs...).Scan(&row.ExpiringItemsCount).Error; err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *Repository) adminOrders(scope Scope) (*AdminOrdersWidget, error) {
+	var row AdminOrdersWidget
+	query := "SELECT COUNT(*) FILTER (WHERE order_status IN ('new','confirmed')) AS pending_orders, COUNT(*) FILTER (WHERE order_status = 'in_production') AS in_production_orders, COUNT(*) FILTER (WHERE order_status = 'ready') AS ready_orders FROM bakery_orders WHERE business_id = ? AND deleted_at IS NULL"
+	args := []interface{}{scope.BusinessID}
+	query, args = addScopedBranch(query, args, "branch_id", scope)
+	err := r.db.Raw(query, args...).Scan(&row).Error
+	return &row, err
+}
+
+func (r *Repository) adminManufacturing(scope Scope) (*AdminManufacturingWidget, error) {
+	var row AdminManufacturingWidget
+	query := "SELECT COUNT(*) FILTER (WHERE status IN ('draft','planned','in_progress')) AS active_batches, COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= ? AND completed_at < ?) AS completed_batches_today FROM production_batches WHERE business_id = ? AND deleted_at IS NULL"
+	args := []interface{}{scope.TodayStart, scope.TodayEnd, scope.BusinessID}
+	query, args = addScopedBranch(query, args, "branch_id", scope)
+	err := r.db.Raw(query, args...).Scan(&row).Error
+	return &row, err
+}
+
+func (r *Repository) adminFinancial(scope Scope) (*AdminFinancialWidget, error) {
+	var row AdminFinancialWidget
+	query := "SELECT COALESCE(SUM(amount),0) FROM sale_payments WHERE business_id = ? AND paid_at >= ? AND paid_at < ? AND payment_status IN ('completed','partially_refunded','refunded') AND deleted_at IS NULL"
+	args := []interface{}{scope.BusinessID, scope.TodayStart, scope.TodayEnd}
+	query, args = addScopedBranch(query, args, "branch_id", scope)
+	if err := r.db.Raw(query, args...).Scan(&row.CollectedToday).Error; err != nil {
+		return nil, err
+	}
+	bakeryCollectedQuery := "SELECT COALESCE(SUM(bop.amount),0) FROM bakery_order_payments bop JOIN bakery_orders bo ON bo.id = bop.bakery_order_id WHERE bop.business_id = ? AND bop.paid_at >= ? AND bop.paid_at < ? AND bo.deleted_at IS NULL"
+	bakeryCollectedArgs := []interface{}{scope.BusinessID, scope.TodayStart, scope.TodayEnd}
+	bakeryCollectedQuery, bakeryCollectedArgs = addScopedBranch(bakeryCollectedQuery, bakeryCollectedArgs, "bo.branch_id", scope)
+	var bakeryCollected float64
+	if err := r.db.Raw(bakeryCollectedQuery, bakeryCollectedArgs...).Scan(&bakeryCollected).Error; err != nil {
+		return nil, err
+	}
+	row.CollectedToday += bakeryCollected
+	refundQuery := "SELECT COALESCE(SUM(refund_amount),0) FROM payment_refunds WHERE business_id = ? AND refunded_at >= ? AND refunded_at < ? AND refund_status = 'completed' AND deleted_at IS NULL"
+	refundArgs := []interface{}{scope.BusinessID, scope.TodayStart, scope.TodayEnd}
+	refundQuery, refundArgs = addScopedBranch(refundQuery, refundArgs, "branch_id", scope)
+	if err := r.db.Raw(refundQuery, refundArgs...).Scan(&row.RefundTotalToday).Error; err != nil {
+		return nil, err
+	}
+	outstandingQuery := "SELECT COALESCE(SUM(balance_amount),0) FROM bakery_orders WHERE business_id = ? AND payment_status IN ('unpaid','partial') AND deleted_at IS NULL"
+	outstandingArgs := []interface{}{scope.BusinessID}
+	outstandingQuery, outstandingArgs = addScopedBranch(outstandingQuery, outstandingArgs, "branch_id", scope)
+	if err := r.db.Raw(outstandingQuery, outstandingArgs...).Scan(&row.OutstandingBalance).Error; err != nil {
+		return nil, err
+	}
+	posOutstandingQuery := "SELECT COALESCE(SUM(total_amount - paid_amount),0) FROM sales WHERE business_id = ? AND payment_status IN ('unpaid','partial') AND sale_status <> 'voided' AND deleted_at IS NULL"
+	posOutstandingArgs := []interface{}{scope.BusinessID}
+	posOutstandingQuery, posOutstandingArgs = addScopedBranch(posOutstandingQuery, posOutstandingArgs, "branch_id", scope)
+	var posOutstanding float64
+	if err := r.db.Raw(posOutstandingQuery, posOutstandingArgs...).Scan(&posOutstanding).Error; err != nil {
+		return nil, err
+	}
+	row.OutstandingBalance += posOutstanding
+	return &row, nil
+}
+
+func (r *Repository) adminCustomers(scope Scope) (*AdminCustomersWidget, error) {
+	var row AdminCustomersWidget
+	query := "SELECT COUNT(*) FROM customers WHERE business_id = ? AND created_at >= ? AND created_at < ? AND deleted_at IS NULL"
+	args := []interface{}{scope.BusinessID, scope.TodayStart, scope.TodayEnd}
+	query, args = addScopedBranch(query, args, "branch_id", scope)
+	err := r.db.Raw(query, args...).Scan(&row.NewCustomersToday).Error
+	return &row, err
+}
+
+func addScopedBranch(query string, args []interface{}, column string, scope Scope) (string, []interface{}) {
+	if !scope.AllBranches {
+		query += " AND " + column + " = ?"
+		args = append(args, scope.BranchID)
+	}
+	return query, args
+}

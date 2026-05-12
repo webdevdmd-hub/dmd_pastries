@@ -1,0 +1,11 @@
+.env
+bin/
+dist/
+tmp/
+vendor/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+coverage.out

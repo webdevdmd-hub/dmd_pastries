@@ -1,0 +1,598 @@
+import { apiRequest } from "@/lib/api/client";
+import type {
+  BatchFilters,
+  BatchStatus,
+  ConsumePayload,
+  CreateBatchPayload,
+  ManufacturingBranchOption,
+  ManufacturingInventoryOption,
+  ManufacturingProductOption,
+  ManufacturingRecipeOption,
+  ManufacturingSummary,
+  ManufacturingUnitOption,
+  ProducePayload,
+  ProductionBatch,
+  ProductionBatchIngredient,
+  ProductionBatchPackaging,
+  ProductionOutput,
+  ProductionWastage,
+  UpdateBatchPayload,
+  UpdateBatchStatusPayload,
+  WastagePayload,
+} from "@/types/manufacturing";
+
+type BackendBatchPayload = {
+  branch_id?: string;
+  recipe_id?: string;
+  planned_quantity?: number;
+  production_date?: string;
+  notes?: string;
+};
+
+type BackendConsumePayload = {
+  lines: {
+    batch_ingredient_id: string;
+    consumed_quantity: number;
+  }[];
+};
+
+type BackendProducePayload = {
+  quantity_produced: number;
+};
+
+type BackendWastagePayload = {
+  inventory_item_id: string;
+  wastage_type: string;
+  quantity: number;
+  reason: string;
+};
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function stringValue(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function optionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function requestString(value: string | null | undefined): string {
+  return value?.trim() ?? "";
+}
+
+function numberValue(value: unknown, fallback = 0): number {
+  return typeof value === "number" ? value : fallback;
+}
+
+function isBatchStatus(value: unknown): value is BatchStatus {
+  return (
+    value === "draft" ||
+    value === "in_progress" ||
+    value === "partially_completed" ||
+    value === "completed" ||
+    value === "cancelled"
+  );
+}
+
+function branchStatus(value: unknown): "active" | "inactive" {
+  return value === "inactive" ? "inactive" : "active";
+}
+
+function parseList<TItem>(value: unknown, parser: (item: unknown) => TItem): TItem[] {
+  if (Array.isArray(value)) {
+    return value.map(parser);
+  }
+
+  if (isObject(value)) {
+    const keys = ["items", "batches", "ingredients", "packaging", "outputs", "wastage", "data"];
+    for (const key of keys) {
+      const nextValue = value[key];
+      if (Array.isArray(nextValue)) {
+        return nextValue.map(parser);
+      }
+    }
+  }
+
+  throw new Error("Backend list payload is invalid.");
+}
+
+function toQueryString(params: Record<string, string | number | null | undefined>): string {
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "" && value !== "all") {
+      searchParams.set(key, String(value));
+    }
+  });
+
+  const query = searchParams.toString();
+  return query ? `?${query}` : "";
+}
+
+function parseBatch(value: unknown): ProductionBatch {
+  if (!isObject(value)) {
+    throw new Error("Backend production batch payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.id),
+    businessId: stringValue(value.business_id),
+    branchId: stringValue(value.branch_id),
+    branchName: stringValue(value.branch_name, "Branch"),
+    productId: stringValue(value.product_id),
+    productName: stringValue(value.product_name, "Product"),
+    recipeId: stringValue(value.recipe_id),
+    recipeName: stringValue(value.recipe_name, "Recipe"),
+    recipeVersionNumber: numberValue(value.recipe_version_number),
+    batchNumber: stringValue(
+      value.production_batch_number,
+      stringValue(value.batch_number, "Batch"),
+    ),
+    plannedQuantity: numberValue(value.planned_quantity),
+    producedQuantity: numberValue(value.produced_quantity),
+    wastageQuantity: numberValue(value.wastage_quantity),
+    batchUnitId: stringValue(value.yield_unit_id, stringValue(value.batch_unit_id)),
+    batchUnitName: stringValue(value.yield_unit_symbol, stringValue(value.batch_unit_name, "Unit")),
+    status: isBatchStatus(value.status) ? value.status : "draft",
+    startTime: optionalString(value.started_at) ?? optionalString(value.start_time),
+    endTime: optionalString(value.completed_at) ?? optionalString(value.end_time),
+    notes: optionalString(value.notes),
+    createdByUserName: stringValue(value.created_by_user_name, "User"),
+    createdAt: stringValue(value.created_at),
+    updatedAt: stringValue(value.updated_at),
+  };
+}
+
+function parseIngredient(value: unknown): ProductionBatchIngredient {
+  if (!isObject(value)) {
+    throw new Error("Backend batch ingredient payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.id),
+    inventoryItemId: stringValue(value.inventory_item_id),
+    itemName: stringValue(value.item_name, "Ingredient"),
+    requiredQuantity: numberValue(value.required_quantity),
+    consumedQuantity: numberValue(value.consumed_quantity),
+    unitName: stringValue(value.unit_name, "Unit"),
+    unitSymbol: stringValue(value.unit_symbol),
+    totalCost: numberValue(value.total_cost),
+    wastagePercentage: numberValue(value.wastage_percentage),
+  };
+}
+
+function parsePackaging(value: unknown): ProductionBatchPackaging {
+  if (!isObject(value)) {
+    throw new Error("Backend batch packaging payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.id),
+    packagingItemId: stringValue(value.packaging_item_id),
+    packagingName: stringValue(value.packaging_name, "Packaging"),
+    requiredQuantity: numberValue(value.required_quantity),
+    consumedQuantity: numberValue(value.consumed_quantity),
+    unitName: stringValue(value.unit_name, "Unit"),
+    unitSymbol: stringValue(value.unit_symbol),
+  };
+}
+
+function parseOutput(value: unknown): ProductionOutput {
+  if (!isObject(value)) {
+    throw new Error("Backend production output payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.id),
+    quantityProduced: numberValue(value.quantity_produced),
+    unitName: stringValue(value.unit_name, "Unit"),
+    createdAt: stringValue(value.created_at),
+  };
+}
+
+function parseWastage(value: unknown): ProductionWastage {
+  if (!isObject(value)) {
+    throw new Error("Backend production wastage payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.id),
+    itemName: stringValue(value.item_name, "Item"),
+    wastageType: stringValue(value.wastage_type, "wastage"),
+    quantity: numberValue(value.quantity),
+    unitName: stringValue(value.unit_name, "Unit"),
+    reason: stringValue(value.reason, "No reason recorded"),
+    createdAt: stringValue(value.created_at),
+  };
+}
+
+function parseSummary(value: unknown): ManufacturingSummary {
+  if (!isObject(value)) {
+    throw new Error("Backend manufacturing summary payload is invalid.");
+  }
+
+  return {
+    totalBatches: numberValue(value.total_batches),
+    inProgressBatches: numberValue(value.in_progress_batches),
+    completedBatches: numberValue(value.completed_batches),
+    totalProductionOutput: numberValue(value.total_production_output),
+  };
+}
+
+function parseProduct(value: unknown): ManufacturingProductOption {
+  if (!isObject(value)) {
+    throw new Error("Backend product payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.id),
+    productName: stringValue(value.product_name, "Product"),
+    productCode: stringValue(value.product_code),
+  };
+}
+
+function parseRecipe(value: unknown): ManufacturingRecipeOption {
+  if (!isObject(value)) {
+    throw new Error("Backend recipe payload is invalid.");
+  }
+
+  const isActive = typeof value.is_active === "boolean" ? value.is_active : null;
+  const status = typeof value.status === "string" ? value.status : null;
+
+  return {
+    id: stringValue(value.id),
+    recipeName: stringValue(value.recipe_name, "Recipe"),
+    recipeCode: stringValue(value.recipe_code),
+    versionNumber: numberValue(value.version_number),
+    batchYieldQuantity: numberValue(value.batch_yield_quantity),
+    batchYieldUnitName: stringValue(value.batch_yield_unit_name, "Unit"),
+    isActive,
+    status,
+  };
+}
+
+function parseInventory(value: unknown): ManufacturingInventoryOption {
+  if (!isObject(value)) {
+    throw new Error("Backend inventory payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.id),
+    itemName: stringValue(value.item_name, "Inventory item"),
+    itemCode: stringValue(value.item_code),
+    unitName: stringValue(value.unit_name, "Unit"),
+    unitSymbol: stringValue(value.unit_symbol),
+  };
+}
+
+function parseUnit(value: unknown): ManufacturingUnitOption {
+  if (!isObject(value)) {
+    throw new Error("Backend unit payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.id),
+    unitName: stringValue(value.unit_name, "Unit"),
+    symbol: stringValue(value.symbol),
+  };
+}
+
+function parseBranch(value: unknown): ManufacturingBranchOption {
+  if (!isObject(value)) {
+    throw new Error("Backend branch payload is invalid.");
+  }
+
+  const branchName = stringValue(value.branch_name, stringValue(value.name, "Branch"));
+  const branchCode = stringValue(value.branch_code, stringValue(value.code));
+
+  return {
+    id: stringValue(value.id),
+    branchName: branchCode ? `${branchName} (${branchCode})` : branchName,
+    status: branchStatus(value.status),
+  };
+}
+
+function batchPayload(payload: CreateBatchPayload | UpdateBatchPayload): BackendBatchPayload {
+  const nextPayload: BackendBatchPayload = {};
+
+  if (payload.branchId !== undefined) nextPayload.branch_id = payload.branchId;
+  if (payload.recipeId !== undefined) nextPayload.recipe_id = payload.recipeId;
+  if (payload.plannedQuantity !== undefined) nextPayload.planned_quantity = payload.plannedQuantity;
+  if (payload.productionDate !== undefined) nextPayload.production_date = payload.productionDate;
+  if (payload.notes !== undefined) nextPayload.notes = requestString(payload.notes);
+
+  return nextPayload;
+}
+
+function consumePayload(payload: ConsumePayload): BackendConsumePayload {
+  return {
+    lines: payload.lines.map((line) => ({
+      batch_ingredient_id: line.batchIngredientId,
+      consumed_quantity: line.consumedQuantity,
+    })),
+  };
+}
+
+function producePayload(payload: ProducePayload): BackendProducePayload {
+  return {
+    quantity_produced: payload.quantityProduced,
+  };
+}
+
+function wastagePayload(payload: WastagePayload): BackendWastagePayload {
+  return {
+    inventory_item_id: payload.inventoryItemId,
+    wastage_type: payload.wastageType,
+    quantity: payload.quantity,
+    reason: payload.reason,
+  };
+}
+
+export async function getBatches(params: BatchFilters): Promise<ProductionBatch[]> {
+  const response = await apiRequest<ProductionBatch[]>(
+    `/api/v1/manufacturing/batches${toQueryString({
+      search: params.search,
+      product_id: params.productId,
+      branch_id: params.branchId,
+      status: params.status,
+      date_from: params.dateFrom,
+      date_to: params.dateTo,
+    })}`,
+    {
+      authMode: "appwrite",
+      parse: (data) => parseList(data, parseBatch),
+    },
+  );
+
+  return response.data;
+}
+
+export async function createBatch(payload: CreateBatchPayload): Promise<ProductionBatch> {
+  const response = await apiRequest<ProductionBatch, BackendBatchPayload>(
+    "/api/v1/manufacturing/batches",
+    {
+      method: "POST",
+      authMode: "appwrite",
+      body: batchPayload(payload),
+      parse: parseBatch,
+    },
+  );
+
+  return response.data;
+}
+
+export async function getBatchById(id: string): Promise<ProductionBatch> {
+  const response = await apiRequest<ProductionBatch>(`/api/v1/manufacturing/batches/${id}`, {
+    authMode: "appwrite",
+    parse: parseBatch,
+  });
+
+  return response.data;
+}
+
+export async function updateBatch(
+  id: string,
+  payload: UpdateBatchPayload,
+): Promise<ProductionBatch> {
+  const response = await apiRequest<ProductionBatch, BackendBatchPayload>(
+    `/api/v1/manufacturing/batches/${id}`,
+    {
+      method: "PATCH",
+      authMode: "appwrite",
+      body: batchPayload(payload),
+      parse: parseBatch,
+    },
+  );
+
+  return response.data;
+}
+
+export async function updateBatchStatus(
+  id: string,
+  payload: UpdateBatchStatusPayload,
+): Promise<ProductionBatch> {
+  const response = await apiRequest<ProductionBatch, { status: BatchStatus }>(
+    `/api/v1/manufacturing/batches/${id}/status`,
+    {
+      method: "PATCH",
+      authMode: "appwrite",
+      body: payload,
+      parse: parseBatch,
+    },
+  );
+
+  return response.data;
+}
+
+export async function deleteBatch(id: string): Promise<void> {
+  await apiRequest<void>(`/api/v1/manufacturing/batches/${id}`, {
+    method: "DELETE",
+    authMode: "appwrite",
+    parse: () => undefined,
+  });
+}
+
+async function postBatchLifecycle(id: string, action: string): Promise<ProductionBatch> {
+  const response = await apiRequest<ProductionBatch>(
+    `/api/v1/manufacturing/batches/${id}/${action}`,
+    {
+      method: "POST",
+      authMode: "appwrite",
+      parse: parseBatch,
+    },
+  );
+
+  return response.data;
+}
+
+export async function startBatch(id: string): Promise<ProductionBatch> {
+  return postBatchLifecycle(id, "start");
+}
+
+export async function completeBatch(id: string): Promise<ProductionBatch> {
+  return postBatchLifecycle(id, "complete");
+}
+
+export async function cancelBatch(id: string): Promise<ProductionBatch> {
+  return postBatchLifecycle(id, "cancel");
+}
+
+export async function consumeBatch(id: string, payload: ConsumePayload): Promise<ProductionBatch> {
+  const response = await apiRequest<ProductionBatch, BackendConsumePayload>(
+    `/api/v1/manufacturing/batches/${id}/consume`,
+    {
+      method: "POST",
+      authMode: "appwrite",
+      body: consumePayload(payload),
+      parse: parseBatch,
+    },
+  );
+
+  return response.data;
+}
+
+export async function produceBatch(id: string, payload: ProducePayload): Promise<ProductionBatch> {
+  const response = await apiRequest<ProductionBatch, BackendProducePayload>(
+    `/api/v1/manufacturing/batches/${id}/produce`,
+    {
+      method: "POST",
+      authMode: "appwrite",
+      body: producePayload(payload),
+      parse: parseBatch,
+    },
+  );
+
+  return response.data;
+}
+
+export async function addBatchWastage(
+  id: string,
+  payload: WastagePayload,
+): Promise<ProductionWastage> {
+  const response = await apiRequest<ProductionWastage, BackendWastagePayload>(
+    `/api/v1/manufacturing/batches/${id}/wastage`,
+    {
+      method: "POST",
+      authMode: "appwrite",
+      body: wastagePayload(payload),
+      parse: parseWastage,
+    },
+  );
+
+  return response.data;
+}
+
+export async function getBatchIngredients(id: string): Promise<ProductionBatchIngredient[]> {
+  const response = await apiRequest<ProductionBatchIngredient[]>(
+    `/api/v1/manufacturing/batches/${id}/ingredients`,
+    {
+      authMode: "appwrite",
+      parse: (data) => parseList(data, parseIngredient),
+    },
+  );
+
+  return response.data;
+}
+
+export async function getBatchPackaging(id: string): Promise<ProductionBatchPackaging[]> {
+  const response = await apiRequest<ProductionBatchPackaging[]>(
+    `/api/v1/manufacturing/batches/${id}/packaging`,
+    {
+      authMode: "appwrite",
+      parse: (data) => parseList(data, parsePackaging),
+    },
+  );
+
+  return response.data;
+}
+
+export async function getBatchOutputs(id: string): Promise<ProductionOutput[]> {
+  const response = await apiRequest<ProductionOutput[]>(
+    `/api/v1/manufacturing/batches/${id}/outputs`,
+    {
+      authMode: "appwrite",
+      parse: (data) => parseList(data, parseOutput),
+    },
+  );
+
+  return response.data;
+}
+
+export async function getBatchWastage(id: string): Promise<ProductionWastage[]> {
+  const response = await apiRequest<ProductionWastage[]>(
+    `/api/v1/manufacturing/batches/${id}/wastage`,
+    {
+      authMode: "appwrite",
+      parse: (data) => parseList(data, parseWastage),
+    },
+  );
+
+  return response.data;
+}
+
+export async function getManufacturingSummary(): Promise<ManufacturingSummary> {
+  const response = await apiRequest<ManufacturingSummary>("/api/v1/manufacturing/summary", {
+    authMode: "appwrite",
+    parse: parseSummary,
+  });
+
+  return response.data;
+}
+
+export async function getManufacturingProducts(): Promise<ManufacturingProductOption[]> {
+  const response = await apiRequest<ManufacturingProductOption[]>("/api/v1/products?limit=100", {
+    authMode: "appwrite",
+    parse: (data) => parseList(data, parseProduct),
+  });
+
+  return response.data;
+}
+
+export async function getManufacturingRecipeByProduct(
+  productId: string,
+): Promise<ManufacturingRecipeOption[]> {
+  const response = await apiRequest<ManufacturingRecipeOption[]>(
+    `/api/v1/recipes/product/${productId}`,
+    {
+      authMode: "appwrite",
+      parse: (data) => {
+        if (Array.isArray(data) || (isObject(data) && Array.isArray(data.items))) {
+          return parseList(data, parseRecipe);
+        }
+        return [parseRecipe(data)];
+      },
+    },
+  );
+
+  return response.data;
+}
+
+export async function getManufacturingInventory(): Promise<ManufacturingInventoryOption[]> {
+  const response = await apiRequest<ManufacturingInventoryOption[]>("/api/v1/inventory?limit=100", {
+    authMode: "appwrite",
+    parse: (data) => parseList(data, parseInventory),
+  });
+
+  return response.data;
+}
+
+export async function getManufacturingUnits(): Promise<ManufacturingUnitOption[]> {
+  const response = await apiRequest<ManufacturingUnitOption[]>("/api/v1/master-data/units", {
+    authMode: "appwrite",
+    parse: (data) => parseList(data, parseUnit),
+  });
+
+  return response.data;
+}
+
+export async function getManufacturingBranches(): Promise<ManufacturingBranchOption[]> {
+  const response = await apiRequest<ManufacturingBranchOption[]>("/api/v1/branches", {
+    authMode: "appwrite",
+    parse: (data) => parseList(data, parseBranch),
+  });
+
+  return response.data;
+}
