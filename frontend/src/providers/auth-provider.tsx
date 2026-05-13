@@ -214,16 +214,30 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       },
       async register(input) {
         const registered = await registerOwner(input);
-        await loginWithAppwrite(input.email, input.password);
-        await loginSync();
-        const profile = await refreshCurrentProfile();
 
-        return {
-          ...registered,
-          user: profile,
-          redirectTo: ROUTES.dashboard,
-          message: registered.message,
-        };
+        try {
+          await loginWithAppwrite(input.email, input.password);
+          await loginSync();
+          const profile = await refreshCurrentProfile();
+
+          return {
+            ...registered,
+            user: profile,
+            redirectTo: ROUTES.dashboard,
+            message: registered.message,
+          };
+        } catch {
+          setUser(null);
+          setStatus("unauthenticated");
+
+          return {
+            ...registered,
+            user: null,
+            redirectTo: ROUTES.login,
+            message:
+              "Your account was created. Please login to continue setting up your workspace.",
+          };
+        }
       },
       async logout() {
         try {

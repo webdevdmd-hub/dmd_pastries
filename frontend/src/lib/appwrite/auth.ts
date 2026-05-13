@@ -47,7 +47,7 @@ export async function loginWithAppwrite(email: string, password: string): Promis
     }
 
     if (!isAppwriteErrorType(error, "user_session_already_exists")) {
-      throw error;
+      throw new Error(`Unable to create an Appwrite session. ${getAppwriteErrorMessage(error)}`);
     }
 
     throw new AppwriteSessionAlreadyExistsError();
@@ -188,6 +188,10 @@ function isAppwriteRateLimitError(error: unknown): boolean {
 }
 
 function getAppwriteErrorMessage(error: unknown): string {
+  if (error instanceof TypeError && error.message.toLowerCase().includes("failed to fetch")) {
+    return "The browser could not reach Appwrite. Verify the frontend domain is added as a Web platform in Appwrite and the Appwrite endpoint is reachable.";
+  }
+
   if (isObject(error) && typeof error.message === "string") {
     return error.message;
   }
