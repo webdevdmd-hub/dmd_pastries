@@ -9,13 +9,11 @@ export type PublicEnvKey =
 
 type RuntimePublicEnv = Partial<Record<PublicEnvKey, string>>;
 
-declare global {
-  interface Window {
-    __PUBLIC_ENV__?: RuntimePublicEnv;
-  }
-}
+type RuntimeWindow = Window & {
+  __PUBLIC_ENV__?: RuntimePublicEnv;
+};
 
-function createPublicEnv(values: Array<[PublicEnvKey, string | undefined]>): RuntimePublicEnv {
+function createPublicEnv(values: [PublicEnvKey, string | undefined][]): RuntimePublicEnv {
   return values.reduce<RuntimePublicEnv>((environment, [key, value]) => {
     if (value && value.length > 0) {
       environment[key] = value;
@@ -49,7 +47,7 @@ function getRuntimePublicEnv(): RuntimePublicEnv {
     return {};
   }
 
-  return window.__PUBLIC_ENV__ ?? {};
+  return (window as RuntimeWindow).__PUBLIC_ENV__ ?? {};
 }
 
 export function getPublicEnvValue(key: PublicEnvKey): string | undefined {

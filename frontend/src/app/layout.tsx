@@ -1,8 +1,8 @@
 import "./globals.css";
 
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
+import Script from "next/script";
 import type { JSX, ReactNode } from "react";
 
 import { AppProviders } from "@/providers/app-providers";
