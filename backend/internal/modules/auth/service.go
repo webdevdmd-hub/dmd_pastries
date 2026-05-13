@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"log"
 	"strings"
 	"time"
 
@@ -83,6 +84,12 @@ func (s *Service) RegisterOwner(req RegisterOwnerRequest, ipAddress, userAgent s
 		message, details := utils.FriendlyAppwriteCreateUserError(err)
 		return nil, apperrors.BadRequest(message, details)
 	}
+	registrationCommitted := false
+	defer func() {
+		if !registrationCommitted {
+			_ = s.appwriteClient.DeleteUser(appwriteUserID)
+		}
+	}()
 
 	now := time.Now().UTC()
 	trialEndsAt := now.AddDate(0, 0, s.cfg.DefaultTrialDays)
@@ -222,8 +229,9 @@ func (s *Service) RegisterOwner(req RegisterOwnerRequest, ipAddress, userAgent s
 		return nil, apperrors.Internal("failed to create company settings")
 	}
 
-	if err := masterdata.SeedDefaults(tx, businessID); err != nil {
+	if err := masterdata.SeedDefaults(tx, businessID, branchID); err != nil {
 		tx.Rollback()
+		log.Printf("owner registration master data seed failed: business_id=%s branch_id=%s error=%v", businessID, branchID, err)
 		return nil, apperrors.Internal("failed to seed master data defaults")
 	}
 
@@ -270,6 +278,7 @@ func (s *Service) RegisterOwner(req RegisterOwnerRequest, ipAddress, userAgent s
 	if err := tx.Commit().Error; err != nil {
 		return nil, apperrors.Internal("failed to commit owner registration")
 	}
+	registrationCommitted = true
 
 	return &RegisterOwnerResponse{
 		BusinessID:         businessID,

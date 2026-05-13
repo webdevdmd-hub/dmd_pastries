@@ -13,17 +13,17 @@ type simpleCategorySeed struct {
 	Description string
 }
 
-func SeedDefaults(tx *gorm.DB, businessID string) error {
+func SeedDefaults(tx *gorm.DB, businessID, branchID string) error {
 	if err := EnsureUnitDefaults(tx); err != nil {
 		return err
 	}
 	if err := EnsureWorkflowStatusDefaults(tx); err != nil {
 		return err
 	}
-	if err := seedProductCategories(tx, businessID); err != nil {
+	if err := seedProductCategories(tx, businessID, branchID); err != nil {
 		return err
 	}
-	if err := seedSimpleCategoryDefaults(tx, "ingredient_categories", businessID, []simpleCategorySeed{
+	if err := seedSimpleCategoryDefaults(tx, "ingredient_categories", businessID, branchID, []simpleCategorySeed{
 		{Name: "Flour"},
 		{Name: "Sugar"},
 		{Name: "Dairy"},
@@ -34,7 +34,7 @@ func SeedDefaults(tx *gorm.DB, businessID string) error {
 	}); err != nil {
 		return err
 	}
-	if err := seedSimpleCategoryDefaults(tx, "packaging_categories", businessID, []simpleCategorySeed{
+	if err := seedSimpleCategoryDefaults(tx, "packaging_categories", businessID, branchID, []simpleCategorySeed{
 		{Name: "Cake Boxes"},
 		{Name: "Cups"},
 		{Name: "Trays"},
@@ -45,7 +45,7 @@ func SeedDefaults(tx *gorm.DB, businessID string) error {
 	}); err != nil {
 		return err
 	}
-	return seedSimpleCategoryDefaults(tx, "supplier_categories", businessID, []simpleCategorySeed{
+	return seedSimpleCategoryDefaults(tx, "supplier_categories", businessID, branchID, []simpleCategorySeed{
 		{Name: "Ingredient Supplier"},
 		{Name: "Packaging Supplier"},
 		{Name: "Equipment Supplier"},
@@ -198,7 +198,7 @@ func EnsureWorkflowStatusDefaults(tx *gorm.DB) error {
 	return nil
 }
 
-func seedProductCategories(tx *gorm.DB, businessID string) error {
+func seedProductCategories(tx *gorm.DB, businessID, branchID string) error {
 	seeds := []struct {
 		Name      string
 		Code      string
@@ -215,7 +215,7 @@ func seedProductCategories(tx *gorm.DB, businessID string) error {
 	for _, seed := range seeds {
 		var count int64
 		if err := tx.Model(&ProductCategory{}).
-			Where("business_id = ? AND LOWER(category_name) = LOWER(?) AND deleted_at IS NULL", businessID, seed.Name).
+			Where("business_id = ? AND branch_id = ? AND LOWER(category_name) = LOWER(?) AND deleted_at IS NULL", businessID, branchID, seed.Name).
 			Count(&count).Error; err != nil {
 			return err
 		}
@@ -226,6 +226,7 @@ func seedProductCategories(tx *gorm.DB, businessID string) error {
 		category := ProductCategory{
 			ID:           utils.NewUUID(),
 			BusinessID:   businessID,
+			BranchID:     branchID,
 			CategoryName: seed.Name,
 			CategoryCode: seed.Code,
 			SortOrder:    seed.SortOrder,
@@ -240,12 +241,12 @@ func seedProductCategories(tx *gorm.DB, businessID string) error {
 	return nil
 }
 
-func seedSimpleCategoryDefaults(tx *gorm.DB, table, businessID string, seeds []simpleCategorySeed) error {
+func seedSimpleCategoryDefaults(tx *gorm.DB, table, businessID, branchID string, seeds []simpleCategorySeed) error {
 	now := time.Now().UTC()
 	for _, seed := range seeds {
 		var count int64
 		if err := tx.Table(table).
-			Where("business_id = ? AND LOWER(category_name) = LOWER(?) AND deleted_at IS NULL", businessID, seed.Name).
+			Where("business_id = ? AND branch_id = ? AND LOWER(category_name) = LOWER(?) AND deleted_at IS NULL", businessID, branchID, seed.Name).
 			Count(&count).Error; err != nil {
 			return err
 		}
@@ -256,6 +257,7 @@ func seedSimpleCategoryDefaults(tx *gorm.DB, table, businessID string, seeds []s
 		category := map[string]interface{}{
 			"id":            utils.NewUUID(),
 			"business_id":   businessID,
+			"branch_id":     branchID,
 			"category_name": seed.Name,
 			"description":   seed.Description,
 			"status":        "active",
