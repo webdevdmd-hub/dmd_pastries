@@ -1,5 +1,6 @@
 import { createAppwriteJwt } from "@/lib/appwrite/auth";
 import { notifySessionExpired } from "@/lib/auth/session-events";
+import { getPublicEnvValue } from "@/lib/public-env";
 import type { ApiFailure, ApiResponse, ApiSuccess, FieldErrorMap } from "@/types/api";
 
 type RequestMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -32,7 +33,7 @@ export class ApiError extends Error {
 }
 
 function getApiBaseUrl(): string {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const baseUrl = getPublicEnvValue("NEXT_PUBLIC_API_BASE_URL");
 
   if (!baseUrl) {
     throw new Error("NEXT_PUBLIC_API_BASE_URL is missing.");

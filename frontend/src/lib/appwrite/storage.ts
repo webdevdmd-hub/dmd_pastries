@@ -3,6 +3,7 @@
 import { ID } from "appwrite";
 
 import { appwriteStorage } from "@/lib/appwrite/client";
+import { getPublicEnvValue } from "@/lib/public-env";
 
 type StorageBucketKey = "businessAssets" | "documents" | "productImages" | "userAvatars";
 
@@ -13,10 +14,10 @@ type AppwriteErrorLike = {
 };
 
 const storageBuckets: Record<StorageBucketKey, string | undefined> = {
-  productImages: process.env.NEXT_PUBLIC_APPWRITE_PRODUCT_IMAGES_BUCKET_ID,
-  businessAssets: process.env.NEXT_PUBLIC_APPWRITE_BUSINESS_ASSETS_BUCKET_ID,
-  userAvatars: process.env.NEXT_PUBLIC_APPWRITE_USER_AVATARS_BUCKET_ID,
-  documents: process.env.NEXT_PUBLIC_APPWRITE_DOCUMENTS_BUCKET_ID,
+  productImages: getPublicEnvValue("NEXT_PUBLIC_APPWRITE_PRODUCT_IMAGES_BUCKET_ID"),
+  businessAssets: getPublicEnvValue("NEXT_PUBLIC_APPWRITE_BUSINESS_ASSETS_BUCKET_ID"),
+  userAvatars: getPublicEnvValue("NEXT_PUBLIC_APPWRITE_USER_AVATARS_BUCKET_ID"),
+  documents: getPublicEnvValue("NEXT_PUBLIC_APPWRITE_DOCUMENTS_BUCKET_ID"),
 };
 
 const storageBucketEnvNames: Record<StorageBucketKey, string> = {

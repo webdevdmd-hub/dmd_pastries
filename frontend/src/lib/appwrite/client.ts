@@ -2,8 +2,10 @@
 
 import { Account, Client, Storage } from "appwrite";
 
-const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT;
-const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
+import { getPublicEnvValue } from "@/lib/public-env";
+
+const endpoint = getPublicEnvValue("NEXT_PUBLIC_APPWRITE_ENDPOINT");
+const projectId = getPublicEnvValue("NEXT_PUBLIC_APPWRITE_PROJECT_ID");
 
 const appwriteClient =
   endpoint && projectId ? new Client().setEndpoint(endpoint).setProject(projectId) : null;
