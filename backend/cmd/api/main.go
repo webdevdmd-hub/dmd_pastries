@@ -271,6 +271,10 @@ func main() {
 		authMiddleware.RequireAuth(),
 		permit("inventory.view"),
 		permit("inventory.opening_stock", "inventory.adjust", "inventory.expiry_batches.manage", "inventory.manage"),
+		permit("inventory.locations.manage", "inventory.manage"),
+		permit("inventory.transfer.create", "inventory.manage"),
+		permit("inventory.transfer.complete", "inventory.manage"),
+		permit("inventory.transfer.cancel", "inventory.manage"),
 	)
 	inventory.RegisterStockMovementRoutes(
 		router,

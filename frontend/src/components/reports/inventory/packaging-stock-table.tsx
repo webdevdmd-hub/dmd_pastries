@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 
 import { formatCurrency } from "@/components/reports/sales/sales-report-format";
+import { ReorderLevelHeader } from "@/components/shared/reorder-level-help";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -22,7 +23,9 @@ export function PackagingStockTable({ rows }: { rows: PackagingStockRow[] }): JS
           <TableHead>Branch</TableHead>
           <TableHead>Current</TableHead>
           <TableHead>Available</TableHead>
-          <TableHead>Reorder</TableHead>
+          <TableHead>
+            <ReorderLevelHeader>Reorder</ReorderLevelHeader>
+          </TableHead>
           <TableHead>Unit</TableHead>
           <TableHead>Cost / Unit</TableHead>
           <TableHead>Stock Value</TableHead>

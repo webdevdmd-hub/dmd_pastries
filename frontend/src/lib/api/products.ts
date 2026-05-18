@@ -538,7 +538,6 @@ function toBackendProductPayload(
     ...(payload.productType !== undefined ? { product_type: payload.productType } : {}),
     ...(payload.salePrice !== undefined ? { sale_price: payload.salePrice } : {}),
     ...(payload.costPrice !== undefined ? { cost_price: payload.costPrice } : {}),
-    ...(payload.compareAtPrice !== undefined ? { compare_at_price: payload.compareAtPrice } : {}),
     ...(payload.sku !== undefined ? { sku: payload.sku } : {}),
     ...(payload.barcode !== undefined ? { barcode: payload.barcode } : {}),
     ...(payload.description !== undefined ? { description: payload.description } : {}),

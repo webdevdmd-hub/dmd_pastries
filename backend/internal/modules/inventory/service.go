@@ -37,6 +37,21 @@ func (s *Service) ListInventory(currentUser *utils.AuthContext, query InventoryL
 	if query.ItemType != "" && !validItemType(query.ItemType) {
 		return nil, apperrors.BadRequest("invalid item_type", nil)
 	}
+	if query.IncludeUninitialized {
+		responses, total, err := s.repo.ListInventoryWithUninitializedResponses(currentUser.BusinessID, query)
+		if err != nil {
+			return nil, err
+		}
+		return &PaginatedInventoryResponse{
+			Items: responses,
+			Pagination: Pagination{
+				Page:       query.Page,
+				Limit:      query.Limit,
+				Total:      total,
+				TotalPages: totalPages(total, query.Limit),
+			},
+		}, nil
+	}
 	items, total, err := s.repo.ListInventoryItems(currentUser.BusinessID, query)
 	if err != nil {
 		return nil, err
@@ -68,12 +83,540 @@ func (s *Service) GetInventoryItem(currentUser *utils.AuthContext, id string) (*
 	return &response, err
 }
 
+func (s *Service) ListStockLocations(currentUser *utils.AuthContext, query StockLocationListQuery) (*PaginatedStockLocationResponse, error) {
+	normalizeStockLocationListQuery(&query)
+	branchID, allBranches, err := currentUser.ResolveBranchScope(query.BranchID, "")
+	if err != nil {
+		return nil, err
+	}
+	if !allBranches {
+		query.BranchID = branchID
+	} else {
+		query.BranchID = ""
+	}
+	if query.Status != "" && query.Status != "active" && query.Status != "inactive" {
+		return nil, apperrors.BadRequest("invalid status", nil)
+	}
+	if query.LocationType != "" && !validStockLocationType(query.LocationType) {
+		return nil, apperrors.BadRequest("invalid location_type", nil)
+	}
+	locations, total, err := s.repo.ListStockLocations(currentUser.BusinessID, query)
+	if err != nil {
+		return nil, err
+	}
+	return &PaginatedStockLocationResponse{
+		Items: s.repo.LoadStockLocationResponses(locations),
+		Pagination: Pagination{
+			Page:       query.Page,
+			Limit:      query.Limit,
+			Total:      total,
+			TotalPages: totalPages(total, query.Limit),
+		},
+	}, nil
+}
+
+func (s *Service) GetStockLocation(currentUser *utils.AuthContext, id string) (*StockLocationResponse, error) {
+	location, err := s.repo.FindStockLocation(id, currentUser.BusinessID)
+	if err != nil {
+		return nil, mapNotFound(err, "stock location not found")
+	}
+	if !currentUser.CanAccessBranch(location.BranchID) {
+		return nil, apperrors.Forbidden("branch access denied")
+	}
+	dto := s.repo.LoadStockLocationResponse(*location)
+	return &dto, nil
+}
+
+func (s *Service) CreateStockLocation(currentUser *utils.AuthContext, req StockLocationRequest, ipAddress, userAgent string) (*StockLocationResponse, error) {
+	branchID, err := currentUser.ResolveOperationalBranch(req.BranchID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.validateStockLocationRequest(currentUser.BusinessID, branchID, req); err != nil {
+		return nil, err
+	}
+	code := strings.ToUpper(strings.TrimSpace(req.LocationCode))
+	exists, err := s.repo.StockLocationCodeExists(currentUser.BusinessID, branchID, code, "")
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, apperrors.Conflict("stock location code already exists", nil)
+	}
+	status := strings.TrimSpace(req.Status)
+	if status == "" {
+		status = "active"
+	}
+	location := StockLocation{
+		ID:              utils.NewUUID(),
+		BusinessID:      currentUser.BusinessID,
+		BranchID:        branchID,
+		LocationName:    strings.TrimSpace(req.LocationName),
+		LocationCode:    code,
+		LocationType:    strings.TrimSpace(req.LocationType),
+		Description:     strings.TrimSpace(req.Description),
+		IsDefault:       req.IsDefault,
+		Status:          status,
+		CreatedByUserID: currentUser.UserID,
+	}
+	var response *StockLocationResponse
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if req.IsDefault {
+			if err := s.repo.UnsetDefaultStockLocations(tx, currentUser.BusinessID, branchID); err != nil {
+				return err
+			}
+		}
+		if err := s.repo.CreateStockLocation(tx, &location); err != nil {
+			return err
+		}
+		if err := s.audit(tx, currentUser, "stock_location.created", location.ID, "Stock location created", ipAddress, userAgent); err != nil {
+			return err
+		}
+		dto := s.repo.LoadStockLocationResponse(location)
+		response = &dto
+		return nil
+	})
+	return response, err
+}
+
+func (s *Service) UpdateStockLocation(currentUser *utils.AuthContext, id string, req UpdateStockLocationRequest, ipAddress, userAgent string) (*StockLocationResponse, error) {
+	location, err := s.repo.FindStockLocation(id, currentUser.BusinessID)
+	if err != nil {
+		return nil, mapNotFound(err, "stock location not found")
+	}
+	if !currentUser.CanAccessBranch(location.BranchID) {
+		return nil, apperrors.Forbidden("branch access denied")
+	}
+	updates := map[string]interface{}{"updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
+	if req.LocationName != nil {
+		name := strings.TrimSpace(*req.LocationName)
+		if name == "" {
+			return nil, apperrors.BadRequest("location_name is required", nil)
+		}
+		updates["location_name"] = name
+	}
+	if req.LocationCode != nil {
+		code := strings.ToUpper(strings.TrimSpace(*req.LocationCode))
+		if code == "" {
+			return nil, apperrors.BadRequest("location_code is required", nil)
+		}
+		exists, err := s.repo.StockLocationCodeExists(currentUser.BusinessID, location.BranchID, code, id)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			return nil, apperrors.Conflict("stock location code already exists", nil)
+		}
+		updates["location_code"] = code
+	}
+	if req.LocationType != nil {
+		locationType := strings.TrimSpace(*req.LocationType)
+		if locationType != "" && !validStockLocationType(locationType) {
+			return nil, apperrors.BadRequest("invalid location_type", nil)
+		}
+		updates["location_type"] = locationType
+	}
+	if req.Description != nil {
+		updates["description"] = strings.TrimSpace(*req.Description)
+	}
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := s.repo.UpdateStockLocation(tx, id, currentUser.BusinessID, updates); err != nil {
+			return err
+		}
+		return s.audit(tx, currentUser, "stock_location.updated", id, "Stock location updated", ipAddress, userAgent)
+	}); err != nil {
+		return nil, err
+	}
+	updated, err := s.repo.FindStockLocation(id, currentUser.BusinessID)
+	if err != nil {
+		return nil, err
+	}
+	dto := s.repo.LoadStockLocationResponse(*updated)
+	return &dto, nil
+}
+
+func (s *Service) UpdateStockLocationStatus(currentUser *utils.AuthContext, id string, req UpdateStockLocationStatusRequest, ipAddress, userAgent string) (*StockLocationResponse, error) {
+	if req.Status != "active" && req.Status != "inactive" {
+		return nil, apperrors.BadRequest("invalid status", nil)
+	}
+	location, err := s.repo.FindStockLocation(id, currentUser.BusinessID)
+	if err != nil {
+		return nil, mapNotFound(err, "stock location not found")
+	}
+	if !currentUser.CanAccessBranch(location.BranchID) {
+		return nil, apperrors.Forbidden("branch access denied")
+	}
+	if req.Status == "inactive" {
+		hasStock, err := s.repo.StockLocationHasStock(s.db, currentUser.BusinessID, id)
+		if err != nil {
+			return nil, err
+		}
+		if hasStock {
+			return nil, apperrors.BadRequest("cannot deactivate location with stock", nil)
+		}
+	}
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := s.repo.UpdateStockLocation(tx, id, currentUser.BusinessID, map[string]interface{}{"status": req.Status, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}); err != nil {
+			return err
+		}
+		return s.audit(tx, currentUser, "stock_location.status_updated", id, "Stock location status updated", ipAddress, userAgent)
+	}); err != nil {
+		return nil, err
+	}
+	updated, err := s.repo.FindStockLocation(id, currentUser.BusinessID)
+	if err != nil {
+		return nil, err
+	}
+	dto := s.repo.LoadStockLocationResponse(*updated)
+	return &dto, nil
+}
+
+func (s *Service) SetDefaultStockLocation(currentUser *utils.AuthContext, id, ipAddress, userAgent string) (*StockLocationResponse, error) {
+	location, err := s.repo.FindStockLocation(id, currentUser.BusinessID)
+	if err != nil {
+		return nil, mapNotFound(err, "stock location not found")
+	}
+	if !currentUser.CanAccessBranch(location.BranchID) {
+		return nil, apperrors.Forbidden("branch access denied")
+	}
+	if location.Status != "active" {
+		return nil, apperrors.BadRequest("cannot set inactive location as default", nil)
+	}
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := s.repo.UnsetDefaultStockLocations(tx, currentUser.BusinessID, location.BranchID); err != nil {
+			return err
+		}
+		if err := s.repo.UpdateStockLocation(tx, id, currentUser.BusinessID, map[string]interface{}{"is_default": true, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}); err != nil {
+			return err
+		}
+		return s.audit(tx, currentUser, "stock_location.default_updated", id, "Default stock location updated", ipAddress, userAgent)
+	}); err != nil {
+		return nil, err
+	}
+	updated, err := s.repo.FindStockLocation(id, currentUser.BusinessID)
+	if err != nil {
+		return nil, err
+	}
+	dto := s.repo.LoadStockLocationResponse(*updated)
+	return &dto, nil
+}
+
+func (s *Service) DeleteStockLocation(currentUser *utils.AuthContext, id, ipAddress, userAgent string) error {
+	location, err := s.repo.FindStockLocation(id, currentUser.BusinessID)
+	if err != nil {
+		return mapNotFound(err, "stock location not found")
+	}
+	if !currentUser.CanAccessBranch(location.BranchID) {
+		return apperrors.Forbidden("branch access denied")
+	}
+	if location.IsDefault {
+		return apperrors.BadRequest("cannot delete default location", nil)
+	}
+	hasStock, err := s.repo.StockLocationHasStock(s.db, currentUser.BusinessID, id)
+	if err != nil {
+		return err
+	}
+	if hasStock {
+		return apperrors.BadRequest("cannot delete location with stock", nil)
+	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := s.repo.DeleteStockLocation(tx, id, currentUser.BusinessID); err != nil {
+			return err
+		}
+		return s.audit(tx, currentUser, "stock_location.deleted", id, "Stock location deleted", ipAddress, userAgent)
+	})
+}
+
+func (s *Service) ListLocationBalances(currentUser *utils.AuthContext, query LocationBalanceListQuery) (*PaginatedLocationBalanceResponse, error) {
+	normalizeLocationBalanceListQuery(&query)
+	branchID, allBranches, err := currentUser.ResolveBranchScope(query.BranchID, "")
+	if err != nil {
+		return nil, err
+	}
+	if !allBranches {
+		query.BranchID = branchID
+	} else {
+		query.BranchID = ""
+	}
+	if query.ItemType != "" && !validItemType(query.ItemType) {
+		return nil, apperrors.BadRequest("invalid item_type", nil)
+	}
+	if err := validateOptionalUUID(query.StockLocationID, "stock_location_id"); err != nil {
+		return nil, err
+	}
+	items, total, err := s.repo.ListLocationBalances(currentUser.BusinessID, query)
+	if err != nil {
+		return nil, err
+	}
+	return &PaginatedLocationBalanceResponse{
+		Items: items,
+		Pagination: Pagination{
+			Page:       query.Page,
+			Limit:      query.Limit,
+			Total:      total,
+			TotalPages: totalPages(total, query.Limit),
+		},
+	}, nil
+}
+
+func (s *Service) GetInventoryItemLocationBalances(currentUser *utils.AuthContext, inventoryItemID string) (*InventoryItemLocationBreakdownResponse, error) {
+	item, err := s.repo.FindInventoryItem(inventoryItemID, currentUser.BusinessID)
+	if err != nil {
+		return nil, mapNotFound(err, "inventory item not found")
+	}
+	if !currentUser.CanAccessBranch(item.BranchID) {
+		return nil, apperrors.Forbidden("branch access denied")
+	}
+	var branchName string
+	_ = s.db.Table("branches").Select("branch_name").Where("id = ? AND business_id = ?", item.BranchID, currentUser.BusinessID).Scan(&branchName).Error
+	itemName, _, _, _ := s.repo.loadItemIdentity(currentUser.BusinessID, *item)
+	locations, err := s.repo.ItemLocationBreakdown(currentUser.BusinessID, inventoryItemID)
+	if err != nil {
+		return nil, err
+	}
+	return &InventoryItemLocationBreakdownResponse{
+		InventoryItemID:     item.ID,
+		ItemName:            itemName,
+		ItemType:            item.ItemType,
+		BranchID:            item.BranchID,
+		BranchName:          branchName,
+		BranchTotalQuantity: roundQuantity(item.CurrentQuantity),
+		Locations:           locations,
+	}, nil
+}
+
+func (s *Service) ListStockTransfers(currentUser *utils.AuthContext, query StockTransferListQuery) (*PaginatedStockTransferResponse, error) {
+	normalizeStockTransferListQuery(&query)
+	branchID, allBranches, err := currentUser.ResolveBranchScope(query.BranchID, "")
+	if err != nil {
+		return nil, err
+	}
+	if !allBranches {
+		query.BranchID = branchID
+	} else {
+		query.BranchID = ""
+	}
+	if err := validateOptionalUUID(query.InventoryItemID, "inventory_item_id"); err != nil {
+		return nil, err
+	}
+	if query.Status != "" && query.Status != "draft" && query.Status != "completed" && query.Status != "cancelled" {
+		return nil, apperrors.BadRequest("invalid status", nil)
+	}
+	transfers, total, err := s.repo.ListStockTransfers(currentUser.BusinessID, query)
+	if err != nil {
+		return nil, err
+	}
+	items, err := s.repo.LoadStockTransferResponses(transfers)
+	if err != nil {
+		return nil, err
+	}
+	return &PaginatedStockTransferResponse{
+		Items: items,
+		Pagination: Pagination{
+			Page:       query.Page,
+			Limit:      query.Limit,
+			Total:      total,
+			TotalPages: totalPages(total, query.Limit),
+		},
+	}, nil
+}
+
+func (s *Service) GetStockTransfer(currentUser *utils.AuthContext, id string) (*StockTransferResponse, error) {
+	transfer, err := s.repo.FindStockTransfer(id, currentUser.BusinessID)
+	if err != nil {
+		return nil, mapNotFound(err, "stock transfer not found")
+	}
+	if !currentUser.CanAccessBranch(transfer.BranchID) {
+		return nil, apperrors.Forbidden("branch access denied")
+	}
+	dto, err := s.repo.LoadStockTransferResponse(*transfer)
+	return &dto, err
+}
+
+func (s *Service) CreateStockTransfer(currentUser *utils.AuthContext, req StockTransferRequest, ipAddress, userAgent string) (*StockTransferResponse, error) {
+	if err := s.validateStockTransferRequest(currentUser, req); err != nil {
+		return nil, err
+	}
+	var response *StockTransferResponse
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		item, err := s.repo.FindInventoryItem(req.InventoryItemID, currentUser.BusinessID)
+		if err != nil {
+			return mapNotFound(err, "inventory item not found")
+		}
+		number, err := s.repo.NextStockTransferNumber(tx, currentUser.BusinessID)
+		if err != nil {
+			return err
+		}
+		transfer := StockTransfer{
+			ID:                  utils.NewUUID(),
+			BusinessID:          currentUser.BusinessID,
+			BranchID:            item.BranchID,
+			TransferNumber:      number,
+			InventoryItemID:     item.ID,
+			FromStockLocationID: req.FromStockLocationID,
+			ToStockLocationID:   req.ToStockLocationID,
+			Quantity:            req.Quantity,
+			UnitID:              item.UnitID,
+			Reason:              strings.TrimSpace(req.Reason),
+			Notes:               strings.TrimSpace(req.Notes),
+			Status:              "draft",
+			CreatedByUserID:     currentUser.UserID,
+		}
+		if err := s.repo.CreateStockTransfer(tx, &transfer); err != nil {
+			return err
+		}
+		if err := s.audit(tx, currentUser, "stock_transfer.created", transfer.ID, "Stock transfer created", ipAddress, userAgent); err != nil {
+			return err
+		}
+		dto, err := s.repo.LoadStockTransferResponse(transfer)
+		if err != nil {
+			return err
+		}
+		response = &dto
+		return nil
+	})
+	return response, err
+}
+
+func (s *Service) CompleteStockTransfer(currentUser *utils.AuthContext, id, ipAddress, userAgent string) (*StockTransferResponse, error) {
+	var response *StockTransferResponse
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		transfer, err := s.repo.FindStockTransferForUpdate(tx, id, currentUser.BusinessID)
+		if err != nil {
+			return mapNotFound(err, "stock transfer not found")
+		}
+		if !currentUser.CanAccessBranch(transfer.BranchID) {
+			return apperrors.Forbidden("branch access denied")
+		}
+		if transfer.Status != "draft" {
+			return apperrors.BadRequest("only draft transfers can be completed", nil)
+		}
+		source, err := s.repo.FindLocationBalanceForUpdate(tx, currentUser.BusinessID, transfer.InventoryItemID, transfer.FromStockLocationID)
+		if err != nil {
+			return mapNotFound(err, "source location has no stock balance")
+		}
+		if source.AvailableQuantity < transfer.Quantity {
+			return apperrors.BadRequest("source location has insufficient available stock", nil)
+		}
+		target, err := s.repo.FindLocationBalanceForUpdate(tx, currentUser.BusinessID, transfer.InventoryItemID, transfer.ToStockLocationID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			target = &InventoryLocationBalance{
+				ID:                utils.NewUUID(),
+				BusinessID:        currentUser.BusinessID,
+				BranchID:          transfer.BranchID,
+				InventoryItemID:   transfer.InventoryItemID,
+				StockLocationID:   transfer.ToStockLocationID,
+				CurrentQuantity:   0,
+				ReservedQuantity:  0,
+				AvailableQuantity: 0,
+			}
+			if err := s.repo.CreateLocationBalance(tx, target); err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		}
+		source.CurrentQuantity = roundQuantity(source.CurrentQuantity - transfer.Quantity)
+		source.AvailableQuantity = roundQuantity(source.CurrentQuantity - source.ReservedQuantity)
+		target.CurrentQuantity = roundQuantity(target.CurrentQuantity + transfer.Quantity)
+		target.AvailableQuantity = roundQuantity(target.CurrentQuantity - target.ReservedQuantity)
+		if err := s.repo.UpdateLocationBalance(tx, source); err != nil {
+			return err
+		}
+		if err := s.repo.UpdateLocationBalance(tx, target); err != nil {
+			return err
+		}
+		now := time.Now().UTC()
+		if err := s.repo.UpdateStockTransfer(tx, transfer.ID, currentUser.BusinessID, map[string]interface{}{"status": "completed", "completed_by_user_id": currentUser.UserID, "completed_at": now, "updated_at": now}); err != nil {
+			return err
+		}
+		item, err := s.repo.FindInventoryItem(transfer.InventoryItemID, currentUser.BusinessID)
+		if err != nil {
+			return err
+		}
+		fromID, toID := transfer.FromStockLocationID, transfer.ToStockLocationID
+		movement := StockMovement{
+			ID:                  utils.NewUUID(),
+			BusinessID:          transfer.BusinessID,
+			BranchID:            transfer.BranchID,
+			InventoryItemID:     transfer.InventoryItemID,
+			FromStockLocationID: &fromID,
+			ToStockLocationID:   &toID,
+			ItemType:            item.ItemType,
+			MovementType:        "transfer",
+			MovementDirection:   "transfer",
+			Quantity:            transfer.Quantity,
+			BeforeQuantity:      item.CurrentQuantity,
+			AfterQuantity:       item.CurrentQuantity,
+			UnitID:              transfer.UnitID,
+			ReferenceType:       "stock_transfer",
+			ReferenceID:         &transfer.ID,
+			ReferenceNumber:     transfer.TransferNumber,
+			Reason:              transfer.Reason,
+			Notes:               transfer.Notes,
+			CreatedByUserID:     currentUser.UserID,
+		}
+		if err := s.repo.CreateStockMovement(tx, &movement); err != nil {
+			return err
+		}
+		if err := s.audit(tx, currentUser, "stock_transfer.completed", transfer.ID, "Stock transfer completed", ipAddress, userAgent); err != nil {
+			return err
+		}
+		updated, err := s.repo.FindStockTransfer(transfer.ID, currentUser.BusinessID)
+		if err != nil {
+			return err
+		}
+		dto, err := s.repo.LoadStockTransferResponse(*updated)
+		if err != nil {
+			return err
+		}
+		response = &dto
+		return nil
+	})
+	return response, err
+}
+
+func (s *Service) CancelStockTransfer(currentUser *utils.AuthContext, id, ipAddress, userAgent string) (*StockTransferResponse, error) {
+	var response *StockTransferResponse
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		transfer, err := s.repo.FindStockTransferForUpdate(tx, id, currentUser.BusinessID)
+		if err != nil {
+			return mapNotFound(err, "stock transfer not found")
+		}
+		if !currentUser.CanAccessBranch(transfer.BranchID) {
+			return apperrors.Forbidden("branch access denied")
+		}
+		if transfer.Status != "draft" {
+			return apperrors.BadRequest("only draft transfers can be cancelled", nil)
+		}
+		now := time.Now().UTC()
+		if err := s.repo.UpdateStockTransfer(tx, transfer.ID, currentUser.BusinessID, map[string]interface{}{"status": "cancelled", "cancelled_at": now, "updated_at": now}); err != nil {
+			return err
+		}
+		if err := s.audit(tx, currentUser, "stock_transfer.cancelled", transfer.ID, "Stock transfer cancelled", ipAddress, userAgent); err != nil {
+			return err
+		}
+		updated, err := s.repo.FindStockTransfer(transfer.ID, currentUser.BusinessID)
+		if err != nil {
+			return err
+		}
+		dto, err := s.repo.LoadStockTransferResponse(*updated)
+		if err != nil {
+			return err
+		}
+		response = &dto
+		return nil
+	})
+	return response, err
+}
+
 func (s *Service) CreateOpeningStock(currentUser *utils.AuthContext, req OpeningStockRequest, ipAddress, userAgent string) (*InventoryItemResponse, error) {
 	branchID, err := currentUser.ResolveOperationalBranch(req.BranchID)
 	if err != nil {
 		return nil, err
 	}
 	req.BranchID = branchID
+	req.ItemType = normalizeOpeningStockItemType(req)
 	if err := s.validateOpeningStock(currentUser.BusinessID, req); err != nil {
 		return nil, err
 	}
@@ -81,7 +624,7 @@ func (s *Service) CreateOpeningStock(currentUser *utils.AuthContext, req Opening
 	var response *InventoryItemResponse
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		itemID := itemIDForRequest(req)
-		item, err := s.repo.FindExistingItem(tx, currentUser.BusinessID, req.BranchID, req.ItemType, itemID)
+		item, err := s.repo.FindExistingItem(tx, currentUser.BusinessID, req.BranchID, req.ItemType, itemID, variantIDForRequest(req))
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
@@ -92,6 +635,7 @@ func (s *Service) CreateOpeningStock(currentUser *utils.AuthContext, req Opening
 				BusinessID:        currentUser.BusinessID,
 				BranchID:          req.BranchID,
 				ProductID:         nullableString(req.ProductID),
+				ProductVariantID:  nullableString(req.ProductVariantID),
 				IngredientID:      nullableString(req.IngredientID),
 				PackagingItemID:   nullableString(req.PackagingItemID),
 				ItemType:          req.ItemType,
@@ -123,6 +667,7 @@ func (s *Service) CreateOpeningStock(currentUser *utils.AuthContext, req Opening
 		movement, err := s.ApplyMovement(tx, ApplyStockMovementInput{
 			BusinessID:      currentUser.BusinessID,
 			InventoryItemID: item.ID,
+			StockLocationID: nullableString(req.StockLocationID),
 			MovementType:    "opening_stock",
 			Quantity:        req.Quantity,
 			ReferenceType:   "opening_stock",
@@ -682,6 +1227,18 @@ func (s *Service) validateOpeningStock(businessID string, req OpeningStockReques
 	if err := s.repo.ValidateUnit(businessID, req.UnitID); err != nil {
 		return mapNotFound(err, "unit not found")
 	}
+	if req.StockLocationID != "" {
+		if err := validateUUID(req.StockLocationID, "stock_location_id"); err != nil {
+			return err
+		}
+		location, err := s.repo.FindStockLocation(req.StockLocationID, businessID)
+		if err != nil {
+			return mapNotFound(err, "stock location not found")
+		}
+		if location.BranchID != req.BranchID || location.Status != "active" {
+			return apperrors.BadRequest("stock location must be active and belong to the selected branch", nil)
+		}
+	}
 	switch req.ItemType {
 	case "product":
 		if err := validateUUID(req.ProductID, "product_id"); err != nil {
@@ -689,6 +1246,16 @@ func (s *Service) validateOpeningStock(businessID string, req OpeningStockReques
 		}
 		if err := s.repo.ValidateProduct(businessID, req.ProductID); err != nil {
 			return mapNotFound(err, "product not found")
+		}
+	case "product_variant":
+		if err := validateUUID(req.ProductID, "product_id"); err != nil {
+			return err
+		}
+		if err := validateUUID(req.ProductVariantID, "product_variant_id"); err != nil {
+			return err
+		}
+		if err := s.repo.ValidateProductVariant(businessID, req.BranchID, req.ProductID, req.ProductVariantID); err != nil {
+			return mapNotFound(err, "product variant not found")
 		}
 	case "ingredient":
 		if err := validateUUID(req.IngredientID, "ingredient_id"); err != nil {
@@ -720,6 +1287,10 @@ func (s *Service) ApplyMovement(tx *gorm.DB, input ApplyStockMovementInput) (*St
 	if err != nil {
 		return nil, mapNotFound(err, "inventory item not found")
 	}
+	stockLocationID, err := s.resolveMovementStockLocation(tx, item, input.StockLocationID)
+	if err != nil {
+		return nil, err
+	}
 	before := item.CurrentQuantity
 	after := before
 	switch direction {
@@ -744,31 +1315,98 @@ func (s *Service) ApplyMovement(tx *gorm.DB, input ApplyStockMovementInput) (*St
 	}); err != nil {
 		return nil, err
 	}
+	if err := s.applyLocationMovement(tx, item, stockLocationID, direction, input.Quantity); err != nil {
+		return nil, err
+	}
 	movement := &StockMovement{
-		ID:                 utils.NewUUID(),
-		BusinessID:         item.BusinessID,
-		BranchID:           item.BranchID,
-		InventoryItemID:    item.ID,
-		ItemType:           item.ItemType,
-		MovementType:       input.MovementType,
-		MovementDirection:  direction,
-		Quantity:           input.Quantity,
-		BeforeQuantity:     before,
-		AfterQuantity:      after,
-		UnitID:             item.UnitID,
-		ReferenceType:      strings.TrimSpace(input.ReferenceType),
-		ReferenceID:        input.ReferenceID,
-		ReferenceNumber:    strings.TrimSpace(input.ReferenceNumber),
-		Reason:             strings.TrimSpace(input.Reason),
-		Notes:              strings.TrimSpace(input.Notes),
-		IsReversal:         input.IsReversal,
-		ReversedMovementID: input.ReversedMovementID,
-		CreatedByUserID:    input.CreatedByUserID,
+		ID:                  utils.NewUUID(),
+		BusinessID:          item.BusinessID,
+		BranchID:            item.BranchID,
+		InventoryItemID:     item.ID,
+		StockLocationID:     stockLocationID,
+		FromStockLocationID: input.FromStockLocationID,
+		ToStockLocationID:   input.ToStockLocationID,
+		ItemType:            item.ItemType,
+		MovementType:        input.MovementType,
+		MovementDirection:   direction,
+		Quantity:            input.Quantity,
+		BeforeQuantity:      before,
+		AfterQuantity:       after,
+		UnitID:              item.UnitID,
+		ReferenceType:       strings.TrimSpace(input.ReferenceType),
+		ReferenceID:         input.ReferenceID,
+		ReferenceNumber:     strings.TrimSpace(input.ReferenceNumber),
+		Reason:              strings.TrimSpace(input.Reason),
+		Notes:               strings.TrimSpace(input.Notes),
+		IsReversal:          input.IsReversal,
+		ReversedMovementID:  input.ReversedMovementID,
+		CreatedByUserID:     input.CreatedByUserID,
 	}
 	if err := s.repo.CreateStockMovement(tx, movement); err != nil {
 		return nil, err
 	}
 	return movement, nil
+}
+
+func (s *Service) resolveMovementStockLocation(tx *gorm.DB, item *InventoryItem, requestedLocationID *string) (*string, error) {
+	if requestedLocationID != nil && strings.TrimSpace(*requestedLocationID) != "" {
+		location, err := s.repo.FindStockLocation(strings.TrimSpace(*requestedLocationID), item.BusinessID)
+		if err != nil {
+			return nil, mapNotFound(err, "stock location not found")
+		}
+		if location.BranchID != item.BranchID || location.Status != "active" {
+			return nil, apperrors.BadRequest("stock location must be active and belong to the inventory item branch", nil)
+		}
+		locationID := location.ID
+		return &locationID, nil
+	}
+	location, err := s.repo.FindDefaultStockLocation(tx, item.BusinessID, item.BranchID)
+	if err != nil {
+		return nil, mapNotFound(err, "default stock location not found for branch")
+	}
+	locationID := location.ID
+	return &locationID, nil
+}
+
+func (s *Service) applyLocationMovement(tx *gorm.DB, item *InventoryItem, stockLocationID *string, direction string, quantity float64) error {
+	if stockLocationID == nil || direction == "neutral" || direction == "transfer" {
+		return nil
+	}
+	balance, err := s.repo.FindLocationBalanceForUpdate(tx, item.BusinessID, item.ID, *stockLocationID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if direction == "out" {
+			return apperrors.BadRequest("stock location has insufficient available stock", nil)
+		}
+		balance = &InventoryLocationBalance{
+			ID:                utils.NewUUID(),
+			BusinessID:        item.BusinessID,
+			BranchID:          item.BranchID,
+			InventoryItemID:   item.ID,
+			StockLocationID:   *stockLocationID,
+			CurrentQuantity:   0,
+			ReservedQuantity:  0,
+			AvailableQuantity: 0,
+		}
+		if err := s.repo.CreateLocationBalance(tx, balance); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+	switch direction {
+	case "in":
+		balance.CurrentQuantity = roundQuantity(balance.CurrentQuantity + quantity)
+	case "out":
+		if balance.AvailableQuantity < quantity {
+			return apperrors.BadRequest("stock location has insufficient available stock", nil)
+		}
+		balance.CurrentQuantity = roundQuantity(balance.CurrentQuantity - quantity)
+	}
+	balance.AvailableQuantity = roundQuantity(balance.CurrentQuantity - balance.ReservedQuantity)
+	if balance.CurrentQuantity < 0 || balance.AvailableQuantity < 0 {
+		return apperrors.BadRequest("stock location cannot go below zero", nil)
+	}
+	return s.repo.UpdateLocationBalance(tx, balance)
 }
 
 func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {
@@ -827,8 +1465,62 @@ func normalizeMovementListQuery(query *MovementListQuery) {
 	}
 }
 
+func normalizeStockLocationListQuery(query *StockLocationListQuery) {
+	if query.Page <= 0 {
+		query.Page = 1
+	}
+	if query.Limit <= 0 || query.Limit > 100 {
+		query.Limit = 20
+	}
+	if query.SortBy == "" {
+		query.SortBy = "created_at"
+	}
+	if query.SortOrder == "" {
+		query.SortOrder = "desc"
+	}
+}
+
+func normalizeLocationBalanceListQuery(query *LocationBalanceListQuery) {
+	if query.Page <= 0 {
+		query.Page = 1
+	}
+	if query.Limit <= 0 || query.Limit > 100 {
+		query.Limit = 20
+	}
+	if query.SortBy == "" {
+		query.SortBy = "location_name"
+	}
+	if query.SortOrder == "" {
+		query.SortOrder = "asc"
+	}
+}
+
+func normalizeStockTransferListQuery(query *StockTransferListQuery) {
+	if query.Page <= 0 {
+		query.Page = 1
+	}
+	if query.Limit <= 0 || query.Limit > 100 {
+		query.Limit = 20
+	}
+	if query.SortBy == "" {
+		query.SortBy = "created_at"
+	}
+	if query.SortOrder == "" {
+		query.SortOrder = "desc"
+	}
+}
+
 func validItemType(value string) bool {
-	return value == "product" || value == "ingredient" || value == "packaging"
+	return value == "product" || value == "product_variant" || value == "ingredient" || value == "packaging"
+}
+
+func validStockLocationType(value string) bool {
+	switch value {
+	case "kitchen", "store_room", "front_desk", "display_counter", "warehouse", "production_area", "pickup_area", "other":
+		return true
+	default:
+		return false
+	}
 }
 
 func movementDirection(movementType string) (string, error) {
@@ -837,6 +1529,8 @@ func movementDirection(movementType string) (string, error) {
 		return "in", nil
 	case "sale_out", "adjustment_out", "wastage", "transfer_out", "production_out":
 		return "out", nil
+	case "transfer":
+		return "transfer", nil
 	case "reversal":
 		return "neutral", nil
 	default:
@@ -887,8 +1581,73 @@ func validateMovementQuery(query MovementListQuery) error {
 			return err
 		}
 	}
-	if query.MovementDirection != "" && query.MovementDirection != "in" && query.MovementDirection != "out" && query.MovementDirection != "neutral" {
+	if query.MovementDirection != "" && query.MovementDirection != "in" && query.MovementDirection != "out" && query.MovementDirection != "neutral" && query.MovementDirection != "transfer" {
 		return apperrors.BadRequest("invalid movement_direction", nil)
+	}
+	return nil
+}
+
+func (s *Service) validateStockLocationRequest(businessID, branchID string, req StockLocationRequest) error {
+	if err := validateUUID(branchID, "branch_id"); err != nil {
+		return err
+	}
+	if err := s.repo.ValidateBranch(businessID, branchID); err != nil {
+		return mapNotFound(err, "branch not found")
+	}
+	if strings.TrimSpace(req.LocationName) == "" {
+		return apperrors.BadRequest("location_name is required", nil)
+	}
+	if strings.TrimSpace(req.LocationCode) == "" {
+		return apperrors.BadRequest("location_code is required", nil)
+	}
+	if req.LocationType != "" && !validStockLocationType(strings.TrimSpace(req.LocationType)) {
+		return apperrors.BadRequest("invalid location_type", nil)
+	}
+	if req.Status != "" && req.Status != "active" && req.Status != "inactive" {
+		return apperrors.BadRequest("invalid status", nil)
+	}
+	return nil
+}
+
+func (s *Service) validateStockTransferRequest(currentUser *utils.AuthContext, req StockTransferRequest) error {
+	if err := validateUUID(req.InventoryItemID, "inventory_item_id"); err != nil {
+		return err
+	}
+	if err := validateUUID(req.FromStockLocationID, "from_stock_location_id"); err != nil {
+		return err
+	}
+	if err := validateUUID(req.ToStockLocationID, "to_stock_location_id"); err != nil {
+		return err
+	}
+	if req.FromStockLocationID == req.ToStockLocationID {
+		return apperrors.BadRequest("source and target locations must be different", nil)
+	}
+	if req.Quantity <= 0 {
+		return apperrors.BadRequest("quantity must be greater than zero", nil)
+	}
+	item, err := s.repo.FindInventoryItem(req.InventoryItemID, currentUser.BusinessID)
+	if err != nil {
+		return mapNotFound(err, "inventory item not found")
+	}
+	if !currentUser.CanAccessBranch(item.BranchID) {
+		return apperrors.Forbidden("branch access denied")
+	}
+	if strings.TrimSpace(req.UnitID) != "" && req.UnitID != item.UnitID {
+		return apperrors.BadRequest("unit_id must match inventory item unit", nil)
+	}
+	from, err := s.repo.FindStockLocation(req.FromStockLocationID, currentUser.BusinessID)
+	if err != nil {
+		return mapNotFound(err, "source stock location not found")
+	}
+	to, err := s.repo.FindStockLocation(req.ToStockLocationID, currentUser.BusinessID)
+	if err != nil {
+		return mapNotFound(err, "target stock location not found")
+	}
+	if from.BranchID != item.BranchID || to.BranchID != item.BranchID {
+		return apperrors.BadRequest("stock locations must belong to the inventory item branch", nil)
+	}
+	if from.Status != "active" || to.Status != "active" {
+		return apperrors.BadRequest("stock locations must be active", nil)
 	}
 	return nil
 }
@@ -917,13 +1676,28 @@ func nullableString(value string) *string {
 
 func itemIDForRequest(req OpeningStockRequest) *string {
 	switch req.ItemType {
-	case "product":
+	case "product", "product_variant":
 		return nullableString(req.ProductID)
 	case "ingredient":
 		return nullableString(req.IngredientID)
 	default:
 		return nullableString(req.PackagingItemID)
 	}
+}
+
+func variantIDForRequest(req OpeningStockRequest) *string {
+	if req.ItemType != "product_variant" {
+		return nil
+	}
+	return nullableString(req.ProductVariantID)
+}
+
+func normalizeOpeningStockItemType(req OpeningStockRequest) string {
+	itemType := strings.TrimSpace(req.ItemType)
+	if itemType == "product" && strings.TrimSpace(req.ProductVariantID) != "" {
+		return "product_variant"
+	}
+	return itemType
 }
 
 func parseDate(value, field string) (time.Time, error) {

@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 
+import { ReorderLevelHeader } from "@/components/shared/reorder-level-help";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -33,7 +34,9 @@ export function CurrentStockTable({ rows }: { rows: CurrentStockRow[] }): JSX.El
           <TableHead>Current</TableHead>
           <TableHead>Reserved</TableHead>
           <TableHead>Available</TableHead>
-          <TableHead>Reorder</TableHead>
+          <TableHead>
+            <ReorderLevelHeader>Reorder</ReorderLevelHeader>
+          </TableHead>
           <TableHead>Unit</TableHead>
           <TableHead>Stock</TableHead>
           <TableHead>Status</TableHead>

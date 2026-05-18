@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"strings"
+
 	"gorm.io/gorm"
 
 	"pastries-pos/internal/modules/users"
@@ -21,6 +23,21 @@ func (r *Repository) FindUserByAppwriteUserID(appwriteUserID string) (*users.Use
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (r *Repository) FindUsersByEmail(email string) ([]users.User, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var found []users.User
+	err := r.db.Preload("Role").
+		Where("LOWER(email) = ?", email).
+		Order("created_at DESC").
+		Limit(2).
+		Find(&found).Error
+	return found, err
 }
 
 func (r *Repository) BusinessOwnerUserID(businessID string) (*string, error) {

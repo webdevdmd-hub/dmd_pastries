@@ -39,7 +39,10 @@ const buildTimePublicEnv = createPublicEnv([
     "NEXT_PUBLIC_APPWRITE_USER_AVATARS_BUCKET_ID",
     process.env.NEXT_PUBLIC_APPWRITE_USER_AVATARS_BUCKET_ID,
   ],
-  ["NEXT_PUBLIC_APPWRITE_DOCUMENTS_BUCKET_ID", process.env.NEXT_PUBLIC_APPWRITE_DOCUMENTS_BUCKET_ID],
+  [
+    "NEXT_PUBLIC_APPWRITE_DOCUMENTS_BUCKET_ID",
+    process.env.NEXT_PUBLIC_APPWRITE_DOCUMENTS_BUCKET_ID,
+  ],
 ]);
 
 function getRuntimePublicEnv(): RuntimePublicEnv {

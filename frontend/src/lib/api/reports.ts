@@ -2,6 +2,8 @@ import { getBranches as getBranchList } from "@/lib/api/branches";
 import { apiBlobRequest, apiRequest } from "@/lib/api/client";
 import type { Branch } from "@/types/branch";
 import type {
+  ReceiptRecordRow,
+  ReceiptRecordsFilters,
   ReportBaseFilters,
   ReportChartData,
   ReportExportPayload,
@@ -49,6 +51,22 @@ type BackendReportExportPayload = {
   filters: Record<string, string | number>;
 };
 
+type BackendReceiptRecordRow = {
+  branch_name?: string;
+  cashier_name?: string;
+  customer_name?: string;
+  last_viewed_at?: string;
+  paid_amount?: number;
+  payment_status?: string;
+  receipt_status?: string;
+  sale_id?: string;
+  sale_number?: string;
+  sale_status?: string;
+  sold_at?: string;
+  total_amount?: number;
+  view_count?: number;
+};
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -63,6 +81,29 @@ function stringList(value: unknown): string[] {
   }
 
   return value.filter((item): item is string => typeof item === "string");
+}
+
+function stringOrEmpty(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function listSource(value: unknown): unknown[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (!isObject(value)) {
+    return [];
+  }
+  if (Array.isArray(value.items)) {
+    return value.items;
+  }
+  if (Array.isArray(value.rows)) {
+    return value.rows;
+  }
+  if (Array.isArray(value.receipts)) {
+    return value.receipts;
+  }
+  return [];
 }
 
 function numberList(value: unknown): number[] {
@@ -153,6 +194,52 @@ function toSearchParams(filters: ReportFilters): string {
   return query ? `?${query}` : "";
 }
 
+function toReceiptSearchParams(filters: ReceiptRecordsFilters): string {
+  const params = new URLSearchParams();
+
+  appendFilter(params, "branch_id", filters.branchId);
+  appendFilter(params, "scope", filters.scope);
+  appendFilter(params, "date_from", filters.dateFrom);
+  appendFilter(params, "date_to", filters.dateTo);
+  appendFilter(params, "timezone", filters.timezone);
+  appendFilter(params, "page", filters.page);
+  appendFilter(params, "limit", filters.limit);
+  appendFilter(params, "sort_by", filters.sortBy);
+  appendFilter(params, "sort_order", filters.sortOrder);
+  appendFilter(params, "search", filters.search);
+  appendFilter(params, "cashier_user_id", filters.cashierUserId);
+  appendFilter(params, "payment_status", filters.paymentStatus);
+  appendFilter(params, "sale_status", filters.saleStatus);
+
+  const query = params.toString();
+
+  return query ? `?${query}` : "";
+}
+
+function parseReceiptRecord(value: unknown): ReceiptRecordRow {
+  const row = isObject(value) ? (value as BackendReceiptRecordRow) : {};
+
+  return {
+    branchName: stringOrEmpty(row.branch_name),
+    cashierName: stringOrEmpty(row.cashier_name),
+    customerName: stringOrEmpty(row.customer_name),
+    lastViewedAt: stringOrEmpty(row.last_viewed_at),
+    paidAmount: numberOrZero(row.paid_amount),
+    paymentStatus: stringOrEmpty(row.payment_status),
+    receiptStatus: stringOrEmpty(row.receipt_status),
+    saleId: stringOrEmpty(row.sale_id),
+    saleNumber: stringOrEmpty(row.sale_number),
+    saleStatus: stringOrEmpty(row.sale_status),
+    soldAt: stringOrEmpty(row.sold_at),
+    totalAmount: numberOrZero(row.total_amount),
+    viewCount: numberOrZero(row.view_count),
+  };
+}
+
+function parseReceiptRecords(value: unknown): ReceiptRecordRow[] {
+  return listSource(value).map(parseReceiptRecord);
+}
+
 function toBackendFilters(filters: ReportBaseFilters): Record<string, string | number> {
   const result: Record<string, string | number> = {};
 
@@ -222,6 +309,20 @@ export async function getOrdersChart(filters: ReportFilters): Promise<ReportChar
     {
       authMode: "appwrite",
       parse: parseReportChartData,
+    },
+  );
+
+  return response.data;
+}
+
+export async function getReceiptRecords(
+  filters: ReceiptRecordsFilters,
+): Promise<ReceiptRecordRow[]> {
+  const response = await apiRequest<ReceiptRecordRow[]>(
+    `/api/v1/reports/receipts${toReceiptSearchParams(filters)}`,
+    {
+      authMode: "appwrite",
+      parse: parseReceiptRecords,
     },
   );
 

@@ -14,9 +14,13 @@ function formatCurrency(value: number): string {
 
 export function RecipeCostCard({
   canManage,
+  draftIngredientCount = 0,
+  draftPackagingCount = 0,
   recipeId,
 }: {
   canManage: boolean;
+  draftIngredientCount?: number;
+  draftPackagingCount?: number;
   recipeId: string | null;
 }): JSX.Element {
   const costQuery = useRecipeCost(recipeId, recipeId !== null);
@@ -35,6 +39,30 @@ export function RecipeCostCard({
       toast.error(getErrorMessage(error));
     }
   };
+
+  if (!recipeId) {
+    return (
+      <Card className="bg-white/80">
+        <CardHeader>
+          <CardTitle>Draft cost preview</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 text-sm text-brand-mocha">
+          <div className="flex justify-between">
+            <span>Ingredient lines</span>
+            <strong className="text-brand-espresso">{draftIngredientCount}</strong>
+          </div>
+          <div className="flex justify-between">
+            <span>Packaging lines</span>
+            <strong className="text-brand-espresso">{draftPackagingCount}</strong>
+          </div>
+          <p className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-3">
+            Exact ingredient, packaging, and yield-unit costs are calculated by the backend after
+            saving.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="bg-white/80">

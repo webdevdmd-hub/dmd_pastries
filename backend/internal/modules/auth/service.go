@@ -399,6 +399,10 @@ func defaultRolePresets() []defaultRolePreset {
 				"inventory.low_stock.view",
 				"inventory.expiry.view",
 				"inventory.expiry_batches.manage",
+				"inventory.locations.manage",
+				"inventory.transfer.create",
+				"inventory.transfer.complete",
+				"inventory.transfer.cancel",
 				"stock_movements.view",
 				"stock_movements.manual_create",
 				"stock_movements.reverse",
@@ -482,6 +486,10 @@ func defaultRolePresets() []defaultRolePreset {
 				"inventory.low_stock.view",
 				"inventory.expiry.view",
 				"inventory.expiry_batches.manage",
+				"inventory.locations.manage",
+				"inventory.transfer.create",
+				"inventory.transfer.complete",
+				"inventory.transfer.cancel",
 				"stock_movements.view",
 				"stock_movements.manual_create",
 				"stock_movements.reverse",
@@ -585,12 +593,9 @@ func (s *Service) AuthenticateToken(token string) (*utils.AuthContext, error) {
 		return nil, apperrors.Unauthorized("invalid Appwrite token")
 	}
 
-	user, err := s.repo.FindUserByAppwriteUserID(identity.ID)
+	user, err := s.resolveLocalUserForIdentity(s.db, identity)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, apperrors.Unauthorized("user is not registered locally")
-		}
-		return nil, apperrors.Internal("failed to load local user")
+		return nil, err
 	}
 
 	if user.Status != "active" {
@@ -638,13 +643,10 @@ func (s *Service) syncProfile(identity *utils.AppwriteIdentity, ipAddress, userA
 		return nil, apperrors.Internal("failed to start transaction")
 	}
 
-	user, err := s.repo.FindUserByAppwriteUserID(identity.ID)
+	user, err := s.resolveLocalUserForIdentity(tx, identity)
 	if err != nil {
 		tx.Rollback()
-		if err == gorm.ErrRecordNotFound {
-			return nil, apperrors.Unauthorized("user is not registered locally")
-		}
-		return nil, apperrors.Internal("failed to load local user")
+		return nil, err
 	}
 
 	if user.Status != "active" {
@@ -678,6 +680,42 @@ func (s *Service) syncProfile(identity *utils.AppwriteIdentity, ipAddress, userA
 	}
 
 	return s.buildProfile(identity.ID)
+}
+
+func (s *Service) resolveLocalUserForIdentity(tx *gorm.DB, identity *utils.AppwriteIdentity) (*users.User, error) {
+	user, err := s.repo.FindUserByAppwriteUserID(identity.ID)
+	if err == nil {
+		return user, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return nil, apperrors.Internal("failed to load local user")
+	}
+
+	email := strings.ToLower(strings.TrimSpace(identity.Email))
+	if email == "" {
+		return nil, apperrors.Unauthorized("user is not registered locally")
+	}
+
+	matches, err := s.repo.FindUsersByEmail(email)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load local user")
+	}
+	if len(matches) == 0 {
+		return nil, apperrors.Unauthorized("user is not registered locally")
+	}
+	if len(matches) > 1 {
+		return nil, apperrors.Unauthorized("multiple local users found for this email; contact support")
+	}
+
+	user = &matches[0]
+	if user.AppwriteUserID != identity.ID {
+		if err := s.userRepo.UpdateAppwriteUserID(tx, user.ID, identity.ID); err != nil {
+			return nil, apperrors.Internal("failed to relink local user")
+		}
+		user.AppwriteUserID = identity.ID
+	}
+
+	return user, nil
 }
 
 func (s *Service) LogoutSync(currentUser *utils.AuthContext, ipAddress, userAgent string) error {

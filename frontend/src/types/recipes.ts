@@ -5,6 +5,8 @@ export type Recipe = {
   businessId: string;
   productId: string;
   productName: string;
+  productVariantId: string | null;
+  productVariantName: string | null;
   recipeCode: string;
   recipeName: string;
   description: string | null;
@@ -88,8 +90,16 @@ export type RecipePackagingPayload = {
   sortOrder: number;
 };
 
+export type RecipeNewProductVariantPayload = {
+  variantName: string;
+  sku: string | null;
+  salePrice: number;
+};
+
 export type CreateRecipePayload = {
   productId: string;
+  productVariantId: string | null;
+  newProductVariant: RecipeNewProductVariantPayload | null;
   recipeName: string;
   description: string | null;
   batchYieldQuantity: number;
@@ -121,6 +131,14 @@ export type RecipeFilters = {
 export type RecipeProductOption = {
   id: string;
   productName: string;
+  variants: RecipeProductVariantOption[];
+};
+
+export type RecipeProductVariantOption = {
+  id: string;
+  variantName: string;
+  sku: string | null;
+  salePrice: number;
 };
 
 export type RecipeInventoryItemOption = {

@@ -12,6 +12,11 @@ type Repository struct {
 	db *gorm.DB
 }
 
+type ProductHistoryReference struct {
+	Reference string `json:"reference"`
+	Count     int64  `json:"count"`
+}
+
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
@@ -42,6 +47,114 @@ func (r *Repository) Update(tx *gorm.DB, id, businessID, branchID string, update
 		return gorm.ErrRecordNotFound
 	}
 	return nil
+}
+
+func (r *Repository) ProductHistoryReferences(businessID, branchID, productID string) ([]ProductHistoryReference, error) {
+	checks := []struct {
+		reference string
+		query     string
+		args      []interface{}
+	}{
+		{
+			reference: "inventory_items",
+			query:     "SELECT COUNT(*) FROM inventory_items WHERE business_id = ? AND branch_id = ? AND product_id = ? AND deleted_at IS NULL",
+			args:      []interface{}{businessID, branchID, productID},
+		},
+		{
+			reference: "stock_movements",
+			query: `SELECT COUNT(*)
+				FROM stock_movements sm
+				JOIN inventory_items ii ON ii.id = sm.inventory_item_id
+				WHERE sm.business_id = ? AND sm.branch_id = ? AND ii.product_id = ?`,
+			args: []interface{}{businessID, branchID, productID},
+		},
+		{
+			reference: "sale_items",
+			query: `SELECT COUNT(*)
+				FROM sale_items si
+				JOIN sales s ON s.id = si.sale_id
+				WHERE si.business_id = ? AND s.branch_id = ? AND si.product_id = ? AND s.deleted_at IS NULL`,
+			args: []interface{}{businessID, branchID, productID},
+		},
+		{
+			reference: "held_sale_items",
+			query: `SELECT COUNT(*)
+				FROM held_sale_items hsi
+				JOIN held_sales hs ON hs.id = hsi.held_sale_id
+				WHERE hsi.business_id = ? AND hs.branch_id = ? AND hsi.product_id = ? AND hs.status = 'held' AND hs.deleted_at IS NULL`,
+			args: []interface{}{businessID, branchID, productID},
+		},
+		{
+			reference: "purchase_order_items",
+			query: `SELECT COUNT(*)
+				FROM purchase_order_items poi
+				JOIN purchase_orders po ON po.id = poi.purchase_order_id
+				WHERE poi.business_id = ? AND po.branch_id = ? AND poi.product_id = ? AND poi.deleted_at IS NULL AND po.deleted_at IS NULL`,
+			args: []interface{}{businessID, branchID, productID},
+		},
+		{
+			reference: "purchase_invoice_items",
+			query: `SELECT COUNT(*)
+				FROM purchase_invoice_items pii
+				JOIN purchase_invoices pi ON pi.id = pii.purchase_invoice_id
+				WHERE pii.business_id = ? AND pi.branch_id = ? AND pii.product_id = ? AND pii.deleted_at IS NULL AND pi.deleted_at IS NULL`,
+			args: []interface{}{businessID, branchID, productID},
+		},
+		{
+			reference: "purchase_receipt_items",
+			query: `SELECT COUNT(*)
+				FROM purchase_receipt_items pri
+				JOIN purchase_receipts pr ON pr.id = pri.purchase_receipt_id
+				WHERE pri.business_id = ? AND pr.branch_id = ? AND pri.product_id = ? AND pri.deleted_at IS NULL AND pr.deleted_at IS NULL`,
+			args: []interface{}{businessID, branchID, productID},
+		},
+		{
+			reference: "recipes",
+			query:     "SELECT COUNT(*) FROM recipes WHERE business_id = ? AND branch_id = ? AND product_id = ? AND deleted_at IS NULL",
+			args:      []interface{}{businessID, branchID, productID},
+		},
+		{
+			reference: "production_batches",
+			query:     "SELECT COUNT(*) FROM production_batches WHERE business_id = ? AND branch_id = ? AND product_id = ? AND deleted_at IS NULL",
+			args:      []interface{}{businessID, branchID, productID},
+		},
+		{
+			reference: "production_outputs",
+			query: `SELECT COUNT(*)
+				FROM production_outputs po
+				JOIN production_batches pb ON pb.id = po.production_batch_id
+				WHERE po.business_id = ? AND pb.branch_id = ? AND po.product_id = ? AND pb.deleted_at IS NULL`,
+			args: []interface{}{businessID, branchID, productID},
+		},
+		{
+			reference: "bakery_order_items",
+			query: `SELECT COUNT(*)
+				FROM bakery_order_items boi
+				JOIN bakery_orders bo ON bo.id = boi.bakery_order_id
+				WHERE boi.business_id = ? AND bo.branch_id = ? AND boi.product_id = ? AND boi.deleted_at IS NULL AND bo.deleted_at IS NULL`,
+			args: []interface{}{businessID, branchID, productID},
+		},
+		{
+			reference: "packaging_usage_rules",
+			query:     "SELECT COUNT(*) FROM packaging_usage_rules WHERE business_id = ? AND branch_id = ? AND product_id = ?",
+			args:      []interface{}{businessID, branchID, productID},
+		},
+	}
+
+	references := make([]ProductHistoryReference, 0)
+	for _, check := range checks {
+		var count int64
+		if err := r.db.Raw(check.query, check.args...).Scan(&count).Error; err != nil {
+			return nil, err
+		}
+		if count > 0 {
+			references = append(references, ProductHistoryReference{
+				Reference: check.reference,
+				Count:     count,
+			})
+		}
+	}
+	return references, nil
 }
 
 func (r *Repository) List(businessID, branchID string, query ProductListQuery) ([]Product, int64, error) {

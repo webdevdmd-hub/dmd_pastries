@@ -47,7 +47,12 @@ function booleanValue(value: unknown, fallback = false): boolean {
 }
 
 function isInventoryItemType(value: unknown): value is InventoryItemType {
-  return value === "product" || value === "ingredient" || value === "packaging";
+  return (
+    value === "product" ||
+    value === "product_variant" ||
+    value === "ingredient" ||
+    value === "packaging"
+  );
 }
 
 function isMovementType(value: unknown): value is MovementType {

@@ -522,3 +522,19 @@ type ReconciliationReportItem struct {
 	Status             string  `json:"status"`
 	CreatedByUserName  string  `json:"created_by_user_name"`
 }
+
+type ReceiptRecordReportItem struct {
+	SaleID        string  `json:"sale_id"`
+	SaleNumber    string  `json:"sale_number"`
+	BranchName    string  `json:"branch_name"`
+	CustomerName  string  `json:"customer_name"`
+	CashierName   string  `json:"cashier_name"`
+	TotalAmount   float64 `json:"total_amount"`
+	PaidAmount    float64 `json:"paid_amount"`
+	PaymentStatus string  `json:"payment_status"`
+	SaleStatus    string  `json:"sale_status"`
+	SoldAt        string  `json:"sold_at"`
+	ViewCount     int64   `json:"view_count"`
+	LastViewedAt  *string `json:"last_viewed_at"`
+	ReceiptStatus string  `json:"receipt_status"`
+}

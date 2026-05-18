@@ -53,8 +53,12 @@ export function RecipeIngredientTable({
             <TableCell>
               {line.quantityRequired} {line.unitSymbol}
             </TableCell>
-            <TableCell>{formatCurrency(line.unitCostSnapshot)}</TableCell>
-            <TableCell>{formatCurrency(line.totalCost)}</TableCell>
+            <TableCell>
+              {line.id.startsWith("draft-") ? "After save" : formatCurrency(line.unitCostSnapshot)}
+            </TableCell>
+            <TableCell>
+              {line.id.startsWith("draft-") ? "After save" : formatCurrency(line.totalCost)}
+            </TableCell>
             <TableCell>{line.wastagePercentage}%</TableCell>
             <TableCell>
               {canManage ? (

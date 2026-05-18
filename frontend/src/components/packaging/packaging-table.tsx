@@ -6,6 +6,7 @@ import type { JSX } from "react";
 
 import { PackagingActionsMenu } from "@/components/packaging/packaging-actions-menu";
 import { PackagingStatusBadge } from "@/components/packaging/packaging-status-badge";
+import { ReorderLevelHeader } from "@/components/shared/reorder-level-help";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -55,7 +56,9 @@ export function PackagingTable({
           <TableHead>Unit</TableHead>
           <TableHead>Cost</TableHead>
           <TableHead>Stock Tracked</TableHead>
-          <TableHead>Reorder Level</TableHead>
+          <TableHead>
+            <ReorderLevelHeader />
+          </TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Created At</TableHead>
           <TableHead>Actions</TableHead>

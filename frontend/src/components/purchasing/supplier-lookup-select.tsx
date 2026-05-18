@@ -1,14 +1,10 @@
 "use client";
 
 import type { JSX } from "react";
+import { useMemo } from "react";
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
+import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import type { PurchasingSupplierOption } from "@/types/purchasing";
 
 export function SupplierLookupSelect({
@@ -20,22 +16,24 @@ export function SupplierLookupSelect({
   suppliers: PurchasingSupplierOption[];
   value: string;
 }): JSX.Element {
+  const supplierOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      suppliers.map((supplier) => ({
+        value: supplier.id,
+        label: supplier.supplierName,
+        keywords: [supplier.supplierName],
+      })),
+    [suppliers],
+  );
+
   return (
-    <Select
-      value={value || "none"}
-      onValueChange={(nextValue) => onValueChange(nextValue === "none" ? "" : nextValue)}
-    >
-      <SelectTrigger>
-        <SelectValue placeholder="Select supplier" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="none">Select supplier</SelectItem>
-        {suppliers.map((supplier) => (
-          <SelectItem key={supplier.id} value={supplier.id}>
-            {supplier.supplierName}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <SearchableCombobox
+      emptyMessage="No matching suppliers found."
+      onValueChange={onValueChange}
+      options={supplierOptions}
+      placeholder="Select supplier"
+      searchPlaceholder="Search supplier..."
+      value={value}
+    />
   );
 }

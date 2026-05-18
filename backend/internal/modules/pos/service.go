@@ -39,7 +39,7 @@ func (s *Service) ListPOSProducts(currentUser *utils.AuthContext, query POSProdu
 	for _, row := range rows {
 		productIDs = append(productIDs, row.ID)
 	}
-	variants, err := s.repo.LoadActiveVariants(currentUser.BusinessID, productIDs)
+	variants, err := s.repo.LoadActiveVariants(currentUser.BusinessID, branchID, productIDs)
 	if err != nil {
 		return nil, apperrors.Internal("failed to load product variants")
 	}
@@ -593,8 +593,8 @@ func (s *Service) VoidSale(currentUser *utils.AuthContext, saleID string, req Vo
 
 func (s *Service) deductInventoryForSale(tx *gorm.DB, currentUser *utils.AuthContext, sale *Sale, items []SaleItem) error {
 	quantities := aggregateSaleItemQuantities(items)
-	for productID, quantity := range quantities {
-		stock, err := s.repo.FindProductInventoryForSale(tx, sale.BusinessID, sale.BranchID, productID)
+	for key, quantity := range quantities {
+		stock, err := s.repo.FindProductInventoryForSale(tx, sale.BusinessID, sale.BranchID, key.ProductID, key.variantIDPointer())
 		if err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return apperrors.BadRequest("invalid product on sale", nil)
@@ -604,11 +604,12 @@ func (s *Service) deductInventoryForSale(tx *gorm.DB, currentUser *utils.AuthCon
 		if !stock.IsStockTracked {
 			continue
 		}
+		itemName := stockName(stock)
 		if stock.InventoryItemID == nil || strings.TrimSpace(*stock.InventoryItemID) == "" {
-			return apperrors.BadRequest("inventory item not found for stock-tracked product "+stock.ProductName, nil)
+			return apperrors.BadRequest("inventory item not found for stock-tracked product "+itemName, nil)
 		}
 		if quantity > stock.AvailableQuantity+0.0001 {
-			return apperrors.BadRequest(fmt.Sprintf("insufficient stock for %s. Required %.4f, available %.4f", stock.ProductName, quantity, stock.AvailableQuantity), nil)
+			return apperrors.BadRequest(fmt.Sprintf("insufficient stock for %s. Required %.4f, available %.4f", itemName, quantity, stock.AvailableQuantity), nil)
 		}
 		if _, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{
 			BusinessID:      sale.BusinessID,
@@ -629,8 +630,8 @@ func (s *Service) deductInventoryForSale(tx *gorm.DB, currentUser *utils.AuthCon
 
 func (s *Service) returnInventoryForVoidedSale(tx *gorm.DB, currentUser *utils.AuthContext, sale *Sale, items []SaleItem, reason string) error {
 	quantities := aggregateSaleItemQuantities(items)
-	for productID, quantity := range quantities {
-		stock, err := s.repo.FindProductInventoryForSale(tx, sale.BusinessID, sale.BranchID, productID)
+	for key, quantity := range quantities {
+		stock, err := s.repo.FindProductInventoryForSale(tx, sale.BusinessID, sale.BranchID, key.ProductID, key.variantIDPointer())
 		if err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return apperrors.BadRequest("invalid product on sale", nil)
@@ -640,8 +641,9 @@ func (s *Service) returnInventoryForVoidedSale(tx *gorm.DB, currentUser *utils.A
 		if !stock.IsStockTracked {
 			continue
 		}
+		itemName := stockName(stock)
 		if stock.InventoryItemID == nil || strings.TrimSpace(*stock.InventoryItemID) == "" {
-			return apperrors.BadRequest("inventory item not found for stock-tracked product "+stock.ProductName, nil)
+			return apperrors.BadRequest("inventory item not found for stock-tracked product "+itemName, nil)
 		}
 		if _, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{
 			BusinessID:      sale.BusinessID,
@@ -660,12 +662,39 @@ func (s *Service) returnInventoryForVoidedSale(tx *gorm.DB, currentUser *utils.A
 	return nil
 }
 
-func aggregateSaleItemQuantities(items []SaleItem) map[string]float64 {
-	quantities := make(map[string]float64)
+type saleStockKey struct {
+	ProductID        string
+	ProductVariantID string
+}
+
+func aggregateSaleItemQuantities(items []SaleItem) map[saleStockKey]float64 {
+	quantities := make(map[saleStockKey]float64)
 	for _, item := range items {
-		quantities[item.ProductID] += item.Quantity
+		key := saleStockKey{ProductID: item.ProductID}
+		if item.ProductVariantID != nil && strings.TrimSpace(*item.ProductVariantID) != "" {
+			key.ProductVariantID = strings.TrimSpace(*item.ProductVariantID)
+		}
+		quantities[key] += item.Quantity
 	}
 	return quantities
+}
+
+func (key saleStockKey) variantIDPointer() *string {
+	if strings.TrimSpace(key.ProductVariantID) == "" {
+		return nil
+	}
+	variantID := key.ProductVariantID
+	return &variantID
+}
+
+func stockName(stock *ProductInventoryStockRow) string {
+	if stock == nil {
+		return ""
+	}
+	if stock.ProductVariantID != nil && strings.TrimSpace(stock.VariantName) != "" {
+		return strings.TrimSpace(stock.ProductName + " - " + stock.VariantName)
+	}
+	return stock.ProductName
 }
 
 type saleCalculation struct {
@@ -1103,13 +1132,15 @@ func toPOSProduct(row ProductRow) POSProductResponse {
 
 func toPOSVariant(row VariantRow) POSVariantResponse {
 	return POSVariantResponse{
-		ID:          row.ID,
-		VariantName: row.VariantName,
-		SKU:         row.SKU,
-		Barcode:     row.Barcode,
-		SalePrice:   row.SalePrice,
-		ImageFileID: row.ImageFileID,
-		Status:      row.Status,
+		ID:                     row.ID,
+		VariantName:            row.VariantName,
+		SKU:                    row.SKU,
+		Barcode:                row.Barcode,
+		SalePrice:              row.SalePrice,
+		ImageFileID:            row.ImageFileID,
+		CurrentStockQuantity:   row.CurrentStockQuantity,
+		AvailableStockQuantity: row.AvailableStockQuantity,
+		Status:                 row.Status,
 	}
 }
 

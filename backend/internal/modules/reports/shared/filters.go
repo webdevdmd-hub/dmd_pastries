@@ -21,6 +21,7 @@ type ReportBaseFilter struct {
 	Limit             int
 	SortBy            string
 	SortOrder         string
+	Search            string
 	CashierUserID     string
 	CustomerID        string
 	ProductID         string
@@ -55,6 +56,7 @@ type ResolvedFilter struct {
 	Limit             int
 	SortBy            string
 	SortOrder         string
+	Search            string
 	CashierUserID     string
 	CustomerID        string
 	ProductID         string
@@ -98,6 +100,7 @@ func ParseQuery(values url.Values) ReportBaseFilter {
 		Limit:             limit,
 		SortBy:            strings.TrimSpace(values.Get("sort_by")),
 		SortOrder:         strings.TrimSpace(values.Get("sort_order")),
+		Search:            strings.TrimSpace(values.Get("search")),
 		CashierUserID:     strings.TrimSpace(values.Get("cashier_user_id")),
 		CustomerID:        strings.TrimSpace(values.Get("customer_id")),
 		ProductID:         strings.TrimSpace(values.Get("product_id")),
@@ -154,7 +157,7 @@ func Resolve(currentUser *utils.AuthContext, filter ReportBaseFilter) (*Resolved
 	if sortOrder != "asc" && sortOrder != "desc" {
 		return nil, apperrors.BadRequest("invalid sort_order", nil)
 	}
-	if filter.ItemType != "" && filter.ItemType != "product" && filter.ItemType != "ingredient" && filter.ItemType != "packaging" {
+	if filter.ItemType != "" && filter.ItemType != "product" && filter.ItemType != "product_variant" && filter.ItemType != "ingredient" && filter.ItemType != "packaging" {
 		return nil, apperrors.BadRequest("invalid item_type", nil)
 	}
 	if filter.MovementDirection != "" && filter.MovementDirection != "in" && filter.MovementDirection != "out" && filter.MovementDirection != "neutral" {
@@ -189,6 +192,7 @@ func Resolve(currentUser *utils.AuthContext, filter ReportBaseFilter) (*Resolved
 		Limit:             limit,
 		SortBy:            filter.SortBy,
 		SortOrder:         sortOrder,
+		Search:            filter.Search,
 		CashierUserID:     filter.CashierUserID,
 		CustomerID:        filter.CustomerID,
 		ProductID:         filter.ProductID,

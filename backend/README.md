@@ -648,6 +648,20 @@ Implemented protected APIs:
 - `GET /api/v1/inventory`
 - `GET /api/v1/inventory/:id`
 - `POST /api/v1/inventory/opening-stock`
+- `GET /api/v1/inventory/stock-locations`
+- `POST /api/v1/inventory/stock-locations`
+- `GET /api/v1/inventory/stock-locations/:locationId`
+- `PATCH /api/v1/inventory/stock-locations/:locationId`
+- `PATCH /api/v1/inventory/stock-locations/:locationId/status`
+- `PATCH /api/v1/inventory/stock-locations/:locationId/default`
+- `DELETE /api/v1/inventory/stock-locations/:locationId`
+- `GET /api/v1/inventory/location-balances`
+- `GET /api/v1/inventory/:id/location-balances`
+- `GET /api/v1/inventory/stock-transfers`
+- `POST /api/v1/inventory/stock-transfers`
+- `GET /api/v1/inventory/stock-transfers/:transferId`
+- `POST /api/v1/inventory/stock-transfers/:transferId/complete`
+- `POST /api/v1/inventory/stock-transfers/:transferId/cancel`
 - `POST /api/v1/inventory/:id/adjust`
 - `GET /api/v1/inventory/:id/movements`
 - `GET /api/v1/inventory/movements`
@@ -662,10 +676,20 @@ Behavior:
 
 - inventory is tenant-scoped by authenticated user `business_id`
 - protected by `inventory.view` and `inventory.manage`
-- stock is tracked per business, branch, item type, and item ID
+- stock is tracked per business, branch, item type, item ID, and optional product variant
 - product inventory is fully validated against existing products, branches, and units
+- product variants can be tracked as separate inventory rows with `item_type = product_variant`, `product_id`, and `product_variant_id`
+- inventory list supports `include_uninitialized=true` to include stock-tracked catalog products, variants, ingredients, and packaging items that do not have an inventory row yet
+- uninitialized inventory rows return zero quantities, `inventory_status = not_initialized`, and `can_add_opening_stock = true`
+- POS checkout deducts variant inventory when `product_variant_id` is provided; otherwise it deducts parent product inventory
 - ingredient inventory IDs are schema-ready for a future ingredients module; packaging inventory IDs now link to Sprint 4.1 packaging items
 - every stock change creates a `stock_movements` record
+- stock locations track physical areas inside a branch, such as Kitchen, Store Room, Front Desk, Display Counter, or Main Stock
+- every branch gets a default `Main Stock` location from migration backfill
+- opening stock accepts optional `stock_location_id`; if omitted, backend uses the branch default location
+- location balances show the branch inventory breakdown by `Branch + Location + Item`, including variant rows such as `Orange Mocktail - Small`
+- stock transfers move quantity between two locations in the same branch without changing the branch-level inventory total
+- transfer completion writes a `transfer` stock movement with `from_stock_location_id` and `to_stock_location_id`
 - opening stock creates or increments an inventory item and writes an `opening_stock` movement
 - manual adjustment supports `increase` and `decrease`, and prevents negative stock
 - `available_quantity` is maintained as `current_quantity - reserved_quantity`
@@ -1769,6 +1793,22 @@ curl -X POST http://localhost:8080/api/v1/inventory/opening-stock \
     "reason":"Initial stock"
   }'
 
+curl -X POST http://localhost:8080/api/v1/inventory/opening-stock \
+  -H "Authorization: Bearer appwrite_jwt_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "branch_id":"branch_uuid_here",
+    "item_type":"product_variant",
+    "product_id":"product_uuid_here",
+    "product_variant_id":"variant_uuid_here",
+    "stock_location_id":"location_uuid_here",
+    "unit_id":"unit_uuid_here",
+    "quantity":30,
+    "reorder_level":5,
+    "is_expiry_tracked":false,
+    "reason":"Initial variant stock"
+  }'
+
 curl -X POST http://localhost:8080/api/v1/inventory/{id}/adjust \
   -H "Authorization: Bearer appwrite_jwt_here" \
   -H "Content-Type: application/json" \
@@ -2002,6 +2042,11 @@ curl -X POST http://localhost:8080/api/v1/recipes \
   -H "Content-Type: application/json" \
   -d '{
     "product_id":"manufactured_product_uuid_here",
+    "new_product_variant":{
+      "variant_name":"Orange Juice Mocktail",
+      "sku":"OJ-MOCKTAIL",
+      "sale_price":12
+    },
     "recipe_name":"Chocolate Cake Base Recipe",
     "description":"Standard chocolate cake recipe",
     "batch_yield_quantity":10,
@@ -2027,6 +2072,14 @@ curl -X POST http://localhost:8080/api/v1/recipes \
       }
     ]
   }'
+
+Recipe output can target either the parent product or a product variant:
+
+- send `product_variant_id` to link the recipe to an existing variant
+- send `new_product_variant` to create a product variant from the recipe form and link the recipe to it
+- omit both to keep the recipe output on the parent product
+
+When manufacturing completes a recipe linked to a variant, finished stock is added to the variant inventory row (`item_type = product_variant`) and POS deducts from that variant when sold.
 
 curl http://localhost:8080/api/v1/recipes/{id}/cost \
   -H "Authorization: Bearer appwrite_jwt_here"
@@ -2317,6 +2370,7 @@ GET  /api/v1/reports/sales/taxes
 GET  /api/v1/reports/sales/top-products
 GET  /api/v1/reports/sales/slow-moving-products
 GET  /api/v1/reports/sales/trend
+GET  /api/v1/reports/receipts
 GET  /api/v1/reports/inventory/summary
 GET  /api/v1/reports/inventory/current-stock
 GET  /api/v1/reports/inventory/stock-valuation
@@ -2357,10 +2411,10 @@ POST /api/v1/reports/export/csv
 Common filters:
 
 ```txt
-branch_id, scope, date_from, date_to, timezone, group_by, page, limit, sort_by, sort_order
+branch_id, scope, date_from, date_to, timezone, group_by, page, limit, sort_by, sort_order, search
 ```
 
-Reports default to the authenticated user's current branch. Owner/Admin all-branch reporting requires `branch_id=all` or `scope=all_branches`. Inventory report endpoints additionally require `inventory.view`; manufacturing report endpoints additionally require `manufacturing.view`; bakery orders report endpoints additionally require `orders.view`.
+Reports default to the authenticated user's current branch. Owner/Admin all-branch reporting requires `branch_id=all` or `scope=all_branches`. Inventory report endpoints additionally require `inventory.view`; manufacturing report endpoints additionally require `manufacturing.view`; bakery orders report endpoints additionally require `orders.view`. Receipt records report returns POS sales receipt status using sales data plus `sale.receipt_viewed` audit events.
 
 ## Dashboard Intelligence APIs
 

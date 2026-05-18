@@ -12,6 +12,7 @@ type ProductionBatch struct {
 	BranchID              string         `gorm:"type:uuid;not null;index" json:"branch_id"`
 	RecipeID              string         `gorm:"type:uuid;not null;index" json:"recipe_id"`
 	ProductID             string         `gorm:"type:uuid;not null;index" json:"product_id"`
+	ProductVariantID      *string        `gorm:"type:uuid;index" json:"product_variant_id"`
 	ProductionBatchNumber string         `gorm:"size:100;not null" json:"production_batch_number"`
 	PlannedQuantity       float64        `gorm:"not null" json:"planned_quantity"`
 	ProducedQuantity      float64        `gorm:"not null;default:0" json:"produced_quantity"`
@@ -87,6 +88,7 @@ type ProductionOutput struct {
 	BusinessID        string     `gorm:"type:uuid;not null;index" json:"business_id"`
 	ProductionBatchID string     `gorm:"type:uuid;not null;index" json:"production_batch_id"`
 	ProductID         string     `gorm:"type:uuid;not null;index" json:"product_id"`
+	ProductVariantID  *string    `gorm:"type:uuid;index" json:"product_variant_id"`
 	InventoryItemID   string     `gorm:"type:uuid;not null;index" json:"inventory_item_id"`
 	ProducedQuantity  float64    `gorm:"not null" json:"produced_quantity"`
 	UnitID            string     `gorm:"type:uuid;not null;index" json:"unit_id"`

@@ -16,23 +16,23 @@ import { OrderProductionSection } from "@/components/orders/order-production-sec
 import { OrderScheduleCard } from "@/components/orders/order-schedule-card";
 import { OrdersErrorState } from "@/components/orders/orders-error-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
+import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useBranches } from "@/hooks/use-branches";
-import { useCreateOrder, useOrder, useUpdateOrder } from "@/hooks/use-orders";
+import { useAddOrderPackaging, useCreateOrder, useOrder, useUpdateOrder } from "@/hooks/use-orders";
 import { usePermission } from "@/hooks/use-permission";
 import { useProductReferenceData, useProducts } from "@/hooks/use-products";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import { createOrderSchema } from "@/lib/validators/orders.schema";
 import type { Branch } from "@/types/branch";
-import type { CreateOrderItemPayload, CreateOrderPayload, OrderType } from "@/types/orders";
+import type {
+  AddOrderPackagingPayload,
+  CreateOrderItemPayload,
+  CreateOrderPayload,
+  OrderType,
+} from "@/types/orders";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -82,6 +82,7 @@ export function OrderFormPage({ orderId }: { orderId: string | null }): JSX.Elem
   const referenceQuery = useProductReferenceData(canView);
   const createMutation = useCreateOrder();
   const updateMutation = useUpdateOrder();
+  const addPackagingMutation = useAddOrderPackaging();
 
   const selectableBranches = useMemo(() => {
     const branches = branchesQuery.data ?? [];
@@ -112,6 +113,19 @@ export function OrderFormPage({ orderId }: { orderId: string | null }): JSX.Elem
       ""
     );
   }, [branchScope.canAccessAllBranches, branchScope.effectiveBranchId, selectableBranches]);
+  const branchOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      selectableBranches.map((branch) => ({
+        value: branch.id,
+        label: branch.name,
+        description: [branch.code, branch.status === "active" ? "Active" : "Inactive"]
+          .filter((part) => part.length > 0)
+          .join(" · "),
+        keywords: [branch.name, branch.code],
+        disabled: branch.status !== "active",
+      })),
+    [selectableBranches],
+  );
 
   const [branchId, setBranchId] = useState("");
   const [customerId, setCustomerId] = useState<string | null>(null);
@@ -124,6 +138,7 @@ export function OrderFormPage({ orderId }: { orderId: string | null }): JSX.Elem
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<CreateOrderItemPayload[]>([]);
+  const [draftPackaging, setDraftPackaging] = useState<AddOrderPackagingPayload[]>([]);
 
   useEffect(() => {
     if (!branchId && defaultBranchId) {
@@ -146,6 +161,7 @@ export function OrderFormPage({ orderId }: { orderId: string | null }): JSX.Elem
     setDeliveryTime(order.deliveryTime ?? "");
     setDeliveryAddress(order.deliveryAddress ?? "");
     setNotes(order.notes ?? "");
+    setDraftPackaging([]);
     setItems(
       mapOrderToItems(
         order.items.map((item) => ({
@@ -193,6 +209,11 @@ export function OrderFormPage({ orderId }: { orderId: string | null }): JSX.Elem
         toast.success("Order updated.");
       } else {
         const created = await createMutation.mutateAsync(result.data);
+        await Promise.all(
+          draftPackaging.map((payload) =>
+            addPackagingMutation.mutateAsync({ orderId: created.id, payload }),
+          ),
+        );
         toast.success("Order created.");
         router.replace(`/orders/${created.id}`);
       }
@@ -238,25 +259,23 @@ export function OrderFormPage({ orderId }: { orderId: string | null }): JSX.Elem
       <div className="mx-auto grid max-w-7xl gap-6">
         <OrderHeader
           canManage={canManage}
-          isSaving={createMutation.isPending || updateMutation.isPending}
+          isSaving={
+            createMutation.isPending || updateMutation.isPending || addPackagingMutation.isPending
+          }
           onSave={() => void save()}
           order={order}
         />
         <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
           <h2 className="text-xl font-semibold text-brand-espresso">Branch</h2>
           <div className="mt-4 max-w-xl">
-            <Select onValueChange={setBranchId} value={branchId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select branch" />
-              </SelectTrigger>
-              <SelectContent>
-                {selectableBranches.map((branch: Branch) => (
-                  <SelectItem key={branch.id} value={branch.id}>
-                    {branch.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableCombobox
+              emptyMessage="No matching branches found."
+              onValueChange={setBranchId}
+              options={branchOptions}
+              placeholder="Select branch"
+              searchPlaceholder="Search branch, code..."
+              value={branchId}
+            />
           </div>
         </section>
         <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
@@ -297,7 +316,12 @@ export function OrderFormPage({ orderId }: { orderId: string | null }): JSX.Elem
           <div className="grid content-start gap-6">
             <OrderPaymentSection canManage={canManage} order={order} />
             <OrderProductionSection canManage={canManage} order={order} />
-            <OrderPackagingSection canManage={canManage} order={order} />
+            <OrderPackagingSection
+              canManage={canManage}
+              draftPackaging={draftPackaging}
+              onDraftPackagingChange={setDraftPackaging}
+              order={order}
+            />
           </div>
         </div>
       </div>

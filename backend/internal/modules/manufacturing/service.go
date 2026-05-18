@@ -338,16 +338,18 @@ func (s *Service) GetOutputs(currentUser *utils.AuthContext, id string) (*Produc
 		return nil, apperrors.Forbidden("branch access denied")
 	}
 
-	_, _, productName, _ := s.repo.NameLookups(currentUser.BusinessID, *batch)
+	_, _, productName, productVariantName, _ := s.repo.NameLookups(currentUser.BusinessID, *batch)
 	result := &ProductionOutputsResponse{
-		BatchID:          batch.ID,
-		Status:           batch.Status,
-		ProductID:        batch.ProductID,
-		ProductName:      productName,
-		PlannedQuantity:  roundQuantity(batch.PlannedQuantity),
-		ProducedQuantity: roundQuantity(batch.ProducedQuantity),
-		YieldUnitID:      batch.YieldUnitID,
-		YieldUnitSymbol:  s.repo.UnitSymbol(batch.YieldUnitID),
+		BatchID:            batch.ID,
+		Status:             batch.Status,
+		ProductID:          batch.ProductID,
+		ProductName:        productName,
+		ProductVariantID:   batch.ProductVariantID,
+		ProductVariantName: productVariantName,
+		PlannedQuantity:    roundQuantity(batch.PlannedQuantity),
+		ProducedQuantity:   roundQuantity(batch.ProducedQuantity),
+		YieldUnitID:        batch.YieldUnitID,
+		YieldUnitSymbol:    s.repo.UnitSymbol(batch.YieldUnitID),
 	}
 
 	output, err := s.repo.Output(batch.ID, currentUser.BusinessID)
@@ -481,7 +483,7 @@ func (s *Service) CompleteBatch(currentUser *utils.AuthContext, id string, req C
 				return err
 			}
 		}
-		outputItem, err := s.findOrCreateProductInventoryItem(tx, currentUser.BusinessID, batch.BranchID, batch.ProductID, batch.YieldUnitID)
+		outputItem, err := s.findOrCreateProductInventoryItem(tx, currentUser.BusinessID, batch.BranchID, batch.ProductID, batch.ProductVariantID, batch.YieldUnitID)
 		if err != nil {
 			return err
 		}
@@ -489,7 +491,7 @@ func (s *Service) CompleteBatch(currentUser *utils.AuthContext, id string, req C
 		if err != nil {
 			return err
 		}
-		output := &ProductionOutput{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, ProductionBatchID: batch.ID, ProductID: batch.ProductID, InventoryItemID: outputItem.ID, ProducedQuantity: producedQuantity, UnitID: batch.YieldUnitID, BatchNumber: strings.TrimSpace(req.BatchNumber), ExpiryDate: expiryDate, StockMovementID: &movement.ID}
+		output := &ProductionOutput{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, ProductionBatchID: batch.ID, ProductID: batch.ProductID, ProductVariantID: batch.ProductVariantID, InventoryItemID: outputItem.ID, ProducedQuantity: producedQuantity, UnitID: batch.YieldUnitID, BatchNumber: strings.TrimSpace(req.BatchNumber), ExpiryDate: expiryDate, StockMovementID: &movement.ID}
 		if err := s.repo.CreateOutput(tx, output); err != nil {
 			return err
 		}
@@ -675,7 +677,7 @@ func (s *Service) buildBatch(tx *gorm.DB, currentUser *utils.AuthContext, req Cr
 	}
 	ingredientCost, packagingCost := sumIngredientCost(ingredients), sumPackagingCost(packaging)
 	total := roundMoney(ingredientCost + packagingCost)
-	batch := &ProductionBatch{ID: batchID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, RecipeID: recipe.ID, ProductID: recipe.ProductID, PlannedQuantity: req.PlannedQuantity, ProducedQuantity: 0, YieldUnitID: recipe.BatchYieldUnitID, Status: "planned", ProductionDate: productionDate, IngredientCost: ingredientCost, PackagingCost: packagingCost, TotalProductionCost: total, CostPerUnit: roundQuantity(total / req.PlannedQuantity), Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}
+	batch := &ProductionBatch{ID: batchID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, RecipeID: recipe.ID, ProductID: recipe.ProductID, ProductVariantID: recipe.ProductVariantID, PlannedQuantity: req.PlannedQuantity, ProducedQuantity: 0, YieldUnitID: recipe.BatchYieldUnitID, Status: "planned", ProductionDate: productionDate, IngredientCost: ingredientCost, PackagingCost: packagingCost, TotalProductionCost: total, CostPerUnit: roundQuantity(total / req.PlannedQuantity), Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}
 	return batch, ingredients, packaging, nil
 }
 
@@ -795,9 +797,13 @@ func (s *Service) costTotals(batchID, businessID string) (float64, float64, erro
 	return sumIngredientCost(ingredients), sumPackagingCost(packaging), nil
 }
 
-func (s *Service) findOrCreateProductInventoryItem(tx *gorm.DB, businessID, branchID, productID, unitID string) (*inventory.InventoryItem, error) {
+func (s *Service) findOrCreateProductInventoryItem(tx *gorm.DB, businessID, branchID, productID string, productVariantID *string, unitID string) (*inventory.InventoryItem, error) {
 	itemID := productID
-	item, err := s.inventoryRepo.FindExistingItem(tx, businessID, branchID, "product", &itemID)
+	itemType := "product"
+	if productVariantID != nil {
+		itemType = "product_variant"
+	}
+	item, err := s.inventoryRepo.FindExistingItem(tx, businessID, branchID, itemType, &itemID, productVariantID)
 	if err == nil {
 		if item.UnitID != unitID {
 			return nil, apperrors.BadRequest("unit conversion is not available yet; output unit must match product inventory unit", nil)
@@ -807,8 +813,17 @@ func (s *Service) findOrCreateProductInventoryItem(tx *gorm.DB, businessID, bran
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
+	product, err := s.repo.Product(tx, businessID, branchID, productID)
+	if err != nil {
+		return nil, notFound(err, "product not found")
+	}
+	if variant, err := s.repo.ProductVariant(tx, businessID, branchID, productID, productVariantID); err != nil {
+		return nil, notFound(err, "product variant not found")
+	} else if variant != nil && variant.Status != "active" {
+		return nil, apperrors.BadRequest("product variant must be active", nil)
+	}
 	productIDPtr := productID
-	item = &inventory.InventoryItem{ID: utils.NewUUID(), BusinessID: businessID, BranchID: branchID, ProductID: &productIDPtr, ItemType: "product", CurrentQuantity: 0, ReservedQuantity: 0, AvailableQuantity: 0, ReorderLevel: 0, UnitID: unitID, IsExpiryTracked: true, Status: "active"}
+	item = &inventory.InventoryItem{ID: utils.NewUUID(), BusinessID: businessID, BranchID: branchID, ProductID: &productIDPtr, ProductVariantID: productVariantID, ItemType: itemType, CurrentQuantity: 0, ReservedQuantity: 0, AvailableQuantity: 0, ReorderLevel: 0, UnitID: unitID, IsExpiryTracked: product.IsExpiryTracked, Status: "active"}
 	if err := s.inventoryRepo.CreateInventoryItem(tx, item); err != nil {
 		return nil, err
 	}
@@ -816,8 +831,8 @@ func (s *Service) findOrCreateProductInventoryItem(tx *gorm.DB, businessID, bran
 }
 
 func (s *Service) batchResponse(businessID string, batch ProductionBatch, includeDetails bool) ProductionBatchResponse {
-	branchName, recipeName, productName, createdByName := s.repo.NameLookups(businessID, batch)
-	response := ProductionBatchResponse{ID: batch.ID, BusinessID: batch.BusinessID, BranchID: batch.BranchID, BranchName: branchName, RecipeID: batch.RecipeID, RecipeName: recipeName, ProductID: batch.ProductID, ProductName: productName, ProductionBatchNumber: batch.ProductionBatchNumber, PlannedQuantity: roundQuantity(batch.PlannedQuantity), ProducedQuantity: roundQuantity(batch.ProducedQuantity), YieldUnitID: batch.YieldUnitID, YieldUnitSymbol: s.repo.UnitSymbol(batch.YieldUnitID), Status: batch.Status, ProductionDate: batch.ProductionDate, StartedAt: batch.StartedAt, CompletedAt: batch.CompletedAt, CancelledAt: batch.CancelledAt, IngredientCost: roundMoney(batch.IngredientCost), PackagingCost: roundMoney(batch.PackagingCost), TotalProductionCost: roundMoney(batch.TotalProductionCost), CostPerUnit: roundQuantity(batch.CostPerUnit), WastageQuantity: roundQuantity(batch.WastageQuantity), WastageReason: batch.WastageReason, Notes: batch.Notes, CreatedByUserID: batch.CreatedByUserID, CreatedByUserName: createdByName, CompletedByUserID: batch.CompletedByUserID, CreatedAt: batch.CreatedAt, UpdatedAt: batch.UpdatedAt}
+	branchName, recipeName, productName, productVariantName, createdByName := s.repo.NameLookups(businessID, batch)
+	response := ProductionBatchResponse{ID: batch.ID, BusinessID: batch.BusinessID, BranchID: batch.BranchID, BranchName: branchName, RecipeID: batch.RecipeID, RecipeName: recipeName, ProductID: batch.ProductID, ProductName: productName, ProductVariantID: batch.ProductVariantID, ProductVariantName: productVariantName, ProductionBatchNumber: batch.ProductionBatchNumber, PlannedQuantity: roundQuantity(batch.PlannedQuantity), ProducedQuantity: roundQuantity(batch.ProducedQuantity), YieldUnitID: batch.YieldUnitID, YieldUnitSymbol: s.repo.UnitSymbol(batch.YieldUnitID), Status: batch.Status, ProductionDate: batch.ProductionDate, StartedAt: batch.StartedAt, CompletedAt: batch.CompletedAt, CancelledAt: batch.CancelledAt, IngredientCost: roundMoney(batch.IngredientCost), PackagingCost: roundMoney(batch.PackagingCost), TotalProductionCost: roundMoney(batch.TotalProductionCost), CostPerUnit: roundQuantity(batch.CostPerUnit), WastageQuantity: roundQuantity(batch.WastageQuantity), WastageReason: batch.WastageReason, Notes: batch.Notes, CreatedByUserID: batch.CreatedByUserID, CreatedByUserName: createdByName, CompletedByUserID: batch.CompletedByUserID, CreatedAt: batch.CreatedAt, UpdatedAt: batch.UpdatedAt}
 	if includeDetails {
 		ingredients, _ := s.repo.Ingredients(batch.ID, businessID)
 		packaging, _ := s.repo.Packaging(batch.ID, businessID)
@@ -861,7 +876,11 @@ func (s *Service) packagingResponses(items []ProductionPackagingConsumption) []P
 }
 
 func (s *Service) outputResponse(output ProductionOutput) ProductionOutputResponse {
-	return ProductionOutputResponse{ID: output.ID, ProductID: output.ProductID, InventoryItemID: output.InventoryItemID, ProducedQuantity: roundQuantity(output.ProducedQuantity), UnitID: output.UnitID, UnitSymbol: s.repo.UnitSymbol(output.UnitID), BatchNumber: output.BatchNumber, ExpiryDate: output.ExpiryDate, StockMovementID: output.StockMovementID, CreatedAt: output.CreatedAt, UpdatedAt: output.UpdatedAt}
+	var variantName string
+	if output.ProductVariantID != nil {
+		_ = s.db.Table("product_variants").Select("variant_name").Where("id = ? AND business_id = ?", *output.ProductVariantID, output.BusinessID).Scan(&variantName).Error
+	}
+	return ProductionOutputResponse{ID: output.ID, ProductID: output.ProductID, ProductVariantID: output.ProductVariantID, ProductVariantName: variantName, InventoryItemID: output.InventoryItemID, ProducedQuantity: roundQuantity(output.ProducedQuantity), UnitID: output.UnitID, UnitSymbol: s.repo.UnitSymbol(output.UnitID), BatchNumber: output.BatchNumber, ExpiryDate: output.ExpiryDate, StockMovementID: output.StockMovementID, CreatedAt: output.CreatedAt, UpdatedAt: output.UpdatedAt}
 }
 
 func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {

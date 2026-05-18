@@ -8,6 +8,12 @@ import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/routes";
 import type { ProductionBatch } from "@/types/manufacturing";
 
+function batchOutputLabel(batch: ProductionBatch): string {
+  return batch.productVariantName
+    ? `${batch.productName} - ${batch.productVariantName}`
+    : batch.productName;
+}
+
 export function BatchHeader({
   batch,
   canManage,
@@ -35,7 +41,7 @@ export function BatchHeader({
           <BatchStatusBadge status={batch.status} />
         </div>
         <p className="mt-2 text-sm text-brand-mocha">
-          {batch.productName} · {batch.recipeName} v{batch.recipeVersionNumber}
+          {batchOutputLabel(batch)} · {batch.recipeName} v{batch.recipeVersionNumber}
         </p>
       </div>
       {canManage ? (

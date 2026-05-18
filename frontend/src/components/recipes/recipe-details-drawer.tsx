@@ -18,6 +18,12 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
 }
 
+function recipeOutputLabel(recipe: Recipe): string {
+  return recipe.productVariantName
+    ? `${recipe.productName} - ${recipe.productVariantName}`
+    : recipe.productName;
+}
+
 export function RecipeDetailsDrawer({
   onOpenChange,
   open,
@@ -32,12 +38,22 @@ export function RecipeDetailsDrawer({
       <SheetContent className="w-full sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>{recipe?.recipeName ?? "Recipe details"}</SheetTitle>
-          <SheetDescription>{recipe?.productName ?? "Recipe quick preview"}</SheetDescription>
+          <SheetDescription>
+            {recipe ? recipeOutputLabel(recipe) : "Recipe quick preview"}
+          </SheetDescription>
         </SheetHeader>
         {recipe ? (
           <div className="mt-6 space-y-4">
             <RecipeStatusBadge status={recipe.status} />
             <div className="grid gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4 text-sm">
+              <div className="flex justify-between gap-4">
+                <span className="text-brand-mocha">Output</span>
+                <strong className="text-right">{recipeOutputLabel(recipe)}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-brand-mocha">Stock target</span>
+                <strong>{recipe.productVariantName ? "Variant" : "Parent product"}</strong>
+              </div>
               <div className="flex justify-between">
                 <span className="text-brand-mocha">Yield</span>
                 <strong>

@@ -164,6 +164,19 @@ func (s *Service) SalesTrend(currentUser *utils.AuthContext, values url.Values, 
 	return &shared.ChartResponse{Labels: labels, Datasets: []shared.ChartDataset{{Label: "Net Sales", Data: netSales}, {Label: "Sales Count", Data: salesCount}}}, nil
 }
 
+func (s *Service) ReceiptRecords(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*PaginatedResponse[ReceiptRecordReportItem], error) {
+	filter, err := shared.Resolve(currentUser, shared.ParseQuery(values))
+	if err != nil {
+		return nil, err
+	}
+	items, total, err := s.repo.ReceiptRecords(filter)
+	if err != nil {
+		return nil, apperrors.Internal("failed to generate receipt records report")
+	}
+	_ = s.writeAudit(currentUser, "report.receipts_viewed", "reports", "receipt_records", "Receipt records report viewed.", filter, ipAddress, userAgent)
+	return &PaginatedResponse[ReceiptRecordReportItem]{Items: items, Pagination: shared.NewPagination(filter.Page, filter.Limit, total)}, nil
+}
+
 func (s *Service) InventorySummary(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*InventoryReportSummaryResponse, error) {
 	filter, err := shared.Resolve(currentUser, shared.ParseQuery(values))
 	if err != nil {

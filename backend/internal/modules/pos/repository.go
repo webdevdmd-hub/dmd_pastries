@@ -57,7 +57,9 @@ func (r *Repository) FindPOSProductByID(tx *gorm.DB, businessID, branchID, produ
 func (r *Repository) FindVariantByID(tx *gorm.DB, businessID, branchID, productID, variantID string) (*VariantRow, error) {
 	var row VariantRow
 	err := tx.Table("product_variants pv").
+		Select("pv.*, COALESCE(ii.current_quantity, 0) AS current_stock_quantity, COALESCE(ii.available_quantity, 0) AS available_stock_quantity").
 		Joins("JOIN products p ON p.id = pv.product_id AND p.business_id = pv.business_id AND p.deleted_at IS NULL").
+		Joins("LEFT JOIN inventory_items ii ON ii.business_id = pv.business_id AND ii.branch_id = p.branch_id AND ii.item_type = ? AND ii.product_id = pv.product_id AND ii.product_variant_id = pv.id AND ii.deleted_at IS NULL", "product_variant").
 		Where("pv.id = ? AND pv.product_id = ? AND pv.business_id = ? AND p.branch_id = ? AND pv.status = ? AND pv.deleted_at IS NULL", variantID, productID, businessID, branchID, "active").
 		Take(&row).Error
 	if err != nil {
@@ -66,25 +68,33 @@ func (r *Repository) FindVariantByID(tx *gorm.DB, businessID, branchID, productI
 	return &row, nil
 }
 
-func (r *Repository) FindProductInventoryForSale(tx *gorm.DB, businessID, branchID, productID string) (*ProductInventoryStockRow, error) {
+func (r *Repository) FindProductInventoryForSale(tx *gorm.DB, businessID, branchID, productID string, variantID *string) (*ProductInventoryStockRow, error) {
 	var row ProductInventoryStockRow
-	err := tx.Table("products p").
+	query := tx.Table("products p").
 		Select("p.id AS product_id, p.product_name, p.is_stock_tracked, ii.id AS inventory_item_id, COALESCE(ii.available_quantity, 0) AS available_quantity").
-		Joins("LEFT JOIN inventory_items ii ON ii.business_id = p.business_id AND ii.branch_id = ? AND ii.item_type = ? AND ii.product_id = p.id AND ii.deleted_at IS NULL", branchID, "product").
-		Where("p.id = ? AND p.business_id = ? AND p.branch_id = ? AND p.deleted_at IS NULL", productID, businessID, branchID).
-		Take(&row).Error
+		Where("p.id = ? AND p.business_id = ? AND p.branch_id = ? AND p.deleted_at IS NULL", productID, businessID, branchID)
+	if variantID != nil && strings.TrimSpace(*variantID) != "" {
+		query = query.Select("p.id AS product_id, p.product_name, pv.id AS product_variant_id, pv.variant_name, p.is_stock_tracked, ii.id AS inventory_item_id, COALESCE(ii.available_quantity, 0) AS available_quantity").
+			Joins("JOIN product_variants pv ON pv.product_id = p.id AND pv.business_id = p.business_id AND pv.id = ? AND pv.status = ? AND pv.deleted_at IS NULL", *variantID, "active").
+			Joins("LEFT JOIN inventory_items ii ON ii.business_id = p.business_id AND ii.branch_id = ? AND ii.item_type = ? AND ii.product_id = p.id AND ii.product_variant_id = pv.id AND ii.deleted_at IS NULL", branchID, "product_variant")
+	} else {
+		query = query.Joins("LEFT JOIN inventory_items ii ON ii.business_id = p.business_id AND ii.branch_id = ? AND ii.item_type = ? AND ii.product_id = p.id AND ii.product_variant_id IS NULL AND ii.deleted_at IS NULL", branchID, "product")
+	}
+	err := query.Take(&row).Error
 	return &row, err
 }
 
-func (r *Repository) LoadActiveVariants(businessID string, productIDs []string) (map[string][]POSVariantResponse, error) {
+func (r *Repository) LoadActiveVariants(businessID, branchID string, productIDs []string) (map[string][]POSVariantResponse, error) {
 	result := map[string][]POSVariantResponse{}
 	if len(productIDs) == 0 {
 		return result, nil
 	}
 
 	var rows []VariantRow
-	if err := r.db.Table("product_variants").
-		Where("business_id = ? AND product_id IN ? AND status = ? AND deleted_at IS NULL", businessID, productIDs, "active").
+	if err := r.db.Table("product_variants pv").
+		Select("pv.*, COALESCE(ii.current_quantity, 0) AS current_stock_quantity, COALESCE(ii.available_quantity, 0) AS available_stock_quantity").
+		Joins("LEFT JOIN inventory_items ii ON ii.business_id = pv.business_id AND ii.branch_id = ? AND ii.item_type = ? AND ii.product_id = pv.product_id AND ii.product_variant_id = pv.id AND ii.deleted_at IS NULL", branchID, "product_variant").
+		Where("pv.business_id = ? AND pv.product_id IN ? AND pv.status = ? AND pv.deleted_at IS NULL", businessID, productIDs, "active").
 		Order("sort_order ASC, variant_name ASC").
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -100,7 +110,9 @@ func (r *Repository) LookupProduct(businessID, branchID, field, value string) (*
 	if field == "sku" || field == "barcode" {
 		var variant VariantRow
 		err := r.db.Table("product_variants pv").
+			Select("pv.*, COALESCE(ii.current_quantity, 0) AS current_stock_quantity, COALESCE(ii.available_quantity, 0) AS available_stock_quantity").
 			Joins("JOIN products p ON p.id = pv.product_id AND p.business_id = pv.business_id AND p.branch_id = ? AND p.deleted_at IS NULL", branchID).
+			Joins("LEFT JOIN inventory_items ii ON ii.business_id = pv.business_id AND ii.branch_id = p.branch_id AND ii.item_type = ? AND ii.product_id = pv.product_id AND ii.product_variant_id = pv.id AND ii.deleted_at IS NULL", "product_variant").
 			Where("pv.business_id = ? AND pv.status = ? AND pv.deleted_at IS NULL", businessID, "active").
 			Where("pv."+field+" = ?", value).
 			Take(&variant).Error
@@ -499,21 +511,25 @@ type ProductRow struct {
 type ProductInventoryStockRow struct {
 	ProductID         string
 	ProductName       string
+	ProductVariantID  *string
+	VariantName       string
 	IsStockTracked    bool
 	InventoryItemID   *string
 	AvailableQuantity float64
 }
 
 type VariantRow struct {
-	ID          string
-	BusinessID  string
-	ProductID   string
-	VariantName string
-	SKU         string
-	Barcode     string
-	SalePrice   float64
-	ImageFileID string
-	Status      string
+	ID                     string
+	BusinessID             string
+	ProductID              string
+	VariantName            string
+	SKU                    string
+	Barcode                string
+	SalePrice              float64
+	ImageFileID            string
+	CurrentStockQuantity   float64
+	AvailableStockQuantity float64
+	Status                 string
 }
 
 type PaymentMethodRow struct {

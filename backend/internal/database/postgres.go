@@ -54,6 +54,9 @@ func VerifySchema(db *gorm.DB) error {
 		"customer_tag_mappings",
 		"customer_notes",
 		"inventory_items",
+		"stock_locations",
+		"inventory_location_balances",
+		"stock_transfers",
 		"stock_movements",
 		"inventory_adjustments",
 		"expiry_batches",
@@ -105,8 +108,12 @@ func VerifySchema(db *gorm.DB) error {
 		"products":           {"image_file_id"},
 		"product_variants":   {"image_file_id"},
 		"product_media":      {"file_id", "bucket_id"},
+		"inventory_items":    {"product_variant_id"},
+		"recipes":            {"product_variant_id"},
+		"production_batches": {"product_variant_id"},
+		"production_outputs": {"product_variant_id"},
 		"sale_payments":      {"branch_id", "payment_method_type_snapshot", "provider_transaction_id", "payment_status", "paid_by_user_id", "notes", "deleted_at"},
-		"stock_movements":    {"movement_direction", "reference_number", "notes", "is_reversal", "reversed_movement_id", "is_reversed", "reversed_by_movement_id"},
+		"stock_movements":    {"movement_direction", "reference_number", "notes", "is_reversal", "reversed_movement_id", "is_reversed", "reversed_by_movement_id", "stock_location_id", "from_stock_location_id", "to_stock_location_id"},
 	}
 
 	for table, columns := range requiredColumns {

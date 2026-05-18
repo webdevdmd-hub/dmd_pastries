@@ -66,6 +66,7 @@ export function MovementsToolbar({
         <SelectContent>
           <SelectItem value="all">All item types</SelectItem>
           <SelectItem value="product">Products</SelectItem>
+          <SelectItem value="product_variant">Variants</SelectItem>
           <SelectItem value="ingredient">Ingredients</SelectItem>
           <SelectItem value="packaging">Packaging</SelectItem>
         </SelectContent>

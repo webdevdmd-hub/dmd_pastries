@@ -207,6 +207,7 @@ export function BatchFormDialog({
               {recipes.map((recipe) => (
                 <SelectItem key={recipe.id} value={recipe.id}>
                   {recipe.recipeName} v{recipe.versionNumber}
+                  {recipe.productVariantName ? ` · ${recipe.productVariantName}` : ""}
                   {recipe.isActive === false ||
                   (recipe.status !== null && recipe.status !== "active")
                     ? " (inactive)"
@@ -232,6 +233,12 @@ export function BatchFormDialog({
         </div>
         {selectedRecipe ? (
           <div className="rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/60 p-4 text-sm text-brand-mocha">
+            <p>
+              Output stock:{" "}
+              <span className="font-semibold text-brand-espresso">
+                {selectedRecipe.productVariantName ?? "Parent product"}
+              </span>
+            </p>
             <p>
               Recipe yield: {selectedRecipe.batchYieldQuantity} {selectedRecipe.batchYieldUnitName}
             </p>

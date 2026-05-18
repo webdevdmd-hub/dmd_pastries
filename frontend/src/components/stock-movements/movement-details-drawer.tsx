@@ -29,6 +29,13 @@ function formatQuantity(value: number, unit: string): string {
   return `${new Intl.NumberFormat("en-AE", { maximumFractionDigits: 3 }).format(value)} ${unit}`;
 }
 
+function formatItemType(value: StockMovement["itemType"]): string {
+  if (value === "product_variant") return "Variant";
+  if (value === "product") return "Product";
+  if (value === "ingredient") return "Ingredient";
+  return "Packaging";
+}
+
 function DetailRow({ label, value }: { label: string; value: string }): JSX.Element {
   return (
     <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-3">
@@ -59,7 +66,7 @@ export function MovementDetailsDrawer({
             <div className="grid gap-3 md:grid-cols-2">
               <DetailRow label="Movement ID" value={movement.id} />
               <DetailRow label="Branch" value={movement.branchName} />
-              <DetailRow label="Item type" value={movement.itemType} />
+              <DetailRow label="Item type" value={formatItemType(movement.itemType)} />
               <DetailRow
                 label="Quantity"
                 value={formatQuantity(movement.quantity, movement.unitSymbol)}

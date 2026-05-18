@@ -37,6 +37,10 @@ import {
 } from "@/hooks/use-packaging";
 import { usePermission } from "@/hooks/use-permission";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import {
+  getHistoryDeleteConflictMessage,
+  isHistoryDeleteConflict,
+} from "@/lib/api/delete-conflicts";
 import type {
   CreatePackagingPayload,
   PackagingFilters,
@@ -131,7 +135,12 @@ export function PackagingPageClient(): JSX.Element {
       }
       setPendingAction(null);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(
+        pendingAction.type === "delete" && isHistoryDeleteConflict(error)
+          ? getHistoryDeleteConflictMessage("packaging item")
+          : getErrorMessage(error),
+      );
+      setPendingAction(null);
     }
   };
 

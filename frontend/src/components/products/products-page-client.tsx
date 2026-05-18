@@ -43,6 +43,10 @@ import {
   useUpdateProductVariant,
 } from "@/hooks/use-products";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import {
+  getHistoryDeleteConflictMessage,
+  isHistoryDeleteConflict,
+} from "@/lib/api/delete-conflicts";
 import type {
   CreateProductPayload,
   CreateProductVariantPayload,
@@ -377,7 +381,14 @@ export function ProductsPageClient(): JSX.Element {
                       toast.success("Product deleted.");
                       setConfirmState(null);
                     })
-                    .catch((error: unknown) => toast.error(getErrorMessage(error)));
+                    .catch((error: unknown) => {
+                      toast.error(
+                        isHistoryDeleteConflict(error)
+                          ? getHistoryDeleteConflictMessage("product")
+                          : getErrorMessage(error),
+                      );
+                      setConfirmState(null);
+                    });
                   return;
                 }
 

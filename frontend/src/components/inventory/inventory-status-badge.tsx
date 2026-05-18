@@ -1,13 +1,17 @@
 import type { JSX } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import type { InventoryStatus } from "@/types/inventory";
+import type { InventoryRecordStatus } from "@/types/inventory";
 
 type InventoryStatusBadgeProps = {
-  status: InventoryStatus;
+  status: InventoryRecordStatus;
 };
 
 export function InventoryStatusBadge({ status }: InventoryStatusBadgeProps): JSX.Element {
+  if (status === "not_initialized") {
+    return <Badge className="bg-sky-100 text-sky-900 hover:bg-sky-100">Not initialized</Badge>;
+  }
+
   return (
     <Badge variant={status === "active" ? "default" : "secondary"}>
       {status === "active" ? "Active" : "Inactive"}

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { ReorderLevelLabel } from "@/components/shared/reorder-level-help";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -272,8 +273,8 @@ export function PackagingFormDialog({
               />
               <span className="text-sm font-medium text-brand-espresso">Consumable</span>
             </label>
-            <label className="grid gap-2">
-              <Label htmlFor="packaging-reorder">Reorder level</Label>
+            <div className="grid gap-2">
+              <ReorderLevelLabel htmlFor="packaging-reorder" />
               <Input
                 id="packaging-reorder"
                 min="0"
@@ -281,7 +282,7 @@ export function PackagingFormDialog({
                 type="number"
                 {...form.register("reorderLevel")}
               />
-            </label>
+            </div>
           </section>
 
           <section className="grid gap-4 md:grid-cols-2">

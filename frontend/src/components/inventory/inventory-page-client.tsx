@@ -32,6 +32,7 @@ import {
   useExpiryBatches,
   useInventory,
   useInventoryItemMovements,
+  useStockLocations,
   useUpdateExpiryBatchStatus,
 } from "@/hooks/use-inventory";
 import { usePackaging } from "@/hooks/use-packaging";
@@ -56,6 +57,7 @@ function buildDefaultFilters(branchId: string): InventoryFilters {
     status: "all",
     lowStockOnly: false,
     expiryTrackedOnly: false,
+    includeUninitialized: false,
   };
 }
 
@@ -80,6 +82,7 @@ export function InventoryPageClient(): JSX.Element {
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [adjustmentItem, setAdjustmentItem] = useState<InventoryItem | null>(null);
   const [batchItem, setBatchItem] = useState<InventoryItem | null>(null);
+  const [openingStockItem, setOpeningStockItem] = useState<InventoryItem | null>(null);
   const inventoryQuery = useInventory(filters, canView && branchScope.hasBranchScope);
   const expiryAlertsQuery = useExpiryAlerts(
     { branchId: filters.branchId, itemType: "all", status: "all", days: 30 },
@@ -121,6 +124,7 @@ export function InventoryPageClient(): JSX.Element {
     canView,
   );
   const referencesQuery = useProductReferenceData(canView);
+  const stockLocationsQuery = useStockLocations(canManage && branchScope.hasBranchScope);
   const movementsQuery = useInventoryItemMovements(
     selectedItem?.id ?? null,
     {},
@@ -190,6 +194,7 @@ export function InventoryPageClient(): JSX.Element {
       await openingStockMutation.mutateAsync(payload);
       toast.success("Opening stock created.");
       setOpeningStockOpen(false);
+      setOpeningStockItem(null);
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -281,6 +286,10 @@ export function InventoryPageClient(): JSX.Element {
               canManage={canManage}
               items={items}
               onAddBatch={setBatchItem}
+              onAddOpeningStock={(item) => {
+                setOpeningStockItem(item);
+                setOpeningStockOpen(true);
+              }}
               onAdjust={setAdjustmentItem}
               onView={setSelectedItem}
             />
@@ -292,11 +301,16 @@ export function InventoryPageClient(): JSX.Element {
         branches={branchOptions}
         isSubmitting={openingStockMutation.isPending}
         ingredients={ingredientsQuery.data ?? []}
-        onClose={() => setOpeningStockOpen(false)}
+        onClose={() => {
+          setOpeningStockOpen(false);
+          setOpeningStockItem(null);
+        }}
         onSubmit={handleOpeningStock}
         open={openingStockOpen}
+        preselectedItem={openingStockItem}
         packagingItems={packagingQuery.data ?? []}
         products={productsQuery.data?.items ?? []}
+        stockLocations={stockLocationsQuery.data ?? []}
         units={referencesQuery.data?.units ?? []}
       />
 

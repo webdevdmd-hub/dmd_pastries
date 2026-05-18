@@ -11,6 +11,8 @@ const nullableNonNegativeNumber = z.preprocess(
   z.number().min(0).nullable(),
 );
 
+const outputVariantModeSchema = z.enum(["parent", "existing", "new"]);
+
 export const yieldSchema = z.object({
   batchYieldQuantity: z.coerce.number().positive("Yield quantity must be greater than 0."),
   batchYieldUnitId: z.string().min(1, "Yield unit is required."),
@@ -34,8 +36,13 @@ export const packagingLineSchema = z.object({
   sortOrder: z.coerce.number().int().min(0),
 });
 
-export const createRecipeSchema = z.object({
+const recipeBaseSchema = z.object({
   productId: z.string().min(1, "Product is required."),
+  outputVariantMode: outputVariantModeSchema,
+  productVariantId: z.string().optional(),
+  newProductVariantName: z.string().trim().optional(),
+  newProductVariantSku: nullableText,
+  newProductVariantSalePrice: nullableNonNegativeNumber,
   recipeName: z.string().trim().min(1, "Recipe name is required."),
   description: nullableText,
   batchYieldQuantity: z.coerce.number().positive("Yield quantity must be greater than 0."),
@@ -46,7 +53,35 @@ export const createRecipeSchema = z.object({
   packaging: z.array(packagingLineSchema).default([]),
 });
 
-export const updateRecipeSchema = createRecipeSchema.partial();
+export const createRecipeSchema = recipeBaseSchema.superRefine((values, context) => {
+  if (values.outputVariantMode === "existing" && !values.productVariantId?.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Select an existing product variant.",
+      path: ["productVariantId"],
+    });
+  }
+
+  if (values.outputVariantMode === "new") {
+    if (!values.newProductVariantName?.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Variant name is required.",
+        path: ["newProductVariantName"],
+      });
+    }
+
+    if (values.newProductVariantSalePrice === null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Variant sale price is required.",
+        path: ["newProductVariantSalePrice"],
+      });
+    }
+  }
+});
+
+export const updateRecipeSchema = recipeBaseSchema.partial();
 
 export const updateRecipeStatusSchema = z.object({
   status: z.enum(["draft", "active", "inactive", "archived"]),

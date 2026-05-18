@@ -11,6 +11,7 @@ type Recipe struct {
 	BusinessID              string         `gorm:"type:uuid;not null;index" json:"business_id"`
 	BranchID                string         `gorm:"type:uuid;not null;index" json:"branch_id"`
 	ProductID               string         `gorm:"type:uuid;not null;index" json:"product_id"`
+	ProductVariantID        *string        `gorm:"type:uuid;index" json:"product_variant_id"`
 	RecipeCode              string         `gorm:"size:100;not null" json:"recipe_code"`
 	RecipeName              string         `gorm:"size:255;not null" json:"recipe_name"`
 	Description             string         `json:"description"`

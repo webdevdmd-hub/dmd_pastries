@@ -8,10 +8,12 @@ import type {
   RecipeIngredientLine,
   RecipeIngredientPayload,
   RecipeInventoryItemOption,
+  RecipeNewProductVariantPayload,
   RecipePackagingLine,
   RecipePackagingOption,
   RecipePackagingPayload,
   RecipeProductOption,
+  RecipeProductVariantOption,
   RecipeStatus,
   RecipeUnitOption,
   RecipeVersion,
@@ -21,6 +23,8 @@ import type {
 
 type BackendRecipePayload = {
   product_id?: string;
+  product_variant_id?: string | null;
+  new_product_variant?: BackendNewProductVariantPayload | null;
   recipe_name?: string;
   description?: string | null;
   batch_yield_quantity?: number;
@@ -29,6 +33,12 @@ type BackendRecipePayload = {
   instructions?: string | null;
   ingredients?: BackendIngredientPayload[];
   packaging?: BackendPackagingPayload[];
+};
+
+type BackendNewProductVariantPayload = {
+  variant_name: string;
+  sku?: string | null;
+  sale_price: number;
 };
 
 type BackendIngredientPayload = {
@@ -111,6 +121,8 @@ function parseRecipe(value: unknown): Recipe {
     businessId: stringValue(value.business_id),
     productId: stringValue(value.product_id),
     productName: stringValue(value.product_name, "Product"),
+    productVariantId: optionalString(value.product_variant_id),
+    productVariantName: optionalString(value.product_variant_name),
     recipeCode: stringValue(value.recipe_code, "Recipe"),
     recipeName: stringValue(value.recipe_name, "Unnamed recipe"),
     description: optionalString(value.description),
@@ -206,6 +218,19 @@ function parseVersion(value: unknown): RecipeVersion {
   };
 }
 
+function parseProductVariantOption(value: unknown): RecipeProductVariantOption {
+  if (!isObject(value)) {
+    throw new Error("Backend product variant option payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.id),
+    variantName: stringValue(value.variant_name, "Variant"),
+    sku: optionalString(value.sku),
+    salePrice: numberValue(value.sale_price),
+  };
+}
+
 function parseProductOption(value: unknown): RecipeProductOption {
   if (!isObject(value)) {
     throw new Error("Backend product option payload is invalid.");
@@ -214,6 +239,9 @@ function parseProductOption(value: unknown): RecipeProductOption {
   return {
     id: stringValue(value.id),
     productName: stringValue(value.product_name, "Product"),
+    variants: Array.isArray(value.variants)
+      ? value.variants.map(parseProductVariantOption).filter((variant) => variant.id.length > 0)
+      : [],
   };
 }
 
@@ -292,9 +320,30 @@ function packagingPayload(payload: RecipePackagingPayload): BackendPackagingPayl
   };
 }
 
+function newProductVariantPayload(
+  payload: RecipeNewProductVariantPayload,
+): BackendNewProductVariantPayload {
+  return {
+    variant_name: payload.variantName,
+    ...(payload.sku !== null ? { sku: payload.sku } : {}),
+    sale_price: payload.salePrice,
+  };
+}
+
 function recipePayload(payload: CreateRecipePayload | UpdateRecipePayload): BackendRecipePayload {
   return {
     ...(payload.productId !== undefined ? { product_id: payload.productId } : {}),
+    ...(payload.productVariantId !== undefined
+      ? { product_variant_id: payload.productVariantId }
+      : {}),
+    ...(payload.newProductVariant !== undefined
+      ? {
+          new_product_variant:
+            payload.newProductVariant === null
+              ? null
+              : newProductVariantPayload(payload.newProductVariant),
+        }
+      : {}),
     ...(payload.recipeName !== undefined ? { recipe_name: payload.recipeName } : {}),
     ...(payload.description !== undefined ? { description: payload.description } : {}),
     ...(payload.batchYieldQuantity !== undefined

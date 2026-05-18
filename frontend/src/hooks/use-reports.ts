@@ -3,16 +3,21 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { useBranchQueryKey } from "@/hooks/use-branch-scope";
+import { getSaleReceipt } from "@/lib/api/pos";
 import {
   exportReportCsv,
   getOrdersChart,
   getPaymentsChart,
+  getReceiptRecords,
   getReportBranches,
   getReportsDashboardSummary,
   getSalesChart,
 } from "@/lib/api/reports";
 import type { Branch } from "@/types/branch";
+import type { SaleReceipt } from "@/types/pos";
 import type {
+  ReceiptRecordRow,
+  ReceiptRecordsFilters,
   ReportChartData,
   ReportExportPayload,
   ReportFilters,
@@ -68,6 +73,22 @@ export function useOrdersReportChart(filters: ReportFilters, enabled = true) {
 }
 
 export const useOrdersChart = useOrdersReportChart;
+
+export function useReceiptRecords(filters: ReceiptRecordsFilters, enabled = true) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<ReceiptRecordRow[]>({
+    queryKey: [reportsQueryKey, branchQueryKey, "receipts", filters],
+    queryFn: async () => getReceiptRecords(filters),
+    enabled,
+  });
+}
+
+export function useSaleReceipt() {
+  return useMutation<SaleReceipt, Error, string>({
+    mutationFn: async (saleId) => getSaleReceipt(saleId),
+  });
+}
 
 export function useExportReportCsv() {
   return useMutation<Blob, Error, ReportExportPayload>({

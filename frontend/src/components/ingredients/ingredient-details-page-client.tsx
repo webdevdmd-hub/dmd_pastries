@@ -12,6 +12,7 @@ import { IngredientStatusBadge } from "@/components/ingredients/ingredient-statu
 import { IngredientsErrorState } from "@/components/ingredients/ingredients-error-state";
 import { IngredientsTableSkeleton } from "@/components/ingredients/ingredients-table-skeleton";
 import { PageHeader } from "@/components/shared/page-header";
+import { ReorderLevelHeader } from "@/components/shared/reorder-level-help";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -150,7 +151,7 @@ export function IngredientDetailsPageClient({
             <Detail label="Unit" value={`${displayItem.unitName} (${displayItem.unitSymbol})`} />
             <Detail label="Cost per unit" value={formatCurrency(displayItem.costPerUnit)} />
             <Detail
-              label="Reorder level"
+              label={<ReorderLevelHeader>Reorder level</ReorderLevelHeader>}
               value={`${String(displayItem.reorderLevel)} ${displayItem.unitSymbol}`}
             />
             <div className="grid gap-2">
@@ -214,7 +215,7 @@ export function IngredientDetailsPageClient({
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }): JSX.Element {
+function Detail({ label, value }: { label: JSX.Element | string; value: string }): JSX.Element {
   return (
     <div className="grid gap-1 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-3">
       <span className="text-sm text-brand-mocha">{label}</span>

@@ -109,6 +109,16 @@ func (h *Handler) SalesTrend(c *gin.Context) {
 	h.writeReport(c, data, err)
 }
 
+func (h *Handler) ReceiptRecords(c *gin.Context) {
+	currentUser := utils.MustAuthContext(c)
+	data, err := h.service.ReceiptRecords(currentUser, c.Request.URL.Query(), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Receipt records report generated successfully", data)
+}
+
 func (h *Handler) InventorySummary(c *gin.Context) {
 	currentUser := utils.MustAuthContext(c)
 	data, err := h.service.InventorySummary(currentUser, c.Request.URL.Query(), c.ClientIP(), c.Request.UserAgent())

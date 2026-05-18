@@ -26,6 +26,12 @@ function formatDateTime(value: string | null): string {
     : "Not set";
 }
 
+function batchOutputLabel(batch: ProductionBatch): string {
+  return batch.productVariantName
+    ? `${batch.productName} - ${batch.productVariantName}`
+    : batch.productName;
+}
+
 export function BatchesTable({
   batches,
   canManage,
@@ -71,7 +77,14 @@ export function BatchesTable({
                 {batch.batchNumber}
               </Link>
             </TableCell>
-            <TableCell>{batch.productName}</TableCell>
+            <TableCell>
+              <div className="grid gap-1">
+                <span>{batchOutputLabel(batch)}</span>
+                <span className="text-xs text-brand-mocha">
+                  Output: {batch.productVariantName ? "Variant stock" : "Parent product stock"}
+                </span>
+              </div>
+            </TableCell>
             <TableCell>
               {batch.recipeName} v{batch.recipeVersionNumber}
             </TableCell>

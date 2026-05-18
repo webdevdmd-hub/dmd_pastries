@@ -88,6 +88,8 @@ type ProductionBatchResponse struct {
 	RecipeName            string                         `json:"recipe_name"`
 	ProductID             string                         `json:"product_id"`
 	ProductName           string                         `json:"product_name"`
+	ProductVariantID      *string                        `json:"product_variant_id"`
+	ProductVariantName    string                         `json:"product_variant_name"`
 	ProductionBatchNumber string                         `json:"production_batch_number"`
 	PlannedQuantity       float64                        `json:"planned_quantity"`
 	ProducedQuantity      float64                        `json:"produced_quantity"`
@@ -151,29 +153,33 @@ type ProductionPackagingResponse struct {
 }
 
 type ProductionOutputResponse struct {
-	ID               string     `json:"id"`
-	ProductID        string     `json:"product_id"`
-	InventoryItemID  string     `json:"inventory_item_id"`
-	ProducedQuantity float64    `json:"produced_quantity"`
-	UnitID           string     `json:"unit_id"`
-	UnitSymbol       string     `json:"unit_symbol"`
-	BatchNumber      string     `json:"batch_number"`
-	ExpiryDate       *time.Time `json:"expiry_date"`
-	StockMovementID  *string    `json:"stock_movement_id"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	ID                 string     `json:"id"`
+	ProductID          string     `json:"product_id"`
+	ProductVariantID   *string    `json:"product_variant_id"`
+	ProductVariantName string     `json:"product_variant_name"`
+	InventoryItemID    string     `json:"inventory_item_id"`
+	ProducedQuantity   float64    `json:"produced_quantity"`
+	UnitID             string     `json:"unit_id"`
+	UnitSymbol         string     `json:"unit_symbol"`
+	BatchNumber        string     `json:"batch_number"`
+	ExpiryDate         *time.Time `json:"expiry_date"`
+	StockMovementID    *string    `json:"stock_movement_id"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 type ProductionOutputsResponse struct {
-	BatchID          string                    `json:"batch_id"`
-	Status           string                    `json:"status"`
-	ProductID        string                    `json:"product_id"`
-	ProductName      string                    `json:"product_name"`
-	PlannedQuantity  float64                   `json:"planned_quantity"`
-	ProducedQuantity float64                   `json:"produced_quantity"`
-	YieldUnitID      string                    `json:"yield_unit_id"`
-	YieldUnitSymbol  string                    `json:"yield_unit_symbol"`
-	Output           *ProductionOutputResponse `json:"output"`
+	BatchID            string                    `json:"batch_id"`
+	Status             string                    `json:"status"`
+	ProductID          string                    `json:"product_id"`
+	ProductName        string                    `json:"product_name"`
+	ProductVariantID   *string                   `json:"product_variant_id"`
+	ProductVariantName string                    `json:"product_variant_name"`
+	PlannedQuantity    float64                   `json:"planned_quantity"`
+	ProducedQuantity   float64                   `json:"produced_quantity"`
+	YieldUnitID        string                    `json:"yield_unit_id"`
+	YieldUnitSymbol    string                    `json:"yield_unit_symbol"`
+	Output             *ProductionOutputResponse `json:"output"`
 }
 
 type ProductionWastageResponse struct {

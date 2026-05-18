@@ -49,7 +49,6 @@ function toDefaultValues(product: Product | null): ProductSchema {
     productType: product?.productType ?? "ready_to_sell",
     salePrice: product?.salePrice ?? 0,
     costPrice: product?.costPrice ?? null,
-    compareAtPrice: product?.compareAtPrice ?? null,
     sku: product?.sku ?? "",
     barcode: product?.barcode ?? "",
     description: product?.description ?? "",
@@ -124,7 +123,6 @@ export function ProductFormDialog({
       productType: values.productType,
       salePrice: values.salePrice,
       costPrice: values.costPrice ?? null,
-      compareAtPrice: values.compareAtPrice ?? null,
       sku: values.sku?.trim() ? values.sku : null,
       barcode: values.barcode?.trim() ? values.barcode : null,
       description: values.description?.trim() ? values.description : null,
@@ -239,10 +237,6 @@ export function ProductFormDialog({
               <div className="space-y-1">
                 <Label htmlFor="costPrice">Cost price</Label>
                 <Input id="costPrice" type="number" {...form.register("costPrice")} />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="compareAtPrice">Compare at price</Label>
-                <Input id="compareAtPrice" type="number" {...form.register("compareAtPrice")} />
               </div>
               <div className="space-y-1">
                 <Label>Tax rate</Label>

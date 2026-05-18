@@ -1,11 +1,13 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowLeftRight,
   Boxes,
   ChartNoAxesCombined,
   Croissant,
   Landmark,
   LayoutDashboard,
   ListChecks,
+  MapPinned,
   NotebookTabs,
   PackageOpen,
   PackageSearch,
@@ -18,6 +20,7 @@ import {
   UserRound,
   Users,
   WalletCards,
+  Warehouse,
   Wheat,
 } from "lucide-react";
 
@@ -139,6 +142,12 @@ export const appNavigationGroups = [
             permissionAny: [PERMISSIONS.reportsView],
           },
           {
+            href: ROUTES.reportsReceipts,
+            icon: ReceiptText,
+            label: "Sales Receipts",
+            permissionAny: [PERMISSIONS.reportsView],
+          },
+          {
             href: ROUTES.reportsInventory,
             icon: PackageSearch,
             label: "Inventory Report",
@@ -184,6 +193,29 @@ export const appNavigationGroups = [
           PERMISSIONS.inventoryOpeningStock,
           PERMISSIONS.inventoryAdjust,
         ],
+      },
+      {
+        href: ROUTES.inventoryLocationBalances,
+        icon: MapPinned,
+        label: "Location Balances",
+        permissionAny: [PERMISSIONS.inventoryView],
+      },
+      {
+        href: ROUTES.inventoryStockTransfers,
+        icon: ArrowLeftRight,
+        label: "Stock Transfers",
+        permissionAny: [
+          PERMISSIONS.inventoryView,
+          PERMISSIONS.inventoryTransferCreate,
+          PERMISSIONS.inventoryTransferComplete,
+          PERMISSIONS.inventoryTransferCancel,
+        ],
+      },
+      {
+        href: ROUTES.inventoryStockLocations,
+        icon: Warehouse,
+        label: "Stock Locations",
+        permissionAny: [PERMISSIONS.inventoryView, PERMISSIONS.inventoryLocationsManage],
       },
       {
         href: ROUTES.inventoryMovements,

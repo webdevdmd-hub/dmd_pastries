@@ -1,4 +1,4 @@
-export type InventoryReportItemType = "product" | "ingredient" | "packaging";
+export type InventoryReportItemType = "product" | "product_variant" | "ingredient" | "packaging";
 
 export type InventoryReportSortOrder = "asc" | "desc";
 

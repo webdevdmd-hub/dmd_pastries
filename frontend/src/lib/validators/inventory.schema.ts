@@ -6,11 +6,13 @@ const optionalTextSchema = z.string().optional();
 export const openingStockSchema = z
   .object({
     branchId: uuidSchema,
-    itemType: z.enum(["product", "ingredient", "packaging"]),
+    itemType: z.enum(["product", "product_variant", "ingredient", "packaging"]),
     productId: z.string().optional(),
+    productVariantId: z.string().optional(),
     ingredientId: z.string().optional(),
     packagingItemId: z.string().optional(),
     unitId: uuidSchema,
+    stockLocationId: z.string().optional(),
     quantity: z.coerce.number().min(0, "Quantity cannot be negative."),
     reorderLevel: z.coerce.number().min(0, "Reorder level cannot be negative."),
     isExpiryTracked: z.boolean(),
@@ -24,6 +26,24 @@ export const openingStockSchema = z
         message: "Product is required.",
         path: ["productId"],
       });
+    }
+
+    if (value.itemType === "product_variant") {
+      if (!value.productId) {
+        context.addIssue({
+          code: "custom",
+          message: "Product is required.",
+          path: ["productId"],
+        });
+      }
+
+      if (!value.productVariantId) {
+        context.addIssue({
+          code: "custom",
+          message: "Variant is required.",
+          path: ["productVariantId"],
+        });
+      }
     }
 
     if (value.itemType === "ingredient" && !value.ingredientId) {
@@ -103,7 +123,7 @@ export const updateExpiryBatchSchema = z.object({
 export const inventoryFiltersSchema = z.object({
   search: z.string(),
   branchId: z.string(),
-  itemType: z.enum(["all", "product", "ingredient", "packaging"]),
+  itemType: z.enum(["all", "product", "product_variant", "ingredient", "packaging"]),
   status: z.enum(["all", "active", "inactive"]),
   lowStockOnly: z.boolean(),
   expiryTrackedOnly: z.boolean(),
@@ -112,7 +132,7 @@ export const inventoryFiltersSchema = z.object({
 export const stockMovementFiltersSchema = z.object({
   search: z.string(),
   branchId: z.string(),
-  itemType: z.enum(["all", "product", "ingredient", "packaging"]),
+  itemType: z.enum(["all", "product", "product_variant", "ingredient", "packaging"]),
   movementType: z.enum([
     "all",
     "opening_stock",

@@ -89,6 +89,7 @@ export function MovementsPageClient(): JSX.Element {
       status: "active",
       lowStockOnly: false,
       expiryTrackedOnly: false,
+      includeUninitialized: false,
     },
     canManage && branchScope.hasBranchScope,
   );

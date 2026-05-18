@@ -40,6 +40,178 @@ func (h *Handler) GetInventoryItem(c *gin.Context) {
 	response.Success(c, 200, "inventory item fetched successfully", result)
 }
 
+func (h *Handler) ListStockLocations(c *gin.Context) {
+	result, err := h.service.ListStockLocations(utils.MustAuthContext(c), parseStockLocationListQuery(c))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "stock locations fetched successfully", result)
+}
+
+func (h *Handler) CreateStockLocation(c *gin.Context) {
+	var req StockLocationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.CreateStockLocation(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 201, "stock location created successfully", result)
+}
+
+func (h *Handler) GetStockLocation(c *gin.Context) {
+	if !validUUIDParam(c, "locationId") {
+		return
+	}
+	result, err := h.service.GetStockLocation(utils.MustAuthContext(c), c.Param("locationId"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "stock location fetched successfully", result)
+}
+
+func (h *Handler) UpdateStockLocation(c *gin.Context) {
+	if !validUUIDParam(c, "locationId") {
+		return
+	}
+	var req UpdateStockLocationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.UpdateStockLocation(utils.MustAuthContext(c), c.Param("locationId"), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "stock location updated successfully", result)
+}
+
+func (h *Handler) UpdateStockLocationStatus(c *gin.Context) {
+	if !validUUIDParam(c, "locationId") {
+		return
+	}
+	var req UpdateStockLocationStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.UpdateStockLocationStatus(utils.MustAuthContext(c), c.Param("locationId"), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "stock location status updated successfully", result)
+}
+
+func (h *Handler) SetDefaultStockLocation(c *gin.Context) {
+	if !validUUIDParam(c, "locationId") {
+		return
+	}
+	result, err := h.service.SetDefaultStockLocation(utils.MustAuthContext(c), c.Param("locationId"), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "default stock location updated successfully", result)
+}
+
+func (h *Handler) DeleteStockLocation(c *gin.Context) {
+	if !validUUIDParam(c, "locationId") {
+		return
+	}
+	if err := h.service.DeleteStockLocation(utils.MustAuthContext(c), c.Param("locationId"), c.ClientIP(), c.Request.UserAgent()); err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "stock location deleted successfully", nil)
+}
+
+func (h *Handler) ListLocationBalances(c *gin.Context) {
+	result, err := h.service.ListLocationBalances(utils.MustAuthContext(c), parseLocationBalanceListQuery(c))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "location balances fetched successfully", result)
+}
+
+func (h *Handler) GetInventoryItemLocationBalances(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	result, err := h.service.GetInventoryItemLocationBalances(utils.MustAuthContext(c), c.Param("id"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "inventory item location balances fetched successfully", result)
+}
+
+func (h *Handler) ListStockTransfers(c *gin.Context) {
+	result, err := h.service.ListStockTransfers(utils.MustAuthContext(c), parseStockTransferListQuery(c))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "stock transfers fetched successfully", result)
+}
+
+func (h *Handler) CreateStockTransfer(c *gin.Context) {
+	var req StockTransferRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.CreateStockTransfer(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 201, "stock transfer created successfully", result)
+}
+
+func (h *Handler) GetStockTransfer(c *gin.Context) {
+	if !validUUIDParam(c, "transferId") {
+		return
+	}
+	result, err := h.service.GetStockTransfer(utils.MustAuthContext(c), c.Param("transferId"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "stock transfer fetched successfully", result)
+}
+
+func (h *Handler) CompleteStockTransfer(c *gin.Context) {
+	if !validUUIDParam(c, "transferId") {
+		return
+	}
+	result, err := h.service.CompleteStockTransfer(utils.MustAuthContext(c), c.Param("transferId"), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "stock transfer completed successfully", result)
+}
+
+func (h *Handler) CancelStockTransfer(c *gin.Context) {
+	if !validUUIDParam(c, "transferId") {
+		return
+	}
+	result, err := h.service.CancelStockTransfer(utils.MustAuthContext(c), c.Param("transferId"), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "stock transfer cancelled successfully", result)
+}
+
 func (h *Handler) CreateOpeningStock(c *gin.Context) {
 	var req OpeningStockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -268,17 +440,19 @@ func parseInventoryListQuery(c *gin.Context) InventoryListQuery {
 		expiryTracked = &parsed
 	}
 	lowStockOnly, _ := strconv.ParseBool(c.DefaultQuery("low_stock_only", "false"))
+	includeUninitialized, _ := strconv.ParseBool(c.DefaultQuery("include_uninitialized", "false"))
 	return InventoryListQuery{
-		Search:        c.Query("search"),
-		BranchID:      c.Query("branch_id"),
-		ItemType:      c.Query("item_type"),
-		Status:        c.Query("status"),
-		LowStockOnly:  lowStockOnly,
-		ExpiryTracked: expiryTracked,
-		Page:          page,
-		Limit:         limit,
-		SortBy:        c.DefaultQuery("sort_by", "created_at"),
-		SortOrder:     c.DefaultQuery("sort_order", "desc"),
+		Search:               c.Query("search"),
+		BranchID:             c.Query("branch_id"),
+		ItemType:             c.Query("item_type"),
+		Status:               c.Query("status"),
+		LowStockOnly:         lowStockOnly,
+		ExpiryTracked:        expiryTracked,
+		IncludeUninitialized: includeUninitialized,
+		Page:                 page,
+		Limit:                limit,
+		SortBy:               c.DefaultQuery("sort_by", "created_at"),
+		SortOrder:            c.DefaultQuery("sort_order", "desc"),
 	}
 }
 
@@ -301,6 +475,51 @@ func parseMovementListQuery(c *gin.Context) MovementListQuery {
 		Limit:             limit,
 		SortBy:            c.DefaultQuery("sort_by", "created_at"),
 		SortOrder:         c.DefaultQuery("sort_order", "desc"),
+	}
+}
+
+func parseStockLocationListQuery(c *gin.Context) StockLocationListQuery {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	return StockLocationListQuery{
+		Search:       c.Query("search"),
+		BranchID:     c.Query("branch_id"),
+		Status:       c.Query("status"),
+		LocationType: c.Query("location_type"),
+		Page:         page,
+		Limit:        limit,
+		SortBy:       c.DefaultQuery("sort_by", "created_at"),
+		SortOrder:    c.DefaultQuery("sort_order", "desc"),
+	}
+}
+
+func parseLocationBalanceListQuery(c *gin.Context) LocationBalanceListQuery {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	return LocationBalanceListQuery{
+		Search:          c.Query("search"),
+		BranchID:        c.Query("branch_id"),
+		ItemType:        c.Query("item_type"),
+		StockLocationID: c.Query("stock_location_id"),
+		Page:            page,
+		Limit:           limit,
+		SortBy:          c.DefaultQuery("sort_by", "location_name"),
+		SortOrder:       c.DefaultQuery("sort_order", "asc"),
+	}
+}
+
+func parseStockTransferListQuery(c *gin.Context) StockTransferListQuery {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	return StockTransferListQuery{
+		Search:          c.Query("search"),
+		BranchID:        c.Query("branch_id"),
+		InventoryItemID: c.Query("inventory_item_id"),
+		Status:          c.Query("status"),
+		Page:            page,
+		Limit:           limit,
+		SortBy:          c.DefaultQuery("sort_by", "created_at"),
+		SortOrder:       c.DefaultQuery("sort_order", "desc"),
 	}
 }
 

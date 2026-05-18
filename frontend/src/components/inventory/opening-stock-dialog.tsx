@@ -5,6 +5,9 @@ import type { JSX } from "react";
 import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 
+import { ReorderLevelLabel } from "@/components/shared/reorder-level-help";
+import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
+import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -28,7 +31,7 @@ import { useBranchScope } from "@/hooks/use-branch-scope";
 import { type OpeningStockSchema, openingStockSchema } from "@/lib/validators/inventory.schema";
 import type { Branch } from "@/types/branch";
 import type { Ingredient } from "@/types/ingredient";
-import type { OpeningStockPayload } from "@/types/inventory";
+import type { InventoryItem, OpeningStockPayload, StockLocation } from "@/types/inventory";
 import type { Unit } from "@/types/master-data";
 import type { PackagingItem } from "@/types/packaging";
 import type { Product } from "@/types/product";
@@ -39,9 +42,11 @@ type OpeningStockDialogProps = {
   onClose: () => void;
   onSubmit: (payload: OpeningStockPayload) => Promise<void>;
   open: boolean;
+  preselectedItem?: InventoryItem | null;
   ingredients: Ingredient[];
   packagingItems: PackagingItem[];
   products: Product[];
+  stockLocations: StockLocation[];
   units: Unit[];
 };
 
@@ -51,9 +56,11 @@ export function OpeningStockDialog({
   onClose,
   onSubmit,
   open,
+  preselectedItem = null,
   ingredients,
   packagingItems,
   products,
+  stockLocations,
   units,
 }: OpeningStockDialogProps): JSX.Element {
   const branchScope = useBranchScope();
@@ -66,13 +73,19 @@ export function OpeningStockDialog({
       ),
     [branchScope.canAccessAllBranches, branchScope.effectiveBranchId, branches],
   );
+  const defaultStockLocation = useMemo(
+    () => stockLocations.find((location) => location.isDefault) ?? stockLocations[0] ?? null,
+    [stockLocations],
+  );
   const form = useForm<OpeningStockSchema>({
     resolver: zodResolver(openingStockSchema),
     defaultValues: {
       branchId: "",
       itemType: "product",
       productId: "",
+      productVariantId: "",
       unitId: "",
+      stockLocationId: "",
       quantity: 0,
       reorderLevel: 0,
       isExpiryTracked: false,
@@ -81,29 +94,183 @@ export function OpeningStockDialog({
     },
   });
   const itemType = form.watch("itemType");
+  const selectedProductId = form.watch("productId") ?? "";
   const expiryTracked = form.watch("isExpiryTracked");
+  const selectedProduct = useMemo(
+    () => products.find((product) => product.id === selectedProductId) ?? null,
+    [products, selectedProductId],
+  );
+  const activeProductVariants = useMemo(
+    () => selectedProduct?.variants.filter((variant) => variant.status === "active") ?? [],
+    [selectedProduct],
+  );
+  const activeStockLocations = useMemo(
+    () => stockLocations.filter((location) => location.status === "active"),
+    [stockLocations],
+  );
+  const branchOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      activeBranches.map((branch) => ({
+        value: branch.id,
+        label: branch.name,
+        description: branch.code,
+        keywords: [branch.code, branch.status],
+      })),
+    [activeBranches],
+  );
+  const productOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      products.map((product) => ({
+        value: product.id,
+        label: product.productName,
+        description: [product.categoryName, product.sku, product.barcode, product.productCode]
+          .filter((part): part is string => typeof part === "string" && part.length > 0)
+          .join(" / "),
+        keywords: [
+          product.productName,
+          product.productCode,
+          product.categoryName,
+          product.sku ?? "",
+          product.barcode ?? "",
+          product.status,
+          ...product.variants.flatMap((variant) => [
+            variant.variantName,
+            variant.sku ?? "",
+            variant.barcode ?? "",
+          ]),
+        ],
+      })),
+    [products],
+  );
+  const variantOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      activeProductVariants.map((variant) => ({
+        value: variant.id,
+        label: variant.variantName,
+        description: [variant.sku, variant.barcode, `AED ${variant.salePrice.toFixed(2)}`]
+          .filter((part): part is string => typeof part === "string" && part.length > 0)
+          .join(" / "),
+        keywords: [variant.variantName, variant.sku ?? "", variant.barcode ?? ""],
+      })),
+    [activeProductVariants],
+  );
+  const ingredientOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      ingredients.map((ingredient) => ({
+        value: ingredient.id,
+        label: ingredient.ingredientName,
+        description: [ingredient.ingredientCategoryName, ingredient.unitName]
+          .filter((part): part is string => typeof part === "string" && part.length > 0)
+          .join(" / "),
+        keywords: [
+          ingredient.ingredientName,
+          ingredient.ingredientCategoryName,
+          ingredient.unitName,
+          ingredient.supplierName ?? "",
+        ],
+      })),
+    [ingredients],
+  );
+  const packagingOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      packagingItems.map((packagingItem) => ({
+        value: packagingItem.id,
+        label: packagingItem.packagingName,
+        description: [packagingItem.packagingCategoryName, packagingItem.unitName]
+          .filter((part): part is string => typeof part === "string" && part.length > 0)
+          .join(" / "),
+        keywords: [
+          packagingItem.packagingName,
+          packagingItem.packagingCategoryName,
+          packagingItem.unitName,
+          packagingItem.supplierName ?? "",
+        ],
+      })),
+    [packagingItems],
+  );
+  const stockLocationOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      activeStockLocations.map((location) => ({
+        value: location.id,
+        label: location.locationName,
+        description: [
+          location.locationCode,
+          location.locationType,
+          location.isDefault ? "Default" : "",
+        ]
+          .filter((part) => part.length > 0)
+          .join(" / "),
+        keywords: [location.locationName, location.locationCode, location.locationType],
+      })),
+    [activeStockLocations],
+  );
+  const unitOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      units.map((unit) => ({
+        value: unit.id,
+        label: `${unit.unitName} (${unit.symbol})`,
+        description: unit.symbol,
+        keywords: [unit.unitName, unit.symbol],
+      })),
+    [units],
+  );
 
   useEffect(() => {
     if (open) {
+      const itemType = preselectedItem?.itemType ?? "product";
+      const productId = preselectedItem?.productId ?? "";
+      const ingredientId = preselectedItem?.ingredientId ?? "";
+      const packagingItemId = preselectedItem?.packagingItemId ?? "";
+      const selectedProduct = products.find((product) => product.id === productId);
+      const selectedVariant = selectedProduct?.variants.find(
+        (variant) => variant.id === preselectedItem?.productVariantId,
+      );
+      const selectedIngredient = ingredients.find((ingredient) => ingredient.id === ingredientId);
+      const selectedPackagingItem = packagingItems.find(
+        (packagingItem) => packagingItem.id === packagingItemId,
+      );
+
       form.reset({
         branchId: branchScope.normalizeBranchId(activeBranches[0]?.id ?? ""),
-        itemType: "product",
-        productId: "",
-        unitId: "",
+        itemType,
+        productId,
+        unitId:
+          preselectedItem?.unitId ??
+          selectedProduct?.unitId ??
+          selectedIngredient?.unitId ??
+          selectedPackagingItem?.unitId ??
+          "",
+        stockLocationId: defaultStockLocation?.id ?? "",
         quantity: 0,
-        reorderLevel: 0,
-        isExpiryTracked: false,
+        reorderLevel: preselectedItem?.reorderLevel ?? 0,
+        isExpiryTracked:
+          preselectedItem?.isExpiryTracked ??
+          selectedProduct?.isExpiryTracked ??
+          selectedIngredient?.isExpiryTracked ??
+          false,
         expiryDate: "",
-        ingredientId: "",
-        packagingItemId: "",
+        productVariantId: selectedVariant?.id ?? preselectedItem?.productVariantId ?? "",
+        ingredientId,
+        packagingItemId,
         reason: "",
       });
     }
-  }, [activeBranches, branchScope, form, open]);
+  }, [
+    activeBranches,
+    branchScope,
+    defaultStockLocation?.id,
+    form,
+    ingredients,
+    open,
+    packagingItems,
+    preselectedItem,
+    products,
+  ]);
 
   const handleProductChange = (productId: string): void => {
     const product = products.find((item) => item.id === productId);
     form.setValue("productId", productId);
+    form.setValue("productVariantId", "");
     if (product?.unitId) {
       form.setValue("unitId", product.unitId);
       form.setValue("isExpiryTracked", product.isExpiryTracked);
@@ -131,6 +298,7 @@ export function OpeningStockDialog({
   const handleItemTypeChange = (value: OpeningStockSchema["itemType"]): void => {
     form.setValue("itemType", value);
     form.setValue("productId", "");
+    form.setValue("productVariantId", "");
     form.setValue("ingredientId", "");
     form.setValue("packagingItemId", "");
     form.setValue("unitId", "");
@@ -142,9 +310,11 @@ export function OpeningStockDialog({
       branchId: values.branchId,
       itemType: values.itemType,
       ...(values.productId ? { productId: values.productId } : {}),
+      ...(values.productVariantId ? { productVariantId: values.productVariantId } : {}),
       ...(values.ingredientId ? { ingredientId: values.ingredientId } : {}),
       ...(values.packagingItemId ? { packagingItemId: values.packagingItemId } : {}),
       unitId: values.unitId,
+      ...(values.stockLocationId ? { stockLocationId: values.stockLocationId } : {}),
       quantity: values.quantity,
       reorderLevel: values.reorderLevel,
       isExpiryTracked: values.isExpiryTracked,
@@ -159,7 +329,8 @@ export function OpeningStockDialog({
         <DialogHeader>
           <DialogTitle>Create opening stock</DialogTitle>
           <DialogDescription>
-            Start branch-level stock tracking for products, ingredients, and packaging items.
+            Start branch-level stock tracking for products, variants, ingredients, and packaging
+            items.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -173,21 +344,14 @@ export function OpeningStockDialog({
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
               <Label>Branch</Label>
-              <Select
+              <SearchableCombobox
+                emptyMessage="No matching branches found."
                 onValueChange={(value) => form.setValue("branchId", value)}
+                options={branchOptions}
+                placeholder="Select branch"
+                searchPlaceholder="Search branch name or code..."
                 value={form.watch("branchId")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeBranches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
             <div className="space-y-1">
               <Label>Item type</Label>
@@ -202,49 +366,62 @@ export function OpeningStockDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="product">Product</SelectItem>
+                  <SelectItem value="product_variant">Variant</SelectItem>
                   <SelectItem value="ingredient">Ingredient</SelectItem>
                   <SelectItem value="packaging">Packaging</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {itemType === "product" ? (
+            {itemType === "product" || itemType === "product_variant" ? (
               <div className="space-y-1">
                 <Label>Product</Label>
-                <Select onValueChange={handleProductChange} value={form.watch("productId") ?? ""}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.productName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableCombobox
+                  emptyMessage="No matching products found."
+                  onValueChange={handleProductChange}
+                  options={productOptions}
+                  placeholder="Select product"
+                  searchPlaceholder="Search product, SKU, barcode, category..."
+                  value={form.watch("productId") ?? ""}
+                />
                 {form.formState.errors.productId ? (
                   <p className="text-sm text-red-800">{form.formState.errors.productId.message}</p>
+                ) : null}
+              </div>
+            ) : null}
+            {itemType === "product_variant" ? (
+              <div className="space-y-1">
+                <Label>Variant</Label>
+                <SearchableCombobox
+                  disabled={!selectedProductId}
+                  emptyMessage="No matching variants found."
+                  onValueChange={(value) => form.setValue("productVariantId", value)}
+                  options={variantOptions}
+                  placeholder={
+                    selectedProductId ? "Select product variant" : "Select product first"
+                  }
+                  searchPlaceholder="Search variant, SKU, barcode..."
+                  value={form.watch("productVariantId") ?? ""}
+                />
+                {form.formState.errors.productVariantId ? (
+                  <p className="text-sm text-red-800">
+                    {form.formState.errors.productVariantId.message}
+                  </p>
+                ) : selectedProductId && activeProductVariants.length === 0 ? (
+                  <p className="text-sm text-brand-mocha">This product has no active variants.</p>
                 ) : null}
               </div>
             ) : null}
             {itemType === "ingredient" ? (
               <div className="space-y-1">
                 <Label>Ingredient</Label>
-                <Select
+                <SearchableCombobox
+                  emptyMessage="No matching ingredients found."
                   onValueChange={handleIngredientChange}
+                  options={ingredientOptions}
+                  placeholder="Select ingredient"
+                  searchPlaceholder="Search ingredient, category, supplier..."
                   value={form.watch("ingredientId") ?? ""}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select ingredient" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ingredients.map((ingredient) => (
-                      <SelectItem key={ingredient.id} value={ingredient.id}>
-                        {ingredient.ingredientName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
                 {form.formState.errors.ingredientId ? (
                   <p className="text-sm text-red-800">
                     {form.formState.errors.ingredientId.message}
@@ -255,21 +432,14 @@ export function OpeningStockDialog({
             {itemType === "packaging" ? (
               <div className="space-y-1">
                 <Label>Packaging</Label>
-                <Select
+                <SearchableCombobox
+                  emptyMessage="No matching packaging items found."
                   onValueChange={handlePackagingChange}
+                  options={packagingOptions}
+                  placeholder="Select packaging item"
+                  searchPlaceholder="Search packaging, category, supplier..."
                   value={form.watch("packagingItemId") ?? ""}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select packaging item" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {packagingItems.map((packagingItem) => (
-                      <SelectItem key={packagingItem.id} value={packagingItem.id}>
-                        {packagingItem.packagingName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
                 {form.formState.errors.packagingItemId ? (
                   <p className="text-sm text-red-800">
                     {form.formState.errors.packagingItemId.message}
@@ -277,23 +447,29 @@ export function OpeningStockDialog({
                 ) : null}
               </div>
             ) : null}
+            {stockLocations.length > 0 ? (
+              <div className="space-y-1">
+                <Label>Stock location</Label>
+                <SearchableCombobox
+                  emptyMessage="No matching stock locations found."
+                  onValueChange={(value) => form.setValue("stockLocationId", value)}
+                  options={stockLocationOptions}
+                  placeholder="Default stock location"
+                  searchPlaceholder="Search location name or code..."
+                  value={form.watch("stockLocationId") ?? ""}
+                />
+              </div>
+            ) : null}
             <div className="space-y-1">
               <Label>Unit</Label>
-              <Select
+              <SearchableCombobox
+                emptyMessage="No matching units found."
                 onValueChange={(value) => form.setValue("unitId", value)}
+                options={unitOptions}
+                placeholder="Select unit"
+                searchPlaceholder="Search unit..."
                 value={form.watch("unitId")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {units.map((unit) => (
-                    <SelectItem key={unit.id} value={unit.id}>
-                      {unit.unitName} ({unit.symbol})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
             <div className="space-y-1">
               <Label htmlFor="openingQuantity">Opening quantity</Label>
@@ -305,7 +481,7 @@ export function OpeningStockDialog({
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="reorderLevel">Reorder level</Label>
+              <ReorderLevelLabel htmlFor="reorderLevel" />
               <Input
                 id="reorderLevel"
                 step="0.001"

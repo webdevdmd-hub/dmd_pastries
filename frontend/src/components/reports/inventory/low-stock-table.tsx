@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 
+import { ReorderLevelHeader } from "@/components/shared/reorder-level-help";
 import {
   Table,
   TableBody,
@@ -18,7 +19,9 @@ export function LowStockTable({ rows }: { rows: LowStockRow[] }): JSX.Element {
           <TableHead>Item</TableHead>
           <TableHead>Branch</TableHead>
           <TableHead>Available</TableHead>
-          <TableHead>Reorder Level</TableHead>
+          <TableHead>
+            <ReorderLevelHeader />
+          </TableHead>
           <TableHead>Shortage</TableHead>
           <TableHead>Unit</TableHead>
         </TableRow>

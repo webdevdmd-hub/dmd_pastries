@@ -443,6 +443,95 @@ func (r *Repository) SalesTrend(filter *shared.ResolvedFilter) ([]trendSeriesRow
 	return rows, nil
 }
 
+func (r *Repository) ReceiptRecords(filter *shared.ResolvedFilter) ([]ReceiptRecordReportItem, int64, error) {
+	sortBy := safeSort(filter.SortBy, map[string]string{
+		"sale_number":    "s.sale_number",
+		"sold_at":        "s.sold_at",
+		"total_amount":   "s.total_amount",
+		"payment_status": "s.payment_status",
+		"sale_status":    "s.sale_status",
+		"view_count":     "COALESCE(rv.view_count,0)",
+	}, "sold_at")
+
+	rows := []struct {
+		SaleID        string
+		SaleNumber    string
+		BranchName    string
+		CustomerName  string
+		CashierName   string
+		TotalAmount   float64
+		PaidAmount    float64
+		PaymentStatus string
+		SaleStatus    string
+		SoldAt        time.Time
+		ViewCount     int64
+		LastViewedAt  *time.Time
+	}{}
+
+	query := `
+		SELECT s.id AS sale_id,
+			s.sale_number,
+			b.branch_name,
+			COALESCE(c.full_name, 'Walk-in Customer') AS customer_name,
+			COALESCE(u.full_name, '') AS cashier_name,
+			s.total_amount,
+			s.paid_amount,
+			s.payment_status,
+			s.sale_status,
+			s.sold_at,
+			COALESCE(rv.view_count, 0) AS view_count,
+			rv.last_viewed_at
+		FROM sales s
+		JOIN branches b ON b.id = s.branch_id
+		LEFT JOIN customers c ON c.id = s.customer_id
+		LEFT JOIN users u ON u.id = s.cashier_user_id
+		LEFT JOIN (
+			SELECT entity_id, COUNT(*) AS view_count, MAX(created_at) AS last_viewed_at
+			FROM audit_logs
+			WHERE business_id = ? AND event_type = 'sale.receipt_viewed' AND entity_type = 'sale'
+			GROUP BY entity_id
+		) rv ON rv.entity_id = s.id::text
+		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.deleted_at IS NULL`
+	args := []interface{}{filter.BusinessID, filter.BusinessID, filter.StartUTC, filter.EndUTC}
+	query, args = addReceiptRecordFilters(query, args, filter)
+	query += " ORDER BY " + sortBy + " " + filter.SortOrder + " LIMIT ? OFFSET ?"
+	args = append(args, filter.Limit, (filter.Page-1)*filter.Limit)
+	if err := r.db.Raw(query, args...).Scan(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+
+	items := make([]ReceiptRecordReportItem, 0, len(rows))
+	for _, row := range rows {
+		var lastViewedAt *string
+		if row.LastViewedAt != nil {
+			value := row.LastViewedAt.Format(time.RFC3339)
+			lastViewedAt = &value
+		}
+		receiptStatus := "not_viewed"
+		if row.ViewCount > 0 {
+			receiptStatus = "viewed"
+		}
+		items = append(items, ReceiptRecordReportItem{
+			SaleID:        row.SaleID,
+			SaleNumber:    row.SaleNumber,
+			BranchName:    row.BranchName,
+			CustomerName:  row.CustomerName,
+			CashierName:   row.CashierName,
+			TotalAmount:   row.TotalAmount,
+			PaidAmount:    row.PaidAmount,
+			PaymentStatus: row.PaymentStatus,
+			SaleStatus:    row.SaleStatus,
+			SoldAt:        row.SoldAt.Format(time.RFC3339),
+			ViewCount:     row.ViewCount,
+			LastViewedAt:  lastViewedAt,
+			ReceiptStatus: receiptStatus,
+		})
+	}
+
+	total, err := r.countReceiptRecords(filter)
+	return items, total, err
+}
+
 func (r *Repository) InventorySummary(filter *shared.ResolvedFilter) (*InventoryReportSummaryResponse, error) {
 	var row InventoryReportSummaryResponse
 	query := `
@@ -451,9 +540,10 @@ func (r *Repository) InventorySummary(filter *shared.ResolvedFilter) (*Inventory
 			COUNT(*) FILTER (WHERE ii.available_quantity <= ii.reorder_level) AS low_stock_count,
 			COUNT(*) FILTER (WHERE ii.available_quantity <= 0) AS out_of_stock_count,
 			COUNT(*) FILTER (WHERE ii.is_expiry_tracked) AS expiry_tracked_count,
-			COALESCE(SUM(ii.current_quantity * COALESCE(p.cost_price, ing.cost_per_unit, pi.cost_per_unit, 0)),0) AS total_stock_value
+			COALESCE(SUM(ii.current_quantity * COALESCE(pv.cost_price, p.cost_price, ing.cost_per_unit, pi.cost_per_unit, 0)),0) AS total_stock_value
 		FROM inventory_items ii
 		LEFT JOIN products p ON p.id = ii.product_id
+		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
 		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
 		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
 		WHERE ii.business_id = ? AND ii.deleted_at IS NULL`
@@ -499,14 +589,15 @@ func (r *Repository) StockValuation(filter *shared.ResolvedFilter) (*StockValuat
 	items := []StockValuationReportItem{}
 	query := `
 		SELECT ii.id AS inventory_item_id,
-			COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') AS item_name,
+			CASE WHEN ii.item_type = 'product_variant' THEN CONCAT(p.product_name, ' - ', pv.variant_name) ELSE COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') END AS item_name,
 			ii.item_type, b.branch_name, ii.current_quantity, u.symbol AS unit_symbol,
-			COALESCE(p.cost_price, ing.cost_per_unit, pi.cost_per_unit, 0) AS unit_cost,
-			(ii.current_quantity * COALESCE(p.cost_price, ing.cost_per_unit, pi.cost_per_unit, 0)) AS stock_value
+			COALESCE(pv.cost_price, p.cost_price, ing.cost_per_unit, pi.cost_per_unit, 0) AS unit_cost,
+			(ii.current_quantity * COALESCE(pv.cost_price, p.cost_price, ing.cost_per_unit, pi.cost_per_unit, 0)) AS stock_value
 		FROM inventory_items ii
 		JOIN branches b ON b.id = ii.branch_id
 		JOIN units u ON u.id = ii.unit_id
 		LEFT JOIN products p ON p.id = ii.product_id
+		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
 		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
 		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
 		WHERE ii.business_id = ? AND ii.deleted_at IS NULL`
@@ -523,9 +614,10 @@ func (r *Repository) StockValuation(filter *shared.ResolvedFilter) (*StockValuat
 	}
 	byType := []StockValueByItemType{}
 	summaryQuery := `
-		SELECT ii.item_type, COALESCE(SUM(ii.current_quantity * COALESCE(p.cost_price, ing.cost_per_unit, pi.cost_per_unit, 0)),0) AS stock_value
+		SELECT ii.item_type, COALESCE(SUM(ii.current_quantity * COALESCE(pv.cost_price, p.cost_price, ing.cost_per_unit, pi.cost_per_unit, 0)),0) AS stock_value
 		FROM inventory_items ii
 		LEFT JOIN products p ON p.id = ii.product_id
+		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
 		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
 		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
 		WHERE ii.business_id = ? AND ii.deleted_at IS NULL`
@@ -546,7 +638,7 @@ func (r *Repository) LowStock(filter *shared.ResolvedFilter) ([]LowStockReportIt
 	items := []LowStockReportItem{}
 	query := `
 		SELECT ii.id AS inventory_item_id,
-			COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') AS item_name,
+			CASE WHEN ii.item_type = 'product_variant' THEN CONCAT(p.product_name, ' - ', pv.variant_name) ELSE COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') END AS item_name,
 			b.branch_name, ii.available_quantity, ii.reorder_level,
 			GREATEST(ii.reorder_level - ii.available_quantity, 0) AS shortage_quantity,
 			u.symbol AS unit_symbol
@@ -554,6 +646,7 @@ func (r *Repository) LowStock(filter *shared.ResolvedFilter) ([]LowStockReportIt
 		JOIN branches b ON b.id = ii.branch_id
 		JOIN units u ON u.id = ii.unit_id
 		LEFT JOIN products p ON p.id = ii.product_id
+		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
 		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
 		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
 		WHERE ii.business_id = ? AND ii.deleted_at IS NULL AND ii.available_quantity <= ii.reorder_level`
@@ -574,7 +667,7 @@ func (r *Repository) ExpiryReport(filter *shared.ResolvedFilter) ([]ExpiryReport
 	items := []ExpiryReportItem{}
 	query := `
 		SELECT eb.id AS batch_id, eb.inventory_item_id,
-			COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') AS item_name,
+			CASE WHEN ii.item_type = 'product_variant' THEN CONCAT(p.product_name, ' - ', pv.variant_name) ELSE COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') END AS item_name,
 			b.branch_name, COALESCE(eb.batch_number,'') AS batch_number,
 			eb.quantity, u.symbol AS unit_symbol,
 			eb.received_date::text AS received_date, eb.expiry_date::text AS expiry_date,
@@ -585,6 +678,7 @@ func (r *Repository) ExpiryReport(filter *shared.ResolvedFilter) ([]ExpiryReport
 		JOIN branches b ON b.id = eb.branch_id
 		JOIN units u ON u.id = ii.unit_id
 		LEFT JOIN products p ON p.id = ii.product_id
+		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
 		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
 		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
 		WHERE eb.business_id = ? AND eb.deleted_at IS NULL AND eb.expiry_date <= CURRENT_DATE + (? * INTERVAL '1 day')`
@@ -612,7 +706,7 @@ func (r *Repository) InventoryMovements(filter *shared.ResolvedFilter) ([]Invent
 	items := []InventoryMovementReportItem{}
 	query := `
 		SELECT sm.id AS movement_id, sm.created_at::text AS date, b.branch_name,
-			COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') AS item_name,
+			CASE WHEN ii.item_type = 'product_variant' THEN CONCAT(p.product_name, ' - ', pv.variant_name) ELSE COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') END AS item_name,
 			sm.item_type, sm.movement_type, sm.movement_direction, sm.quantity,
 			sm.before_quantity, sm.after_quantity, u.symbol AS unit_symbol,
 			COALESCE(sm.reference_number,'') AS reference_number,
@@ -623,6 +717,7 @@ func (r *Repository) InventoryMovements(filter *shared.ResolvedFilter) ([]Invent
 		JOIN units u ON u.id = sm.unit_id
 		LEFT JOIN users us ON us.id = sm.created_by_user_id
 		LEFT JOIN products p ON p.id = ii.product_id
+		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
 		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
 		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
 		WHERE sm.business_id = ? AND sm.created_at >= ? AND sm.created_at < ?`
@@ -640,7 +735,7 @@ func (r *Repository) InventoryMovements(filter *shared.ResolvedFilter) ([]Invent
 func (r *Repository) WastageReport(filter *shared.ResolvedFilter) (*WastageReportResponse, error) {
 	items := []WastageReportItem{}
 	query := `
-		SELECT COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') AS item_name,
+		SELECT CASE WHEN ii.item_type = 'product_variant' THEN CONCAT(p.product_name, ' - ', pv.variant_name) ELSE COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') END AS item_name,
 			sm.item_type, b.branch_name, sm.quantity, u.symbol AS unit_symbol,
 			COALESCE(sm.reason,'') AS reason, sm.created_at::text AS created_at
 		FROM stock_movements sm
@@ -648,6 +743,7 @@ func (r *Repository) WastageReport(filter *shared.ResolvedFilter) (*WastageRepor
 		JOIN branches b ON b.id = sm.branch_id
 		JOIN units u ON u.id = sm.unit_id
 		LEFT JOIN products p ON p.id = ii.product_id
+		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
 		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
 		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
 		WHERE sm.business_id = ? AND sm.created_at >= ? AND sm.created_at < ? AND sm.movement_type = 'wastage'`
@@ -664,10 +760,11 @@ func (r *Repository) WastageReport(filter *shared.ResolvedFilter) (*WastageRepor
 	}
 	summaryQuery := `
 		SELECT COALESCE(SUM(sm.quantity),0) AS total_wastage_quantity,
-			COALESCE(SUM(sm.quantity * COALESCE(p.cost_price, ing.cost_per_unit, pi.cost_per_unit, 0)),0) AS wastage_value
+			COALESCE(SUM(sm.quantity * COALESCE(pv.cost_price, p.cost_price, ing.cost_per_unit, pi.cost_per_unit, 0)),0) AS wastage_value
 		FROM stock_movements sm
 		JOIN inventory_items ii ON ii.id = sm.inventory_item_id
 		LEFT JOIN products p ON p.id = ii.product_id
+		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
 		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
 		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
 		WHERE sm.business_id = ? AND sm.created_at >= ? AND sm.created_at < ? AND sm.movement_type = 'wastage'`
@@ -706,7 +803,7 @@ func (r *Repository) InventoryAudit(filter *shared.ResolvedFilter) ([]InventoryA
 	items := []InventoryAuditReportItem{}
 	query := `
 		SELECT ii.id AS inventory_item_id,
-			COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') AS item_name,
+			CASE WHEN ii.item_type = 'product_variant' THEN CONCAT(p.product_name, ' - ', pv.variant_name) ELSE COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') END AS item_name,
 			b.branch_name, ii.current_quantity,
 			COALESCE(SUM(CASE WHEN sm.movement_direction = 'in' THEN sm.quantity WHEN sm.movement_direction = 'out' THEN -sm.quantity ELSE 0 END),0) AS calculated_quantity_from_movements,
 			(ii.current_quantity - COALESCE(SUM(CASE WHEN sm.movement_direction = 'in' THEN sm.quantity WHEN sm.movement_direction = 'out' THEN -sm.quantity ELSE 0 END),0)) AS difference,
@@ -715,6 +812,7 @@ func (r *Repository) InventoryAudit(filter *shared.ResolvedFilter) ([]InventoryA
 		JOIN branches b ON b.id = ii.branch_id
 		LEFT JOIN stock_movements sm ON sm.inventory_item_id = ii.id
 		LEFT JOIN products p ON p.id = ii.product_id
+		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
 		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
 		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
 		WHERE ii.business_id = ? AND ii.deleted_at IS NULL`
@@ -1599,8 +1697,8 @@ func addBranchCondition(query string, args []interface{}, filter *shared.Resolve
 func inventoryItemSelect() string {
 	return `
 		SELECT ii.id AS inventory_item_id, ii.branch_id, b.branch_name, ii.item_type,
-			COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') AS item_name,
-			COALESCE(p.product_code, ing.ingredient_code, pi.packaging_code, '') AS item_code,
+			CASE WHEN ii.item_type = 'product_variant' THEN CONCAT(p.product_name, ' - ', pv.variant_name) ELSE COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') END AS item_name,
+			COALESCE(NULLIF(pv.sku, ''), p.product_code, ing.ingredient_code, pi.packaging_code, '') AS item_code,
 			ii.current_quantity, ii.reserved_quantity, ii.available_quantity, ii.reorder_level,
 			u.symbol AS unit_symbol, ii.status,
 			(ii.available_quantity <= ii.reorder_level) AS is_low_stock,
@@ -1609,6 +1707,7 @@ func inventoryItemSelect() string {
 		JOIN branches b ON b.id = ii.branch_id
 		JOIN units u ON u.id = ii.unit_id
 		LEFT JOIN products p ON p.id = ii.product_id
+		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
 		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
 		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id`
 }
@@ -1997,6 +2096,30 @@ func addHeaderSalesFilters(query string, args []interface{}, filter *shared.Reso
 		args = append(args, filter.SaleStatus)
 	}
 	return query, args
+}
+
+func addReceiptRecordFilters(query string, args []interface{}, filter *shared.ResolvedFilter) (string, []interface{}) {
+	query, args = addHeaderSalesFilters(query, args, filter)
+	if filter.Search != "" {
+		like := "%" + strings.ToLower(filter.Search) + "%"
+		query += " AND (LOWER(s.sale_number) LIKE ? OR LOWER(COALESCE(c.full_name, '')) LIKE ? OR LOWER(COALESCE(u.full_name, '')) LIKE ?)"
+		args = append(args, like, like, like)
+	}
+	return query, args
+}
+
+func (r *Repository) countReceiptRecords(filter *shared.ResolvedFilter) (int64, error) {
+	var total int64
+	query := `
+		SELECT COUNT(*)
+		FROM sales s
+		LEFT JOIN customers c ON c.id = s.customer_id
+		LEFT JOIN users u ON u.id = s.cashier_user_id
+		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.deleted_at IS NULL`
+	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
+	query, args = addReceiptRecordFilters(query, args, filter)
+	err := r.db.Raw(query, args...).Scan(&total).Error
+	return total, err
 }
 
 func (r *Repository) countGroupedSales(filter *shared.ResolvedFilter, groupExpr string) (int64, error) {

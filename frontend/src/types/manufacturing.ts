@@ -14,6 +14,8 @@ export type ProductionBatch = {
   branchName: string;
   productId: string;
   productName: string;
+  productVariantId: string | null;
+  productVariantName: string | null;
   recipeId: string;
   recipeName: string;
   recipeVersionNumber: number;
@@ -88,6 +90,8 @@ export type ManufacturingRecipeOption = {
   id: string;
   recipeName: string;
   recipeCode: string;
+  productVariantId: string | null;
+  productVariantName: string | null;
   versionNumber: number;
   batchYieldQuantity: number;
   batchYieldUnitName: string;

@@ -30,6 +30,7 @@ func RegisterRoutes(
 	group.GET("/sales/top-products", view, handler.TopProducts)
 	group.GET("/sales/slow-moving-products", view, handler.SlowMovingProducts)
 	group.GET("/sales/trend", view, handler.SalesTrend)
+	group.GET("/receipts", view, handler.ReceiptRecords)
 	group.GET("/inventory/summary", view, inventoryView, handler.InventorySummary)
 	group.GET("/inventory/current-stock", view, inventoryView, handler.CurrentStock)
 	group.GET("/inventory/stock-valuation", view, inventoryView, handler.StockValuation)

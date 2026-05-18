@@ -19,6 +19,7 @@ type POSReceiptDialogProps = {
   onNewSale: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
+  primaryActionLabel?: string;
   receipt: SaleReceipt | null;
 };
 
@@ -112,6 +113,7 @@ export function POSReceiptDialog({
   onNewSale,
   onOpenChange,
   open,
+  primaryActionLabel = "New sale",
   receipt,
 }: POSReceiptDialogProps): JSX.Element {
   const config = layout?.layoutConfig ?? fallbackLayoutConfig;
@@ -260,7 +262,7 @@ export function POSReceiptDialog({
             Print
           </Button>
           <Button onClick={onNewSale} type="button">
-            New sale
+            {primaryActionLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

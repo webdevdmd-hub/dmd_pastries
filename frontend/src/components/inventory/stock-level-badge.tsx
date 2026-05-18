@@ -8,6 +8,10 @@ type StockLevelBadgeProps = {
 };
 
 export function StockLevelBadge({ item }: StockLevelBadgeProps): JSX.Element {
+  if (item.status === "not_initialized") {
+    return <Badge className="bg-sky-100 text-sky-900 hover:bg-sky-100">Needs opening stock</Badge>;
+  }
+
   if (item.availableQuantity <= 0) {
     return <Badge className="border-red-200 bg-red-100 text-red-900">Out of stock</Badge>;
   }

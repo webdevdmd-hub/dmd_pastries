@@ -256,6 +256,16 @@ func (s *Service) DeleteProduct(currentUser *utils.AuthContext, id string, ipAdd
 		}
 		return apperrors.Internal("failed to load product")
 	}
+	references, err := s.repo.ProductHistoryReferences(currentUser.BusinessID, branchID, id)
+	if err != nil {
+		return apperrors.Internal("failed to validate product history")
+	}
+	if len(references) > 0 {
+		return apperrors.Conflict("Product has transaction history and cannot be deleted. Deactivate it instead.", map[string]interface{}{
+			"reason":     "product_has_history",
+			"references": references,
+		})
+	}
 	return s.updateWithAudit(currentUser, "product.deleted", id, "Product deleted.", ipAddress, userAgent, func(tx *gorm.DB) error {
 		return s.repo.Update(tx, id, currentUser.BusinessID, branchID, map[string]interface{}{
 			"status":         "archived",

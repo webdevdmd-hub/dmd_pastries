@@ -15,6 +15,8 @@ type ListQuery struct {
 
 type CreateRecipeRequest struct {
 	ProductID              string                  `json:"product_id" binding:"required"`
+	ProductVariantID       string                  `json:"product_variant_id"`
+	NewProductVariant      *RecipeVariantInput     `json:"new_product_variant"`
 	RecipeName             string                  `json:"recipe_name" binding:"required"`
 	Description            string                  `json:"description"`
 	BatchYieldQuantity     float64                 `json:"batch_yield_quantity" binding:"required"`
@@ -27,13 +29,25 @@ type CreateRecipeRequest struct {
 }
 
 type UpdateRecipeRequest struct {
-	RecipeName             string   `json:"recipe_name"`
-	Description            string   `json:"description"`
-	BatchYieldQuantity     *float64 `json:"batch_yield_quantity"`
-	BatchYieldUnitID       string   `json:"batch_yield_unit_id"`
-	PreparationTimeMinutes *int     `json:"preparation_time_minutes"`
-	Instructions           string   `json:"instructions"`
-	Status                 string   `json:"status"`
+	RecipeName             string              `json:"recipe_name"`
+	ProductVariantID       *string             `json:"product_variant_id"`
+	NewProductVariant      *RecipeVariantInput `json:"new_product_variant"`
+	Description            string              `json:"description"`
+	BatchYieldQuantity     *float64            `json:"batch_yield_quantity"`
+	BatchYieldUnitID       string              `json:"batch_yield_unit_id"`
+	PreparationTimeMinutes *int                `json:"preparation_time_minutes"`
+	Instructions           string              `json:"instructions"`
+	Status                 string              `json:"status"`
+}
+
+type RecipeVariantInput struct {
+	VariantName string   `json:"variant_name"`
+	SKU         string   `json:"sku"`
+	Barcode     string   `json:"barcode"`
+	SalePrice   *float64 `json:"sale_price"`
+	CostPrice   *float64 `json:"cost_price"`
+	ImageFileID string   `json:"image_file_id"`
+	SortOrder   int      `json:"sort_order"`
 }
 
 type UpdateStatusRequest struct {
@@ -81,6 +95,8 @@ type RecipeResponse struct {
 	ProductID               string                     `json:"product_id"`
 	ProductName             string                     `json:"product_name"`
 	ProductType             string                     `json:"product_type"`
+	ProductVariantID        *string                    `json:"product_variant_id"`
+	ProductVariantName      string                     `json:"product_variant_name"`
 	RecipeCode              string                     `json:"recipe_code"`
 	RecipeName              string                     `json:"recipe_name"`
 	Description             string                     `json:"description"`
@@ -159,11 +175,13 @@ type LookupResponse struct {
 }
 
 type RecipeLookupItem struct {
-	ID          string `json:"id"`
-	RecipeCode  string `json:"recipe_code"`
-	RecipeName  string `json:"recipe_name"`
-	ProductID   string `json:"product_id"`
-	ProductName string `json:"product_name"`
-	Status      string `json:"status"`
-	IsActive    bool   `json:"is_active"`
+	ID                 string  `json:"id"`
+	RecipeCode         string  `json:"recipe_code"`
+	RecipeName         string  `json:"recipe_name"`
+	ProductID          string  `json:"product_id"`
+	ProductName        string  `json:"product_name"`
+	ProductVariantID   *string `json:"product_variant_id"`
+	ProductVariantName string  `json:"product_variant_name"`
+	Status             string  `json:"status"`
+	IsActive           bool    `json:"is_active"`
 }

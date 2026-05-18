@@ -117,6 +117,7 @@ export function InventoryMovementsPageClient(): JSX.Element {
           <SelectContent>
             <SelectItem value="all">All types</SelectItem>
             <SelectItem value="product">Products</SelectItem>
+            <SelectItem value="product_variant">Variants</SelectItem>
             <SelectItem value="ingredient">Ingredients</SelectItem>
             <SelectItem value="packaging">Packaging</SelectItem>
           </SelectContent>

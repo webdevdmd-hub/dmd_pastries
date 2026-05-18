@@ -61,7 +61,7 @@ func (s *Service) Create(currentUser *utils.AuthContext, req CreateRecipeRequest
 		}
 		recipe.RecipeCode = code
 		if recipe.IsActive {
-			if err := s.repo.DeactivateOtherActiveRecipes(tx, currentUser.BusinessID, branchID, recipe.ProductID, recipe.ID); err != nil {
+			if err := s.repo.DeactivateOtherActiveRecipes(tx, currentUser.BusinessID, branchID, recipe.ProductID, recipe.ProductVariantID, recipe.ID); err != nil {
 				return err
 			}
 		}
@@ -144,10 +144,18 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateRe
 			}
 			updates["status"] = req.Status
 			updates["is_active"] = req.Status == "active"
-			if req.Status == "active" {
-				if err := s.repo.DeactivateOtherActiveRecipes(tx, currentUser.BusinessID, branchID, recipe.ProductID, recipe.ID); err != nil {
-					return err
-				}
+		}
+		if req.NewProductVariant != nil || req.ProductVariantID != nil {
+			variantID, err := s.resolveRecipeVariant(tx, currentUser.BusinessID, branchID, recipe.ProductID, recipe, req.ProductVariantID, req.NewProductVariant)
+			if err != nil {
+				return err
+			}
+			updates["product_variant_id"] = variantID
+			recipe.ProductVariantID = variantID
+		}
+		if updates["is_active"] == true || (recipe.IsActive && (req.NewProductVariant != nil || req.ProductVariantID != nil)) {
+			if err := s.repo.DeactivateOtherActiveRecipes(tx, currentUser.BusinessID, branchID, recipe.ProductID, recipe.ProductVariantID, recipe.ID); err != nil {
+				return err
 			}
 		}
 		if err := s.repo.UpdateRecipe(tx, id, currentUser.BusinessID, branchID, updates); err != nil {
@@ -178,7 +186,7 @@ func (s *Service) UpdateStatus(currentUser *utils.AuthContext, id string, req Up
 			return notFound(err, "recipe not found")
 		}
 		if req.Status == "active" {
-			if err := s.repo.DeactivateOtherActiveRecipes(tx, currentUser.BusinessID, branchID, recipe.ProductID, recipe.ID); err != nil {
+			if err := s.repo.DeactivateOtherActiveRecipes(tx, currentUser.BusinessID, branchID, recipe.ProductID, recipe.ProductVariantID, recipe.ID); err != nil {
 				return err
 			}
 		}
@@ -513,6 +521,10 @@ func (s *Service) buildRecipe(tx *gorm.DB, currentUser *utils.AuthContext, branc
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	productVariantID, err := s.resolveCreateRecipeVariant(tx, currentUser.BusinessID, branchID, product, req)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	if req.BatchYieldQuantity <= 0 {
 		return nil, nil, nil, apperrors.BadRequest("batch_yield_quantity must be greater than zero", nil)
 	}
@@ -554,7 +566,119 @@ func (s *Service) buildRecipe(tx *gorm.DB, currentUser *utils.AuthContext, branc
 	}
 	ingredientCost, packagingCost := sumIngredientCost(ingredients), sumPackagingCost(packaging)
 	totalCost := roundMoney(ingredientCost + packagingCost)
-	return &Recipe{ID: recipeID, BusinessID: currentUser.BusinessID, BranchID: branchID, ProductID: product.ID, RecipeName: strings.TrimSpace(req.RecipeName), Description: strings.TrimSpace(req.Description), BatchYieldQuantity: req.BatchYieldQuantity, BatchYieldUnitID: req.BatchYieldUnitID, PreparationTimeMinutes: req.PreparationTimeMinutes, Instructions: strings.TrimSpace(req.Instructions), EstimatedIngredientCost: ingredientCost, EstimatedPackagingCost: packagingCost, EstimatedTotalCost: totalCost, CostPerYieldUnit: roundQuantity(totalCost / req.BatchYieldQuantity), VersionNumber: 1, IsActive: status == "active", Status: status, CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}, ingredients, packaging, nil
+	return &Recipe{ID: recipeID, BusinessID: currentUser.BusinessID, BranchID: branchID, ProductID: product.ID, ProductVariantID: productVariantID, RecipeName: strings.TrimSpace(req.RecipeName), Description: strings.TrimSpace(req.Description), BatchYieldQuantity: req.BatchYieldQuantity, BatchYieldUnitID: req.BatchYieldUnitID, PreparationTimeMinutes: req.PreparationTimeMinutes, Instructions: strings.TrimSpace(req.Instructions), EstimatedIngredientCost: ingredientCost, EstimatedPackagingCost: packagingCost, EstimatedTotalCost: totalCost, CostPerYieldUnit: roundQuantity(totalCost / req.BatchYieldQuantity), VersionNumber: 1, IsActive: status == "active", Status: status, CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}, ingredients, packaging, nil
+}
+
+func (s *Service) resolveCreateRecipeVariant(tx *gorm.DB, businessID, branchID string, product *ProductInfo, req CreateRecipeRequest) (*string, error) {
+	if req.NewProductVariant != nil && strings.TrimSpace(req.ProductVariantID) != "" {
+		return nil, apperrors.BadRequest("use either product_variant_id or new_product_variant, not both", nil)
+	}
+	if req.NewProductVariant != nil {
+		return s.createRecipeProductVariant(tx, businessID, branchID, product, req.NewProductVariant)
+	}
+	if strings.TrimSpace(req.ProductVariantID) == "" {
+		return nil, nil
+	}
+	if err := validateUUID(req.ProductVariantID, "product_variant_id"); err != nil {
+		return nil, err
+	}
+	variant, err := s.repo.ProductVariant(tx, businessID, branchID, product.ID, req.ProductVariantID)
+	if err != nil {
+		return nil, notFound(err, "product variant not found")
+	}
+	if variant.Status != "active" {
+		return nil, apperrors.BadRequest("product variant must be active", nil)
+	}
+	return &variant.ID, nil
+}
+
+func (s *Service) resolveRecipeVariant(tx *gorm.DB, businessID, branchID, productID string, product *Recipe, variantIDInput *string, newVariant *RecipeVariantInput) (*string, error) {
+	if newVariant != nil && variantIDInput != nil && strings.TrimSpace(*variantIDInput) != "" {
+		return nil, apperrors.BadRequest("use either product_variant_id or new_product_variant, not both", nil)
+	}
+	productInfo, err := s.validateProduct(tx, businessID, branchID, productID)
+	if err != nil {
+		return nil, err
+	}
+	if newVariant != nil {
+		return s.createRecipeProductVariant(tx, businessID, branchID, productInfo, newVariant)
+	}
+	if variantIDInput == nil {
+		return product.ProductVariantID, nil
+	}
+	variantID := strings.TrimSpace(*variantIDInput)
+	if variantID == "" {
+		return nil, nil
+	}
+	if err := validateUUID(variantID, "product_variant_id"); err != nil {
+		return nil, err
+	}
+	variant, err := s.repo.ProductVariant(tx, businessID, branchID, productID, variantID)
+	if err != nil {
+		return nil, notFound(err, "product variant not found")
+	}
+	if variant.Status != "active" {
+		return nil, apperrors.BadRequest("product variant must be active", nil)
+	}
+	return &variant.ID, nil
+}
+
+func (s *Service) createRecipeProductVariant(tx *gorm.DB, businessID, branchID string, product *ProductInfo, input *RecipeVariantInput) (*string, error) {
+	if input == nil {
+		return nil, nil
+	}
+	name := strings.TrimSpace(input.VariantName)
+	if name == "" {
+		return nil, apperrors.BadRequest("new_product_variant.variant_name is required", nil)
+	}
+	if input.SalePrice != nil && *input.SalePrice < 0 {
+		return nil, apperrors.BadRequest("new_product_variant.sale_price must be non-negative", nil)
+	}
+	if input.CostPrice != nil && *input.CostPrice < 0 {
+		return nil, apperrors.BadRequest("new_product_variant.cost_price must be non-negative", nil)
+	}
+	exists, err := s.repo.ProductVariantNameExists(tx, businessID, product.ID, name)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, apperrors.Conflict("product variant already exists", nil)
+	}
+	if exists, err = s.repo.VariantSKUExists(tx, businessID, input.SKU); err != nil {
+		return nil, err
+	} else if exists {
+		return nil, apperrors.Conflict("variant SKU already exists", nil)
+	}
+	if exists, err = s.repo.VariantBarcodeExists(tx, businessID, input.Barcode); err != nil {
+		return nil, err
+	} else if exists {
+		return nil, apperrors.Conflict("variant barcode already exists", nil)
+	}
+	salePrice := product.SalePrice
+	if input.SalePrice != nil {
+		salePrice = *input.SalePrice
+	}
+	costPrice := product.CostPrice
+	if input.CostPrice != nil {
+		costPrice = input.CostPrice
+	}
+	variant := &ProductVariantInfo{
+		ID:          utils.NewUUID(),
+		BusinessID:  businessID,
+		ProductID:   product.ID,
+		VariantName: name,
+		SKU:         strings.TrimSpace(input.SKU),
+		Barcode:     strings.TrimSpace(input.Barcode),
+		SalePrice:   salePrice,
+		CostPrice:   costPrice,
+		ImageFileID: strings.TrimSpace(input.ImageFileID),
+		SortOrder:   input.SortOrder,
+		Status:      "active",
+	}
+	if err := s.repo.CreateProductVariant(tx, variant); err != nil {
+		return nil, err
+	}
+	return &variant.ID, nil
 }
 
 func (s *Service) validateProduct(tx *gorm.DB, businessID, branchID, productID string) (*ProductInfo, error) {

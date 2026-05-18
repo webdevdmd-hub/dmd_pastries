@@ -37,6 +37,10 @@ import {
 } from "@/hooks/use-ingredients";
 import { usePermission } from "@/hooks/use-permission";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import {
+  getHistoryDeleteConflictMessage,
+  isHistoryDeleteConflict,
+} from "@/lib/api/delete-conflicts";
 import type {
   CreateIngredientPayload,
   Ingredient,
@@ -128,7 +132,12 @@ export function IngredientsPageClient(): JSX.Element {
       }
       setPendingAction(null);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(
+        pendingAction.type === "delete" && isHistoryDeleteConflict(error)
+          ? getHistoryDeleteConflictMessage("ingredient")
+          : getErrorMessage(error),
+      );
+      setPendingAction(null);
     }
   };
 

@@ -11,6 +11,7 @@ type InventoryItem struct {
 	BusinessID        string         `gorm:"type:uuid;not null;index" json:"business_id"`
 	BranchID          string         `gorm:"type:uuid;not null;index" json:"branch_id"`
 	ProductID         *string        `gorm:"type:uuid;index" json:"product_id"`
+	ProductVariantID  *string        `gorm:"type:uuid;index" json:"product_variant_id"`
 	IngredientID      *string        `gorm:"type:uuid;index" json:"ingredient_id"`
 	PackagingItemID   *string        `gorm:"type:uuid;index" json:"packaging_item_id"`
 	ItemType          string         `gorm:"size:50;not null" json:"item_type"`
@@ -35,6 +36,9 @@ type StockMovement struct {
 	BusinessID           string    `gorm:"type:uuid;not null;index" json:"business_id"`
 	BranchID             string    `gorm:"type:uuid;not null;index" json:"branch_id"`
 	InventoryItemID      string    `gorm:"type:uuid;not null;index" json:"inventory_item_id"`
+	StockLocationID      *string   `gorm:"type:uuid;index" json:"stock_location_id"`
+	FromStockLocationID  *string   `gorm:"type:uuid;index" json:"from_stock_location_id"`
+	ToStockLocationID    *string   `gorm:"type:uuid;index" json:"to_stock_location_id"`
 	ItemType             string    `gorm:"size:50;not null" json:"item_type"`
 	MovementType         string    `gorm:"size:50;not null" json:"movement_type"`
 	MovementDirection    string    `gorm:"size:20;not null" json:"movement_direction"`
@@ -57,6 +61,70 @@ type StockMovement struct {
 
 func (StockMovement) TableName() string {
 	return "stock_movements"
+}
+
+type StockLocation struct {
+	ID              string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID      string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID        string         `gorm:"type:uuid;not null;index" json:"branch_id"`
+	LocationName    string         `gorm:"size:150;not null" json:"location_name"`
+	LocationCode    string         `gorm:"size:80;not null" json:"location_code"`
+	LocationType    string         `gorm:"size:50" json:"location_type"`
+	Description     string         `json:"description"`
+	IsDefault       bool           `gorm:"not null;default:false" json:"is_default"`
+	Status          string         `gorm:"size:50;not null;default:active" json:"status"`
+	CreatedByUserID string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
+	UpdatedByUserID *string        `gorm:"type:uuid;index" json:"updated_by_user_id"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (StockLocation) TableName() string {
+	return "stock_locations"
+}
+
+type InventoryLocationBalance struct {
+	ID                string    `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID        string    `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID          string    `gorm:"type:uuid;not null;index" json:"branch_id"`
+	InventoryItemID   string    `gorm:"type:uuid;not null;index" json:"inventory_item_id"`
+	StockLocationID   string    `gorm:"type:uuid;not null;index" json:"stock_location_id"`
+	CurrentQuantity   float64   `gorm:"not null;default:0" json:"current_quantity"`
+	ReservedQuantity  float64   `gorm:"not null;default:0" json:"reserved_quantity"`
+	AvailableQuantity float64   `gorm:"not null;default:0" json:"available_quantity"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+func (InventoryLocationBalance) TableName() string {
+	return "inventory_location_balances"
+}
+
+type StockTransfer struct {
+	ID                  string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID          string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID            string         `gorm:"type:uuid;not null;index" json:"branch_id"`
+	TransferNumber      string         `gorm:"size:100;not null;index" json:"transfer_number"`
+	InventoryItemID     string         `gorm:"type:uuid;not null;index" json:"inventory_item_id"`
+	FromStockLocationID string         `gorm:"type:uuid;not null;index" json:"from_stock_location_id"`
+	ToStockLocationID   string         `gorm:"type:uuid;not null;index" json:"to_stock_location_id"`
+	Quantity            float64        `gorm:"not null" json:"quantity"`
+	UnitID              string         `gorm:"type:uuid;not null;index" json:"unit_id"`
+	Reason              string         `json:"reason"`
+	Notes               string         `json:"notes"`
+	Status              string         `gorm:"size:50;not null;default:draft" json:"status"`
+	CreatedByUserID     string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
+	CompletedByUserID   *string        `gorm:"type:uuid;index" json:"completed_by_user_id"`
+	CompletedAt         *time.Time     `json:"completed_at"`
+	CancelledAt         *time.Time     `json:"cancelled_at"`
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
+	DeletedAt           gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (StockTransfer) TableName() string {
+	return "stock_transfers"
 }
 
 type InventoryAdjustment struct {

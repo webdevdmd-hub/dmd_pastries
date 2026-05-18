@@ -155,6 +155,7 @@ export function POSWorkspace(): JSX.Element {
     {
       branchId: branchId || "all",
       expiryTrackedOnly: false,
+      includeUninitialized: false,
       itemType: "product",
       lowStockOnly: false,
       search: "",
@@ -530,21 +531,36 @@ export function POSWorkspace(): JSX.Element {
           <div className="grid gap-2">
             {variantProduct?.variants
               .filter((variant) => variant.status === "active")
-              .map((variant) => (
-                <Button
-                  className="h-14 justify-between rounded-2xl"
-                  key={variant.id}
-                  onClick={() => {
-                    addProduct(variantProduct, variant);
-                    setVariantProduct(null);
-                  }}
-                  type="button"
-                  variant="outline"
-                >
-                  <span>{variant.variantName}</span>
-                  <span>AED {variant.salePrice.toFixed(2)}</span>
-                </Button>
-              ))}
+              .map((variant) => {
+                const availableQuantity = variant.availableStockQuantity;
+                const isOutOfStock = availableQuantity !== null && availableQuantity <= 0;
+
+                return (
+                  <Button
+                    className="h-auto min-h-14 justify-between gap-4 rounded-2xl py-3"
+                    disabled={isOutOfStock}
+                    key={variant.id}
+                    onClick={() => {
+                      addProduct(variantProduct, variant);
+                      setVariantProduct(null);
+                    }}
+                    type="button"
+                    variant="outline"
+                  >
+                    <span className="flex flex-col items-start text-left">
+                      <span>{variant.variantName}</span>
+                      <span className="text-xs text-brand-mocha">
+                        {availableQuantity !== null
+                          ? `${availableQuantity.toLocaleString(undefined, {
+                              maximumFractionDigits: 3,
+                            })} available`
+                          : "Stock not linked"}
+                      </span>
+                    </span>
+                    <span>AED {variant.salePrice.toFixed(2)}</span>
+                  </Button>
+                );
+              })}
           </div>
         </DialogContent>
       </Dialog>

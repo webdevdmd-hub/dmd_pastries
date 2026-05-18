@@ -36,6 +36,12 @@ function formatDate(value: string): string {
     : "Not recorded";
 }
 
+function recipeOutputLabel(recipe: Recipe): string {
+  return recipe.productVariantName
+    ? `${recipe.productName} - ${recipe.productVariantName}`
+    : recipe.productName;
+}
+
 export function RecipesTable({
   canManage,
   onCreateVersion,
@@ -70,7 +76,14 @@ export function RecipesTable({
                 </span>
               </Link>
             </TableCell>
-            <TableCell>{recipe.productName}</TableCell>
+            <TableCell>
+              <div className="grid gap-1">
+                <span>{recipeOutputLabel(recipe)}</span>
+                <span className="text-xs text-brand-mocha">
+                  Output: {recipe.productVariantName ? "Variant stock" : "Parent product stock"}
+                </span>
+              </div>
+            </TableCell>
             <TableCell>
               {recipe.batchYieldQuantity} {recipe.batchYieldUnitName}
             </TableCell>

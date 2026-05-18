@@ -2,7 +2,10 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import type { JSX } from "react";
+import { useMemo } from "react";
 
+import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
+import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -74,6 +77,45 @@ export function PurchasingItemLineEditor({
   units,
 }: PurchasingItemLineEditorProps): JSX.Element {
   const safeLines = lines.length > 0 ? lines : [createLine()];
+  const productOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      products.map((product) => ({
+        value: product.id,
+        label: product.productName,
+        description: product.productCode,
+        keywords: [product.productName, product.productCode],
+      })),
+    [products],
+  );
+  const ingredientOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      ingredients.map((ingredient) => ({
+        value: ingredient.id,
+        label: ingredient.ingredientName,
+        description: [
+          ingredient.ingredientCode,
+          `${ingredient.unitName} (${ingredient.unitSymbol})`,
+          `AED ${ingredient.costPerUnit.toFixed(2)}`,
+        ].join(" · "),
+        keywords: [
+          ingredient.ingredientName,
+          ingredient.ingredientCode,
+          ingredient.unitName,
+          ingredient.unitSymbol,
+        ],
+      })),
+    [ingredients],
+  );
+  const unitOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      units.map((unit) => ({
+        value: unit.id,
+        label: `${unit.unitName} (${unit.symbol})`,
+        description: unit.symbol,
+        keywords: [unit.unitName, unit.symbol],
+      })),
+    [units],
+  );
 
   return (
     <div className="space-y-3">
@@ -121,117 +163,117 @@ export function PurchasingItemLineEditor({
               </SelectContent>
             </Select>
             {line.itemType === "ingredient" ? (
-              <Select
-                value={line.ingredientId ?? "none"}
+              <SearchableCombobox
+                emptyMessage="No matching ingredients found."
                 onValueChange={(ingredientId) => {
                   const selected = ingredients.find((ingredient) => ingredient.id === ingredientId);
                   onLinesChange(
                     updateLine(safeLines, line.lineId, {
-                      ingredientId: ingredientId === "none" ? null : ingredientId,
+                      ingredientId: ingredientId.length === 0 ? null : ingredientId,
                       unitCost: selected?.costPerUnit ?? line.unitCost,
                       unitId: selected?.unitId ?? line.unitId,
                     }),
                   );
                 }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Ingredient" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Select ingredient</SelectItem>
-                  {ingredients.map((ingredient) => (
-                    <SelectItem key={ingredient.id} value={ingredient.id}>
-                      {ingredient.ingredientName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={ingredientOptions}
+                placeholder="Select ingredient"
+                searchPlaceholder="Search ingredient, code, unit..."
+                value={line.ingredientId ?? ""}
+              />
             ) : (
-              <Select
-                value={line.productId ?? "none"}
+              <SearchableCombobox
+                disabled={line.itemType === "packaging"}
+                emptyMessage="No matching products found."
                 onValueChange={(productId) =>
                   onLinesChange(
                     updateLine(safeLines, line.lineId, {
-                      productId: productId === "none" ? null : productId,
+                      productId: productId.length === 0 ? null : productId,
                     }),
                   )
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Product" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">
-                    {line.itemType === "packaging" ? "Packaging item pending" : "Select product"}
-                  </SelectItem>
-                  {line.itemType === "product"
-                    ? products.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.productName}
-                        </SelectItem>
-                      ))
-                    : null}
-                </SelectContent>
-              </Select>
+                options={line.itemType === "product" ? productOptions : []}
+                placeholder={
+                  line.itemType === "packaging" ? "Packaging item pending" : "Select product"
+                }
+                searchPlaceholder="Search product, code..."
+                value={line.productId ?? ""}
+              />
             )}
-            <Select
-              value={line.unitId || "none"}
+            <SearchableCombobox
+              emptyMessage="No matching units found."
               onValueChange={(unitId) =>
-                onLinesChange(
-                  updateLine(safeLines, line.lineId, { unitId: unitId === "none" ? "" : unitId }),
-                )
+                onLinesChange(updateLine(safeLines, line.lineId, { unitId }))
               }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Unit" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Select unit</SelectItem>
-                {units.map((unit) => (
-                  <SelectItem key={unit.id} value={unit.id}>
-                    {unit.unitName} ({unit.symbol})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input
-              aria-label="Quantity"
-              min="0"
-              onChange={(event) =>
-                onLinesChange(
-                  updateLine(safeLines, line.lineId, { quantity: Number(event.target.value) }),
-                )
-              }
-              placeholder="Quantity"
-              type="number"
-              value={line.quantity}
+              options={unitOptions}
+              placeholder="Select unit"
+              searchPlaceholder="Search unit..."
+              value={line.unitId}
             />
-            <Input
-              aria-label="Unit cost"
-              min="0"
-              onChange={(event) =>
-                onLinesChange(
-                  updateLine(safeLines, line.lineId, { unitCost: Number(event.target.value) }),
-                )
-              }
-              placeholder="Unit cost"
-              type="number"
-              value={line.unitCost}
-            />
-            <Input
-              aria-label="Discount"
-              min="0"
-              onChange={(event) =>
-                onLinesChange(
-                  updateLine(safeLines, line.lineId, {
-                    discountAmount: Number(event.target.value),
-                  }),
-                )
-              }
-              placeholder="Discount"
-              type="number"
-              value={line.discountAmount}
-            />
+            <div className="space-y-2">
+              <label
+                className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha"
+                htmlFor={`purchase-line-${line.lineId}-quantity`}
+              >
+                Quantity
+              </label>
+              <Input
+                aria-label="Quantity"
+                id={`purchase-line-${line.lineId}-quantity`}
+                min="0"
+                onChange={(event) =>
+                  onLinesChange(
+                    updateLine(safeLines, line.lineId, { quantity: Number(event.target.value) }),
+                  )
+                }
+                placeholder="Enter quantity"
+                type="number"
+                value={line.quantity}
+              />
+            </div>
+            <div className="space-y-2">
+              <label
+                className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha"
+                htmlFor={`purchase-line-${line.lineId}-unit-cost`}
+              >
+                Unit cost
+              </label>
+              <Input
+                aria-label="Unit cost"
+                id={`purchase-line-${line.lineId}-unit-cost`}
+                min="0"
+                onChange={(event) =>
+                  onLinesChange(
+                    updateLine(safeLines, line.lineId, { unitCost: Number(event.target.value) }),
+                  )
+                }
+                placeholder="Cost per unit"
+                type="number"
+                value={line.unitCost}
+              />
+            </div>
+            <div className="space-y-2">
+              <label
+                className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha"
+                htmlFor={`purchase-line-${line.lineId}-discount`}
+              >
+                Discount amount
+              </label>
+              <Input
+                aria-label="Discount amount"
+                id={`purchase-line-${line.lineId}-discount`}
+                min="0"
+                onChange={(event) =>
+                  onLinesChange(
+                    updateLine(safeLines, line.lineId, {
+                      discountAmount: Number(event.target.value),
+                    }),
+                  )
+                }
+                placeholder="Optional discount"
+                type="number"
+                value={line.discountAmount}
+              />
+            </div>
             <Select
               value={line.taxRateId ?? "none"}
               onValueChange={(taxRateId) =>

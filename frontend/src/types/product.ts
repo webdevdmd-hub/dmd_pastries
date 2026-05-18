@@ -71,7 +71,6 @@ export type CreateProductPayload = {
   productType: ProductType;
   salePrice: number;
   costPrice: number | null;
-  compareAtPrice: number | null;
   sku: string | null;
   barcode: string | null;
   description: string | null;

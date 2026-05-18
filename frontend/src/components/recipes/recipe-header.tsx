@@ -9,6 +9,12 @@ import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/routes";
 import type { Recipe } from "@/types/recipes";
 
+function recipeOutputLabel(recipe: Recipe): string {
+  return recipe.productVariantName
+    ? `${recipe.productName} - ${recipe.productVariantName}`
+    : recipe.productName;
+}
+
 export function RecipeHeader({
   canManage,
   onActivate,
@@ -37,7 +43,9 @@ export function RecipeHeader({
           {recipe?.isActive ? <Badge>Active BOM</Badge> : null}
         </div>
         <p className="mt-2 text-sm text-brand-mocha">
-          {recipe ? `${recipe.recipeCode} · ${recipe.productName}` : "Define a new product BOM."}
+          {recipe
+            ? `${recipe.recipeCode} · ${recipeOutputLabel(recipe)}`
+            : "Define a new product BOM."}
         </p>
       </div>
       {canManage && recipe ? (

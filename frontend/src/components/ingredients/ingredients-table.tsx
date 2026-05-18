@@ -6,6 +6,7 @@ import type { JSX } from "react";
 
 import { IngredientActionsMenu } from "@/components/ingredients/ingredient-actions-menu";
 import { IngredientStatusBadge } from "@/components/ingredients/ingredient-status-badge";
+import { ReorderLevelHeader } from "@/components/shared/reorder-level-help";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -56,7 +57,9 @@ export function IngredientsTable({
           <TableHead>Cost</TableHead>
           <TableHead>Stock</TableHead>
           <TableHead>Expiry</TableHead>
-          <TableHead>Reorder Level</TableHead>
+          <TableHead>
+            <ReorderLevelHeader />
+          </TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Created At</TableHead>
           <TableHead>Actions</TableHead>

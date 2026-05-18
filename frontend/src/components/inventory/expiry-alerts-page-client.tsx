@@ -34,7 +34,7 @@ import { useBranches } from "@/hooks/use-branches";
 import { useExpiryAlerts } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
-import type { ExpiryAlertFilters, ExpiryBatchStatus } from "@/types/inventory";
+import type { ExpiryAlertFilters, ExpiryBatch, ExpiryBatchStatus } from "@/types/inventory";
 
 const defaultFilters: ExpiryAlertFilters = {
   branchId: "",
@@ -65,6 +65,30 @@ function statusBadge(status: ExpiryBatchStatus): JSX.Element {
   return <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">Expiring</Badge>;
 }
 
+function itemTypeLabel(itemType: ExpiryBatch["itemType"]): string {
+  if (itemType === "product_variant") {
+    return "Variant";
+  }
+
+  if (itemType === "product") {
+    return "Product";
+  }
+
+  if (itemType === "ingredient") {
+    return "Ingredient";
+  }
+
+  if (itemType === "packaging") {
+    return "Packaging";
+  }
+
+  return "Unknown type";
+}
+
+function shortId(value: string): string {
+  return value.length > 8 ? value.slice(0, 8) : value;
+}
+
 export function ExpiryAlertsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
@@ -82,6 +106,16 @@ export function ExpiryAlertsPageClient(): JSX.Element {
       ),
     [branchScope, branchesQuery.data],
   );
+  const branchNameById = useMemo(
+    () => new Map((branchesQuery.data ?? []).map((branch) => [branch.id, branch.name])),
+    [branchesQuery.data],
+  );
+
+  function getBranchLabel(batch: ExpiryBatch): string {
+    return (
+      batch.branchName ?? branchNameById.get(batch.branchId) ?? `Branch ${shortId(batch.branchId)}`
+    );
+  }
 
   useEffect(() => {
     setFilters((currentFilters) => {
@@ -137,6 +171,7 @@ export function ExpiryAlertsPageClient(): JSX.Element {
           <SelectContent>
             <SelectItem value="all">All types</SelectItem>
             <SelectItem value="product">Products</SelectItem>
+            <SelectItem value="product_variant">Variants</SelectItem>
             <SelectItem value="ingredient">Ingredients</SelectItem>
             <SelectItem value="packaging">Packaging</SelectItem>
           </SelectContent>
@@ -194,6 +229,8 @@ export function ExpiryAlertsPageClient(): JSX.Element {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Item</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Batch</TableHead>
                   <TableHead>Branch</TableHead>
                   <TableHead>Quantity</TableHead>
@@ -208,9 +245,25 @@ export function ExpiryAlertsPageClient(): JSX.Element {
                   const remaining = daysRemaining(batch.expiryDate);
                   return (
                     <TableRow key={batch.id}>
+                      <TableCell>
+                        <div className="font-bold text-brand-espresso">
+                          {batch.itemName ?? `Inventory item ${shortId(batch.inventoryItemId)}`}
+                        </div>
+                        <div className="text-xs text-brand-mocha">
+                          {batch.itemCode ? `Code: ${batch.itemCode}` : "Item details unavailable"}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className="border-brand-cappuccino bg-brand-latte/70 text-brand-espresso">
+                          {itemTypeLabel(batch.itemType)}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="font-bold">{batch.batchNumber}</TableCell>
-                      <TableCell>{batch.branchId.slice(0, 8)}</TableCell>
-                      <TableCell>{batch.quantity}</TableCell>
+                      <TableCell>{getBranchLabel(batch)}</TableCell>
+                      <TableCell>
+                        {batch.quantity}
+                        {batch.unitSymbol ? ` ${batch.unitSymbol}` : ""}
+                      </TableCell>
                       <TableCell>{formatDate(batch.receivedDate)}</TableCell>
                       <TableCell>{formatDate(batch.expiryDate)}</TableCell>
                       <TableCell className={remaining < 0 ? "font-bold text-red-800" : undefined}>

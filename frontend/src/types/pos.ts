@@ -9,6 +9,8 @@ export type POSProductVariant = {
   sku: string | null;
   barcode: string | null;
   salePrice: number;
+  currentStockQuantity: number | null;
+  availableStockQuantity: number | null;
   status: RecordStatus;
 };
 

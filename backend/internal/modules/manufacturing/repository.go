@@ -116,7 +116,7 @@ func (r *Repository) NextNumber(tx *gorm.DB, businessID string) (string, error) 
 
 func (r *Repository) ActiveRecipe(tx *gorm.DB, businessID, branchID, recipeID string) (*recipeInfo, error) {
 	var recipe recipeInfo
-	err := tx.Table("recipes").Select("id, product_id, recipe_name, batch_yield_quantity, batch_yield_unit_id, estimated_ingredient_cost, estimated_packaging_cost, is_active, status").
+	err := tx.Table("recipes").Select("id, product_id, product_variant_id, recipe_name, batch_yield_quantity, batch_yield_unit_id, estimated_ingredient_cost, estimated_packaging_cost, is_active, status").
 		Where("id = ? AND business_id = ? AND branch_id = ? AND is_active = ? AND status = ? AND deleted_at IS NULL", recipeID, businessID, branchID, true, "active").
 		Take(&recipe).Error
 	return &recipe, err
@@ -146,6 +146,19 @@ func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string
 	return &product, err
 }
 
+func (r *Repository) ProductVariant(tx *gorm.DB, businessID, branchID, productID string, productVariantID *string) (*productVariantInfo, error) {
+	if productVariantID == nil {
+		return nil, nil
+	}
+	var variant productVariantInfo
+	err := tx.Table("product_variants pv").
+		Select("pv.id, pv.variant_name, pv.status").
+		Joins("JOIN products p ON p.id = pv.product_id AND p.business_id = pv.business_id").
+		Where("pv.id = ? AND pv.product_id = ? AND pv.business_id = ? AND p.branch_id = ? AND pv.deleted_at IS NULL", *productVariantID, productID, businessID, branchID).
+		Take(&variant).Error
+	return &variant, err
+}
+
 func (r *Repository) Ingredient(tx *gorm.DB, businessID, branchID, ingredientID string) (*ingredientInfo, error) {
 	var ingredient ingredientInfo
 	err := tx.Table("ingredients").Select("id, ingredient_name, unit_id, is_expiry_tracked, reorder_level").Where("id = ? AND business_id = ? AND branch_id = ? AND status = ? AND deleted_at IS NULL", ingredientID, businessID, branchID, "active").Take(&ingredient).Error
@@ -162,10 +175,13 @@ func (r *Repository) UnitSymbol(unitID string) string {
 	return symbol
 }
 
-func (r *Repository) NameLookups(businessID string, batch ProductionBatch) (branchName, recipeName, productName, createdByName string) {
+func (r *Repository) NameLookups(businessID string, batch ProductionBatch) (branchName, recipeName, productName, productVariantName, createdByName string) {
 	_ = r.db.Table("branches").Select("branch_name").Where("id = ? AND business_id = ?", batch.BranchID, businessID).Scan(&branchName).Error
 	_ = r.db.Table("recipes").Select("recipe_name").Where("id = ? AND business_id = ? AND branch_id = ?", batch.RecipeID, businessID, batch.BranchID).Scan(&recipeName).Error
 	_ = r.db.Table("products").Select("product_name").Where("id = ? AND business_id = ? AND branch_id = ?", batch.ProductID, businessID, batch.BranchID).Scan(&productName).Error
+	if batch.ProductVariantID != nil {
+		_ = r.db.Table("product_variants").Select("variant_name").Where("id = ? AND business_id = ?", *batch.ProductVariantID, businessID).Scan(&productVariantName).Error
+	}
 	_ = r.db.Table("users").Select("full_name").Where("id = ? AND business_id = ?", batch.CreatedByUserID, businessID).Scan(&createdByName).Error
 	return
 }
@@ -281,6 +297,7 @@ func roundQuantity(value float64) float64 { return math.Round(value*10000) / 100
 type recipeInfo struct {
 	ID                      string
 	ProductID               string
+	ProductVariantID        *string
 	RecipeName              string
 	BatchYieldQuantity      float64
 	BatchYieldUnitID        string
@@ -288,6 +305,12 @@ type recipeInfo struct {
 	EstimatedPackagingCost  float64
 	IsActive                bool
 	Status                  string
+}
+
+type productVariantInfo struct {
+	ID          string
+	VariantName string
+	Status      string
 }
 
 type recipeIngredientInfo struct {

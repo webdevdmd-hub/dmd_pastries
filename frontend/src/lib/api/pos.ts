@@ -28,6 +28,10 @@ type BackendPOSProductVariant = {
   sku?: string | null;
   barcode?: string | null;
   sale_price?: number;
+  current_stock_quantity?: number | null;
+  current_quantity?: number | null;
+  available_stock_quantity?: number | null;
+  available_quantity?: number | null;
   status?: string;
 };
 
@@ -242,6 +246,12 @@ function parseVariant(value: unknown): POSProductVariant {
     sku: optionalString(variant.sku),
     barcode: optionalString(variant.barcode),
     salePrice: requiredNumber(variant.sale_price),
+    currentStockQuantity: optionalNumber(
+      variant.current_stock_quantity ?? variant.current_quantity,
+    ),
+    availableStockQuantity: optionalNumber(
+      variant.available_stock_quantity ?? variant.available_quantity,
+    ),
     status: isRecordStatus(variant.status) ? variant.status : "active",
   };
 }

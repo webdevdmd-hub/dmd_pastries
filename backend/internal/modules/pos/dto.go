@@ -118,13 +118,15 @@ type POSProductResponse struct {
 }
 
 type POSVariantResponse struct {
-	ID          string  `json:"id"`
-	VariantName string  `json:"variant_name"`
-	SKU         string  `json:"sku"`
-	Barcode     string  `json:"barcode"`
-	SalePrice   float64 `json:"sale_price"`
-	ImageFileID string  `json:"image_file_id"`
-	Status      string  `json:"status"`
+	ID                     string  `json:"id"`
+	VariantName            string  `json:"variant_name"`
+	SKU                    string  `json:"sku"`
+	Barcode                string  `json:"barcode"`
+	SalePrice              float64 `json:"sale_price"`
+	ImageFileID            string  `json:"image_file_id"`
+	CurrentStockQuantity   float64 `json:"current_stock_quantity"`
+	AvailableStockQuantity float64 `json:"available_stock_quantity"`
+	Status                 string  `json:"status"`
 }
 
 type POSLookupResponse struct {

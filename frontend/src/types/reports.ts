@@ -36,6 +36,38 @@ export type ReportFilters = ReportBaseFilters & {
   sortOrder?: "asc" | "desc";
 };
 
+export type ReceiptRecordsFilters = {
+  branchId?: string;
+  cashierUserId?: string;
+  dateFrom: string;
+  dateTo: string;
+  limit?: number;
+  page?: number;
+  paymentStatus?: string;
+  saleStatus?: string;
+  scope?: ReportScope;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  timezone?: string;
+};
+
+export type ReceiptRecordRow = {
+  branchName: string;
+  cashierName: string;
+  customerName: string;
+  lastViewedAt: string;
+  paidAmount: number;
+  paymentStatus: string;
+  receiptStatus: string;
+  saleId: string;
+  saleNumber: string;
+  saleStatus: string;
+  soldAt: string;
+  totalAmount: number;
+  viewCount: number;
+};
+
 export type KpiCard = {
   label: string;
   value: string;

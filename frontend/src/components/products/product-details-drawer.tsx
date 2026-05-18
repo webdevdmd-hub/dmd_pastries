@@ -80,10 +80,9 @@ export function ProductDetailsDrawer({
                 </p>
               </div>
               <div>
-                <p className="text-brand-mocha">Sale / Cost / Compare</p>
+                <p className="text-brand-mocha">Sale / Cost</p>
                 <p className="font-medium text-brand-espresso">
-                  {product.salePrice.toFixed(2)} / {product.costPrice?.toFixed(2) ?? "-"} /{" "}
-                  {product.compareAtPrice?.toFixed(2) ?? "-"}
+                  {product.salePrice.toFixed(2)} / {product.costPrice?.toFixed(2) ?? "-"}
                 </p>
               </div>
               <div>

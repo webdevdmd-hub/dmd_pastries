@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { JSX } from "react";
 
 import { PackagingStatusBadge } from "@/components/packaging/packaging-status-badge";
+import { ReorderLevelHeader } from "@/components/shared/reorder-level-help";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +23,13 @@ function formatDate(value: string): string {
     : "Not recorded";
 }
 
-function Detail({ label, value }: { label: string; value: string | JSX.Element }): JSX.Element {
+function Detail({
+  label,
+  value,
+}: {
+  label: string | JSX.Element;
+  value: string | JSX.Element;
+}): JSX.Element {
   return (
     <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-4">
       <p className="text-xs uppercase tracking-[0.16em] text-brand-mocha">{label}</p>
@@ -73,7 +80,10 @@ export function PackagingProfileCard({ item }: { item: PackagingItem }): JSX.Ele
             label="Consumable"
             value={<Badge variant="outline">{item.isConsumable ? "Consumable" : "Reusable"}</Badge>}
           />
-          <Detail label="Reorder level" value={`${String(item.reorderLevel)} ${item.unitSymbol}`} />
+          <Detail
+            label={<ReorderLevelHeader>Reorder level</ReorderLevelHeader>}
+            value={`${String(item.reorderLevel)} ${item.unitSymbol}`}
+          />
           <Detail label="Created" value={formatDate(item.createdAt)} />
         </div>
 

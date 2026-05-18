@@ -18,17 +18,20 @@ type ApiErrorOptions = {
   message: string;
   status: number;
   errors?: FieldErrorMap;
+  errorDetails?: Record<string, unknown>;
 };
 
 export class ApiError extends Error {
   readonly status: number;
   readonly errors: FieldErrorMap | undefined;
+  readonly errorDetails: Record<string, unknown> | undefined;
 
   constructor(options: ApiErrorOptions) {
     super(options.message);
     this.name = "ApiError";
     this.status = options.status;
     this.errors = options.errors;
+    this.errorDetails = options.errorDetails;
   }
 }
 
@@ -121,6 +124,7 @@ function normalizeApiResponse(value: unknown): ApiResponse<unknown> {
 
   if (success === false || ("error" in value && value.error !== undefined)) {
     const errors = normalizeErrors(value.errors) ?? backendError.errors;
+    const errorDetails = isObject(value.errors) ? value.errors : undefined;
     const resolvedMessage =
       backendError.messageSuffix && backendError.messageSuffix !== message
         ? `${message}: ${backendError.messageSuffix}`
@@ -130,6 +134,7 @@ function normalizeApiResponse(value: unknown): ApiResponse<unknown> {
       success: false,
       message: resolvedMessage,
       ...(errors ? { errors } : {}),
+      ...(errorDetails ? { errorDetails } : {}),
     } satisfies ApiFailure;
   }
 
@@ -201,6 +206,7 @@ export async function apiRequest<TResponse, TBody = undefined>(
 
   if (!response.ok || !normalized.success) {
     const errors = normalized.success ? undefined : normalized.errors;
+    const errorDetails = normalized.success ? undefined : normalized.errorDetails;
     if (response.status === 401) {
       notifySessionExpired();
     }
@@ -209,6 +215,7 @@ export async function apiRequest<TResponse, TBody = undefined>(
       message: normalized.message,
       status: response.status,
       ...(errors ? { errors } : {}),
+      ...(errorDetails ? { errorDetails } : {}),
     });
   }
 
@@ -238,6 +245,7 @@ export async function apiBlobRequest<TBody = undefined>(
     const responseText = await response.text();
     let message = "Backend request failed.";
     let errors: FieldErrorMap | undefined;
+    let errorDetails: Record<string, unknown> | undefined;
 
     if (responseText.length > 0) {
       try {
@@ -245,6 +253,7 @@ export async function apiBlobRequest<TBody = undefined>(
         const normalized = normalizeApiResponse(payload);
         message = normalized.message;
         errors = normalized.success ? undefined : normalized.errors;
+        errorDetails = normalized.success ? undefined : normalized.errorDetails;
       } catch {
         message = responseText.slice(0, 240);
       }
@@ -258,6 +267,7 @@ export async function apiBlobRequest<TBody = undefined>(
       message,
       status: response.status,
       ...(errors ? { errors } : {}),
+      ...(errorDetails ? { errorDetails } : {}),
     });
   }
 

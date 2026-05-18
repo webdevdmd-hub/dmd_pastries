@@ -68,6 +68,7 @@ export function InventoryToolbar({
         <SelectContent>
           <SelectItem value="all">All types</SelectItem>
           <SelectItem value="product">Products</SelectItem>
+          <SelectItem value="product_variant">Variants</SelectItem>
           <SelectItem value="ingredient">Ingredients</SelectItem>
           <SelectItem value="packaging">Packaging</SelectItem>
         </SelectContent>
@@ -94,6 +95,7 @@ export function InventoryToolbar({
             status: "all",
             lowStockOnly: false,
             expiryTrackedOnly: false,
+            includeUninitialized: false,
           })
         }
         type="button"
@@ -115,6 +117,13 @@ export function InventoryToolbar({
             onCheckedChange={(checked) => updateFilters({ expiryTrackedOnly: checked === true })}
           />
           Expiry tracked
+        </label>
+        <label className="flex items-center gap-2 text-sm text-brand-mocha">
+          <Checkbox
+            checked={filters.includeUninitialized}
+            onCheckedChange={(checked) => updateFilters({ includeUninitialized: checked === true })}
+          />
+          Include catalog items without stock
         </label>
         <Label className="sr-only">Inventory filters</Label>
       </div>

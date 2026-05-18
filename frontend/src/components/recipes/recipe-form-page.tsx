@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -15,6 +15,8 @@ import { RecipeInstructionsCard } from "@/components/recipes/recipe-instructions
 import { RecipePackagingSection } from "@/components/recipes/recipe-packaging-section";
 import { RecipeVersionDialog } from "@/components/recipes/recipe-version-dialog";
 import { RecipeYieldCard } from "@/components/recipes/recipe-yield-card";
+import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
+import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,6 +44,12 @@ import {
   type CreateRecipeInputValues,
   createRecipeSchema,
 } from "@/lib/validators/recipes.schema";
+import type {
+  CreateRecipePayload,
+  RecipeIngredientPayload,
+  RecipePackagingPayload,
+  UpdateRecipePayload,
+} from "@/types/recipes";
 
 type RecipeFormPageProps = {
   recipeId: string | null;
@@ -53,11 +61,66 @@ const emptyValues: CreateRecipeInputValues = {
   description: null,
   ingredients: [],
   instructions: null,
+  newProductVariantName: "",
+  newProductVariantSalePrice: null,
+  newProductVariantSku: null,
+  outputVariantMode: "parent",
   packaging: [],
   preparationTimeMinutes: 0,
   productId: "",
+  productVariantId: "",
   recipeName: "",
 };
+
+function toCreateRecipePayload(
+  values: CreateRecipeFormValues,
+  ingredients: RecipeIngredientPayload[],
+  packaging: RecipePackagingPayload[],
+): CreateRecipePayload {
+  return {
+    batchYieldQuantity: values.batchYieldQuantity,
+    batchYieldUnitId: values.batchYieldUnitId,
+    description: values.description,
+    ingredients,
+    instructions: values.instructions,
+    newProductVariant:
+      values.outputVariantMode === "new"
+        ? {
+            salePrice: values.newProductVariantSalePrice ?? 0,
+            sku: values.newProductVariantSku,
+            variantName: values.newProductVariantName?.trim() ?? "",
+          }
+        : null,
+    packaging,
+    preparationTimeMinutes: values.preparationTimeMinutes,
+    productId: values.productId,
+    productVariantId:
+      values.outputVariantMode === "existing" ? (values.productVariantId ?? null) : null,
+    recipeName: values.recipeName,
+  };
+}
+
+function toUpdateRecipePayload(values: CreateRecipeFormValues): UpdateRecipePayload {
+  return {
+    batchYieldQuantity: values.batchYieldQuantity,
+    batchYieldUnitId: values.batchYieldUnitId,
+    description: values.description,
+    instructions: values.instructions,
+    newProductVariant:
+      values.outputVariantMode === "new"
+        ? {
+            salePrice: values.newProductVariantSalePrice ?? 0,
+            sku: values.newProductVariantSku,
+            variantName: values.newProductVariantName?.trim() ?? "",
+          }
+        : null,
+    preparationTimeMinutes: values.preparationTimeMinutes,
+    productId: values.productId,
+    productVariantId:
+      values.outputVariantMode === "existing" ? (values.productVariantId ?? null) : null,
+    recipeName: values.recipeName,
+  };
+}
 
 export function RecipeFormPage({ recipeId }: RecipeFormPageProps): JSX.Element {
   const router = useRouter();
@@ -74,6 +137,8 @@ export function RecipeFormPage({ recipeId }: RecipeFormPageProps): JSX.Element {
     PERMISSIONS.recipesVersionsCreate,
   ]);
   const isCreate = recipeId === null;
+  const [draftIngredients, setDraftIngredients] = useState<RecipeIngredientPayload[]>([]);
+  const [draftPackaging, setDraftPackaging] = useState<RecipePackagingPayload[]>([]);
   const [versionOpen, setVersionOpen] = useState(false);
   const recipeQuery = useRecipe(recipeId, recipeId !== null);
   const referenceQuery = useRecipeReferenceData(true);
@@ -93,24 +158,36 @@ export function RecipeFormPage({ recipeId }: RecipeFormPageProps): JSX.Element {
         description: recipeQuery.data.description,
         ingredients: [],
         instructions: recipeQuery.data.instructions,
+        newProductVariantName: "",
+        newProductVariantSalePrice: null,
+        newProductVariantSku: null,
+        outputVariantMode: recipeQuery.data.productVariantId ? "existing" : "parent",
         packaging: [],
         preparationTimeMinutes: recipeQuery.data.preparationTimeMinutes,
         productId: recipeQuery.data.productId,
+        productVariantId: recipeQuery.data.productVariantId ?? "",
         recipeName: recipeQuery.data.recipeName,
       });
     }
   }, [form, recipeQuery.data]);
 
-  const saveRecipe = async (values: CreateRecipeFormValues): Promise<void> => {
+  const saveRecipe = async (
+    values: CreateRecipeFormValues,
+    options: { activateAfterSave?: boolean } = {},
+  ): Promise<void> => {
     try {
       if (isCreate) {
-        const created = await createMutation.mutateAsync({
-          ...values,
-          description: values.description,
-          instructions: values.instructions,
-          preparationTimeMinutes: values.preparationTimeMinutes,
-        });
-        toast.success("Recipe created.");
+        const payload = toCreateRecipePayload(values, draftIngredients, draftPackaging);
+        const created = await createMutation.mutateAsync(payload);
+        if (options.activateAfterSave) {
+          await statusMutation.mutateAsync({
+            id: created.id,
+            payload: { isActive: true, status: "active" },
+          });
+        }
+        toast.success(
+          options.activateAfterSave ? "Recipe created and activated." : "Recipe created.",
+        );
         router.replace(`${ROUTES.recipes}/${created.id}`);
         return;
       }
@@ -118,14 +195,17 @@ export function RecipeFormPage({ recipeId }: RecipeFormPageProps): JSX.Element {
       if (recipeId) {
         await updateMutation.mutateAsync({
           id: recipeId,
-          payload: {
-            ...values,
-            description: values.description,
-            instructions: values.instructions,
-            preparationTimeMinutes: values.preparationTimeMinutes,
-          },
+          payload: toUpdateRecipePayload(values),
         });
-        toast.success("Recipe updated.");
+        if (options.activateAfterSave) {
+          await statusMutation.mutateAsync({
+            id: recipeId,
+            payload: { isActive: true, status: "active" },
+          });
+        }
+        toast.success(
+          options.activateAfterSave ? "Recipe saved and activated." : "Recipe updated.",
+        );
       }
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -160,6 +240,81 @@ export function RecipeFormPage({ recipeId }: RecipeFormPageProps): JSX.Element {
     units: [],
   };
   const recipe = recipeQuery.data ?? null;
+  const selectedProductId = form.watch("productId");
+  const outputVariantMode = form.watch("outputVariantMode");
+  const selectedVariantId = form.watch("productVariantId") ?? "";
+  const selectedProduct = data.products.find((product) => product.id === selectedProductId) ?? null;
+  const selectedProductVariants = useMemo(() => selectedProduct?.variants ?? [], [selectedProduct]);
+  const isSaving = createMutation.isPending || updateMutation.isPending || statusMutation.isPending;
+  const productOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      data.products.map((product) => ({
+        value: product.id,
+        label: product.productName,
+        description:
+          product.variants.length > 0
+            ? `${product.variants.length.toLocaleString()} variants available`
+            : "Parent product output",
+        keywords: [
+          product.productName,
+          ...product.variants.flatMap((variant) => [
+            variant.variantName,
+            variant.sku ?? "",
+            String(variant.salePrice),
+          ]),
+        ],
+      })),
+    [data.products],
+  );
+  const variantOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      selectedProductVariants.map((variant) => ({
+        value: variant.id,
+        label: variant.variantName,
+        description: `AED ${variant.salePrice.toFixed(2)}${variant.sku ? ` · ${variant.sku}` : ""}`,
+        keywords: [variant.variantName, variant.sku ?? "", String(variant.salePrice)],
+      })),
+    [selectedProductVariants],
+  );
+  const unitOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      data.units.map((unit) => ({
+        value: unit.id,
+        label: `${unit.unitName} (${unit.unitSymbol})`,
+        description: unit.unitSymbol,
+        keywords: [unit.unitName, unit.unitSymbol],
+      })),
+    [data.units],
+  );
+
+  const handleProductChange = (productId: string): void => {
+    form.setValue("productId", productId);
+    form.setValue("outputVariantMode", "parent");
+    form.setValue("productVariantId", "");
+    form.setValue("newProductVariantName", "");
+    form.setValue("newProductVariantSku", null);
+    form.setValue("newProductVariantSalePrice", null);
+  };
+
+  const recipeActionButtons = (
+    <div className="flex flex-col gap-3 sm:flex-row xl:flex-col">
+      <Button onClick={() => router.push(ROUTES.recipes)} type="button" variant="outline">
+        Cancel
+      </Button>
+      <Button disabled={isSaving} type="submit" variant="outline">
+        {isCreate ? "Save draft" : "Save changes"}
+      </Button>
+      <Button
+        disabled={isSaving}
+        onClick={() => {
+          void form.handleSubmit((values) => saveRecipe(values, { activateAfterSave: true }))();
+        }}
+        type="button"
+      >
+        Save & activate
+      </Button>
+    </div>
+  );
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -179,7 +334,7 @@ export function RecipeFormPage({ recipeId }: RecipeFormPageProps): JSX.Element {
       <form
         className="grid gap-6"
         onSubmit={(event) => {
-          void form.handleSubmit(saveRecipe)(event);
+          void form.handleSubmit((values) => saveRecipe(values))(event);
         }}
       >
         <Card className="bg-white/80">
@@ -189,26 +344,107 @@ export function RecipeFormPage({ recipeId }: RecipeFormPageProps): JSX.Element {
           <CardContent className="grid gap-4 lg:grid-cols-2">
             <label className="grid gap-2">
               <Label>Product</Label>
-              <Select
+              <SearchableCombobox
                 disabled={!canManage}
-                onValueChange={(value) => form.setValue("productId", value)}
-                value={form.watch("productId")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {data.products.map((product) => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.productName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                emptyMessage="No matching products found."
+                onValueChange={handleProductChange}
+                options={productOptions}
+                placeholder="Select product"
+                searchPlaceholder="Search product, variant, SKU..."
+                value={selectedProductId}
+              />
               {fieldError("productId") ? (
                 <span className="text-sm text-red-700">{fieldError("productId")}</span>
               ) : null}
             </label>
+            <label className="grid gap-2">
+              <Label>Recipe output</Label>
+              <Select
+                disabled={!canManage || selectedProductId.length === 0}
+                onValueChange={(value) => {
+                  const nextMode = value as CreateRecipeFormValues["outputVariantMode"];
+                  form.setValue("outputVariantMode", nextMode);
+                  form.setValue("productVariantId", "");
+                  form.setValue("newProductVariantName", "");
+                  form.setValue("newProductVariantSku", null);
+                  form.setValue("newProductVariantSalePrice", null);
+                }}
+                value={outputVariantMode}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select output stock target" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="parent">
+                    Parent product stock{selectedProduct ? ` (${selectedProduct.productName})` : ""}
+                  </SelectItem>
+                  <SelectItem value="existing" disabled={selectedProductVariants.length === 0}>
+                    Existing product variant
+                  </SelectItem>
+                  <SelectItem value="new">Create new product variant</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+            {outputVariantMode === "existing" ? (
+              <label className="grid gap-2">
+                <Label>Product variant</Label>
+                <SearchableCombobox
+                  disabled={!canManage}
+                  emptyMessage="No matching variants found."
+                  onValueChange={(value) => form.setValue("productVariantId", value)}
+                  options={variantOptions}
+                  placeholder="Select variant"
+                  searchPlaceholder="Search variant, SKU..."
+                  value={selectedVariantId}
+                />
+                {fieldError("productVariantId") ? (
+                  <span className="text-sm text-red-700">{fieldError("productVariantId")}</span>
+                ) : null}
+              </label>
+            ) : null}
+            {outputVariantMode === "new" ? (
+              <div className="grid gap-4 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/50 p-4 lg:col-span-2 lg:grid-cols-3">
+                <label className="grid gap-2">
+                  <Label htmlFor="new-variant-name">New variant name</Label>
+                  <Input
+                    disabled={!canManage}
+                    id="new-variant-name"
+                    placeholder="Small / Large / Mocktail"
+                    {...form.register("newProductVariantName")}
+                  />
+                  {fieldError("newProductVariantName") ? (
+                    <span className="text-sm text-red-700">
+                      {fieldError("newProductVariantName")}
+                    </span>
+                  ) : null}
+                </label>
+                <label className="grid gap-2">
+                  <Label htmlFor="new-variant-sku">Variant SKU</Label>
+                  <Input
+                    disabled={!canManage}
+                    id="new-variant-sku"
+                    placeholder="Optional"
+                    {...form.register("newProductVariantSku")}
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <Label htmlFor="new-variant-price">Variant sale price</Label>
+                  <Input
+                    disabled={!canManage}
+                    id="new-variant-price"
+                    min="0"
+                    step="0.01"
+                    type="number"
+                    {...form.register("newProductVariantSalePrice")}
+                  />
+                  {fieldError("newProductVariantSalePrice") ? (
+                    <span className="text-sm text-red-700">
+                      {fieldError("newProductVariantSalePrice")}
+                    </span>
+                  ) : null}
+                </label>
+              </div>
+            ) : null}
             <label className="grid gap-2">
               <Label htmlFor="recipe-name">Recipe name</Label>
               <Input disabled={!canManage} id="recipe-name" {...form.register("recipeName")} />
@@ -247,22 +483,15 @@ export function RecipeFormPage({ recipeId }: RecipeFormPageProps): JSX.Element {
                 </label>
                 <label className="grid gap-2">
                   <Label>Yield unit</Label>
-                  <Select
+                  <SearchableCombobox
                     disabled={!canManage}
+                    emptyMessage="No matching units found."
                     onValueChange={(value) => form.setValue("batchYieldUnitId", value)}
+                    options={unitOptions}
+                    placeholder="Select unit"
+                    searchPlaceholder="Search unit..."
                     value={form.watch("batchYieldUnitId")}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {data.units.map((unit) => (
-                        <SelectItem key={unit.id} value={unit.id}>
-                          {unit.unitName} ({unit.unitSymbol})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                 </label>
                 <label className="grid gap-2">
                   <Label htmlFor="prep-time">Preparation minutes</Label>
@@ -280,27 +509,42 @@ export function RecipeFormPage({ recipeId }: RecipeFormPageProps): JSX.Element {
 
             <RecipeIngredientsSection
               canManage={canManage}
+              draftLines={draftIngredients}
               inventoryItems={data.inventoryItems}
-              onCreateRecipe={() => {
-                void form.handleSubmit(saveRecipe)();
-              }}
+              onDraftLinesChange={setDraftIngredients}
               recipeId={recipeId}
-              savingRecipe={createMutation.isPending}
               units={data.units}
             />
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+            {canManage ? (
+              <Card className="bg-white/90">
+                <CardHeader>
+                  <CardTitle>Builder actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-brand-mocha">
+                    Save the recipe with its BOM lines in one flow. Activate it when it is ready for
+                    manufacturing.
+                  </p>
+                  {recipeActionButtons}
+                </CardContent>
+              </Card>
+            ) : null}
             <RecipeYieldCard recipe={recipe} />
-            <RecipeCostCard canManage={canManage} recipeId={recipeId} />
+            <RecipeCostCard
+              canManage={canManage}
+              draftIngredientCount={draftIngredients.length}
+              draftPackagingCount={draftPackaging.length}
+              recipeId={recipeId}
+            />
             <RecipePackagingSection
               canManage={canManage}
-              onCreateRecipe={() => {
-                void form.handleSubmit(saveRecipe)();
-              }}
+              draftLines={draftPackaging}
+              onDraftLinesChange={setDraftPackaging}
               packagingItems={data.packagingItems}
               recipeId={recipeId}
-              savingRecipe={createMutation.isPending}
               units={data.units}
             />
             <Card className="bg-white/80">
@@ -320,13 +564,8 @@ export function RecipeFormPage({ recipeId }: RecipeFormPageProps): JSX.Element {
         </div>
 
         {canManage ? (
-          <div className="flex justify-end gap-3">
-            <Button onClick={() => router.push(ROUTES.recipes)} type="button" variant="outline">
-              Cancel
-            </Button>
-            <Button disabled={createMutation.isPending || updateMutation.isPending} type="submit">
-              {isCreate ? "Create recipe" : "Save recipe"}
-            </Button>
+          <div className="rounded-3xl border border-brand-cappuccino bg-white/80 p-4 shadow-sm xl:hidden">
+            {recipeActionButtons}
           </div>
         ) : null}
       </form>

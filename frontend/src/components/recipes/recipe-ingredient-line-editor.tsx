@@ -1,19 +1,14 @@
 "use client";
 
 import type { JSX } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
+import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ingredientLineSchema } from "@/lib/validators/recipes.schema";
 import type {
   RecipeIngredientLine,
@@ -46,6 +41,28 @@ export function RecipeIngredientLineEditor({
   const [notes, setNotes] = useState(line?.notes ?? "");
   const [sortOrder, setSortOrder] = useState(String(line?.sortOrder ?? 0));
   const selectedItem = inventoryItems.find((item) => item.id === inventoryItemId);
+  const inventoryItemOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      inventoryItems.map((item) => ({
+        value: item.id,
+        label: item.itemName,
+        description: `${item.currentQuantity.toLocaleString(undefined, {
+          maximumFractionDigits: 3,
+        })} ${item.unitSymbol} available`,
+        keywords: [item.itemName, item.unitName, item.unitSymbol],
+      })),
+    [inventoryItems],
+  );
+  const unitOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      units.map((unit) => ({
+        value: unit.id,
+        label: `${unit.unitName} (${unit.unitSymbol})`,
+        description: unit.unitSymbol,
+        keywords: [unit.unitName, unit.unitSymbol],
+      })),
+    [units],
+  );
 
   useEffect(() => {
     if (selectedItem && unitId.length === 0) {
@@ -76,33 +93,25 @@ export function RecipeIngredientLineEditor({
       <div className="grid gap-4 lg:grid-cols-2">
         <label className="grid gap-2">
           <Label>Ingredient</Label>
-          <Select onValueChange={setInventoryItemId} value={inventoryItemId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select ingredient" />
-            </SelectTrigger>
-            <SelectContent>
-              {inventoryItems.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
-                  {item.itemName} - {item.unitSymbol}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableCombobox
+            emptyMessage="No matching ingredients found."
+            onValueChange={setInventoryItemId}
+            options={inventoryItemOptions}
+            placeholder="Select ingredient"
+            searchPlaceholder="Search ingredient..."
+            value={inventoryItemId}
+          />
         </label>
         <label className="grid gap-2">
           <Label>Unit</Label>
-          <Select onValueChange={setUnitId} value={unitId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select unit" />
-            </SelectTrigger>
-            <SelectContent>
-              {units.map((unit) => (
-                <SelectItem key={unit.id} value={unit.id}>
-                  {unit.unitName} ({unit.unitSymbol})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableCombobox
+            emptyMessage="No matching units found."
+            onValueChange={setUnitId}
+            options={unitOptions}
+            placeholder="Select unit"
+            searchPlaceholder="Search unit..."
+            value={unitId}
+          />
         </label>
       </div>
       <div className="grid gap-4 md:grid-cols-4">

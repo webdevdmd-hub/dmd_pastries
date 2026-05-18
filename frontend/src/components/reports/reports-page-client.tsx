@@ -46,6 +46,14 @@ const reportCards = [
     title: "Sales Reports",
   },
   {
+    description:
+      "Completed POS sale bills with receipt view history and printable receipt details.",
+    href: ROUTES.reportsReceipts,
+    icon: ReceiptText,
+    status: "Ready",
+    title: "Sales Receipts",
+  },
+  {
     description: "Payment method, collection, refund, and reconciliation reporting.",
     href: ROUTES.reportsFinancial,
     icon: WalletCards,

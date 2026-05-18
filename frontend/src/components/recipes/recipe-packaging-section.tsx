@@ -25,20 +25,21 @@ import type {
 
 export function RecipePackagingSection({
   canManage,
-  onCreateRecipe,
+  draftLines = [],
+  onDraftLinesChange,
   packagingItems,
   recipeId,
-  savingRecipe,
   units,
 }: {
   canManage: boolean;
-  onCreateRecipe?: () => void;
+  draftLines?: RecipePackagingPayload[];
+  onDraftLinesChange?: (lines: RecipePackagingPayload[]) => void;
   packagingItems: RecipePackagingOption[];
   recipeId: string | null;
-  savingRecipe?: boolean;
   units: RecipeUnitOption[];
 }): JSX.Element {
   const [editingLine, setEditingLine] = useState<RecipePackagingLine | null>(null);
+  const [editingDraftIndex, setEditingDraftIndex] = useState<number | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const packagingQuery = useRecipePackaging(recipeId, recipeId !== null);
   const addMutation = useAddRecipePackaging();
@@ -46,8 +47,48 @@ export function RecipePackagingSection({
   const deleteMutation = useDeleteRecipePackaging();
   const lines = packagingQuery.data ?? [];
 
+  const draftLineToRecipeLine = (
+    line: RecipePackagingPayload,
+    index: number,
+  ): RecipePackagingLine => {
+    const item = packagingItems.find((packagingItem) => packagingItem.id === line.packagingItemId);
+    const unit = units.find((unitOption) => unitOption.id === line.unitId);
+
+    return {
+      id: `draft-${String(index)}`,
+      isOptional: line.isOptional,
+      packagingItemId: line.packagingItemId,
+      packagingNameSnapshot: item?.packagingName ?? "Packaging item",
+      quantityRequired: line.quantityRequired,
+      sortOrder: line.sortOrder,
+      totalCost: 0,
+      unitCostSnapshot: 0,
+      unitId: line.unitId,
+      unitName: unit?.unitName ?? item?.unitName ?? "Unit",
+      unitSymbol: unit?.unitSymbol ?? item?.unitSymbol ?? "",
+    };
+  };
+
   const saveLine = async (payload: RecipePackagingPayload): Promise<void> => {
     if (!recipeId) {
+      const duplicate = draftLines.some(
+        (line, index) =>
+          line.packagingItemId === payload.packagingItemId && index !== editingDraftIndex,
+      );
+
+      if (duplicate) {
+        toast.error("This packaging item is already in the recipe.");
+        return;
+      }
+
+      const nextLines =
+        editingDraftIndex === null
+          ? [...draftLines, payload]
+          : draftLines.map((line, index) => (index === editingDraftIndex ? payload : line));
+      onDraftLinesChange?.(nextLines);
+      setEditingDraftIndex(null);
+      setEditingLine(null);
+      setEditorOpen(false);
       return;
     }
 
@@ -76,6 +117,12 @@ export function RecipePackagingSection({
   };
 
   const deleteLine = async (line: RecipePackagingLine): Promise<void> => {
+    if (!recipeId && line.id.startsWith("draft-")) {
+      const draftIndex = Number(line.id.replace("draft-", ""));
+      onDraftLinesChange?.(draftLines.filter((_draftLine, index) => index !== draftIndex));
+      return;
+    }
+
     if (!recipeId) {
       return;
     }
@@ -92,9 +139,10 @@ export function RecipePackagingSection({
     <Card className="bg-white/80">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Packaging BOM</CardTitle>
-        {canManage && recipeId ? (
+        {canManage ? (
           <Button
             onClick={() => {
+              setEditingDraftIndex(null);
               setEditingLine(null);
               setEditorOpen(true);
             }}
@@ -108,26 +156,17 @@ export function RecipePackagingSection({
       <CardContent className="space-y-4">
         {!recipeId ? (
           <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-4">
-            <p className="font-semibold text-brand-espresso">Create the recipe first.</p>
+            <p className="font-semibold text-brand-espresso">Build the packaging BOM now.</p>
             <p className="mt-1 text-sm text-brand-mocha">
-              Packaging BOM lines need a saved recipe ID before they can be attached.
+              Add boxes, wraps, inserts, or optional packaging before saving the recipe.
             </p>
-            {canManage && onCreateRecipe ? (
-              <Button
-                className="mt-4"
-                disabled={savingRecipe}
-                onClick={onCreateRecipe}
-                type="button"
-              >
-                {savingRecipe ? "Creating recipe..." : "Create recipe first"}
-              </Button>
-            ) : null}
           </div>
         ) : null}
         {editorOpen ? (
           <RecipePackagingLineEditor
             line={editingLine}
             onCancel={() => {
+              setEditingDraftIndex(null);
               setEditingLine(null);
               setEditorOpen(false);
             }}
@@ -149,11 +188,29 @@ export function RecipePackagingSection({
               setEditorOpen(true);
             }}
           />
+        ) : !recipeId && draftLines.length > 0 ? (
+          <RecipePackagingTable
+            canManage={canManage}
+            lines={draftLines.map(draftLineToRecipeLine)}
+            onDelete={(line) => {
+              void deleteLine(line);
+            }}
+            onEdit={(line) => {
+              const draftIndex = Number(line.id.replace("draft-", ""));
+              setEditingDraftIndex(draftIndex);
+              setEditingLine(line);
+              setEditorOpen(true);
+            }}
+          />
         ) : recipeId ? (
           <p className="rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4 text-sm text-brand-mocha">
             No packaging added yet.
           </p>
-        ) : null}
+        ) : (
+          <p className="rounded-2xl border border-dashed border-brand-cappuccino bg-white/70 p-4 text-sm text-brand-mocha">
+            Add your first packaging line if this recipe needs branch packaging.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

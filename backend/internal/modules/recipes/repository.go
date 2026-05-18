@@ -118,8 +118,14 @@ func (r *Repository) DeletePackaging(tx *gorm.DB, id, recipeID, businessID, bran
 	return updateOne(tx.Model(&RecipePackaging{}).Where("id = ? AND recipe_id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", id, recipeID, businessID, branchID).Update("deleted_at", gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}))
 }
 
-func (r *Repository) DeactivateOtherActiveRecipes(tx *gorm.DB, businessID, branchID, productID, exceptRecipeID string) error {
-	return tx.Model(&Recipe{}).Where("business_id = ? AND branch_id = ? AND product_id = ? AND id <> ? AND deleted_at IS NULL", businessID, branchID, productID, exceptRecipeID).
+func (r *Repository) DeactivateOtherActiveRecipes(tx *gorm.DB, businessID, branchID, productID string, productVariantID *string, exceptRecipeID string) error {
+	query := tx.Model(&Recipe{}).Where("business_id = ? AND branch_id = ? AND product_id = ? AND id <> ? AND deleted_at IS NULL", businessID, branchID, productID, exceptRecipeID)
+	if productVariantID != nil {
+		query = query.Where("product_variant_id = ?", *productVariantID)
+	} else {
+		query = query.Where("product_variant_id IS NULL")
+	}
+	return query.
 		Updates(map[string]interface{}{"is_active": false, "status": "inactive", "updated_at": time.Now().UTC()}).Error
 }
 
@@ -136,8 +142,75 @@ func (r *Repository) NextRecipeCode(tx *gorm.DB, businessID, branchID string) (s
 
 func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string) (*ProductInfo, error) {
 	var p ProductInfo
-	err := tx.Table("products").Select("id, product_name, product_type, unit_id, cost_price").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", productID, businessID, branchID).Take(&p).Error
+	err := tx.Table("products").Select("id, product_name, product_type, unit_id, sale_price, cost_price").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", productID, businessID, branchID).Take(&p).Error
 	return &p, err
+}
+
+func (r *Repository) ProductVariant(tx *gorm.DB, businessID, branchID, productID, variantID string) (*ProductVariantInfo, error) {
+	var variant ProductVariantInfo
+	err := tx.Table("product_variants pv").
+		Select("pv.id, pv.business_id, pv.product_id, pv.variant_name, pv.sku, pv.barcode, pv.sale_price, pv.cost_price, pv.image_file_id, pv.sort_order, pv.status").
+		Joins("JOIN products p ON p.id = pv.product_id AND p.business_id = pv.business_id").
+		Where("pv.id = ? AND pv.product_id = ? AND pv.business_id = ? AND p.branch_id = ? AND pv.deleted_at IS NULL", variantID, productID, businessID, branchID).
+		Take(&variant).Error
+	return &variant, err
+}
+
+func (r *Repository) ProductVariantName(tx *gorm.DB, businessID string, variantID *string) string {
+	if variantID == nil {
+		return ""
+	}
+	var name string
+	_ = tx.Table("product_variants").Select("variant_name").Where("id = ? AND business_id = ? AND deleted_at IS NULL", *variantID, businessID).Scan(&name).Error
+	return name
+}
+
+func (r *Repository) ProductVariantNameExists(tx *gorm.DB, businessID, productID, variantName string) (bool, error) {
+	var count int64
+	err := tx.Table("product_variants").
+		Where("business_id = ? AND product_id = ? AND LOWER(variant_name) = LOWER(?) AND deleted_at IS NULL", businessID, productID, strings.TrimSpace(variantName)).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *Repository) VariantSKUExists(tx *gorm.DB, businessID, sku string) (bool, error) {
+	if strings.TrimSpace(sku) == "" {
+		return false, nil
+	}
+	var count int64
+	err := tx.Table("product_variants").
+		Where("business_id = ? AND LOWER(sku) = LOWER(?) AND deleted_at IS NULL", businessID, strings.TrimSpace(sku)).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *Repository) VariantBarcodeExists(tx *gorm.DB, businessID, barcode string) (bool, error) {
+	if strings.TrimSpace(barcode) == "" {
+		return false, nil
+	}
+	var count int64
+	err := tx.Table("product_variants").
+		Where("business_id = ? AND LOWER(barcode) = LOWER(?) AND deleted_at IS NULL", businessID, strings.TrimSpace(barcode)).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *Repository) CreateProductVariant(tx *gorm.DB, variant *ProductVariantInfo) error {
+	return tx.Table("product_variants").Create(map[string]interface{}{
+		"id":            variant.ID,
+		"business_id":   variant.BusinessID,
+		"product_id":    variant.ProductID,
+		"variant_name":  variant.VariantName,
+		"sku":           variant.SKU,
+		"barcode":       variant.Barcode,
+		"sale_price":    variant.SalePrice,
+		"cost_price":    variant.CostPrice,
+		"image_file_id": variant.ImageFileID,
+		"sort_order":    variant.SortOrder,
+		"status":        variant.Status,
+		"created_at":    time.Now().UTC(),
+		"updated_at":    time.Now().UTC(),
+	}).Error
 }
 
 func (r *Repository) ValidateUnit(tx *gorm.DB, businessID, unitID string) error {
@@ -210,8 +283,9 @@ func (r *Repository) Versions(recipeID, businessID, branchID string) ([]RecipeVe
 }
 
 func (r *Repository) Lookup(businessID, branchID, search string, limit int) ([]RecipeLookupItem, error) {
-	db := r.db.Table("recipes r").Select("r.id, r.recipe_code, r.recipe_name, r.product_id, p.product_name, r.status, r.is_active").
+	db := r.db.Table("recipes r").Select("r.id, r.recipe_code, r.recipe_name, r.product_id, p.product_name, r.product_variant_id, pv.variant_name AS product_variant_name, r.status, r.is_active").
 		Joins("JOIN products p ON p.id = r.product_id AND p.branch_id = r.branch_id").
+		Joins("LEFT JOIN product_variants pv ON pv.id = r.product_variant_id AND pv.business_id = r.business_id AND pv.deleted_at IS NULL").
 		Where("r.business_id = ? AND r.branch_id = ? AND r.deleted_at IS NULL", businessID, branchID)
 	if search != "" {
 		like := "%" + strings.ToLower(search) + "%"
@@ -224,7 +298,7 @@ func (r *Repository) Lookup(businessID, branchID, search string, limit int) ([]R
 
 func (r *Repository) ActiveByProduct(businessID, branchID, productID string) (*Recipe, error) {
 	var recipe Recipe
-	err := r.db.Where("business_id = ? AND branch_id = ? AND product_id = ? AND is_active = ? AND deleted_at IS NULL", businessID, branchID, productID, true).First(&recipe).Error
+	err := r.db.Where("business_id = ? AND branch_id = ? AND product_id = ? AND product_variant_id IS NULL AND is_active = ? AND deleted_at IS NULL", businessID, branchID, productID, true).First(&recipe).Error
 	return &recipe, err
 }
 
@@ -235,8 +309,10 @@ func (r *Repository) ToResponse(businessID string, recipe Recipe, includeLines b
 		productName = product.ProductName
 		productType = product.ProductType
 	}
+	variantName := r.ProductVariantName(r.db, businessID, recipe.ProductVariantID)
 	response := RecipeResponse{
 		ID: recipe.ID, BusinessID: recipe.BusinessID, BranchID: recipe.BranchID, ProductID: recipe.ProductID, ProductName: productName, ProductType: productType,
+		ProductVariantID: recipe.ProductVariantID, ProductVariantName: variantName,
 		RecipeCode: recipe.RecipeCode, RecipeName: recipe.RecipeName, Description: recipe.Description,
 		BatchYieldQuantity: roundQuantity(recipe.BatchYieldQuantity), BatchYieldUnitID: recipe.BatchYieldUnitID, BatchYieldUnitSymbol: r.UnitSymbol(recipe.BatchYieldUnitID),
 		PreparationTimeMinutes: recipe.PreparationTimeMinutes, Instructions: recipe.Instructions,
@@ -331,7 +407,22 @@ type ProductInfo struct {
 	ProductName string
 	ProductType string
 	UnitID      string
+	SalePrice   float64
 	CostPrice   *float64
+}
+
+type ProductVariantInfo struct {
+	ID          string
+	BusinessID  string
+	ProductID   string
+	VariantName string
+	SKU         string
+	Barcode     string
+	SalePrice   float64
+	CostPrice   *float64
+	ImageFileID string
+	SortOrder   int
+	Status      string
 }
 
 type InventoryItemInfo struct {
