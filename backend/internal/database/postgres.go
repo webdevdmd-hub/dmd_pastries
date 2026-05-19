@@ -102,18 +102,20 @@ func VerifySchema(db *gorm.DB) error {
 	}
 
 	requiredColumns := map[string][]string{
-		"users":              {"avatar_file_id", "current_branch_id", "can_access_all_branches"},
-		"company_settings":   {"logo_file_id"},
-		"product_categories": {"image_file_id"},
-		"products":           {"image_file_id"},
-		"product_variants":   {"image_file_id"},
-		"product_media":      {"file_id", "bucket_id"},
-		"inventory_items":    {"product_variant_id"},
-		"recipes":            {"product_variant_id"},
-		"production_batches": {"product_variant_id"},
-		"production_outputs": {"product_variant_id"},
-		"sale_payments":      {"branch_id", "payment_method_type_snapshot", "provider_transaction_id", "payment_status", "paid_by_user_id", "notes", "deleted_at"},
-		"stock_movements":    {"movement_direction", "reference_number", "notes", "is_reversal", "reversed_movement_id", "is_reversed", "reversed_by_movement_id", "stock_location_id", "from_stock_location_id", "to_stock_location_id"},
+		"users":                    {"avatar_file_id", "current_branch_id", "can_access_all_branches"},
+		"company_settings":         {"logo_file_id"},
+		"product_categories":       {"image_file_id"},
+		"products":                 {"image_file_id"},
+		"product_variants":         {"image_file_id"},
+		"product_media":            {"file_id", "bucket_id"},
+		"inventory_items":          {"product_variant_id"},
+		"recipes":                  {"product_variant_id"},
+		"production_batches":       {"product_variant_id"},
+		"production_outputs":       {"product_variant_id"},
+		"bakery_order_items":       {"product_variant_id", "product_variant_name_snapshot", "item_name_snapshot", "item_source"},
+		"bakery_order_productions": {"bakery_order_item_id"},
+		"sale_payments":            {"branch_id", "payment_method_type_snapshot", "provider_transaction_id", "payment_status", "paid_by_user_id", "notes", "deleted_at"},
+		"stock_movements":          {"movement_direction", "reference_number", "notes", "is_reversal", "reversed_movement_id", "is_reversed", "reversed_by_movement_id", "stock_location_id", "from_stock_location_id", "to_stock_location_id"},
 	}
 
 	for table, columns := range requiredColumns {

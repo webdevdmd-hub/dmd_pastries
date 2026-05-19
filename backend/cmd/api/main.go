@@ -149,7 +149,7 @@ func main() {
 	purchasingHandler := purchasing.NewHandler(purchasingService)
 	recipeService := recipes.NewService(db, recipeRepo, auditRepo)
 	recipeHandler := recipes.NewHandler(recipeService)
-	bakeryOrderService := bakeryorders.NewService(db, bakeryOrderRepo, auditRepo)
+	bakeryOrderService := bakeryorders.NewService(db, bakeryOrderRepo, auditRepo, manufacturingService)
 	bakeryOrderHandler := bakeryorders.NewHandler(bakeryOrderService)
 	auditService := audit.NewService(auditRepo)
 	auditHandler := audit.NewHandler(auditService)

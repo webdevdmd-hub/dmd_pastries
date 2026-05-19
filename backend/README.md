@@ -928,6 +928,7 @@ Implemented protected APIs:
 - `GET /api/v1/bakery-orders/:id/payments`
 - `POST /api/v1/bakery-orders/:id/payments`
 - `POST /api/v1/bakery-orders/:id/assign-production`
+- `POST /api/v1/bakery-orders/:id/items/:itemId/create-production`
 - `PATCH /api/v1/bakery-orders/:id/production-status`
 - `GET /api/v1/bakery-orders/:id/packaging`
 - `POST /api/v1/bakery-orders/:id/packaging`
@@ -942,6 +943,7 @@ Behavior:
 - deposit, balance, and full payment records update `paid_amount`, `balance_amount`, and `payment_status`
 - order status follows `new -> confirmed -> in_production -> ready -> delivered -> completed`; any active order can move to `cancelled`
 - production batch assignment and production status linkage are available as a foundation
+- item-level production batch creation is available; catalog items can auto-resolve their matching active recipe, and custom one-off items must pass `recipe_id`
 - packaging items can be attached to orders for future deduction on fulfillment
 - create/update/status/payment/production/packaging actions write activity logs
 
@@ -2190,6 +2192,7 @@ curl -X POST http://localhost:8080/api/v1/bakery-orders \
     "pickup_time":"10:00",
     "items":[{
       "product_id":"product_uuid_here",
+      "product_variant_id":"variant_uuid_optional",
       "quantity":1,
       "unit_id":"unit_uuid_here",
       "weight":1.5,
@@ -2201,6 +2204,23 @@ curl -X POST http://localhost:8080/api/v1/bakery-orders \
     }],
     "notes":"Custom cake order"
   }'
+
+Bakery order items can be catalog-based or custom one-off lines. Catalog lines use `product_id` with optional `product_variant_id`; when `unit_price` is omitted or zero, backend uses the variant sale price first, then the parent product sale price. Custom one-off lines omit `product_id` and require `item_name`:
+
+```json
+{
+  "item_name": "Custom Batman Birthday Cake 2kg",
+  "quantity": 1,
+  "unit_id": "unit_uuid_here",
+  "unit_price": 180,
+  "weight": 2,
+  "flavor": "Chocolate",
+  "message_text": "Happy Birthday Adam",
+  "design_notes": "Batman theme"
+}
+```
+
+Responses include `product_variant_id`, `product_variant_name_snapshot`, `item_name_snapshot`, and `item_source`. Bakery order create/update does not deduct stock; manufacturing/fulfillment remains manual.
 
 curl -X POST http://localhost:8080/api/v1/bakery-orders/{id}/payments \
   -H "Authorization: Bearer appwrite_jwt_here" \
@@ -2216,6 +2236,11 @@ curl -X POST http://localhost:8080/api/v1/bakery-orders/{id}/assign-production \
   -H "Authorization: Bearer appwrite_jwt_here" \
   -H "Content-Type: application/json" \
   -d '{"production_batch_id":"production_batch_uuid_here"}'
+
+curl -X POST http://localhost:8080/api/v1/bakery-orders/{id}/items/{itemId}/create-production \
+  -H "Authorization: Bearer appwrite_jwt_here" \
+  -H "Content-Type: application/json" \
+  -d '{"recipe_id":"recipe_uuid_optional_for_catalog_required_for_custom","planned_quantity":2,"production_date":"2026-05-10","notes":"Optional production notes"}'
 
 curl http://localhost:8080/api/v1/bakery-orders/summary \
   -H "Authorization: Bearer appwrite_jwt_here"

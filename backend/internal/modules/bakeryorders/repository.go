@@ -86,6 +86,12 @@ func (r *Repository) FindItemForUpdate(tx *gorm.DB, businessID, orderID, itemID 
 	return &item, err
 }
 
+func (r *Repository) FindItem(businessID, orderID, itemID string) (*BakeryOrderItem, error) {
+	var item BakeryOrderItem
+	err := r.db.Where("id = ? AND bakery_order_id = ? AND business_id = ? AND deleted_at IS NULL", itemID, orderID, businessID).First(&item).Error
+	return &item, err
+}
+
 func (r *Repository) CreateItem(tx *gorm.DB, item *BakeryOrderItem) error {
 	return tx.Create(item).Error
 }
@@ -130,9 +136,10 @@ func (r *Repository) CreatePayment(tx *gorm.DB, payment *BakeryOrderPayment) err
 func (r *Repository) Production(businessID, orderID string) (*BakeryOrderProductionResponse, error) {
 	var row BakeryOrderProductionResponse
 	result := r.db.Table("bakery_order_productions bop").
-		Select("bop.id, bop.bakery_order_id, bop.production_batch_id, pb.production_batch_number, bop.status, bop.created_at, bop.updated_at").
+		Select("bop.id, bop.bakery_order_id, bop.bakery_order_item_id, bop.production_batch_id, pb.production_batch_number, bop.status, bop.created_at, bop.updated_at").
 		Joins("LEFT JOIN production_batches pb ON pb.id = bop.production_batch_id").
 		Where("bop.business_id = ? AND bop.bakery_order_id = ?", businessID, orderID).
+		Order("CASE WHEN bop.bakery_order_item_id IS NULL THEN 0 ELSE 1 END, bop.created_at ASC").
 		Limit(1).
 		Find(&row)
 	if result.Error != nil {
@@ -144,9 +151,26 @@ func (r *Repository) Production(businessID, orderID string) (*BakeryOrderProduct
 	return &row, nil
 }
 
+func (r *Repository) Productions(businessID, orderID string) ([]BakeryOrderProductionResponse, error) {
+	var rows []BakeryOrderProductionResponse
+	err := r.db.Table("bakery_order_productions bop").
+		Select("bop.id, bop.bakery_order_id, bop.bakery_order_item_id, bop.production_batch_id, pb.production_batch_number, bop.status, bop.created_at, bop.updated_at").
+		Joins("LEFT JOIN production_batches pb ON pb.id = bop.production_batch_id").
+		Where("bop.business_id = ? AND bop.bakery_order_id = ?", businessID, orderID).
+		Order("bop.created_at ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
 func (r *Repository) UpsertProduction(tx *gorm.DB, production *BakeryOrderProduction) error {
 	var existing BakeryOrderProduction
-	err := tx.Where("business_id = ? AND bakery_order_id = ?", production.BusinessID, production.BakeryOrderID).Take(&existing).Error
+	query := tx.Where("business_id = ? AND bakery_order_id = ?", production.BusinessID, production.BakeryOrderID)
+	if production.BakeryOrderItemID != nil {
+		query = query.Where("bakery_order_item_id = ?", *production.BakeryOrderItemID)
+	} else {
+		query = query.Where("bakery_order_item_id IS NULL")
+	}
+	err := query.Take(&existing).Error
 	if err == nil {
 		updates := map[string]interface{}{"status": production.Status, "updated_at": time.Now().UTC()}
 		if production.ProductionBatchID != nil {
@@ -217,7 +241,17 @@ func (r *Repository) Customer(tx *gorm.DB, businessID, branchID, customerID stri
 
 func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string) (*productRow, error) {
 	var row productRow
-	err := tx.Table("products").Select("id, product_name, tax_rate_id, status").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", productID, businessID, branchID).Take(&row).Error
+	err := tx.Table("products").Select("id, product_name, tax_rate_id, sale_price, status").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", productID, businessID, branchID).Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) ProductVariant(tx *gorm.DB, businessID, branchID, productID, variantID string) (*productVariantRow, error) {
+	var row productVariantRow
+	err := tx.Table("product_variants pv").
+		Select("pv.id, pv.product_id, pv.variant_name, pv.sale_price, pv.status").
+		Joins("JOIN products p ON p.id = pv.product_id AND p.business_id = pv.business_id").
+		Where("pv.id = ? AND pv.product_id = ? AND pv.business_id = ? AND p.branch_id = ? AND pv.deleted_at IS NULL", variantID, productID, businessID, branchID).
+		Take(&row).Error
 	return &row, err
 }
 
@@ -242,6 +276,29 @@ func (r *Repository) PaymentMethod(tx *gorm.DB, businessID, methodID string) (*p
 
 func (r *Repository) ProductionBatch(tx *gorm.DB, businessID, branchID, batchID string) error {
 	return exists(tx.Table("production_batches").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", batchID, businessID, branchID))
+}
+
+func (r *Repository) RecipeForProduction(tx *gorm.DB, businessID, branchID, recipeID string) (*recipeProductionRow, error) {
+	var row recipeProductionRow
+	err := tx.Table("recipes").
+		Select("id, product_id, product_variant_id, is_active, status").
+		Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", recipeID, businessID, branchID).
+		Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) ActiveRecipeForItem(tx *gorm.DB, businessID, branchID, productID string, productVariantID *string) (*recipeProductionRow, error) {
+	query := tx.Table("recipes").
+		Select("id, product_id, product_variant_id, is_active, status").
+		Where("business_id = ? AND branch_id = ? AND product_id = ? AND is_active = ? AND status = ? AND deleted_at IS NULL", businessID, branchID, productID, true, "active")
+	if productVariantID != nil {
+		query = query.Where("product_variant_id = ?", *productVariantID)
+	} else {
+		query = query.Where("product_variant_id IS NULL")
+	}
+	var row recipeProductionRow
+	err := query.Order("updated_at DESC").Take(&row).Error
+	return &row, err
 }
 
 func (r *Repository) PackagingItem(tx *gorm.DB, businessID, branchID, itemID string) (*packagingRow, error) {

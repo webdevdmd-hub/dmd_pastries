@@ -56,6 +56,8 @@ psql "$DATABASE_URL" -f migrations/000034_receipt_layouts.sql
 psql "$DATABASE_URL" -f migrations/000035_stock_locations_inventory_foundation.sql
 psql "$DATABASE_URL" -f migrations/000036_product_variant_inventory.sql
 psql "$DATABASE_URL" -f migrations/000037_recipe_product_variant_output.sql
+psql "$DATABASE_URL" -f migrations/000038_bakery_order_item_variants_custom.sql
+psql "$DATABASE_URL" -f migrations/000039_bakery_order_item_production_batches.sql
 ```
 
 The API now verifies required tables at startup and fails fast if migrations were not applied.

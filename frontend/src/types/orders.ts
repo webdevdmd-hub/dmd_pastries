@@ -11,6 +11,8 @@ export type OrderType = "pickup" | "delivery";
 
 export type OrderPaymentStatus = "unpaid" | "partial" | "paid" | "refunded";
 
+export type OrderItemSource = "catalog" | "custom";
+
 export type BakeryOrder = {
   id: string;
   branchId: string;
@@ -42,12 +44,16 @@ export type BakeryOrder = {
 
 export type BakeryOrderItem = {
   id: string;
-  productId: string;
+  productId: string | null;
   productNameSnapshot: string;
+  productVariantId: string | null;
+  productVariantNameSnapshot: string | null;
+  itemNameSnapshot: string;
+  itemSource: OrderItemSource;
   quantity: number;
   unitId: string;
   unitName: string;
-  weight: string | null;
+  weight: number | null;
   flavor: string | null;
   designNotes: string | null;
   messageText: string | null;
@@ -95,10 +101,12 @@ export type BakeryOrderFilters = {
 };
 
 export type CreateOrderItemPayload = {
-  productId: string;
+  productId: string | null;
+  productVariantId: string | null;
+  itemName: string | null;
   quantity: number;
   unitId: string;
-  weight: string | null;
+  weight: number | null;
   flavor: string | null;
   designNotes: string | null;
   messageText: string | null;

@@ -29,6 +29,7 @@ func RegisterRoutes(
 	group.POST("/:id/payments", manage, handler.AddPayment)
 
 	group.POST("/:id/assign-production", manage, handler.AssignProduction)
+	group.POST("/:id/items/:itemId/create-production", manage, handler.CreateProductionFromItem)
 	group.PATCH("/:id/production-status", manage, handler.UpdateProductionStatus)
 
 	group.GET("/:id/packaging", view, handler.ListPackaging)

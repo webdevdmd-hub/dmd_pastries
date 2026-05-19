@@ -111,9 +111,15 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
                 key={item.id}
               >
                 <div>
-                  <p className="font-semibold text-brand-espresso">{item.productNameSnapshot}</p>
+                  <p className="font-semibold text-brand-espresso">{item.itemNameSnapshot}</p>
+                  {item.itemSource === "custom" ? (
+                    <p className="text-xs font-medium uppercase tracking-[0.14em] text-brand-mocha">
+                      Custom item
+                    </p>
+                  ) : null}
                   <p className="text-brand-mocha">
                     Qty {item.quantity} - {item.unitName}
+                    {item.weight !== null ? ` - ${String(item.weight)} kg` : ""}
                     {item.flavor ? ` - ${item.flavor}` : ""}
                     {item.messageText ? ` - "${item.messageText}"` : ""}
                   </p>

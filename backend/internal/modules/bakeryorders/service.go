@@ -11,18 +11,24 @@ import (
 	"gorm.io/gorm"
 
 	"pastries-pos/internal/modules/audit"
+	"pastries-pos/internal/modules/manufacturing"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
 
 type Service struct {
-	db        *gorm.DB
-	repo      *Repository
-	auditRepo *audit.Repository
+	db                   *gorm.DB
+	repo                 *Repository
+	auditRepo            *audit.Repository
+	manufacturingService *manufacturing.Service
 }
 
-func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository) *Service {
-	return &Service{db: db, repo: repo, auditRepo: auditRepo}
+func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository, manufacturingService ...*manufacturing.Service) *Service {
+	service := &Service{db: db, repo: repo, auditRepo: auditRepo}
+	if len(manufacturingService) > 0 {
+		service.manufacturingService = manufacturingService[0]
+	}
+	return service
 }
 
 func (s *Service) ListOrders(currentUser *utils.AuthContext, query OrderListQuery) (*PaginatedOrdersResponse, error) {
@@ -249,7 +255,7 @@ func (s *Service) UpdateItem(currentUser *utils.AuthContext, orderID, itemID str
 		if err != nil {
 			return err
 		}
-		updates := map[string]interface{}{"product_id": item.ProductID, "product_name_snapshot": item.ProductNameSnapshot, "quantity": item.Quantity, "unit_id": item.UnitID, "weight": item.Weight, "flavor": item.Flavor, "design_notes": item.DesignNotes, "message_text": item.MessageText, "customizations_json": item.CustomizationsJSON, "unit_price": item.UnitPrice, "discount_amount": item.DiscountAmount, "tax_rate_id": item.TaxRateID, "tax_amount": item.TaxAmount, "line_total": item.LineTotal, "updated_at": time.Now().UTC()}
+		updates := map[string]interface{}{"product_id": item.ProductID, "product_variant_id": item.ProductVariantID, "product_name_snapshot": item.ProductNameSnapshot, "product_variant_name_snapshot": item.ProductVariantNameSnapshot, "item_name_snapshot": item.ItemNameSnapshot, "item_source": item.ItemSource, "quantity": item.Quantity, "unit_id": item.UnitID, "weight": item.Weight, "flavor": item.Flavor, "design_notes": item.DesignNotes, "message_text": item.MessageText, "customizations_json": item.CustomizationsJSON, "unit_price": item.UnitPrice, "discount_amount": item.DiscountAmount, "tax_rate_id": item.TaxRateID, "tax_amount": item.TaxAmount, "line_total": item.LineTotal, "updated_at": time.Now().UTC()}
 		if err := s.repo.UpdateItem(tx, itemID, orderID, currentUser.BusinessID, updates); err != nil {
 			return err
 		}
@@ -374,6 +380,91 @@ func (s *Service) AssignProduction(currentUser *utils.AuthContext, orderID strin
 			return err
 		}
 		return s.audit(tx, currentUser, "bakery_order.production_assigned", orderID, "Bakery order production assigned", ipAddress, userAgent)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetOrder(currentUser, orderID)
+}
+
+func (s *Service) CreateProductionFromItem(currentUser *utils.AuthContext, orderID, itemID string, req CreateProductionFromItemRequest, ipAddress, userAgent string) (*BakeryOrderResponse, error) {
+	if s.manufacturingService == nil {
+		return nil, apperrors.Internal("manufacturing service is not configured")
+	}
+	if req.PlannedQuantity < 0 {
+		return nil, apperrors.BadRequest("planned_quantity must be greater than zero when provided", nil)
+	}
+	var order *BakeryOrder
+	var item *BakeryOrderItem
+	var recipeID string
+	var plannedQuantity float64
+	var productionDate string
+	var notes string
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		lockedOrder, err := s.repo.FindOrderForUpdate(tx, orderID, currentUser.BusinessID)
+		if err != nil {
+			return notFound(err, "bakery order not found")
+		}
+		if !currentUser.CanAccessBranch(lockedOrder.BranchID) {
+			return apperrors.Forbidden("branch access denied")
+		}
+		if !orderCanCreateProduction(lockedOrder.OrderStatus) {
+			return apperrors.BadRequest("production cannot be created for this order status", map[string]string{"order_status": lockedOrder.OrderStatus})
+		}
+		lockedItem, err := s.repo.FindItemForUpdate(tx, currentUser.BusinessID, orderID, itemID)
+		if err != nil {
+			return notFound(err, "bakery order item not found")
+		}
+		resolvedRecipe, err := s.resolveProductionRecipe(tx, currentUser.BusinessID, lockedOrder.BranchID, lockedItem, req.RecipeID)
+		if err != nil {
+			return err
+		}
+		order = lockedOrder
+		item = lockedItem
+		recipeID = resolvedRecipe.ID
+		plannedQuantity = req.PlannedQuantity
+		if plannedQuantity <= 0 {
+			plannedQuantity = lockedItem.Quantity
+		}
+		productionDate = strings.TrimSpace(req.ProductionDate)
+		if productionDate == "" {
+			productionDate = lockedOrder.EventDate.Format("2006-01-02")
+		}
+		notes = strings.TrimSpace(req.Notes)
+		if notes == "" {
+			notes = "Bakery order " + lockedOrder.OrderNumber + " item " + lockedItem.ItemNameSnapshot
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	batch, err := s.manufacturingService.CreateBatch(currentUser, manufacturing.CreateBatchRequest{
+		BranchID:        order.BranchID,
+		RecipeID:        recipeID,
+		PlannedQuantity: plannedQuantity,
+		ProductionDate:  productionDate,
+		Notes:           notes,
+	}, ipAddress, userAgent)
+	if err != nil {
+		return nil, err
+	}
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		batchID := batch.ID
+		production := &BakeryOrderProduction{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BakeryOrderID: orderID, BakeryOrderItemID: &item.ID, ProductionBatchID: &batchID, Status: "assigned"}
+		if err := s.repo.UpsertProduction(tx, production); err != nil {
+			return err
+		}
+		updates := map[string]interface{}{"updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
+		if order.OrderStatus == "confirmed" {
+			updates["order_status"] = "in_production"
+		}
+		if len(updates) > 2 {
+			if err := s.repo.UpdateOrder(tx, orderID, currentUser.BusinessID, updates); err != nil {
+				return err
+			}
+		}
+		return s.audit(tx, currentUser, "bakery_order.production_batch_created", orderID, "Production batch created from bakery order item", ipAddress, userAgent)
 	})
 	if err != nil {
 		return nil, err
@@ -530,9 +621,6 @@ func (s *Service) buildOrder(tx *gorm.DB, currentUser *utils.AuthContext, req Cr
 }
 
 func (s *Service) buildOrderItem(tx *gorm.DB, businessID, branchID, orderID string, req OrderItemRequest) (*BakeryOrderItem, error) {
-	if err := validateUUID(req.ProductID, "product_id"); err != nil {
-		return nil, err
-	}
 	if err := validateUUID(req.UnitID, "unit_id"); err != nil {
 		return nil, err
 	}
@@ -545,32 +633,84 @@ func (s *Service) buildOrderItem(tx *gorm.DB, businessID, branchID, orderID stri
 	if req.DiscountAmount < 0 {
 		return nil, apperrors.BadRequest("discount_amount must be non-negative", nil)
 	}
-	product, err := s.repo.Product(tx, businessID, branchID, req.ProductID)
-	if err != nil {
-		return nil, notFound(err, "product not found")
-	}
-	if product.Status != "active" {
-		return nil, apperrors.BadRequest("product is not active", nil)
-	}
 	if err := s.repo.ValidateUnit(tx, businessID, req.UnitID); err != nil {
 		return nil, notFound(err, "unit not found")
-	}
-	tax, err := s.repo.TaxRate(tx, businessID, product.TaxRateID)
-	if err != nil {
-		return nil, notFound(err, "tax rate not found")
-	}
-	subtotal := roundMoney(req.Quantity * req.UnitPrice)
-	if req.DiscountAmount > subtotal {
-		return nil, apperrors.BadRequest("discount_amount cannot exceed line subtotal", nil)
 	}
 	weight, err := parseOptionalWeight(req.Weight)
 	if err != nil {
 		return nil, err
 	}
+	productIDValue := strings.TrimSpace(req.ProductID)
+	var productID *string
+	var productVariantID *string
+	productName := ""
+	variantName := ""
+	itemName := ""
+	itemSource := "catalog"
+	unitPrice := req.UnitPrice
+	var taxRateID *string
+	var tax *taxRow
+
+	if productIDValue == "" {
+		if strings.TrimSpace(req.ProductVariantID) != "" {
+			return nil, apperrors.BadRequest("product_variant_id is only allowed for catalog items", nil)
+		}
+		itemSource = "custom"
+		itemName = strings.TrimSpace(req.ItemName)
+		if itemName == "" {
+			return nil, apperrors.BadRequest("item_name is required for custom bakery order items", nil)
+		}
+		productName = itemName
+	} else {
+		if err := validateUUID(productIDValue, "product_id"); err != nil {
+			return nil, err
+		}
+		product, err := s.repo.Product(tx, businessID, branchID, productIDValue)
+		if err != nil {
+			return nil, notFound(err, "product not found")
+		}
+		if product.Status != "active" {
+			return nil, apperrors.BadRequest("product is not active", nil)
+		}
+		productID = &product.ID
+		productName = product.ProductName
+		itemName = product.ProductName
+		if unitPrice <= 0 {
+			unitPrice = product.SalePrice
+		}
+		if strings.TrimSpace(req.ProductVariantID) != "" {
+			if err := validateUUID(req.ProductVariantID, "product_variant_id"); err != nil {
+				return nil, err
+			}
+			variant, err := s.repo.ProductVariant(tx, businessID, branchID, product.ID, req.ProductVariantID)
+			if err != nil {
+				return nil, notFound(err, "product variant not found")
+			}
+			if variant.Status != "active" {
+				return nil, apperrors.BadRequest("product variant is not active", nil)
+			}
+			productVariantID = &variant.ID
+			variantName = variant.VariantName
+			itemName = strings.TrimSpace(product.ProductName + " - " + variant.VariantName)
+			if req.UnitPrice <= 0 {
+				unitPrice = variant.SalePrice
+				if unitPrice <= 0 {
+					unitPrice = product.SalePrice
+				}
+			}
+		}
+		tax, err = s.repo.TaxRate(tx, businessID, product.TaxRateID)
+		if err != nil {
+			return nil, notFound(err, "tax rate not found")
+		}
+	}
+	subtotal := roundMoney(req.Quantity * unitPrice)
+	if req.DiscountAmount > subtotal {
+		return nil, apperrors.BadRequest("discount_amount cannot exceed line subtotal", nil)
+	}
 	taxable := roundMoney(subtotal - req.DiscountAmount)
 	taxAmount := 0.0
 	lineTotal := taxable
-	var taxRateID *string
 	if tax != nil {
 		taxRateID = &tax.ID
 		if tax.IsInclusive {
@@ -585,7 +725,52 @@ func (s *Service) buildOrderItem(tx *gorm.DB, businessID, branchID, orderID stri
 	if err != nil {
 		return nil, err
 	}
-	return &BakeryOrderItem{ID: utils.NewUUID(), BusinessID: businessID, BakeryOrderID: orderID, ProductID: product.ID, ProductNameSnapshot: product.ProductName, Quantity: roundQuantity(req.Quantity), UnitID: req.UnitID, Weight: weight, Flavor: strings.TrimSpace(req.Flavor), DesignNotes: strings.TrimSpace(req.DesignNotes), MessageText: strings.TrimSpace(req.MessageText), CustomizationsJSON: customizations, UnitPrice: roundMoney(req.UnitPrice), DiscountAmount: roundMoney(req.DiscountAmount), TaxRateID: taxRateID, TaxAmount: taxAmount, LineTotal: lineTotal}, nil
+	return &BakeryOrderItem{ID: utils.NewUUID(), BusinessID: businessID, BakeryOrderID: orderID, ProductID: productID, ProductVariantID: productVariantID, ProductNameSnapshot: productName, ProductVariantNameSnapshot: variantName, ItemNameSnapshot: itemName, ItemSource: itemSource, Quantity: roundQuantity(req.Quantity), UnitID: req.UnitID, Weight: weight, Flavor: strings.TrimSpace(req.Flavor), DesignNotes: strings.TrimSpace(req.DesignNotes), MessageText: strings.TrimSpace(req.MessageText), CustomizationsJSON: customizations, UnitPrice: roundMoney(unitPrice), DiscountAmount: roundMoney(req.DiscountAmount), TaxRateID: taxRateID, TaxAmount: taxAmount, LineTotal: lineTotal}, nil
+}
+
+func (s *Service) resolveProductionRecipe(tx *gorm.DB, businessID, branchID string, item *BakeryOrderItem, requestedRecipeID string) (*recipeProductionRow, error) {
+	recipeID := strings.TrimSpace(requestedRecipeID)
+	if item.ItemSource == "custom" {
+		if recipeID == "" {
+			return nil, apperrors.BadRequest("recipe_id is required for custom bakery order items", nil)
+		}
+		return s.activeRecipeByID(tx, businessID, branchID, recipeID)
+	}
+	if item.ProductID == nil {
+		return nil, apperrors.BadRequest("catalog bakery order item is missing product_id", nil)
+	}
+	if recipeID == "" {
+		recipe, err := s.repo.ActiveRecipeForItem(tx, businessID, branchID, *item.ProductID, item.ProductVariantID)
+		if err != nil {
+			return nil, notFound(err, "active recipe not found for bakery order item")
+		}
+		return recipe, nil
+	}
+	recipe, err := s.activeRecipeByID(tx, businessID, branchID, recipeID)
+	if err != nil {
+		return nil, err
+	}
+	if recipe.ProductID != *item.ProductID {
+		return nil, apperrors.BadRequest("recipe product does not match bakery order item product", nil)
+	}
+	if !sameOptionalID(recipe.ProductVariantID, item.ProductVariantID) {
+		return nil, apperrors.BadRequest("recipe variant does not match bakery order item variant", nil)
+	}
+	return recipe, nil
+}
+
+func (s *Service) activeRecipeByID(tx *gorm.DB, businessID, branchID, recipeID string) (*recipeProductionRow, error) {
+	if err := validateUUID(recipeID, "recipe_id"); err != nil {
+		return nil, err
+	}
+	recipe, err := s.repo.RecipeForProduction(tx, businessID, branchID, recipeID)
+	if err != nil {
+		return nil, notFound(err, "active recipe not found")
+	}
+	if !recipe.IsActive || recipe.Status != "active" {
+		return nil, apperrors.BadRequest("recipe must be active before creating production", nil)
+	}
+	return recipe, nil
 }
 
 func (s *Service) validCustomer(tx *gorm.DB, businessID, branchID, customerID string) (*customerRow, error) {
@@ -627,6 +812,7 @@ func (s *Service) orderResponse(businessID string, order BakeryOrder, includeDet
 		if production, err := s.repo.Production(businessID, order.ID); err == nil && production != nil {
 			response.Production = production
 		}
+		response.Productions, _ = s.repo.Productions(businessID, order.ID)
 		response.Packaging, _ = s.repo.Packaging(businessID, order.ID)
 	}
 	return response
@@ -643,7 +829,7 @@ func (s *Service) itemResponses(businessID string, items []BakeryOrderItem) []Ba
 		if item.Weight != nil {
 			weight = strconv.FormatFloat(roundQuantity(*item.Weight), 'f', -1, 64)
 		}
-		result = append(result, BakeryOrderItemResponse{ID: item.ID, BakeryOrderID: item.BakeryOrderID, ProductID: item.ProductID, ProductNameSnapshot: item.ProductNameSnapshot, Quantity: roundQuantity(item.Quantity), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), Weight: weight, Flavor: item.Flavor, DesignNotes: item.DesignNotes, MessageText: item.MessageText, CustomizationsJSON: customizations, UnitPrice: roundMoney(item.UnitPrice), DiscountAmount: roundMoney(item.DiscountAmount), TaxRateID: item.TaxRateID, TaxRateName: s.repo.TaxName(businessID, item.TaxRateID), TaxAmount: roundMoney(item.TaxAmount), LineTotal: roundMoney(item.LineTotal), CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
+		result = append(result, BakeryOrderItemResponse{ID: item.ID, BakeryOrderID: item.BakeryOrderID, ProductID: item.ProductID, ProductVariantID: item.ProductVariantID, ProductNameSnapshot: item.ProductNameSnapshot, ProductVariantNameSnapshot: item.ProductVariantNameSnapshot, ItemNameSnapshot: item.ItemNameSnapshot, ItemSource: item.ItemSource, Quantity: roundQuantity(item.Quantity), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), Weight: weight, Flavor: item.Flavor, DesignNotes: item.DesignNotes, MessageText: item.MessageText, CustomizationsJSON: customizations, UnitPrice: roundMoney(item.UnitPrice), DiscountAmount: roundMoney(item.DiscountAmount), TaxRateID: item.TaxRateID, TaxRateName: s.repo.TaxName(businessID, item.TaxRateID), TaxAmount: roundMoney(item.TaxAmount), LineTotal: roundMoney(item.LineTotal), CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
 	}
 	return result
 }
@@ -847,6 +1033,20 @@ func allowedStatusTransition(from, to string) bool {
 
 func orderCanEdit(status string) bool {
 	return status == "new" || status == "confirmed"
+}
+
+func orderCanCreateProduction(status string) bool {
+	return status == "new" || status == "confirmed" || status == "in_production"
+}
+
+func sameOptionalID(left, right *string) bool {
+	if left == nil && right == nil {
+		return true
+	}
+	if left == nil || right == nil {
+		return false
+	}
+	return *left == *right
 }
 
 func notFound(err error, message string) error {

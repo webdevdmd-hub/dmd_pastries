@@ -22,6 +22,8 @@ type OrderListQuery struct {
 
 type OrderItemRequest struct {
 	ProductID          string          `json:"product_id"`
+	ProductVariantID   string          `json:"product_variant_id"`
+	ItemName           string          `json:"item_name"`
 	Quantity           float64         `json:"quantity"`
 	UnitID             string          `json:"unit_id"`
 	Weight             json.RawMessage `json:"weight"`
@@ -74,6 +76,13 @@ type AssignProductionRequest struct {
 	ProductionBatchID string `json:"production_batch_id"`
 }
 
+type CreateProductionFromItemRequest struct {
+	RecipeID        string  `json:"recipe_id"`
+	PlannedQuantity float64 `json:"planned_quantity"`
+	ProductionDate  string  `json:"production_date"`
+	Notes           string  `json:"notes"`
+}
+
 type UpdateProductionStatusRequest struct {
 	Status string `json:"status"`
 }
@@ -97,60 +106,65 @@ type PaginatedOrdersResponse struct {
 }
 
 type BakeryOrderResponse struct {
-	ID                    string                         `json:"id"`
-	BusinessID            string                         `json:"business_id"`
-	BranchID              string                         `json:"branch_id"`
-	BranchName            string                         `json:"branch_name"`
-	OrderNumber           string                         `json:"order_number"`
-	CustomerID            *string                        `json:"customer_id"`
-	CustomerNameSnapshot  string                         `json:"customer_name_snapshot"`
-	CustomerPhoneSnapshot string                         `json:"customer_phone_snapshot"`
-	OrderType             string                         `json:"order_type"`
-	OrderDate             time.Time                      `json:"order_date"`
-	EventDate             time.Time                      `json:"event_date"`
-	PickupTime            string                         `json:"pickup_time"`
-	DeliveryTime          string                         `json:"delivery_time"`
-	DeliveryAddress       string                         `json:"delivery_address"`
-	SubtotalAmount        float64                        `json:"subtotal_amount"`
-	DiscountAmount        float64                        `json:"discount_amount"`
-	TaxAmount             float64                        `json:"tax_amount"`
-	TotalAmount           float64                        `json:"total_amount"`
-	PaidAmount            float64                        `json:"paid_amount"`
-	BalanceAmount         float64                        `json:"balance_amount"`
-	PaymentStatus         string                         `json:"payment_status"`
-	OrderStatus           string                         `json:"order_status"`
-	Notes                 string                         `json:"notes"`
-	CreatedByUserID       string                         `json:"created_by_user_id"`
-	CreatedByUserName     string                         `json:"created_by_user_name"`
-	CreatedAt             time.Time                      `json:"created_at"`
-	UpdatedAt             time.Time                      `json:"updated_at"`
-	Items                 []BakeryOrderItemResponse      `json:"items,omitempty"`
-	Payments              []BakeryOrderPaymentResponse   `json:"payments,omitempty"`
-	Production            *BakeryOrderProductionResponse `json:"production,omitempty"`
-	Packaging             []BakeryOrderPackagingResponse `json:"packaging,omitempty"`
+	ID                    string                          `json:"id"`
+	BusinessID            string                          `json:"business_id"`
+	BranchID              string                          `json:"branch_id"`
+	BranchName            string                          `json:"branch_name"`
+	OrderNumber           string                          `json:"order_number"`
+	CustomerID            *string                         `json:"customer_id"`
+	CustomerNameSnapshot  string                          `json:"customer_name_snapshot"`
+	CustomerPhoneSnapshot string                          `json:"customer_phone_snapshot"`
+	OrderType             string                          `json:"order_type"`
+	OrderDate             time.Time                       `json:"order_date"`
+	EventDate             time.Time                       `json:"event_date"`
+	PickupTime            string                          `json:"pickup_time"`
+	DeliveryTime          string                          `json:"delivery_time"`
+	DeliveryAddress       string                          `json:"delivery_address"`
+	SubtotalAmount        float64                         `json:"subtotal_amount"`
+	DiscountAmount        float64                         `json:"discount_amount"`
+	TaxAmount             float64                         `json:"tax_amount"`
+	TotalAmount           float64                         `json:"total_amount"`
+	PaidAmount            float64                         `json:"paid_amount"`
+	BalanceAmount         float64                         `json:"balance_amount"`
+	PaymentStatus         string                          `json:"payment_status"`
+	OrderStatus           string                          `json:"order_status"`
+	Notes                 string                          `json:"notes"`
+	CreatedByUserID       string                          `json:"created_by_user_id"`
+	CreatedByUserName     string                          `json:"created_by_user_name"`
+	CreatedAt             time.Time                       `json:"created_at"`
+	UpdatedAt             time.Time                       `json:"updated_at"`
+	Items                 []BakeryOrderItemResponse       `json:"items,omitempty"`
+	Payments              []BakeryOrderPaymentResponse    `json:"payments,omitempty"`
+	Production            *BakeryOrderProductionResponse  `json:"production,omitempty"`
+	Productions           []BakeryOrderProductionResponse `json:"productions,omitempty"`
+	Packaging             []BakeryOrderPackagingResponse  `json:"packaging,omitempty"`
 }
 
 type BakeryOrderItemResponse struct {
-	ID                  string    `json:"id"`
-	BakeryOrderID       string    `json:"bakery_order_id"`
-	ProductID           string    `json:"product_id"`
-	ProductNameSnapshot string    `json:"product_name_snapshot"`
-	Quantity            float64   `json:"quantity"`
-	UnitID              string    `json:"unit_id"`
-	UnitSymbol          string    `json:"unit_symbol"`
-	Weight              string    `json:"weight"`
-	Flavor              string    `json:"flavor"`
-	DesignNotes         string    `json:"design_notes"`
-	MessageText         string    `json:"message_text"`
-	CustomizationsJSON  string    `json:"customizations_json"`
-	UnitPrice           float64   `json:"unit_price"`
-	DiscountAmount      float64   `json:"discount_amount"`
-	TaxRateID           *string   `json:"tax_rate_id"`
-	TaxRateName         string    `json:"tax_rate_name"`
-	TaxAmount           float64   `json:"tax_amount"`
-	LineTotal           float64   `json:"line_total"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	ID                         string    `json:"id"`
+	BakeryOrderID              string    `json:"bakery_order_id"`
+	ProductID                  *string   `json:"product_id"`
+	ProductVariantID           *string   `json:"product_variant_id"`
+	ProductNameSnapshot        string    `json:"product_name_snapshot"`
+	ProductVariantNameSnapshot string    `json:"product_variant_name_snapshot"`
+	ItemNameSnapshot           string    `json:"item_name_snapshot"`
+	ItemSource                 string    `json:"item_source"`
+	Quantity                   float64   `json:"quantity"`
+	UnitID                     string    `json:"unit_id"`
+	UnitSymbol                 string    `json:"unit_symbol"`
+	Weight                     string    `json:"weight"`
+	Flavor                     string    `json:"flavor"`
+	DesignNotes                string    `json:"design_notes"`
+	MessageText                string    `json:"message_text"`
+	CustomizationsJSON         string    `json:"customizations_json"`
+	UnitPrice                  float64   `json:"unit_price"`
+	DiscountAmount             float64   `json:"discount_amount"`
+	TaxRateID                  *string   `json:"tax_rate_id"`
+	TaxRateName                string    `json:"tax_rate_name"`
+	TaxAmount                  float64   `json:"tax_amount"`
+	LineTotal                  float64   `json:"line_total"`
+	CreatedAt                  time.Time `json:"created_at"`
+	UpdatedAt                  time.Time `json:"updated_at"`
 }
 
 type BakeryOrderPaymentResponse struct {
@@ -170,6 +184,7 @@ type BakeryOrderPaymentResponse struct {
 type BakeryOrderProductionResponse struct {
 	ID                    string    `json:"id"`
 	BakeryOrderID         string    `json:"bakery_order_id"`
+	BakeryOrderItemID     *string   `json:"bakery_order_item_id"`
 	ProductionBatchID     *string   `json:"production_batch_id"`
 	ProductionBatchNumber string    `json:"production_batch_number"`
 	Status                string    `json:"status"`
@@ -202,6 +217,15 @@ type productRow struct {
 	ID          string
 	ProductName string
 	TaxRateID   *string
+	SalePrice   float64
+	Status      string
+}
+
+type productVariantRow struct {
+	ID          string
+	ProductID   string
+	VariantName string
+	SalePrice   float64
 	Status      string
 }
 
@@ -230,4 +254,12 @@ type packagingRow struct {
 	PackagingName string
 	UnitID        string
 	Status        string
+}
+
+type recipeProductionRow struct {
+	ID               string
+	ProductID        string
+	ProductVariantID *string
+	IsActive         bool
+	Status           string
 }

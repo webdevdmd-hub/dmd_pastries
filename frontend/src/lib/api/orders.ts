@@ -11,6 +11,7 @@ import type {
   BakeryOrderSummary,
   CreateOrderItemPayload,
   CreateOrderPayload,
+  OrderItemSource,
   OrderPaymentStatus,
   OrderStatus,
   OrderType,
@@ -36,9 +37,11 @@ type BackendOrderPayload = {
 
 type BackendOrderItemPayload = {
   product_id?: string;
+  product_variant_id?: string;
+  item_name?: string;
   quantity?: number;
   unit_id?: string;
-  weight?: string | null;
+  weight?: number | null;
   flavor?: string;
   design_notes?: string;
   message_text?: string;
@@ -89,6 +92,19 @@ function numberValue(value: unknown, fallback = 0): number {
   return typeof value === "number" ? value : fallback;
 }
 
+function optionalNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
 function isOrderStatus(value: unknown): value is OrderStatus {
   return (
     value === "new" ||
@@ -107,6 +123,10 @@ function isOrderType(value: unknown): value is OrderType {
 
 function isPaymentStatus(value: unknown): value is OrderPaymentStatus {
   return value === "unpaid" || value === "partial" || value === "paid" || value === "refunded";
+}
+
+function isOrderItemSource(value: unknown): value is OrderItemSource {
+  return value === "catalog" || value === "custom";
 }
 
 function parseList<TItem>(value: unknown, parser: (item: unknown) => TItem): TItem[] {
@@ -149,12 +169,19 @@ function parseOrderItem(value: unknown): BakeryOrderItem {
 
   return {
     id: stringValue(value.id),
-    productId: stringValue(value.product_id),
+    productId: optionalString(value.product_id),
     productNameSnapshot: stringValue(value.product_name_snapshot, "Order item"),
+    productVariantId: optionalString(value.product_variant_id),
+    productVariantNameSnapshot: optionalString(value.product_variant_name_snapshot),
+    itemNameSnapshot: stringValue(
+      value.item_name_snapshot,
+      stringValue(value.product_name_snapshot, "Order item"),
+    ),
+    itemSource: isOrderItemSource(value.item_source) ? value.item_source : "catalog",
     quantity: numberValue(value.quantity),
     unitId: stringValue(value.unit_id),
     unitName: stringValue(value.unit_name, "Unit"),
-    weight: optionalString(value.weight),
+    weight: optionalNumber(value.weight),
     flavor: optionalString(value.flavor),
     designNotes: optionalString(value.design_notes),
     messageText: optionalString(value.message_text),
@@ -256,7 +283,15 @@ function itemPayload(
   payload: CreateOrderItemPayload | UpdateOrderItemPayload,
 ): BackendOrderItemPayload {
   return {
-    ...(payload.productId !== undefined ? { product_id: payload.productId } : {}),
+    ...(payload.productId !== undefined && payload.productId !== null
+      ? { product_id: payload.productId }
+      : {}),
+    ...(payload.productVariantId !== undefined && payload.productVariantId !== null
+      ? { product_variant_id: payload.productVariantId }
+      : {}),
+    ...(payload.itemName !== undefined && payload.itemName !== null
+      ? { item_name: requestString(payload.itemName) }
+      : {}),
     ...(payload.quantity !== undefined ? { quantity: payload.quantity } : {}),
     ...(payload.unitId !== undefined ? { unit_id: payload.unitId } : {}),
     ...(payload.weight !== undefined ? { weight: payload.weight } : {}),

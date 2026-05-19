@@ -120,7 +120,7 @@ export function OrderFormPage({ orderId }: { orderId: string | null }): JSX.Elem
         label: branch.name,
         description: [branch.code, branch.status === "active" ? "Active" : "Inactive"]
           .filter((part) => part.length > 0)
-          .join(" · "),
+          .join(" - "),
         keywords: [branch.name, branch.code],
         disabled: branch.status !== "active",
       })),
@@ -169,8 +169,10 @@ export function OrderFormPage({ orderId }: { orderId: string | null }): JSX.Elem
           designNotes: item.designNotes,
           discountAmount: item.discountAmount,
           flavor: item.flavor,
+          itemName: item.itemSource === "custom" ? item.itemNameSnapshot : null,
           messageText: item.messageText,
           productId: item.productId,
+          productVariantId: item.productVariantId,
           quantity: item.quantity,
           taxRateId: item.taxRateId,
           unitId: item.unitId,

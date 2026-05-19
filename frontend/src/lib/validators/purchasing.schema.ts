@@ -1,10 +1,12 @@
 import { z } from "zod";
 
-const optionalNullableString = z
-  .string()
-  .trim()
-  .optional()
-  .transform((value) => (value && value.length > 0 ? value : null));
+const optionalNullableString = z.union([z.string(), z.null(), z.undefined()]).transform((value) => {
+  if (typeof value !== "string") return null;
+
+  const trimmedValue = value.trim();
+
+  return trimmedValue.length > 0 ? trimmedValue : null;
+});
 
 export const purchaseItemLineSchema = z
   .object({

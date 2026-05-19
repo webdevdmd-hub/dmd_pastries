@@ -39,26 +39,30 @@ type BakeryOrder struct {
 func (BakeryOrder) TableName() string { return "bakery_orders" }
 
 type BakeryOrderItem struct {
-	ID                  string         `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID          string         `gorm:"type:uuid;not null;index" json:"business_id"`
-	BakeryOrderID       string         `gorm:"type:uuid;not null;index" json:"bakery_order_id"`
-	ProductID           string         `gorm:"type:uuid;not null;index" json:"product_id"`
-	ProductNameSnapshot string         `gorm:"size:255;not null" json:"product_name_snapshot"`
-	Quantity            float64        `gorm:"not null" json:"quantity"`
-	UnitID              string         `gorm:"type:uuid;not null;index" json:"unit_id"`
-	Weight              *float64       `json:"weight"`
-	Flavor              string         `gorm:"size:255" json:"flavor"`
-	DesignNotes         string         `json:"design_notes"`
-	MessageText         string         `json:"message_text"`
-	CustomizationsJSON  *string        `gorm:"type:jsonb" json:"customizations_json"`
-	UnitPrice           float64        `gorm:"not null;default:0" json:"unit_price"`
-	DiscountAmount      float64        `gorm:"not null;default:0" json:"discount_amount"`
-	TaxRateID           *string        `gorm:"type:uuid;index" json:"tax_rate_id"`
-	TaxAmount           float64        `gorm:"not null;default:0" json:"tax_amount"`
-	LineTotal           float64        `gorm:"not null;default:0" json:"line_total"`
-	CreatedAt           time.Time      `json:"created_at"`
-	UpdatedAt           time.Time      `json:"updated_at"`
-	DeletedAt           gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	ID                         string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID                 string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BakeryOrderID              string         `gorm:"type:uuid;not null;index" json:"bakery_order_id"`
+	ProductID                  *string        `gorm:"type:uuid;index" json:"product_id"`
+	ProductVariantID           *string        `gorm:"type:uuid;index" json:"product_variant_id"`
+	ProductNameSnapshot        string         `gorm:"size:255;not null" json:"product_name_snapshot"`
+	ProductVariantNameSnapshot string         `gorm:"size:255;not null;default:''" json:"product_variant_name_snapshot"`
+	ItemNameSnapshot           string         `gorm:"size:255;not null" json:"item_name_snapshot"`
+	ItemSource                 string         `gorm:"size:50;not null;default:catalog" json:"item_source"`
+	Quantity                   float64        `gorm:"not null" json:"quantity"`
+	UnitID                     string         `gorm:"type:uuid;not null;index" json:"unit_id"`
+	Weight                     *float64       `json:"weight"`
+	Flavor                     string         `gorm:"size:255" json:"flavor"`
+	DesignNotes                string         `json:"design_notes"`
+	MessageText                string         `json:"message_text"`
+	CustomizationsJSON         *string        `gorm:"type:jsonb" json:"customizations_json"`
+	UnitPrice                  float64        `gorm:"not null;default:0" json:"unit_price"`
+	DiscountAmount             float64        `gorm:"not null;default:0" json:"discount_amount"`
+	TaxRateID                  *string        `gorm:"type:uuid;index" json:"tax_rate_id"`
+	TaxAmount                  float64        `gorm:"not null;default:0" json:"tax_amount"`
+	LineTotal                  float64        `gorm:"not null;default:0" json:"line_total"`
+	CreatedAt                  time.Time      `json:"created_at"`
+	UpdatedAt                  time.Time      `json:"updated_at"`
+	DeletedAt                  gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 func (BakeryOrderItem) TableName() string { return "bakery_order_items" }
@@ -83,6 +87,7 @@ type BakeryOrderProduction struct {
 	ID                string    `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID        string    `gorm:"type:uuid;not null;index" json:"business_id"`
 	BakeryOrderID     string    `gorm:"type:uuid;not null;index" json:"bakery_order_id"`
+	BakeryOrderItemID *string   `gorm:"type:uuid;index" json:"bakery_order_item_id"`
 	ProductionBatchID *string   `gorm:"type:uuid;index" json:"production_batch_id"`
 	Status            string    `gorm:"size:50;not null;default:pending" json:"status"`
 	CreatedAt         time.Time `json:"created_at"`

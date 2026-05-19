@@ -15,8 +15,10 @@ function createEmptyItem(defaultUnitId: string): CreateOrderItemPayload {
     designNotes: null,
     discountAmount: 0,
     flavor: null,
+    itemName: null,
     messageText: null,
-    productId: "",
+    productId: null,
+    productVariantId: null,
     quantity: 1,
     taxRateId: null,
     unitId: defaultUnitId,
@@ -65,7 +67,7 @@ export function OrderItemsSection({
         {items.map((item, index) => (
           <OrderItemEditor
             item={item}
-            key={`${item.productId || "new"}-${String(index)}`}
+            key={String(index)}
             onChange={(nextItem) => {
               onChange(items.map((entry, entryIndex) => (entryIndex === index ? nextItem : entry)));
             }}

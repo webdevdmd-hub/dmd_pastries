@@ -135,6 +135,18 @@ func (h *Handler) AssignProduction(c *gin.Context) {
 	respond(c, "bakery order production assigned successfully", result, err)
 }
 
+func (h *Handler) CreateProductionFromItem(c *gin.Context) {
+	if !validParam(c, "id") || !validParam(c, "itemId") {
+		return
+	}
+	var req CreateProductionFromItemRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.CreateProductionFromItem(utils.MustAuthContext(c), c.Param("id"), c.Param("itemId"), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "production batch created from bakery order item successfully", result, err)
+}
+
 func (h *Handler) UpdateProductionStatus(c *gin.Context) {
 	if !validParam(c, "id") {
 		return

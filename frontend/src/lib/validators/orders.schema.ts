@@ -7,24 +7,47 @@ const nullableTrimmedString = z
   .optional()
   .transform((value) => (value && value.length > 0 ? value : null));
 
-export const orderItemSchema = z.object({
-  productId: z.string().min(1, "Product is required."),
-  quantity: z.coerce.number().positive("Quantity must be greater than 0."),
-  unitId: z.string().min(1, "Unit is required."),
-  weight: nullableTrimmedString,
-  flavor: nullableTrimmedString,
-  designNotes: nullableTrimmedString,
-  messageText: nullableTrimmedString,
-  customizationsJson: nullableTrimmedString,
-  unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."),
-  discountAmount: z.coerce.number().min(0, "Discount cannot be negative."),
-  taxRateId: z
-    .string()
-    .trim()
-    .nullable()
-    .optional()
-    .transform((value) => (value && value.length > 0 ? value : null)),
-});
+const nullableCoercedNumber = z.preprocess((value) => {
+  if (value === "" || value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : value;
+  }
+  return value;
+}, z.number().nullable());
+
+export const orderItemSchema = z
+  .object({
+    productId: nullableTrimmedString,
+    productVariantId: nullableTrimmedString,
+    itemName: nullableTrimmedString,
+    quantity: z.coerce.number().positive("Quantity must be greater than 0."),
+    unitId: z.string().min(1, "Unit is required."),
+    weight: nullableCoercedNumber,
+    flavor: nullableTrimmedString,
+    designNotes: nullableTrimmedString,
+    messageText: nullableTrimmedString,
+    customizationsJson: nullableTrimmedString,
+    unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."),
+    discountAmount: z.coerce.number().min(0, "Discount cannot be negative."),
+    taxRateId: z
+      .string()
+      .trim()
+      .nullable()
+      .optional()
+      .transform((value) => (value && value.length > 0 ? value : null)),
+  })
+  .superRefine((value, context) => {
+    if (!value.productId && !value.itemName) {
+      context.addIssue({
+        code: "custom",
+        message: "Select a product or enter a custom item name.",
+        path: ["itemName"],
+      });
+    }
+  });
 
 export const createOrderSchema = z.object({
   branchId: z.string().min(1, "Branch is required."),
