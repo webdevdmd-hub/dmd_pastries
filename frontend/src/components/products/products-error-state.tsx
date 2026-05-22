@@ -18,7 +18,7 @@ export function ProductsErrorState({ description, onRetry }: ProductsErrorStateP
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 text-red-700">
           <AlertTriangle className="h-6 w-6" />
         </div>
-        <h3 className="text-xl font-semibold text-brand-espresso">Unable to load products</h3>
+        <h3 className="text-xl font-semibold text-brand-espresso">Products could not be loaded</h3>
         <p className="mx-auto mt-2 max-w-xl text-sm text-brand-mocha">{description}</p>
         <Button className="mt-4" onClick={onRetry} variant="outline">
           Retry

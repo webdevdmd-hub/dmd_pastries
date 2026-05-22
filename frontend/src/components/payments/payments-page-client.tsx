@@ -16,6 +16,7 @@ import { PaymentsSummaryCards } from "@/components/payments/payments-summary-car
 import { PaymentsTable } from "@/components/payments/payments-table";
 import { PaymentsTableSkeleton } from "@/components/payments/payments-table-skeleton";
 import { PaymentsToolbar } from "@/components/payments/payments-toolbar";
+import { POSReceiptDialog } from "@/components/pos/pos-receipt-dialog";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,8 @@ import {
   useRefunds,
 } from "@/hooks/use-payments";
 import { usePermission } from "@/hooks/use-permission";
+import { useSaleReceipt } from "@/hooks/use-reports";
+import { useReceiptLayouts } from "@/hooks/use-settings-data";
 import { useUsers } from "@/hooks/use-users";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import type {
@@ -41,6 +44,8 @@ import type {
   RefundPaymentPayload,
   SalePayment,
 } from "@/types/payment";
+import type { SaleReceipt } from "@/types/pos";
+import type { ReceiptLayout } from "@/types/settings";
 import type { User } from "@/types/user";
 
 const defaultFilters: PaymentFilters = {
@@ -64,6 +69,27 @@ function isOwnerOrAdminRole(roleName: string): boolean {
   return normalizedRoleName.includes("owner") || normalizedRoleName.includes("admin");
 }
 
+function selectReceiptLayout(
+  layouts: ReceiptLayout[],
+  branchId: string | null,
+): ReceiptLayout | null {
+  const activeLayouts = layouts.filter((layout) => layout.status === "active");
+  const branchLayouts = branchId
+    ? activeLayouts.filter((layout) => layout.branchId === branchId)
+    : [];
+  const businessWideLayouts = activeLayouts.filter((layout) => layout.branchId === null);
+
+  return (
+    branchLayouts.find((layout) => layout.isDefault) ??
+    branchLayouts.find((layout) => Boolean(layout.counterId ?? layout.printerType)) ??
+    branchLayouts[0] ??
+    businessWideLayouts.find((layout) => layout.isDefault) ??
+    activeLayouts.find((layout) => layout.isDefault) ??
+    activeLayouts[0] ??
+    null
+  );
+}
+
 export function PaymentsPageClient(): JSX.Element {
   const { user } = useAuth();
   const branchScope = useBranchScope();
@@ -75,6 +101,8 @@ export function PaymentsPageClient(): JSX.Element {
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<SalePayment | null>(null);
   const [refundPayment, setRefundPayment] = useState<SalePayment | null>(null);
+  const [receipt, setReceipt] = useState<SaleReceipt | null>(null);
+  const [receiptBranchId, setReceiptBranchId] = useState<string | null>(null);
   const canView = hasAnyPermission([PERMISSIONS.paymentsView, PERMISSIONS.posView]);
   const canAdd = hasAnyPermission([PERMISSIONS.paymentsAdd, PERMISSIONS.posSell]);
   const canRefund = hasAnyPermission([PERMISSIONS.paymentsRefund, PERMISSIONS.posRefund]);
@@ -101,9 +129,15 @@ export function PaymentsPageClient(): JSX.Element {
     canView && branchScope.hasBranchScope,
   );
   const methodsQuery = usePaymentMethods(canView);
+  const receiptLayoutsQuery = useReceiptLayouts(canView && branchScope.hasBranchScope);
   const usersQuery = useUsers({ search: "", status: "active" }, canRefund && canViewUsers);
   const addPaymentMutation = useAddPaymentToSale();
   const refundMutation = useRefundPayment();
+  const saleReceiptMutation = useSaleReceipt();
+  const receiptLayout = selectReceiptLayout(
+    receiptLayoutsQuery.data ?? [],
+    receiptBranchId ?? branchScope.effectiveBranchId,
+  );
   const isPermissionDenied =
     paymentsQuery.error instanceof ApiError && paymentsQuery.error.status === 403;
   const approverOptions = (usersQuery.data ?? []).filter(hasApproverRole).map((approver) => ({
@@ -148,11 +182,25 @@ export function PaymentsPageClient(): JSX.Element {
     }
   };
 
+  const handleViewReceipt = async (payment: SalePayment): Promise<void> => {
+    if (payment.sourceType !== "pos_sale" || !payment.sourceId) {
+      return;
+    }
+
+    try {
+      const saleReceipt = await saleReceiptMutation.mutateAsync(payment.sourceId);
+      setReceiptBranchId(payment.branchId || branchScope.effectiveBranchId);
+      setReceipt(saleReceipt);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
         title="Payments"
-        description="Track sale payments, split payments, refunds, and daily collection status."
+        description="Track incoming customer collections from POS sales and bakery orders."
         actions={
           canAdd ? (
             <Button onClick={() => setAddPaymentOpen(true)} type="button">
@@ -199,8 +247,12 @@ export function PaymentsPageClient(): JSX.Element {
           <CardContent className="p-0">
             <PaymentsTable
               canRefund={canRefund}
+              isReceiptLoading={saleReceiptMutation.isPending}
               onRefund={setRefundPayment}
               onView={setSelectedPayment}
+              onViewReceipt={(payment) => {
+                void handleViewReceipt(payment);
+              }}
               payments={paymentsQuery.data ?? []}
             />
           </CardContent>
@@ -209,17 +261,38 @@ export function PaymentsPageClient(): JSX.Element {
 
       <PaymentDetailsDrawer
         canRefund={canRefund}
+        isReceiptLoading={saleReceiptMutation.isPending}
         onOpenChange={(open) => {
           if (!open) {
             setSelectedPayment(null);
           }
         }}
         onRefund={setRefundPayment}
+        onViewReceipt={(payment) => {
+          void handleViewReceipt(payment);
+        }}
         open={selectedPayment !== null}
         payment={selectedPayment}
         refunds={(refundsQuery.data ?? []).filter(
           (refund) => refund.salePaymentId === selectedPayment?.id,
         )}
+      />
+
+      <POSReceiptDialog
+        layout={receiptLayout}
+        onNewSale={() => {
+          setReceipt(null);
+          setReceiptBranchId(null);
+        }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReceipt(null);
+            setReceiptBranchId(null);
+          }
+        }}
+        open={receipt !== null}
+        primaryActionLabel="Close"
+        receipt={receipt}
       />
 
       <AddPaymentDialog

@@ -105,6 +105,28 @@ type PurchaseInvoiceItem struct {
 
 func (PurchaseInvoiceItem) TableName() string { return "purchase_invoice_items" }
 
+type PurchaseInvoicePayment struct {
+	ID                        string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID                string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID                  string         `gorm:"type:uuid;not null;index" json:"branch_id"`
+	PurchaseInvoiceID         string         `gorm:"type:uuid;not null;index" json:"purchase_invoice_id"`
+	SupplierID                string         `gorm:"type:uuid;not null;index" json:"supplier_id"`
+	PaymentMethodID           string         `gorm:"type:uuid;not null;index" json:"payment_method_id"`
+	PaymentMethodNameSnapshot string         `gorm:"size:150;not null" json:"payment_method_name_snapshot"`
+	PaymentMethodTypeSnapshot string         `gorm:"size:50;not null" json:"payment_method_type_snapshot"`
+	Amount                    float64        `gorm:"not null" json:"amount"`
+	PaymentStatus             string         `gorm:"size:50;not null;default:completed" json:"payment_status"`
+	ReferenceNumber           string         `gorm:"size:255" json:"reference_number"`
+	PaidByUserID              string         `gorm:"type:uuid;not null;index" json:"paid_by_user_id"`
+	PaidAt                    time.Time      `gorm:"not null" json:"paid_at"`
+	Notes                     string         `json:"notes"`
+	CreatedAt                 time.Time      `json:"created_at"`
+	UpdatedAt                 time.Time      `json:"updated_at"`
+	DeletedAt                 gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (PurchaseInvoicePayment) TableName() string { return "purchase_invoice_payments" }
+
 type PurchaseReceipt struct {
 	ID                string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID        string         `gorm:"type:uuid;not null;index" json:"business_id"`

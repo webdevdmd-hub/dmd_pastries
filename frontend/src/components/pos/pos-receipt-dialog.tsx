@@ -65,6 +65,14 @@ function formatDateTime(value: string): string {
   }).format(new Date(value));
 }
 
+function getPaymentStatus(receipt: SaleReceipt): string {
+  if (receipt.balanceDue > 0) {
+    return receipt.paidAmount > 0 ? "Partial" : "Unpaid";
+  }
+
+  return "Paid";
+}
+
 function buildReceiptText(receipt: SaleReceipt, config: ReceiptLayoutConfig): string {
   const lines = [
     config.showBusinessName ? receipt.businessName : null,
@@ -83,7 +91,9 @@ function buildReceiptText(receipt: SaleReceipt, config: ReceiptLayoutConfig): st
     config.showTax ? `Tax: ${formatMoney(receipt.taxAmount)}` : null,
     `Total: ${formatMoney(receipt.total)}`,
     `Paid: ${formatMoney(receipt.paidAmount)}`,
+    receipt.balanceDue > 0 ? `Balance due: ${formatMoney(receipt.balanceDue)}` : null,
     `Change: ${formatMoney(receipt.changeAmount)}`,
+    `Payment status: ${getPaymentStatus(receipt)}`,
     config.showPaymentMethod
       ? `Payment: ${receipt.payments.map((payment) => payment.paymentMethodName).join(", ")}`
       : null,
@@ -217,9 +227,19 @@ export function POSReceiptDialog({
                 <span>Paid</span>
                 <span>{formatMoney(receipt.paidAmount)}</span>
               </div>
+              {receipt.balanceDue > 0 ? (
+                <div className="flex justify-between font-semibold text-destructive">
+                  <span>Balance due</span>
+                  <span>{formatMoney(receipt.balanceDue)}</span>
+                </div>
+              ) : null}
               <div className="flex justify-between">
                 <span>Change</span>
                 <span>{formatMoney(receipt.changeAmount)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-brand-mocha">
+                <span>Payment status</span>
+                <span>{getPaymentStatus(receipt)}</span>
               </div>
               {config.showPaymentMethod ? (
                 <div className="text-left text-xs text-brand-mocha">

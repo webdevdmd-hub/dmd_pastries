@@ -1,6 +1,6 @@
 "use client";
 
-import { ShoppingCart } from "lucide-react";
+import { PackagePlus, ShoppingCart } from "lucide-react";
 import type { JSX } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -16,6 +16,7 @@ import { POSReceiptDialog } from "@/components/pos/pos-receipt-dialog";
 import { POSTopBar } from "@/components/pos/pos-top-bar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -48,10 +49,13 @@ import { usePOSProducts, usePOSReferenceData } from "@/hooks/use-pos-products";
 import { useReceiptLayouts } from "@/hooks/use-settings-data";
 import { getErrorMessage } from "@/lib/api/client";
 import { lookupPOSProduct } from "@/lib/api/pos";
+import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
 import { checkoutSchema } from "@/lib/validators/pos.schema";
 import type { ProductCategory } from "@/types/master-data";
-import type { POSProduct, POSProductVariant, SaleReceipt } from "@/types/pos";
+import type { CartItem, POSProduct, POSProductVariant, SaleReceipt } from "@/types/pos";
 import type { ReceiptLayout } from "@/types/settings";
+
+const POS_SHOW_PRICES_STORAGE_KEY = "pos.showPrices";
 
 function useDebouncedValue(value: string, delay: number): string {
   const [debounced, setDebounced] = useState(value);
@@ -62,6 +66,28 @@ function useDebouncedValue(value: string, delay: number): string {
   }, [delay, value]);
 
   return debounced;
+}
+
+function getCartReceiptItemName(item: CartItem): string {
+  return item.variantName ? `${item.productName} - ${item.variantName}` : item.productName;
+}
+
+function withCartItemNames(receipt: SaleReceipt, cartItems: CartItem[]): SaleReceipt {
+  return {
+    ...receipt,
+    items: receipt.items.map((receiptItem, index) => {
+      const cartItem = cartItems[index];
+
+      if (!cartItem) {
+        return receiptItem;
+      }
+
+      return {
+        ...receiptItem,
+        name: getCartReceiptItemName(cartItem),
+      };
+    }),
+  };
 }
 
 function selectReceiptLayout(layouts: ReceiptLayout[], branchId: string): ReceiptLayout | null {
@@ -97,6 +123,8 @@ export function POSWorkspace(): JSX.Element {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receipt, setReceipt] = useState<SaleReceipt | null>(null);
   const [search, setSearch] = useState("");
+  const [pricePreferenceLoaded, setPricePreferenceLoaded] = useState(false);
+  const [showPrices, setShowPrices] = useState(false);
   const [categoryId, setCategoryId] = useState("all");
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [variantProduct, setVariantProduct] = useState<POSProduct | null>(null);
@@ -169,6 +197,18 @@ export function POSWorkspace(): JSX.Element {
   }, []);
 
   useEffect(() => {
+    setShowPrices(window.localStorage.getItem(POS_SHOW_PRICES_STORAGE_KEY) === "true");
+    setPricePreferenceLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!pricePreferenceLoaded) {
+      return;
+    }
+    window.localStorage.setItem(POS_SHOW_PRICES_STORAGE_KEY, String(showPrices));
+  }, [pricePreferenceLoaded, showPrices]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       const target = event.target;
       const isTyping =
@@ -207,14 +247,20 @@ export function POSWorkspace(): JSX.Element {
   }, [cart]);
 
   const addProduct = (product: POSProduct, variant?: POSProductVariant): void => {
-    if (product.variants.length > 0 && !variant) {
-      setVariantProduct(product);
+    cart.addProduct(variant ? { product, variant } : { product });
+    toast.success(
+      variant
+        ? `${product.productName} - ${variant.variantName} added to cart`
+        : `${product.productName} added to cart`,
+    );
+    barcodeInputRef.current?.focus();
+  };
+
+  const openVariantChooser = (product: POSProduct): void => {
+    if (product.variants.length === 0) {
       return;
     }
-
-    cart.addProduct(variant ? { product, variant } : { product });
-    toast.success(`${product.productName} added to cart`);
-    barcodeInputRef.current?.focus();
+    setVariantProduct(product);
   };
 
   const handleLookup = async (query: string): Promise<void> => {
@@ -272,9 +318,11 @@ export function POSWorkspace(): JSX.Element {
       return;
     }
 
+    const receiptItemSnapshot = cart.items.map((item) => ({ ...item }));
+
     try {
       const checkedOut = await checkoutMutation.mutateAsync(payload);
-      setReceipt(checkedOut.receipt);
+      setReceipt(withCartItemNames(checkedOut.receipt, receiptItemSnapshot));
       setCheckoutOpen(false);
       setReceiptOpen(true);
       cart.clearCart();
@@ -451,7 +499,7 @@ export function POSWorkspace(): JSX.Element {
             </div>
 
             <section className="scrollbar-hidden min-h-0 overflow-y-auto rounded-[2rem] border border-brand-cappuccino/70 bg-white/45 p-4 shadow-[0_24px_80px_rgba(59,42,34,0.08)] backdrop-blur">
-              <div className="sticky top-0 z-10 mb-5 grid gap-3 rounded-[1.7rem] bg-white/90 p-3 shadow-sm backdrop-blur md:grid-cols-2">
+              <div className="sticky top-0 z-10 mb-5 grid gap-3 rounded-[1.7rem] bg-white/90 p-3 shadow-sm backdrop-blur md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                 <POSProductSearch onChange={setSearch} value={search} />
                 <POSBarcodeInput
                   inputRef={barcodeInputRef}
@@ -459,6 +507,13 @@ export function POSWorkspace(): JSX.Element {
                     void handleLookup(query);
                   }}
                 />
+                <label className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-brand-cappuccino bg-brand-latte/70 px-3 text-xs font-black text-brand-mocha md:justify-start">
+                  <Checkbox
+                    checked={showPrices}
+                    onCheckedChange={(checked) => setShowPrices(checked === true)}
+                  />
+                  Show prices
+                </label>
               </div>
               <div className="mb-5 flex gap-2 overflow-x-auto lg:hidden">
                 <Button
@@ -487,10 +542,12 @@ export function POSWorkspace(): JSX.Element {
                   productsQuery.isLoading || (referenceQuery.isLoading && categories.length === 0)
                 }
                 onProductClick={addProduct}
+                onProductVariantsClick={openVariantChooser}
                 onRetry={() => {
                   void productsQuery.refetch();
                 }}
                 products={products}
+                showPrices={showPrices}
                 stockByProductId={stockByProductId}
               />
             </section>
@@ -523,21 +580,43 @@ export function POSWorkspace(): JSX.Element {
         onOpenChange={(open) => !open && setVariantProduct(null)}
         open={variantProduct !== null}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Select variant</DialogTitle>
-            <DialogDescription>{variantProduct?.productName}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-2">
+        <DialogContent className="max-w-[34rem] rounded-[2rem] border-brand-cappuccino/80 bg-white/95 p-0 shadow-[0_28px_90px_rgba(59,42,34,0.22)] backdrop-blur">
+          <div className="rounded-t-[2rem] border-b border-brand-cappuccino/70 bg-brand-latte/65 px-5 py-4">
+            <DialogHeader>
+              <DialogTitle className="font-display text-2xl text-brand-espresso">
+                Choose a variant
+              </DialogTitle>
+              <DialogDescription className="text-brand-mocha">
+                {variantProduct?.productName}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="grid gap-3 p-4">
             {variantProduct?.variants
               .filter((variant) => variant.status === "active")
               .map((variant) => {
                 const availableQuantity = variant.availableStockQuantity;
                 const isOutOfStock = availableQuantity !== null && availableQuantity <= 0;
+                const parentImageUrl =
+                  getProductImagePreviewUrl(variantProduct.imageFileId) ?? variantProduct.imageUrl;
+                const variantImageUrl =
+                  getProductImagePreviewUrl(variant.imageFileId) ??
+                  variant.imageUrl ??
+                  parentImageUrl;
+                const stockLabel =
+                  availableQuantity !== null
+                    ? `${availableQuantity.toLocaleString(undefined, {
+                        maximumFractionDigits: 3,
+                      })} available`
+                    : "Stock not linked";
+                const metadata = [variant.sku, variant.barcode]
+                  .filter((part): part is string => Boolean(part))
+                  .join(" / ");
 
                 return (
                   <Button
-                    className="h-auto min-h-14 justify-between gap-4 rounded-2xl py-3"
+                    className="h-auto items-center justify-between gap-4 rounded-[1.35rem] border-brand-cappuccino/75 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-brand-caramel hover:bg-brand-latte/35 hover:shadow-md disabled:translate-y-0 disabled:border-red-200 disabled:bg-red-50 disabled:text-red-800"
                     disabled={isOutOfStock}
                     key={variant.id}
                     onClick={() => {
@@ -547,17 +626,42 @@ export function POSWorkspace(): JSX.Element {
                     type="button"
                     variant="outline"
                   >
-                    <span className="flex flex-col items-start text-left">
-                      <span>{variant.variantName}</span>
-                      <span className="text-xs text-brand-mocha">
-                        {availableQuantity !== null
-                          ? `${availableQuantity.toLocaleString(undefined, {
-                              maximumFractionDigits: 3,
-                            })} available`
-                          : "Stock not linked"}
+                    <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1rem] border border-brand-cappuccino/60 bg-brand-latte text-brand-mocha shadow-sm">
+                      {variantImageUrl ? (
+                        <img alt="" className="h-full w-full object-cover" src={variantImageUrl} />
+                      ) : (
+                        <PackagePlus className="h-5 w-5" />
+                      )}
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+                      <span className="line-clamp-1 text-base font-black text-brand-espresso">
+                        {variant.variantName}
+                      </span>
+                      {metadata ? (
+                        <span className="line-clamp-1 text-xs font-medium text-brand-mocha">
+                          {metadata}
+                        </span>
+                      ) : null}
+                      <span
+                        className={
+                          isOutOfStock
+                            ? "rounded-full bg-red-100 px-2 py-0.5 text-[0.68rem] font-black text-red-700"
+                            : "rounded-full bg-brand-latte px-2 py-0.5 text-[0.68rem] font-black text-brand-mocha"
+                        }
+                      >
+                        {stockLabel}
                       </span>
                     </span>
-                    <span>AED {variant.salePrice.toFixed(2)}</span>
+                    <span className="flex shrink-0 flex-col items-end gap-1">
+                      {showPrices ? (
+                        <span className="text-base font-black text-brand-espresso">
+                          AED {variant.salePrice.toFixed(2)}
+                        </span>
+                      ) : null}
+                      <span className="rounded-full bg-brand-caramel px-3 py-1 text-[0.68rem] font-black text-white">
+                        Select
+                      </span>
+                    </span>
                   </Button>
                 );
               })}

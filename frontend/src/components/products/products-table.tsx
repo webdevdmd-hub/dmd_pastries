@@ -1,12 +1,13 @@
 "use client";
 
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, Clock3, EyeOff, PackageSearch } from "lucide-react";
 import type { JSX } from "react";
 
 import { ProductActionsMenu } from "@/components/products/product-actions-menu";
 import { ProductStatusBadge } from "@/components/products/product-status-badge";
 import { ProductTypeBadge } from "@/components/products/product-type-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -37,6 +38,46 @@ function initials(value: string): string {
     .join("");
 }
 
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    maximumFractionDigits: 2,
+    style: "currency",
+  }).format(value);
+}
+
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat("en-AE", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function ProductCapabilityBadges({ product }: { product: Product }): JSX.Element {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <Badge
+        className={
+          product.isPosVisible
+            ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-50"
+            : "border-brand-cappuccino bg-brand-latte text-brand-mocha hover:bg-brand-latte"
+        }
+      >
+        {product.isPosVisible ? (
+          <CheckCircle2 className="h-3.5 w-3.5" />
+        ) : (
+          <EyeOff className="h-3.5 w-3.5" />
+        )}
+        POS {product.isPosVisible ? "Visible" : "Hidden"}
+      </Badge>
+      {product.isStockTracked ? <Badge variant="outline">Stock</Badge> : null}
+      {product.isExpiryTracked ? <Badge variant="outline">Expiry</Badge> : null}
+      {product.isCustomOrderAvailable ? <Badge variant="outline">Custom</Badge> : null}
+    </div>
+  );
+}
+
 export function ProductsTable({
   canManage,
   onDelete,
@@ -47,87 +88,159 @@ export function ProductsTable({
   products,
 }: ProductsTableProps): JSX.Element {
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Product</TableHead>
-            <TableHead>Code/SKU</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Unit</TableHead>
-            <TableHead>Sale Price</TableHead>
-            <TableHead>Tax</TableHead>
-            <TableHead>POS Visible</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Updated At</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {products.map((product) => (
-            <TableRow key={product.id}>
-              <TableCell>
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage
-                      alt={product.productName}
-                      src={getProductImagePreviewUrl(product.imageFileId) ?? product.imageUrl ?? ""}
-                    />
-                    <AvatarFallback>{initials(product.productName)}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium text-brand-espresso">{product.productName}</p>
-                    <p className="text-xs text-brand-mocha">
-                      {product.description ?? product.productCode}
-                    </p>
-                  </div>
+    <div>
+      <div className="grid gap-3 p-3 md:hidden">
+        {products.map((product) => (
+          <div
+            key={product.id}
+            className="rounded-2xl border border-brand-cappuccino/70 bg-white/80 p-4 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar className="h-12 w-12 rounded-2xl">
+                  <AvatarImage
+                    alt={product.productName}
+                    src={getProductImagePreviewUrl(product.imageFileId) ?? product.imageUrl ?? ""}
+                  />
+                  <AvatarFallback className="rounded-2xl">
+                    {initials(product.productName)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-brand-espresso">
+                    {product.productName}
+                  </p>
+                  <p className="truncate text-xs text-brand-mocha">
+                    {product.productCode} {product.sku ? `• ${product.sku}` : ""}
+                  </p>
                 </div>
-              </TableCell>
-              <TableCell className="text-sm text-brand-mocha">
-                {product.productCode}
-                <br />
-                {product.sku ?? "-"}
-              </TableCell>
-              <TableCell>{product.categoryName}</TableCell>
-              <TableCell>
-                <ProductTypeBadge type={product.productType} />
-              </TableCell>
-              <TableCell>{product.unitName}</TableCell>
-              <TableCell>{product.salePrice.toFixed(2)}</TableCell>
-              <TableCell>{product.taxRateName ?? "-"}</TableCell>
-              <TableCell>
-                {product.isPosVisible ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-700">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Yes
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-brand-mocha">
-                    <XCircle className="h-4 w-4" />
-                    No
-                  </span>
-                )}
-              </TableCell>
-              <TableCell>
-                <ProductStatusBadge status={product.status} />
-              </TableCell>
-              <TableCell>{new Date(product.updatedAt).toLocaleString()}</TableCell>
-              <TableCell className="text-right">
-                <ProductActionsMenu
-                  canManage={canManage}
-                  onDelete={onDelete}
-                  onEdit={onEdit}
-                  onManageVariants={onManageVariants}
-                  onStatusChange={onStatusChange}
-                  onView={onView}
-                  product={product}
-                />
-              </TableCell>
+              </div>
+              <ProductActionsMenu
+                canManage={canManage}
+                onDelete={onDelete}
+                onEdit={onEdit}
+                onManageVariants={onManageVariants}
+                onStatusChange={onStatusChange}
+                onView={onView}
+                product={product}
+              />
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <ProductStatusBadge status={product.status} />
+              <ProductTypeBadge type={product.productType} />
+              <ProductCapabilityBadges product={product} />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha/70">Price</p>
+                <p className="font-semibold text-brand-espresso">
+                  {formatCurrency(product.salePrice)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha/70">Unit</p>
+                <p className="font-medium text-brand-espresso">{product.unitName}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha/70">Category</p>
+                <p className="font-medium text-brand-espresso">{product.categoryName}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="min-w-[280px]">Product</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead>Behavior</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Updated</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {products.map((product) => (
+              <TableRow key={product.id} className="align-top">
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-11 w-11 rounded-2xl">
+                      <AvatarImage
+                        alt={product.productName}
+                        src={
+                          getProductImagePreviewUrl(product.imageFileId) ?? product.imageUrl ?? ""
+                        }
+                      />
+                      <AvatarFallback className="rounded-2xl">
+                        {initials(product.productName)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-brand-espresso">
+                        {product.productName}
+                      </p>
+                      <p className="mt-0.5 text-xs text-brand-mocha">
+                        {product.productCode}
+                        {product.sku ? ` • SKU ${product.sku}` : ""}
+                        {product.barcode ? ` • ${product.barcode}` : ""}
+                      </p>
+                      {product.variants.length > 0 ? (
+                        <p className="mt-1 inline-flex items-center gap-1 text-xs text-brand-mocha">
+                          <PackageSearch className="h-3.5 w-3.5" />
+                          {product.variants.length} variants
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <p className="font-medium text-brand-espresso">{product.categoryName}</p>
+                  <p className="text-xs text-brand-mocha">{product.unitName}</p>
+                </TableCell>
+                <TableCell>
+                  <ProductTypeBadge type={product.productType} />
+                </TableCell>
+                <TableCell>
+                  <p className="font-semibold text-brand-espresso">
+                    {formatCurrency(product.salePrice)}
+                  </p>
+                  <p className="text-xs text-brand-mocha">
+                    Cost {product.costPrice === null ? "-" : formatCurrency(product.costPrice)}
+                  </p>
+                  <p className="text-xs text-brand-mocha">Tax {product.taxRateName ?? "-"}</p>
+                </TableCell>
+                <TableCell>
+                  <ProductCapabilityBadges product={product} />
+                </TableCell>
+                <TableCell>
+                  <ProductStatusBadge status={product.status} />
+                </TableCell>
+                <TableCell>
+                  <span className="inline-flex items-center gap-1 text-sm text-brand-mocha">
+                    <Clock3 className="h-3.5 w-3.5" />
+                    {formatDate(product.updatedAt)}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">
+                  <ProductActionsMenu
+                    canManage={canManage}
+                    onDelete={onDelete}
+                    onEdit={onEdit}
+                    onManageVariants={onManageVariants}
+                    onStatusChange={onStatusChange}
+                    onView={onView}
+                    product={product}
+                  />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

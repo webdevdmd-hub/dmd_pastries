@@ -1,0 +1,116 @@
+package accounting
+
+import (
+	"strings"
+
+	"gorm.io/gorm"
+
+	"pastries-pos/internal/shared/utils"
+)
+
+type defaultAccountSeed struct {
+	Code               string
+	Name               string
+	Type               string
+	Group              string
+	NormalBalance      string
+	Description        string
+	IsControlAccount   bool
+	AllowManualPosting bool
+}
+
+func DefaultChartAccountSeeds() []defaultAccountSeed {
+	return []defaultAccountSeed{
+		{Code: "1000", Name: "Cash in Hand", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true},
+		{Code: "1010", Name: "Bank Account", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true},
+		{Code: "1020", Name: "Petty Cash", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true},
+		{Code: "1100", Name: "Accounts Receivable", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "1200", Name: "Inventory / Stock", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "1300", Name: "VAT Receivable", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "1400", Name: "Advance to Supplier", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "1500", Name: "Prepaid Expenses", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "1600", Name: "Security Deposit", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "1700", Name: "Other Current Assets", Type: "asset", Group: "other_current_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "1800", Name: "Furniture & Fixtures", Type: "asset", Group: "fixed_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "1810", Name: "Office Equipment", Type: "asset", Group: "fixed_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "1820", Name: "Computer & Laptop", Type: "asset", Group: "fixed_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "1830", Name: "Machinery", Type: "asset", Group: "fixed_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "1840", Name: "Accumulated Depreciation", Type: "asset", Group: "accumulated_depreciation", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "1900", Name: "Other Non-Current Assets", Type: "asset", Group: "non_current_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "2000", Name: "Accounts Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "2100", Name: "VAT Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "2200", Name: "Customer Advance", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "2300", Name: "Salary Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "2400", Name: "Utility Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "2500", Name: "Expense Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "2600", Name: "Other Current Liabilities", Type: "liability", Group: "other_current_liability", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "2800", Name: "Bank Loan", Type: "liability", Group: "long_term_liability", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "2900", Name: "Other Liabilities", Type: "liability", Group: "other_liability", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "3000", Name: "Owner Capital", Type: "equity", Group: "equity", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true},
+		{Code: "3010", Name: "Partner Capital", Type: "equity", Group: "partner_capital", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "3100", Name: "Retained Earnings", Type: "equity", Group: "equity", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "3200", Name: "Current Year Profit / Loss", Type: "equity", Group: "equity", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "3300", Name: "Drawings", Type: "equity", Group: "equity", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "4000", Name: "Sales Income", Type: "income", Group: "sales_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "4010", Name: "Bakery Order Income", Type: "income", Group: "sales_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "4020", Name: "Service Income", Type: "income", Group: "service_income", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "4030", Name: "Discount Received", Type: "income", Group: "discount_income", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "4090", Name: "Other Income", Type: "income", Group: "other_income", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "5000", Name: "Opening Stock", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "5010", Name: "Purchase", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "5020", Name: "Purchase Return", Type: "cogs", Group: "direct_expense", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "5030", Name: "Freight / Carriage Inward", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "5040", Name: "Direct Labour", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "5050", Name: "Production Cost", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "5060", Name: "Manufacturing Expense", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "5070", Name: "Cost of Goods Sold", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "5080", Name: "Wastage Expense", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "6000", Name: "Salary Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6010", Name: "Rent Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6020", Name: "Electricity Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6030", Name: "Water Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6040", Name: "Telephone & Internet Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6050", Name: "Bank Charges", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6060", Name: "Cleaning Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6070", Name: "Repair & Maintenance", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6080", Name: "Advertising Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6090", Name: "Professional Fees / Audit Fees", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6100", Name: "Depreciation Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6110", Name: "Office Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6120", Name: "Insurance Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6200", Name: "Administrative Expense", Type: "expense", Group: "admin_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6210", Name: "Selling Expense", Type: "expense", Group: "selling_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6220", Name: "Finance Cost", Type: "expense", Group: "finance_cost", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6230", Name: "Tax Expense", Type: "expense", Group: "tax_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+	}
+}
+
+func SeedDefaultChartOfAccounts(tx *gorm.DB, businessID string) error {
+	for _, seed := range DefaultChartAccountSeeds() {
+		var count int64
+		if err := tx.Model(&ChartAccount{}).Where("business_id = ? AND LOWER(account_code) = LOWER(?) AND deleted_at IS NULL", businessID, seed.Code).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			continue
+		}
+		account := ChartAccount{
+			ID:                 utils.NewUUID(),
+			BusinessID:         businessID,
+			AccountCode:        seed.Code,
+			AccountName:        seed.Name,
+			AccountType:        seed.Type,
+			AccountGroup:       seed.Group,
+			NormalBalance:      seed.NormalBalance,
+			Description:        strings.TrimSpace(seed.Description),
+			IsSystemAccount:    true,
+			IsControlAccount:   seed.IsControlAccount,
+			AllowManualPosting: seed.AllowManualPosting,
+			Status:             "active",
+		}
+		if err := tx.Create(&account).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}

@@ -1,6 +1,9 @@
 import type { Permission } from "@/types/permission";
 
 export const PERMISSIONS = {
+  accountingAccountsManage: "accounting.accounts.manage",
+  accountingJournalEntriesManage: "accounting.journal_entries.manage",
+  accountingView: "accounting.view",
   auditLogsView: "audit_logs.view",
   branchesAccessManage: "branches.access.manage",
   branchesCreate: "branches.create",

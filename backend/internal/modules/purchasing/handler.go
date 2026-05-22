@@ -95,6 +95,31 @@ func (h *Handler) GetInvoice(c *gin.Context) {
 	respond(c, "purchase invoice fetched successfully", result, err)
 }
 
+func (h *Handler) ListInvoicePayments(c *gin.Context) {
+	result, err := h.service.ListInvoicePayments(utils.MustAuthContext(c), parsePaymentListQuery(c))
+	respond(c, "purchase invoice payments fetched successfully", result, err)
+}
+
+func (h *Handler) ListInvoicePaymentsByInvoice(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.ListInvoicePaymentsByInvoice(utils.MustAuthContext(c), c.Param("id"))
+	respond(c, "purchase invoice payments fetched successfully", result, err)
+}
+
+func (h *Handler) AddInvoicePayment(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	var req AddPurchaseInvoicePaymentRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.AddInvoicePayment(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "purchase invoice payment added successfully", result, err)
+}
+
 func (h *Handler) UpdateInvoice(c *gin.Context) {
 	if !validParam(c, "id") {
 		return
@@ -189,6 +214,26 @@ func parseListQuery(c *gin.Context) ListQuery {
 		Limit:         limit,
 		SortBy:        c.DefaultQuery("sort_by", "created_at"),
 		SortOrder:     c.DefaultQuery("sort_order", "desc"),
+	}
+}
+
+func parsePaymentListQuery(c *gin.Context) PaymentListQuery {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	return PaymentListQuery{
+		Search:          c.Query("search"),
+		BranchID:        c.Query("branch_id"),
+		SupplierID:      c.Query("supplier_id"),
+		InvoiceID:       c.Query("purchase_invoice_id"),
+		PaymentMethodID: c.Query("payment_method_id"),
+		PaymentStatus:   c.Query("payment_status"),
+		PaidByUserID:    c.Query("paid_by_user_id"),
+		DateFrom:        c.Query("date_from"),
+		DateTo:          c.Query("date_to"),
+		Page:            page,
+		Limit:           limit,
+		SortBy:          c.DefaultQuery("sort_by", "paid_at"),
+		SortOrder:       c.DefaultQuery("sort_order", "desc"),
 	}
 }
 

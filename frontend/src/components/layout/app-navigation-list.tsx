@@ -197,7 +197,7 @@ export function AppNavigationList({
   return (
     <div
       className={cn(
-        "scrollbar-hidden flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto",
+        "scrollbar-hidden flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto",
         collapsed ? "items-center px-2" : "pr-1",
       )}
     >
@@ -209,7 +209,7 @@ export function AppNavigationList({
             <button
               aria-expanded={isOpen}
               className={cn(
-                "flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-brand-latte/55 transition-colors hover:bg-brand-latte/10 hover:text-brand-latte",
+                "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[0.66rem] font-semibold uppercase tracking-[0.2em] text-workspace-sidebar-muted transition-colors hover:bg-white/[0.06] hover:text-white",
                 collapsed ? "justify-center px-2" : "",
               )}
               onClick={() => {
@@ -228,7 +228,7 @@ export function AppNavigationList({
               type="button"
             >
               {collapsed ? (
-                <span className="h-1.5 w-1.5 rounded-full bg-brand-latte/45" />
+                <span className="h-1.5 w-1.5 rounded-full bg-workspace-sidebar-muted" />
               ) : (
                 <>
                   <span>{group.label}</span>
@@ -258,11 +258,11 @@ export function AppNavigationList({
                           <button
                             aria-expanded={isItemOpen}
                             className={cn(
-                              "flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-colors",
+                              "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                               isParentActive
-                                ? "bg-brand-caramel text-brand-latte shadow-panel"
-                                : "text-brand-latte/80 hover:bg-brand-latte/10 hover:text-brand-latte",
-                              collapsed ? "justify-center px-3" : "",
+                                ? "bg-workspace-sidebar-active text-white shadow-sm"
+                                : "text-white/78 hover:bg-white/[0.07] hover:text-white",
+                              collapsed ? "justify-center px-2.5" : "",
                             )}
                             onClick={() => {
                               setOpenGroups((current) => {
@@ -297,7 +297,7 @@ export function AppNavigationList({
                         </NavigationTooltip>
 
                         {isItemOpen && !collapsed ? (
-                          <div className="ml-5 grid gap-1 border-l border-brand-latte/15 pl-3">
+                          <div className="ml-4 grid gap-1 border-l border-white/10 pl-3">
                             {item.children?.map((child) => {
                               const ChildIcon = child.icon;
                               const childIsActive = isCurrentItem(child, pathname, visibleItems);
@@ -305,10 +305,10 @@ export function AppNavigationList({
                               return (
                                 <Link
                                   className={cn(
-                                    "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors",
+                                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                                     childIsActive
-                                      ? "bg-brand-latte text-brand-espresso shadow-panel"
-                                      : "text-brand-latte/70 hover:bg-brand-latte/10 hover:text-brand-latte",
+                                      ? "bg-white text-workspace-sidebar shadow-sm"
+                                      : "text-white/65 hover:bg-white/[0.07] hover:text-white",
                                   )}
                                   href={child.href}
                                   key={child.href}
@@ -329,11 +329,11 @@ export function AppNavigationList({
                     <NavigationTooltip collapsed={collapsed} key={item.href} label={item.label}>
                       <Link
                         className={cn(
-                          "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-colors",
+                          "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                           isActive
-                            ? "bg-brand-caramel text-brand-latte shadow-panel"
-                            : "text-brand-latte/80 hover:bg-brand-latte/10 hover:text-brand-latte",
-                          collapsed ? "justify-center px-3" : "",
+                            ? "bg-workspace-sidebar-active text-white shadow-sm"
+                            : "text-white/78 hover:bg-white/[0.07] hover:text-white",
+                          collapsed ? "justify-center px-2.5" : "",
                         )}
                         href={item.href}
                         {...(onNavigate ? { onClick: onNavigate } : {})}

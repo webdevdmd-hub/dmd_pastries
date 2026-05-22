@@ -114,16 +114,18 @@ export function AppHeader(): JSX.Element {
   };
 
   return (
-    <header className="sticky top-0 z-20 border-b border-brand-cappuccino/70 bg-brand-latte/80 backdrop-blur-md">
-      <div className="flex flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-20 border-b border-workspace-border/80 bg-workspace-canvas/90 backdrop-blur-xl">
+      <div className="flex flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="flex min-h-12 items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="lg:hidden">
               <AppSidebar />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-brand-mocha/70">Operations</p>
-              <p className="text-sm font-medium text-brand-espresso">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-workspace-muted">
+                Operations
+              </p>
+              <p className="text-sm font-semibold text-brand-espresso">
                 {businessQuery.data?.businessName ?? user?.businessName ?? "Business workspace"}
               </p>
             </div>
@@ -131,8 +133,11 @@ export function AppHeader(): JSX.Element {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button className="h-auto rounded-2xl px-3 py-2" variant="outline">
-                <Avatar className="h-9 w-9">
+              <Button
+                className="h-auto rounded-2xl border-workspace-border bg-workspace-panel px-2.5 py-2 shadow-none hover:bg-brand-latte/70"
+                variant="outline"
+              >
+                <Avatar className="h-8 w-8">
                   <AvatarFallback>{initials(user?.fullName ?? "PP")}</AvatarFallback>
                 </Avatar>
                 <div className="hidden text-left sm:block">
@@ -222,7 +227,7 @@ export function AppHeader(): JSX.Element {
 
         <Separator />
 
-        <Breadcrumb>
+        <Breadcrumb className="text-xs">
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink href={ROUTES.dashboard}>Home</BreadcrumbLink>

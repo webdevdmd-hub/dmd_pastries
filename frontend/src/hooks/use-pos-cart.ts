@@ -82,6 +82,8 @@ export function usePOSCart() {
           productName: product.productName,
           variantName: variant?.variantName ?? null,
           sku: variant?.sku ?? product.sku,
+          imageUrl: variant?.imageUrl ?? product.imageUrl,
+          imageFileId: variant?.imageFileId ?? product.imageFileId,
           quantity: 1,
           unitPrice,
           discountType: null,

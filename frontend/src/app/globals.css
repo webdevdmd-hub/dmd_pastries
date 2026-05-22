@@ -9,6 +9,14 @@
     --brand-caramel: 176 137 104;
     --brand-mocha: 122 85 58;
     --brand-espresso: 59 42 34;
+    --workspace-canvas: 248 246 241;
+    --workspace-sidebar: 59 42 34;
+    --workspace-sidebar-panel: 74 53 43;
+    --workspace-sidebar-active: 176 137 104;
+    --workspace-sidebar-muted: 214 191 166;
+    --workspace-panel: 255 255 255;
+    --workspace-border: 226 214 200;
+    --workspace-muted: 111 91 77;
     --background: 36 52% 90%;
     --foreground: 20 26% 18%;
     --card: 33 34% 98%;
@@ -37,6 +45,14 @@
     --brand-caramel: 67 182 107;
     --brand-mocha: 94 116 104;
     --brand-espresso: 23 37 28;
+    --workspace-canvas: 248 252 249;
+    --workspace-sidebar: 15 31 23;
+    --workspace-sidebar-panel: 27 48 36;
+    --workspace-sidebar-active: 67 182 107;
+    --workspace-sidebar-muted: 168 188 176;
+    --workspace-panel: 255 255 255;
+    --workspace-border: 213 232 220;
+    --workspace-muted: 94 116 104;
     --background: 136 100% 98%;
     --foreground: 137 23% 12%;
     --card: 0 0% 100%;
@@ -65,10 +81,13 @@
   }
 
   body {
-    @apply min-h-screen bg-brand-latte text-brand-espresso antialiased;
-    background-image:
-      radial-gradient(circle at top, rgb(var(--brand-cappuccino) / 0.28), transparent 38%),
-      radial-gradient(circle at bottom right, rgb(var(--brand-caramel) / 0.12), transparent 28%);
+    @apply min-h-screen text-brand-espresso antialiased;
+    background-color: rgb(var(--workspace-canvas));
+    background-image: linear-gradient(
+      180deg,
+      rgb(var(--workspace-canvas)) 0%,
+      rgb(var(--brand-latte) / 0.72) 100%
+    );
   }
 
   a {
@@ -284,6 +303,53 @@
     border-color: rgb(var(--brand-espresso));
   }
 
+  .bg-workspace-canvas {
+    background-color: rgb(var(--workspace-canvas));
+  }
+
+  .bg-workspace-canvas\/90 {
+    background-color: rgb(var(--workspace-canvas) / 0.9);
+  }
+
+  .bg-workspace-sidebar {
+    background-color: rgb(var(--workspace-sidebar));
+  }
+
+  .bg-workspace-sidebar-active {
+    background-color: rgb(var(--workspace-sidebar-active));
+  }
+
+  .bg-workspace-panel {
+    background-color: rgb(var(--workspace-panel));
+  }
+
+  .text-workspace-sidebar {
+    color: rgb(var(--workspace-sidebar));
+  }
+
+  .text-workspace-sidebar-muted {
+    color: rgb(var(--workspace-sidebar-muted));
+  }
+
+  .text-workspace-muted {
+    color: rgb(var(--workspace-muted));
+  }
+
+  .border-workspace-border {
+    border-color: rgb(var(--workspace-border));
+  }
+
+  .border-workspace-border\/80 {
+    border-color: rgb(var(--workspace-border) / 0.8);
+  }
+
+  .shadow-workspace {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 20px 55px rgba(13, 17, 23, 0.22);
+  }
+
+  :root[data-theme="pistachio"] aside.bg-workspace-sidebar,
   :root[data-theme="pistachio"] aside.bg-brand-espresso,
   :root[data-theme="pistachio"] [data-sidebar-theme="pistachio"] {
     background:

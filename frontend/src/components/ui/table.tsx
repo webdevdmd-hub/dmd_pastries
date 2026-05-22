@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils/cn";
 
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto rounded-3xl">
+    <div className="relative w-full overflow-auto">
       <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
     </div>
   ),
@@ -17,7 +17,7 @@ const TableHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <thead
     ref={ref}
-    className={cn("[&_tr]:border-b [&_tr]:border-brand-cappuccino", className)}
+    className={cn("[&_tr]:border-b [&_tr]:border-workspace-border", className)}
     {...props}
   />
 ));
@@ -38,7 +38,7 @@ const TableFooter = React.forwardRef<
   <tfoot
     ref={ref}
     className={cn(
-      "border-t border-brand-cappuccino bg-brand-cappuccino/20 font-medium [&>tr]:last:border-b-0",
+      "border-t border-workspace-border bg-brand-latte/40 font-medium [&>tr]:last:border-b-0",
       className,
     )}
     {...props}
@@ -51,7 +51,7 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
     <tr
       ref={ref}
       className={cn(
-        "border-b border-brand-cappuccino/80 transition-colors hover:bg-brand-cappuccino/15 data-[state=selected]:bg-brand-cappuccino/20",
+        "border-b border-workspace-border transition-colors hover:bg-brand-latte/45 data-[state=selected]:bg-brand-latte/60",
         className,
       )}
       {...props}
@@ -67,7 +67,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-12 px-4 text-left align-middle text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha",
+      "h-10 px-4 text-left align-middle text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-workspace-muted",
       className,
     )}
     {...props}
@@ -81,7 +81,7 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn("px-4 py-4 align-middle text-brand-espresso", className)}
+    className={cn("px-4 py-3 align-middle text-brand-espresso", className)}
     {...props}
   />
 ));

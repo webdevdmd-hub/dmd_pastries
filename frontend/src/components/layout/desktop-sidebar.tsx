@@ -15,27 +15,27 @@ export function DesktopSidebar(): JSX.Element {
   return (
     <aside
       className={cn(
-        "sticky top-0 hidden h-screen shrink-0 border-r border-brand-latte/10 bg-brand-espresso text-brand-latte shadow-panel transition-[width] duration-300 lg:flex lg:flex-col",
-        collapsed ? "w-[5.75rem]" : "w-[19rem]",
+        "sticky top-0 hidden h-screen shrink-0 border-r border-white/10 bg-workspace-sidebar text-white shadow-workspace transition-[width] duration-300 lg:flex lg:flex-col",
+        collapsed ? "w-[4.75rem]" : "w-[18rem]",
       )}
     >
       <div
         className={cn(
-          "flex items-center gap-3 border-b border-brand-latte/10 p-5",
-          collapsed ? "justify-center px-3" : "justify-between",
+          "flex min-h-20 items-center gap-3 border-b border-white/10 px-4",
+          collapsed ? "justify-center" : "justify-between",
         )}
       >
         {!collapsed ? (
-          <div>
-            <p className="font-display text-3xl leading-none text-brand-latte">COCKPIT</p>
-            <p className="mt-1 text-xs uppercase tracking-[0.22em] text-brand-latte/55">
+          <div className="min-w-0">
+            <p className="truncate text-xl font-semibold tracking-tight text-white">COCKPIT</p>
+            <p className="mt-1 text-[0.68rem] uppercase tracking-[0.28em] text-workspace-sidebar-muted">
               Operations OS
             </p>
           </div>
         ) : null}
         <Button
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="border-brand-latte/15 bg-brand-latte/5 text-brand-latte hover:bg-brand-latte/10"
+          className="h-10 w-10 rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10"
           size="icon"
           type="button"
           variant="outline"
@@ -50,17 +50,15 @@ export function DesktopSidebar(): JSX.Element {
       </div>
 
       <TooltipProvider delayDuration={150}>
-        <nav aria-label="Primary" className="flex min-h-0 flex-1 px-3 py-5">
+        <nav aria-label="Primary" className="flex min-h-0 flex-1 px-2 py-4">
           <AppNavigationList collapsed={collapsed} />
         </nav>
       </TooltipProvider>
 
       {!collapsed ? (
-        <div className="m-4 rounded-3xl border border-brand-latte/10 bg-brand-latte/5 p-4 text-sm text-brand-latte/75">
-          <p className="font-medium text-brand-latte">Branch-aware navigation</p>
-          <p className="mt-2 leading-6">
-            Modules stay grouped by workflow, with Reports expanded into focused analytics areas.
-          </p>
+        <div className="mx-3 mb-4 rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-xs text-workspace-sidebar-muted">
+          <p className="font-medium text-white">Protected workspace</p>
+          <p className="mt-1.5 leading-5">Branch-aware modules grouped by operating workflow.</p>
         </div>
       ) : null}
     </aside>

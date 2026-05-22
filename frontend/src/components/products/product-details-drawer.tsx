@@ -1,9 +1,11 @@
 "use client";
 
+import { Barcode, Clock3, DollarSign, Package, ReceiptText, Store } from "lucide-react";
 import type { JSX } from "react";
 
 import { ProductVariantsSection } from "@/components/products/product-variants-section";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
@@ -26,6 +28,40 @@ type ProductDetailsDrawerProps = {
   variants: ProductVariant[];
 };
 
+function formatMoney(value: number | null): string {
+  if (value === null) return "-";
+
+  return new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    maximumFractionDigits: 2,
+    style: "currency",
+  }).format(value);
+}
+
+function formatPreparationTime(value: number | null): string {
+  return value === null ? "- min" : `${String(value)} min`;
+}
+
+function DetailMetric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Barcode;
+  label: string;
+  value: string;
+}): JSX.Element {
+  return (
+    <div className="rounded-2xl border border-brand-cappuccino/70 bg-white/80 p-3">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha">
+        <Icon className="h-3.5 w-3.5" />
+        {label}
+      </div>
+      <p className="mt-2 break-words text-sm font-semibold text-brand-espresso">{value}</p>
+    </div>
+  );
+}
+
 export function ProductDetailsDrawer({
   canManage,
   onAddVariant,
@@ -40,11 +76,11 @@ export function ProductDetailsDrawer({
     <Sheet onOpenChange={onOpenChange} open={open}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
         {product ? (
-          <div className="space-y-5">
+          <div className="flex flex-col gap-5">
             <SheetHeader>
-              <SheetTitle>{product.productName}</SheetTitle>
+              <SheetTitle className="pr-8 text-2xl">{product.productName}</SheetTitle>
               <SheetDescription>
-                {product.description ?? "No product description."}
+                {product.productCode} · {product.categoryName} · {product.unitName}
               </SheetDescription>
             </SheetHeader>
 
@@ -56,53 +92,27 @@ export function ProductDetailsDrawer({
               />
             ) : null}
 
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-brand-mocha">Product code</p>
-                <p className="font-medium text-brand-espresso">{product.productCode}</p>
-              </div>
-              <div>
-                <p className="text-brand-mocha">SKU / Barcode</p>
-                <p className="font-medium text-brand-espresso">
-                  {product.sku ?? "-"} / {product.barcode ?? "-"}
-                </p>
-              </div>
-              <div>
-                <p className="text-brand-mocha">Category / Unit</p>
-                <p className="font-medium text-brand-espresso">
-                  {product.categoryName} / {product.unitName}
-                </p>
-              </div>
-              <div>
-                <p className="text-brand-mocha">Tax / Type</p>
-                <p className="font-medium text-brand-espresso">
-                  {product.taxRateName ?? "-"} / {product.productType.replaceAll("_", " ")}
-                </p>
-              </div>
-              <div>
-                <p className="text-brand-mocha">Sale / Cost</p>
-                <p className="font-medium text-brand-espresso">
-                  {product.salePrice.toFixed(2)} / {product.costPrice?.toFixed(2) ?? "-"}
-                </p>
-              </div>
-              <div>
-                <p className="text-brand-mocha">Preparation time</p>
-                <p className="font-medium text-brand-espresso">
-                  {product.preparationTimeMinutes ?? "-"} min
-                </p>
-              </div>
-              <div>
-                <p className="text-brand-mocha">Created at</p>
-                <p className="font-medium text-brand-espresso">
-                  {new Date(product.createdAt).toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-brand-mocha">Updated at</p>
-                <p className="font-medium text-brand-espresso">
-                  {new Date(product.updatedAt).toLocaleString()}
-                </p>
-              </div>
+            <div className="grid grid-cols-2 gap-3">
+              <DetailMetric
+                icon={DollarSign}
+                label="Sale price"
+                value={formatMoney(product.salePrice)}
+              />
+              <DetailMetric
+                icon={ReceiptText}
+                label="Cost price"
+                value={formatMoney(product.costPrice)}
+              />
+              <DetailMetric
+                icon={Barcode}
+                label="SKU / Barcode"
+                value={`${product.sku ?? "-"} / ${product.barcode ?? "-"}`}
+              />
+              <DetailMetric
+                icon={Clock3}
+                label="Prep time"
+                value={formatPreparationTime(product.preparationTimeMinutes)}
+              />
             </div>
             <Separator />
             <div className="flex flex-wrap gap-2">
@@ -118,6 +128,45 @@ export function ProductDetailsDrawer({
               </Badge>
               <Badge variant="outline">Status: {product.status}</Badge>
             </div>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-latte text-brand-mocha">
+                    <Package className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="font-semibold text-brand-espresso">Catalog notes</p>
+                    <p className="mt-1 text-sm leading-6 text-brand-mocha">
+                      {product.description ?? "No product description has been added."}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="grid gap-3 p-4 text-sm sm:grid-cols-2">
+                <DetailMetric
+                  icon={Store}
+                  label="Product type"
+                  value={product.productType.replaceAll("_", " ")}
+                />
+                <DetailMetric
+                  icon={ReceiptText}
+                  label="Tax rate"
+                  value={product.taxRateName ?? "-"}
+                />
+                <DetailMetric
+                  icon={Clock3}
+                  label="Created"
+                  value={new Date(product.createdAt).toLocaleString()}
+                />
+                <DetailMetric
+                  icon={Clock3}
+                  label="Updated"
+                  value={new Date(product.updatedAt).toLocaleString()}
+                />
+              </CardContent>
+            </Card>
             <ProductVariantsSection
               canManage={canManage}
               onAdd={onAddVariant}

@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -39,6 +40,10 @@ type ProductFormDialogProps = {
   referenceData: ProductReferenceData;
   submitting: boolean;
 };
+
+function FieldError({ message }: { message: string | undefined }): JSX.Element | null {
+  return message ? <p className="text-xs font-medium text-red-700">{message}</p> : null;
+}
 
 function toDefaultValues(product: Product | null): ProductSchema {
   return {
@@ -149,211 +154,246 @@ export function ProductFormDialog({
         <DialogHeader>
           <DialogTitle>{product ? "Edit product" : "Add product"}</DialogTitle>
           <DialogDescription>
-            Manage sellable items, bakery products, retail items, variants, pricing, tax, and POS
-            visibility.
+            Set the catalog identity, pricing, POS visibility, and stock behavior for this item.
           </DialogDescription>
         </DialogHeader>
         <form
-          className="space-y-5"
+          className="flex flex-col gap-4"
           onSubmit={(event) => {
             void form.handleSubmit((values) => {
               void onSubmit(values);
             })(event);
           }}
         >
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-brand-mocha">Basic Information</h3>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-1">
-                <Label htmlFor="productName">Product name</Label>
-                <Input id="productName" {...form.register("productName")} />
+          <Card>
+            <CardContent className="p-4">
+              <div className="mb-4">
+                <h3 className="font-semibold text-brand-espresso">Catalog identity</h3>
+                <p className="text-sm text-brand-mocha">
+                  Use clear names and category mapping so billing staff can find products quickly.
+                </p>
               </div>
-              <div className="space-y-1">
-                <Label>Product type</Label>
-                <Select
-                  onValueChange={(value) =>
-                    form.setValue("productType", value as ProductSchema["productType"])
-                  }
-                  value={form.watch("productType")}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ready_to_sell">Ready to Sell</SelectItem>
-                    <SelectItem value="made_to_order">Made to Order</SelectItem>
-                    <SelectItem value="manufactured">Manufactured</SelectItem>
-                    <SelectItem value="retail">Retail</SelectItem>
-                    <SelectItem value="service">Service</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Category</Label>
-                <Select
-                  onValueChange={(value) => form.setValue("categoryId", value)}
-                  value={form.watch("categoryId")}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {referenceData.categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.categoryName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Unit</Label>
-                <Select
-                  onValueChange={(value) => form.setValue("unitId", value)}
-                  value={form.watch("unitId")}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select unit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {referenceData.units.map((unit) => (
-                      <SelectItem key={unit.id} value={unit.id}>
-                        {unit.unitName} ({unit.symbol})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-brand-mocha">Pricing & Tax</h3>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-1">
-                <Label htmlFor="salePrice">Sale price</Label>
-                <Input id="salePrice" type="number" {...form.register("salePrice")} />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="costPrice">Cost price</Label>
-                <Input id="costPrice" type="number" {...form.register("costPrice")} />
-              </div>
-              <div className="space-y-1">
-                <Label>Tax rate</Label>
-                <Select
-                  onValueChange={(value) =>
-                    form.setValue("taxRateId", value === "__none" ? "" : value)
-                  }
-                  value={watchedTaxRateId.trim() ? watchedTaxRateId : "__none"}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Optional tax rate" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none">No tax rate</SelectItem>
-                    {referenceData.taxRates.map((taxRate) => (
-                      <SelectItem key={taxRate.id} value={taxRate.id}>
-                        {taxRate.taxName} ({taxRate.ratePercentage}%)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-brand-mocha">POS & Inventory Behavior</h3>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-1">
-                <Label htmlFor="preparationTimeMinutes">Preparation time (minutes)</Label>
-                <Input
-                  id="preparationTimeMinutes"
-                  type="number"
-                  {...form.register("preparationTimeMinutes")}
-                />
-              </div>
-              <div className="grid gap-2 pt-6">
-                <label className="flex items-center gap-2 text-sm text-brand-espresso">
-                  <Checkbox
-                    checked={form.watch("isPosVisible")}
-                    onCheckedChange={(checked) => form.setValue("isPosVisible", checked === true)}
-                  />
-                  POS visible
-                </label>
-                <label className="flex items-center gap-2 text-sm text-brand-espresso">
-                  <Checkbox
-                    checked={form.watch("isStockTracked")}
-                    onCheckedChange={(checked) => form.setValue("isStockTracked", checked === true)}
-                  />
-                  Stock tracked
-                </label>
-                <label className="flex items-center gap-2 text-sm text-brand-espresso">
-                  <Checkbox
-                    checked={form.watch("isExpiryTracked")}
-                    onCheckedChange={(checked) =>
-                      form.setValue("isExpiryTracked", checked === true)
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="productName">Product name</Label>
+                  <Input id="productName" {...form.register("productName")} />
+                  <FieldError message={form.formState.errors.productName?.message} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label>Product type</Label>
+                  <Select
+                    onValueChange={(value) =>
+                      form.setValue("productType", value as ProductSchema["productType"])
                     }
-                  />
-                  Expiry tracked
-                </label>
-                <label className="flex items-center gap-2 text-sm text-brand-espresso">
-                  <Checkbox
-                    checked={form.watch("isCustomOrderAvailable")}
-                    onCheckedChange={(checked) =>
-                      form.setValue("isCustomOrderAvailable", checked === true)
-                    }
-                  />
-                  Custom order available
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-brand-mocha">Media & Notes</h3>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-1">
-                <Label htmlFor="sku">SKU</Label>
-                <Input id="sku" {...form.register("sku")} />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="barcode">Barcode</Label>
-                <Input id="barcode" {...form.register("barcode")} />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="productImage">Product image</Label>
-                <div className="flex flex-col gap-3 rounded-lg border border-brand-cappuccino bg-brand-latte/50 p-3 sm:flex-row sm:items-center">
-                  {previewUrl ? (
-                    <img
-                      alt="Selected product"
-                      className="h-20 w-20 rounded-md object-cover"
-                      src={previewUrl}
-                    />
-                  ) : (
-                    <div className="flex h-20 w-20 items-center justify-center rounded-md bg-brand-cappuccino/50 text-xs text-brand-mocha">
-                      No image
-                    </div>
-                  )}
-                  <Input
-                    accept="image/jpeg,image/png,image/webp"
-                    id="productImage"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0] ?? null;
-                      setSelectedImage(file);
-                    }}
-                    type="file"
-                  />
+                    value={form.watch("productType")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ready_to_sell">Ready to Sell</SelectItem>
+                      <SelectItem value="made_to_order">Made to Order</SelectItem>
+                      <SelectItem value="manufactured">Manufactured</SelectItem>
+                      <SelectItem value="retail">Retail</SelectItem>
+                      <SelectItem value="service">Service</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label>Category</Label>
+                  <Select
+                    onValueChange={(value) => form.setValue("categoryId", value)}
+                    value={form.watch("categoryId")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {referenceData.categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.categoryName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldError message={form.formState.errors.categoryId?.message} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label>Unit</Label>
+                  <Select
+                    onValueChange={(value) => form.setValue("unitId", value)}
+                    value={form.watch("unitId")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {referenceData.units.map((unit) => (
+                        <SelectItem key={unit.id} value={unit.id}>
+                          {unit.unitName} ({unit.symbol})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldError message={form.formState.errors.unitId?.message} />
                 </div>
               </div>
-              <div className="space-y-1 md:col-span-2">
-                <Label htmlFor="description">Description</Label>
-                <Input id="description" {...form.register("description")} />
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <DialogFooter>
+          <Card>
+            <CardContent className="p-4">
+              <div className="mb-4">
+                <h3 className="font-semibold text-brand-espresso">Pricing and tax</h3>
+                <p className="text-sm text-brand-mocha">
+                  Prices are used by POS and receipt generation. Cost price is optional.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="salePrice">Sale price</Label>
+                  <Input id="salePrice" type="number" {...form.register("salePrice")} />
+                  <FieldError message={form.formState.errors.salePrice?.message} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="costPrice">Cost price</Label>
+                  <Input id="costPrice" type="number" {...form.register("costPrice")} />
+                  <FieldError message={form.formState.errors.costPrice?.message} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label>Tax rate</Label>
+                  <Select
+                    onValueChange={(value) =>
+                      form.setValue("taxRateId", value === "__none" ? "" : value)
+                    }
+                    value={watchedTaxRateId.trim() ? watchedTaxRateId : "__none"}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Optional tax rate" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">No tax rate</SelectItem>
+                      {referenceData.taxRates.map((taxRate) => (
+                        <SelectItem key={taxRate.id} value={taxRate.id}>
+                          {taxRate.taxName} ({taxRate.ratePercentage}%)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="mb-4">
+                <h3 className="font-semibold text-brand-espresso">Operational behavior</h3>
+                <p className="text-sm text-brand-mocha">
+                  Control whether this item appears in POS and how inventory should track it.
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-[1fr_1.2fr]">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="preparationTimeMinutes">Preparation time (minutes)</Label>
+                  <Input
+                    id="preparationTimeMinutes"
+                    type="number"
+                    {...form.register("preparationTimeMinutes")}
+                  />
+                  <FieldError message={form.formState.errors.preparationTimeMinutes?.message} />
+                </div>
+                <div className="grid gap-2 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/40 p-3 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 rounded-xl bg-white/60 p-2 text-sm text-brand-espresso">
+                    <Checkbox
+                      checked={form.watch("isPosVisible")}
+                      onCheckedChange={(checked) => form.setValue("isPosVisible", checked === true)}
+                    />
+                    POS visible
+                  </label>
+                  <label className="flex items-center gap-2 rounded-xl bg-white/60 p-2 text-sm text-brand-espresso">
+                    <Checkbox
+                      checked={form.watch("isStockTracked")}
+                      onCheckedChange={(checked) =>
+                        form.setValue("isStockTracked", checked === true)
+                      }
+                    />
+                    Stock tracked
+                  </label>
+                  <label className="flex items-center gap-2 rounded-xl bg-white/60 p-2 text-sm text-brand-espresso">
+                    <Checkbox
+                      checked={form.watch("isExpiryTracked")}
+                      onCheckedChange={(checked) =>
+                        form.setValue("isExpiryTracked", checked === true)
+                      }
+                    />
+                    Expiry tracked
+                  </label>
+                  <label className="flex items-center gap-2 rounded-xl bg-white/60 p-2 text-sm text-brand-espresso">
+                    <Checkbox
+                      checked={form.watch("isCustomOrderAvailable")}
+                      onCheckedChange={(checked) =>
+                        form.setValue("isCustomOrderAvailable", checked === true)
+                      }
+                    />
+                    Custom order available
+                  </label>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="mb-4">
+                <h3 className="font-semibold text-brand-espresso">Identifiers and media</h3>
+                <p className="text-sm text-brand-mocha">
+                  SKU, barcode, and image make catalog search and POS selection faster.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="sku">SKU</Label>
+                  <Input id="sku" {...form.register("sku")} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="barcode">Barcode</Label>
+                  <Input id="barcode" {...form.register("barcode")} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="productImage">Product image</Label>
+                  <div className="flex flex-col gap-3 rounded-lg border border-brand-cappuccino bg-brand-latte/50 p-3 sm:flex-row sm:items-center">
+                    {previewUrl ? (
+                      <img
+                        alt="Selected product"
+                        className="h-20 w-20 rounded-md object-cover"
+                        src={previewUrl}
+                      />
+                    ) : (
+                      <div className="flex h-20 w-20 items-center justify-center rounded-md bg-brand-cappuccino/50 text-xs text-brand-mocha">
+                        No image
+                      </div>
+                    )}
+                    <Input
+                      accept="image/jpeg,image/png,image/webp"
+                      id="productImage"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        setSelectedImage(file);
+                      }}
+                      type="file"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1 md:col-span-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Input id="description" {...form.register("description")} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <DialogFooter className="sticky bottom-0 -mx-2 rounded-2xl border border-brand-cappuccino/70 bg-white/95 p-3 backdrop-blur">
             <Button onClick={onClose} type="button" variant="outline">
               Cancel
             </Button>

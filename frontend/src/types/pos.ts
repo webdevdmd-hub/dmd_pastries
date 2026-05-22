@@ -11,6 +11,8 @@ export type POSProductVariant = {
   salePrice: number;
   currentStockQuantity: number | null;
   availableStockQuantity: number | null;
+  imageUrl: string | null;
+  imageFileId: string | null;
   status: RecordStatus;
 };
 
@@ -56,6 +58,8 @@ export type CartItem = {
   productName: string;
   variantName: string | null;
   sku: string | null;
+  imageUrl: string | null;
+  imageFileId: string | null;
   quantity: number;
   unitPrice: number;
   discountType: CartDiscountType | null;
@@ -161,6 +165,7 @@ export type SaleReceipt = {
   payments: PaymentInput[];
   paidAmount: number;
   changeAmount: number;
+  balanceDue: number;
 };
 
 export type CheckoutResponse = {

@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	"pastries-pos/internal/config"
+	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
 	"pastries-pos/internal/modules/branches"
 	"pastries-pos/internal/modules/businesses"
@@ -245,6 +246,11 @@ func (s *Service) RegisterOwner(req RegisterOwnerRequest, ipAddress, userAgent s
 		return nil, apperrors.Internal("failed to seed default payment methods")
 	}
 
+	if err := accounting.SeedDefaultChartOfAccounts(tx, businessID); err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("failed to seed chart of accounts")
+	}
+
 	subscription := &subscriptions.Subscription{
 		ID:          utils.NewUUID(),
 		BusinessID:  businessID,
@@ -463,6 +469,9 @@ func defaultRolePresets() []defaultRolePreset {
 				"reports.inventory.view",
 				"reports.payments.view",
 				"reports.production.view",
+				"accounting.view",
+				"accounting.accounts.manage",
+				"accounting.journal_entries.manage",
 				"dashboard.view",
 				"audit_logs.view",
 			},

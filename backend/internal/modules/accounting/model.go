@@ -1,0 +1,73 @@
+package accounting
+
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
+
+type ChartAccount struct {
+	ID                 string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID         string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	ParentAccountID    *string        `gorm:"type:uuid;index" json:"parent_account_id"`
+	AccountCode        string         `gorm:"size:50;not null" json:"account_code"`
+	AccountName        string         `gorm:"size:255;not null" json:"account_name"`
+	AccountType        string         `gorm:"size:50;not null" json:"account_type"`
+	AccountGroup       string         `gorm:"size:100;not null" json:"account_group"`
+	NormalBalance      string         `gorm:"size:20;not null" json:"normal_balance"`
+	Description        string         `json:"description"`
+	IsSystemAccount    bool           `gorm:"not null;default:false" json:"is_system_account"`
+	IsControlAccount   bool           `gorm:"not null;default:false" json:"is_control_account"`
+	AllowManualPosting bool           `gorm:"not null;default:true" json:"allow_manual_posting"`
+	Status             string         `gorm:"size:50;not null;default:active" json:"status"`
+	CreatedByUserID    *string        `gorm:"type:uuid;index" json:"created_by_user_id"`
+	UpdatedByUserID    *string        `gorm:"type:uuid;index" json:"updated_by_user_id"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (ChartAccount) TableName() string { return "chart_of_accounts" }
+
+type JournalEntry struct {
+	ID               string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID       string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID         *string        `gorm:"type:uuid;index" json:"branch_id"`
+	EntryNumber      string         `gorm:"size:100;not null" json:"entry_number"`
+	EntryDate        time.Time      `gorm:"type:date;not null" json:"entry_date"`
+	ReferenceNumber  string         `gorm:"size:255" json:"reference_number"`
+	SourceType       string         `gorm:"size:100" json:"source_type"`
+	SourceID         *string        `gorm:"type:uuid;index" json:"source_id"`
+	Narration        string         `json:"narration"`
+	Status           string         `gorm:"size:50;not null;default:draft" json:"status"`
+	TotalDebit       float64        `gorm:"not null;default:0" json:"total_debit"`
+	TotalCredit      float64        `gorm:"not null;default:0" json:"total_credit"`
+	PostedAt         *time.Time     `json:"posted_at"`
+	PostedByUserID   *string        `gorm:"type:uuid;index" json:"posted_by_user_id"`
+	ReversedEntryID  *string        `gorm:"type:uuid;index" json:"reversed_entry_id"`
+	ReversedAt       *time.Time     `json:"reversed_at"`
+	ReversedByUserID *string        `gorm:"type:uuid;index" json:"reversed_by_user_id"`
+	CreatedByUserID  string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
+	UpdatedByUserID  *string        `gorm:"type:uuid;index" json:"updated_by_user_id"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
+	DeletedAt        gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (JournalEntry) TableName() string { return "journal_entries" }
+
+type JournalEntryLine struct {
+	ID             string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID     string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	JournalEntryID string         `gorm:"type:uuid;not null;index" json:"journal_entry_id"`
+	AccountID      string         `gorm:"type:uuid;not null;index" json:"account_id"`
+	LineNumber     int            `gorm:"not null" json:"line_number"`
+	DebitAmount    float64        `gorm:"not null;default:0" json:"debit_amount"`
+	CreditAmount   float64        `gorm:"not null;default:0" json:"credit_amount"`
+	Description    string         `json:"description"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (JournalEntryLine) TableName() string { return "journal_entry_lines" }

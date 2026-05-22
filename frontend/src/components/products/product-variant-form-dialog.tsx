@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +41,10 @@ type ProductVariantFormDialogProps = {
   submitting: boolean;
   variant: ProductVariant | null;
 };
+
+function FieldError({ message }: { message: string | undefined }): JSX.Element | null {
+  return message ? <p className="text-xs font-medium text-red-700">{message}</p> : null;
+}
 
 function toDefaultValues(variant: ProductVariant | null): ProductVariantSchema {
   return {
@@ -128,55 +133,81 @@ export function ProductVariantFormDialog({
 
   return (
     <Dialog onOpenChange={(nextOpen) => !nextOpen && onClose()} open={open}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{variant ? "Edit variant" : "Add variant"}</DialogTitle>
-          <DialogDescription>Manage product variant price and identifiers.</DialogDescription>
+          <DialogDescription>
+            Variants are sellable options under the same product, such as Small, Large, 500g, or
+            1kg.
+          </DialogDescription>
         </DialogHeader>
         <form
-          className="space-y-4"
+          className="flex flex-col gap-4"
           onSubmit={(event) => {
             void form.handleSubmit((values) => {
               void onSubmit(values);
             })(event);
           }}
         >
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-1">
-              <Label htmlFor="variantName">Variant name</Label>
-              <Input id="variantName" {...form.register("variantName")} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="sortOrder">Sort order</Label>
-              <Input id="sortOrder" type="number" {...form.register("sortOrder")} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="salePrice">Sale price</Label>
-              <Input id="salePrice" type="number" {...form.register("salePrice")} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="costPrice">Cost price</Label>
-              <Input id="costPrice" type="number" {...form.register("costPrice")} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="sku">SKU</Label>
-              <Input id="sku" {...form.register("sku")} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="barcode">Barcode</Label>
-              <Input id="barcode" {...form.register("barcode")} />
-            </div>
-            <div className="space-y-2 md:col-span-2">
+          <Card>
+            <CardContent className="grid gap-3 p-4 md:grid-cols-2">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="variantName">Variant name</Label>
+                <Input id="variantName" {...form.register("variantName")} />
+                <FieldError message={form.formState.errors.variantName?.message} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="sortOrder">Sort order</Label>
+                <Input id="sortOrder" type="number" {...form.register("sortOrder")} />
+                <FieldError message={form.formState.errors.sortOrder?.message} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="salePrice">Sale price</Label>
+                <Input id="salePrice" type="number" {...form.register("salePrice")} />
+                <FieldError message={form.formState.errors.salePrice?.message} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="costPrice">Cost price</Label>
+                <Input id="costPrice" type="number" {...form.register("costPrice")} />
+                <FieldError message={form.formState.errors.costPrice?.message} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="sku">SKU</Label>
+                <Input id="sku" {...form.register("sku")} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="barcode">Barcode</Label>
+                <Input id="barcode" {...form.register("barcode")} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label>Status</Label>
+                <Select
+                  onValueChange={(value) => form.setValue("status", value as "active" | "inactive")}
+                  value={form.watch("status")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
               <Label htmlFor="variantImage">Variant image</Label>
-              <div className="flex flex-col gap-3 rounded-lg border border-brand-cappuccino bg-brand-latte/50 p-3 sm:flex-row sm:items-center">
+              <div className="mt-2 flex flex-col gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-3 sm:flex-row sm:items-center">
                 {previewUrl ? (
                   <img
                     alt="Selected variant"
-                    className="h-20 w-20 rounded-md object-cover"
+                    className="h-20 w-20 rounded-xl object-cover"
                     src={previewUrl}
                   />
                 ) : (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-md bg-brand-cappuccino/50 text-xs text-brand-mocha">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-brand-cappuccino/50 text-xs text-brand-mocha">
                     No image
                   </div>
                 )}
@@ -190,23 +221,8 @@ export function ProductVariantFormDialog({
                   type="file"
                 />
               </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Status</Label>
-              <Select
-                onValueChange={(value) => form.setValue("status", value as "active" | "inactive")}
-                value={form.watch("status")}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
           <DialogFooter>
             <Button onClick={onClose} type="button" variant="outline">
               Cancel

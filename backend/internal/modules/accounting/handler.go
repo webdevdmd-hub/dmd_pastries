@@ -1,0 +1,338 @@
+package accounting
+
+import (
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
+	apperrors "pastries-pos/internal/shared/errors"
+	"pastries-pos/internal/shared/response"
+	"pastries-pos/internal/shared/utils"
+)
+
+type Handler struct {
+	service *Service
+}
+
+func NewHandler(service *Service) *Handler {
+	return &Handler{service: service}
+}
+
+func (h *Handler) ListChartAccounts(c *gin.Context) {
+	result, err := h.service.ListChartAccounts(utils.MustAuthContext(c), parseChartAccountListQuery(c))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "chart of accounts fetched successfully", result)
+}
+
+func (h *Handler) SeedDefaults(c *gin.Context) {
+	if err := h.service.SeedDefaults(utils.MustAuthContext(c), c.ClientIP(), c.Request.UserAgent()); err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "chart of accounts defaults seeded successfully", gin.H{"seeded": true})
+}
+
+func (h *Handler) CreateChartAccount(c *gin.Context) {
+	var req CreateChartAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.CreateChartAccount(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 201, "chart account created successfully", result)
+}
+
+func (h *Handler) GetChartAccount(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	result, err := h.service.GetChartAccount(utils.MustAuthContext(c), c.Param("id"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "chart account fetched successfully", result)
+}
+
+func (h *Handler) GetLedgerDetails(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	result, err := h.service.GetLedgerDetails(utils.MustAuthContext(c), c.Param("id"), parseLedgerDetailsQuery(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "ledger details fetched successfully", result)
+}
+
+func (h *Handler) UpdateChartAccount(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	var req UpdateChartAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.UpdateChartAccount(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "chart account updated successfully", result)
+}
+
+func (h *Handler) UpdateChartAccountStatus(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	var req UpdateChartAccountStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.UpdateChartAccountStatus(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "chart account status updated successfully", result)
+}
+
+func (h *Handler) DeleteChartAccount(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	if err := h.service.DeleteChartAccount(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent()); err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "chart account deleted successfully", gin.H{"deleted": true})
+}
+
+func (h *Handler) ListJournalEntries(c *gin.Context) {
+	result, err := h.service.ListJournalEntries(utils.MustAuthContext(c), parseJournalEntryListQuery(c))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "journal entries fetched successfully", result)
+}
+
+func (h *Handler) GetGeneralLedger(c *gin.Context) {
+	result, err := h.service.GetGeneralLedger(utils.MustAuthContext(c), parseGeneralLedgerQuery(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "general ledger fetched successfully", result)
+}
+
+func (h *Handler) GetTrialBalance(c *gin.Context) {
+	result, err := h.service.GetTrialBalance(utils.MustAuthContext(c), parseTrialBalanceQuery(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "trial balance fetched successfully", result)
+}
+
+func (h *Handler) GetProfitLoss(c *gin.Context) {
+	result, err := h.service.GetProfitLoss(utils.MustAuthContext(c), parseProfitLossQuery(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "profit and loss fetched successfully", result)
+}
+
+func (h *Handler) GetBalanceSheet(c *gin.Context) {
+	result, err := h.service.GetBalanceSheet(utils.MustAuthContext(c), parseBalanceSheetQuery(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "balance sheet fetched successfully", result)
+}
+
+func (h *Handler) CreateJournalEntry(c *gin.Context) {
+	var req CreateJournalEntryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.CreateJournalEntry(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 201, "journal entry created successfully", result)
+}
+
+func (h *Handler) GetJournalEntry(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	result, err := h.service.GetJournalEntry(utils.MustAuthContext(c), c.Param("id"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "journal entry fetched successfully", result)
+}
+
+func (h *Handler) UpdateJournalEntry(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	var req UpdateJournalEntryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.UpdateJournalEntry(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "journal entry updated successfully", result)
+}
+
+func (h *Handler) PostJournalEntry(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	result, err := h.service.PostJournalEntry(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "journal entry posted successfully", result)
+}
+
+func (h *Handler) ReverseJournalEntry(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	var req ReverseJournalEntryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.ReverseJournalEntry(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 201, "journal entry reversed successfully", result)
+}
+
+func parseChartAccountListQuery(c *gin.Context) ChartAccountListQuery {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	return ChartAccountListQuery{
+		Search:          c.Query("search"),
+		AccountType:     c.Query("account_type"),
+		AccountGroup:    c.Query("account_group"),
+		Status:          c.Query("status"),
+		ParentAccountID: c.Query("parent_account_id"),
+		Page:            page,
+		Limit:           limit,
+		SortBy:          c.DefaultQuery("sort_by", "account_code"),
+		SortOrder:       c.DefaultQuery("sort_order", "asc"),
+	}
+}
+
+func parseJournalEntryListQuery(c *gin.Context) JournalEntryListQuery {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	return JournalEntryListQuery{
+		Search:     c.Query("search"),
+		BranchID:   c.Query("branch_id"),
+		Status:     c.Query("status"),
+		SourceType: c.Query("source_type"),
+		DateFrom:   c.Query("date_from"),
+		DateTo:     c.Query("date_to"),
+		Page:       page,
+		Limit:      limit,
+		SortBy:     c.DefaultQuery("sort_by", "entry_date"),
+		SortOrder:  c.DefaultQuery("sort_order", "desc"),
+	}
+}
+
+func parseGeneralLedgerQuery(c *gin.Context) GeneralLedgerQuery {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	return GeneralLedgerQuery{
+		AccountID: c.Query("account_id"),
+		BranchID:  c.Query("branch_id"),
+		DateFrom:  c.Query("date_from"),
+		DateTo:    c.Query("date_to"),
+		Page:      page,
+		Limit:     limit,
+		SortOrder: c.DefaultQuery("sort_order", "asc"),
+	}
+}
+
+func parseLedgerDetailsQuery(c *gin.Context) LedgerDetailsQuery {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	return LedgerDetailsQuery{
+		BranchID:  c.Query("branch_id"),
+		DateFrom:  c.Query("date_from"),
+		DateTo:    c.Query("date_to"),
+		Page:      page,
+		Limit:     limit,
+		SortOrder: c.DefaultQuery("sort_order", "asc"),
+	}
+}
+
+func parseTrialBalanceQuery(c *gin.Context) TrialBalanceQuery {
+	includeZeroBalances, _ := strconv.ParseBool(c.DefaultQuery("include_zero_balances", "false"))
+	return TrialBalanceQuery{
+		BranchID:            c.Query("branch_id"),
+		DateFrom:            c.Query("date_from"),
+		DateTo:              c.Query("date_to"),
+		IncludeZeroBalances: includeZeroBalances,
+	}
+}
+
+func parseProfitLossQuery(c *gin.Context) ProfitLossQuery {
+	return ProfitLossQuery{
+		BranchID: c.Query("branch_id"),
+		DateFrom: c.Query("date_from"),
+		DateTo:   c.Query("date_to"),
+	}
+}
+
+func parseBalanceSheetQuery(c *gin.Context) BalanceSheetQuery {
+	return BalanceSheetQuery{
+		BranchID: c.Query("branch_id"),
+		AsOfDate: c.Query("as_of_date"),
+	}
+}
+
+func validUUIDParam(c *gin.Context, name string) bool {
+	if _, err := uuid.Parse(c.Param(name)); err != nil {
+		handleError(c, apperrors.BadRequest(name+" must be a valid UUID", nil))
+		return false
+	}
+	return true
+}
+
+func handleError(c *gin.Context, err error) {
+	if appErr, ok := err.(*apperrors.AppError); ok {
+		response.Error(c, appErr.StatusCode, appErr.Message, appErr.Details)
+		return
+	}
+	response.Error(c, 500, "internal server error", err.Error())
+}

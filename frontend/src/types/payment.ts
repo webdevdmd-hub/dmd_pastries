@@ -2,13 +2,20 @@ export type PaymentStatus = "pending" | "completed" | "failed" | "refunded" | "p
 
 export type RefundStatus = "pending" | "completed" | "failed" | "cancelled";
 export type ReconciliationStatus = "draft" | "submitted" | "approved" | "rejected";
+export type PaymentSourceType = "pos_sale" | "bakery_order";
+export type CustomerPaymentType = "deposit" | "balance" | "full";
 
 export type SalePayment = {
   id: string;
   businessId: string;
   branchId: string;
+  branchName: string;
   saleId: string;
   saleNumber: string;
+  sourceType: PaymentSourceType;
+  sourceId: string;
+  sourceNumber: string;
+  customerName: string | null;
   paymentMethodId: string;
   paymentMethodNameSnapshot: string;
   paymentMethodTypeSnapshot: string;
@@ -16,6 +23,7 @@ export type SalePayment = {
   referenceNumber: string | null;
   providerTransactionId: string | null;
   paymentStatus: PaymentStatus;
+  paymentType: CustomerPaymentType | null;
   paidByUserId: string | null;
   paidByUserName: string;
   paidAt: string;

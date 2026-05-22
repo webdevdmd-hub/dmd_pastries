@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { ReceiptText, RotateCcw } from "lucide-react";
 import type { JSX } from "react";
 
 import { PaymentMethodBadge } from "@/components/payments/payment-method-badge";
@@ -17,8 +17,10 @@ import type { PaymentRefund, SalePayment } from "@/types/payment";
 
 type PaymentDetailsDrawerProps = {
   canRefund: boolean;
+  isReceiptLoading: boolean;
   onOpenChange: (open: boolean) => void;
   onRefund: (payment: SalePayment) => void;
+  onViewReceipt: (payment: SalePayment) => void;
   open: boolean;
   payment: SalePayment | null;
   refunds: PaymentRefund[];
@@ -43,18 +45,22 @@ function DetailRow({ label, value }: { label: string; value: string }): JSX.Elem
 
 export function PaymentDetailsDrawer({
   canRefund,
+  isReceiptLoading,
   onOpenChange,
   onRefund,
+  onViewReceipt,
   open,
   payment,
   refunds,
 }: PaymentDetailsDrawerProps): JSX.Element {
   const isRefundable =
-    payment?.paymentStatus === "completed" || payment?.paymentStatus === "partially_refunded";
+    payment?.sourceType === "pos_sale" &&
+    (payment.paymentStatus === "completed" || payment.paymentStatus === "partially_refunded");
   const refundedAmount = refunds
     .filter((refund) => refund.refundStatus !== "failed" && refund.refundStatus !== "cancelled")
     .reduce((total, refund) => total + refund.refundAmount, 0);
   const remainingRefundableAmount = Math.max((payment?.amount ?? 0) - refundedAmount, 0);
+  const sourceLabel = payment?.sourceType === "bakery_order" ? "Bakery Order" : "POS Sale";
 
   return (
     <Sheet onOpenChange={onOpenChange} open={open}>
@@ -62,7 +68,7 @@ export function PaymentDetailsDrawer({
         <SheetHeader>
           <SheetTitle className="font-display text-3xl">Payment details</SheetTitle>
           <SheetDescription>
-            Sale payment details, reference data, and refund actions.
+            Customer collection details, source data, and refund actions where supported.
           </SheetDescription>
         </SheetHeader>
 
@@ -73,8 +79,11 @@ export function PaymentDetailsDrawer({
                 <div>
                   <p className="text-sm text-brand-mocha">{payment.id}</p>
                   <h3 className="mt-1 text-2xl font-black text-brand-espresso">
-                    {payment.saleNumber}
+                    {payment.sourceNumber}
                   </h3>
+                  <p className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
+                    {sourceLabel}
+                  </p>
                 </div>
                 <PaymentStatusBadge status={payment.paymentStatus} />
               </div>
@@ -89,7 +98,14 @@ export function PaymentDetailsDrawer({
             />
 
             <div className="grid gap-3">
-              <DetailRow label="Sale ID" value={payment.saleId} />
+              <DetailRow label="Source Type" value={sourceLabel} />
+              <DetailRow label="Source ID" value={payment.sourceId} />
+              <DetailRow label="Customer" value={payment.customerName ?? "Walk-in customer"} />
+              <DetailRow label="Branch" value={payment.branchName} />
+              <DetailRow
+                label="Payment Type"
+                value={payment.paymentType ? payment.paymentType.replace("_", " ") : "Not set"}
+              />
               <DetailRow label="Reference" value={payment.referenceNumber ?? "No reference"} />
               <DetailRow
                 label="Provider transaction"
@@ -136,7 +152,14 @@ export function PaymentDetailsDrawer({
               )}
             </div>
 
-            <Button className="w-full" disabled type="button" variant="outline">
+            <Button
+              className="w-full"
+              disabled={payment.sourceType !== "pos_sale" || !payment.sourceId || isReceiptLoading}
+              onClick={() => onViewReceipt(payment)}
+              type="button"
+              variant="outline"
+            >
+              <ReceiptText className="h-4 w-4" />
               Open receipt
             </Button>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, PlusCircle } from "lucide-react";
+import { Archive, Box, Eye, PackageCheck, PlusCircle, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
@@ -117,6 +117,7 @@ export function ProductsPageClient(): JSX.Element {
       posVisible,
     };
   }, [list, productsQuery.data?.total]);
+  const totalPages = Math.max(1, Math.ceil((productsQuery.data?.total ?? 0) / filters.limit));
 
   if (!canViewProducts) {
     return <ProductsAccessDeniedCard />;
@@ -184,7 +185,7 @@ export function ProductsPageClient(): JSX.Element {
   };
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-5">
       <PageHeader
         title="Products"
         description="Manage sellable items, bakery products, retail items, variants, pricing, tax, and POS visibility."
@@ -203,31 +204,27 @@ export function ProductsPageClient(): JSX.Element {
         }
       />
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-brand-mocha">Total Products</p>
-            <p className="text-3xl font-semibold">{stats.total}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-brand-mocha">Active Products</p>
-            <p className="text-3xl font-semibold">{stats.active}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-brand-mocha">POS Visible</p>
-            <p className="text-3xl font-semibold">{stats.posVisible}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-brand-mocha">Archived Products</p>
-            <p className="text-3xl font-semibold">{stats.archived}</p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { icon: PackageCheck, label: "Catalog records", value: stats.total },
+          { icon: ShieldAlert, label: "Active products", value: stats.active },
+          { icon: Eye, label: "Visible in POS", value: stats.posVisible },
+          { icon: Archive, label: "Archived", value: stats.archived },
+        ].map((item) => (
+          <Card key={item.label} className="overflow-hidden">
+            <CardContent className="flex items-center justify-between gap-3 p-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha">
+                  {item.label}
+                </p>
+                <p className="mt-1 text-3xl font-semibold text-brand-espresso">{item.value}</p>
+              </div>
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-latte text-brand-mocha">
+                <item.icon className="h-5 w-5" />
+              </span>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <ProductsToolbar
@@ -255,8 +252,19 @@ export function ProductsPageClient(): JSX.Element {
         />
       ) : null}
       {!productsQuery.isLoading && !productsQuery.error && list.length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
+            <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 bg-white/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-brand-espresso">Product catalog</p>
+                <p className="text-xs text-brand-mocha">
+                  Showing {list.length} of {productsQuery.data?.total ?? list.length} records
+                </p>
+              </div>
+              <p className="text-xs text-brand-mocha">
+                Page {filters.page} of {totalPages}
+              </p>
+            </div>
             <ProductsTable
               canManage={canManageProducts}
               onDelete={(product) => setConfirmState({ action: "delete", product })}
@@ -281,7 +289,7 @@ export function ProductsPageClient(): JSX.Element {
         </Card>
       ) : null}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 rounded-3xl border border-brand-cappuccino/70 bg-white/70 p-3 sm:flex-row sm:items-center sm:justify-between">
         <Button
           disabled={filters.page <= 1}
           onClick={() => setFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
@@ -289,9 +297,9 @@ export function ProductsPageClient(): JSX.Element {
         >
           Previous
         </Button>
-        <p className="text-sm text-brand-mocha">
-          Page {filters.page} /{" "}
-          {Math.max(1, Math.ceil((productsQuery.data?.total ?? 0) / filters.limit))}
+        <p className="text-center text-sm text-brand-mocha">
+          Page <span className="font-semibold text-brand-espresso">{filters.page}</span> of{" "}
+          <span className="font-semibold text-brand-espresso">{totalPages}</span>
         </p>
         <Button
           disabled={(productsQuery.data?.items.length ?? 0) < filters.limit}
@@ -406,7 +414,7 @@ export function ProductsPageClient(): JSX.Element {
                 }
               }}
             >
-              Confirm
+              {confirmState?.action === "delete" ? "Delete" : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>

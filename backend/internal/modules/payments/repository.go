@@ -38,17 +38,26 @@ type PaymentMethodRow struct {
 
 type paymentScanRow struct {
 	ID                        string
+	PaymentID                 string
 	BusinessID                string
 	BranchID                  string
+	BranchName                string
 	SaleID                    string
 	SaleNumber                string
+	SourceType                string
+	SourceID                  string
+	SourceNumber              string
+	CustomerName              string
 	PaymentMethodID           string
 	PaymentMethodNameSnapshot string
 	PaymentMethodTypeSnapshot string
+	PaymentMethodName         string
+	PaymentMethodType         string
 	Amount                    float64
 	ReferenceNumber           string
 	ProviderTransactionID     string
 	PaymentStatus             string
+	PaymentType               *string
 	PaidByUserID              string
 	PaidByUserName            string
 	Notes                     string
@@ -58,13 +67,10 @@ type paymentScanRow struct {
 }
 
 func (r *Repository) ListPayments(businessID string, query PaymentListQuery) ([]PaymentResponse, int64, error) {
-	db := r.db.Table("sale_payments sp").
-		Joins("JOIN sales s ON s.id = sp.sale_id").
-		Joins("LEFT JOIN users u ON u.id = sp.paid_by_user_id").
-		Where("sp.business_id = ? AND sp.deleted_at IS NULL", businessID)
-	db = applyPaymentFilters(db, query)
+	baseSQL, args := customerPaymentLedgerSQL(businessID, query)
+	countSQL := "SELECT COUNT(*) FROM (" + baseSQL + ") ledger"
 	var total int64
-	if err := db.Count(&total).Error; err != nil {
+	if err := r.db.Raw(countSQL, args...).Scan(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	sortBy := safePaymentSortBy(query.SortBy)
@@ -73,12 +79,224 @@ func (r *Repository) ListPayments(businessID string, query PaymentListQuery) ([]
 		sortOrder = "asc"
 	}
 	var rows []paymentScanRow
-	err := db.Select("sp.*, s.sale_number, u.full_name AS paid_by_user_name").
-		Order("sp." + sortBy + " " + sortOrder).
-		Offset((query.Page - 1) * query.Limit).
-		Limit(query.Limit).
-		Scan(&rows).Error
+	listSQL := "SELECT * FROM (" + baseSQL + ") ledger ORDER BY " + sortBy + " " + sortOrder + " OFFSET ? LIMIT ?"
+	listArgs := append(args, (query.Page-1)*query.Limit, query.Limit)
+	err := r.db.Raw(listSQL, listArgs...).Scan(&rows).Error
 	return toPaymentResponses(rows), total, err
+}
+
+func customerPaymentLedgerSQL(businessID string, query PaymentListQuery) (string, []interface{}) {
+	sourceType := strings.ToLower(strings.TrimSpace(query.SourceType))
+	queries := make([]string, 0, 2)
+	args := make([]interface{}, 0)
+	if sourceType == "" || sourceType == "pos_sale" {
+		sql, sqlArgs := posPaymentLedgerSQL(businessID, query)
+		queries = append(queries, sql)
+		args = append(args, sqlArgs...)
+	}
+	if sourceType == "" || sourceType == "bakery_order" {
+		sql, sqlArgs := bakeryOrderPaymentLedgerSQL(businessID, query)
+		queries = append(queries, sql)
+		args = append(args, sqlArgs...)
+	}
+	if len(queries) == 0 {
+		return emptyPaymentLedgerSQL(), nil
+	}
+	return strings.Join(queries, " UNION ALL "), args
+}
+
+func posPaymentLedgerSQL(businessID string, query PaymentListQuery) (string, []interface{}) {
+	where := []string{"sp.business_id = ?", "sp.deleted_at IS NULL", "s.deleted_at IS NULL"}
+	args := []interface{}{businessID}
+	if query.Search != "" {
+		like := "%" + strings.ToLower(strings.TrimSpace(query.Search)) + "%"
+		where = append(where, `(LOWER(COALESCE(sp.reference_number, '')) LIKE ? OR LOWER(COALESCE(sp.provider_transaction_id, '')) LIKE ? OR LOWER(COALESCE(s.sale_number, '')) LIKE ? OR LOWER(COALESCE(c.full_name, '')) LIKE ? OR LOWER(COALESCE(sp.payment_method_name_snapshot, '')) LIKE ? OR LOWER(COALESCE(u.full_name, '')) LIKE ?)`)
+		args = append(args, like, like, like, like, like, like)
+	}
+	if query.SaleID != "" {
+		where = append(where, "sp.sale_id = ?")
+		args = append(args, query.SaleID)
+	}
+	if query.BakeryOrderID != "" {
+		where = append(where, "1 = 0")
+	}
+	if query.SourceID != "" {
+		where = append(where, "sp.sale_id = ?")
+		args = append(args, query.SourceID)
+	}
+	if query.PaymentMethodID != "" {
+		where = append(where, "sp.payment_method_id = ?")
+		args = append(args, query.PaymentMethodID)
+	}
+	if query.PaymentStatus != "" {
+		where = append(where, "sp.payment_status = ?")
+		args = append(args, query.PaymentStatus)
+	}
+	if query.BranchID != "" {
+		where = append(where, "sp.branch_id = ?")
+		args = append(args, query.BranchID)
+	}
+	if query.PaidByUserID != "" {
+		where = append(where, "sp.paid_by_user_id = ?")
+		args = append(args, query.PaidByUserID)
+	}
+	if query.DateFrom != "" {
+		where = append(where, "sp.paid_at >= ?")
+		args = append(args, query.DateFrom)
+	}
+	if query.DateTo != "" {
+		where = append(where, "sp.paid_at <= ?")
+		args = append(args, query.DateTo)
+	}
+	sql := `
+		SELECT
+			sp.id::text AS id,
+			sp.id::text AS payment_id,
+			sp.business_id::text AS business_id,
+			sp.branch_id::text AS branch_id,
+			COALESCE(b.branch_name, '') AS branch_name,
+			sp.sale_id::text AS sale_id,
+			COALESCE(s.sale_number, '') AS sale_number,
+			'pos_sale' AS source_type,
+			sp.sale_id::text AS source_id,
+			COALESCE(s.sale_number, '') AS source_number,
+			COALESCE(c.full_name, '') AS customer_name,
+			sp.payment_method_id::text AS payment_method_id,
+			sp.payment_method_name_snapshot,
+			sp.payment_method_type_snapshot,
+			sp.payment_method_name_snapshot AS payment_method_name,
+			sp.payment_method_type_snapshot AS payment_method_type,
+			sp.amount,
+			COALESCE(sp.reference_number, '') AS reference_number,
+			COALESCE(sp.provider_transaction_id, '') AS provider_transaction_id,
+			sp.payment_status,
+			NULL::text AS payment_type,
+			sp.paid_by_user_id::text AS paid_by_user_id,
+			COALESCE(u.full_name, '') AS paid_by_user_name,
+			COALESCE(sp.notes, '') AS notes,
+			sp.paid_at,
+			sp.created_at,
+			sp.updated_at
+		FROM sale_payments sp
+		JOIN sales s ON s.id = sp.sale_id AND s.business_id = sp.business_id
+		LEFT JOIN branches b ON b.id = sp.branch_id AND b.business_id = sp.business_id
+		LEFT JOIN customers c ON c.id = s.customer_id AND c.business_id = s.business_id AND c.branch_id = s.branch_id
+		LEFT JOIN users u ON u.id = sp.paid_by_user_id AND u.business_id = sp.business_id
+		WHERE ` + strings.Join(where, " AND ")
+	return sql, args
+}
+
+func bakeryOrderPaymentLedgerSQL(businessID string, query PaymentListQuery) (string, []interface{}) {
+	where := []string{"bop.business_id = ?", "bo.deleted_at IS NULL"}
+	args := []interface{}{businessID}
+	if query.Search != "" {
+		like := "%" + strings.ToLower(strings.TrimSpace(query.Search)) + "%"
+		where = append(where, `(LOWER(COALESCE(bop.reference_number, '')) LIKE ? OR LOWER(COALESCE(bo.order_number, '')) LIKE ? OR LOWER(COALESCE(bo.customer_name_snapshot, '')) LIKE ? OR LOWER(COALESCE(bop.payment_method_name_snapshot, '')) LIKE ? OR LOWER(COALESCE(u.full_name, '')) LIKE ?)`)
+		args = append(args, like, like, like, like, like)
+	}
+	if query.SaleID != "" {
+		where = append(where, "1 = 0")
+	}
+	if query.BakeryOrderID != "" {
+		where = append(where, "bop.bakery_order_id = ?")
+		args = append(args, query.BakeryOrderID)
+	}
+	if query.SourceID != "" {
+		where = append(where, "bop.bakery_order_id = ?")
+		args = append(args, query.SourceID)
+	}
+	if query.PaymentMethodID != "" {
+		where = append(where, "bop.payment_method_id = ?")
+		args = append(args, query.PaymentMethodID)
+	}
+	if query.PaymentStatus != "" && strings.ToLower(strings.TrimSpace(query.PaymentStatus)) != "completed" {
+		where = append(where, "1 = 0")
+	}
+	if query.BranchID != "" {
+		where = append(where, "bo.branch_id = ?")
+		args = append(args, query.BranchID)
+	}
+	if query.PaidByUserID != "" {
+		where = append(where, "bop.paid_by_user_id = ?")
+		args = append(args, query.PaidByUserID)
+	}
+	if query.DateFrom != "" {
+		where = append(where, "bop.paid_at >= ?")
+		args = append(args, query.DateFrom)
+	}
+	if query.DateTo != "" {
+		where = append(where, "bop.paid_at <= ?")
+		args = append(args, query.DateTo)
+	}
+	sql := `
+		SELECT
+			bop.id::text AS id,
+			bop.id::text AS payment_id,
+			bop.business_id::text AS business_id,
+			bo.branch_id::text AS branch_id,
+			COALESCE(b.branch_name, '') AS branch_name,
+			'' AS sale_id,
+			'' AS sale_number,
+			'bakery_order' AS source_type,
+			bop.bakery_order_id::text AS source_id,
+			COALESCE(bo.order_number, '') AS source_number,
+			COALESCE(bo.customer_name_snapshot, '') AS customer_name,
+			bop.payment_method_id::text AS payment_method_id,
+			bop.payment_method_name_snapshot,
+			COALESCE(pm.method_type, '') AS payment_method_type_snapshot,
+			bop.payment_method_name_snapshot AS payment_method_name,
+			COALESCE(pm.method_type, '') AS payment_method_type,
+			bop.amount,
+			COALESCE(bop.reference_number, '') AS reference_number,
+			'' AS provider_transaction_id,
+			'completed' AS payment_status,
+			bop.payment_type,
+			bop.paid_by_user_id::text AS paid_by_user_id,
+			COALESCE(u.full_name, '') AS paid_by_user_name,
+			'' AS notes,
+			bop.paid_at,
+			bop.created_at,
+			bop.created_at AS updated_at
+		FROM bakery_order_payments bop
+		JOIN bakery_orders bo ON bo.id = bop.bakery_order_id AND bo.business_id = bop.business_id
+		LEFT JOIN branches b ON b.id = bo.branch_id AND b.business_id = bop.business_id
+		LEFT JOIN payment_methods pm ON pm.id = bop.payment_method_id AND pm.business_id = bop.business_id
+		LEFT JOIN users u ON u.id = bop.paid_by_user_id AND u.business_id = bop.business_id
+		WHERE ` + strings.Join(where, " AND ")
+	return sql, args
+}
+
+func emptyPaymentLedgerSQL() string {
+	return `
+		SELECT
+			'' AS id,
+			'' AS payment_id,
+			'' AS business_id,
+			'' AS branch_id,
+			'' AS branch_name,
+			'' AS sale_id,
+			'' AS sale_number,
+			'' AS source_type,
+			'' AS source_id,
+			'' AS source_number,
+			'' AS customer_name,
+			'' AS payment_method_id,
+			'' AS payment_method_name_snapshot,
+			'' AS payment_method_type_snapshot,
+			'' AS payment_method_name,
+			'' AS payment_method_type,
+			0 AS amount,
+			'' AS reference_number,
+			'' AS provider_transaction_id,
+			'' AS payment_status,
+			NULL::text AS payment_type,
+			'' AS paid_by_user_id,
+			'' AS paid_by_user_name,
+			'' AS notes,
+			NOW() AS paid_at,
+			NOW() AS created_at,
+			NOW() AS updated_at
+		WHERE 1 = 0`
 }
 
 func (r *Repository) FindPayment(businessID, paymentID string) (*PaymentResponse, error) {
@@ -399,7 +617,7 @@ func applyRefundFilters(db *gorm.DB, q RefundListQuery) *gorm.DB {
 
 func safePaymentSortBy(value string) string {
 	switch value {
-	case "amount", "payment_status", "created_at":
+	case "amount", "payment_status", "created_at", "paid_at", "source_type", "source_number", "customer_name", "payment_method_name", "branch_name":
 		return value
 	default:
 		return "paid_at"
@@ -428,19 +646,52 @@ func roundMoney(value float64) float64 {
 }
 
 func (row paymentScanRow) toResponse() PaymentResponse {
+	paymentID := row.PaymentID
+	if paymentID == "" {
+		paymentID = row.ID
+	}
+	sourceType := row.SourceType
+	if sourceType == "" && row.SaleID != "" {
+		sourceType = "pos_sale"
+	}
+	sourceID := row.SourceID
+	if sourceID == "" {
+		sourceID = row.SaleID
+	}
+	sourceNumber := row.SourceNumber
+	if sourceNumber == "" {
+		sourceNumber = row.SaleNumber
+	}
+	paymentMethodName := row.PaymentMethodName
+	if paymentMethodName == "" {
+		paymentMethodName = row.PaymentMethodNameSnapshot
+	}
+	paymentMethodType := row.PaymentMethodType
+	if paymentMethodType == "" {
+		paymentMethodType = row.PaymentMethodTypeSnapshot
+	}
 	return PaymentResponse{
 		ID:                        row.ID,
+		PaymentID:                 paymentID,
 		BusinessID:                row.BusinessID,
 		BranchID:                  row.BranchID,
+		BranchName:                row.BranchName,
 		SaleID:                    row.SaleID,
 		SaleNumber:                row.SaleNumber,
+		SourceType:                sourceType,
+		SourceID:                  sourceID,
+		SourceNumber:              sourceNumber,
+		CustomerName:              row.CustomerName,
 		PaymentMethodID:           row.PaymentMethodID,
 		PaymentMethodNameSnapshot: row.PaymentMethodNameSnapshot,
 		PaymentMethodTypeSnapshot: row.PaymentMethodTypeSnapshot,
+		PaymentMethodName:         paymentMethodName,
+		PaymentMethodType:         paymentMethodType,
 		Amount:                    row.Amount,
 		ReferenceNumber:           row.ReferenceNumber,
 		ProviderTransactionID:     row.ProviderTransactionID,
 		PaymentStatus:             row.PaymentStatus,
+		PaymentType:               row.PaymentType,
 		PaidByUserID:              row.PaidByUserID,
 		PaidByUserName:            row.PaidByUserName,
 		Notes:                     row.Notes,

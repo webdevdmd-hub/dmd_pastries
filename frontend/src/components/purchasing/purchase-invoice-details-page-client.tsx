@@ -5,6 +5,7 @@ import type { JSX } from "react";
 
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
+import { PurchaseInvoicePaymentsSection } from "@/components/purchasing/purchase-invoice-payments-section";
 import { PurchaseInvoiceStatusBadge } from "@/components/purchasing/purchase-invoice-status-badge";
 import { PurchasePaymentStatusBadge } from "@/components/purchasing/purchase-payment-status-badge";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
@@ -27,6 +28,10 @@ export function PurchaseInvoiceDetailsPageClient({
 }): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.purchasingView, PERMISSIONS.inventoryView]);
+  const canManage = hasAnyPermission([
+    PERMISSIONS.purchasingInvoicesEdit,
+    PERMISSIONS.purchasingInvoicesPost,
+  ]);
   const invoiceQuery = usePurchaseInvoice(invoiceId, canView);
 
   if (!canView) {
@@ -105,6 +110,7 @@ export function PurchaseInvoiceDetailsPageClient({
         </Card>
       </div>
       <PurchasingItemLines lines={invoice.items} title="Purchase invoice items" />
+      <PurchaseInvoicePaymentsSection canManage={canManage} invoice={invoice} />
       <Card className="bg-white/85">
         <CardHeader>
           <CardTitle>Notes</CardTitle>

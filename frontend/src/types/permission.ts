@@ -1,4 +1,7 @@
 export const PERMISSION_KEYS = [
+  "accounting.view",
+  "accounting.accounts.manage",
+  "accounting.journal_entries.manage",
   "users.view",
   "users.create",
   "users.edit",
@@ -150,6 +153,7 @@ export const PERMISSION_KEYS = [
 ] as const;
 
 export const PERMISSION_MODULES = [
+  "accounting",
   "users",
   "roles",
   "branches",
@@ -199,6 +203,10 @@ export const PERMISSION_MODULE_META: Record<
     description: string;
   }
 > = {
+  accounting: {
+    title: "Accounting",
+    description: "Control Chart of Accounts access and future accounting workflows.",
+  },
   users: {
     title: "Users",
     description: "Control staff account visibility, creation, editing, and removal.",

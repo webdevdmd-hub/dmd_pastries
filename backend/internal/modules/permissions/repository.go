@@ -172,6 +172,9 @@ func DefaultSeeds() []Seed {
 		{ModuleName: "reports", PermissionKey: "reports.payments.view", Description: "View payment reports"},
 		{ModuleName: "reports", PermissionKey: "reports.production.view", Description: "View production reports"},
 		{ModuleName: "reports", PermissionKey: "reports.export", Description: "Export reports"},
+		{ModuleName: "accounting", PermissionKey: "accounting.view", Description: "View accounting records"},
+		{ModuleName: "accounting", PermissionKey: "accounting.accounts.manage", Description: "Manage chart of accounts"},
+		{ModuleName: "accounting", PermissionKey: "accounting.journal_entries.manage", Description: "Manage journal entries"},
 		{ModuleName: "dashboard", PermissionKey: "dashboard.view", Description: "View operational dashboards"},
 		{ModuleName: "audit_logs", PermissionKey: "audit_logs.view", Description: "View audit logs"},
 	}

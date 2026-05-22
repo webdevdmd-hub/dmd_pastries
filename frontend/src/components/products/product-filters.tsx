@@ -1,5 +1,6 @@
 "use client";
 
+import { Search } from "lucide-react";
 import type { JSX } from "react";
 
 import { Input } from "@/components/ui/input";
@@ -33,23 +34,29 @@ export function ProductFilters({
   onFiltersChange,
 }: ProductFiltersProps): JSX.Element {
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-      <div className="space-y-1">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+      <div className="md:col-span-2 xl:col-span-2">
         <Label htmlFor="products-search">Search</Label>
-        <Input
-          id="products-search"
-          onChange={(event) => onFiltersChange({ ...filters, page: 1, search: event.target.value })}
-          placeholder="Search by name, code, SKU..."
-          value={filters.search}
-        />
+        <div className="relative mt-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mocha" />
+          <Input
+            className="pl-9"
+            id="products-search"
+            onChange={(event) =>
+              onFiltersChange({ ...filters, page: 1, search: event.target.value })
+            }
+            placeholder="Name, code, SKU, barcode"
+            value={filters.search}
+          />
+        </div>
       </div>
-      <div className="space-y-1">
+      <div>
         <Label>Category</Label>
         <Select
           onValueChange={(value) => onFiltersChange({ ...filters, page: 1, categoryId: value })}
           value={filters.categoryId}
         >
-          <SelectTrigger>
+          <SelectTrigger className="mt-1">
             <SelectValue placeholder="All categories" />
           </SelectTrigger>
           <SelectContent>
@@ -62,7 +69,7 @@ export function ProductFilters({
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-1">
+      <div>
         <Label>Type</Label>
         <Select
           onValueChange={(value) =>
@@ -74,7 +81,7 @@ export function ProductFilters({
           }
           value={filters.productType}
         >
-          <SelectTrigger>
+          <SelectTrigger className="mt-1">
             <SelectValue placeholder="All types" />
           </SelectTrigger>
           <SelectContent>
@@ -87,7 +94,7 @@ export function ProductFilters({
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-1">
+      <div>
         <Label>Status</Label>
         <Select
           onValueChange={(value) =>
@@ -95,7 +102,7 @@ export function ProductFilters({
           }
           value={filters.status}
         >
-          <SelectTrigger>
+          <SelectTrigger className="mt-1">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
@@ -106,7 +113,7 @@ export function ProductFilters({
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-1">
+      <div>
         <Label>POS Visible</Label>
         <Select
           onValueChange={(value) =>
@@ -118,13 +125,56 @@ export function ProductFilters({
           }
           value={filters.isPosVisible}
         >
-          <SelectTrigger>
+          <SelectTrigger className="mt-1">
             <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="true">Yes</SelectItem>
             <SelectItem value="false">No</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label>Sort</Label>
+        <Select
+          onValueChange={(value) => {
+            const [sortBy, sortOrder] = value.split(":");
+
+            onFiltersChange({
+              ...filters,
+              page: 1,
+              sortBy: sortBy as ProductListFilters["sortBy"],
+              sortOrder: sortOrder as ProductListFilters["sortOrder"],
+            });
+          }}
+          value={`${filters.sortBy}:${filters.sortOrder}`}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="created_at:desc">Newest first</SelectItem>
+            <SelectItem value="updated_at:desc">Recently updated</SelectItem>
+            <SelectItem value="product_name:asc">Name A-Z</SelectItem>
+            <SelectItem value="sale_price:asc">Price low-high</SelectItem>
+            <SelectItem value="sale_price:desc">Price high-low</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label>Rows</Label>
+        <Select
+          onValueChange={(value) => onFiltersChange({ ...filters, limit: Number(value), page: 1 })}
+          value={String(filters.limit)}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="10">10 rows</SelectItem>
+            <SelectItem value="20">20 rows</SelectItem>
+            <SelectItem value="50">50 rows</SelectItem>
           </SelectContent>
         </Select>
       </div>

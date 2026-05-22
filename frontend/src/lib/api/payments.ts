@@ -3,11 +3,13 @@ import { getPaymentMethods as getSettingsPaymentMethods } from "@/lib/api/settin
 import type {
   AddPaymentPayload,
   CreateReconciliationPayload,
+  CustomerPaymentType,
   DailyPaymentSummary,
   PaymentFilters,
   PaymentMethodSummary,
   PaymentReconciliation,
   PaymentRefund,
+  PaymentSourceType,
   PaymentStatus,
   ReconciliationFilters,
   ReconciliationStatus,
@@ -20,17 +22,26 @@ import type { PaymentMethod } from "@/types/settings";
 
 type BackendSalePayment = {
   id?: string;
+  payment_id?: string;
   business_id?: string;
   branch_id?: string;
+  branch_name?: string;
   sale_id?: string;
   sale_number?: string;
+  source_type?: string;
+  source_id?: string;
+  source_number?: string;
+  customer_name?: string | null;
   payment_method_id?: string;
+  payment_method_name?: string;
   payment_method_name_snapshot?: string;
+  payment_method_type?: string;
   payment_method_type_snapshot?: string;
   amount?: number;
   reference_number?: string | null;
   provider_transaction_id?: string | null;
   payment_status?: string;
+  payment_type?: string | null;
   paid_by_user_id?: string | null;
   paid_by_user_name?: string;
   paid_at?: string;
@@ -126,6 +137,14 @@ function isPaymentStatus(value: unknown): value is PaymentStatus {
   );
 }
 
+function isPaymentSourceType(value: unknown): value is PaymentSourceType {
+  return value === "pos_sale" || value === "bakery_order";
+}
+
+function isCustomerPaymentType(value: unknown): value is CustomerPaymentType {
+  return value === "deposit" || value === "balance" || value === "full";
+}
+
 function isRefundStatus(value: unknown): value is RefundStatus {
   return (
     value === "pending" || value === "completed" || value === "failed" || value === "cancelled"
@@ -154,20 +173,42 @@ function parsePayment(value: unknown): SalePayment {
   }
 
   const payment = value as BackendSalePayment;
+  const sourceType: PaymentSourceType = isPaymentSourceType(payment.source_type)
+    ? payment.source_type
+    : "pos_sale";
+  const sourceId = requiredString(payment.source_id, requiredString(payment.sale_id));
+  const sourceNumber = requiredString(
+    payment.source_number,
+    requiredString(payment.sale_number, "Payment"),
+  );
+  const paymentMethodName = requiredString(
+    payment.payment_method_name,
+    requiredString(payment.payment_method_name_snapshot, "Payment"),
+  );
+  const paymentMethodType = requiredString(
+    payment.payment_method_type,
+    requiredString(payment.payment_method_type_snapshot, "method"),
+  );
 
   return {
-    id: requiredString(payment.id),
+    id: requiredString(payment.payment_id, requiredString(payment.id)),
     businessId: requiredString(payment.business_id),
     branchId: requiredString(payment.branch_id),
-    saleId: requiredString(payment.sale_id),
-    saleNumber: requiredString(payment.sale_number, "Sale"),
+    branchName: requiredString(payment.branch_name, "Branch"),
+    saleId: sourceType === "pos_sale" ? sourceId : "",
+    saleNumber: sourceType === "pos_sale" ? sourceNumber : "",
+    sourceType,
+    sourceId,
+    sourceNumber,
+    customerName: optionalString(payment.customer_name),
     paymentMethodId: requiredString(payment.payment_method_id),
-    paymentMethodNameSnapshot: requiredString(payment.payment_method_name_snapshot, "Payment"),
-    paymentMethodTypeSnapshot: requiredString(payment.payment_method_type_snapshot, "method"),
+    paymentMethodNameSnapshot: paymentMethodName,
+    paymentMethodTypeSnapshot: paymentMethodType,
     amount: requiredNumber(payment.amount),
     referenceNumber: optionalString(payment.reference_number),
     providerTransactionId: optionalString(payment.provider_transaction_id),
     paymentStatus: isPaymentStatus(payment.payment_status) ? payment.payment_status : "pending",
+    paymentType: isCustomerPaymentType(payment.payment_type) ? payment.payment_type : null,
     paidByUserId: optionalString(payment.paid_by_user_id),
     paidByUserName: requiredString(payment.paid_by_user_name, "Cashier"),
     paidAt: requiredString(payment.paid_at),

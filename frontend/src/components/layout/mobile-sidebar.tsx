@@ -21,7 +21,7 @@ export function MobileSidebar(): JSX.Element {
       <SheetTrigger asChild>
         <Button
           aria-label="Open navigation"
-          className="border-brand-cappuccino bg-white/45 text-brand-espresso hover:bg-brand-cappuccino/35"
+          className="border-workspace-border bg-workspace-panel text-brand-espresso shadow-none hover:bg-brand-latte/70"
           size="icon"
           variant="outline"
         >
@@ -30,33 +30,31 @@ export function MobileSidebar(): JSX.Element {
         </Button>
       </SheetTrigger>
       <SheetContent
-        className="flex w-[20rem] flex-col border-brand-espresso/10 bg-brand-espresso p-5 text-brand-latte sm:w-[22rem]"
+        className="flex w-[20rem] flex-col border-white/10 bg-workspace-sidebar p-4 text-white sm:w-[22rem]"
         data-sidebar-theme="pistachio"
         side="left"
       >
         <SheetHeader>
-          <SheetTitle className="text-left font-display text-4xl leading-none text-brand-latte">
-            Pastries POS
+          <SheetTitle className="text-left text-xl font-semibold leading-none text-white">
+            COCKPIT
           </SheetTitle>
-          <SheetDescription className="text-left text-brand-latte/70">
-            Protected dashboard navigation for your bakery workspace.
+          <SheetDescription className="text-left text-xs uppercase tracking-[0.22em] text-workspace-sidebar-muted">
+            Operations OS
           </SheetDescription>
         </SheetHeader>
-        <div className="mt-6 w-fit rounded-full border border-brand-caramel/20 bg-brand-caramel/20 px-3 py-1 text-xs font-semibold text-brand-latte">
+        <div className="mt-5 w-fit rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs font-semibold text-white">
           Operations shell
         </div>
 
-        <nav aria-label="Primary" className="mt-8 flex min-h-0 flex-1">
+        <nav aria-label="Primary" className="mt-6 flex min-h-0 flex-1">
           <TooltipProvider delayDuration={150}>
             <AppNavigationList />
           </TooltipProvider>
         </nav>
 
-        <div className="rounded-3xl border border-brand-latte/10 bg-brand-latte/5 p-4 text-sm text-brand-latte/75">
-          <p className="font-medium text-brand-latte">Warm, controlled operations</p>
-          <p className="mt-2 leading-6">
-            Access, roles, settings, and POS modules stay grouped under one protected menu.
-          </p>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-xs text-workspace-sidebar-muted">
+          <p className="font-medium text-white">Protected workspace</p>
+          <p className="mt-1.5 leading-5">Modules stay grouped by operating workflow.</p>
         </div>
       </SheetContent>
     </Sheet>

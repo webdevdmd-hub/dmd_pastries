@@ -15,6 +15,8 @@ export type PurchaseReceiptStatus = "draft" | "posted" | "cancelled";
 
 export type PurchaseItemType = "product" | "ingredient" | "packaging";
 
+export type SupplierPaymentStatus = "completed" | "pending" | "failed";
+
 export type PurchaseOrderItem = {
   id: string;
   itemType: PurchaseItemType;
@@ -193,6 +195,40 @@ export type PurchasingFilters = {
   dateTo: string;
 };
 
+export type SupplierPaymentFilters = {
+  branchId: string;
+  dateFrom: string;
+  dateTo: string;
+  paidByUserId: string;
+  paymentMethodId: string;
+  paymentStatus: string;
+  purchaseInvoiceId: string;
+  search: string;
+  sortBy: string;
+  sortOrder: string;
+  supplierId: string;
+};
+
+export type SupplierPayment = {
+  id: string;
+  purchaseInvoiceId: string;
+  invoiceNumber: string;
+  supplierId: string;
+  supplierName: string;
+  branchId: string;
+  branchName: string;
+  paymentMethodId: string;
+  paymentMethodName: string;
+  paymentMethodType: string;
+  amount: number;
+  paymentStatus: SupplierPaymentStatus;
+  referenceNumber: string | null;
+  paidByUserId: string;
+  paidByUserName: string;
+  paidAt: string;
+  notes: string | null;
+};
+
 export type PurchaseItemLinePayload = {
   itemType: PurchaseItemType;
   productId: string | null;
@@ -247,4 +283,12 @@ export type ReceivePurchasePayload = {
   receivedDate: string;
   items: PurchaseItemLinePayload[];
   notes: string | null;
+};
+
+export type AddSupplierPaymentPayload = {
+  amount: number;
+  notes: string | null;
+  paidAt: string | null;
+  paymentMethodId: string;
+  referenceNumber: string | null;
 };

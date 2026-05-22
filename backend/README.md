@@ -6,7 +6,7 @@ Backend foundation for a multi-tenant POS SaaS platform built with Go, Gin, GORM
 
 Current backend stage: **Sprint 5.7 dashboard intelligence foundation**
 
-This repository currently contains the backend foundation plus Sprint 2 products, POS billing, payments, held sales, customers, Sprint 3 inventory/purchasing foundations, Sprint 4.1 packaging, Sprint 4.2 recipes/BOM, Sprint 4.3 manufacturing production batches, Sprint 4.4 ingredients catalog, bakery orders, Sprint 5 reports foundation with sales, inventory, manufacturing, bakery orders, and financial/payment reports, and Sprint 5.7 dashboard intelligence APIs. Supplier payment accounting, loyalty, and online payment gateways are not built yet.
+This repository currently contains the backend foundation plus Sprint 2 products, POS billing, payments, held sales, customers, Sprint 3 inventory/purchasing foundations, Sprint 4.1 packaging, Sprint 4.2 recipes/BOM, Sprint 4.3 manufacturing production batches, Sprint 4.4 ingredients catalog, bakery orders, Sprint 5 reports foundation with sales, inventory, manufacturing, bakery orders, and financial/payment reports, and Sprint 5.7 dashboard intelligence APIs. Supplier invoice payment tracking is available inside purchasing. The accounting foundation has started with Chart of Accounts management. Loyalty, online payment gateways, and full journal-entry accounting are not built yet.
 
 Admin maturity contracts from `frondend/docs/backend-contracts.md` are implemented for staff invitations, branch assignment, soft-delete/restore users, and activity logs.
 
@@ -45,6 +45,10 @@ Sprint 3.2 finalizes the stock movement ledger with movement direction, referenc
 Sprint 3.3 adds supplier profiles, supplier contacts, supplier notes, category integration, lookup, status management, placeholder supplier stats, and migration `000019_sprint3_suppliers.sql`.
 
 Sprint 3.4 adds purchase orders, purchase invoices, purchase receipts, receiving stock-in through stock movements, supplier purchase history, purchasing summary, and migration `000020_sprint3_purchasing.sql`.
+
+Supplier invoice payments add supplier payment transaction records under purchasing, update invoice paid/balance/payment status, keep supplier payments separate from customer-side payment collections, and add migration `000040_purchase_invoice_payments.sql`.
+
+Accounting foundation adds business-level Chart of Accounts management, default accounting ledgers for assets/liabilities/equity/income/COGS/expenses, and migration `000041_chart_of_accounts.sql`. Journal Entries / Voucher Entry add balanced debit-credit accounting transactions, posting, reversal, and migration `000042_journal_entries.sql`. General Ledger, Trial Balance, Profit & Loss, and Balance Sheet are planned next.
 
 Sprint 4.1 adds packaging item catalog, packaging supplier/category/unit links, packaging inventory item creation, product packaging usage rules, lookup APIs, and migration `000021_sprint4_packaging.sql`.
 
@@ -763,10 +767,13 @@ Implemented protected APIs:
 - `DELETE /api/v1/purchasing/orders/:id`
 - `GET /api/v1/purchasing/invoices`
 - `POST /api/v1/purchasing/invoices`
+- `GET /api/v1/purchasing/payments`
 - `GET /api/v1/purchasing/invoices/:id`
 - `PATCH /api/v1/purchasing/invoices/:id`
 - `POST /api/v1/purchasing/invoices/:id/post`
 - `POST /api/v1/purchasing/invoices/:id/cancel`
+- `GET /api/v1/purchasing/invoices/:id/payments`
+- `POST /api/v1/purchasing/invoices/:id/payments`
 - `POST /api/v1/purchasing/receive`
 - `GET /api/v1/purchasing/receipts`
 - `GET /api/v1/purchasing/receipts/:id`
@@ -783,6 +790,8 @@ Behavior:
 - supplier and branch are validated against the authenticated business
 - product purchase lines validate real products; packaging lines validate Sprint 4.1 packaging items; ingredient IDs remain UUID placeholders until the ingredients module exists
 - invoices are created as draft, can be posted, and posted invoices can be used for receiving
+- supplier payments can be added only to posted invoices and update invoice `paid_amount`, `balance_amount`, and `payment_status`
+- supplier payments stay inside purchasing and are not mixed into customer-side `GET /api/v1/payments`
 - receiving creates inventory items when missing and applies `purchase_in` stock movements
 - receiving with expiry dates creates expiry batches
 - receipt cancellation creates compensating stock-out reversal movements
@@ -1969,6 +1978,23 @@ curl -X POST http://localhost:8080/api/v1/purchasing/invoices \
 curl -X POST http://localhost:8080/api/v1/purchasing/invoices/{id}/post \
   -H "Authorization: Bearer appwrite_jwt_here"
 
+curl -X POST http://localhost:8080/api/v1/purchasing/invoices/{id}/payments \
+  -H "Authorization: Bearer appwrite_jwt_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "payment_method_id":"payment_method_uuid_here",
+    "amount":1000,
+    "reference_number":"BANK-REF-001",
+    "paid_at":"2026-05-20T10:00:00Z",
+    "notes":"Supplier bank transfer"
+  }'
+
+curl "http://localhost:8080/api/v1/purchasing/payments?page=1&limit=20" \
+  -H "Authorization: Bearer appwrite_jwt_here"
+
+curl "http://localhost:8080/api/v1/purchasing/invoices/{id}/payments" \
+  -H "Authorization: Bearer appwrite_jwt_here"
+
 curl -X POST http://localhost:8080/api/v1/purchasing/receive \
   -H "Authorization: Bearer appwrite_jwt_here" \
   -H "Content-Type: application/json" \
@@ -2471,6 +2497,79 @@ Role visibility:
 - Production dashboard: manufacturing users.
 - Purchasing dashboard: purchasing or inventory users.
 
+## Accounting Chart of Accounts APIs
+
+Chart of Accounts is business-level accounting master data. It is not branch-owned; future journal entries will carry `branch_id` for branch-wise accounting reports.
+
+Read endpoints require `accounting.view`; chart account create/update/delete/default seeding requires `accounting.accounts.manage`; journal entry create/update/post/reverse requires `accounting.journal_entries.manage`.
+
+```txt
+GET    /api/v1/accounting/chart-of-accounts
+POST   /api/v1/accounting/chart-of-accounts/seed-defaults
+POST   /api/v1/accounting/chart-of-accounts
+GET    /api/v1/accounting/chart-of-accounts/:id
+PATCH  /api/v1/accounting/chart-of-accounts/:id
+PATCH  /api/v1/accounting/chart-of-accounts/:id/status
+DELETE /api/v1/accounting/chart-of-accounts/:id
+GET    /api/v1/accounting/journal-entries
+POST   /api/v1/accounting/journal-entries
+GET    /api/v1/accounting/journal-entries/:id
+PATCH  /api/v1/accounting/journal-entries/:id
+POST   /api/v1/accounting/journal-entries/:id/post
+POST   /api/v1/accounting/journal-entries/:id/reverse
+```
+
+Supported filters:
+
+```txt
+search
+account_type: asset | liability | equity | income | cogs | expense
+account_group: current_asset | other_current_asset | fixed_asset | non_current_asset | accumulated_depreciation | contra_asset | current_liability | other_current_liability | long_term_liability | other_liability | equity | partner_capital | sales_income | service_income | discount_income | other_income | direct_expense | operating_expense | admin_expense | selling_expense | finance_cost | tax_expense
+status: active | inactive
+parent_account_id
+page, limit, sort_by, sort_order
+```
+
+Default owner registration seeds common accounts for cash/bank, receivables, inventory, payables, VAT, capital, income, COGS/direct expenses, and operating expenses. Existing businesses can call `POST /api/v1/accounting/chart-of-accounts/seed-defaults`.
+
+Journal entry rules:
+
+```txt
+status: draft | posted | reversed
+draft entries can be edited
+posted entries are immutable
+reversal creates a new posted opposite journal entry
+total debit must equal total credit
+each line must contain either debit or credit, not both
+manual journal lines can use only active accounts with allow_manual_posting=true
+branch_id is optional and is used later for branch-wise accounting reports
+```
+
+Create journal entry example:
+
+```json
+{
+  "branch_id": "optional_branch_uuid",
+  "entry_date": "2026-05-21",
+  "reference_number": "JV-MANUAL-001",
+  "narration": "Manual expense voucher",
+  "lines": [
+    {
+      "account_id": "rent_expense_account_uuid",
+      "debit_amount": 1000,
+      "credit_amount": 0,
+      "description": "Monthly rent"
+    },
+    {
+      "account_id": "cash_account_uuid",
+      "debit_amount": 0,
+      "credit_amount": 1000,
+      "description": "Paid by cash"
+    }
+  ]
+}
+```
+
 ## Receipt Layout Settings APIs
 
 Receipt layout endpoints are under settings and use the existing settings permissions. Read endpoints require `settings.view`; create/update/delete/default/preview require `settings.receipt.update` or the existing settings manage fallback.
@@ -2507,7 +2606,7 @@ SELECT id, role_name, description FROM roles ORDER BY role_name;
 Still pending:
 
 - branch module advanced features such as opening hours and tax registrations
-- POS sale inventory deduction, packaging deduction from sales, production scheduling calendar, quality control, supplier payment accounting, and advanced reports
+- POS sale inventory deduction, packaging deduction from sales, production scheduling calendar, quality control, supplier payment reversal/refund flows, and advanced reports
 - online payment gateway integrations
 - production-grade email invitation delivery instead of returning temporary password
 - password reset and email verification screens in the frontend/Appwrite flow

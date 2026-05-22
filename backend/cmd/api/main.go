@@ -6,6 +6,7 @@ import (
 	"pastries-pos/internal/config"
 	"pastries-pos/internal/database"
 	"pastries-pos/internal/middleware"
+	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
 	"pastries-pos/internal/modules/auth"
 	"pastries-pos/internal/modules/bakeryorders"
@@ -82,6 +83,7 @@ func main() {
 	dashboardRepo := dashboard.NewRepository(db)
 	userRepo := users.NewRepository(db)
 	authRepo := auth.NewRepository(db)
+	accountingRepo := accounting.NewRepository(db)
 
 	if _, err := permissionRepo.EnsureDefaults(db); err != nil {
 		log.Fatalf("permission seeding failed: %v", err)
@@ -165,6 +167,8 @@ func main() {
 	dashboardCacheService := dashboardcache.NewService()
 	dashboardService := dashboard.NewService(db, dashboardRepo, auditRepo, dashboardCacheService)
 	dashboardHandler := dashboard.NewHandler(dashboardService)
+	accountingService := accounting.NewService(db, accountingRepo, auditRepo)
+	accountingHandler := accounting.NewHandler(accountingService)
 
 	authMiddleware := middleware.NewAuthMiddleware(authService)
 	permissionMiddleware := middleware.NewPermissionMiddleware()
@@ -333,6 +337,13 @@ func main() {
 		dashboardHandler,
 		authMiddleware.RequireAuth(),
 		permit("dashboard.view"),
+	)
+	accounting.RegisterRoutes(
+		router,
+		accountingHandler,
+		authMiddleware.RequireAuth(),
+		permit("accounting.view"),
+		permit("accounting.accounts.manage", "accounting.journal_entries.manage"),
 	)
 	audit.RegisterRoutes(
 		router,

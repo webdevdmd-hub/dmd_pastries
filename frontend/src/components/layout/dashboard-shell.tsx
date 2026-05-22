@@ -13,7 +13,7 @@ export function DashboardShell({ children }: DashboardShellProps): JSX.Element {
   const isPosRoute = pathname === "/pos" || pathname.startsWith("/pos/");
 
   return (
-    <div className="min-h-screen bg-brand-latte text-brand-espresso">
+    <div className="min-h-screen bg-workspace-canvas text-brand-espresso">
       <div className="flex min-h-screen">
         <DesktopSidebar />
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">

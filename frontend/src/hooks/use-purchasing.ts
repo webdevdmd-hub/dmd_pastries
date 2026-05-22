@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useBranchQueryKey } from "@/hooks/use-branch-scope";
 import {
+  addSupplierInvoicePayment,
   cancelPurchaseInvoice,
   cancelPurchaseReceipt,
   createPurchaseInvoice,
@@ -20,6 +21,8 @@ import {
   getPurchaseReceiptById,
   getPurchaseReceipts,
   getPurchasingSummary,
+  getSupplierInvoicePayments,
+  getSupplierPayments,
   getTaxRates,
   getUnits,
   lookupSuppliers,
@@ -31,6 +34,7 @@ import {
   updatePurchaseOrderStatus,
 } from "@/lib/api/purchasing";
 import type {
+  AddSupplierPaymentPayload,
   CreatePurchaseInvoicePayload,
   CreatePurchaseOrderPayload,
   PurchaseInvoice,
@@ -45,6 +49,8 @@ import type {
   PurchasingTaxRateOption,
   PurchasingUnitOption,
   ReceivePurchasePayload,
+  SupplierPayment,
+  SupplierPaymentFilters,
   UpdatePurchaseInvoicePayload,
   UpdatePurchaseOrderPayload,
   UpdatePurchaseOrderStatusPayload,
@@ -137,6 +143,32 @@ export function usePurchaseReceipt(id: string | null, enabled = true) {
       return getPurchaseReceiptById(id);
     },
     enabled: enabled && id !== null,
+  });
+}
+
+export function useSupplierPayments(filters: SupplierPaymentFilters, enabled = true) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<SupplierPayment[]>({
+    queryKey: [purchasingQueryKey, branchQueryKey, "supplier-payments", filters],
+    queryFn: async () => getSupplierPayments(filters),
+    enabled,
+  });
+}
+
+export function useSupplierInvoicePayments(invoiceId: string | null, enabled = true) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<SupplierPayment[]>({
+    queryKey: [purchasingQueryKey, branchQueryKey, "invoice-payments", invoiceId],
+    queryFn: async () => {
+      if (!invoiceId) {
+        throw new Error("Purchase invoice ID is required.");
+      }
+
+      return getSupplierInvoicePayments(invoiceId);
+    },
+    enabled: enabled && invoiceId !== null,
   });
 }
 
@@ -292,6 +324,21 @@ export function useCancelPurchaseInvoice() {
 
   return useMutation<PurchaseInvoice, Error, string>({
     mutationFn: async (id) => cancelPurchaseInvoice(id),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+    },
+  });
+}
+
+export function useAddSupplierInvoicePayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    SupplierPayment,
+    Error,
+    { invoiceId: string; payload: AddSupplierPaymentPayload }
+  >({
+    mutationFn: async ({ invoiceId, payload }) => addSupplierInvoicePayment(invoiceId, payload),
     onSuccess: async () => {
       await invalidatePurchasing(queryClient);
     },

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"pastries-pos/internal/modules/audit"
@@ -23,6 +24,9 @@ func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository) *Ser
 
 func (s *Service) ListPayments(currentUser *utils.AuthContext, query PaymentListQuery) (*PaginatedResponse[PaymentResponse], error) {
 	query.Page, query.Limit = normalizePagination(query.Page, query.Limit)
+	if err := validatePaymentListQuery(query); err != nil {
+		return nil, err
+	}
 	branchID, allBranches, err := currentUser.ResolveBranchScope(query.BranchID, "")
 	if err != nil {
 		return nil, err
@@ -508,6 +512,42 @@ func validateDateRange(dateFrom, dateTo string) error {
 	}
 	if !from.IsZero() && !to.IsZero() && from.After(to) {
 		return apperrors.BadRequest("date_from cannot be after date_to", nil)
+	}
+	return nil
+}
+
+func validatePaymentListQuery(query PaymentListQuery) error {
+	if err := validateDateRange(query.DateFrom, query.DateTo); err != nil {
+		return err
+	}
+	sourceType := strings.TrimSpace(query.SourceType)
+	if sourceType != "" && sourceType != "pos_sale" && sourceType != "bakery_order" {
+		return apperrors.BadRequest("source_type must be pos_sale or bakery_order", nil)
+	}
+	if err := validateOptionalUUID("sale_id", query.SaleID); err != nil {
+		return err
+	}
+	if err := validateOptionalUUID("bakery_order_id", query.BakeryOrderID); err != nil {
+		return err
+	}
+	if err := validateOptionalUUID("source_id", query.SourceID); err != nil {
+		return err
+	}
+	if err := validateOptionalUUID("payment_method_id", query.PaymentMethodID); err != nil {
+		return err
+	}
+	if err := validateOptionalUUID("paid_by_user_id", query.PaidByUserID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateOptionalUUID(field, value string) error {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	if _, err := uuid.Parse(value); err != nil {
+		return apperrors.BadRequest(field+" must be a valid UUID", nil)
 	}
 	return nil
 }

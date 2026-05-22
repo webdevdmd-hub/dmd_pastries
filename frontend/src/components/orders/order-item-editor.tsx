@@ -21,15 +21,10 @@ import type { Product } from "@/types/product";
 
 type ProductOptionMeta = {
   productId: string | null;
-  productVariantId: string | null;
 };
 
 function parentProductValue(productId: string): string {
   return `product:${productId}`;
-}
-
-function variantProductValue(productId: string, variantId: string): string {
-  return `variant:${productId}:${variantId}`;
 }
 
 export function OrderItemEditor({
@@ -48,75 +43,66 @@ export function OrderItemEditor({
   const selectedProduct = products.find((product) => product.id === item.productId);
   const selectedVariant =
     selectedProduct?.variants.find((variant) => variant.id === item.productVariantId) ?? null;
+  const activeProductVariants = useMemo(
+    () => selectedProduct?.variants.filter((variant) => variant.status === "active") ?? [],
+    [selectedProduct],
+  );
   const isCustomItem = item.productId === null && item.itemName !== null;
-  const productSelectValue = item.productId
-    ? item.productVariantId
-      ? variantProductValue(item.productId, item.productVariantId)
-      : parentProductValue(item.productId)
-    : "";
+  const productSelectValue = item.productId ? parentProductValue(item.productId) : "";
   const productOptionMetaByValue = useMemo<Map<string, ProductOptionMeta>>(() => {
     const map = new Map<string, ProductOptionMeta>();
     products.forEach((product) => {
       map.set(parentProductValue(product.id), {
         productId: product.id,
-        productVariantId: null,
-      });
-      product.variants.forEach((variant) => {
-        map.set(variantProductValue(product.id, variant.id), {
-          productId: product.id,
-          productVariantId: variant.id,
-        });
       });
     });
     return map;
   }, [products]);
   const productOptions = useMemo<SearchableComboboxOption[]>(
     () =>
-      products.flatMap((product) => [
-        {
-          value: parentProductValue(product.id),
-          label: product.productName,
-          description: [
-            "Parent product",
-            product.productCode,
-            product.categoryName,
-            `AED ${product.salePrice.toFixed(2)}`,
-          ]
-            .filter((part) => part.length > 0)
-            .join(" - "),
-          keywords: [
-            product.productName,
-            product.productCode,
-            product.categoryName,
-            product.sku ?? "",
-            product.barcode ?? "",
-          ],
-        },
-        ...product.variants.map((variant) => ({
-          value: variantProductValue(product.id, variant.id),
-          label: `${product.productName} - ${variant.variantName}`,
-          description: [
-            "Variant",
-            variant.sku ?? "",
-            variant.barcode ?? "",
-            product.categoryName,
-            `AED ${variant.salePrice.toFixed(2)}`,
-          ]
-            .filter((part) => part.length > 0)
-            .join(" - "),
-          keywords: [
-            product.productName,
-            product.productCode,
-            product.categoryName,
-            product.sku ?? "",
-            product.barcode ?? "",
+      products.map((product) => ({
+        value: parentProductValue(product.id),
+        label: product.productName,
+        description: [
+          product.variants.length > 0
+            ? [String(product.variants.length), "variants"].join(" ")
+            : "Base product",
+          product.productCode,
+          product.categoryName,
+          `AED ${product.salePrice.toFixed(2)}`,
+        ]
+          .filter((part) => part.length > 0)
+          .join(" - "),
+        keywords: [
+          product.productName,
+          product.productCode,
+          product.categoryName,
+          product.sku ?? "",
+          product.barcode ?? "",
+          ...product.variants.flatMap((variant) => [
             variant.variantName,
             variant.sku ?? "",
             variant.barcode ?? "",
-          ],
-        })),
-      ]),
+          ]),
+        ],
+      })),
     [products],
+  );
+  const variantOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      activeProductVariants.map((variant) => ({
+        value: variant.id,
+        label: variant.variantName,
+        description: [
+          variant.sku ?? "",
+          variant.barcode ?? "",
+          `AED ${variant.salePrice.toFixed(2)}`,
+        ]
+          .filter((part) => part.length > 0)
+          .join(" - "),
+        keywords: [variant.variantName, variant.sku ?? "", variant.barcode ?? ""],
+      })),
+    [activeProductVariants],
   );
   const update = (patch: Partial<CreateOrderItemPayload>): void => {
     onChange({ ...item, ...patch });
@@ -124,7 +110,7 @@ export function OrderItemEditor({
 
   return (
     <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-white/80 p-4">
-      <div className="grid gap-3 md:grid-cols-[0.75fr_1.5fr_0.55fr_0.8fr_0.8fr_auto]">
+      <div className="grid gap-3 md:grid-cols-[0.75fr_1.25fr_1fr_0.55fr_0.8fr_0.8fr_auto]">
         <label className="grid gap-1.5">
           <span className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha">
             Item type
@@ -160,7 +146,7 @@ export function OrderItemEditor({
         </label>
         <div className="grid gap-1.5">
           <span className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha">
-            {isCustomItem ? "Custom item name" : "Product / variant"}
+            {isCustomItem ? "Custom item name" : "Product"}
           </span>
           {isCustomItem ? (
             <Input
@@ -174,25 +160,48 @@ export function OrderItemEditor({
               onValueChange={(selectedValue) => {
                 const selectedMeta = productOptionMetaByValue.get(selectedValue);
                 const product = products.find((entry) => entry.id === selectedMeta?.productId);
-                const variant =
-                  product?.variants.find((entry) => entry.id === selectedMeta?.productVariantId) ??
-                  null;
                 update({
                   itemName: null,
                   productId: selectedMeta?.productId ?? null,
-                  productVariantId: selectedMeta?.productVariantId ?? null,
+                  productVariantId: null,
                   taxRateId: product?.taxRateId ?? null,
                   unitId: product?.unitId ?? item.unitId,
-                  unitPrice: variant?.salePrice ?? product?.salePrice ?? item.unitPrice,
+                  unitPrice: product?.salePrice ?? item.unitPrice,
                 });
               }}
               options={productOptions}
-              placeholder="Select product or variant"
+              placeholder="Select product"
               searchPlaceholder="Search product, variant, SKU, barcode, category..."
               value={productSelectValue}
             />
           )}
         </div>
+        <label className="grid gap-1.5">
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha">
+            Variant
+          </span>
+          <SearchableCombobox
+            disabled={isCustomItem || activeProductVariants.length === 0}
+            emptyMessage="No matching variants found."
+            onValueChange={(variantId) => {
+              const variant = activeProductVariants.find((entry) => entry.id === variantId) ?? null;
+              update({
+                productVariantId: variant?.id ?? null,
+                unitPrice: variant?.salePrice ?? selectedProduct?.salePrice ?? item.unitPrice,
+              });
+            }}
+            options={variantOptions}
+            placeholder={
+              isCustomItem
+                ? "Custom item"
+                : activeProductVariants.length > 0
+                  ? "Base product"
+                  : "No variants"
+            }
+            searchPlaceholder="Search variant, SKU, barcode..."
+            value={item.productVariantId ?? ""}
+          />
+        </label>
         <label className="grid gap-1.5">
           <span className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha">
             Quantity

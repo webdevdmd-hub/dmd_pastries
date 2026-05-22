@@ -1,4 +1,4 @@
-import { Eye, RotateCcw } from "lucide-react";
+import { Eye, ReceiptText, RotateCcw } from "lucide-react";
 import type { JSX } from "react";
 
 import { PaymentMethodBadge } from "@/components/payments/payment-method-badge";
@@ -16,8 +16,10 @@ import type { SalePayment } from "@/types/payment";
 
 type PaymentsTableProps = {
   canRefund: boolean;
+  isReceiptLoading: boolean;
   onRefund: (payment: SalePayment) => void;
   onView: (payment: SalePayment) => void;
+  onViewReceipt: (payment: SalePayment) => void;
   payments: SalePayment[];
 };
 
@@ -30,10 +32,17 @@ function formatDate(value: string): string {
 }
 
 function isRefundable(payment: SalePayment): boolean {
-  return payment.paymentStatus === "completed" || payment.paymentStatus === "partially_refunded";
+  return (
+    payment.sourceType === "pos_sale" &&
+    (payment.paymentStatus === "completed" || payment.paymentStatus === "partially_refunded")
+  );
 }
 
 function refundDisabledReason(payment: SalePayment): string | null {
+  if (payment.sourceType !== "pos_sale") {
+    return "Refund actions are currently available for POS sale payments only.";
+  }
+
   if (payment.paymentStatus === "refunded") {
     return "This payment is already fully refunded.";
   }
@@ -49,18 +58,30 @@ function refundDisabledReason(payment: SalePayment): string | null {
   return null;
 }
 
+function sourceLabel(payment: SalePayment): string {
+  return payment.sourceType === "bakery_order" ? "Bakery Order" : "POS Sale";
+}
+
+function paymentTypeLabel(payment: SalePayment): string {
+  return payment.paymentType ? payment.paymentType.replace("_", " ") : "-";
+}
+
 export function PaymentsTable({
   canRefund,
+  isReceiptLoading,
   onRefund,
   onView,
+  onViewReceipt,
   payments,
 }: PaymentsTableProps): JSX.Element {
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Sale Number</TableHead>
+          <TableHead>Source</TableHead>
+          <TableHead>Customer</TableHead>
           <TableHead>Payment Method</TableHead>
+          <TableHead>Type</TableHead>
           <TableHead>Amount</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Reference</TableHead>
@@ -72,13 +93,20 @@ export function PaymentsTable({
       <TableBody>
         {payments.map((payment) => (
           <TableRow key={payment.id}>
-            <TableCell className="font-bold">{payment.saleNumber}</TableCell>
+            <TableCell>
+              <span className="block font-bold text-brand-espresso">{payment.sourceNumber}</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-brand-mocha">
+                {sourceLabel(payment)}
+              </span>
+            </TableCell>
+            <TableCell>{payment.customerName ?? "Walk-in customer"}</TableCell>
             <TableCell>
               <PaymentMethodBadge
                 methodName={payment.paymentMethodNameSnapshot}
                 methodType={payment.paymentMethodTypeSnapshot}
               />
             </TableCell>
+            <TableCell className="capitalize">{paymentTypeLabel(payment)}</TableCell>
             <TableCell className="font-black">{formatMoney(payment.amount)}</TableCell>
             <TableCell>
               <PaymentStatusBadge status={payment.paymentStatus} />
@@ -89,7 +117,7 @@ export function PaymentsTable({
             <TableCell>
               <div className="flex justify-end gap-2">
                 <Button
-                  aria-label={`View ${payment.saleNumber}`}
+                  aria-label={`View ${payment.sourceNumber}`}
                   onClick={() => onView(payment)}
                   size="icon"
                   type="button"
@@ -97,9 +125,22 @@ export function PaymentsTable({
                 >
                   <Eye className="h-4 w-4" />
                 </Button>
+                {payment.sourceType === "pos_sale" && payment.sourceId ? (
+                  <Button
+                    aria-label={`View receipt for ${payment.sourceNumber}`}
+                    disabled={isReceiptLoading}
+                    onClick={() => onViewReceipt(payment)}
+                    size="icon"
+                    title="View receipt"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <ReceiptText className="h-4 w-4" />
+                  </Button>
+                ) : null}
                 {canRefund ? (
                   <Button
-                    aria-label={`Refund ${payment.saleNumber}`}
+                    aria-label={`Refund ${payment.sourceNumber}`}
                     disabled={!isRefundable(payment)}
                     onClick={() => onRefund(payment)}
                     size="icon"

@@ -32,6 +32,8 @@ type BackendPOSProductVariant = {
   current_quantity?: number | null;
   available_stock_quantity?: number | null;
   available_quantity?: number | null;
+  image_url?: string | null;
+  image_file_id?: string | null;
   status?: string;
 };
 
@@ -89,7 +91,13 @@ type BackendCheckoutPayload = {
 
 type BackendReceiptLine = {
   name?: string;
+  item_name?: string;
+  item_name_snapshot?: string;
   product_name?: string;
+  product_name_snapshot?: string;
+  product_variant_name?: string | null;
+  product_variant_name_snapshot?: string | null;
+  variant_name?: string | null;
   quantity?: number;
   unit_price?: number;
   line_total?: number;
@@ -110,6 +118,8 @@ type BackendReceipt = {
   payments?: unknown;
   paid_amount?: number;
   change_amount?: number;
+  balance_amount?: number;
+  balance_due?: number;
 };
 
 type BackendCheckoutResponse = {
@@ -127,6 +137,12 @@ type BackendHeldSaleItem = {
   product_name?: string;
   variant_name?: string | null;
   sku?: string | null;
+  image_url?: string | null;
+  image_file_id?: string | null;
+  product_image_url?: string | null;
+  product_image_file_id?: string | null;
+  variant_image_url?: string | null;
+  variant_image_file_id?: string | null;
   quantity?: number;
   unit_price?: number;
   discount_type?: string | null;
@@ -252,6 +268,8 @@ function parseVariant(value: unknown): POSProductVariant {
     availableStockQuantity: optionalNumber(
       variant.available_stock_quantity ?? variant.available_quantity,
     ),
+    imageUrl: optionalString(variant.image_url),
+    imageFileId: optionalString(variant.image_file_id),
     status: isRecordStatus(variant.status) ? variant.status : "active",
   };
 }
@@ -467,6 +485,30 @@ function parsePayment(value: unknown): PaymentInput {
   };
 }
 
+function getReceiptLineName(line: BackendReceiptLine): string {
+  const directName =
+    optionalString(line.name) ??
+    optionalString(line.item_name) ??
+    optionalString(line.item_name_snapshot);
+
+  if (directName) {
+    return directName;
+  }
+
+  const productName =
+    optionalString(line.product_name_snapshot) ?? optionalString(line.product_name);
+  const variantName =
+    optionalString(line.product_variant_name_snapshot) ??
+    optionalString(line.product_variant_name) ??
+    optionalString(line.variant_name);
+
+  if (productName && variantName) {
+    return `${productName} - ${variantName}`;
+  }
+
+  return productName ?? variantName ?? "Purchased item";
+}
+
 function parseReceipt(value: unknown): SaleReceipt {
   if (!isObject(value)) {
     throw new Error("Backend receipt payload is invalid.");
@@ -475,6 +517,13 @@ function parseReceipt(value: unknown): SaleReceipt {
   const receipt = value as BackendReceipt;
   const lines = Array.isArray(receipt.items) ? receipt.items : [];
   const payments = Array.isArray(receipt.payments) ? receipt.payments : [];
+  const total = requiredNumber(receipt.total);
+  const paidAmount = requiredNumber(receipt.paid_amount);
+  const changeAmount = requiredNumber(receipt.change_amount);
+  const balanceDue = Math.max(
+    requiredNumber(receipt.balance_due ?? receipt.balance_amount, total - paidAmount),
+    0,
+  );
 
   return {
     businessName: requiredString(receipt.business_name, "Business"),
@@ -490,7 +539,7 @@ function parseReceipt(value: unknown): SaleReceipt {
 
       const receiptLine = line as BackendReceiptLine;
       return {
-        name: requiredString(receiptLine.name ?? receiptLine.product_name, "Item"),
+        name: getReceiptLineName(receiptLine),
         quantity: requiredNumber(receiptLine.quantity, 1),
         unitPrice: requiredNumber(receiptLine.unit_price),
         lineTotal: requiredNumber(receiptLine.line_total),
@@ -499,10 +548,11 @@ function parseReceipt(value: unknown): SaleReceipt {
     subtotal: requiredNumber(receipt.subtotal),
     discountAmount: requiredNumber(receipt.discount_amount),
     taxAmount: requiredNumber(receipt.tax_amount),
-    total: requiredNumber(receipt.total),
+    total,
     payments: payments.map(parsePayment),
-    paidAmount: requiredNumber(receipt.paid_amount),
-    changeAmount: requiredNumber(receipt.change_amount),
+    paidAmount,
+    changeAmount,
+    balanceDue,
   };
 }
 
@@ -605,6 +655,10 @@ function parseHeldSaleCartItem(value: unknown): CartItem {
     productName: requiredString(item.product_name, "Product"),
     variantName: optionalString(item.variant_name),
     sku: optionalString(item.sku),
+    imageUrl: optionalString(item.variant_image_url ?? item.product_image_url ?? item.image_url),
+    imageFileId: optionalString(
+      item.variant_image_file_id ?? item.product_image_file_id ?? item.image_file_id,
+    ),
     quantity,
     unitPrice,
     discountType: isCartDiscountType(item.discount_type) ? item.discount_type : null,

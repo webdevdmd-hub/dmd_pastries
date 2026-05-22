@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { ReceiptsReportPageClient } from "@/components/reports/receipts-report-page-client";
+import { ROUTES } from "@/constants/routes";
 
 export const metadata: Metadata = {
   title: "Sales Receipts",
 };
 
 export default function ReceiptsReportPage() {
-  return <ReceiptsReportPageClient />;
+  redirect(ROUTES.payments);
 }

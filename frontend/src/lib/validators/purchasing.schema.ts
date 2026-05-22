@@ -84,6 +84,16 @@ export const purchaseFiltersSchema = z.object({
   dateTo: z.string(),
 });
 
+export const supplierPaymentSchema = z.object({
+  amount: z.coerce.number().positive("Payment amount must be greater than 0."),
+  notes: optionalNullableString,
+  paidAt: optionalNullableString,
+  paymentMethodId: z.string().min(1, "Payment method is required."),
+  referenceNumber: optionalNullableString,
+});
+
 export type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
 export type PurchaseInvoiceFormValues = z.infer<typeof purchaseInvoiceSchema>;
 export type PurchaseReceiveFormValues = z.infer<typeof purchaseReceiveSchema>;
+export type SupplierPaymentInputValues = z.input<typeof supplierPaymentSchema>;
+export type SupplierPaymentFormValues = z.infer<typeof supplierPaymentSchema>;

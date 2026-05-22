@@ -21,10 +21,13 @@ func RegisterRoutes(
 
 	group.GET("/invoices", view, handler.ListInvoices)
 	group.POST("/invoices", manage, handler.CreateInvoice)
+	group.GET("/payments", view, handler.ListInvoicePayments)
 	group.GET("/invoices/:id", view, handler.GetInvoice)
 	group.PATCH("/invoices/:id", manage, handler.UpdateInvoice)
 	group.POST("/invoices/:id/post", manage, handler.PostInvoice)
 	group.POST("/invoices/:id/cancel", manage, handler.CancelInvoice)
+	group.GET("/invoices/:id/payments", view, handler.ListInvoicePaymentsByInvoice)
+	group.POST("/invoices/:id/payments", manage, handler.AddInvoicePayment)
 
 	group.POST("/receive", manage, handler.Receive)
 	group.GET("/receipts", view, handler.ListReceipts)

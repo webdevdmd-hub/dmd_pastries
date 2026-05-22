@@ -28,6 +28,9 @@ type CreateReconciliationRequest struct {
 type PaymentListQuery struct {
 	Search          string
 	SaleID          string
+	BakeryOrderID   string
+	SourceType      string
+	SourceID        string
 	PaymentMethodID string
 	PaymentStatus   string
 	BranchID        string
@@ -75,17 +78,26 @@ type PaginationResponse struct {
 
 type PaymentResponse struct {
 	ID                        string                  `json:"id"`
+	PaymentID                 string                  `json:"payment_id"`
 	BusinessID                string                  `json:"business_id"`
 	BranchID                  string                  `json:"branch_id"`
+	BranchName                string                  `json:"branch_name"`
 	SaleID                    string                  `json:"sale_id"`
 	SaleNumber                string                  `json:"sale_number"`
+	SourceType                string                  `json:"source_type"`
+	SourceID                  string                  `json:"source_id"`
+	SourceNumber              string                  `json:"source_number"`
+	CustomerName              string                  `json:"customer_name"`
 	PaymentMethodID           string                  `json:"payment_method_id"`
 	PaymentMethodNameSnapshot string                  `json:"payment_method_name_snapshot"`
 	PaymentMethodTypeSnapshot string                  `json:"payment_method_type_snapshot"`
+	PaymentMethodName         string                  `json:"payment_method_name"`
+	PaymentMethodType         string                  `json:"payment_method_type"`
 	Amount                    float64                 `json:"amount"`
 	ReferenceNumber           string                  `json:"reference_number"`
 	ProviderTransactionID     string                  `json:"provider_transaction_id"`
 	PaymentStatus             string                  `json:"payment_status"`
+	PaymentType               *string                 `json:"payment_type"`
 	PaidByUserID              string                  `json:"paid_by_user_id"`
 	PaidByUserName            string                  `json:"paid_by_user_name"`
 	Notes                     string                  `json:"notes"`

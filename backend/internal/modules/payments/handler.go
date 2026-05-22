@@ -163,7 +163,23 @@ func (h *Handler) GetReconciliation(c *gin.Context) {
 func parsePaymentListQuery(c *gin.Context) PaymentListQuery {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	return PaymentListQuery{Search: c.Query("search"), SaleID: c.Query("sale_id"), PaymentMethodID: c.Query("payment_method_id"), PaymentStatus: c.Query("payment_status"), BranchID: c.Query("branch_id"), PaidByUserID: c.Query("paid_by_user_id"), DateFrom: c.Query("date_from"), DateTo: c.Query("date_to"), Page: page, Limit: limit, SortBy: c.DefaultQuery("sort_by", "paid_at"), SortOrder: c.DefaultQuery("sort_order", "desc")}
+	return PaymentListQuery{
+		Search:          c.Query("search"),
+		SaleID:          c.Query("sale_id"),
+		BakeryOrderID:   c.Query("bakery_order_id"),
+		SourceType:      c.Query("source_type"),
+		SourceID:        c.Query("source_id"),
+		PaymentMethodID: c.Query("payment_method_id"),
+		PaymentStatus:   c.Query("payment_status"),
+		BranchID:        c.Query("branch_id"),
+		PaidByUserID:    c.Query("paid_by_user_id"),
+		DateFrom:        c.Query("date_from"),
+		DateTo:          c.Query("date_to"),
+		Page:            page,
+		Limit:           limit,
+		SortBy:          c.DefaultQuery("sort_by", "paid_at"),
+		SortOrder:       c.DefaultQuery("sort_order", "desc"),
+	}
 }
 
 func parseRefundListQuery(c *gin.Context) RefundListQuery {

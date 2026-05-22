@@ -16,6 +16,22 @@ type ListQuery struct {
 	SortOrder     string
 }
 
+type PaymentListQuery struct {
+	Search          string
+	BranchID        string
+	SupplierID      string
+	InvoiceID       string
+	PaymentMethodID string
+	PaymentStatus   string
+	PaidByUserID    string
+	DateFrom        string
+	DateTo          string
+	Page            int
+	Limit           int
+	SortBy          string
+	SortOrder       string
+}
+
 type CreatePurchaseOrderRequest struct {
 	BranchID             string                   `json:"branch_id" binding:"required"`
 	SupplierID           string                   `json:"supplier_id" binding:"required"`
@@ -96,6 +112,14 @@ type ReceivePurchaseRequest struct {
 	Notes             string                     `json:"notes"`
 }
 
+type AddPurchaseInvoicePaymentRequest struct {
+	PaymentMethodID string  `json:"payment_method_id" binding:"required"`
+	Amount          float64 `json:"amount" binding:"required"`
+	ReferenceNumber string  `json:"reference_number"`
+	PaidAt          string  `json:"paid_at"`
+	Notes           string  `json:"notes"`
+}
+
 type PurchaseReceiptItemInput struct {
 	ItemType         string  `json:"item_type" binding:"required"`
 	ProductID        string  `json:"product_id"`
@@ -159,28 +183,29 @@ type PurchaseOrderItemResponse struct {
 }
 
 type PurchaseInvoiceResponse struct {
-	ID              string                        `json:"id"`
-	BusinessID      string                        `json:"business_id"`
-	BranchID        string                        `json:"branch_id"`
-	BranchName      string                        `json:"branch_name"`
-	SupplierID      string                        `json:"supplier_id"`
-	SupplierName    string                        `json:"supplier_name"`
-	PurchaseOrderID *string                       `json:"purchase_order_id"`
-	InvoiceNumber   string                        `json:"invoice_number"`
-	InvoiceDate     time.Time                     `json:"invoice_date"`
-	DueDate         *time.Time                    `json:"due_date"`
-	Status          string                        `json:"status"`
-	PaymentStatus   string                        `json:"payment_status"`
-	SubtotalAmount  float64                       `json:"subtotal_amount"`
-	TaxAmount       float64                       `json:"tax_amount"`
-	DiscountAmount  float64                       `json:"discount_amount"`
-	TotalAmount     float64                       `json:"total_amount"`
-	PaidAmount      float64                       `json:"paid_amount"`
-	BalanceAmount   float64                       `json:"balance_amount"`
-	Notes           string                        `json:"notes"`
-	Items           []PurchaseInvoiceItemResponse `json:"items,omitempty"`
-	CreatedAt       time.Time                     `json:"created_at"`
-	UpdatedAt       time.Time                     `json:"updated_at"`
+	ID              string                           `json:"id"`
+	BusinessID      string                           `json:"business_id"`
+	BranchID        string                           `json:"branch_id"`
+	BranchName      string                           `json:"branch_name"`
+	SupplierID      string                           `json:"supplier_id"`
+	SupplierName    string                           `json:"supplier_name"`
+	PurchaseOrderID *string                          `json:"purchase_order_id"`
+	InvoiceNumber   string                           `json:"invoice_number"`
+	InvoiceDate     time.Time                        `json:"invoice_date"`
+	DueDate         *time.Time                       `json:"due_date"`
+	Status          string                           `json:"status"`
+	PaymentStatus   string                           `json:"payment_status"`
+	SubtotalAmount  float64                          `json:"subtotal_amount"`
+	TaxAmount       float64                          `json:"tax_amount"`
+	DiscountAmount  float64                          `json:"discount_amount"`
+	TotalAmount     float64                          `json:"total_amount"`
+	PaidAmount      float64                          `json:"paid_amount"`
+	BalanceAmount   float64                          `json:"balance_amount"`
+	Notes           string                           `json:"notes"`
+	Items           []PurchaseInvoiceItemResponse    `json:"items,omitempty"`
+	Payments        []PurchaseInvoicePaymentResponse `json:"payments,omitempty"`
+	CreatedAt       time.Time                        `json:"created_at"`
+	UpdatedAt       time.Time                        `json:"updated_at"`
 }
 
 type PurchaseInvoiceItemResponse struct {
@@ -200,6 +225,28 @@ type PurchaseInvoiceItemResponse struct {
 	LineTotal        float64    `json:"line_total"`
 	ExpiryDate       *time.Time `json:"expiry_date"`
 	BatchNumber      string     `json:"batch_number"`
+}
+
+type PurchaseInvoicePaymentResponse struct {
+	PaymentID         string    `json:"payment_id"`
+	PurchaseInvoiceID string    `json:"purchase_invoice_id"`
+	InvoiceNumber     string    `json:"invoice_number"`
+	SupplierID        string    `json:"supplier_id"`
+	SupplierName      string    `json:"supplier_name"`
+	BranchID          string    `json:"branch_id"`
+	BranchName        string    `json:"branch_name"`
+	PaymentMethodID   string    `json:"payment_method_id"`
+	PaymentMethodName string    `json:"payment_method_name"`
+	PaymentMethodType string    `json:"payment_method_type"`
+	Amount            float64   `json:"amount"`
+	PaymentStatus     string    `json:"payment_status"`
+	ReferenceNumber   string    `json:"reference_number"`
+	PaidByUserID      string    `json:"paid_by_user_id"`
+	PaidByUserName    string    `json:"paid_by_user_name"`
+	PaidAt            time.Time `json:"paid_at"`
+	Notes             string    `json:"notes"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 type PurchaseReceiptResponse struct {

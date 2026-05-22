@@ -253,6 +253,121 @@ func (s *Service) GetInvoice(currentUser *utils.AuthContext, id string) (*Purcha
 	return &dto, nil
 }
 
+func (s *Service) ListInvoicePayments(currentUser *utils.AuthContext, query PaymentListQuery) (*PaginatedResponse[PurchaseInvoicePaymentResponse], error) {
+	normalizePaymentQuery(&query)
+	branchID, allBranches, err := currentUser.ResolveBranchScope(query.BranchID, "")
+	if err != nil {
+		return nil, err
+	}
+	if allBranches {
+		query.BranchID = ""
+	} else {
+		query.BranchID = branchID
+	}
+	if err := validatePaymentListQuery(query); err != nil {
+		return nil, err
+	}
+	payments, total, err := s.repo.ListAllInvoicePayments(currentUser.BusinessID, query)
+	if err != nil {
+		return nil, apperrors.Internal("failed to list purchase invoice payments")
+	}
+	for i := range payments {
+		payments[i].Amount = roundMoney(payments[i].Amount)
+	}
+	return &PaginatedResponse[PurchaseInvoicePaymentResponse]{Items: payments, Pagination: PaginationResponse{Page: query.Page, Limit: query.Limit, Total: total, TotalPages: totalPages(total, query.Limit)}}, nil
+}
+
+func (s *Service) ListInvoicePaymentsByInvoice(currentUser *utils.AuthContext, invoiceID string) ([]PurchaseInvoicePaymentResponse, error) {
+	invoice, err := s.repo.FindInvoice(invoiceID, currentUser.BusinessID)
+	if err != nil {
+		return nil, notFound(err, "purchase invoice not found")
+	}
+	if !currentUser.CanAccessBranch(invoice.BranchID) {
+		return nil, apperrors.Forbidden("branch access denied")
+	}
+	payments, err := s.repo.ListInvoicePayments(currentUser.BusinessID, invoiceID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to list purchase invoice payments")
+	}
+	for i := range payments {
+		payments[i].Amount = roundMoney(payments[i].Amount)
+	}
+	return payments, nil
+}
+
+func (s *Service) AddInvoicePayment(currentUser *utils.AuthContext, invoiceID string, req AddPurchaseInvoicePaymentRequest, ipAddress, userAgent string) (*PurchaseInvoiceResponse, error) {
+	if err := validateUUID(req.PaymentMethodID, "payment_method_id"); err != nil {
+		return nil, err
+	}
+	if req.Amount <= 0 {
+		return nil, apperrors.BadRequest("amount must be greater than zero", nil)
+	}
+	paidAt, err := parseOptionalDateTime(req.PaidAt, time.Now().UTC(), "paid_at")
+	if err != nil {
+		return nil, err
+	}
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		invoice, err := s.repo.FindInvoiceForUpdate(tx, invoiceID, currentUser.BusinessID)
+		if err != nil {
+			return notFound(err, "purchase invoice not found")
+		}
+		if !currentUser.CanAccessBranch(invoice.BranchID) {
+			return apperrors.Forbidden("branch access denied")
+		}
+		if invoice.Status != "posted" {
+			return apperrors.BadRequest("only posted purchase invoices can be paid", nil)
+		}
+		if invoice.BalanceAmount <= 0 || invoice.PaymentStatus == "paid" {
+			return apperrors.BadRequest("purchase invoice is already paid", nil)
+		}
+		amount := roundMoney(req.Amount)
+		if amount > roundMoney(invoice.BalanceAmount) {
+			return apperrors.BadRequest("payment amount cannot exceed invoice balance", map[string]float64{"balance_amount": roundMoney(invoice.BalanceAmount)})
+		}
+		method, err := s.repo.PaymentMethod(tx, currentUser.BusinessID, req.PaymentMethodID)
+		if err != nil {
+			return notFound(err, "payment method not found")
+		}
+		reference := strings.TrimSpace(req.ReferenceNumber)
+		if method.RequiresReference && reference == "" {
+			return apperrors.BadRequest("reference_number is required for this payment method", nil)
+		}
+		payment := &PurchaseInvoicePayment{
+			ID:                        utils.NewUUID(),
+			BusinessID:                currentUser.BusinessID,
+			BranchID:                  invoice.BranchID,
+			PurchaseInvoiceID:         invoice.ID,
+			SupplierID:                invoice.SupplierID,
+			PaymentMethodID:           method.ID,
+			PaymentMethodNameSnapshot: method.MethodName,
+			PaymentMethodTypeSnapshot: method.MethodType,
+			Amount:                    amount,
+			PaymentStatus:             "completed",
+			ReferenceNumber:           reference,
+			PaidByUserID:              currentUser.UserID,
+			PaidAt:                    paidAt,
+			Notes:                     strings.TrimSpace(req.Notes),
+		}
+		if err := s.repo.CreateInvoicePayment(tx, payment); err != nil {
+			return err
+		}
+		paidAmount := roundMoney(invoice.PaidAmount + amount)
+		balanceAmount := roundMoney(invoice.TotalAmount - paidAmount)
+		if balanceAmount < 0 {
+			balanceAmount = 0
+		}
+		status := invoicePaymentStatus(invoice.TotalAmount, paidAmount)
+		if err := s.repo.UpdateInvoice(tx, invoice.ID, currentUser.BusinessID, map[string]interface{}{"paid_amount": paidAmount, "balance_amount": balanceAmount, "payment_status": status, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}, nil); err != nil {
+			return err
+		}
+		return s.audit(tx, currentUser, "purchase_invoice.payment_added", invoice.ID, "Purchase invoice payment added", ipAddress, userAgent)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetInvoice(currentUser, invoiceID)
+}
+
 func (s *Service) UpdateInvoice(currentUser *utils.AuthContext, id string, req UpdatePurchaseInvoiceRequest, ipAddress, userAgent string) (*PurchaseInvoiceResponse, error) {
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		existing, err := s.repo.FindInvoiceForUpdate(tx, id, currentUser.BusinessID)
@@ -349,6 +464,13 @@ func (s *Service) CancelInvoice(currentUser *utils.AuthContext, id, ipAddress, u
 		}
 		if receipts > 0 {
 			return apperrors.BadRequest("invoice with posted receipts cannot be cancelled", nil)
+		}
+		payments, err := s.repo.CompletedInvoicePaymentCount(tx, currentUser.BusinessID, id)
+		if err != nil {
+			return err
+		}
+		if payments > 0 {
+			return apperrors.BadRequest("invoice with completed supplier payments cannot be cancelled", nil)
 		}
 		if err := s.repo.UpdateInvoice(tx, id, currentUser.BusinessID, map[string]interface{}{"status": "cancelled", "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}, nil); err != nil {
 			return err
@@ -922,6 +1044,11 @@ func (s *Service) invoiceResponse(businessID string, invoice PurchaseInvoice, in
 		for _, item := range items {
 			response.Items = append(response.Items, PurchaseInvoiceItemResponse{ID: item.ID, ItemType: item.ItemType, ProductID: item.ProductID, IngredientID: item.IngredientID, PackagingItemID: item.PackagingItemID, ItemNameSnapshot: item.ItemNameSnapshot, Quantity: roundQuantity(item.Quantity), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), UnitCost: roundMoney(item.UnitCost), DiscountAmount: roundMoney(item.DiscountAmount), TaxRateID: item.TaxRateID, TaxAmount: roundMoney(item.TaxAmount), LineTotal: roundMoney(item.LineTotal), ExpiryDate: item.ExpiryDate, BatchNumber: item.BatchNumber})
 		}
+		payments, _ := s.repo.ListInvoicePayments(businessID, invoice.ID)
+		for i := range payments {
+			payments[i].Amount = roundMoney(payments[i].Amount)
+		}
+		response.Payments = payments
 	}
 	return response
 }
@@ -996,12 +1123,53 @@ func normalizeQuery(query *ListQuery) {
 	}
 }
 
+func normalizePaymentQuery(query *PaymentListQuery) {
+	if query.Page <= 0 {
+		query.Page = 1
+	}
+	if query.Limit <= 0 || query.Limit > 100 {
+		query.Limit = 20
+	}
+	if query.SortBy == "" {
+		query.SortBy = "paid_at"
+	}
+	if query.SortOrder == "" {
+		query.SortOrder = "desc"
+	}
+}
+
+func validatePaymentListQuery(query PaymentListQuery) error {
+	for field, value := range map[string]string{"branch_id": query.BranchID, "supplier_id": query.SupplierID, "purchase_invoice_id": query.InvoiceID, "payment_method_id": query.PaymentMethodID, "paid_by_user_id": query.PaidByUserID} {
+		if strings.TrimSpace(value) != "" {
+			if err := validateUUID(value, field); err != nil {
+				return err
+			}
+		}
+	}
+	if query.PaymentStatus != "" && query.PaymentStatus != "completed" && query.PaymentStatus != "voided" {
+		return apperrors.BadRequest("payment_status must be completed or voided", nil)
+	}
+	return nil
+}
+
 func parseDate(value, field string) (time.Time, error) {
 	parsed, err := time.Parse("2006-01-02", strings.TrimSpace(value))
 	if err != nil {
 		return time.Time{}, apperrors.BadRequest(field+" must use YYYY-MM-DD format", nil)
 	}
 	return parsed, nil
+}
+
+func parseOptionalDateTime(value string, fallback time.Time, field string) (time.Time, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return fallback, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, trimmed)
+	if err != nil {
+		return time.Time{}, apperrors.BadRequest(field+" must use RFC3339 datetime format", nil)
+	}
+	return parsed.UTC(), nil
 }
 
 func parseOptionalDate(value, field string) (*time.Time, error) {
@@ -1028,6 +1196,16 @@ func validItemType(value string) bool {
 
 func validOrderStatus(value string) bool {
 	return value == "draft" || value == "ordered" || value == "partially_received" || value == "received" || value == "cancelled"
+}
+
+func invoicePaymentStatus(totalAmount, paidAmount float64) string {
+	if paidAmount <= 0 {
+		return "unpaid"
+	}
+	if roundMoney(paidAmount) < roundMoney(totalAmount) {
+		return "partial"
+	}
+	return "paid"
 }
 
 func nullableString(value string) *string {

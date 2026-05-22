@@ -10,7 +10,7 @@ type PaymentsEmptyStateProps = {
 
 export function PaymentsEmptyState({
   title = "No payments found.",
-  description = "Payments will appear here once POS sales or split payments are recorded.",
+  description = "Customer collections will appear here once POS sales or bakery order payments are recorded.",
 }: PaymentsEmptyStateProps): JSX.Element {
   return (
     <Card>

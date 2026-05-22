@@ -142,12 +142,6 @@ export const appNavigationGroups = [
             permissionAny: [PERMISSIONS.reportsView],
           },
           {
-            href: ROUTES.reportsReceipts,
-            icon: ReceiptText,
-            label: "Sales Receipts",
-            permissionAny: [PERMISSIONS.reportsView],
-          },
-          {
             href: ROUTES.reportsInventory,
             icon: PackageSearch,
             label: "Inventory Report",
@@ -156,7 +150,7 @@ export const appNavigationGroups = [
           {
             href: ROUTES.reportsFinancial,
             icon: WalletCards,
-            label: "Payment Report",
+            label: "Financial Reports",
             permissionAny: [PERMISSIONS.reportsView],
           },
           {
@@ -302,6 +296,17 @@ export const appNavigationGroups = [
           PERMISSIONS.inventoryView,
         ],
       },
+      {
+        href: ROUTES.purchasingPayments,
+        icon: WalletCards,
+        label: "Supplier Payments",
+        permissionAny: [
+          PERMISSIONS.purchasingView,
+          PERMISSIONS.purchasingInvoicesEdit,
+          PERMISSIONS.purchasingInvoicesPost,
+          PERMISSIONS.inventoryView,
+        ],
+      },
     ],
   },
   {
@@ -362,6 +367,55 @@ export const appNavigationGroups = [
           PERMISSIONS.manufacturingBatchesCreate,
           PERMISSIONS.manufacturingBatchesEdit,
           PERMISSIONS.inventoryView,
+        ],
+      },
+    ],
+  },
+  {
+    label: "Accountant",
+    items: [
+      {
+        href: ROUTES.accountingChartOfAccounts,
+        icon: Landmark,
+        label: "Chart of Accounts",
+        permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingAccountsManage],
+      },
+      {
+        href: ROUTES.accountingJournalEntries,
+        icon: ListChecks,
+        label: "Journal Entries",
+        permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingJournalEntriesManage],
+      },
+      {
+        href: ROUTES.accountingGeneralLedger,
+        icon: ChartNoAxesCombined,
+        label: "Reports",
+        permissionAny: [PERMISSIONS.accountingView],
+        children: [
+          {
+            href: ROUTES.accountingGeneralLedger,
+            icon: ChartNoAxesCombined,
+            label: "General Ledger",
+            permissionAny: [PERMISSIONS.accountingView],
+          },
+          {
+            href: ROUTES.accountingTrialBalance,
+            icon: Landmark,
+            label: "Trial Balance",
+            permissionAny: [PERMISSIONS.accountingView],
+          },
+          {
+            href: ROUTES.accountingProfitLoss,
+            icon: WalletCards,
+            label: "Profit & Loss",
+            permissionAny: [PERMISSIONS.accountingView],
+          },
+          {
+            href: ROUTES.accountingBalanceSheet,
+            icon: Landmark,
+            label: "Balance Sheet",
+            permissionAny: [PERMISSIONS.accountingView],
+          },
         ],
       },
     ],

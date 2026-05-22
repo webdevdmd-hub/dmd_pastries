@@ -3,9 +3,11 @@
 import type { JSX } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils/cn";
 import type { ProductType } from "@/types/product";
 
 type ProductTypeBadgeProps = {
+  className?: string;
   type: ProductType;
 };
 
@@ -17,9 +19,14 @@ const labels: Record<ProductType, string> = {
   service: "Service",
 };
 
-export function ProductTypeBadge({ type }: ProductTypeBadgeProps): JSX.Element {
+export function ProductTypeBadge({ className, type }: ProductTypeBadgeProps): JSX.Element {
   return (
-    <Badge className="bg-brand-cappuccino/50 text-brand-espresso hover:bg-brand-cappuccino/50">
+    <Badge
+      className={cn(
+        "border-brand-cappuccino/80 bg-brand-latte text-brand-espresso hover:bg-brand-latte",
+        className,
+      )}
+    >
       {labels[type]}
     </Badge>
   );

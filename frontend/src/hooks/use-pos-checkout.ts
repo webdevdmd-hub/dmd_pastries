@@ -6,6 +6,7 @@ import { useBranchQueryKey } from "@/hooks/use-branch-scope";
 import {
   cancelHeldSale,
   checkoutPOS,
+  getHeldSaleById,
   getHeldSales,
   holdSalePOS,
   resumeHeldSale,
@@ -31,6 +32,22 @@ export function useHeldSales(enabled: boolean) {
     queryKey: ["pos", branchQueryKey, "held-sales"],
     queryFn: getHeldSales,
     enabled,
+  });
+}
+
+export function useHeldSaleDetails(heldSaleId: string | null, enabled: boolean) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<HeldSaleResumeData>({
+    queryKey: ["pos", branchQueryKey, "held-sales", heldSaleId],
+    queryFn: async () => {
+      if (!heldSaleId) {
+        throw new Error("Held sale id is required.");
+      }
+
+      return getHeldSaleById(heldSaleId);
+    },
+    enabled: enabled && heldSaleId !== null,
   });
 }
 

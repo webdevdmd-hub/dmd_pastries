@@ -2,6 +2,8 @@ package server
 
 import (
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -19,10 +21,18 @@ func NewRouter(cfg config.Config) *gin.Engine {
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-Appwrite-Project", "X-Appwrite-JWT", "X-Appwrite-Response-Format", "Cache-Control", "Pragma"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: false,
+		MaxAge:           12 * time.Hour,
 	}))
+	router.Use(func(c *gin.Context) {
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	})
 
 	router.GET("/health", func(c *gin.Context) {
 		response.Success(c, 200, "ok", gin.H{

@@ -10,10 +10,10 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-brand-caramel text-brand-latte shadow-sm hover:bg-brand-mocha",
-        secondary: "bg-brand-cappuccino/60 text-brand-espresso hover:bg-brand-cappuccino",
+        secondary: "bg-brand-latte text-brand-espresso hover:bg-brand-cappuccino/55",
         outline:
-          "border border-brand-cappuccino bg-brand-latte text-brand-espresso hover:bg-brand-cappuccino/40",
-        ghost: "text-brand-espresso hover:bg-brand-cappuccino/40",
+          "border border-workspace-border bg-workspace-panel text-brand-espresso hover:bg-brand-latte/70",
+        ghost: "text-brand-espresso hover:bg-brand-latte/70",
         link: "text-brand-espresso underline-offset-4 hover:underline",
       },
       size: {

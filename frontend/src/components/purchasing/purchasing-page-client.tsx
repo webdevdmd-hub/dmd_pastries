@@ -1,6 +1,6 @@
 "use client";
 
-import { FilePlus2, PackageCheck, ReceiptText, Truck } from "lucide-react";
+import { FilePlus2, PackageCheck, ReceiptText, Truck, WalletCards } from "lucide-react";
 import Link from "next/link";
 import type { JSX } from "react";
 
@@ -33,6 +33,12 @@ const quickActions = [
     href: ROUTES.purchasingReceipts,
     icon: PackageCheck,
     label: "Receive Stock",
+  },
+  {
+    description: "Track outgoing supplier payments against posted purchase invoices.",
+    href: ROUTES.purchasingPayments,
+    icon: WalletCards,
+    label: "Supplier Payments",
   },
   {
     description: "Supplier history foundation links purchasing back to supplier profiles.",
@@ -69,7 +75,7 @@ export function PurchasingPageClient(): JSX.Element {
         <PurchasingSummaryCards summary={summaryQuery.data} />
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {quickActions.map((action) => {
           const Icon = action.icon;
           return (

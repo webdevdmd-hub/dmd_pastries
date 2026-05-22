@@ -1,5 +1,6 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
+  AddSupplierPaymentPayload,
   CreatePurchaseInvoicePayload,
   CreatePurchaseOrderPayload,
   PurchaseInvoice,
@@ -23,6 +24,9 @@ import type {
   PurchasingTaxRateOption,
   PurchasingUnitOption,
   ReceivePurchasePayload,
+  SupplierPayment,
+  SupplierPaymentFilters,
+  SupplierPaymentStatus,
   UpdatePurchaseInvoicePayload,
   UpdatePurchaseOrderPayload,
   UpdatePurchaseOrderStatusPayload,
@@ -74,6 +78,14 @@ type BackendReceivePayload = {
   notes: string | null;
 };
 
+type BackendSupplierPaymentPayload = {
+  amount: number;
+  notes: string | null;
+  paid_at: string | null;
+  payment_method_id: string;
+  reference_number: string | null;
+};
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -105,6 +117,7 @@ function parseList<TItem>(value: unknown, parser: (item: unknown) => TItem): TIt
       "suppliers",
       "products",
       "ingredients",
+      "payments",
     ];
     for (const key of keys) {
       const nextValue = value[key];
@@ -154,6 +167,10 @@ function isPaymentStatus(value: unknown): value is PurchasePaymentStatus {
 
 function isReceiptStatus(value: unknown): value is PurchaseReceiptStatus {
   return value === "draft" || value === "posted" || value === "cancelled";
+}
+
+function isSupplierPaymentStatus(value: unknown): value is SupplierPaymentStatus {
+  return value === "completed" || value === "pending" || value === "failed";
 }
 
 function branchStatus(value: unknown): "active" | "inactive" {
@@ -313,6 +330,34 @@ function parseReceipt(value: unknown): PurchaseReceipt {
     createdAt: stringValue(value.created_at),
     updatedAt: stringValue(value.updated_at),
     items: Array.isArray(value.items) ? value.items.map(parseReceiptItem) : [],
+  };
+}
+
+function parseSupplierPayment(value: unknown): SupplierPayment {
+  if (!isObject(value)) {
+    throw new Error("Backend supplier payment payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.payment_id, stringValue(value.id)),
+    purchaseInvoiceId: stringValue(value.purchase_invoice_id),
+    invoiceNumber: stringValue(value.invoice_number, "Invoice"),
+    supplierId: stringValue(value.supplier_id),
+    supplierName: stringValue(value.supplier_name, "Supplier"),
+    branchId: stringValue(value.branch_id),
+    branchName: stringValue(value.branch_name, "Branch"),
+    paymentMethodId: stringValue(value.payment_method_id),
+    paymentMethodName: stringValue(value.payment_method_name, "Payment method"),
+    paymentMethodType: stringValue(value.payment_method_type),
+    amount: numberValue(value.amount),
+    paymentStatus: isSupplierPaymentStatus(value.payment_status)
+      ? value.payment_status
+      : "completed",
+    referenceNumber: optionalString(value.reference_number),
+    paidByUserId: stringValue(value.paid_by_user_id),
+    paidByUserName: stringValue(value.paid_by_user_name, "User"),
+    paidAt: stringValue(value.paid_at),
+    notes: optionalString(value.notes),
   };
 }
 
@@ -485,6 +530,16 @@ function receivePayload(payload: ReceivePurchasePayload): BackendReceivePayload 
     received_date: payload.receivedDate,
     items: payload.items.map((line) => linePayload(line, "quantity_received")),
     notes: payload.notes,
+  };
+}
+
+function supplierPaymentPayload(payload: AddSupplierPaymentPayload): BackendSupplierPaymentPayload {
+  return {
+    amount: payload.amount,
+    notes: payload.notes,
+    paid_at: payload.paidAt,
+    payment_method_id: payload.paymentMethodId,
+    reference_number: payload.referenceNumber,
   };
 }
 
@@ -661,6 +716,61 @@ export async function cancelPurchaseInvoice(id: string): Promise<PurchaseInvoice
     authMode: "appwrite",
     parse: parseInvoice,
   });
+
+  return response.data;
+}
+
+export async function getSupplierPayments(
+  params: SupplierPaymentFilters,
+): Promise<SupplierPayment[]> {
+  const response = await apiRequest<SupplierPayment[]>(
+    `/api/v1/purchasing/payments${toQueryString({
+      branch_id: params.branchId,
+      date_from: params.dateFrom,
+      date_to: params.dateTo,
+      paid_by_user_id: params.paidByUserId,
+      payment_method_id: params.paymentMethodId,
+      payment_status: params.paymentStatus,
+      purchase_invoice_id: params.purchaseInvoiceId,
+      search: params.search,
+      sort_by: params.sortBy,
+      sort_order: params.sortOrder,
+      supplier_id: params.supplierId,
+    })}`,
+    {
+      authMode: "appwrite",
+      parse: (data) => parseList(data, parseSupplierPayment),
+    },
+  );
+
+  return response.data;
+}
+
+export async function getSupplierInvoicePayments(invoiceId: string): Promise<SupplierPayment[]> {
+  const response = await apiRequest<SupplierPayment[]>(
+    `/api/v1/purchasing/invoices/${invoiceId}/payments`,
+    {
+      authMode: "appwrite",
+      parse: (data) => parseList(data, parseSupplierPayment),
+    },
+  );
+
+  return response.data;
+}
+
+export async function addSupplierInvoicePayment(
+  invoiceId: string,
+  payload: AddSupplierPaymentPayload,
+): Promise<SupplierPayment> {
+  const response = await apiRequest<SupplierPayment, BackendSupplierPaymentPayload>(
+    `/api/v1/purchasing/invoices/${invoiceId}/payments`,
+    {
+      authMode: "appwrite",
+      body: supplierPaymentPayload(payload),
+      method: "POST",
+      parse: parseSupplierPayment,
+    },
+  );
 
   return response.data;
 }

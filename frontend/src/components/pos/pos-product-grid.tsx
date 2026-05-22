@@ -15,8 +15,10 @@ type POSProductGridProps = {
   error: Error | null;
   isLoading: boolean;
   onProductClick: (product: POSProduct) => void;
+  onProductVariantsClick: (product: POSProduct) => void;
   onRetry: () => void;
   products: POSProduct[];
+  showPrices: boolean;
   stockByProductId?: Map<string, POSProductStock>;
 };
 
@@ -24,8 +26,10 @@ export function POSProductGrid({
   error,
   isLoading,
   onProductClick,
+  onProductVariantsClick,
   onRetry,
   products,
+  showPrices,
   stockByProductId,
 }: POSProductGridProps): JSX.Element {
   if (isLoading) {
@@ -67,7 +71,9 @@ export function POSProductGrid({
           <POSProductCard
             key={product.id}
             onAdd={onProductClick}
+            onOpenVariants={onProductVariantsClick}
             product={product}
+            showPrices={showPrices}
             {...(stock
               ? {
                   stockQuantity: stock.quantity,

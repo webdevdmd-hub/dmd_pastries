@@ -138,6 +138,65 @@ func (r *Repository) InvoiceItems(invoiceID, businessID string) ([]PurchaseInvoi
 	return items, err
 }
 
+func (r *Repository) CreateInvoicePayment(tx *gorm.DB, payment *PurchaseInvoicePayment) error {
+	return tx.Create(payment).Error
+}
+
+func (r *Repository) ListInvoicePayments(businessID, invoiceID string) ([]PurchaseInvoicePaymentResponse, error) {
+	var rows []PurchaseInvoicePaymentResponse
+	err := r.db.Table("purchase_invoice_payments pip").
+		Select(`pip.id AS payment_id, pip.purchase_invoice_id, pi.invoice_number, pip.supplier_id, s.supplier_name,
+			pip.branch_id, b.branch_name, pip.payment_method_id,
+			pip.payment_method_name_snapshot AS payment_method_name,
+			pip.payment_method_type_snapshot AS payment_method_type,
+			pip.amount, pip.payment_status, pip.reference_number, pip.paid_by_user_id,
+			u.full_name AS paid_by_user_name, pip.paid_at, pip.notes, pip.created_at, pip.updated_at`).
+		Joins("JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id").
+		Joins("JOIN suppliers s ON s.id = pip.supplier_id").
+		Joins("JOIN branches b ON b.id = pip.branch_id").
+		Joins("LEFT JOIN users u ON u.id = pip.paid_by_user_id").
+		Where("pip.business_id = ? AND pip.purchase_invoice_id = ? AND pip.deleted_at IS NULL", businessID, invoiceID).
+		Order("pip.paid_at ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) ListAllInvoicePayments(businessID string, query PaymentListQuery) ([]PurchaseInvoicePaymentResponse, int64, error) {
+	db := r.db.Table("purchase_invoice_payments pip").
+		Joins("JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id").
+		Joins("JOIN suppliers s ON s.id = pip.supplier_id").
+		Joins("JOIN branches b ON b.id = pip.branch_id").
+		Joins("LEFT JOIN users u ON u.id = pip.paid_by_user_id").
+		Where("pip.business_id = ? AND pip.deleted_at IS NULL", businessID)
+	db = applyPaymentFilters(db, query)
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	sortBy := safePaymentSort(query.SortBy)
+	sortOrder := safeOrder(query.SortOrder)
+	var rows []PurchaseInvoicePaymentResponse
+	err := db.Select(`pip.id AS payment_id, pip.purchase_invoice_id, pi.invoice_number, pip.supplier_id, s.supplier_name,
+			pip.branch_id, b.branch_name, pip.payment_method_id,
+			pip.payment_method_name_snapshot AS payment_method_name,
+			pip.payment_method_type_snapshot AS payment_method_type,
+			pip.amount, pip.payment_status, pip.reference_number, pip.paid_by_user_id,
+			u.full_name AS paid_by_user_name, pip.paid_at, pip.notes, pip.created_at, pip.updated_at`).
+		Order("pip." + sortBy + " " + sortOrder).
+		Offset((query.Page - 1) * query.Limit).
+		Limit(query.Limit).
+		Scan(&rows).Error
+	return rows, total, err
+}
+
+func (r *Repository) CompletedInvoicePaymentCount(tx *gorm.DB, businessID, invoiceID string) (int64, error) {
+	var count int64
+	err := tx.Model(&PurchaseInvoicePayment{}).
+		Where("business_id = ? AND purchase_invoice_id = ? AND payment_status = ? AND deleted_at IS NULL", businessID, invoiceID, "completed").
+		Count(&count).Error
+	return count, err
+}
+
 func (r *Repository) InvoiceNumberExists(tx *gorm.DB, businessID, supplierID, invoiceNumber, excludeID string) (bool, error) {
 	db := tx.Model(&PurchaseInvoice{}).Where("business_id = ? AND supplier_id = ? AND LOWER(invoice_number) = LOWER(?) AND deleted_at IS NULL", businessID, supplierID, invoiceNumber)
 	if excludeID != "" {
@@ -217,6 +276,15 @@ func (r *Repository) TaxRate(tx *gorm.DB, businessID, taxRateID string) (*TaxRat
 	var tax TaxRateInfo
 	err := tx.Table("tax_rates").Select("id, tax_name, rate_percentage, is_inclusive").Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", taxRateID, businessID, "active").Take(&tax).Error
 	return &tax, err
+}
+
+func (r *Repository) PaymentMethod(tx *gorm.DB, businessID, methodID string) (*PaymentMethodInfo, error) {
+	var method PaymentMethodInfo
+	err := tx.Table("payment_methods").
+		Select("id, method_name, method_type, requires_reference").
+		Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", methodID, businessID, "active").
+		Take(&method).Error
+	return &method, err
 }
 
 func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string) (*ProductInfo, error) {
@@ -309,12 +377,53 @@ func applyCommonFilters(db *gorm.DB, table string, query ListQuery) *gorm.DB {
 	return db
 }
 
+func applyPaymentFilters(db *gorm.DB, query PaymentListQuery) *gorm.DB {
+	if query.BranchID != "" {
+		db = db.Where("pip.branch_id = ?", query.BranchID)
+	}
+	if query.SupplierID != "" {
+		db = db.Where("pip.supplier_id = ?", query.SupplierID)
+	}
+	if query.InvoiceID != "" {
+		db = db.Where("pip.purchase_invoice_id = ?", query.InvoiceID)
+	}
+	if query.PaymentMethodID != "" {
+		db = db.Where("pip.payment_method_id = ?", query.PaymentMethodID)
+	}
+	if query.PaymentStatus != "" {
+		db = db.Where("pip.payment_status = ?", query.PaymentStatus)
+	}
+	if query.PaidByUserID != "" {
+		db = db.Where("pip.paid_by_user_id = ?", query.PaidByUserID)
+	}
+	if query.DateFrom != "" {
+		db = db.Where("pip.paid_at >= ?", query.DateFrom)
+	}
+	if query.DateTo != "" {
+		db = db.Where("pip.paid_at <= ?", query.DateTo)
+	}
+	if query.Search != "" {
+		like := "%" + strings.ToLower(query.Search) + "%"
+		db = db.Where("LOWER(pi.invoice_number) LIKE ? OR LOWER(s.supplier_name) LIKE ? OR LOWER(pip.reference_number) LIKE ? OR LOWER(pip.payment_method_name_snapshot) LIKE ? OR LOWER(pip.notes) LIKE ?", like, like, like, like, like)
+	}
+	return db
+}
+
 func safeSort(value string) string {
 	switch value {
 	case "updated_at", "status", "total_amount", "invoice_date", "order_date", "received_date":
 		return value
 	default:
 		return "created_at"
+	}
+}
+
+func safePaymentSort(value string) string {
+	switch value {
+	case "paid_at", "amount", "payment_status", "created_at", "updated_at":
+		return value
+	default:
+		return "paid_at"
 	}
 }
 
@@ -366,6 +475,13 @@ type TaxRateInfo struct {
 	TaxName        string
 	RatePercentage float64
 	IsInclusive    bool
+}
+
+type PaymentMethodInfo struct {
+	ID                string
+	MethodName        string
+	MethodType        string
+	RequiresReference bool
 }
 
 type ProductInfo struct {
