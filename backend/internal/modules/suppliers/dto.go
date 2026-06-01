@@ -3,17 +3,16 @@ package suppliers
 import "time"
 
 type SupplierListQuery struct {
-	Search             string
-	SupplierCategoryID string
-	Status             string
-	City               string
-	Country            string
-	DateFrom           string
-	DateTo             string
-	Page               int
-	Limit              int
-	SortBy             string
-	SortOrder          string
+	Search    string
+	Status    string
+	City      string
+	Country   string
+	DateFrom  string
+	DateTo    string
+	Page      int
+	Limit     int
+	SortBy    string
+	SortOrder string
 }
 
 type SupplierLookupQuery struct {
@@ -22,35 +21,33 @@ type SupplierLookupQuery struct {
 }
 
 type CreateSupplierRequest struct {
-	SupplierName       string `json:"supplier_name" binding:"required"`
-	SupplierCategoryID string `json:"supplier_category_id"`
-	Phone              string `json:"phone"`
-	Email              string `json:"email"`
-	Website            string `json:"website"`
-	AddressLine1       string `json:"address_line_1"`
-	AddressLine2       string `json:"address_line_2"`
-	City               string `json:"city"`
-	State              string `json:"state"`
-	Country            string `json:"country"`
-	PostalCode         string `json:"postal_code"`
-	TaxNumber          string `json:"tax_number"`
-	Notes              string `json:"notes"`
+	SupplierName string `json:"supplier_name" binding:"required"`
+	Phone        string `json:"phone"`
+	Email        string `json:"email"`
+	Website      string `json:"website"`
+	AddressLine1 string `json:"address_line_1"`
+	AddressLine2 string `json:"address_line_2"`
+	City         string `json:"city"`
+	State        string `json:"state"`
+	Country      string `json:"country"`
+	PostalCode   string `json:"postal_code"`
+	TaxNumber    string `json:"tax_number"`
+	Notes        string `json:"notes"`
 }
 
 type UpdateSupplierRequest struct {
-	SupplierName       string `json:"supplier_name"`
-	SupplierCategoryID string `json:"supplier_category_id"`
-	Phone              string `json:"phone"`
-	Email              string `json:"email"`
-	Website            string `json:"website"`
-	AddressLine1       string `json:"address_line_1"`
-	AddressLine2       string `json:"address_line_2"`
-	City               string `json:"city"`
-	State              string `json:"state"`
-	Country            string `json:"country"`
-	PostalCode         string `json:"postal_code"`
-	TaxNumber          string `json:"tax_number"`
-	Notes              string `json:"notes"`
+	SupplierName string `json:"supplier_name"`
+	Phone        string `json:"phone"`
+	Email        string `json:"email"`
+	Website      string `json:"website"`
+	AddressLine1 string `json:"address_line_1"`
+	AddressLine2 string `json:"address_line_2"`
+	City         string `json:"city"`
+	State        string `json:"state"`
+	Country      string `json:"country"`
+	PostalCode   string `json:"postal_code"`
+	TaxNumber    string `json:"tax_number"`
+	Notes        string `json:"notes"`
 }
 
 type UpdateSupplierStatusRequest struct {
@@ -80,28 +77,26 @@ type CreateSupplierNoteRequest struct {
 }
 
 type SupplierResponse struct {
-	ID                 string                   `json:"id"`
-	BusinessID         string                   `json:"business_id"`
-	BranchID           string                   `json:"branch_id"`
-	SupplierCode       string                   `json:"supplier_code"`
-	SupplierName       string                   `json:"supplier_name"`
-	SupplierCategoryID *string                  `json:"supplier_category_id"`
-	CategoryName       string                   `json:"category_name"`
-	Phone              string                   `json:"phone"`
-	Email              string                   `json:"email"`
-	Website            string                   `json:"website"`
-	AddressLine1       string                   `json:"address_line_1"`
-	AddressLine2       string                   `json:"address_line_2"`
-	City               string                   `json:"city"`
-	State              string                   `json:"state"`
-	Country            string                   `json:"country"`
-	PostalCode         string                   `json:"postal_code"`
-	TaxNumber          string                   `json:"tax_number"`
-	Notes              string                   `json:"notes"`
-	Status             string                   `json:"status"`
-	PrimaryContact     *SupplierContactResponse `json:"primary_contact"`
-	CreatedAt          time.Time                `json:"created_at"`
-	UpdatedAt          time.Time                `json:"updated_at"`
+	ID             string                   `json:"id"`
+	BusinessID     string                   `json:"business_id"`
+	BranchID       string                   `json:"branch_id"`
+	SupplierCode   string                   `json:"supplier_code"`
+	SupplierName   string                   `json:"supplier_name"`
+	Phone          string                   `json:"phone"`
+	Email          string                   `json:"email"`
+	Website        string                   `json:"website"`
+	AddressLine1   string                   `json:"address_line_1"`
+	AddressLine2   string                   `json:"address_line_2"`
+	City           string                   `json:"city"`
+	State          string                   `json:"state"`
+	Country        string                   `json:"country"`
+	PostalCode     string                   `json:"postal_code"`
+	TaxNumber      string                   `json:"tax_number"`
+	Notes          string                   `json:"notes"`
+	Status         string                   `json:"status"`
+	PrimaryContact *SupplierContactResponse `json:"primary_contact"`
+	CreatedAt      time.Time                `json:"created_at"`
+	UpdatedAt      time.Time                `json:"updated_at"`
 }
 
 type SupplierContactResponse struct {
@@ -128,14 +123,12 @@ type SupplierNoteResponse struct {
 }
 
 type SupplierLookupItem struct {
-	ID                 string  `json:"id"`
-	SupplierCode       string  `json:"supplier_code"`
-	SupplierName       string  `json:"supplier_name"`
-	SupplierCategoryID *string `json:"supplier_category_id"`
-	CategoryName       string  `json:"category_name"`
-	Phone              string  `json:"phone"`
-	Email              string  `json:"email"`
-	Status             string  `json:"status"`
+	ID           string `json:"id"`
+	SupplierCode string `json:"supplier_code"`
+	SupplierName string `json:"supplier_name"`
+	Phone        string `json:"phone"`
+	Email        string `json:"email"`
+	Status       string `json:"status"`
 }
 
 type SupplierLookupResponse struct {

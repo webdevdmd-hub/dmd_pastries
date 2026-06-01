@@ -17,6 +17,63 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
+type posSaleAccountingRow struct {
+	ID                       string
+	BusinessID               string
+	BranchID                 string
+	SaleNumber               string
+	TotalAmount              float64
+	PaidAmount               float64
+	ChangeAmount             float64
+	TaxAmount                float64
+	SaleStatus               string
+	AccountingJournalEntryID *string
+	SoldAt                   time.Time
+}
+
+type posPaymentAccountingRow struct {
+	ID                        string
+	Amount                    float64
+	PaymentStatus             string
+	PaymentMethodNameSnapshot string
+	PaymentMethodTypeSnapshot string
+	DefaultPaymentAccountID   *string
+	PaymentAccountBranchID    *string
+	PaymentAccountName        string
+	ChartAccountID            string
+}
+
+type bakeryOrderAccountingRow struct {
+	ID                       string
+	BusinessID               string
+	BranchID                 string
+	OrderNumber              string
+	TotalAmount              float64
+	PaidAmount               float64
+	BalanceAmount            float64
+	TaxAmount                float64
+	OrderStatus              string
+	AccountingJournalEntryID *string
+}
+
+type bakeryPaymentAccountingRow struct {
+	ID                        string
+	BusinessID                string
+	BakeryOrderID             string
+	BranchID                  string
+	OrderNumber               string
+	OrderStatus               string
+	PaymentType               string
+	Amount                    float64
+	PaymentMethodNameSnapshot string
+	DefaultPaymentAccountID   *string
+	PaymentAccountBranchID    *string
+	PaymentAccountName        string
+	ChartAccountID            string
+	JournalEntryID            *string
+	PaidAt                    time.Time
+}
+
 func (r *Repository) Create(tx *gorm.DB, account *ChartAccount) error {
 	return tx.Create(account).Error
 }
@@ -40,6 +97,28 @@ func (r *Repository) ReplaceJournalEntryLines(tx *gorm.DB, businessID, entryID s
 
 func (r *Repository) UpdateJournalEntry(tx *gorm.DB, businessID, id string, updates map[string]interface{}) error {
 	result := tx.Model(&JournalEntry{}).Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, id).Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) CountJournalReversalLinks(tx *gorm.DB, businessID, id string) (int64, error) {
+	var count int64
+	err := tx.Model(&JournalEntry{}).
+		Where("business_id = ? AND reversed_entry_id = ? AND deleted_at IS NULL", businessID, id).
+		Count(&count).Error
+	return count, err
+}
+
+func (r *Repository) HardDeleteJournalEntry(tx *gorm.DB, businessID, id string) error {
+	if err := tx.Unscoped().Where("business_id = ? AND journal_entry_id = ?", businessID, id).Delete(&JournalEntryLine{}).Error; err != nil {
+		return err
+	}
+	result := tx.Unscoped().Where("business_id = ? AND id = ?", businessID, id).Delete(&JournalEntry{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -143,6 +222,125 @@ func (r *Repository) ValidateActiveAccount(tx *gorm.DB, businessID, accountID st
 	return &account, err
 }
 
+func (r *Repository) FindActiveAccountByCode(tx *gorm.DB, businessID, accountCode string) (*ChartAccount, error) {
+	var account ChartAccount
+	err := tx.Where("business_id = ? AND account_code = ? AND status = ? AND deleted_at IS NULL", businessID, accountCode, "active").First(&account).Error
+	return &account, err
+}
+
+func (r *Repository) FindPOSSaleForAccounting(tx *gorm.DB, businessID, saleID string) (*posSaleAccountingRow, error) {
+	var row posSaleAccountingRow
+	err := tx.Table("sales").
+		Select("id, business_id, branch_id, sale_number, total_amount, paid_amount, change_amount, tax_amount, sale_status, accounting_journal_entry_id, sold_at").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, saleID).
+		Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) ListPOSSalePaymentsForAccounting(tx *gorm.DB, businessID, saleID string) ([]posPaymentAccountingRow, error) {
+	var rows []posPaymentAccountingRow
+	err := tx.Table("sale_payments sp").
+		Select(`
+			sp.id,
+			sp.amount,
+			sp.payment_status,
+			sp.payment_method_name_snapshot,
+			sp.payment_method_type_snapshot,
+			pm.default_payment_account_id,
+			pa.branch_id AS payment_account_branch_id,
+			COALESCE(pa.account_name, '') AS payment_account_name,
+			COALESCE(pa.chart_account_id::text, '') AS chart_account_id
+		`).
+		Joins("JOIN payment_methods pm ON pm.id = sp.payment_method_id AND pm.business_id = sp.business_id AND pm.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = sp.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL").
+		Where("sp.business_id = ? AND sp.sale_id = ? AND sp.deleted_at IS NULL AND sp.payment_status = ?", businessID, saleID, "completed").
+		Order("sp.paid_at ASC, sp.created_at ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) UpdatePOSSaleAccountingJournalID(tx *gorm.DB, businessID, saleID, journalEntryID string) error {
+	result := tx.Table("sales").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, saleID).
+		Updates(map[string]interface{}{"accounting_journal_entry_id": journalEntryID, "updated_at": time.Now().UTC()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) UpdatePOSSalePaymentJournalIDs(tx *gorm.DB, businessID, saleID, journalEntryID string) error {
+	return tx.Table("sale_payments").
+		Where("business_id = ? AND sale_id = ? AND deleted_at IS NULL AND payment_status = ?", businessID, saleID, "completed").
+		Updates(map[string]interface{}{"journal_entry_id": journalEntryID, "updated_at": time.Now().UTC()}).Error
+}
+
+func (r *Repository) FindBakeryOrderForAccounting(tx *gorm.DB, businessID, orderID string) (*bakeryOrderAccountingRow, error) {
+	var row bakeryOrderAccountingRow
+	err := tx.Table("bakery_orders").
+		Select("id, business_id, branch_id, order_number, total_amount, paid_amount, balance_amount, tax_amount, order_status, accounting_journal_entry_id").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, orderID).
+		Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) FindBakeryPaymentForAccounting(tx *gorm.DB, businessID, paymentID string) (*bakeryPaymentAccountingRow, error) {
+	var row bakeryPaymentAccountingRow
+	err := tx.Table("bakery_order_payments bop").
+		Select(`
+			bop.id,
+			bop.business_id,
+			bop.bakery_order_id,
+			bo.branch_id,
+			bo.order_number,
+			bo.order_status,
+			bop.payment_type,
+			bop.amount,
+			bop.payment_method_name_snapshot,
+			pm.default_payment_account_id,
+			pa.branch_id AS payment_account_branch_id,
+			COALESCE(pa.account_name, '') AS payment_account_name,
+			COALESCE(pa.chart_account_id::text, '') AS chart_account_id,
+			bop.journal_entry_id,
+			bop.paid_at
+		`).
+		Joins("JOIN bakery_orders bo ON bo.id = bop.bakery_order_id AND bo.business_id = bop.business_id AND bo.deleted_at IS NULL").
+		Joins("JOIN payment_methods pm ON pm.id = bop.payment_method_id AND pm.business_id = bop.business_id AND pm.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = bop.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL").
+		Where("bop.business_id = ? AND bop.id = ?", businessID, paymentID).
+		Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) UpdateBakeryPaymentJournalID(tx *gorm.DB, businessID, paymentID, journalEntryID string) error {
+	result := tx.Table("bakery_order_payments").
+		Where("business_id = ? AND id = ?", businessID, paymentID).
+		Update("journal_entry_id", journalEntryID)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) UpdateBakeryOrderAccountingJournalID(tx *gorm.DB, businessID, orderID, journalEntryID string) error {
+	result := tx.Table("bakery_orders").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, orderID).
+		Updates(map[string]interface{}{"accounting_journal_entry_id": journalEntryID, "updated_at": time.Now().UTC()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func (r *Repository) BranchExists(tx *gorm.DB, businessID, branchID string) (bool, error) {
 	if strings.TrimSpace(branchID) == "" {
 		return true, nil
@@ -205,6 +403,361 @@ func (r *Repository) LoadResponse(businessID string, account ChartAccount) (Char
 		_ = r.db.Table("chart_of_accounts").Select("account_name").Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, *account.ParentAccountID).Scan(&parentName).Error
 	}
 	return toChartAccountResponse(account, parentName), nil
+}
+
+func (r *Repository) CreatePaymentAccount(tx *gorm.DB, account *PaymentAccount) error {
+	return tx.Create(account).Error
+}
+
+func (r *Repository) ListPaymentAccounts(businessID string, query PaymentAccountListQuery) ([]PaymentAccount, int64, error) {
+	db := r.db.Model(&PaymentAccount{}).Where("business_id = ? AND deleted_at IS NULL", businessID)
+	db = applyPaymentAccountFilters(db, query)
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	sortOrder := "asc"
+	if strings.ToLower(query.SortOrder) == "desc" {
+		sortOrder = "desc"
+	}
+	var accounts []PaymentAccount
+	err := db.Order(fmt.Sprintf("%s %s", safePaymentAccountSortBy(query.SortBy), sortOrder)).
+		Offset((query.Page - 1) * query.Limit).
+		Limit(query.Limit).
+		Find(&accounts).Error
+	return accounts, total, err
+}
+
+func (r *Repository) FindPaymentAccountByID(businessID, id string) (*PaymentAccount, error) {
+	var account PaymentAccount
+	err := r.db.Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, id).First(&account).Error
+	return &account, err
+}
+
+func (r *Repository) PaymentAccountNameExists(businessID string, branchID *string, name, excludedID string) (bool, error) {
+	query := r.db.Model(&PaymentAccount{}).
+		Where("business_id = ? AND LOWER(account_name) = LOWER(?) AND deleted_at IS NULL", businessID, strings.TrimSpace(name))
+	if branchID == nil || strings.TrimSpace(*branchID) == "" {
+		query = query.Where("branch_id IS NULL")
+	} else {
+		query = query.Where("branch_id = ?", strings.TrimSpace(*branchID))
+	}
+	if excludedID != "" {
+		query = query.Where("id <> ?", excludedID)
+	}
+	var count int64
+	err := query.Count(&count).Error
+	return count > 0, err
+}
+
+func (r *Repository) PaymentAccountChartExists(businessID string, branchID *string, chartAccountID, excludedID string) (bool, error) {
+	query := r.db.Model(&PaymentAccount{}).
+		Where("business_id = ? AND chart_account_id = ? AND deleted_at IS NULL", businessID, chartAccountID)
+	if branchID == nil || strings.TrimSpace(*branchID) == "" {
+		query = query.Where("branch_id IS NULL")
+	} else {
+		query = query.Where("branch_id = ?", strings.TrimSpace(*branchID))
+	}
+	if excludedID != "" {
+		query = query.Where("id <> ?", excludedID)
+	}
+	var count int64
+	err := query.Count(&count).Error
+	return count > 0, err
+}
+
+func (r *Repository) UpdatePaymentAccount(tx *gorm.DB, businessID, id string, updates map[string]interface{}) error {
+	result := tx.Model(&PaymentAccount{}).Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, id).Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) CountPaymentMethodsUsingPaymentAccount(tx *gorm.DB, businessID, id string) (int64, error) {
+	var count int64
+	err := tx.Table("payment_methods").
+		Where("business_id = ? AND default_payment_account_id = ? AND deleted_at IS NULL", businessID, id).
+		Count(&count).Error
+	return count, err
+}
+
+func (r *Repository) ValidateActiveAssetChartAccount(tx *gorm.DB, businessID, accountID string) (*ChartAccount, error) {
+	var account ChartAccount
+	err := tx.Where("business_id = ? AND id = ? AND account_type = ? AND status = ? AND deleted_at IS NULL", businessID, accountID, "asset", "active").First(&account).Error
+	return &account, err
+}
+
+func (r *Repository) LoadPaymentAccountResponses(businessID string, accounts []PaymentAccount) ([]PaymentAccountResponse, error) {
+	responses := make([]PaymentAccountResponse, 0, len(accounts))
+	for _, account := range accounts {
+		response, err := r.LoadPaymentAccountResponse(businessID, account)
+		if err != nil {
+			return nil, err
+		}
+		responses = append(responses, response)
+	}
+	return responses, nil
+}
+
+func (r *Repository) LoadPaymentAccountResponse(businessID string, account PaymentAccount) (PaymentAccountResponse, error) {
+	branchName := ""
+	if account.BranchID != nil && *account.BranchID != "" {
+		_ = r.db.Table("branches").Select("branch_name").Where("business_id = ? AND id = ?", businessID, *account.BranchID).Scan(&branchName).Error
+	}
+	var chart ChartAccount
+	if err := r.db.Where("business_id = ? AND id = ?", businessID, account.ChartAccountID).First(&chart).Error; err != nil {
+		return PaymentAccountResponse{}, err
+	}
+	balance, err := r.PaymentAccountCurrentBalance(businessID, account.ChartAccountID, account.BranchID)
+	if err != nil {
+		return PaymentAccountResponse{}, err
+	}
+	return toPaymentAccountResponse(account, branchName, chart, balance), nil
+}
+
+func (r *Repository) PaymentAccountCurrentBalance(businessID, chartAccountID string, branchID *string) (float64, error) {
+	branchFilter := ""
+	args := []interface{}{businessID, chartAccountID}
+	if branchID != nil && strings.TrimSpace(*branchID) != "" {
+		branchFilter = "AND je.branch_id = ?"
+		args = append(args, strings.TrimSpace(*branchID))
+	}
+	var balance float64
+	err := r.db.Raw(`
+		SELECT COALESCE(SUM(jel.debit_amount - jel.credit_amount), 0)
+		FROM journal_entry_lines jel
+		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
+		WHERE jel.business_id = ?
+		  AND jel.account_id = ?
+		  AND jel.deleted_at IS NULL
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted', 'reversed')
+		  `+branchFilter+`
+	`, args...).Scan(&balance).Error
+	return roundMoney(balance), err
+}
+
+func (r *Repository) NextAccountTransferNumber(tx *gorm.DB, businessID string, transferDate time.Time) (string, error) {
+	datePart := transferDate.Format("20060102")
+	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+datePart+":account_transfers").Error; err != nil {
+		return "", err
+	}
+	var count int64
+	prefix := "TRF-" + datePart + "-"
+	if err := tx.Model(&AccountTransfer{}).Where("business_id = ? AND transfer_number LIKE ?", businessID, prefix+"%").Count(&count).Error; err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s%06d", prefix, count+1), nil
+}
+
+func (r *Repository) CreateAccountTransfer(tx *gorm.DB, transfer *AccountTransfer) error {
+	return tx.Create(transfer).Error
+}
+
+func (r *Repository) UpdateAccountTransfer(tx *gorm.DB, businessID, id string, updates map[string]interface{}) error {
+	result := tx.Model(&AccountTransfer{}).Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, id).Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) FindAccountTransferByID(businessID, id string) (*AccountTransfer, error) {
+	var transfer AccountTransfer
+	err := r.db.Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, id).First(&transfer).Error
+	return &transfer, err
+}
+
+func (r *Repository) ListAccountTransfers(businessID string, query AccountTransferListQuery) ([]AccountTransfer, int64, error) {
+	db := r.db.Model(&AccountTransfer{}).Where("business_id = ? AND deleted_at IS NULL", businessID)
+	db = applyAccountTransferFilters(db, query)
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	order := "desc"
+	if strings.ToLower(query.SortOrder) == "asc" {
+		order = "asc"
+	}
+	var transfers []AccountTransfer
+	err := db.Order("transfer_date " + order + ", transfer_number " + order).
+		Offset((query.Page - 1) * query.Limit).
+		Limit(query.Limit).
+		Find(&transfers).Error
+	return transfers, total, err
+}
+
+func (r *Repository) LoadAccountTransferResponses(businessID string, transfers []AccountTransfer) ([]AccountTransferResponse, error) {
+	responses := make([]AccountTransferResponse, 0, len(transfers))
+	for _, transfer := range transfers {
+		response, err := r.LoadAccountTransferResponse(businessID, transfer)
+		if err != nil {
+			return nil, err
+		}
+		responses = append(responses, response)
+	}
+	return responses, nil
+}
+
+func (r *Repository) LoadAccountTransferResponse(businessID string, transfer AccountTransfer) (AccountTransferResponse, error) {
+	branchName := ""
+	if transfer.BranchID != nil && *transfer.BranchID != "" {
+		_ = r.db.Table("branches").Select("branch_name").Where("business_id = ? AND id = ?", businessID, *transfer.BranchID).Scan(&branchName).Error
+	}
+	fromName := r.paymentAccountName(businessID, transfer.FromPaymentAccountID)
+	toName := r.paymentAccountName(businessID, transfer.ToPaymentAccountID)
+	return AccountTransferResponse{
+		ID:                     transfer.ID,
+		BusinessID:             transfer.BusinessID,
+		BranchID:               transfer.BranchID,
+		BranchName:             branchName,
+		TransferNumber:         transfer.TransferNumber,
+		TransferDate:           transfer.TransferDate.Format("2006-01-02"),
+		FromPaymentAccountID:   transfer.FromPaymentAccountID,
+		FromPaymentAccountName: fromName,
+		ToPaymentAccountID:     transfer.ToPaymentAccountID,
+		ToPaymentAccountName:   toName,
+		Amount:                 roundMoney(transfer.Amount),
+		ReferenceNumber:        transfer.ReferenceNumber,
+		Notes:                  transfer.Notes,
+		Status:                 transfer.Status,
+		JournalEntryID:         transfer.JournalEntryID,
+		CreatedByUserID:        transfer.CreatedByUserID,
+		CreatedAt:              transfer.CreatedAt,
+		UpdatedAt:              transfer.UpdatedAt,
+	}, nil
+}
+
+func (r *Repository) NextPlatformSettlementNumber(tx *gorm.DB, businessID string, settlementDate time.Time) (string, error) {
+	datePart := settlementDate.Format("20060102")
+	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+datePart+":platform_settlements").Error; err != nil {
+		return "", err
+	}
+	var count int64
+	prefix := "STL-" + datePart + "-"
+	if err := tx.Model(&PlatformSettlement{}).Where("business_id = ? AND settlement_number LIKE ?", businessID, prefix+"%").Count(&count).Error; err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s%06d", prefix, count+1), nil
+}
+
+func (r *Repository) CreatePlatformSettlement(tx *gorm.DB, settlement *PlatformSettlement, deductions []PlatformSettlementDeduction) error {
+	if err := tx.Create(settlement).Error; err != nil {
+		return err
+	}
+	if len(deductions) == 0 {
+		return nil
+	}
+	return tx.Create(&deductions).Error
+}
+
+func (r *Repository) UpdatePlatformSettlement(tx *gorm.DB, businessID, id string, updates map[string]interface{}) error {
+	result := tx.Model(&PlatformSettlement{}).Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, id).Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) FindPlatformSettlementByID(businessID, id string) (*PlatformSettlement, error) {
+	var settlement PlatformSettlement
+	err := r.db.Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, id).First(&settlement).Error
+	return &settlement, err
+}
+
+func (r *Repository) ListPlatformSettlements(businessID string, query PlatformSettlementListQuery) ([]PlatformSettlement, int64, error) {
+	db := r.db.Model(&PlatformSettlement{}).Where("business_id = ? AND deleted_at IS NULL", businessID)
+	db = applyPlatformSettlementFilters(db, query)
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	order := "desc"
+	if strings.ToLower(query.SortOrder) == "asc" {
+		order = "asc"
+	}
+	var settlements []PlatformSettlement
+	err := db.Order("settlement_date " + order + ", settlement_number " + order).
+		Offset((query.Page - 1) * query.Limit).
+		Limit(query.Limit).
+		Find(&settlements).Error
+	return settlements, total, err
+}
+
+func (r *Repository) LoadPlatformSettlementResponses(businessID string, settlements []PlatformSettlement) ([]PlatformSettlementResponse, error) {
+	responses := make([]PlatformSettlementResponse, 0, len(settlements))
+	for _, settlement := range settlements {
+		response, err := r.LoadPlatformSettlementResponse(businessID, settlement)
+		if err != nil {
+			return nil, err
+		}
+		responses = append(responses, response)
+	}
+	return responses, nil
+}
+
+func (r *Repository) LoadPlatformSettlementResponse(businessID string, settlement PlatformSettlement) (PlatformSettlementResponse, error) {
+	branchName := ""
+	if settlement.BranchID != nil && *settlement.BranchID != "" {
+		_ = r.db.Table("branches").Select("branch_name").Where("business_id = ? AND id = ?", businessID, *settlement.BranchID).Scan(&branchName).Error
+	}
+	deductions, err := r.ListPlatformSettlementDeductions(businessID, settlement.ID)
+	if err != nil {
+		return PlatformSettlementResponse{}, err
+	}
+	return PlatformSettlementResponse{
+		ID:                         settlement.ID,
+		BusinessID:                 settlement.BusinessID,
+		BranchID:                   settlement.BranchID,
+		BranchName:                 branchName,
+		SettlementNumber:           settlement.SettlementNumber,
+		SettlementDate:             settlement.SettlementDate.Format("2006-01-02"),
+		PlatformPaymentAccountID:   settlement.PlatformPaymentAccountID,
+		PlatformPaymentAccountName: r.paymentAccountName(businessID, settlement.PlatformPaymentAccountID),
+		DepositPaymentAccountID:    settlement.DepositPaymentAccountID,
+		DepositPaymentAccountName:  r.paymentAccountName(businessID, settlement.DepositPaymentAccountID),
+		GrossAmount:                roundMoney(settlement.GrossAmount),
+		DeductionsTotal:            roundMoney(settlement.DeductionsTotal),
+		NetReceivedAmount:          roundMoney(settlement.NetReceivedAmount),
+		Deductions:                 deductions,
+		ReferenceNumber:            settlement.ReferenceNumber,
+		Notes:                      settlement.Notes,
+		Status:                     settlement.Status,
+		JournalEntryID:             settlement.JournalEntryID,
+		CreatedByUserID:            settlement.CreatedByUserID,
+		CreatedAt:                  settlement.CreatedAt,
+		UpdatedAt:                  settlement.UpdatedAt,
+	}, nil
+}
+
+func (r *Repository) ListPlatformSettlementDeductions(businessID, settlementID string) ([]PlatformSettlementDeductionResponse, error) {
+	var deductions []PlatformSettlementDeductionResponse
+	err := r.db.Table("platform_settlement_deductions psd").
+		Select("psd.id, psd.expense_account_id, coa.account_code AS expense_account_code, coa.account_name AS expense_account_name, psd.deduction_type, COALESCE(psd.description, '') AS description, psd.amount").
+		Joins("JOIN chart_of_accounts coa ON coa.id = psd.expense_account_id AND coa.business_id = psd.business_id").
+		Where("psd.business_id = ? AND psd.platform_settlement_id = ? AND psd.deleted_at IS NULL", businessID, settlementID).
+		Order("psd.created_at ASC, psd.id ASC").
+		Scan(&deductions).Error
+	for i := range deductions {
+		deductions[i].Amount = roundMoney(deductions[i].Amount)
+	}
+	return deductions, err
+}
+
+func (r *Repository) paymentAccountName(businessID, accountID string) string {
+	var name string
+	_ = r.db.Table("payment_accounts").Select("account_name").Where("business_id = ? AND id = ?", businessID, accountID).Scan(&name).Error
+	return name
 }
 
 func (r *Repository) LoadJournalEntryResponses(businessID string, entries []JournalEntry, includeLines bool) ([]JournalEntryResponse, error) {
@@ -534,6 +1087,58 @@ func applyChartAccountFilters(db *gorm.DB, query ChartAccountListQuery) *gorm.DB
 	return db
 }
 
+func applyPaymentAccountFilters(db *gorm.DB, query PaymentAccountListQuery) *gorm.DB {
+	if query.Search != "" {
+		like := "%" + strings.ToLower(strings.TrimSpace(query.Search)) + "%"
+		db = db.Where("LOWER(account_name) LIKE ? OR LOWER(description) LIKE ?", like, like)
+	}
+	if query.BranchID != "" {
+		db = db.Where("branch_id = ?", query.BranchID)
+	}
+	if query.AccountType != "" {
+		db = db.Where("account_type = ?", query.AccountType)
+	}
+	if query.Status != "" {
+		db = db.Where("status = ?", query.Status)
+	}
+	return db
+}
+
+func applyAccountTransferFilters(db *gorm.DB, query AccountTransferListQuery) *gorm.DB {
+	if query.BranchID != "" {
+		db = db.Where("branch_id = ?", query.BranchID)
+	}
+	if query.PaymentAccountID != "" {
+		db = db.Where("(from_payment_account_id = ? OR to_payment_account_id = ?)", query.PaymentAccountID, query.PaymentAccountID)
+	}
+	if query.DateFrom != "" {
+		db = db.Where("transfer_date >= ?", query.DateFrom)
+	}
+	if query.DateTo != "" {
+		db = db.Where("transfer_date <= ?", query.DateTo)
+	}
+	return db
+}
+
+func applyPlatformSettlementFilters(db *gorm.DB, query PlatformSettlementListQuery) *gorm.DB {
+	if query.BranchID != "" {
+		db = db.Where("branch_id = ?", query.BranchID)
+	}
+	if query.PlatformPaymentAccountID != "" {
+		db = db.Where("platform_payment_account_id = ?", query.PlatformPaymentAccountID)
+	}
+	if query.DepositPaymentAccountID != "" {
+		db = db.Where("deposit_payment_account_id = ?", query.DepositPaymentAccountID)
+	}
+	if query.DateFrom != "" {
+		db = db.Where("settlement_date >= ?", query.DateFrom)
+	}
+	if query.DateTo != "" {
+		db = db.Where("settlement_date <= ?", query.DateTo)
+	}
+	return db
+}
+
 func applyJournalEntryFilters(db *gorm.DB, query JournalEntryListQuery) *gorm.DB {
 	if query.Search != "" {
 		like := "%" + strings.ToLower(strings.TrimSpace(query.Search)) + "%"
@@ -563,6 +1168,15 @@ func safeChartAccountSortBy(value string) string {
 		return value
 	default:
 		return "account_code"
+	}
+}
+
+func safePaymentAccountSortBy(value string) string {
+	switch value {
+	case "account_name", "account_type", "status", "updated_at", "created_at":
+		return value
+	default:
+		return "account_name"
 	}
 }
 
@@ -610,6 +1224,27 @@ func toChartAccountResponse(account ChartAccount, parentName string) ChartAccoun
 		Status:             account.Status,
 		CreatedAt:          account.CreatedAt,
 		UpdatedAt:          account.UpdatedAt,
+	}
+}
+
+func toPaymentAccountResponse(account PaymentAccount, branchName string, chart ChartAccount, currentBalance float64) PaymentAccountResponse {
+	return PaymentAccountResponse{
+		ID:               account.ID,
+		BusinessID:       account.BusinessID,
+		BranchID:         account.BranchID,
+		BranchName:       branchName,
+		AccountName:      account.AccountName,
+		AccountType:      account.AccountType,
+		ChartAccountID:   account.ChartAccountID,
+		ChartAccountCode: chart.AccountCode,
+		ChartAccountName: chart.AccountName,
+		ChartAccountType: chart.AccountType,
+		Description:      account.Description,
+		CurrentBalance:   roundMoney(absMoney(currentBalance)),
+		BalanceLabel:     balanceLabel(currentBalance),
+		Status:           account.Status,
+		CreatedAt:        account.CreatedAt,
+		UpdatedAt:        account.UpdatedAt,
 	}
 }
 

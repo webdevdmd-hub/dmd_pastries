@@ -45,13 +45,7 @@ func SeedDefaults(tx *gorm.DB, businessID, branchID string) error {
 	}); err != nil {
 		return err
 	}
-	return seedSimpleCategoryDefaults(tx, "supplier_categories", businessID, branchID, []simpleCategorySeed{
-		{Name: "Ingredient Supplier"},
-		{Name: "Packaging Supplier"},
-		{Name: "Equipment Supplier"},
-		{Name: "Logistics Supplier"},
-		{Name: "Service Provider"},
-	})
+	return nil
 }
 
 func EnsureUnitDefaults(tx *gorm.DB) error {

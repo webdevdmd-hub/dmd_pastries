@@ -6,18 +6,20 @@ import (
 )
 
 type OrderListQuery struct {
-	Search        string
-	BranchID      string
-	CustomerID    string
-	OrderType     string
-	OrderStatus   string
-	PaymentStatus string
-	DateFrom      string
-	DateTo        string
-	Page          int
-	Limit         int
-	SortBy        string
-	SortOrder     string
+	Search              string
+	BranchID            string
+	CustomerID          string
+	SalesChannelID      string
+	ExternalOrderNumber string
+	OrderType           string
+	OrderStatus         string
+	PaymentStatus       string
+	DateFrom            string
+	DateTo              string
+	Page                int
+	Limit               int
+	SortBy              string
+	SortOrder           string
 }
 
 type OrderItemRequest struct {
@@ -36,29 +38,33 @@ type OrderItemRequest struct {
 }
 
 type CreateOrderRequest struct {
-	BranchID      string             `json:"branch_id"`
-	CustomerID    string             `json:"customer_id"`
-	CustomerName  string             `json:"customer_name"`
-	CustomerPhone string             `json:"customer_phone"`
-	OrderType     string             `json:"order_type"`
-	EventDate     string             `json:"event_date"`
-	PickupTime    string             `json:"pickup_time"`
-	DeliveryTime  string             `json:"delivery_time"`
-	DeliveryAddr  string             `json:"delivery_address"`
-	Items         []OrderItemRequest `json:"items"`
-	Notes         string             `json:"notes"`
+	BranchID            string             `json:"branch_id"`
+	CustomerID          string             `json:"customer_id"`
+	SalesChannelID      string             `json:"sales_channel_id"`
+	ExternalOrderNumber string             `json:"external_order_number"`
+	CustomerName        string             `json:"customer_name"`
+	CustomerPhone       string             `json:"customer_phone"`
+	OrderType           string             `json:"order_type"`
+	EventDate           string             `json:"event_date"`
+	PickupTime          string             `json:"pickup_time"`
+	DeliveryTime        string             `json:"delivery_time"`
+	DeliveryAddr        string             `json:"delivery_address"`
+	Items               []OrderItemRequest `json:"items"`
+	Notes               string             `json:"notes"`
 }
 
 type UpdateOrderRequest struct {
-	CustomerID    *string `json:"customer_id"`
-	CustomerName  *string `json:"customer_name"`
-	CustomerPhone *string `json:"customer_phone"`
-	OrderType     *string `json:"order_type"`
-	EventDate     *string `json:"event_date"`
-	PickupTime    *string `json:"pickup_time"`
-	DeliveryTime  *string `json:"delivery_time"`
-	DeliveryAddr  *string `json:"delivery_address"`
-	Notes         *string `json:"notes"`
+	CustomerID          *string `json:"customer_id"`
+	SalesChannelID      *string `json:"sales_channel_id"`
+	ExternalOrderNumber *string `json:"external_order_number"`
+	CustomerName        *string `json:"customer_name"`
+	CustomerPhone       *string `json:"customer_phone"`
+	OrderType           *string `json:"order_type"`
+	EventDate           *string `json:"event_date"`
+	PickupTime          *string `json:"pickup_time"`
+	DeliveryTime        *string `json:"delivery_time"`
+	DeliveryAddr        *string `json:"delivery_address"`
+	Notes               *string `json:"notes"`
 }
 
 type UpdateStatusRequest struct {
@@ -81,6 +87,35 @@ type CreateProductionFromItemRequest struct {
 	PlannedQuantity float64 `json:"planned_quantity"`
 	ProductionDate  string  `json:"production_date"`
 	Notes           string  `json:"notes"`
+}
+
+type ConvertItemToProductRequest struct {
+	CategoryID             string   `json:"category_id"`
+	ProductName            string   `json:"product_name"`
+	ProductCode            string   `json:"product_code"`
+	SKU                    string   `json:"sku"`
+	Barcode                string   `json:"barcode"`
+	SalePrice              float64  `json:"sale_price"`
+	CostPrice              *float64 `json:"cost_price"`
+	UnitID                 string   `json:"unit_id"`
+	ProductType            string   `json:"product_type"`
+	IsStockTracked         bool     `json:"is_stock_tracked"`
+	IsExpiryTracked        bool     `json:"is_expiry_tracked"`
+	IsCustomOrderAvailable bool     `json:"is_custom_order_available"`
+	ShowInPOS              *bool    `json:"show_in_pos"`
+	Description            string   `json:"description"`
+	Status                 string   `json:"status"`
+}
+
+type ConvertItemToVariantRequest struct {
+	ProductID   string   `json:"product_id"`
+	VariantName string   `json:"variant_name"`
+	SKU         string   `json:"sku"`
+	Barcode     string   `json:"barcode"`
+	SalePrice   float64  `json:"sale_price"`
+	CostPrice   *float64 `json:"cost_price"`
+	UnitID      string   `json:"unit_id"`
+	ShowInPOS   *bool    `json:"show_in_pos"`
 }
 
 type UpdateProductionStatusRequest struct {
@@ -106,38 +141,42 @@ type PaginatedOrdersResponse struct {
 }
 
 type BakeryOrderResponse struct {
-	ID                    string                          `json:"id"`
-	BusinessID            string                          `json:"business_id"`
-	BranchID              string                          `json:"branch_id"`
-	BranchName            string                          `json:"branch_name"`
-	OrderNumber           string                          `json:"order_number"`
-	CustomerID            *string                         `json:"customer_id"`
-	CustomerNameSnapshot  string                          `json:"customer_name_snapshot"`
-	CustomerPhoneSnapshot string                          `json:"customer_phone_snapshot"`
-	OrderType             string                          `json:"order_type"`
-	OrderDate             time.Time                       `json:"order_date"`
-	EventDate             time.Time                       `json:"event_date"`
-	PickupTime            string                          `json:"pickup_time"`
-	DeliveryTime          string                          `json:"delivery_time"`
-	DeliveryAddress       string                          `json:"delivery_address"`
-	SubtotalAmount        float64                         `json:"subtotal_amount"`
-	DiscountAmount        float64                         `json:"discount_amount"`
-	TaxAmount             float64                         `json:"tax_amount"`
-	TotalAmount           float64                         `json:"total_amount"`
-	PaidAmount            float64                         `json:"paid_amount"`
-	BalanceAmount         float64                         `json:"balance_amount"`
-	PaymentStatus         string                          `json:"payment_status"`
-	OrderStatus           string                          `json:"order_status"`
-	Notes                 string                          `json:"notes"`
-	CreatedByUserID       string                          `json:"created_by_user_id"`
-	CreatedByUserName     string                          `json:"created_by_user_name"`
-	CreatedAt             time.Time                       `json:"created_at"`
-	UpdatedAt             time.Time                       `json:"updated_at"`
-	Items                 []BakeryOrderItemResponse       `json:"items,omitempty"`
-	Payments              []BakeryOrderPaymentResponse    `json:"payments,omitempty"`
-	Production            *BakeryOrderProductionResponse  `json:"production,omitempty"`
-	Productions           []BakeryOrderProductionResponse `json:"productions,omitempty"`
-	Packaging             []BakeryOrderPackagingResponse  `json:"packaging,omitempty"`
+	ID                       string                          `json:"id"`
+	BusinessID               string                          `json:"business_id"`
+	BranchID                 string                          `json:"branch_id"`
+	BranchName               string                          `json:"branch_name"`
+	OrderNumber              string                          `json:"order_number"`
+	CustomerID               *string                         `json:"customer_id"`
+	SalesChannelID           *string                         `json:"sales_channel_id"`
+	SalesChannelNameSnapshot string                          `json:"sales_channel_name_snapshot"`
+	ExternalOrderNumber      string                          `json:"external_order_number"`
+	CustomerNameSnapshot     string                          `json:"customer_name_snapshot"`
+	CustomerPhoneSnapshot    string                          `json:"customer_phone_snapshot"`
+	OrderType                string                          `json:"order_type"`
+	OrderDate                time.Time                       `json:"order_date"`
+	EventDate                time.Time                       `json:"event_date"`
+	PickupTime               string                          `json:"pickup_time"`
+	DeliveryTime             string                          `json:"delivery_time"`
+	DeliveryAddress          string                          `json:"delivery_address"`
+	SubtotalAmount           float64                         `json:"subtotal_amount"`
+	DiscountAmount           float64                         `json:"discount_amount"`
+	TaxAmount                float64                         `json:"tax_amount"`
+	TotalAmount              float64                         `json:"total_amount"`
+	PaidAmount               float64                         `json:"paid_amount"`
+	BalanceAmount            float64                         `json:"balance_amount"`
+	PaymentStatus            string                          `json:"payment_status"`
+	OrderStatus              string                          `json:"order_status"`
+	AccountingJournalEntryID *string                         `json:"accounting_journal_entry_id"`
+	Notes                    string                          `json:"notes"`
+	CreatedByUserID          string                          `json:"created_by_user_id"`
+	CreatedByUserName        string                          `json:"created_by_user_name"`
+	CreatedAt                time.Time                       `json:"created_at"`
+	UpdatedAt                time.Time                       `json:"updated_at"`
+	Items                    []BakeryOrderItemResponse       `json:"items,omitempty"`
+	Payments                 []BakeryOrderPaymentResponse    `json:"payments,omitempty"`
+	Production               *BakeryOrderProductionResponse  `json:"production,omitempty"`
+	Productions              []BakeryOrderProductionResponse `json:"productions,omitempty"`
+	Packaging                []BakeryOrderPackagingResponse  `json:"packaging,omitempty"`
 }
 
 type BakeryOrderItemResponse struct {
@@ -175,6 +214,7 @@ type BakeryOrderPaymentResponse struct {
 	Amount                    float64   `json:"amount"`
 	ReferenceNumber           string    `json:"reference_number"`
 	PaymentType               string    `json:"payment_type"`
+	JournalEntryID            *string   `json:"journal_entry_id"`
 	PaidByUserID              string    `json:"paid_by_user_id"`
 	PaidByUserName            string    `json:"paid_by_user_name"`
 	PaidAt                    time.Time `json:"paid_at"`
@@ -214,11 +254,13 @@ type SummaryResponse struct {
 }
 
 type productRow struct {
-	ID          string
-	ProductName string
-	TaxRateID   *string
-	SalePrice   float64
-	Status      string
+	ID           string
+	ProductName  string
+	UnitID       string
+	TaxRateID    *string
+	SalePrice    float64
+	Status       string
+	IsPOSVisible bool
 }
 
 type productVariantRow struct {
@@ -244,9 +286,17 @@ type taxRow struct {
 }
 
 type paymentMethodRow struct {
-	ID                string
-	MethodName        string
-	RequiresReference bool
+	ID                 string
+	MethodName         string
+	RequiresReference  bool
+	ShowInBakeryOrders bool
+}
+
+type salesChannelRow struct {
+	ID                          string
+	ChannelName                 string
+	RequiresExternalOrderNumber bool
+	Status                      string
 }
 
 type packagingRow struct {

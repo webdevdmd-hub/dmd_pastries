@@ -103,6 +103,30 @@ func (h *Handler) DeleteItem(c *gin.Context) {
 	respond(c, "bakery order item deleted successfully", result, err)
 }
 
+func (h *Handler) ConvertItemToProduct(c *gin.Context) {
+	if !validParam(c, "id") || !validParam(c, "itemId") {
+		return
+	}
+	var req ConvertItemToProductRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.ConvertItemToProduct(utils.MustAuthContext(c), c.Param("id"), c.Param("itemId"), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "bakery order item converted to product successfully", result, err)
+}
+
+func (h *Handler) ConvertItemToVariant(c *gin.Context) {
+	if !validParam(c, "id") || !validParam(c, "itemId") {
+		return
+	}
+	var req ConvertItemToVariantRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.ConvertItemToVariant(utils.MustAuthContext(c), c.Param("id"), c.Param("itemId"), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "bakery order item converted to variant successfully", result, err)
+}
+
 func (h *Handler) ListPayments(c *gin.Context) {
 	if !validParam(c, "id") {
 		return
@@ -187,7 +211,7 @@ func (h *Handler) Summary(c *gin.Context) {
 func parseListQuery(c *gin.Context) OrderListQuery {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	return OrderListQuery{Search: c.Query("search"), BranchID: c.Query("branch_id"), CustomerID: c.Query("customer_id"), OrderType: c.Query("order_type"), OrderStatus: c.Query("order_status"), PaymentStatus: c.Query("payment_status"), DateFrom: c.Query("date_from"), DateTo: c.Query("date_to"), Page: page, Limit: limit, SortBy: c.DefaultQuery("sort_by", "created_at"), SortOrder: c.DefaultQuery("sort_order", "desc")}
+	return OrderListQuery{Search: c.Query("search"), BranchID: c.Query("branch_id"), CustomerID: c.Query("customer_id"), SalesChannelID: c.Query("sales_channel_id"), ExternalOrderNumber: c.Query("external_order_number"), OrderType: c.Query("order_type"), OrderStatus: c.Query("order_status"), PaymentStatus: c.Query("payment_status"), DateFrom: c.Query("date_from"), DateTo: c.Query("date_to"), Page: page, Limit: limit, SortBy: c.DefaultQuery("sort_by", "created_at"), SortOrder: c.DefaultQuery("sort_order", "desc")}
 }
 
 func bindJSON(c *gin.Context, target interface{}) bool {

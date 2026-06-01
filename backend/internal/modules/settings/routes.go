@@ -30,6 +30,14 @@ func RegisterRoutes(
 	group.PATCH("/payment-methods/:id/status", settingsManage, handler.UpdatePaymentMethodStatus)
 	group.DELETE("/payment-methods/:id", settingsManage, handler.DeletePaymentMethod)
 
+	group.GET("/sales-channels", settingsView, handler.ListSalesChannels)
+	group.POST("/sales-channels", settingsManage, handler.CreateSalesChannel)
+	group.GET("/sales-channels/:id", settingsView, handler.GetSalesChannel)
+	group.PATCH("/sales-channels/:id", settingsManage, handler.UpdateSalesChannel)
+	group.PATCH("/sales-channels/:id/status", settingsManage, handler.UpdateSalesChannelStatus)
+	group.PATCH("/sales-channels/:id/default", settingsManage, handler.SetDefaultSalesChannel)
+	group.DELETE("/sales-channels/:id", settingsManage, handler.DeleteSalesChannel)
+
 	group.GET("/receipt-layouts", settingsView, handler.ListReceiptLayouts)
 	group.POST("/receipt-layouts", settingsManage, handler.CreateReceiptLayout)
 	group.GET("/receipt-layouts/:id", settingsView, handler.GetReceiptLayout)

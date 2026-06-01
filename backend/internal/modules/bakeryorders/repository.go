@@ -15,6 +15,50 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
+type catalogProductCreate struct {
+	ID                     string
+	BusinessID             string
+	BranchID               string
+	CategoryID             string
+	UnitID                 string
+	ProductName            string
+	ProductCode            string
+	SKU                    string
+	Barcode                string
+	Description            string
+	ProductType            string
+	SalePrice              float64
+	CostPrice              *float64
+	IsPOSVisible           bool
+	IsStockTracked         bool
+	IsExpiryTracked        bool
+	IsCustomOrderAvailable bool
+	Status                 string
+	CreatedBy              string
+	UpdatedBy              string
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
+}
+
+func (catalogProductCreate) TableName() string { return "products" }
+
+type catalogVariantCreate struct {
+	ID          string
+	BusinessID  string
+	ProductID   string
+	VariantName string
+	SKU         string
+	Barcode     string
+	SalePrice   float64
+	CostPrice   *float64
+	SortOrder   int
+	Status      string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+func (catalogVariantCreate) TableName() string { return "product_variants" }
+
 func (r *Repository) CreateOrder(tx *gorm.DB, order *BakeryOrder, items []BakeryOrderItem) error {
 	if err := tx.Create(order).Error; err != nil {
 		return err
@@ -121,7 +165,7 @@ func (r *Repository) DeleteItem(tx *gorm.DB, itemID, orderID, businessID string)
 func (r *Repository) Payments(businessID, orderID string) ([]BakeryOrderPaymentResponse, error) {
 	var rows []BakeryOrderPaymentResponse
 	err := r.db.Table("bakery_order_payments bop").
-		Select("bop.id, bop.bakery_order_id, bop.payment_method_id, bop.payment_method_name_snapshot, bop.amount, bop.reference_number, bop.payment_type, bop.paid_by_user_id, u.full_name AS paid_by_user_name, bop.paid_at, bop.created_at").
+		Select("bop.id, bop.bakery_order_id, bop.payment_method_id, bop.payment_method_name_snapshot, bop.amount, bop.reference_number, bop.payment_type, bop.journal_entry_id, bop.paid_by_user_id, u.full_name AS paid_by_user_name, bop.paid_at, bop.created_at").
 		Joins("LEFT JOIN users u ON u.id = bop.paid_by_user_id").
 		Where("bop.business_id = ? AND bop.bakery_order_id = ?", businessID, orderID).
 		Order("bop.paid_at ASC").
@@ -241,7 +285,26 @@ func (r *Repository) Customer(tx *gorm.DB, businessID, branchID, customerID stri
 
 func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string) (*productRow, error) {
 	var row productRow
-	err := tx.Table("products").Select("id, product_name, tax_rate_id, sale_price, status").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", productID, businessID, branchID).Take(&row).Error
+	err := tx.Table("products").Select("id, product_name, unit_id, tax_rate_id, sale_price, status, is_pos_visible").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", productID, businessID, branchID).Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) SalesChannel(tx *gorm.DB, businessID, channelID string) (*salesChannelRow, error) {
+	var row salesChannelRow
+	err := tx.Table("sales_channels").
+		Select("id, channel_name, requires_external_order_number, status").
+		Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", channelID, businessID, "active").
+		Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) DefaultSalesChannel(tx *gorm.DB, businessID string) (*salesChannelRow, error) {
+	var row salesChannelRow
+	err := tx.Table("sales_channels").
+		Select("id, channel_name, requires_external_order_number, status").
+		Where("business_id = ? AND status = ? AND deleted_at IS NULL", businessID, "active").
+		Order("is_default DESC, channel_name ASC").
+		Take(&row).Error
 	return &row, err
 }
 
@@ -259,6 +322,63 @@ func (r *Repository) ValidateUnit(tx *gorm.DB, businessID, unitID string) error 
 	return exists(tx.Table("units").Where("id = ? AND (business_id IS NULL OR business_id = ?) AND status = ? AND deleted_at IS NULL", unitID, businessID, "active"))
 }
 
+func (r *Repository) ValidateProductCategory(tx *gorm.DB, businessID, branchID, categoryID string) error {
+	return exists(tx.Table("product_categories").Where("id = ? AND business_id = ? AND branch_id = ? AND status = ? AND deleted_at IS NULL", categoryID, businessID, branchID, "active"))
+}
+
+func (r *Repository) CreateCatalogProduct(tx *gorm.DB, product *catalogProductCreate) error {
+	return tx.Create(product).Error
+}
+
+func (r *Repository) CreateCatalogVariant(tx *gorm.DB, variant *catalogVariantCreate) error {
+	return tx.Create(variant).Error
+}
+
+func (r *Repository) UpdateProductVisibility(tx *gorm.DB, businessID, branchID, productID string, visible bool) error {
+	return tx.Table("products").
+		Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", productID, businessID, branchID).
+		Updates(map[string]interface{}{"is_pos_visible": visible, "updated_at": time.Now().UTC()}).Error
+}
+
+func (r *Repository) NextProductCode(tx *gorm.DB, businessID, branchID string) (string, error) {
+	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+branchID+":products").Error; err != nil {
+		return "", err
+	}
+	var count int64
+	if err := tx.Table("products").Where("business_id = ? AND branch_id = ?", businessID, branchID).Count(&count).Error; err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("PRD-%06d", count+1), nil
+}
+
+func (r *Repository) ProductValueExists(tx *gorm.DB, businessID, branchID, column, value string) (bool, error) {
+	if strings.TrimSpace(value) == "" {
+		return false, nil
+	}
+	if column != "product_code" && column != "sku" && column != "barcode" {
+		return false, fmt.Errorf("unsupported product uniqueness column %q", column)
+	}
+	var count int64
+	err := tx.Table("products").
+		Where("business_id = ? AND branch_id = ? AND LOWER("+column+") = LOWER(?) AND deleted_at IS NULL", businessID, branchID, value).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *Repository) VariantValueExists(tx *gorm.DB, businessID, column, value string) (bool, error) {
+	if strings.TrimSpace(value) == "" {
+		return false, nil
+	}
+	if column != "sku" && column != "barcode" {
+		return false, fmt.Errorf("unsupported variant uniqueness column %q", column)
+	}
+	var count int64
+	err := tx.Table("product_variants").
+		Where("business_id = ? AND LOWER("+column+") = LOWER(?) AND deleted_at IS NULL", businessID, value).
+		Count(&count).Error
+	return count > 0, err
+}
+
 func (r *Repository) TaxRate(tx *gorm.DB, businessID string, taxRateID *string) (*taxRow, error) {
 	if taxRateID == nil {
 		return nil, nil
@@ -270,7 +390,7 @@ func (r *Repository) TaxRate(tx *gorm.DB, businessID string, taxRateID *string) 
 
 func (r *Repository) PaymentMethod(tx *gorm.DB, businessID, methodID string) (*paymentMethodRow, error) {
 	var row paymentMethodRow
-	err := tx.Table("payment_methods").Select("id, method_name, requires_reference").Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", methodID, businessID, "active").Take(&row).Error
+	err := tx.Table("payment_methods").Select("id, method_name, requires_reference, show_in_bakery_orders").Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", methodID, businessID, "active").Take(&row).Error
 	return &row, err
 }
 
@@ -335,13 +455,19 @@ func (r *Repository) stringLookup(table, column, where string, args ...interface
 func applyOrderFilters(db *gorm.DB, query OrderListQuery) *gorm.DB {
 	if query.Search != "" {
 		like := "%" + strings.ToLower(query.Search) + "%"
-		db = db.Where("LOWER(order_number) LIKE ? OR LOWER(customer_name_snapshot) LIKE ? OR LOWER(customer_phone_snapshot) LIKE ?", like, like, like)
+		db = db.Where("LOWER(order_number) LIKE ? OR LOWER(customer_name_snapshot) LIKE ? OR LOWER(customer_phone_snapshot) LIKE ? OR LOWER(external_order_number) LIKE ?", like, like, like, like)
 	}
 	if query.BranchID != "" {
 		db = db.Where("branch_id = ?", query.BranchID)
 	}
 	if query.CustomerID != "" {
 		db = db.Where("customer_id = ?", query.CustomerID)
+	}
+	if query.SalesChannelID != "" {
+		db = db.Where("sales_channel_id = ?", query.SalesChannelID)
+	}
+	if query.ExternalOrderNumber != "" {
+		db = db.Where("LOWER(external_order_number) = LOWER(?)", strings.TrimSpace(query.ExternalOrderNumber))
 	}
 	if query.OrderType != "" {
 		db = db.Where("order_type = ?", query.OrderType)

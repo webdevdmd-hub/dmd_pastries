@@ -15,6 +15,7 @@ import (
 	"pastries-pos/internal/modules/customers"
 	"pastries-pos/internal/modules/dashboard"
 	dashboardcache "pastries-pos/internal/modules/dashboard/cache"
+	"pastries-pos/internal/modules/expenses"
 	"pastries-pos/internal/modules/ingredients"
 	"pastries-pos/internal/modules/inventory"
 	"pastries-pos/internal/modules/manufacturing"
@@ -81,6 +82,7 @@ func main() {
 	bakeryOrderRepo := bakeryorders.NewRepository(db)
 	reportRepo := reports.NewRepository(db)
 	dashboardRepo := dashboard.NewRepository(db)
+	expenseRepo := expenses.NewRepository(db)
 	userRepo := users.NewRepository(db)
 	authRepo := auth.NewRepository(db)
 	accountingRepo := accounting.NewRepository(db)
@@ -135,7 +137,9 @@ func main() {
 	productVariantHandler := productvariants.NewHandler(productVariantService)
 	inventoryService := inventory.NewService(db, inventoryRepo, auditRepo)
 	inventoryHandler := inventory.NewHandler(inventoryService)
-	posService := pos.NewService(db, posRepo, inventoryService, auditRepo)
+	accountingService := accounting.NewService(db, accountingRepo, auditRepo)
+	accountingHandler := accounting.NewHandler(accountingService)
+	posService := pos.NewService(db, posRepo, inventoryService, auditRepo, accountingService)
 	posHandler := pos.NewHandler(posService)
 	paymentService := payments.NewService(db, paymentRepo, auditRepo)
 	paymentHandler := payments.NewHandler(paymentService)
@@ -151,7 +155,7 @@ func main() {
 	purchasingHandler := purchasing.NewHandler(purchasingService)
 	recipeService := recipes.NewService(db, recipeRepo, auditRepo)
 	recipeHandler := recipes.NewHandler(recipeService)
-	bakeryOrderService := bakeryorders.NewService(db, bakeryOrderRepo, auditRepo, manufacturingService)
+	bakeryOrderService := bakeryorders.NewService(db, bakeryOrderRepo, auditRepo, manufacturingService, accountingService)
 	bakeryOrderHandler := bakeryorders.NewHandler(bakeryOrderService)
 	auditService := audit.NewService(auditRepo)
 	auditHandler := audit.NewHandler(auditService)
@@ -167,8 +171,8 @@ func main() {
 	dashboardCacheService := dashboardcache.NewService()
 	dashboardService := dashboard.NewService(db, dashboardRepo, auditRepo, dashboardCacheService)
 	dashboardHandler := dashboard.NewHandler(dashboardService)
-	accountingService := accounting.NewService(db, accountingRepo, auditRepo)
-	accountingHandler := accounting.NewHandler(accountingService)
+	expenseService := expenses.NewService(db, expenseRepo, auditRepo)
+	expenseHandler := expenses.NewHandler(expenseService)
 
 	authMiddleware := middleware.NewAuthMiddleware(authService)
 	permissionMiddleware := middleware.NewPermissionMiddleware()
@@ -212,7 +216,7 @@ func main() {
 		masterDataHandler,
 		authMiddleware.RequireAuth(),
 		permit("master_data.view"),
-		permit("master_data.units.manage", "master_data.product_categories.manage", "master_data.ingredient_categories.manage", "master_data.packaging_categories.manage", "master_data.supplier_categories.manage", "master_data.order_statuses.manage", "master_data.payment_statuses.manage", "master_data.manage"),
+		permit("master_data.units.manage", "master_data.product_categories.manage", "master_data.ingredient_categories.manage", "master_data.packaging_categories.manage", "master_data.order_statuses.manage", "master_data.payment_statuses.manage", "master_data.manage"),
 	)
 	packaging.RegisterRoutes(
 		router,
@@ -321,6 +325,8 @@ func main() {
 		authMiddleware.RequireAuth(),
 		permit("orders.view", "pos.view"),
 		permit("orders.create", "orders.edit", "orders.delete", "orders.status.update", "orders.payments.manage", "orders.production.assign", "orders.packaging.manage", "orders.manage", "pos.sell"),
+		permit("products.create", "products.manage"),
+		permit("products.variants.manage", "products.manage"),
 	)
 	reports.RegisterRoutes(
 		router,
@@ -344,6 +350,15 @@ func main() {
 		authMiddleware.RequireAuth(),
 		permit("accounting.view"),
 		permit("accounting.accounts.manage", "accounting.journal_entries.manage"),
+	)
+	expenses.RegisterRoutes(
+		router,
+		expenseHandler,
+		authMiddleware.RequireAuth(),
+		permit("expenses.view", "accounting.view"),
+		permit("expenses.create", "expenses.manage", "accounting.journal_entries.manage"),
+		permit("expenses.edit", "expenses.manage", "accounting.journal_entries.manage"),
+		permit("expenses.delete", "expenses.manage", "accounting.journal_entries.manage"),
 	)
 	audit.RegisterRoutes(
 		router,

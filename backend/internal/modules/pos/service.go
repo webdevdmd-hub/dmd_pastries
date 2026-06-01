@@ -6,8 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
 	"pastries-pos/internal/modules/inventory"
 	apperrors "pastries-pos/internal/shared/errors"
@@ -15,14 +17,19 @@ import (
 )
 
 type Service struct {
-	db               *gorm.DB
-	repo             *Repository
-	inventoryService *inventory.Service
-	auditRepo        *audit.Repository
+	db                *gorm.DB
+	repo              *Repository
+	inventoryService  *inventory.Service
+	auditRepo         *audit.Repository
+	accountingService *accounting.Service
 }
 
-func NewService(db *gorm.DB, repo *Repository, inventoryService *inventory.Service, auditRepo *audit.Repository) *Service {
-	return &Service{db: db, repo: repo, inventoryService: inventoryService, auditRepo: auditRepo}
+func NewService(db *gorm.DB, repo *Repository, inventoryService *inventory.Service, auditRepo *audit.Repository, accountingService ...*accounting.Service) *Service {
+	service := &Service{db: db, repo: repo, inventoryService: inventoryService, auditRepo: auditRepo}
+	if len(accountingService) > 0 {
+		service.accountingService = accountingService[0]
+	}
+	return service
 }
 
 func (s *Service) ListPOSProducts(currentUser *utils.AuthContext, query POSProductQuery) (*PaginatedResponse[POSProductResponse], error) {
@@ -113,6 +120,10 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 			return nil, apperrors.BadRequest("invalid customer_id", nil)
 		}
 	}
+	salesChannel, externalOrderNumber, err := s.resolveSalesChannel(tx, currentUser.BusinessID, req.SalesChannelID, req.ExternalOrderNumber)
+	if err != nil {
+		return nil, err
+	}
 
 	calculation, err := s.calculateSale(tx, currentUser.BusinessID, req.BranchID, req)
 	if err != nil {
@@ -141,25 +152,28 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 		changeAmount = overpayAmount
 	}
 	sale := &Sale{
-		ID:             utils.NewUUID(),
-		BusinessID:     currentUser.BusinessID,
-		BranchID:       req.BranchID,
-		CashierUserID:  currentUser.UserID,
-		CustomerID:     cleanStringPointer(req.CustomerID),
-		SaleNumber:     saleNumber,
-		SubtotalAmount: calculation.SubtotalAmount,
-		DiscountType:   cleanStringPointer(req.SaleDiscountType),
-		DiscountValue:  roundMoney(req.SaleDiscountValue),
-		DiscountAmount: calculation.DiscountAmount,
-		TaxableAmount:  calculation.TaxableAmount,
-		TaxAmount:      calculation.TaxAmount,
-		TotalAmount:    calculation.TotalAmount,
-		PaidAmount:     roundMoney(paidAmount),
-		ChangeAmount:   changeAmount,
-		PaymentStatus:  paymentStatus(paidAmount, calculation.TotalAmount),
-		SaleStatus:     "completed",
-		Notes:          strings.TrimSpace(req.Notes),
-		SoldAt:         now,
+		ID:                       utils.NewUUID(),
+		BusinessID:               currentUser.BusinessID,
+		BranchID:                 req.BranchID,
+		CashierUserID:            currentUser.UserID,
+		CustomerID:               cleanStringPointer(req.CustomerID),
+		SalesChannelID:           &salesChannel.ID,
+		SalesChannelNameSnapshot: salesChannel.ChannelName,
+		ExternalOrderNumber:      externalOrderNumber,
+		SaleNumber:               saleNumber,
+		SubtotalAmount:           calculation.SubtotalAmount,
+		DiscountType:             cleanStringPointer(req.SaleDiscountType),
+		DiscountValue:            roundMoney(req.SaleDiscountValue),
+		DiscountAmount:           calculation.DiscountAmount,
+		TaxableAmount:            calculation.TaxableAmount,
+		TaxAmount:                calculation.TaxAmount,
+		TotalAmount:              calculation.TotalAmount,
+		PaidAmount:               roundMoney(paidAmount),
+		ChangeAmount:             changeAmount,
+		PaymentStatus:            paymentStatus(paidAmount, calculation.TotalAmount),
+		SaleStatus:               "completed",
+		Notes:                    strings.TrimSpace(req.Notes),
+		SoldAt:                   now,
 	}
 
 	for i := range calculation.Items {
@@ -171,6 +185,11 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 
 	if err := s.repo.CreateSale(tx, sale, calculation.Items, payments); err != nil {
 		return nil, apperrors.Internal("failed to create sale")
+	}
+	if s.accountingService != nil {
+		if _, err := s.accountingService.PostPOSSaleJournal(tx, currentUser, sale.ID); err != nil {
+			return nil, err
+		}
 	}
 	if err := s.deductInventoryForSale(tx, currentUser, sale, calculation.Items); err != nil {
 		return nil, err
@@ -923,6 +942,9 @@ func (s *Service) buildPayments(tx *gorm.DB, businessID, branchID, paidByUserID 
 			}
 			return nil, 0, 0, apperrors.Internal("failed to validate payment method")
 		}
+		if !method.ShowInPOS {
+			return nil, 0, 0, apperrors.BadRequest("payment method is not enabled for POS", nil)
+		}
 		if method.RequiresReference && strings.TrimSpace(reqPayment.ReferenceNumber) == "" {
 			return nil, 0, 0, apperrors.BadRequest("reference_number is required for this payment method", nil)
 		}
@@ -948,6 +970,42 @@ func (s *Service) buildPayments(tx *gorm.DB, businessID, branchID, paidByUserID 
 		})
 	}
 	return payments, roundMoney(total), roundMoney(cashTotal), nil
+}
+
+func (s *Service) resolveSalesChannel(tx *gorm.DB, businessID string, requestedID *string, requestedExternalNumber string) (*SalesChannelRow, string, error) {
+	channelID := ""
+	if requestedID != nil {
+		channelID = strings.TrimSpace(*requestedID)
+	}
+
+	var channel *SalesChannelRow
+	var err error
+	if channelID != "" {
+		if _, parseErr := uuid.Parse(channelID); parseErr != nil {
+			return nil, "", apperrors.BadRequest("sales_channel_id must be a valid UUID", nil)
+		}
+		channel, err = s.repo.FindSalesChannel(tx, businessID, channelID)
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return nil, "", apperrors.BadRequest("invalid sales_channel_id", nil)
+			}
+			return nil, "", apperrors.Internal("failed to validate sales channel")
+		}
+	} else {
+		channel, err = s.repo.DefaultSalesChannel(tx, businessID)
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return nil, "", apperrors.BadRequest("default sales channel is not configured", nil)
+			}
+			return nil, "", apperrors.Internal("failed to load default sales channel")
+		}
+	}
+
+	externalNumber := strings.TrimSpace(requestedExternalNumber)
+	if channel.RequiresExternalOrderNumber && externalNumber == "" {
+		return nil, "", apperrors.BadRequest("external_order_number is required for the selected sales channel", nil)
+	}
+	return channel, externalNumber, nil
 }
 
 func validateCheckoutRequest(req CheckoutRequest) error {
@@ -999,6 +1057,11 @@ func validateHoldSaleRequest(req HoldSaleRequest) error {
 }
 
 func validateSalesQuery(query SalesListQuery) error {
+	if strings.TrimSpace(query.SalesChannelID) != "" {
+		if _, err := uuid.Parse(strings.TrimSpace(query.SalesChannelID)); err != nil {
+			return apperrors.BadRequest("sales_channel_id must be a valid UUID", nil)
+		}
+	}
 	if query.SaleStatus != "" {
 		switch query.SaleStatus {
 		case "completed", "voided", "refunded", "partially_refunded":

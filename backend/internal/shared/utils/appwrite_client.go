@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -16,6 +18,8 @@ type AppwriteClient struct {
 	endpoint  string
 	projectID string
 	apiKey    string
+	appEnv    string
+	e2eToken  string
 }
 
 type AppwriteIdentity struct {
@@ -31,10 +35,16 @@ func NewAppwriteClient(cfg config.Config) *AppwriteClient {
 		endpoint:  cfg.AppwriteEndpoint,
 		projectID: cfg.AppwriteProjectID,
 		apiKey:    cfg.AppwriteAPIKey,
+		appEnv:    cfg.AppEnv,
+		e2eToken:  cfg.E2EAuthToken,
 	}
 }
 
 func (c *AppwriteClient) CreateUser(email, password, name, phone string) (string, error) {
+	if c.isE2E() {
+		return e2eAppwriteUserID(email), nil
+	}
+
 	client := appwrite.NewClient(
 		appwrite.WithEndpoint(c.endpoint),
 		appwrite.WithProject(c.projectID),
@@ -60,6 +70,10 @@ func (c *AppwriteClient) CreateUser(email, password, name, phone string) (string
 }
 
 func (c *AppwriteClient) DeleteUser(userID string) error {
+	if c.isE2E() {
+		return nil
+	}
+
 	client := appwrite.NewClient(
 		appwrite.WithEndpoint(c.endpoint),
 		appwrite.WithProject(c.projectID),
@@ -111,6 +125,10 @@ func FriendlyAppwriteCreateUserError(err error) (string, map[string]interface{})
 }
 
 func (c *AppwriteClient) SetUserStatus(userID string, enabled bool) error {
+	if c.isE2E() {
+		return nil
+	}
+
 	client := appwrite.NewClient(
 		appwrite.WithEndpoint(c.endpoint),
 		appwrite.WithProject(c.projectID),
@@ -123,6 +141,10 @@ func (c *AppwriteClient) SetUserStatus(userID string, enabled bool) error {
 }
 
 func (c *AppwriteClient) DeleteUserSessions(userID string) error {
+	if c.isE2E() {
+		return nil
+	}
+
 	client := appwrite.NewClient(
 		appwrite.WithEndpoint(c.endpoint),
 		appwrite.WithProject(c.projectID),
@@ -135,6 +157,10 @@ func (c *AppwriteClient) DeleteUserSessions(userID string) error {
 }
 
 func (c *AppwriteClient) CreatePasswordRecovery(email, redirectURL string) error {
+	if c.isE2E() {
+		return nil
+	}
+
 	client := appwrite.NewClient(
 		appwrite.WithEndpoint(c.endpoint),
 		appwrite.WithProject(c.projectID),
@@ -146,6 +172,10 @@ func (c *AppwriteClient) CreatePasswordRecovery(email, redirectURL string) error
 }
 
 func (c *AppwriteClient) CompletePasswordRecovery(userID, secret, password string) error {
+	if c.isE2E() {
+		return nil
+	}
+
 	client := appwrite.NewClient(
 		appwrite.WithEndpoint(c.endpoint),
 		appwrite.WithProject(c.projectID),
@@ -159,6 +189,20 @@ func (c *AppwriteClient) CompletePasswordRecovery(userID, secret, password strin
 func (c *AppwriteClient) VerifyJWT(jwt string) (*AppwriteIdentity, error) {
 	if jwt == "" {
 		return nil, fmt.Errorf("missing jwt")
+	}
+
+	if c.isE2E() {
+		if jwt != c.e2eToken {
+			return nil, fmt.Errorf("invalid e2e jwt")
+		}
+
+		return &AppwriteIdentity{
+			ID:            "e2e-owner",
+			Email:         "owner.e2e@pastries.local",
+			Phone:         "+971500000000",
+			Name:          "E2E Owner",
+			EmailVerified: true,
+		}, nil
 	}
 
 	client := appwrite.NewClient(
@@ -180,4 +224,18 @@ func (c *AppwriteClient) VerifyJWT(jwt string) (*AppwriteIdentity, error) {
 		Name:          account.Name,
 		EmailVerified: account.EmailVerification,
 	}, nil
+}
+
+func (c *AppwriteClient) isE2E() bool {
+	return c.appEnv == "e2e" && strings.TrimSpace(c.e2eToken) != ""
+}
+
+func e2eAppwriteUserID(email string) string {
+	normalizedEmail := strings.ToLower(strings.TrimSpace(email))
+	if normalizedEmail == "owner.e2e@pastries.local" {
+		return "e2e-owner"
+	}
+
+	sum := sha256.Sum256([]byte(normalizedEmail))
+	return "e2e-user-" + hex.EncodeToString(sum[:8])
 }

@@ -12,11 +12,15 @@ func RegisterRoutes(
 	group := router.Group("/api/v1/purchasing")
 	group.Use(authGuard)
 
+	group.GET("/document-chain", view, handler.GetDocumentChain)
+
 	group.GET("/orders", view, handler.ListOrders)
 	group.POST("/orders", manage, handler.CreateOrder)
 	group.GET("/orders/:id", view, handler.GetOrder)
+	group.GET("/orders/:id/document-chain", view, handler.GetOrderDocumentChain)
 	group.PATCH("/orders/:id", manage, handler.UpdateOrder)
 	group.PATCH("/orders/:id/status", manage, handler.UpdateOrderStatus)
+	group.POST("/orders/:id/convert-to-invoice", manage, handler.ConvertOrderToInvoice)
 	group.DELETE("/orders/:id", manage, handler.DeleteOrder)
 
 	group.GET("/invoices", view, handler.ListInvoices)
@@ -26,6 +30,7 @@ func RegisterRoutes(
 	group.PATCH("/invoices/:id", manage, handler.UpdateInvoice)
 	group.POST("/invoices/:id/post", manage, handler.PostInvoice)
 	group.POST("/invoices/:id/cancel", manage, handler.CancelInvoice)
+	group.POST("/invoices/:id/convert-to-receipt", manage, handler.ConvertInvoiceToReceipt)
 	group.GET("/invoices/:id/payments", view, handler.ListInvoicePaymentsByInvoice)
 	group.POST("/invoices/:id/payments", manage, handler.AddInvoicePayment)
 

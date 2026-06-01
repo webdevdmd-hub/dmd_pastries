@@ -166,7 +166,33 @@ func (r *Repository) CustomerExists(tx *gorm.DB, businessID, branchID, customerI
 func (r *Repository) FindPaymentMethod(tx *gorm.DB, businessID, paymentMethodID string) (*PaymentMethodRow, error) {
 	var row PaymentMethodRow
 	err := tx.Table("payment_methods").
+		Select("id, method_name, method_type, requires_reference, show_in_pos").
 		Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", paymentMethodID, businessID, "active").
+		Take(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *Repository) FindSalesChannel(tx *gorm.DB, businessID, channelID string) (*SalesChannelRow, error) {
+	var row SalesChannelRow
+	err := tx.Table("sales_channels").
+		Select("id, channel_name, requires_external_order_number, status").
+		Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", channelID, businessID, "active").
+		Take(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *Repository) DefaultSalesChannel(tx *gorm.DB, businessID string) (*SalesChannelRow, error) {
+	var row SalesChannelRow
+	err := tx.Table("sales_channels").
+		Select("id, channel_name, requires_external_order_number, status").
+		Where("business_id = ? AND status = ? AND deleted_at IS NULL", businessID, "active").
+		Order("is_default DESC, channel_name ASC").
 		Take(&row).Error
 	if err != nil {
 		return nil, err
@@ -253,7 +279,7 @@ func (r *Repository) ListSales(businessID string, query SalesListQuery) ([]SaleS
 		sortOrder = "asc"
 	}
 	var rows []SaleSummaryResponse
-	err := db.Select("s.id, s.sale_number, s.branch_id, b.branch_name, s.cashier_user_id, u.full_name AS cashier_name, s.customer_id, COALESCE(c.full_name, '') AS customer_name, s.total_amount, s.paid_amount, s.payment_status, s.sale_status, s.sold_at").
+	err := db.Select("s.id, s.sale_number, s.branch_id, b.branch_name, s.cashier_user_id, u.full_name AS cashier_name, s.customer_id, COALESCE(c.full_name, '') AS customer_name, s.sales_channel_id, s.sales_channel_name_snapshot, s.external_order_number, s.total_amount, s.paid_amount, s.payment_status, s.sale_status, s.sold_at").
 		Order("s." + sortBy + " " + sortOrder).
 		Offset((query.Page - 1) * query.Limit).
 		Limit(query.Limit).
@@ -286,27 +312,31 @@ func (r *Repository) SaleItems(tx *gorm.DB, businessID, saleID string) ([]SaleIt
 
 func (r *Repository) toSaleResponse(sale Sale, includeChildren bool) (*SaleResponse, error) {
 	response := &SaleResponse{
-		ID:             sale.ID,
-		BusinessID:     sale.BusinessID,
-		BranchID:       sale.BranchID,
-		CashierUserID:  sale.CashierUserID,
-		CustomerID:     sale.CustomerID,
-		SaleNumber:     sale.SaleNumber,
-		SubtotalAmount: sale.SubtotalAmount,
-		DiscountType:   sale.DiscountType,
-		DiscountValue:  sale.DiscountValue,
-		DiscountAmount: sale.DiscountAmount,
-		TaxableAmount:  sale.TaxableAmount,
-		TaxAmount:      sale.TaxAmount,
-		TotalAmount:    sale.TotalAmount,
-		PaidAmount:     sale.PaidAmount,
-		ChangeAmount:   sale.ChangeAmount,
-		PaymentStatus:  sale.PaymentStatus,
-		SaleStatus:     sale.SaleStatus,
-		Notes:          sale.Notes,
-		SoldAt:         sale.SoldAt,
-		CreatedAt:      sale.CreatedAt,
-		UpdatedAt:      sale.UpdatedAt,
+		ID:                       sale.ID,
+		BusinessID:               sale.BusinessID,
+		BranchID:                 sale.BranchID,
+		CashierUserID:            sale.CashierUserID,
+		CustomerID:               sale.CustomerID,
+		SalesChannelID:           sale.SalesChannelID,
+		SalesChannelNameSnapshot: sale.SalesChannelNameSnapshot,
+		ExternalOrderNumber:      sale.ExternalOrderNumber,
+		SaleNumber:               sale.SaleNumber,
+		SubtotalAmount:           sale.SubtotalAmount,
+		DiscountType:             sale.DiscountType,
+		DiscountValue:            sale.DiscountValue,
+		DiscountAmount:           sale.DiscountAmount,
+		TaxableAmount:            sale.TaxableAmount,
+		TaxAmount:                sale.TaxAmount,
+		TotalAmount:              sale.TotalAmount,
+		PaidAmount:               sale.PaidAmount,
+		ChangeAmount:             sale.ChangeAmount,
+		PaymentStatus:            sale.PaymentStatus,
+		SaleStatus:               sale.SaleStatus,
+		AccountingJournalEntryID: sale.AccountingJournalEntryID,
+		Notes:                    sale.Notes,
+		SoldAt:                   sale.SoldAt,
+		CreatedAt:                sale.CreatedAt,
+		UpdatedAt:                sale.UpdatedAt,
 	}
 
 	_ = r.db.Table("users").Select("full_name").Where("id = ? AND business_id = ?", sale.CashierUserID, sale.BusinessID).Scan(&response.CashierName).Error
@@ -537,6 +567,14 @@ type PaymentMethodRow struct {
 	MethodName        string
 	MethodType        string
 	RequiresReference bool
+	ShowInPOS         bool
+}
+
+type SalesChannelRow struct {
+	ID                          string
+	ChannelName                 string
+	RequiresExternalOrderNumber bool
+	Status                      string
 }
 
 type heldSaleScanRow struct {
@@ -613,7 +651,8 @@ func applyPOSProductFilters(db *gorm.DB, query POSProductQuery) *gorm.DB {
 
 func applySalesFilters(db *gorm.DB, query SalesListQuery) *gorm.DB {
 	if query.Search != "" {
-		db = db.Where("LOWER(s.sale_number) LIKE ? OR LOWER(u.full_name) LIKE ?", "%"+strings.ToLower(query.Search)+"%", "%"+strings.ToLower(query.Search)+"%")
+		like := "%" + strings.ToLower(query.Search) + "%"
+		db = db.Where("LOWER(s.sale_number) LIKE ? OR LOWER(u.full_name) LIKE ? OR LOWER(s.external_order_number) LIKE ?", like, like, like)
 	}
 	if query.BranchID != "" {
 		db = db.Where("s.branch_id = ?", query.BranchID)
@@ -629,6 +668,12 @@ func applySalesFilters(db *gorm.DB, query SalesListQuery) *gorm.DB {
 	}
 	if query.CustomerID != "" {
 		db = db.Where("s.customer_id = ?", query.CustomerID)
+	}
+	if query.SalesChannelID != "" {
+		db = db.Where("s.sales_channel_id = ?", query.SalesChannelID)
+	}
+	if query.ExternalOrderNumber != "" {
+		db = db.Where("LOWER(s.external_order_number) = LOWER(?)", strings.TrimSpace(query.ExternalOrderNumber))
 	}
 	if query.DateFrom != "" {
 		db = db.Where("s.sold_at >= ?", query.DateFrom)

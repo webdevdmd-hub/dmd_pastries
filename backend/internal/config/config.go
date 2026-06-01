@@ -24,6 +24,7 @@ type Config struct {
 	AppwriteEndpoint         string
 	AppwriteProjectID        string
 	AppwriteAPIKey           string
+	E2EAuthToken             string
 	RequireEmailVerification bool
 	PasswordResetURL         string
 	DefaultBusinessCurrency  string
@@ -40,6 +41,7 @@ func Load() Config {
 	cfg.AppwriteEndpoint = mustEnv("APPWRITE_ENDPOINT")
 	cfg.AppwriteProjectID = mustEnv("APPWRITE_PROJECT_ID")
 	cfg.AppwriteAPIKey = mustEnv("APPWRITE_API_KEY")
+	cfg.E2EAuthToken = getEnv("E2E_AUTH_TOKEN", "")
 	cfg.RequireEmailVerification = getEnvBool("REQUIRE_EMAIL_VERIFICATION", false)
 	cfg.PasswordResetURL = getEnv("PASSWORD_RESET_URL", "http://localhost:3000/reset-password")
 	cfg.DefaultBusinessCurrency = getEnv("DEFAULT_BUSINESS_CURRENCY", "AED")

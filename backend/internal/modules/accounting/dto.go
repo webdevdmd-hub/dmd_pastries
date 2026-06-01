@@ -14,6 +14,38 @@ type ChartAccountListQuery struct {
 	SortOrder       string
 }
 
+type PaymentAccountListQuery struct {
+	Search      string
+	BranchID    string
+	AccountType string
+	Status      string
+	Page        int
+	Limit       int
+	SortBy      string
+	SortOrder   string
+}
+
+type AccountTransferListQuery struct {
+	BranchID         string
+	PaymentAccountID string
+	DateFrom         string
+	DateTo           string
+	Page             int
+	Limit            int
+	SortOrder        string
+}
+
+type PlatformSettlementListQuery struct {
+	BranchID                 string
+	PlatformPaymentAccountID string
+	DepositPaymentAccountID  string
+	DateFrom                 string
+	DateTo                   string
+	Page                     int
+	Limit                    int
+	SortOrder                string
+}
+
 type CreateChartAccountRequest struct {
 	ParentAccountID    *string `json:"parent_account_id" binding:"omitempty,uuid"`
 	AccountCode        string  `json:"account_code" binding:"required"`
@@ -26,6 +58,44 @@ type CreateChartAccountRequest struct {
 	AllowManualPosting *bool   `json:"allow_manual_posting"`
 }
 
+type CreatePaymentAccountRequest struct {
+	BranchID       *string `json:"branch_id" binding:"omitempty,uuid"`
+	AccountName    string  `json:"account_name" binding:"required"`
+	AccountType    string  `json:"account_type" binding:"required"`
+	ChartAccountID string  `json:"chart_account_id" binding:"required,uuid"`
+	Description    string  `json:"description"`
+	Status         string  `json:"status" binding:"omitempty,oneof=active inactive"`
+}
+
+type CreateAccountTransferRequest struct {
+	BranchID             *string `json:"branch_id" binding:"omitempty,uuid"`
+	TransferDate         string  `json:"transfer_date" binding:"required"`
+	FromPaymentAccountID string  `json:"from_payment_account_id" binding:"required,uuid"`
+	ToPaymentAccountID   string  `json:"to_payment_account_id" binding:"required,uuid"`
+	Amount               float64 `json:"amount" binding:"required"`
+	ReferenceNumber      string  `json:"reference_number"`
+	Notes                string  `json:"notes"`
+}
+
+type PlatformSettlementDeductionRequest struct {
+	ExpenseAccountID string  `json:"expense_account_id" binding:"required,uuid"`
+	DeductionType    string  `json:"deduction_type" binding:"required"`
+	Description      string  `json:"description"`
+	Amount           float64 `json:"amount" binding:"required"`
+}
+
+type CreatePlatformSettlementRequest struct {
+	BranchID                 *string                              `json:"branch_id" binding:"omitempty,uuid"`
+	SettlementDate           string                               `json:"settlement_date" binding:"required"`
+	PlatformPaymentAccountID string                               `json:"platform_payment_account_id" binding:"required,uuid"`
+	DepositPaymentAccountID  string                               `json:"deposit_payment_account_id" binding:"required,uuid"`
+	GrossAmount              float64                              `json:"gross_amount" binding:"required"`
+	NetReceivedAmount        float64                              `json:"net_received_amount" binding:"required"`
+	Deductions               []PlatformSettlementDeductionRequest `json:"deductions"`
+	ReferenceNumber          string                               `json:"reference_number"`
+	Notes                    string                               `json:"notes"`
+}
+
 type UpdateChartAccountRequest struct {
 	ParentAccountID    *string `json:"parent_account_id" binding:"omitempty,uuid"`
 	AccountName        *string `json:"account_name"`
@@ -33,6 +103,15 @@ type UpdateChartAccountRequest struct {
 	Description        *string `json:"description"`
 	IsControlAccount   *bool   `json:"is_control_account"`
 	AllowManualPosting *bool   `json:"allow_manual_posting"`
+}
+
+type UpdatePaymentAccountRequest struct {
+	BranchID       *string `json:"branch_id" binding:"omitempty,uuid"`
+	AccountName    *string `json:"account_name"`
+	AccountType    *string `json:"account_type"`
+	ChartAccountID *string `json:"chart_account_id" binding:"omitempty,uuid"`
+	Description    *string `json:"description"`
+	Status         *string `json:"status" binding:"omitempty,oneof=active inactive"`
 }
 
 type UpdateChartAccountStatusRequest struct {
@@ -139,6 +218,80 @@ type ChartAccountResponse struct {
 	Status             string    `json:"status"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
+}
+
+type PaymentAccountResponse struct {
+	ID               string    `json:"id"`
+	BusinessID       string    `json:"business_id"`
+	BranchID         *string   `json:"branch_id"`
+	BranchName       string    `json:"branch_name"`
+	AccountName      string    `json:"account_name"`
+	AccountType      string    `json:"account_type"`
+	ChartAccountID   string    `json:"chart_account_id"`
+	ChartAccountCode string    `json:"chart_account_code"`
+	ChartAccountName string    `json:"chart_account_name"`
+	ChartAccountType string    `json:"chart_account_type"`
+	Description      string    `json:"description"`
+	CurrentBalance   float64   `json:"current_balance"`
+	BalanceLabel     string    `json:"balance_label"`
+	Status           string    `json:"status"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+type AccountTransferResponse struct {
+	ID                     string    `json:"id"`
+	BusinessID             string    `json:"business_id"`
+	BranchID               *string   `json:"branch_id"`
+	BranchName             string    `json:"branch_name"`
+	TransferNumber         string    `json:"transfer_number"`
+	TransferDate           string    `json:"transfer_date"`
+	FromPaymentAccountID   string    `json:"from_payment_account_id"`
+	FromPaymentAccountName string    `json:"from_payment_account_name"`
+	ToPaymentAccountID     string    `json:"to_payment_account_id"`
+	ToPaymentAccountName   string    `json:"to_payment_account_name"`
+	Amount                 float64   `json:"amount"`
+	ReferenceNumber        string    `json:"reference_number"`
+	Notes                  string    `json:"notes"`
+	Status                 string    `json:"status"`
+	JournalEntryID         *string   `json:"journal_entry_id"`
+	CreatedByUserID        string    `json:"created_by_user_id"`
+	CreatedAt              time.Time `json:"created_at"`
+	UpdatedAt              time.Time `json:"updated_at"`
+}
+
+type PlatformSettlementDeductionResponse struct {
+	ID                 string  `json:"id"`
+	ExpenseAccountID   string  `json:"expense_account_id"`
+	ExpenseAccountCode string  `json:"expense_account_code"`
+	ExpenseAccountName string  `json:"expense_account_name"`
+	DeductionType      string  `json:"deduction_type"`
+	Description        string  `json:"description"`
+	Amount             float64 `json:"amount"`
+}
+
+type PlatformSettlementResponse struct {
+	ID                         string                                `json:"id"`
+	BusinessID                 string                                `json:"business_id"`
+	BranchID                   *string                               `json:"branch_id"`
+	BranchName                 string                                `json:"branch_name"`
+	SettlementNumber           string                                `json:"settlement_number"`
+	SettlementDate             string                                `json:"settlement_date"`
+	PlatformPaymentAccountID   string                                `json:"platform_payment_account_id"`
+	PlatformPaymentAccountName string                                `json:"platform_payment_account_name"`
+	DepositPaymentAccountID    string                                `json:"deposit_payment_account_id"`
+	DepositPaymentAccountName  string                                `json:"deposit_payment_account_name"`
+	GrossAmount                float64                               `json:"gross_amount"`
+	DeductionsTotal            float64                               `json:"deductions_total"`
+	NetReceivedAmount          float64                               `json:"net_received_amount"`
+	Deductions                 []PlatformSettlementDeductionResponse `json:"deductions"`
+	ReferenceNumber            string                                `json:"reference_number"`
+	Notes                      string                                `json:"notes"`
+	Status                     string                                `json:"status"`
+	JournalEntryID             *string                               `json:"journal_entry_id"`
+	CreatedByUserID            string                                `json:"created_by_user_id"`
+	CreatedAt                  time.Time                             `json:"created_at"`
+	UpdatedAt                  time.Time                             `json:"updated_at"`
 }
 
 type JournalEntryResponse struct {

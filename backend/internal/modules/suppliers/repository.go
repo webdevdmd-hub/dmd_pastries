@@ -61,8 +61,7 @@ func (r *Repository) List(businessID, branchID string, query SupplierListQuery) 
 
 func (r *Repository) Lookup(businessID, branchID string, query SupplierLookupQuery) ([]SupplierLookupItem, error) {
 	db := r.db.Table("suppliers s").
-		Select("s.id, s.supplier_code, s.supplier_name, s.supplier_category_id, sc.category_name, s.phone, s.email, s.status").
-		Joins("LEFT JOIN supplier_categories sc ON sc.id = s.supplier_category_id AND sc.business_id = s.business_id AND sc.branch_id = s.branch_id").
+		Select("s.id, s.supplier_code, s.supplier_name, s.phone, s.email, s.status").
 		Where("s.business_id = ? AND s.branch_id = ? AND s.status = ? AND s.deleted_at IS NULL", businessID, branchID, "active")
 	if query.Search != "" {
 		like := "%" + strings.ToLower(query.Search) + "%"
@@ -90,26 +89,7 @@ func (r *Repository) SupplierCodeExists(tx *gorm.DB, businessID, branchID, value
 	return count > 0, err
 }
 
-func (r *Repository) ValidateCategory(businessID, branchID, categoryID string) error {
-	if strings.TrimSpace(categoryID) == "" {
-		return nil
-	}
-	var count int64
-	err := r.db.Table("supplier_categories").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", categoryID, businessID, branchID).Count(&count).Error
-	if err != nil {
-		return err
-	}
-	if count == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
-}
-
 func (r *Repository) LoadSupplierResponse(businessID string, supplier Supplier) (SupplierResponse, error) {
-	categoryName := ""
-	if supplier.SupplierCategoryID != nil {
-		_ = r.db.Table("supplier_categories").Select("category_name").Where("id = ? AND business_id = ? AND branch_id = ?", *supplier.SupplierCategoryID, businessID, supplier.BranchID).Scan(&categoryName).Error
-	}
 	var primaryContact *SupplierContactResponse
 	contacts, err := r.ListContacts(businessID, supplier.BranchID, supplier.ID)
 	if err == nil {
@@ -122,7 +102,7 @@ func (r *Repository) LoadSupplierResponse(businessID string, supplier Supplier) 
 	}
 	return SupplierResponse{
 		ID: supplier.ID, BusinessID: supplier.BusinessID, BranchID: supplier.BranchID, SupplierCode: supplier.SupplierCode, SupplierName: supplier.SupplierName,
-		SupplierCategoryID: supplier.SupplierCategoryID, CategoryName: categoryName, Phone: supplier.Phone, Email: supplier.Email, Website: supplier.Website,
+		Phone: supplier.Phone, Email: supplier.Email, Website: supplier.Website,
 		AddressLine1: supplier.AddressLine1, AddressLine2: supplier.AddressLine2, City: supplier.City, State: supplier.State, Country: supplier.Country,
 		PostalCode: supplier.PostalCode, TaxNumber: supplier.TaxNumber, Notes: supplier.Notes, Status: supplier.Status, PrimaryContact: primaryContact,
 		CreatedAt: supplier.CreatedAt, UpdatedAt: supplier.UpdatedAt,
@@ -211,9 +191,6 @@ func applySupplierFilters(db *gorm.DB, query SupplierListQuery) *gorm.DB {
 	if query.Search != "" {
 		like := "%" + strings.ToLower(query.Search) + "%"
 		db = db.Where("LOWER(suppliers.supplier_name) LIKE ? OR LOWER(suppliers.supplier_code) LIKE ? OR LOWER(suppliers.phone) LIKE ? OR LOWER(suppliers.email) LIKE ?", like, like, like, like)
-	}
-	if query.SupplierCategoryID != "" {
-		db = db.Where("suppliers.supplier_category_id = ?", query.SupplierCategoryID)
 	}
 	if query.Status != "" {
 		db = db.Where("suppliers.status = ?", query.Status)

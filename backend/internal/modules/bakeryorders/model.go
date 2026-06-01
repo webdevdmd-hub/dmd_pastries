@@ -7,33 +7,37 @@ import (
 )
 
 type BakeryOrder struct {
-	ID                    string         `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID            string         `gorm:"type:uuid;not null;index" json:"business_id"`
-	BranchID              string         `gorm:"type:uuid;not null;index" json:"branch_id"`
-	OrderNumber           string         `gorm:"size:100;not null" json:"order_number"`
-	CustomerID            *string        `gorm:"type:uuid;index" json:"customer_id"`
-	CustomerNameSnapshot  string         `gorm:"size:255" json:"customer_name_snapshot"`
-	CustomerPhoneSnapshot string         `gorm:"size:100" json:"customer_phone_snapshot"`
-	OrderType             string         `gorm:"size:50;not null" json:"order_type"`
-	OrderDate             time.Time      `gorm:"type:date;not null" json:"order_date"`
-	EventDate             time.Time      `gorm:"type:date;not null" json:"event_date"`
-	PickupTime            string         `gorm:"size:20" json:"pickup_time"`
-	DeliveryTime          string         `gorm:"size:20" json:"delivery_time"`
-	DeliveryAddress       string         `json:"delivery_address"`
-	SubtotalAmount        float64        `gorm:"not null;default:0" json:"subtotal_amount"`
-	DiscountAmount        float64        `gorm:"not null;default:0" json:"discount_amount"`
-	TaxAmount             float64        `gorm:"not null;default:0" json:"tax_amount"`
-	TotalAmount           float64        `gorm:"not null;default:0" json:"total_amount"`
-	PaidAmount            float64        `gorm:"not null;default:0" json:"paid_amount"`
-	BalanceAmount         float64        `gorm:"not null;default:0" json:"balance_amount"`
-	PaymentStatus         string         `gorm:"size:50;not null;default:unpaid" json:"payment_status"`
-	OrderStatus           string         `gorm:"size:50;not null;default:new" json:"order_status"`
-	Notes                 string         `json:"notes"`
-	CreatedByUserID       string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
-	UpdatedByUserID       string         `gorm:"type:uuid;index" json:"updated_by_user_id"`
-	CreatedAt             time.Time      `json:"created_at"`
-	UpdatedAt             time.Time      `json:"updated_at"`
-	DeletedAt             gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	ID                       string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID               string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID                 string         `gorm:"type:uuid;not null;index" json:"branch_id"`
+	OrderNumber              string         `gorm:"size:100;not null" json:"order_number"`
+	CustomerID               *string        `gorm:"type:uuid;index" json:"customer_id"`
+	SalesChannelID           *string        `gorm:"type:uuid;index" json:"sales_channel_id"`
+	SalesChannelNameSnapshot string         `gorm:"size:150;not null;default:''" json:"sales_channel_name_snapshot"`
+	ExternalOrderNumber      string         `gorm:"size:150;not null;default:''" json:"external_order_number"`
+	CustomerNameSnapshot     string         `gorm:"size:255" json:"customer_name_snapshot"`
+	CustomerPhoneSnapshot    string         `gorm:"size:100" json:"customer_phone_snapshot"`
+	OrderType                string         `gorm:"size:50;not null" json:"order_type"`
+	OrderDate                time.Time      `gorm:"type:date;not null" json:"order_date"`
+	EventDate                time.Time      `gorm:"type:date;not null" json:"event_date"`
+	PickupTime               string         `gorm:"size:20" json:"pickup_time"`
+	DeliveryTime             string         `gorm:"size:20" json:"delivery_time"`
+	DeliveryAddress          string         `json:"delivery_address"`
+	SubtotalAmount           float64        `gorm:"not null;default:0" json:"subtotal_amount"`
+	DiscountAmount           float64        `gorm:"not null;default:0" json:"discount_amount"`
+	TaxAmount                float64        `gorm:"not null;default:0" json:"tax_amount"`
+	TotalAmount              float64        `gorm:"not null;default:0" json:"total_amount"`
+	PaidAmount               float64        `gorm:"not null;default:0" json:"paid_amount"`
+	BalanceAmount            float64        `gorm:"not null;default:0" json:"balance_amount"`
+	PaymentStatus            string         `gorm:"size:50;not null;default:unpaid" json:"payment_status"`
+	OrderStatus              string         `gorm:"size:50;not null;default:new" json:"order_status"`
+	AccountingJournalEntryID *string        `gorm:"type:uuid;index" json:"accounting_journal_entry_id"`
+	Notes                    string         `json:"notes"`
+	CreatedByUserID          string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
+	UpdatedByUserID          string         `gorm:"type:uuid;index" json:"updated_by_user_id"`
+	CreatedAt                time.Time      `json:"created_at"`
+	UpdatedAt                time.Time      `json:"updated_at"`
+	DeletedAt                gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 func (BakeryOrder) TableName() string { return "bakery_orders" }
@@ -76,6 +80,7 @@ type BakeryOrderPayment struct {
 	Amount                    float64   `gorm:"not null" json:"amount"`
 	ReferenceNumber           string    `gorm:"size:255" json:"reference_number"`
 	PaymentType               string    `gorm:"size:50;not null" json:"payment_type"`
+	JournalEntryID            *string   `gorm:"type:uuid;index" json:"journal_entry_id"`
 	PaidByUserID              string    `gorm:"type:uuid;not null;index" json:"paid_by_user_id"`
 	PaidAt                    time.Time `gorm:"not null" json:"paid_at"`
 	CreatedAt                 time.Time `json:"created_at"`

@@ -29,6 +29,89 @@ type ChartAccount struct {
 
 func (ChartAccount) TableName() string { return "chart_of_accounts" }
 
+type PaymentAccount struct {
+	ID              string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID      string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID        *string        `gorm:"type:uuid;index" json:"branch_id"`
+	AccountName     string         `gorm:"size:150;not null" json:"account_name"`
+	AccountType     string         `gorm:"size:50;not null" json:"account_type"`
+	ChartAccountID  string         `gorm:"type:uuid;not null;index" json:"chart_account_id"`
+	Description     string         `json:"description"`
+	Status          string         `gorm:"size:50;not null;default:active" json:"status"`
+	CreatedByUserID *string        `gorm:"type:uuid;index" json:"created_by_user_id"`
+	UpdatedByUserID *string        `gorm:"type:uuid;index" json:"updated_by_user_id"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (PaymentAccount) TableName() string { return "payment_accounts" }
+
+type AccountTransfer struct {
+	ID                   string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID           string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID             *string        `gorm:"type:uuid;index" json:"branch_id"`
+	TransferNumber       string         `gorm:"size:100;not null" json:"transfer_number"`
+	TransferDate         time.Time      `gorm:"type:date;not null" json:"transfer_date"`
+	FromPaymentAccountID string         `gorm:"type:uuid;not null;index" json:"from_payment_account_id"`
+	ToPaymentAccountID   string         `gorm:"type:uuid;not null;index" json:"to_payment_account_id"`
+	FromChartAccountID   string         `gorm:"type:uuid;not null;index" json:"from_chart_account_id"`
+	ToChartAccountID     string         `gorm:"type:uuid;not null;index" json:"to_chart_account_id"`
+	Amount               float64        `gorm:"not null;default:0" json:"amount"`
+	ReferenceNumber      string         `gorm:"size:255" json:"reference_number"`
+	Notes                string         `json:"notes"`
+	Status               string         `gorm:"size:50;not null;default:completed" json:"status"`
+	JournalEntryID       *string        `gorm:"type:uuid;index" json:"journal_entry_id"`
+	CreatedByUserID      string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
+	DeletedAt            gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (AccountTransfer) TableName() string { return "account_transfers" }
+
+type PlatformSettlement struct {
+	ID                       string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID               string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID                 *string        `gorm:"type:uuid;index" json:"branch_id"`
+	SettlementNumber         string         `gorm:"size:100;not null" json:"settlement_number"`
+	SettlementDate           time.Time      `gorm:"type:date;not null" json:"settlement_date"`
+	PlatformPaymentAccountID string         `gorm:"type:uuid;not null;index" json:"platform_payment_account_id"`
+	DepositPaymentAccountID  string         `gorm:"type:uuid;not null;index" json:"deposit_payment_account_id"`
+	PlatformChartAccountID   string         `gorm:"type:uuid;not null;index" json:"platform_chart_account_id"`
+	DepositChartAccountID    string         `gorm:"type:uuid;not null;index" json:"deposit_chart_account_id"`
+	GrossAmount              float64        `gorm:"not null;default:0" json:"gross_amount"`
+	DeductionsTotal          float64        `gorm:"not null;default:0" json:"deductions_total"`
+	NetReceivedAmount        float64        `gorm:"not null;default:0" json:"net_received_amount"`
+	ReferenceNumber          string         `gorm:"size:255" json:"reference_number"`
+	Notes                    string         `json:"notes"`
+	Status                   string         `gorm:"size:50;not null;default:completed" json:"status"`
+	JournalEntryID           *string        `gorm:"type:uuid;index" json:"journal_entry_id"`
+	CreatedByUserID          string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
+	CreatedAt                time.Time      `json:"created_at"`
+	UpdatedAt                time.Time      `json:"updated_at"`
+	DeletedAt                gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (PlatformSettlement) TableName() string { return "platform_settlements" }
+
+type PlatformSettlementDeduction struct {
+	ID                   string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID           string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	PlatformSettlementID string         `gorm:"type:uuid;not null;index" json:"platform_settlement_id"`
+	ExpenseAccountID     string         `gorm:"type:uuid;not null;index" json:"expense_account_id"`
+	DeductionType        string         `gorm:"size:100;not null" json:"deduction_type"`
+	Description          string         `json:"description"`
+	Amount               float64        `gorm:"not null;default:0" json:"amount"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
+	DeletedAt            gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (PlatformSettlementDeduction) TableName() string {
+	return "platform_settlement_deductions"
+}
+
 type JournalEntry struct {
 	ID               string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID       string         `gorm:"type:uuid;not null;index" json:"business_id"`

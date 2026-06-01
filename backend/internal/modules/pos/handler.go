@@ -205,18 +205,20 @@ func parseSalesListQuery(c *gin.Context) SalesListQuery {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	return SalesListQuery{
-		Search:        c.Query("search"),
-		BranchID:      c.Query("branch_id"),
-		SaleStatus:    c.Query("sale_status"),
-		PaymentStatus: c.Query("payment_status"),
-		CashierUserID: c.Query("cashier_user_id"),
-		CustomerID:    c.Query("customer_id"),
-		DateFrom:      c.Query("date_from"),
-		DateTo:        c.Query("date_to"),
-		Page:          page,
-		Limit:         limit,
-		SortBy:        c.DefaultQuery("sort_by", "sold_at"),
-		SortOrder:     c.DefaultQuery("sort_order", "desc"),
+		Search:              c.Query("search"),
+		BranchID:            c.Query("branch_id"),
+		SaleStatus:          c.Query("sale_status"),
+		PaymentStatus:       c.Query("payment_status"),
+		CashierUserID:       c.Query("cashier_user_id"),
+		CustomerID:          c.Query("customer_id"),
+		SalesChannelID:      c.Query("sales_channel_id"),
+		ExternalOrderNumber: c.Query("external_order_number"),
+		DateFrom:            c.Query("date_from"),
+		DateTo:              c.Query("date_to"),
+		Page:                page,
+		Limit:               limit,
+		SortBy:              c.DefaultQuery("sort_by", "sold_at"),
+		SortOrder:           c.DefaultQuery("sort_order", "desc"),
 	}
 }
 

@@ -225,6 +225,105 @@ func (h *Handler) DeletePaymentMethod(c *gin.Context) {
 	response.Success(c, 200, "payment method deactivated successfully", gin.H{"deactivated": true})
 }
 
+func (h *Handler) ListSalesChannels(c *gin.Context) {
+	currentUser := utils.MustAuthContext(c)
+	channels, err := h.service.ListSalesChannels(currentUser, c.Query("channel_type"), c.Query("status"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "sales channels fetched successfully", channels)
+}
+
+func (h *Handler) CreateSalesChannel(c *gin.Context) {
+	var req CreateSalesChannelRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	currentUser := utils.MustAuthContext(c)
+	channel, err := h.service.CreateSalesChannel(currentUser, req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 201, "sales channel created successfully", channel)
+}
+
+func (h *Handler) GetSalesChannel(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	currentUser := utils.MustAuthContext(c)
+	channel, err := h.service.GetSalesChannel(currentUser, c.Param("id"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "sales channel fetched successfully", channel)
+}
+
+func (h *Handler) UpdateSalesChannel(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	var req UpdateSalesChannelRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	currentUser := utils.MustAuthContext(c)
+	channel, err := h.service.UpdateSalesChannel(currentUser, c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "sales channel updated successfully", channel)
+}
+
+func (h *Handler) UpdateSalesChannelStatus(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	var req UpdateStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	currentUser := utils.MustAuthContext(c)
+	channel, err := h.service.UpdateSalesChannelStatus(currentUser, c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "sales channel status updated successfully", channel)
+}
+
+func (h *Handler) SetDefaultSalesChannel(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	currentUser := utils.MustAuthContext(c)
+	channel, err := h.service.SetDefaultSalesChannel(currentUser, c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "default sales channel updated successfully", channel)
+}
+
+func (h *Handler) DeleteSalesChannel(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	currentUser := utils.MustAuthContext(c)
+	if err := h.service.DeleteSalesChannel(currentUser, c.Param("id"), c.ClientIP(), c.Request.UserAgent()); err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "sales channel deactivated successfully", gin.H{"deactivated": true})
+}
+
 func (h *Handler) ListReceiptLayouts(c *gin.Context) {
 	currentUser := utils.MustAuthContext(c)
 	layouts, err := h.service.ListReceiptLayouts(currentUser, c.Query("branch_id"), c.Query("receipt_type"), c.Query("status"))

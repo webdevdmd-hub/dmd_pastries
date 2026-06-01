@@ -138,6 +138,22 @@ func (r *Repository) InvoiceItems(invoiceID, businessID string) ([]PurchaseInvoi
 	return items, err
 }
 
+func (r *Repository) ActiveInvoiceCountForOrder(tx *gorm.DB, businessID, orderID string) (int64, error) {
+	var count int64
+	err := tx.Model(&PurchaseInvoice{}).
+		Where("business_id = ? AND purchase_order_id = ? AND status <> ? AND deleted_at IS NULL", businessID, orderID, "cancelled").
+		Count(&count).Error
+	return count, err
+}
+
+func (r *Repository) InvoicesForOrder(businessID, orderID string) ([]PurchaseInvoice, error) {
+	var invoices []PurchaseInvoice
+	err := r.db.Where("business_id = ? AND purchase_order_id = ? AND deleted_at IS NULL", businessID, orderID).
+		Order("invoice_date ASC, created_at ASC").
+		Find(&invoices).Error
+	return invoices, err
+}
+
 func (r *Repository) CreateInvoicePayment(tx *gorm.DB, payment *PurchaseInvoicePayment) error {
 	return tx.Create(payment).Error
 }
@@ -197,6 +213,25 @@ func (r *Repository) CompletedInvoicePaymentCount(tx *gorm.DB, businessID, invoi
 	return count, err
 }
 
+func (r *Repository) InvoicePaymentsForOrder(businessID, orderID string) ([]PurchaseInvoicePaymentResponse, error) {
+	var rows []PurchaseInvoicePaymentResponse
+	err := r.db.Table("purchase_invoice_payments pip").
+		Select(`pip.id AS payment_id, pip.purchase_invoice_id, pi.invoice_number, pip.supplier_id, s.supplier_name,
+			pip.branch_id, b.branch_name, pip.payment_method_id,
+			pip.payment_method_name_snapshot AS payment_method_name,
+			pip.payment_method_type_snapshot AS payment_method_type,
+			pip.amount, pip.payment_status, pip.reference_number, pip.paid_by_user_id,
+			u.full_name AS paid_by_user_name, pip.paid_at, pip.notes, pip.created_at, pip.updated_at`).
+		Joins("JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id").
+		Joins("JOIN suppliers s ON s.id = pip.supplier_id").
+		Joins("JOIN branches b ON b.id = pip.branch_id").
+		Joins("LEFT JOIN users u ON u.id = pip.paid_by_user_id").
+		Where("pip.business_id = ? AND pi.purchase_order_id = ? AND pip.deleted_at IS NULL", businessID, orderID).
+		Order("pip.paid_at ASC, pip.created_at ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
 func (r *Repository) InvoiceNumberExists(tx *gorm.DB, businessID, supplierID, invoiceNumber, excludeID string) (bool, error) {
 	db := tx.Model(&PurchaseInvoice{}).Where("business_id = ? AND supplier_id = ? AND LOWER(invoice_number) = LOWER(?) AND deleted_at IS NULL", businessID, supplierID, invoiceNumber)
 	if excludeID != "" {
@@ -239,10 +274,41 @@ func (r *Repository) ListReceipts(businessID string, query ListQuery) ([]Purchas
 	return rows, total, err
 }
 
+func (r *Repository) ActiveReceiptCountForInvoice(tx *gorm.DB, businessID, invoiceID string) (int64, error) {
+	var count int64
+	err := tx.Model(&PurchaseReceipt{}).
+		Where("business_id = ? AND purchase_invoice_id = ? AND status <> ? AND deleted_at IS NULL", businessID, invoiceID, "cancelled").
+		Count(&count).Error
+	return count, err
+}
+
+func (r *Repository) ReceiptsForOrder(businessID, orderID string) ([]PurchaseReceipt, error) {
+	var receipts []PurchaseReceipt
+	err := r.db.Where("business_id = ? AND purchase_order_id = ? AND deleted_at IS NULL", businessID, orderID).
+		Order("received_date ASC, created_at ASC").
+		Find(&receipts).Error
+	return receipts, err
+}
+
 func (r *Repository) ReceiptItems(receiptID, businessID string) ([]PurchaseReceiptItem, error) {
 	var items []PurchaseReceiptItem
 	err := r.db.Where("purchase_receipt_id = ? AND business_id = ? AND deleted_at IS NULL", receiptID, businessID).Order("created_at ASC").Find(&items).Error
 	return items, err
+}
+
+func (r *Repository) ReceiptItemsForUpdate(tx *gorm.DB, receiptID, businessID string) ([]PurchaseReceiptItem, error) {
+	var items []PurchaseReceiptItem
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("purchase_receipt_id = ? AND business_id = ? AND deleted_at IS NULL", receiptID, businessID).
+		Order("created_at ASC").
+		Find(&items).Error
+	return items, err
+}
+
+func (r *Repository) UpdateReceiptItemStockMovement(tx *gorm.DB, itemID, businessID, stockMovementID string) error {
+	return updateOne(tx.Model(&PurchaseReceiptItem{}).
+		Where("id = ? AND business_id = ? AND deleted_at IS NULL", itemID, businessID).
+		Updates(map[string]interface{}{"stock_movement_id": stockMovementID, "updated_at": time.Now().UTC()}))
 }
 
 func (r *Repository) UpdateReceipt(tx *gorm.DB, id, businessID string, updates map[string]interface{}) error {
@@ -281,7 +347,7 @@ func (r *Repository) TaxRate(tx *gorm.DB, businessID, taxRateID string) (*TaxRat
 func (r *Repository) PaymentMethod(tx *gorm.DB, businessID, methodID string) (*PaymentMethodInfo, error) {
 	var method PaymentMethodInfo
 	err := tx.Table("payment_methods").
-		Select("id, method_name, method_type, requires_reference").
+		Select("id, method_name, method_type, requires_reference, show_in_purchasing").
 		Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", methodID, businessID, "active").
 		Take(&method).Error
 	return &method, err
@@ -482,6 +548,7 @@ type PaymentMethodInfo struct {
 	MethodName        string
 	MethodType        string
 	RequiresReference bool
+	ShowInPurchasing  bool
 }
 
 type ProductInfo struct {

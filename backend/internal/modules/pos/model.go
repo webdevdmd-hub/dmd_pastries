@@ -7,28 +7,32 @@ import (
 )
 
 type Sale struct {
-	ID             string         `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID     string         `gorm:"type:uuid;not null;index" json:"business_id"`
-	BranchID       string         `gorm:"type:uuid;not null;index" json:"branch_id"`
-	CashierUserID  string         `gorm:"type:uuid;not null;index" json:"cashier_user_id"`
-	CustomerID     *string        `gorm:"type:uuid;index" json:"customer_id"`
-	SaleNumber     string         `gorm:"size:100;not null" json:"sale_number"`
-	SubtotalAmount float64        `gorm:"not null;default:0" json:"subtotal_amount"`
-	DiscountType   *string        `gorm:"size:50" json:"discount_type"`
-	DiscountValue  float64        `gorm:"not null;default:0" json:"discount_value"`
-	DiscountAmount float64        `gorm:"not null;default:0" json:"discount_amount"`
-	TaxableAmount  float64        `gorm:"not null;default:0" json:"taxable_amount"`
-	TaxAmount      float64        `gorm:"not null;default:0" json:"tax_amount"`
-	TotalAmount    float64        `gorm:"not null;default:0" json:"total_amount"`
-	PaidAmount     float64        `gorm:"not null;default:0" json:"paid_amount"`
-	ChangeAmount   float64        `gorm:"not null;default:0" json:"change_amount"`
-	PaymentStatus  string         `gorm:"size:50;not null;default:unpaid" json:"payment_status"`
-	SaleStatus     string         `gorm:"size:50;not null;default:completed" json:"sale_status"`
-	Notes          string         `json:"notes"`
-	SoldAt         time.Time      `gorm:"not null" json:"sold_at"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	ID                       string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID               string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID                 string         `gorm:"type:uuid;not null;index" json:"branch_id"`
+	CashierUserID            string         `gorm:"type:uuid;not null;index" json:"cashier_user_id"`
+	CustomerID               *string        `gorm:"type:uuid;index" json:"customer_id"`
+	SalesChannelID           *string        `gorm:"type:uuid;index" json:"sales_channel_id"`
+	SalesChannelNameSnapshot string         `gorm:"size:150;not null;default:''" json:"sales_channel_name_snapshot"`
+	ExternalOrderNumber      string         `gorm:"size:150;not null;default:''" json:"external_order_number"`
+	SaleNumber               string         `gorm:"size:100;not null" json:"sale_number"`
+	SubtotalAmount           float64        `gorm:"not null;default:0" json:"subtotal_amount"`
+	DiscountType             *string        `gorm:"size:50" json:"discount_type"`
+	DiscountValue            float64        `gorm:"not null;default:0" json:"discount_value"`
+	DiscountAmount           float64        `gorm:"not null;default:0" json:"discount_amount"`
+	TaxableAmount            float64        `gorm:"not null;default:0" json:"taxable_amount"`
+	TaxAmount                float64        `gorm:"not null;default:0" json:"tax_amount"`
+	TotalAmount              float64        `gorm:"not null;default:0" json:"total_amount"`
+	PaidAmount               float64        `gorm:"not null;default:0" json:"paid_amount"`
+	ChangeAmount             float64        `gorm:"not null;default:0" json:"change_amount"`
+	PaymentStatus            string         `gorm:"size:50;not null;default:unpaid" json:"payment_status"`
+	SaleStatus               string         `gorm:"size:50;not null;default:completed" json:"sale_status"`
+	AccountingJournalEntryID *string        `gorm:"type:uuid;index" json:"accounting_journal_entry_id"`
+	Notes                    string         `json:"notes"`
+	SoldAt                   time.Time      `gorm:"not null" json:"sold_at"`
+	CreatedAt                time.Time      `json:"created_at"`
+	UpdatedAt                time.Time      `json:"updated_at"`
+	DeletedAt                gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 func (Sale) TableName() string {
@@ -73,6 +77,7 @@ type SalePayment struct {
 	ReferenceNumber           string         `gorm:"size:255" json:"reference_number"`
 	ProviderTransactionID     string         `gorm:"size:255" json:"provider_transaction_id"`
 	PaymentStatus             string         `gorm:"size:50;not null;default:completed" json:"payment_status"`
+	JournalEntryID            *string        `gorm:"type:uuid;index" json:"journal_entry_id"`
 	PaidByUserID              string         `gorm:"type:uuid;index" json:"paid_by_user_id"`
 	Notes                     string         `json:"notes"`
 	PaidAt                    time.Time      `gorm:"not null" json:"paid_at"`

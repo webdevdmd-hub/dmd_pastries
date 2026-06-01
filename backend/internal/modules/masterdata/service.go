@@ -73,8 +73,6 @@ func (s *Service) CopyCategories(currentUser *utils.AuthContext, req CopyCategor
 		result, err = s.copySimpleCategoriesTx(tx, ingredientConfig(), currentUser.BusinessID, sourceBranchID, targetBranchID)
 	case "packaging_categories":
 		result, err = s.copySimpleCategoriesTx(tx, packagingConfig(), currentUser.BusinessID, sourceBranchID, targetBranchID)
-	case "supplier_categories":
-		result, err = s.copySimpleCategoriesTx(tx, supplierConfig(), currentUser.BusinessID, sourceBranchID, targetBranchID)
 	default:
 		tx.Rollback()
 		return nil, apperrors.BadRequest("invalid category_type", nil)
@@ -940,10 +938,6 @@ func (s *Service) Overview(currentUser *utils.AuthContext) (*OverviewResponse, e
 	if err != nil {
 		return nil, apperrors.Internal("failed to count packaging categories")
 	}
-	supplierCount, err := s.repo.CountActive("supplier_categories", currentUser.BusinessID, branchID)
-	if err != nil {
-		return nil, apperrors.Internal("failed to count supplier categories")
-	}
 	orderStatusCount, err := s.repo.CountActiveShared("order_statuses", currentUser.BusinessID)
 	if err != nil {
 		return nil, apperrors.Internal("failed to count order statuses")
@@ -957,7 +951,6 @@ func (s *Service) Overview(currentUser *utils.AuthContext) (*OverviewResponse, e
 		ProductCategoriesCount:    productCount,
 		IngredientCategoriesCount: ingredientCount,
 		PackagingCategoriesCount:  packagingCount,
-		SupplierCategoriesCount:   supplierCount,
 		OrderStatusesCount:        orderStatusCount,
 		PaymentStatusesCount:      paymentStatusCount,
 	}, nil
@@ -1224,8 +1217,6 @@ func categoryManagePermission(categoryType string) string {
 		return "master_data.ingredient_categories.manage"
 	case "packaging_categories":
 		return "master_data.packaging_categories.manage"
-	case "supplier_categories":
-		return "master_data.supplier_categories.manage"
 	default:
 		return ""
 	}

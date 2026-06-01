@@ -170,9 +170,9 @@ func EnsureDefaultPaymentMethods(tx *gorm.DB, businessID string) error {
 
 func (r *Repository) EnsureDefaultPaymentMethods(tx *gorm.DB, businessID string) error {
 	seeds := []PaymentMethod{
-		{ID: utils.NewUUID(), BusinessID: businessID, MethodName: "Cash", MethodType: "cash", IsDefault: true, AllowSplitPayment: true, RequiresReference: false, Status: "active"},
-		{ID: utils.NewUUID(), BusinessID: businessID, MethodName: "Card", MethodType: "card", IsDefault: false, AllowSplitPayment: true, RequiresReference: true, Status: "active"},
-		{ID: utils.NewUUID(), BusinessID: businessID, MethodName: "Bank Transfer", MethodType: "bank_transfer", IsDefault: false, AllowSplitPayment: true, RequiresReference: true, Status: "active"},
+		{ID: utils.NewUUID(), BusinessID: businessID, MethodName: "Cash", MethodType: "cash", IsDefault: true, AllowSplitPayment: true, RequiresReference: false, ShowInPOS: true, ShowInBakeryOrders: true, ShowInPurchasing: true, ShowInExpenses: true, ShowInDashboardCollection: true, Status: "active"},
+		{ID: utils.NewUUID(), BusinessID: businessID, MethodName: "Card", MethodType: "card", IsDefault: false, AllowSplitPayment: true, RequiresReference: true, ShowInPOS: true, ShowInBakeryOrders: true, ShowInPurchasing: false, ShowInExpenses: false, ShowInDashboardCollection: true, Status: "active"},
+		{ID: utils.NewUUID(), BusinessID: businessID, MethodName: "Bank Transfer", MethodType: "bank_transfer", IsDefault: false, AllowSplitPayment: true, RequiresReference: true, ShowInPOS: true, ShowInBakeryOrders: true, ShowInPurchasing: true, ShowInExpenses: true, ShowInDashboardCollection: true, Status: "active"},
 	}
 	for _, seed := range seeds {
 		var count int64
@@ -250,6 +250,136 @@ func (r *Repository) CountActivePaymentMethods(businessID string) (int64, error)
 	var count int64
 	err := r.db.Model(&PaymentMethod{}).Where("business_id = ? AND status = ? AND deleted_at IS NULL", businessID, "active").Count(&count).Error
 	return count, err
+}
+
+func EnsureDefaultSalesChannels(tx *gorm.DB, businessID string) error {
+	repo := &Repository{}
+	return repo.EnsureDefaultSalesChannels(tx, businessID)
+}
+
+func (r *Repository) EnsureDefaultSalesChannels(tx *gorm.DB, businessID string) error {
+	seeds := []SalesChannel{
+		{ID: utils.NewUUID(), BusinessID: businessID, ChannelName: "Walk-in", ChannelType: "walk_in", IsDefault: true, Status: "active"},
+		{ID: utils.NewUUID(), BusinessID: businessID, ChannelName: "Phone", ChannelType: "phone", IsDefault: false, Status: "active"},
+		{ID: utils.NewUUID(), BusinessID: businessID, ChannelName: "WhatsApp", ChannelType: "whatsapp", IsDefault: false, Status: "active"},
+		{ID: utils.NewUUID(), BusinessID: businessID, ChannelName: "Website", ChannelType: "website", IsDefault: false, Status: "active"},
+		{ID: utils.NewUUID(), BusinessID: businessID, ChannelName: "Other", ChannelType: "other", IsDefault: false, Status: "active"},
+	}
+	for _, seed := range seeds {
+		var count int64
+		if err := tx.Model(&SalesChannel{}).
+			Where("business_id = ? AND LOWER(channel_name) = LOWER(?) AND deleted_at IS NULL", businessID, seed.ChannelName).
+			Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			continue
+		}
+		if seed.IsDefault {
+			if err := r.ClearDefaultSalesChannels(tx, businessID, ""); err != nil {
+				return err
+			}
+		}
+		if err := tx.Create(&seed).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repository) CreateSalesChannel(tx *gorm.DB, channel *SalesChannel) error {
+	return tx.Create(channel).Error
+}
+
+func (r *Repository) ListSalesChannels(businessID, channelType, status string) ([]SalesChannel, error) {
+	var channels []SalesChannel
+	query := r.db.Where("business_id = ? AND deleted_at IS NULL", businessID)
+	if channelType != "" {
+		query = query.Where("channel_type = ?", channelType)
+	}
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	err := query.Order("is_default DESC, channel_name ASC").Find(&channels).Error
+	return channels, err
+}
+
+func (r *Repository) FindSalesChannel(id, businessID string) (*SalesChannel, error) {
+	var channel SalesChannel
+	err := r.db.Where("id = ? AND business_id = ? AND deleted_at IS NULL", id, businessID).First(&channel).Error
+	if err != nil {
+		return nil, err
+	}
+	return &channel, nil
+}
+
+func (r *Repository) SalesChannelNameExists(businessID, name, excludedID string) (bool, error) {
+	var count int64
+	query := r.db.Model(&SalesChannel{}).Where("business_id = ? AND LOWER(channel_name) = LOWER(?) AND deleted_at IS NULL", businessID, name)
+	if excludedID != "" {
+		query = query.Where("id <> ?", excludedID)
+	}
+	err := query.Count(&count).Error
+	return count > 0, err
+}
+
+func (r *Repository) ClearDefaultSalesChannels(tx *gorm.DB, businessID, excludedID string) error {
+	query := tx.Model(&SalesChannel{}).Where("business_id = ? AND deleted_at IS NULL", businessID)
+	if excludedID != "" {
+		query = query.Where("id <> ?", excludedID)
+	}
+	return query.Update("is_default", false).Error
+}
+
+func (r *Repository) UpdateSalesChannel(tx *gorm.DB, id, businessID string, updates map[string]interface{}) error {
+	result := tx.Model(&SalesChannel{}).Where("id = ? AND business_id = ? AND deleted_at IS NULL", id, businessID).Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) PaymentMethodIsActive(businessID, methodID string) (bool, error) {
+	var count int64
+	err := r.db.Model(&PaymentMethod{}).
+		Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", methodID, businessID, "active").
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *Repository) PaymentMethodName(businessID string, methodID *string) string {
+	if methodID == nil || *methodID == "" {
+		return ""
+	}
+	var name string
+	_ = r.db.Model(&PaymentMethod{}).
+		Select("method_name").
+		Where("id = ? AND business_id = ? AND deleted_at IS NULL", *methodID, businessID).
+		Scan(&name).Error
+	return name
+}
+
+func (r *Repository) PaymentAccountIsActive(businessID, accountID string) (bool, error) {
+	var count int64
+	err := r.db.Table("payment_accounts").
+		Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", accountID, businessID, "active").
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *Repository) PaymentAccountName(businessID string, accountID *string) string {
+	if accountID == nil || *accountID == "" {
+		return ""
+	}
+	var name string
+	_ = r.db.Table("payment_accounts").
+		Select("account_name").
+		Where("id = ? AND business_id = ? AND deleted_at IS NULL", *accountID, businessID).
+		Scan(&name).Error
+	return name
 }
 
 func (r *Repository) CreateReceiptLayout(tx *gorm.DB, layout *ReceiptLayout) error {

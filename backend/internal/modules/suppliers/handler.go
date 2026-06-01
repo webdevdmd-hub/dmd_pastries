@@ -222,17 +222,16 @@ func parseSupplierListQuery(c *gin.Context) SupplierListQuery {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	return SupplierListQuery{
-		Search:             c.Query("search"),
-		SupplierCategoryID: c.Query("supplier_category_id"),
-		Status:             c.Query("status"),
-		City:               c.Query("city"),
-		Country:            c.Query("country"),
-		DateFrom:           c.Query("date_from"),
-		DateTo:             c.Query("date_to"),
-		Page:               page,
-		Limit:              limit,
-		SortBy:             c.DefaultQuery("sort_by", "created_at"),
-		SortOrder:          c.DefaultQuery("sort_order", "desc"),
+		Search:    c.Query("search"),
+		Status:    c.Query("status"),
+		City:      c.Query("city"),
+		Country:   c.Query("country"),
+		DateFrom:  c.Query("date_from"),
+		DateTo:    c.Query("date_to"),
+		Page:      page,
+		Limit:     limit,
+		SortBy:    c.DefaultQuery("sort_by", "created_at"),
+		SortOrder: c.DefaultQuery("sort_order", "desc"),
 	}
 }
 

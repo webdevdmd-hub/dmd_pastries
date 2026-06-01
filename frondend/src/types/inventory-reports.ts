@@ -1,0 +1,143 @@
+export type InventoryReportItemType = "product" | "product_variant" | "ingredient" | "packaging";
+
+export type InventoryReportSortOrder = "asc" | "desc";
+
+export type InventoryReportFilters = {
+  branchId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  itemType?: InventoryReportItemType;
+  limit?: number;
+  page?: number;
+  sortBy?: string;
+  sortOrder?: InventoryReportSortOrder;
+  status?: string;
+};
+
+export type InventorySummary = {
+  activeInventoryItems: number;
+  expiringSoonCount: number;
+  expiryTrackedCount: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  totalInventoryItems: number;
+  totalStockValue: number;
+};
+
+export type CurrentStockRow = {
+  availableQuantity: number;
+  branchId: string;
+  branchName: string;
+  currentQuantity: number;
+  inventoryItemId: string;
+  isLowStock: boolean;
+  isOutOfStock: boolean;
+  itemCode: string;
+  itemName: string;
+  itemType: string;
+  reorderLevel: number;
+  reservedQuantity: number;
+  status: string;
+  unitSymbol: string;
+};
+
+export type StockValuationRow = {
+  branchName: string;
+  currentQuantity: number;
+  inventoryItemId: string;
+  itemName: string;
+  itemType: string;
+  stockValue: number;
+  unitCost: number;
+  unitSymbol: string;
+};
+
+export type LowStockRow = {
+  availableQuantity: number;
+  branchName: string;
+  inventoryItemId: string;
+  itemName: string;
+  reorderLevel: number;
+  shortageQuantity: number;
+  unitSymbol: string;
+};
+
+export type ExpiryReportRow = {
+  batchId: string;
+  batchNumber: string;
+  branchName: string;
+  daysRemaining: number;
+  expiryDate: string;
+  inventoryItemId: string;
+  itemName: string;
+  quantity: number;
+  receivedDate: string;
+  status: string;
+  unitSymbol: string;
+};
+
+export type InventoryMovementReportRow = {
+  afterQuantity: number;
+  beforeQuantity: number;
+  branchName: string;
+  createdBy: string;
+  date: string;
+  itemName: string;
+  itemType: string;
+  movementDirection: string;
+  movementId: string;
+  movementType: string;
+  quantity: number;
+  referenceNumber: string;
+  unitSymbol: string;
+};
+
+export type WastageReportItem = {
+  branchName: string;
+  createdAt: string;
+  itemName: string;
+  itemType: string;
+  quantity: number;
+  reason: string;
+  unitSymbol: string;
+};
+
+export type WastageReport = {
+  items: WastageReportItem[];
+  totalWastageQuantity: number;
+  wastageValue: number;
+};
+
+export type PackagingStockRow = {
+  availableQuantity: number;
+  branchName: string;
+  categoryName: string;
+  costPerUnit: number;
+  currentQuantity: number;
+  isLowStock: boolean;
+  packagingItemId: string;
+  packagingName: string;
+  reorderLevel: number;
+  stockValue: number;
+  unitSymbol: string;
+};
+
+export type InventoryAuditRow = {
+  branchName: string;
+  calculatedQuantityFromMovements: number;
+  currentQuantity: number;
+  difference: number;
+  inventoryItemId: string;
+  isBalanced: boolean;
+  itemName: string;
+};
+
+export type InventoryTrendDataset = {
+  data: number[];
+  label: string;
+};
+
+export type InventoryTrendChart = {
+  datasets: InventoryTrendDataset[];
+  labels: string[];
+};

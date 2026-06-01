@@ -148,7 +148,7 @@ func (s *Service) ListPaymentMethods(currentUser *utils.AuthContext) ([]PaymentM
 	}
 	response := make([]PaymentMethodResponse, 0, len(methods))
 	for _, method := range methods {
-		response = append(response, toPaymentMethodResponse(method))
+		response = append(response, s.toPaymentMethodResponse(method))
 	}
 	return response, nil
 }
@@ -161,7 +161,7 @@ func (s *Service) GetPaymentMethod(currentUser *utils.AuthContext, id string) (*
 		}
 		return nil, apperrors.Internal("failed to fetch payment method")
 	}
-	response := toPaymentMethodResponse(*method)
+	response := s.toPaymentMethodResponse(*method)
 	return &response, nil
 }
 
@@ -181,16 +181,26 @@ func (s *Service) CreatePaymentMethod(currentUser *utils.AuthContext, req Create
 	if exists {
 		return nil, apperrors.Conflict("payment method name already exists", nil)
 	}
+	defaultPaymentAccountID, err := s.normalizePaymentMethodPaymentAccount(currentUser.BusinessID, req.DefaultPaymentAccountID)
+	if err != nil {
+		return nil, err
+	}
 
 	method := &PaymentMethod{
-		ID:                utils.NewUUID(),
-		BusinessID:        currentUser.BusinessID,
-		MethodName:        name,
-		MethodType:        methodType,
-		IsDefault:         req.IsDefault,
-		AllowSplitPayment: req.AllowSplitPayment,
-		RequiresReference: req.RequiresReference,
-		Status:            "active",
+		ID:                        utils.NewUUID(),
+		BusinessID:                currentUser.BusinessID,
+		MethodName:                name,
+		MethodType:                methodType,
+		IsDefault:                 req.IsDefault,
+		AllowSplitPayment:         req.AllowSplitPayment,
+		RequiresReference:         req.RequiresReference,
+		ShowInPOS:                 defaultBool(req.ShowInPOS, defaultShowInPOS(methodType)),
+		ShowInBakeryOrders:        defaultBool(req.ShowInBakeryOrders, true),
+		ShowInPurchasing:          defaultBool(req.ShowInPurchasing, defaultShowInPurchasing(methodType)),
+		ShowInExpenses:            defaultBool(req.ShowInExpenses, defaultShowInExpenses(methodType)),
+		ShowInDashboardCollection: defaultBool(req.ShowInDashboardCollection, true),
+		DefaultPaymentAccountID:   defaultPaymentAccountID,
+		Status:                    "active",
 	}
 
 	tx := s.db.Begin()
@@ -252,6 +262,32 @@ func (s *Service) UpdatePaymentMethod(currentUser *utils.AuthContext, id string,
 	}
 	if req.RequiresReference != nil {
 		updates["requires_reference"] = *req.RequiresReference
+	}
+	if req.ShowInPOS != nil {
+		updates["show_in_pos"] = *req.ShowInPOS
+	}
+	if req.ShowInBakeryOrders != nil {
+		updates["show_in_bakery_orders"] = *req.ShowInBakeryOrders
+	}
+	if req.ShowInPurchasing != nil {
+		updates["show_in_purchasing"] = *req.ShowInPurchasing
+	}
+	if req.ShowInExpenses != nil {
+		updates["show_in_expenses"] = *req.ShowInExpenses
+	}
+	if req.ShowInDashboardCollection != nil {
+		updates["show_in_dashboard_collection"] = *req.ShowInDashboardCollection
+	}
+	if req.DefaultPaymentAccountID != nil {
+		defaultPaymentAccountID, err := s.normalizePaymentMethodPaymentAccount(currentUser.BusinessID, req.DefaultPaymentAccountID)
+		if err != nil {
+			return nil, err
+		}
+		if defaultPaymentAccountID == nil {
+			updates["default_payment_account_id"] = nil
+		} else {
+			updates["default_payment_account_id"] = *defaultPaymentAccountID
+		}
 	}
 	if len(updates) == 0 {
 		return s.GetPaymentMethod(currentUser, id)
@@ -330,6 +366,283 @@ func (s *Service) DeletePaymentMethod(currentUser *utils.AuthContext, id string,
 	}
 	if err := tx.Commit().Error; err != nil {
 		return apperrors.Internal("failed to commit payment method deactivation")
+	}
+	return nil
+}
+
+func (s *Service) ListSalesChannels(currentUser *utils.AuthContext, channelType, status string) ([]SalesChannelResponse, error) {
+	channelType = strings.TrimSpace(channelType)
+	status = strings.TrimSpace(status)
+	if channelType != "" {
+		if err := validateSalesChannelType(channelType); err != nil {
+			return nil, err
+		}
+	}
+	if status != "" && status != "active" && status != "inactive" {
+		return nil, apperrors.BadRequest("status must be active or inactive", nil)
+	}
+	channels, err := s.repo.ListSalesChannels(currentUser.BusinessID, channelType, status)
+	if err != nil {
+		return nil, apperrors.Internal("failed to list sales channels")
+	}
+	response := make([]SalesChannelResponse, 0, len(channels))
+	for _, channel := range channels {
+		response = append(response, s.toSalesChannelResponse(channel))
+	}
+	return response, nil
+}
+
+func (s *Service) GetSalesChannel(currentUser *utils.AuthContext, id string) (*SalesChannelResponse, error) {
+	channel, err := s.repo.FindSalesChannel(id, currentUser.BusinessID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.NotFound("sales channel not found")
+		}
+		return nil, apperrors.Internal("failed to fetch sales channel")
+	}
+	response := s.toSalesChannelResponse(*channel)
+	return &response, nil
+}
+
+func (s *Service) CreateSalesChannel(currentUser *utils.AuthContext, req CreateSalesChannelRequest, ipAddress, userAgent string) (*SalesChannelResponse, error) {
+	name := strings.TrimSpace(req.ChannelName)
+	channelType := strings.TrimSpace(req.ChannelType)
+	if name == "" || channelType == "" {
+		return nil, apperrors.BadRequest("channel_name and channel_type are required", nil)
+	}
+	if err := validateSalesChannelType(channelType); err != nil {
+		return nil, err
+	}
+	status := strings.TrimSpace(req.Status)
+	if status == "" {
+		status = "active"
+	}
+	if status != "active" && status != "inactive" {
+		return nil, apperrors.BadRequest("status must be active or inactive", nil)
+	}
+	if req.IsDefault && status != "active" {
+		return nil, apperrors.BadRequest("only active sales channels can be default", nil)
+	}
+	if err := validateCommissionRate(req.CommissionRate); err != nil {
+		return nil, err
+	}
+	paymentMethodID, err := s.normalizeSalesChannelPaymentMethod(currentUser.BusinessID, req.DefaultPaymentMethodID)
+	if err != nil {
+		return nil, err
+	}
+	exists, err := s.repo.SalesChannelNameExists(currentUser.BusinessID, name, "")
+	if err != nil {
+		return nil, apperrors.Internal("failed to validate sales channel")
+	}
+	if exists {
+		return nil, apperrors.Conflict("sales channel name already exists", nil)
+	}
+
+	channel := &SalesChannel{
+		ID:                          utils.NewUUID(),
+		BusinessID:                  currentUser.BusinessID,
+		ChannelName:                 name,
+		ChannelType:                 channelType,
+		RequiresExternalOrderNumber: req.RequiresExternalOrderNumber,
+		DefaultPaymentMethodID:      paymentMethodID,
+		CommissionRate:              req.CommissionRate,
+		IsDefault:                   req.IsDefault,
+		Status:                      status,
+	}
+
+	tx := s.db.Begin()
+	if tx.Error != nil {
+		return nil, apperrors.Internal("failed to start transaction")
+	}
+	if channel.IsDefault {
+		if err := s.repo.ClearDefaultSalesChannels(tx, currentUser.BusinessID, ""); err != nil {
+			tx.Rollback()
+			return nil, apperrors.Internal("failed to update default sales channel")
+		}
+	}
+	if err := s.repo.CreateSalesChannel(tx, channel); err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("failed to create sales channel")
+	}
+	if err := s.writeSettingsAudit(tx, currentUser, "sales_channel.created", "sales_channel", channel.ID, "Sales channel created.", ipAddress, userAgent); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+	if err := tx.Commit().Error; err != nil {
+		return nil, apperrors.Internal("failed to commit sales channel creation")
+	}
+	return s.GetSalesChannel(currentUser, channel.ID)
+}
+
+func (s *Service) UpdateSalesChannel(currentUser *utils.AuthContext, id string, req UpdateSalesChannelRequest, ipAddress, userAgent string) (*SalesChannelResponse, error) {
+	channel, err := s.repo.FindSalesChannel(id, currentUser.BusinessID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.NotFound("sales channel not found")
+		}
+		return nil, apperrors.Internal("failed to fetch sales channel")
+	}
+
+	updates := map[string]interface{}{}
+	if strings.TrimSpace(req.ChannelName) != "" {
+		name := strings.TrimSpace(req.ChannelName)
+		exists, err := s.repo.SalesChannelNameExists(currentUser.BusinessID, name, id)
+		if err != nil {
+			return nil, apperrors.Internal("failed to validate sales channel")
+		}
+		if exists {
+			return nil, apperrors.Conflict("sales channel name already exists", nil)
+		}
+		updates["channel_name"] = name
+	}
+	if strings.TrimSpace(req.ChannelType) != "" {
+		channelType := strings.TrimSpace(req.ChannelType)
+		if err := validateSalesChannelType(channelType); err != nil {
+			return nil, err
+		}
+		updates["channel_type"] = channelType
+	}
+	if req.RequiresExternalOrderNumber != nil {
+		updates["requires_external_order_number"] = *req.RequiresExternalOrderNumber
+	}
+	if req.DefaultPaymentMethodID != nil {
+		paymentMethodID, err := s.normalizeSalesChannelPaymentMethod(currentUser.BusinessID, req.DefaultPaymentMethodID)
+		if err != nil {
+			return nil, err
+		}
+		updates["default_payment_method_id"] = paymentMethodID
+	}
+	if req.CommissionRate != nil {
+		if err := validateCommissionRate(req.CommissionRate); err != nil {
+			return nil, err
+		}
+		updates["commission_rate"] = req.CommissionRate
+	}
+	targetStatus := channel.Status
+	if req.Status != "" {
+		targetStatus = req.Status
+		updates["status"] = req.Status
+		if req.Status == "inactive" {
+			updates["is_default"] = false
+		}
+	}
+	if req.IsDefault != nil {
+		if *req.IsDefault && targetStatus != "active" {
+			return nil, apperrors.BadRequest("only active sales channels can be default", nil)
+		}
+		updates["is_default"] = *req.IsDefault
+	}
+	if len(updates) == 0 {
+		response := s.toSalesChannelResponse(*channel)
+		return &response, nil
+	}
+	updates["updated_at"] = time.Now().UTC()
+
+	tx := s.db.Begin()
+	if tx.Error != nil {
+		return nil, apperrors.Internal("failed to start transaction")
+	}
+	if req.IsDefault != nil && *req.IsDefault {
+		if err := s.repo.ClearDefaultSalesChannels(tx, currentUser.BusinessID, id); err != nil {
+			tx.Rollback()
+			return nil, apperrors.Internal("failed to update default sales channel")
+		}
+	}
+	if err := s.repo.UpdateSalesChannel(tx, id, currentUser.BusinessID, updates); err != nil {
+		tx.Rollback()
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.NotFound("sales channel not found")
+		}
+		return nil, apperrors.Internal("failed to update sales channel")
+	}
+	if err := s.writeSettingsAudit(tx, currentUser, "sales_channel.updated", "sales_channel", id, "Sales channel updated.", ipAddress, userAgent); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+	if err := tx.Commit().Error; err != nil {
+		return nil, apperrors.Internal("failed to commit sales channel update")
+	}
+	return s.GetSalesChannel(currentUser, id)
+}
+
+func (s *Service) UpdateSalesChannelStatus(currentUser *utils.AuthContext, id string, req UpdateStatusRequest, ipAddress, userAgent string) (*SalesChannelResponse, error) {
+	updates := map[string]interface{}{"status": req.Status, "updated_at": time.Now().UTC()}
+	if req.Status == "inactive" {
+		updates["is_default"] = false
+	}
+	tx := s.db.Begin()
+	if tx.Error != nil {
+		return nil, apperrors.Internal("failed to start transaction")
+	}
+	if err := s.repo.UpdateSalesChannel(tx, id, currentUser.BusinessID, updates); err != nil {
+		tx.Rollback()
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.NotFound("sales channel not found")
+		}
+		return nil, apperrors.Internal("failed to update sales channel status")
+	}
+	if err := s.writeSettingsAudit(tx, currentUser, "sales_channel.status_changed", "sales_channel", id, "Sales channel status changed.", ipAddress, userAgent); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+	if err := tx.Commit().Error; err != nil {
+		return nil, apperrors.Internal("failed to commit sales channel status update")
+	}
+	return s.GetSalesChannel(currentUser, id)
+}
+
+func (s *Service) SetDefaultSalesChannel(currentUser *utils.AuthContext, id string, ipAddress, userAgent string) (*SalesChannelResponse, error) {
+	channel, err := s.repo.FindSalesChannel(id, currentUser.BusinessID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.NotFound("sales channel not found")
+		}
+		return nil, apperrors.Internal("failed to fetch sales channel")
+	}
+	if channel.Status != "active" {
+		return nil, apperrors.BadRequest("only active sales channels can be default", nil)
+	}
+	tx := s.db.Begin()
+	if tx.Error != nil {
+		return nil, apperrors.Internal("failed to start transaction")
+	}
+	if err := s.repo.ClearDefaultSalesChannels(tx, currentUser.BusinessID, id); err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("failed to update default sales channel")
+	}
+	if err := s.repo.UpdateSalesChannel(tx, id, currentUser.BusinessID, map[string]interface{}{"is_default": true, "updated_at": time.Now().UTC()}); err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("failed to set default sales channel")
+	}
+	if err := s.writeSettingsAudit(tx, currentUser, "sales_channel.default_updated", "sales_channel", id, "Default sales channel updated.", ipAddress, userAgent); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+	if err := tx.Commit().Error; err != nil {
+		return nil, apperrors.Internal("failed to commit default sales channel update")
+	}
+	return s.GetSalesChannel(currentUser, id)
+}
+
+func (s *Service) DeleteSalesChannel(currentUser *utils.AuthContext, id string, ipAddress, userAgent string) error {
+	tx := s.db.Begin()
+	if tx.Error != nil {
+		return apperrors.Internal("failed to start transaction")
+	}
+	updates := map[string]interface{}{"status": "inactive", "is_default": false, "updated_at": time.Now().UTC()}
+	if err := s.repo.UpdateSalesChannel(tx, id, currentUser.BusinessID, updates); err != nil {
+		tx.Rollback()
+		if err == gorm.ErrRecordNotFound {
+			return apperrors.NotFound("sales channel not found")
+		}
+		return apperrors.Internal("failed to deactivate sales channel")
+	}
+	if err := s.writeSettingsAudit(tx, currentUser, "sales_channel.deleted", "sales_channel", id, "Sales channel deactivated.", ipAddress, userAgent); err != nil {
+		tx.Rollback()
+		return err
+	}
+	if err := tx.Commit().Error; err != nil {
+		return apperrors.Internal("failed to commit sales channel deactivation")
 	}
 	return nil
 }
@@ -866,6 +1179,59 @@ func validatePaymentMethodType(methodType string) error {
 	}
 }
 
+func defaultShowInPOS(methodType string) bool {
+	switch methodType {
+	case "cash", "card", "bank_transfer", "online", "wallet", "custom":
+		return true
+	default:
+		return false
+	}
+}
+
+func defaultShowInPurchasing(methodType string) bool {
+	switch methodType {
+	case "cash", "bank_transfer":
+		return true
+	default:
+		return false
+	}
+}
+
+func defaultShowInExpenses(methodType string) bool {
+	switch methodType {
+	case "cash", "bank_transfer":
+		return true
+	default:
+		return false
+	}
+}
+
+func defaultBool(value *bool, fallback bool) bool {
+	if value == nil {
+		return fallback
+	}
+	return *value
+}
+
+func validateSalesChannelType(channelType string) error {
+	switch channelType {
+	case "walk_in", "phone", "whatsapp", "social", "website", "platform", "partner", "other":
+		return nil
+	default:
+		return apperrors.BadRequest("channel_type must be walk_in, phone, whatsapp, social, website, platform, partner, or other", nil)
+	}
+}
+
+func validateCommissionRate(rate *float64) error {
+	if rate == nil {
+		return nil
+	}
+	if *rate < 0 || *rate > 100 {
+		return apperrors.BadRequest("commission_rate must be between 0 and 100", nil)
+	}
+	return nil
+}
+
 func validateReceiptType(receiptType string) error {
 	switch receiptType {
 	case "58mm", "80mm", "a4", "custom":
@@ -897,6 +1263,42 @@ func (s *Service) validateReceiptLayoutBranch(currentUser *utils.AuthContext, br
 	}
 	*branchID = normalized
 	return nil
+}
+
+func (s *Service) normalizeSalesChannelPaymentMethod(businessID string, methodID *string) (*string, error) {
+	normalized := normalizeOptionalStringPtr(methodID)
+	if normalized == nil {
+		return nil, nil
+	}
+	if _, err := uuid.Parse(*normalized); err != nil {
+		return nil, apperrors.BadRequest("default_payment_method_id must be a valid UUID", nil)
+	}
+	exists, err := s.repo.PaymentMethodIsActive(businessID, *normalized)
+	if err != nil {
+		return nil, apperrors.Internal("failed to validate default payment method")
+	}
+	if !exists {
+		return nil, apperrors.BadRequest("default_payment_method_id is invalid or inactive", nil)
+	}
+	return normalized, nil
+}
+
+func (s *Service) normalizePaymentMethodPaymentAccount(businessID string, accountID *string) (*string, error) {
+	normalized := normalizeOptionalStringPtr(accountID)
+	if normalized == nil {
+		return nil, nil
+	}
+	if _, err := uuid.Parse(*normalized); err != nil {
+		return nil, apperrors.BadRequest("default_payment_account_id must be a valid UUID", nil)
+	}
+	exists, err := s.repo.PaymentAccountIsActive(businessID, *normalized)
+	if err != nil {
+		return nil, apperrors.Internal("failed to validate default payment account")
+	}
+	if !exists {
+		return nil, apperrors.BadRequest("default_payment_account_id is invalid or inactive", nil)
+	}
+	return normalized, nil
 }
 
 func normalizeOptionalStringPtr(input *string) *string {
@@ -972,18 +1374,42 @@ func toTaxRateResponse(taxRate TaxRate) TaxRateResponse {
 	}
 }
 
-func toPaymentMethodResponse(method PaymentMethod) PaymentMethodResponse {
+func (s *Service) toPaymentMethodResponse(method PaymentMethod) PaymentMethodResponse {
 	return PaymentMethodResponse{
-		ID:                method.ID,
-		BusinessID:        method.BusinessID,
-		MethodName:        method.MethodName,
-		MethodType:        method.MethodType,
-		IsDefault:         method.IsDefault,
-		AllowSplitPayment: method.AllowSplitPayment,
-		RequiresReference: method.RequiresReference,
-		Status:            method.Status,
-		CreatedAt:         method.CreatedAt,
-		UpdatedAt:         method.UpdatedAt,
+		ID:                        method.ID,
+		BusinessID:                method.BusinessID,
+		MethodName:                method.MethodName,
+		MethodType:                method.MethodType,
+		IsDefault:                 method.IsDefault,
+		AllowSplitPayment:         method.AllowSplitPayment,
+		RequiresReference:         method.RequiresReference,
+		ShowInPOS:                 method.ShowInPOS,
+		ShowInBakeryOrders:        method.ShowInBakeryOrders,
+		ShowInPurchasing:          method.ShowInPurchasing,
+		ShowInExpenses:            method.ShowInExpenses,
+		ShowInDashboardCollection: method.ShowInDashboardCollection,
+		DefaultPaymentAccountID:   method.DefaultPaymentAccountID,
+		DefaultPaymentAccountName: s.repo.PaymentAccountName(method.BusinessID, method.DefaultPaymentAccountID),
+		Status:                    method.Status,
+		CreatedAt:                 method.CreatedAt,
+		UpdatedAt:                 method.UpdatedAt,
+	}
+}
+
+func (s *Service) toSalesChannelResponse(channel SalesChannel) SalesChannelResponse {
+	return SalesChannelResponse{
+		ID:                          channel.ID,
+		BusinessID:                  channel.BusinessID,
+		ChannelName:                 channel.ChannelName,
+		ChannelType:                 channel.ChannelType,
+		RequiresExternalOrderNumber: channel.RequiresExternalOrderNumber,
+		DefaultPaymentMethodID:      channel.DefaultPaymentMethodID,
+		DefaultPaymentMethodName:    s.repo.PaymentMethodName(channel.BusinessID, channel.DefaultPaymentMethodID),
+		CommissionRate:              channel.CommissionRate,
+		IsDefault:                   channel.IsDefault,
+		Status:                      channel.Status,
+		CreatedAt:                   channel.CreatedAt,
+		UpdatedAt:                   channel.UpdatedAt,
 	}
 }
 

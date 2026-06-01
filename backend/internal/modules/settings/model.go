@@ -50,21 +50,46 @@ func (TaxRate) TableName() string {
 }
 
 type PaymentMethod struct {
-	ID                string         `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID        string         `gorm:"type:uuid;not null;index" json:"business_id"`
-	MethodName        string         `gorm:"size:150;not null" json:"method_name"`
-	MethodType        string         `gorm:"size:50;not null" json:"method_type"`
-	IsDefault         bool           `gorm:"not null;default:false" json:"is_default"`
-	AllowSplitPayment bool           `gorm:"not null;default:true" json:"allow_split_payment"`
-	RequiresReference bool           `gorm:"not null;default:false" json:"requires_reference"`
-	Status            string         `gorm:"size:50;not null;default:active" json:"status"`
-	CreatedAt         time.Time      `json:"created_at"`
-	UpdatedAt         time.Time      `json:"updated_at"`
-	DeletedAt         gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	ID                        string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID                string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	MethodName                string         `gorm:"size:150;not null" json:"method_name"`
+	MethodType                string         `gorm:"size:50;not null" json:"method_type"`
+	IsDefault                 bool           `gorm:"not null;default:false" json:"is_default"`
+	AllowSplitPayment         bool           `gorm:"not null;default:true" json:"allow_split_payment"`
+	RequiresReference         bool           `gorm:"not null;default:false" json:"requires_reference"`
+	ShowInPOS                 bool           `gorm:"not null;default:true" json:"show_in_pos"`
+	ShowInBakeryOrders        bool           `gorm:"not null;default:true" json:"show_in_bakery_orders"`
+	ShowInPurchasing          bool           `gorm:"not null;default:false" json:"show_in_purchasing"`
+	ShowInExpenses            bool           `gorm:"not null;default:false" json:"show_in_expenses"`
+	ShowInDashboardCollection bool           `gorm:"not null;default:true" json:"show_in_dashboard_collection"`
+	DefaultPaymentAccountID   *string        `gorm:"type:uuid;index" json:"default_payment_account_id"`
+	Status                    string         `gorm:"size:50;not null;default:active" json:"status"`
+	CreatedAt                 time.Time      `json:"created_at"`
+	UpdatedAt                 time.Time      `json:"updated_at"`
+	DeletedAt                 gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 func (PaymentMethod) TableName() string {
 	return "payment_methods"
+}
+
+type SalesChannel struct {
+	ID                          string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID                  string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	ChannelName                 string         `gorm:"size:150;not null" json:"channel_name"`
+	ChannelType                 string         `gorm:"size:50;not null" json:"channel_type"`
+	RequiresExternalOrderNumber bool           `gorm:"not null;default:false" json:"requires_external_order_number"`
+	DefaultPaymentMethodID      *string        `gorm:"type:uuid;index" json:"default_payment_method_id"`
+	CommissionRate              *float64       `json:"commission_rate"`
+	IsDefault                   bool           `gorm:"not null;default:false" json:"is_default"`
+	Status                      string         `gorm:"size:50;not null;default:active" json:"status"`
+	CreatedAt                   time.Time      `json:"created_at"`
+	UpdatedAt                   time.Time      `json:"updated_at"`
+	DeletedAt                   gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (SalesChannel) TableName() string {
+	return "sales_channels"
 }
 
 type ReceiptLayout struct {

@@ -61,6 +61,14 @@ psql "$DATABASE_URL" -f migrations/000039_bakery_order_item_production_batches.s
 psql "$DATABASE_URL" -f migrations/000040_purchase_invoice_payments.sql
 psql "$DATABASE_URL" -f migrations/000041_chart_of_accounts.sql
 psql "$DATABASE_URL" -f migrations/000042_journal_entries.sql
+psql "$DATABASE_URL" -f migrations/000043_expenses.sql
+psql "$DATABASE_URL" -f migrations/000044_remove_supplier_categories.sql
+psql "$DATABASE_URL" -f migrations/000045_sales_channels.sql
+psql "$DATABASE_URL" -f migrations/000046_attach_sales_channels_to_sales_orders.sql
+psql "$DATABASE_URL" -f migrations/000047_payment_method_module_visibility.sql
+psql "$DATABASE_URL" -f migrations/000048_payment_accounts.sql
+psql "$DATABASE_URL" -f migrations/000049_account_transfers_platform_settlements.sql
+psql "$DATABASE_URL" -f migrations/000050_auto_accounting_sales_orders.sql
 ```
 
 The API now verifies required tables at startup and fails fast if migrations were not applied.

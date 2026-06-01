@@ -8,6 +8,8 @@ func RegisterRoutes(
 	authGuard gin.HandlerFunc,
 	view gin.HandlerFunc,
 	manage gin.HandlerFunc,
+	productCreate gin.HandlerFunc,
+	variantManage gin.HandlerFunc,
 ) {
 	group := router.Group("/api/v1/bakery-orders")
 	group.Use(authGuard)
@@ -24,6 +26,8 @@ func RegisterRoutes(
 	group.POST("/:id/items", manage, handler.AddItem)
 	group.PATCH("/:id/items/:itemId", manage, handler.UpdateItem)
 	group.DELETE("/:id/items/:itemId", manage, handler.DeleteItem)
+	group.POST("/:id/items/:itemId/convert-to-product", manage, productCreate, handler.ConvertItemToProduct)
+	group.POST("/:id/items/:itemId/convert-to-variant", manage, variantManage, handler.ConvertItemToVariant)
 
 	group.GET("/:id/payments", view, handler.ListPayments)
 	group.POST("/:id/payments", manage, handler.AddPayment)

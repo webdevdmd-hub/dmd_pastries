@@ -246,6 +246,11 @@ func (s *Service) RegisterOwner(req RegisterOwnerRequest, ipAddress, userAgent s
 		return nil, apperrors.Internal("failed to seed default payment methods")
 	}
 
+	if err := settings.EnsureDefaultSalesChannels(tx, businessID); err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("failed to seed default sales channels")
+	}
+
 	if err := accounting.SeedDefaultChartOfAccounts(tx, businessID); err != nil {
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to seed chart of accounts")
@@ -363,7 +368,6 @@ func defaultRolePresets() []defaultRolePreset {
 				"master_data.product_categories.manage",
 				"master_data.ingredient_categories.manage",
 				"master_data.packaging_categories.manage",
-				"master_data.supplier_categories.manage",
 				"master_data.order_statuses.manage",
 				"master_data.payment_statuses.manage",
 				"pos.view",
@@ -472,6 +476,11 @@ func defaultRolePresets() []defaultRolePreset {
 				"accounting.view",
 				"accounting.accounts.manage",
 				"accounting.journal_entries.manage",
+				"expenses.view",
+				"expenses.create",
+				"expenses.edit",
+				"expenses.delete",
+				"expenses.manage",
 				"dashboard.view",
 				"audit_logs.view",
 			},

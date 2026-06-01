@@ -1,6 +1,8 @@
 package purchasing
 
 import (
+	"errors"
+	"io"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -71,6 +73,36 @@ func (h *Handler) DeleteOrder(c *gin.Context) {
 	}
 	err := h.service.DeleteOrder(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
 	respond(c, "purchase order deleted successfully", gin.H{"deleted": true}, err)
+}
+
+func (h *Handler) ConvertOrderToInvoice(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	var req ConvertPurchaseOrderToInvoiceRequest
+	if !bindOptionalJSON(c, &req) {
+		return
+	}
+	result, err := h.service.ConvertOrderToInvoice(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "purchase order converted to invoice successfully", result, err)
+}
+
+func (h *Handler) GetOrderDocumentChain(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.GetDocumentChain(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase document chain fetched successfully", result, err)
+}
+
+func (h *Handler) GetDocumentChain(c *gin.Context) {
+	purchaseOrderID := c.Query("purchase_order_id")
+	if _, err := uuid.Parse(purchaseOrderID); err != nil {
+		handleError(c, apperrors.BadRequest("purchase_order_id must be a valid UUID", nil))
+		return
+	}
+	result, err := h.service.GetDocumentChain(utils.MustAuthContext(c), purchaseOrderID, c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase document chain fetched successfully", result, err)
 }
 
 func (h *Handler) ListInvoices(c *gin.Context) {
@@ -146,6 +178,18 @@ func (h *Handler) CancelInvoice(c *gin.Context) {
 	}
 	result, err := h.service.CancelInvoice(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
 	respond(c, "purchase invoice cancelled successfully", result, err)
+}
+
+func (h *Handler) ConvertInvoiceToReceipt(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	var req ConvertPurchaseInvoiceToReceiptRequest
+	if !bindOptionalJSON(c, &req) {
+		return
+	}
+	result, err := h.service.ConvertInvoiceToReceipt(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "purchase invoice converted to receipt successfully", result, err)
 }
 
 func (h *Handler) Receive(c *gin.Context) {
@@ -239,6 +283,20 @@ func parsePaymentListQuery(c *gin.Context) PaymentListQuery {
 
 func bindJSON(c *gin.Context, target interface{}) bool {
 	if err := c.ShouldBindJSON(target); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return false
+	}
+	return true
+}
+
+func bindOptionalJSON(c *gin.Context, target interface{}) bool {
+	if c.Request.Body == nil || c.Request.ContentLength == 0 {
+		return true
+	}
+	if err := c.ShouldBindJSON(target); err != nil {
+		if errors.Is(err, io.EOF) {
+			return true
+		}
 		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
 		return false
 	}

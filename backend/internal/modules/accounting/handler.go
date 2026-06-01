@@ -119,6 +119,156 @@ func (h *Handler) DeleteChartAccount(c *gin.Context) {
 	response.Success(c, 200, "chart account deleted successfully", gin.H{"deleted": true})
 }
 
+func (h *Handler) ListPaymentAccounts(c *gin.Context) {
+	result, err := h.service.ListPaymentAccounts(utils.MustAuthContext(c), parsePaymentAccountListQuery(c))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "payment accounts fetched successfully", result)
+}
+
+func (h *Handler) CreatePaymentAccount(c *gin.Context) {
+	var req CreatePaymentAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.CreatePaymentAccount(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 201, "payment account created successfully", result)
+}
+
+func (h *Handler) GetPaymentAccount(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	result, err := h.service.GetPaymentAccount(utils.MustAuthContext(c), c.Param("id"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "payment account fetched successfully", result)
+}
+
+func (h *Handler) UpdatePaymentAccount(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	var req UpdatePaymentAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.UpdatePaymentAccount(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "payment account updated successfully", result)
+}
+
+func (h *Handler) UpdatePaymentAccountStatus(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	var req UpdateChartAccountStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.UpdatePaymentAccountStatus(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "payment account status updated successfully", result)
+}
+
+func (h *Handler) DeletePaymentAccount(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	if err := h.service.DeletePaymentAccount(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent()); err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "payment account deleted successfully", gin.H{"deleted": true})
+}
+
+func (h *Handler) ListAccountTransfers(c *gin.Context) {
+	result, err := h.service.ListAccountTransfers(utils.MustAuthContext(c), parseAccountTransferListQuery(c))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "account transfers fetched successfully", result)
+}
+
+func (h *Handler) CreateAccountTransfer(c *gin.Context) {
+	var req CreateAccountTransferRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.CreateAccountTransfer(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 201, "account transfer created successfully", result)
+}
+
+func (h *Handler) GetAccountTransfer(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	result, err := h.service.GetAccountTransfer(utils.MustAuthContext(c), c.Param("id"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "account transfer fetched successfully", result)
+}
+
+func (h *Handler) ListPlatformSettlements(c *gin.Context) {
+	result, err := h.service.ListPlatformSettlements(utils.MustAuthContext(c), parsePlatformSettlementListQuery(c))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "platform settlements fetched successfully", result)
+}
+
+func (h *Handler) CreatePlatformSettlement(c *gin.Context) {
+	var req CreatePlatformSettlementRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.CreatePlatformSettlement(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 201, "platform settlement created successfully", result)
+}
+
+func (h *Handler) GetPlatformSettlement(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	result, err := h.service.GetPlatformSettlement(utils.MustAuthContext(c), c.Param("id"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "platform settlement fetched successfully", result)
+}
+
 func (h *Handler) ListJournalEntries(c *gin.Context) {
 	result, err := h.service.ListJournalEntries(utils.MustAuthContext(c), parseJournalEntryListQuery(c))
 	if err != nil {
@@ -219,6 +369,17 @@ func (h *Handler) PostJournalEntry(c *gin.Context) {
 	response.Success(c, 200, "journal entry posted successfully", result)
 }
 
+func (h *Handler) DeleteJournalEntry(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	if err := h.service.DeleteJournalEntry(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent()); err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "journal entry hard deleted successfully", gin.H{"deleted": true})
+}
+
 func (h *Handler) ReverseJournalEntry(c *gin.Context) {
 	if !validUUIDParam(c, "id") {
 		return
@@ -249,6 +410,50 @@ func parseChartAccountListQuery(c *gin.Context) ChartAccountListQuery {
 		Limit:           limit,
 		SortBy:          c.DefaultQuery("sort_by", "account_code"),
 		SortOrder:       c.DefaultQuery("sort_order", "asc"),
+	}
+}
+
+func parsePaymentAccountListQuery(c *gin.Context) PaymentAccountListQuery {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	return PaymentAccountListQuery{
+		Search:      c.Query("search"),
+		BranchID:    c.Query("branch_id"),
+		AccountType: c.Query("account_type"),
+		Status:      c.Query("status"),
+		Page:        page,
+		Limit:       limit,
+		SortBy:      c.DefaultQuery("sort_by", "account_name"),
+		SortOrder:   c.DefaultQuery("sort_order", "asc"),
+	}
+}
+
+func parseAccountTransferListQuery(c *gin.Context) AccountTransferListQuery {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	return AccountTransferListQuery{
+		BranchID:         c.Query("branch_id"),
+		PaymentAccountID: c.Query("payment_account_id"),
+		DateFrom:         c.Query("date_from"),
+		DateTo:           c.Query("date_to"),
+		Page:             page,
+		Limit:            limit,
+		SortOrder:        c.DefaultQuery("sort_order", "desc"),
+	}
+}
+
+func parsePlatformSettlementListQuery(c *gin.Context) PlatformSettlementListQuery {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	return PlatformSettlementListQuery{
+		BranchID:                 c.Query("branch_id"),
+		PlatformPaymentAccountID: c.Query("platform_payment_account_id"),
+		DepositPaymentAccountID:  c.Query("deposit_payment_account_id"),
+		DateFrom:                 c.Query("date_from"),
+		DateTo:                   c.Query("date_to"),
+		Page:                     page,
+		Limit:                    limit,
+		SortOrder:                c.DefaultQuery("sort_order", "desc"),
 	}
 }
 

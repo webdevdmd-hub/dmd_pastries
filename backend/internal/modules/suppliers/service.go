@@ -66,7 +66,7 @@ func (s *Service) CreateSupplier(currentUser *utils.AuthContext, req CreateSuppl
 	if err != nil {
 		return nil, err
 	}
-	if err := s.validateSupplierPayload(currentUser.BusinessID, branchID, req.SupplierName, req.SupplierCategoryID, req.Phone, req.Email, req.Website); err != nil {
+	if err := s.validateSupplierPayload(req.SupplierName, req.Phone, req.Email, req.Website); err != nil {
 		return nil, err
 	}
 	var id string
@@ -76,26 +76,25 @@ func (s *Service) CreateSupplier(currentUser *utils.AuthContext, req CreateSuppl
 			return apperrors.Internal("failed to generate supplier code")
 		}
 		supplier := &Supplier{
-			ID:                 newUUID(),
-			BusinessID:         currentUser.BusinessID,
-			BranchID:           branchID,
-			SupplierCode:       code,
-			SupplierName:       strings.TrimSpace(req.SupplierName),
-			SupplierCategoryID: nullableString(req.SupplierCategoryID),
-			Phone:              strings.TrimSpace(req.Phone),
-			Email:              strings.ToLower(strings.TrimSpace(req.Email)),
-			Website:            strings.TrimSpace(req.Website),
-			AddressLine1:       strings.TrimSpace(req.AddressLine1),
-			AddressLine2:       strings.TrimSpace(req.AddressLine2),
-			City:               strings.TrimSpace(req.City),
-			State:              strings.TrimSpace(req.State),
-			Country:            strings.TrimSpace(req.Country),
-			PostalCode:         strings.TrimSpace(req.PostalCode),
-			TaxNumber:          strings.TrimSpace(req.TaxNumber),
-			Notes:              strings.TrimSpace(req.Notes),
-			Status:             "active",
-			CreatedByUserID:    currentUser.UserID,
-			UpdatedByUserID:    currentUser.UserID,
+			ID:              newUUID(),
+			BusinessID:      currentUser.BusinessID,
+			BranchID:        branchID,
+			SupplierCode:    code,
+			SupplierName:    strings.TrimSpace(req.SupplierName),
+			Phone:           strings.TrimSpace(req.Phone),
+			Email:           strings.ToLower(strings.TrimSpace(req.Email)),
+			Website:         strings.TrimSpace(req.Website),
+			AddressLine1:    strings.TrimSpace(req.AddressLine1),
+			AddressLine2:    strings.TrimSpace(req.AddressLine2),
+			City:            strings.TrimSpace(req.City),
+			State:           strings.TrimSpace(req.State),
+			Country:         strings.TrimSpace(req.Country),
+			PostalCode:      strings.TrimSpace(req.PostalCode),
+			TaxNumber:       strings.TrimSpace(req.TaxNumber),
+			Notes:           strings.TrimSpace(req.Notes),
+			Status:          "active",
+			CreatedByUserID: currentUser.UserID,
+			UpdatedByUserID: currentUser.UserID,
 		}
 		if err := s.repo.Create(tx, supplier); err != nil {
 			return apperrors.Internal("failed to create supplier")
@@ -132,14 +131,11 @@ func (s *Service) UpdateSupplier(currentUser *utils.AuthContext, id string, req 
 	if _, err := s.repo.FindByID(id, currentUser.BusinessID, branchID); err != nil {
 		return nil, mapSupplierNotFound(err, "supplier not found")
 	}
-	if err := s.validateSupplierPayload(currentUser.BusinessID, branchID, firstNonEmpty(req.SupplierName, "valid"), req.SupplierCategoryID, req.Phone, req.Email, req.Website); err != nil {
+	if err := s.validateSupplierPayload(firstNonEmpty(req.SupplierName, "valid"), req.Phone, req.Email, req.Website); err != nil {
 		return nil, err
 	}
 	updates := map[string]interface{}{"updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
 	setString(updates, "supplier_name", req.SupplierName)
-	if req.SupplierCategoryID != "" {
-		updates["supplier_category_id"] = nullableString(req.SupplierCategoryID)
-	}
 	setString(updates, "phone", req.Phone)
 	setStringLower(updates, "email", req.Email)
 	setString(updates, "website", req.Website)
@@ -360,17 +356,12 @@ func (s *Service) Stats(currentUser *utils.AuthContext, supplierID string) (*Sup
 	return s.repo.Stats(currentUser.BusinessID, supplierID)
 }
 
-func (s *Service) validateSupplierPayload(businessID, branchID, name, categoryID, phone, email, website string) error {
+func (s *Service) validateSupplierPayload(name, phone, email, website string) error {
 	if strings.TrimSpace(name) == "" {
 		return apperrors.BadRequest("supplier_name is required", nil)
 	}
 	if err := validateSupplierContact(phone, email, website); err != nil {
 		return err
-	}
-	if strings.TrimSpace(categoryID) != "" {
-		if err := s.repo.ValidateCategory(businessID, branchID, strings.TrimSpace(categoryID)); err != nil {
-			return apperrors.BadRequest("invalid supplier_category_id", nil)
-		}
 	}
 	return nil
 }
@@ -460,14 +451,6 @@ func validateContact(name, phone, email string) error {
 		return apperrors.BadRequest("contact_name is required", nil)
 	}
 	return validateSupplierContact(phone, email, "")
-}
-
-func nullableString(value string) *string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return nil
-	}
-	return &trimmed
 }
 
 func setString(updates map[string]interface{}, key, value string) {

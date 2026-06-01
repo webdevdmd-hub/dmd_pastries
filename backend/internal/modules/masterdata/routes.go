@@ -42,7 +42,6 @@ func RegisterRoutes(
 
 	registerSimpleRoutes(group, "/ingredient-categories", handler, ingredientConfig(), masterDataView, masterDataManage, "ingredient")
 	registerSimpleRoutes(group, "/packaging-categories", handler, packagingConfig(), masterDataView, masterDataManage, "packaging")
-	registerSimpleRoutes(group, "/supplier-categories", handler, supplierConfig(), masterDataView, masterDataManage, "supplier")
 }
 
 func registerSimpleRoutes(group *gin.RouterGroup, path string, handler *Handler, cfg simpleCategoryConfig, view gin.HandlerFunc, manage gin.HandlerFunc, label string) {
@@ -72,8 +71,4 @@ func ingredientConfig() simpleCategoryConfig {
 
 func packagingConfig() simpleCategoryConfig {
 	return simpleCategoryConfig{Table: "packaging_categories", EntityType: "packaging_category", EventPrefix: "packaging_category"}
-}
-
-func supplierConfig() simpleCategoryConfig {
-	return simpleCategoryConfig{Table: "supplier_categories", EntityType: "supplier_category", EventPrefix: "supplier_category"}
 }

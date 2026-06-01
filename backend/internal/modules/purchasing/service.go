@@ -2,6 +2,7 @@ package purchasing
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -192,6 +193,163 @@ func (s *Service) DeleteOrder(currentUser *utils.AuthContext, id, ipAddress, use
 	return err
 }
 
+func (s *Service) ConvertOrderToInvoice(currentUser *utils.AuthContext, id string, req ConvertPurchaseOrderToInvoiceRequest, ipAddress, userAgent string) (*PurchaseInvoiceResponse, error) {
+	if err := requireAllOrOverride(currentUser, []string{"purchasing.orders.edit", "purchasing.invoices.create"}, []string{"purchasing.manage"}); err != nil {
+		return nil, err
+	}
+	var invoiceID string
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		order, err := s.repo.FindOrderForUpdate(tx, id, currentUser.BusinessID)
+		if err != nil {
+			return notFound(err, "purchase order not found")
+		}
+		if !currentUser.CanAccessBranch(order.BranchID) {
+			return apperrors.Forbidden("branch access denied")
+		}
+		if order.Status == "cancelled" || order.Status == "received" || order.Status == "partially_received" {
+			return apperrors.BadRequest("cancelled, received, or partially received purchase orders cannot be converted", nil)
+		}
+		existingInvoices, err := s.repo.ActiveInvoiceCountForOrder(tx, currentUser.BusinessID, order.ID)
+		if err != nil {
+			return err
+		}
+		if existingInvoices > 0 {
+			return apperrors.Conflict("purchase order already has a purchase invoice", nil)
+		}
+		orderItems, err := s.repo.OrderItemsForUpdate(tx, order.ID, currentUser.BusinessID)
+		if err != nil {
+			return err
+		}
+		if len(orderItems) == 0 {
+			return apperrors.BadRequest("purchase order has no items to convert", nil)
+		}
+		invoiceDate, err := parseDate(defaultDate(req.InvoiceDate), "invoice_date")
+		if err != nil {
+			return err
+		}
+		dueDate, err := parseOptionalDate(req.DueDate, "due_date")
+		if err != nil {
+			return err
+		}
+		invoiceNumber, err := s.repo.NextNumber(tx, currentUser.BusinessID, "purchase_invoices", "invoice_number", "PI", "purchase_invoices")
+		if err != nil {
+			return err
+		}
+		if exists, err := s.repo.InvoiceNumberExists(tx, currentUser.BusinessID, order.SupplierID, invoiceNumber, ""); err != nil {
+			return err
+		} else if exists {
+			return apperrors.Conflict("generated invoice_number already exists for this supplier", nil)
+		}
+		notes := strings.TrimSpace(req.Notes)
+		if notes == "" {
+			notes = order.Notes
+		}
+		invoiceID = utils.NewUUID()
+		invoice := &PurchaseInvoice{
+			ID:              invoiceID,
+			BusinessID:      currentUser.BusinessID,
+			BranchID:        order.BranchID,
+			SupplierID:      order.SupplierID,
+			PurchaseOrderID: &order.ID,
+			InvoiceNumber:   invoiceNumber,
+			InvoiceDate:     invoiceDate,
+			DueDate:         dueDate,
+			Status:          "draft",
+			PaymentStatus:   "unpaid",
+			SubtotalAmount:  order.SubtotalAmount,
+			TaxAmount:       order.TaxAmount,
+			DiscountAmount:  order.DiscountAmount,
+			TotalAmount:     order.TotalAmount,
+			BalanceAmount:   order.TotalAmount,
+			Notes:           notes,
+			CreatedByUserID: currentUser.UserID,
+			UpdatedByUserID: currentUser.UserID,
+		}
+		items := make([]PurchaseInvoiceItem, 0, len(orderItems))
+		for _, item := range orderItems {
+			items = append(items, PurchaseInvoiceItem{
+				ID:                utils.NewUUID(),
+				BusinessID:        currentUser.BusinessID,
+				PurchaseInvoiceID: invoiceID,
+				ItemType:          item.ItemType,
+				ProductID:         item.ProductID,
+				IngredientID:      item.IngredientID,
+				PackagingItemID:   item.PackagingItemID,
+				ItemNameSnapshot:  item.ItemNameSnapshot,
+				Quantity:          item.QuantityOrdered,
+				UnitID:            item.UnitID,
+				UnitCost:          item.UnitCost,
+				DiscountAmount:    item.DiscountAmount,
+				TaxRateID:         item.TaxRateID,
+				TaxAmount:         item.TaxAmount,
+				LineTotal:         item.LineTotal,
+			})
+		}
+		if err := s.repo.CreateInvoice(tx, invoice, items); err != nil {
+			return err
+		}
+		if order.Status == "draft" {
+			if err := s.repo.UpdateOrder(tx, order.ID, currentUser.BusinessID, map[string]interface{}{"status": "ordered", "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}, nil); err != nil {
+				return err
+			}
+		}
+		if err := s.audit(tx, currentUser, "purchase_order.converted_to_invoice", order.ID, "Purchase order converted to purchase invoice", ipAddress, userAgent); err != nil {
+			return err
+		}
+		return s.audit(tx, currentUser, "purchase_invoice.created", invoice.ID, "Purchase invoice created from purchase order", ipAddress, userAgent)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetInvoice(currentUser, invoiceID)
+}
+
+func (s *Service) GetDocumentChain(currentUser *utils.AuthContext, purchaseOrderID, ipAddress, userAgent string) (*PurchasingDocumentChainResponse, error) {
+	if err := validateUUID(purchaseOrderID, "purchase_order_id"); err != nil {
+		return nil, err
+	}
+	order, err := s.repo.FindOrder(purchaseOrderID, currentUser.BusinessID)
+	if err != nil {
+		return nil, notFound(err, "purchase order not found")
+	}
+	if !currentUser.CanAccessBranch(order.BranchID) {
+		return nil, apperrors.Forbidden("branch access denied")
+	}
+	invoices, err := s.repo.InvoicesForOrder(currentUser.BusinessID, purchaseOrderID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load purchase invoices")
+	}
+	receipts, err := s.repo.ReceiptsForOrder(currentUser.BusinessID, purchaseOrderID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load purchase receipts")
+	}
+	payments, err := s.repo.InvoicePaymentsForOrder(currentUser.BusinessID, purchaseOrderID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load supplier payments")
+	}
+	response := &PurchasingDocumentChainResponse{}
+	orderID := order.ID
+	response.PurchaseOrder = &PurchaseDocumentChainItem{ID: order.ID, DocumentNumber: order.PurchaseOrderNumber, DocumentType: "purchase_order", Status: order.Status, Date: order.OrderDate, TotalAmount: roundMoney(order.TotalAmount), PurchaseOrderID: &orderID}
+	for _, invoice := range invoices {
+		invoiceID := invoice.ID
+		response.PurchaseInvoices = append(response.PurchaseInvoices, PurchaseDocumentChainItem{ID: invoice.ID, DocumentNumber: invoice.InvoiceNumber, DocumentType: "purchase_invoice", Status: invoice.Status, Date: invoice.InvoiceDate, TotalAmount: roundMoney(invoice.TotalAmount), PurchaseOrderID: invoice.PurchaseOrderID, PurchaseInvoiceID: &invoiceID, PreviousID: invoice.PurchaseOrderID})
+	}
+	for _, receipt := range receipts {
+		receiptID := receipt.ID
+		previousID := receipt.PurchaseInvoiceID
+		if previousID == nil {
+			previousID = receipt.PurchaseOrderID
+		}
+		response.PurchaseReceipts = append(response.PurchaseReceipts, PurchaseDocumentChainItem{ID: receipt.ID, DocumentNumber: receipt.ReceiptNumber, DocumentType: "purchase_receipt", Status: receipt.Status, Date: receipt.ReceivedDate, TotalAmount: 0, PurchaseOrderID: receipt.PurchaseOrderID, PurchaseInvoiceID: receipt.PurchaseInvoiceID, PurchaseReceiptID: &receiptID, PreviousID: previousID})
+	}
+	for i, payment := range payments {
+		invoiceID := payment.PurchaseInvoiceID
+		response.SupplierPayments = append(response.SupplierPayments, PurchaseDocumentChainItem{ID: payment.PaymentID, DocumentNumber: supplierPaymentChainNumber(i + 1), DocumentType: "supplier_payment", Status: payment.PaymentStatus, Date: payment.PaidAt, TotalAmount: roundMoney(payment.Amount), PurchaseInvoiceID: &invoiceID, PreviousID: &invoiceID})
+	}
+	_ = s.audit(s.db, currentUser, "purchasing.document_chain_viewed", purchaseOrderID, "Purchasing document chain viewed", ipAddress, userAgent)
+	return response, nil
+}
+
 func (s *Service) ListInvoices(currentUser *utils.AuthContext, query ListQuery) (*PaginatedResponse[PurchaseInvoiceResponse], error) {
 	normalizeQuery(&query)
 	branchID, allBranches, err := currentUser.ResolveBranchScope(query.BranchID, "")
@@ -327,6 +485,9 @@ func (s *Service) AddInvoicePayment(currentUser *utils.AuthContext, invoiceID st
 		method, err := s.repo.PaymentMethod(tx, currentUser.BusinessID, req.PaymentMethodID)
 		if err != nil {
 			return notFound(err, "payment method not found")
+		}
+		if !method.ShowInPurchasing {
+			return apperrors.BadRequest("payment method is not enabled for purchasing", nil)
 		}
 		reference := strings.TrimSpace(req.ReferenceNumber)
 		if method.RequiresReference && reference == "" {
@@ -483,20 +644,83 @@ func (s *Service) CancelInvoice(currentUser *utils.AuthContext, id, ipAddress, u
 	return s.GetInvoice(currentUser, id)
 }
 
-func (s *Service) Receive(currentUser *utils.AuthContext, req ReceivePurchaseRequest, ipAddress, userAgent string) (*PurchaseReceiptResponse, error) {
+func (s *Service) ConvertInvoiceToReceipt(currentUser *utils.AuthContext, id string, req ConvertPurchaseInvoiceToReceiptRequest, ipAddress, userAgent string) (*PurchaseReceiptResponse, error) {
+	if err := requireAllOrOverride(currentUser, []string{"purchasing.receipts.create"}, []string{"purchasing.manage", "inventory.manage"}); err != nil {
+		return nil, err
+	}
 	var receiptID string
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		receipt, items, err := s.buildReceiptWithStock(tx, currentUser, req)
+		invoice, err := s.repo.FindInvoiceForUpdate(tx, id, currentUser.BusinessID)
+		if err != nil {
+			return notFound(err, "purchase invoice not found")
+		}
+		if !currentUser.CanAccessBranch(invoice.BranchID) {
+			return apperrors.Forbidden("branch access denied")
+		}
+		if invoice.Status != "posted" {
+			return apperrors.BadRequest("only posted purchase invoices can be converted to receipt", nil)
+		}
+		existingReceipts, err := s.repo.ActiveReceiptCountForInvoice(tx, currentUser.BusinessID, invoice.ID)
+		if err != nil {
+			return err
+		}
+		if existingReceipts > 0 {
+			return apperrors.Conflict("purchase invoice already has a stock receipt", nil)
+		}
+		invoiceItems, err := s.repo.InvoiceItems(invoice.ID, currentUser.BusinessID)
+		if err != nil {
+			return err
+		}
+		if len(invoiceItems) == 0 {
+			return apperrors.BadRequest("purchase invoice has no items to convert", nil)
+		}
+		notes := strings.TrimSpace(req.Notes)
+		if notes == "" {
+			notes = invoice.Notes
+		}
+		receiveReq := ReceivePurchaseRequest{
+			BranchID:          invoice.BranchID,
+			SupplierID:        invoice.SupplierID,
+			PurchaseOrderID:   deref(invoice.PurchaseOrderID),
+			PurchaseInvoiceID: invoice.ID,
+			ReceivedDate:      defaultDate(req.ReceivedDate),
+			Items:             receiptInputsFromInvoiceItems(invoiceItems),
+			Notes:             notes,
+		}
+		receipt, items, err := s.buildReceipt(tx, currentUser, receiveReq, "draft")
 		if err != nil {
 			return err
 		}
 		if err := s.repo.CreateReceipt(tx, receipt, items); err != nil {
 			return err
 		}
-		if receipt.PurchaseOrderID != nil {
-			if err := s.refreshOrderReceivedStatus(tx, currentUser.BusinessID, *receipt.PurchaseOrderID); err != nil {
-				return err
-			}
+		if err := s.audit(tx, currentUser, "purchase_invoice.converted_to_receipt", invoice.ID, "Purchase invoice converted to draft stock receipt", ipAddress, userAgent); err != nil {
+			return err
+		}
+		receiptID = receipt.ID
+		return s.audit(tx, currentUser, "purchase_receipt.created", receipt.ID, "Draft purchase receipt created from purchase invoice", ipAddress, userAgent)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetReceipt(currentUser, receiptID)
+}
+
+func (s *Service) Receive(currentUser *utils.AuthContext, req ReceivePurchaseRequest, ipAddress, userAgent string) (*PurchaseReceiptResponse, error) {
+	if err := requireAllOrOverride(currentUser, []string{"purchasing.receipts.create", "purchasing.receive_stock"}, []string{"purchasing.manage", "inventory.manage"}); err != nil {
+		return nil, err
+	}
+	var receiptID string
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		receipt, items, err := s.buildReceipt(tx, currentUser, req, "posted")
+		if err != nil {
+			return err
+		}
+		if err := s.repo.CreateReceipt(tx, receipt, items); err != nil {
+			return err
+		}
+		if err := s.applyReceiptStock(tx, currentUser, receipt); err != nil {
+			return err
 		}
 		if err := s.audit(tx, currentUser, "purchase_receipt.created", receipt.ID, "Purchase receipt created", ipAddress, userAgent); err != nil {
 			return err
@@ -548,6 +772,9 @@ func (s *Service) GetReceipt(currentUser *utils.AuthContext, id string) (*Purcha
 }
 
 func (s *Service) PostReceipt(currentUser *utils.AuthContext, id, ipAddress, userAgent string) (*PurchaseReceiptResponse, error) {
+	if err := requireAllOrOverride(currentUser, []string{"purchasing.receipts.post", "purchasing.receive_stock"}, []string{"purchasing.manage", "inventory.manage"}); err != nil {
+		return nil, err
+	}
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		receipt, err := s.repo.FindReceiptForUpdate(tx, id, currentUser.BusinessID)
 		if err != nil {
@@ -559,10 +786,16 @@ func (s *Service) PostReceipt(currentUser *utils.AuthContext, id, ipAddress, use
 		if receipt.Status != "draft" {
 			return apperrors.BadRequest("only draft receipts can be posted", nil)
 		}
+		if err := s.applyReceiptStock(tx, currentUser, receipt); err != nil {
+			return err
+		}
 		if err := s.repo.UpdateReceipt(tx, id, currentUser.BusinessID, map[string]interface{}{"status": "posted", "updated_at": time.Now().UTC()}); err != nil {
 			return err
 		}
-		return s.audit(tx, currentUser, "purchase_receipt.posted", id, "Purchase receipt posted", ipAddress, userAgent)
+		if err := s.audit(tx, currentUser, "purchase_receipt.posted", id, "Purchase receipt posted", ipAddress, userAgent); err != nil {
+			return err
+		}
+		return s.audit(tx, currentUser, "purchase_stock_received", id, "Purchase stock received", ipAddress, userAgent)
 	})
 	if err != nil {
 		return nil, err
@@ -777,7 +1010,7 @@ func (s *Service) buildInvoiceItems(tx *gorm.DB, businessID, branchID, invoiceID
 	return items, total.round(), nil
 }
 
-func (s *Service) buildReceiptWithStock(tx *gorm.DB, currentUser *utils.AuthContext, req ReceivePurchaseRequest) (*PurchaseReceipt, []PurchaseReceiptItem, error) {
+func (s *Service) buildReceipt(tx *gorm.DB, currentUser *utils.AuthContext, req ReceivePurchaseRequest, status string) (*PurchaseReceipt, []PurchaseReceiptItem, error) {
 	resolvedBranchID, err := currentUser.ResolveOperationalBranch(req.BranchID)
 	if err != nil {
 		return nil, nil, err
@@ -822,22 +1055,16 @@ func (s *Service) buildReceiptWithStock(tx *gorm.DB, currentUser *utils.AuthCont
 		return nil, nil, err
 	}
 	receipt := &PurchaseReceipt{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BranchID: req.BranchID, SupplierID: req.SupplierID, PurchaseOrderID: nullableString(req.PurchaseOrderID), PurchaseInvoiceID: nullableString(req.PurchaseInvoiceID), ReceiptNumber: receiptNumber, ReceivedDate: receivedDate, Status: "posted", ReceivedByUserID: currentUser.UserID, Notes: strings.TrimSpace(req.Notes)}
+	if status != "" {
+		receipt.Status = status
+	}
 	items := make([]PurchaseReceiptItem, 0, len(req.Items))
 	for _, input := range req.Items {
 		prepared, err := s.prepareReceiptItem(tx, currentUser.BusinessID, req.BranchID, input)
 		if err != nil {
 			return nil, nil, err
 		}
-		if req.PurchaseOrderID != "" {
-			if err := s.applyPOReceiveQuantity(tx, currentUser.BusinessID, req.PurchaseOrderID, prepared); err != nil {
-				return nil, nil, err
-			}
-		}
 		inventoryItem, err := s.findOrCreateInventoryItem(tx, currentUser.BusinessID, req.BranchID, prepared)
-		if err != nil {
-			return nil, nil, err
-		}
-		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: inventoryItem.ID, MovementType: "purchase_in", Quantity: input.QuantityReceived, ReferenceType: "purchase_receipt", ReferenceID: &receipt.ID, ReferenceNumber: receipt.ReceiptNumber, Reason: "Purchase received", CreatedByUserID: currentUser.UserID})
 		if err != nil {
 			return nil, nil, err
 		}
@@ -845,15 +1072,47 @@ func (s *Service) buildReceiptWithStock(tx *gorm.DB, currentUser *utils.AuthCont
 		if err != nil {
 			return nil, nil, err
 		}
-		if expiryDate != nil {
-			batch := &inventory.ExpiryBatch{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BranchID: req.BranchID, InventoryItemID: inventoryItem.ID, BatchNumber: strings.TrimSpace(input.BatchNumber), Quantity: input.QuantityReceived, ExpiryDate: *expiryDate, ReceivedDate: receivedDate, Status: "active"}
-			if err := s.inventoryRepo.CreateExpiryBatch(tx, batch); err != nil {
-				return nil, nil, err
-			}
-		}
-		items = append(items, PurchaseReceiptItem{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, PurchaseReceiptID: receipt.ID, ItemType: prepared.ItemType, ProductID: prepared.ProductID, IngredientID: prepared.IngredientID, PackagingItemID: prepared.PackagingItemID, InventoryItemID: inventoryItem.ID, QuantityReceived: input.QuantityReceived, UnitID: input.UnitID, ExpiryDate: expiryDate, BatchNumber: strings.TrimSpace(input.BatchNumber), StockMovementID: &movement.ID})
+		items = append(items, PurchaseReceiptItem{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, PurchaseReceiptID: receipt.ID, ItemType: prepared.ItemType, ProductID: prepared.ProductID, IngredientID: prepared.IngredientID, PackagingItemID: prepared.PackagingItemID, InventoryItemID: inventoryItem.ID, QuantityReceived: input.QuantityReceived, UnitID: input.UnitID, ExpiryDate: expiryDate, BatchNumber: strings.TrimSpace(input.BatchNumber)})
 	}
 	return receipt, items, nil
+}
+
+func (s *Service) applyReceiptStock(tx *gorm.DB, currentUser *utils.AuthContext, receipt *PurchaseReceipt) error {
+	items, err := s.repo.ReceiptItemsForUpdate(tx, receipt.ID, currentUser.BusinessID)
+	if err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return apperrors.BadRequest("purchase receipt has no items to post", nil)
+	}
+	for _, item := range items {
+		if item.StockMovementID != nil {
+			continue
+		}
+		prepared := preparedItem{ItemType: item.ItemType, UnitID: item.UnitID, ProductID: item.ProductID, IngredientID: item.IngredientID, PackagingItemID: item.PackagingItemID, Quantity: item.QuantityReceived}
+		if receipt.PurchaseOrderID != nil {
+			if err := s.applyPOReceiveQuantity(tx, currentUser.BusinessID, *receipt.PurchaseOrderID, prepared); err != nil {
+				return err
+			}
+		}
+		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: item.InventoryItemID, MovementType: "purchase_in", Quantity: item.QuantityReceived, ReferenceType: "purchase_receipt", ReferenceID: &receipt.ID, ReferenceNumber: receipt.ReceiptNumber, Reason: "Purchase received", CreatedByUserID: currentUser.UserID})
+		if err != nil {
+			return err
+		}
+		if item.ExpiryDate != nil {
+			batch := &inventory.ExpiryBatch{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BranchID: receipt.BranchID, InventoryItemID: item.InventoryItemID, BatchNumber: strings.TrimSpace(item.BatchNumber), Quantity: item.QuantityReceived, ExpiryDate: *item.ExpiryDate, ReceivedDate: receipt.ReceivedDate, Status: "active"}
+			if err := s.inventoryRepo.CreateExpiryBatch(tx, batch); err != nil {
+				return err
+			}
+		}
+		if err := s.repo.UpdateReceiptItemStockMovement(tx, item.ID, currentUser.BusinessID, movement.ID); err != nil {
+			return err
+		}
+	}
+	if receipt.PurchaseOrderID != nil {
+		return s.refreshOrderReceivedStatus(tx, currentUser.BusinessID, *receipt.PurchaseOrderID)
+	}
+	return nil
 }
 
 func (s *Service) validateHeader(tx *gorm.DB, businessID, branchID, supplierID string) error {
@@ -1261,4 +1520,49 @@ func invoiceInputsFromItems(items []PurchaseInvoiceItem) []PurchaseInvoiceItemIn
 		result = append(result, PurchaseInvoiceItemInput{ItemType: item.ItemType, ProductID: deref(item.ProductID), IngredientID: deref(item.IngredientID), PackagingItemID: deref(item.PackagingItemID), Quantity: item.Quantity, UnitID: item.UnitID, UnitCost: item.UnitCost, DiscountAmount: item.DiscountAmount, TaxRateID: deref(item.TaxRateID), ExpiryDate: optionalDateString(item.ExpiryDate), BatchNumber: item.BatchNumber})
 	}
 	return result
+}
+
+func receiptInputsFromInvoiceItems(items []PurchaseInvoiceItem) []PurchaseReceiptItemInput {
+	result := make([]PurchaseReceiptItemInput, 0, len(items))
+	for _, item := range items {
+		result = append(result, PurchaseReceiptItemInput{ItemType: item.ItemType, ProductID: deref(item.ProductID), IngredientID: deref(item.IngredientID), PackagingItemID: deref(item.PackagingItemID), QuantityReceived: item.Quantity, UnitID: item.UnitID, ExpiryDate: optionalDateString(item.ExpiryDate), BatchNumber: item.BatchNumber})
+	}
+	return result
+}
+
+func defaultDate(value string) string {
+	if strings.TrimSpace(value) != "" {
+		return strings.TrimSpace(value)
+	}
+	return time.Now().UTC().Format("2006-01-02")
+}
+
+func supplierPaymentChainNumber(sequence int) string {
+	return fmt.Sprintf("SP-%06d", sequence)
+}
+
+func requireAllOrOverride(currentUser *utils.AuthContext, required []string, overrides []string) error {
+	if currentUser == nil {
+		return apperrors.Unauthorized("missing authenticated user")
+	}
+	for _, permission := range overrides {
+		if hasPermission(currentUser, permission) {
+			return nil
+		}
+	}
+	for _, permission := range required {
+		if !hasPermission(currentUser, permission) {
+			return apperrors.Forbidden("missing required permission")
+		}
+	}
+	return nil
+}
+
+func hasPermission(currentUser *utils.AuthContext, permission string) bool {
+	for _, existing := range currentUser.Permissions {
+		if existing == permission {
+			return true
+		}
+	}
+	return false
 }

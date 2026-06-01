@@ -86,32 +86,86 @@ type TaxRateResponse struct {
 }
 
 type CreatePaymentMethodRequest struct {
-	MethodName        string `json:"method_name" binding:"required"`
-	MethodType        string `json:"method_type" binding:"required"`
-	IsDefault         bool   `json:"is_default"`
-	AllowSplitPayment bool   `json:"allow_split_payment"`
-	RequiresReference bool   `json:"requires_reference"`
+	MethodName                string  `json:"method_name" binding:"required"`
+	MethodType                string  `json:"method_type" binding:"required"`
+	IsDefault                 bool    `json:"is_default"`
+	AllowSplitPayment         bool    `json:"allow_split_payment"`
+	RequiresReference         bool    `json:"requires_reference"`
+	ShowInPOS                 *bool   `json:"show_in_pos"`
+	ShowInBakeryOrders        *bool   `json:"show_in_bakery_orders"`
+	ShowInPurchasing          *bool   `json:"show_in_purchasing"`
+	ShowInExpenses            *bool   `json:"show_in_expenses"`
+	ShowInDashboardCollection *bool   `json:"show_in_dashboard_collection"`
+	DefaultPaymentAccountID   *string `json:"default_payment_account_id"`
 }
 
 type UpdatePaymentMethodRequest struct {
-	MethodName        string `json:"method_name"`
-	MethodType        string `json:"method_type"`
-	IsDefault         *bool  `json:"is_default"`
-	AllowSplitPayment *bool  `json:"allow_split_payment"`
-	RequiresReference *bool  `json:"requires_reference"`
+	MethodName                string  `json:"method_name"`
+	MethodType                string  `json:"method_type"`
+	IsDefault                 *bool   `json:"is_default"`
+	AllowSplitPayment         *bool   `json:"allow_split_payment"`
+	RequiresReference         *bool   `json:"requires_reference"`
+	ShowInPOS                 *bool   `json:"show_in_pos"`
+	ShowInBakeryOrders        *bool   `json:"show_in_bakery_orders"`
+	ShowInPurchasing          *bool   `json:"show_in_purchasing"`
+	ShowInExpenses            *bool   `json:"show_in_expenses"`
+	ShowInDashboardCollection *bool   `json:"show_in_dashboard_collection"`
+	DefaultPaymentAccountID   *string `json:"default_payment_account_id"`
 }
 
 type PaymentMethodResponse struct {
-	ID                string    `json:"id"`
-	BusinessID        string    `json:"business_id"`
-	MethodName        string    `json:"method_name"`
-	MethodType        string    `json:"method_type"`
-	IsDefault         bool      `json:"is_default"`
-	AllowSplitPayment bool      `json:"allow_split_payment"`
-	RequiresReference bool      `json:"requires_reference"`
-	Status            string    `json:"status"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                        string    `json:"id"`
+	BusinessID                string    `json:"business_id"`
+	MethodName                string    `json:"method_name"`
+	MethodType                string    `json:"method_type"`
+	IsDefault                 bool      `json:"is_default"`
+	AllowSplitPayment         bool      `json:"allow_split_payment"`
+	RequiresReference         bool      `json:"requires_reference"`
+	ShowInPOS                 bool      `json:"show_in_pos"`
+	ShowInBakeryOrders        bool      `json:"show_in_bakery_orders"`
+	ShowInPurchasing          bool      `json:"show_in_purchasing"`
+	ShowInExpenses            bool      `json:"show_in_expenses"`
+	ShowInDashboardCollection bool      `json:"show_in_dashboard_collection"`
+	DefaultPaymentAccountID   *string   `json:"default_payment_account_id"`
+	DefaultPaymentAccountName string    `json:"default_payment_account_name"`
+	Status                    string    `json:"status"`
+	CreatedAt                 time.Time `json:"created_at"`
+	UpdatedAt                 time.Time `json:"updated_at"`
+}
+
+type CreateSalesChannelRequest struct {
+	ChannelName                 string   `json:"channel_name" binding:"required"`
+	ChannelType                 string   `json:"channel_type" binding:"required"`
+	RequiresExternalOrderNumber bool     `json:"requires_external_order_number"`
+	DefaultPaymentMethodID      *string  `json:"default_payment_method_id"`
+	CommissionRate              *float64 `json:"commission_rate"`
+	IsDefault                   bool     `json:"is_default"`
+	Status                      string   `json:"status"`
+}
+
+type UpdateSalesChannelRequest struct {
+	ChannelName                 string   `json:"channel_name"`
+	ChannelType                 string   `json:"channel_type"`
+	RequiresExternalOrderNumber *bool    `json:"requires_external_order_number"`
+	DefaultPaymentMethodID      *string  `json:"default_payment_method_id"`
+	CommissionRate              *float64 `json:"commission_rate"`
+	IsDefault                   *bool    `json:"is_default"`
+	Status                      string   `json:"status" binding:"omitempty,oneof=active inactive"`
+}
+
+type SalesChannelResponse struct {
+	ID                          string    `json:"id"`
+	BusinessID                  string    `json:"business_id"`
+	ChannelName                 string    `json:"channel_name"`
+	ChannelType                 string    `json:"channel_type"`
+	RequiresExternalOrderNumber bool      `json:"requires_external_order_number"`
+	DefaultPaymentMethodID      *string   `json:"default_payment_method_id"`
+	DefaultPaymentMethodName    string    `json:"default_payment_method_name"`
+	CommissionRate              *float64  `json:"commission_rate"`
+	IsDefault                   bool      `json:"is_default"`
+	Status                      string    `json:"status"`
+	CreatedAt                   time.Time `json:"created_at"`
+	UpdatedAt                   time.Time `json:"updated_at"`
 }
 
 type CreateReceiptLayoutRequest struct {

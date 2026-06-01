@@ -18,6 +18,7 @@ dist/
 .build/
 .next/
 out/
+.codex-e2e/
 
 # Environment files
 .env*

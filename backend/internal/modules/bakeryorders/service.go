@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
 	"pastries-pos/internal/modules/manufacturing"
 	apperrors "pastries-pos/internal/shared/errors"
@@ -21,12 +22,14 @@ type Service struct {
 	repo                 *Repository
 	auditRepo            *audit.Repository
 	manufacturingService *manufacturing.Service
+	accountingService    *accounting.Service
 }
 
-func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository, manufacturingService ...*manufacturing.Service) *Service {
+func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository, manufacturingService *manufacturing.Service, accountingService ...*accounting.Service) *Service {
 	service := &Service{db: db, repo: repo, auditRepo: auditRepo}
-	if len(manufacturingService) > 0 {
-		service.manufacturingService = manufacturingService[0]
+	service.manufacturingService = manufacturingService
+	if len(accountingService) > 0 {
+		service.accountingService = accountingService[0]
 	}
 	return service
 }
@@ -128,6 +131,24 @@ func (s *Service) UpdateOrder(currentUser *utils.AuthContext, id string, req Upd
 		if req.CustomerPhone != nil {
 			updates["customer_phone_snapshot"] = strings.TrimSpace(*req.CustomerPhone)
 		}
+		if req.SalesChannelID != nil || req.ExternalOrderNumber != nil {
+			requestedChannelID := order.SalesChannelID
+			if req.SalesChannelID != nil {
+				cleaned := strings.TrimSpace(*req.SalesChannelID)
+				requestedChannelID = &cleaned
+			}
+			externalNumber := order.ExternalOrderNumber
+			if req.ExternalOrderNumber != nil {
+				externalNumber = strings.TrimSpace(*req.ExternalOrderNumber)
+			}
+			channel, resolvedExternalNumber, err := s.resolveSalesChannel(tx, currentUser.BusinessID, requestedChannelID, externalNumber)
+			if err != nil {
+				return err
+			}
+			updates["sales_channel_id"] = channel.ID
+			updates["sales_channel_name_snapshot"] = channel.ChannelName
+			updates["external_order_number"] = resolvedExternalNumber
+		}
 		if req.OrderType != nil {
 			value := strings.TrimSpace(*req.OrderType)
 			if !validOrderType(value) {
@@ -178,6 +199,11 @@ func (s *Service) UpdateStatus(currentUser *utils.AuthContext, id string, req Up
 		}
 		if err := s.repo.UpdateOrder(tx, id, currentUser.BusinessID, map[string]interface{}{"order_status": status, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}); err != nil {
 			return err
+		}
+		if status == "completed" && s.accountingService != nil {
+			if _, err := s.accountingService.PostBakeryOrderRevenueJournal(tx, currentUser, id); err != nil {
+				return err
+			}
 		}
 		return s.audit(tx, currentUser, "bakery_order.status_updated", id, "Bakery order status updated", ipAddress, userAgent)
 	})
@@ -296,6 +322,207 @@ func (s *Service) DeleteItem(currentUser *utils.AuthContext, orderID, itemID, ip
 	return s.GetOrder(currentUser, orderID)
 }
 
+func (s *Service) ConvertItemToProduct(currentUser *utils.AuthContext, orderID, itemID string, req ConvertItemToProductRequest, ipAddress, userAgent string) (*BakeryOrderResponse, error) {
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		order, item, err := s.lockCustomItemForConversion(tx, currentUser, orderID, itemID)
+		if err != nil {
+			return err
+		}
+		productName := strings.TrimSpace(req.ProductName)
+		if productName == "" {
+			productName = item.ItemNameSnapshot
+		}
+		if productName == "" {
+			return apperrors.BadRequest("product_name is required", nil)
+		}
+		if err := validateUUID(req.CategoryID, "category_id"); err != nil {
+			return err
+		}
+		if err := validateUUID(req.UnitID, "unit_id"); err != nil {
+			return err
+		}
+		if err := s.repo.ValidateProductCategory(tx, currentUser.BusinessID, order.BranchID, req.CategoryID); err != nil {
+			return notFound(err, "product category not found")
+		}
+		if err := s.repo.ValidateUnit(tx, currentUser.BusinessID, req.UnitID); err != nil {
+			return notFound(err, "unit not found")
+		}
+		productType := strings.TrimSpace(req.ProductType)
+		if productType == "" {
+			productType = "made_to_order"
+		}
+		if !validProductType(productType) {
+			return apperrors.BadRequest("invalid product_type", nil)
+		}
+		status := strings.TrimSpace(req.Status)
+		if status == "" {
+			status = "active"
+		}
+		if !validCatalogStatus(status) {
+			return apperrors.BadRequest("invalid status", nil)
+		}
+		if req.SalePrice < 0 {
+			return apperrors.BadRequest("sale_price must be >= 0", nil)
+		}
+		if req.CostPrice != nil && *req.CostPrice < 0 {
+			return apperrors.BadRequest("cost_price must be >= 0", nil)
+		}
+		productCode := strings.TrimSpace(req.ProductCode)
+		if productCode == "" {
+			code, err := s.repo.NextProductCode(tx, currentUser.BusinessID, order.BranchID)
+			if err != nil {
+				return apperrors.Internal("failed to generate product code")
+			}
+			productCode = code
+		}
+		if err := s.validateCatalogProductCodes(tx, currentUser.BusinessID, order.BranchID, productCode, req.SKU, req.Barcode); err != nil {
+			return err
+		}
+		showInPOS := true
+		if req.ShowInPOS != nil {
+			showInPOS = *req.ShowInPOS
+		}
+		now := time.Now().UTC()
+		productID := utils.NewUUID()
+		product := &catalogProductCreate{
+			ID:                     productID,
+			BusinessID:             currentUser.BusinessID,
+			BranchID:               order.BranchID,
+			CategoryID:             req.CategoryID,
+			UnitID:                 req.UnitID,
+			ProductName:            productName,
+			ProductCode:            productCode,
+			SKU:                    strings.TrimSpace(req.SKU),
+			Barcode:                strings.TrimSpace(req.Barcode),
+			Description:            strings.TrimSpace(req.Description),
+			ProductType:            productType,
+			SalePrice:              roundMoney(req.SalePrice),
+			CostPrice:              req.CostPrice,
+			IsPOSVisible:           showInPOS,
+			IsStockTracked:         req.IsStockTracked,
+			IsExpiryTracked:        req.IsExpiryTracked,
+			IsCustomOrderAvailable: req.IsCustomOrderAvailable,
+			Status:                 status,
+			CreatedBy:              currentUser.UserID,
+			UpdatedBy:              currentUser.UserID,
+			CreatedAt:              now,
+			UpdatedAt:              now,
+		}
+		if err := s.repo.CreateCatalogProduct(tx, product); err != nil {
+			return apperrors.Internal("failed to create product")
+		}
+		if err := s.repo.UpdateItem(tx, item.ID, order.ID, currentUser.BusinessID, map[string]interface{}{
+			"product_id":                    productID,
+			"product_variant_id":            nil,
+			"product_name_snapshot":         productName,
+			"product_variant_name_snapshot": "",
+			"item_name_snapshot":            productName,
+			"item_source":                   "catalog",
+			"unit_id":                       req.UnitID,
+			"updated_at":                    now,
+		}); err != nil {
+			return err
+		}
+		if err := s.auditEntity(tx, currentUser, "product.created", "product", productID, "Product created from bakery order item", ipAddress, userAgent); err != nil {
+			return err
+		}
+		return s.audit(tx, currentUser, "bakery_order.item_converted_to_product", order.ID, "Bakery order item converted to product", ipAddress, userAgent)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetOrder(currentUser, orderID)
+}
+
+func (s *Service) ConvertItemToVariant(currentUser *utils.AuthContext, orderID, itemID string, req ConvertItemToVariantRequest, ipAddress, userAgent string) (*BakeryOrderResponse, error) {
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		order, item, err := s.lockCustomItemForConversion(tx, currentUser, orderID, itemID)
+		if err != nil {
+			return err
+		}
+		if err := validateUUID(req.ProductID, "product_id"); err != nil {
+			return err
+		}
+		if err := validateUUID(req.UnitID, "unit_id"); err != nil {
+			return err
+		}
+		product, err := s.repo.Product(tx, currentUser.BusinessID, order.BranchID, req.ProductID)
+		if err != nil {
+			return notFound(err, "product not found")
+		}
+		if product.Status != "active" {
+			return apperrors.BadRequest("product is not active", nil)
+		}
+		if req.UnitID != product.UnitID {
+			return apperrors.BadRequest("unit_id must match the selected product unit", nil)
+		}
+		variantName := strings.TrimSpace(req.VariantName)
+		if variantName == "" {
+			variantName = item.ItemNameSnapshot
+		}
+		if variantName == "" {
+			return apperrors.BadRequest("variant_name is required", nil)
+		}
+		if req.SalePrice < 0 {
+			return apperrors.BadRequest("sale_price must be >= 0", nil)
+		}
+		if req.CostPrice != nil && *req.CostPrice < 0 {
+			return apperrors.BadRequest("cost_price must be >= 0", nil)
+		}
+		if err := s.validateCatalogVariantCodes(tx, currentUser.BusinessID, order.BranchID, req.SKU, req.Barcode); err != nil {
+			return err
+		}
+		showInPOS := false
+		if req.ShowInPOS != nil {
+			showInPOS = *req.ShowInPOS
+		}
+		now := time.Now().UTC()
+		variantID := utils.NewUUID()
+		variant := &catalogVariantCreate{
+			ID:          variantID,
+			BusinessID:  currentUser.BusinessID,
+			ProductID:   product.ID,
+			VariantName: variantName,
+			SKU:         strings.TrimSpace(req.SKU),
+			Barcode:     strings.TrimSpace(req.Barcode),
+			SalePrice:   roundMoney(req.SalePrice),
+			CostPrice:   req.CostPrice,
+			Status:      "active",
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+		if err := s.repo.CreateCatalogVariant(tx, variant); err != nil {
+			return apperrors.Internal("failed to create product variant")
+		}
+		if showInPOS && !product.IsPOSVisible {
+			if err := s.repo.UpdateProductVisibility(tx, currentUser.BusinessID, order.BranchID, product.ID, true); err != nil {
+				return apperrors.Internal("failed to update product visibility")
+			}
+		}
+		itemName := strings.TrimSpace(product.ProductName + " - " + variantName)
+		if err := s.repo.UpdateItem(tx, item.ID, order.ID, currentUser.BusinessID, map[string]interface{}{
+			"product_id":                    product.ID,
+			"product_variant_id":            variantID,
+			"product_name_snapshot":         product.ProductName,
+			"product_variant_name_snapshot": variantName,
+			"item_name_snapshot":            itemName,
+			"item_source":                   "catalog",
+			"unit_id":                       req.UnitID,
+			"updated_at":                    now,
+		}); err != nil {
+			return err
+		}
+		if err := s.auditEntity(tx, currentUser, "product_variant.created", "product_variant", variantID, "Product variant created from bakery order item", ipAddress, userAgent); err != nil {
+			return err
+		}
+		return s.audit(tx, currentUser, "bakery_order.item_converted_to_variant", order.ID, "Bakery order item converted to product variant", ipAddress, userAgent)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetOrder(currentUser, orderID)
+}
+
 func (s *Service) ListPayments(currentUser *utils.AuthContext, orderID string) ([]BakeryOrderPaymentResponse, error) {
 	order, err := s.repo.FindOrder(orderID, currentUser.BusinessID)
 	if err != nil {
@@ -332,6 +559,9 @@ func (s *Service) AddPayment(currentUser *utils.AuthContext, orderID string, req
 		if err != nil {
 			return notFound(err, "payment method not found")
 		}
+		if !method.ShowInBakeryOrders {
+			return apperrors.BadRequest("payment method is not enabled for bakery orders", nil)
+		}
 		if method.RequiresReference && strings.TrimSpace(req.ReferenceNumber) == "" {
 			return apperrors.BadRequest("reference_number is required for this payment method", nil)
 		}
@@ -342,6 +572,11 @@ func (s *Service) AddPayment(currentUser *utils.AuthContext, orderID string, req
 		payment := &BakeryOrderPayment{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BakeryOrderID: orderID, PaymentMethodID: method.ID, PaymentMethodNameSnapshot: method.MethodName, Amount: roundMoney(req.Amount), ReferenceNumber: strings.TrimSpace(req.ReferenceNumber), PaymentType: req.PaymentType, PaidByUserID: currentUser.UserID, PaidAt: now}
 		if err := s.repo.CreatePayment(tx, payment); err != nil {
 			return err
+		}
+		if s.accountingService != nil {
+			if _, err := s.accountingService.PostBakeryOrderPaymentJournal(tx, currentUser, payment.ID); err != nil {
+				return err
+			}
 		}
 		paid := roundMoney(order.PaidAmount + payment.Amount)
 		if paid > order.TotalAmount {
@@ -606,6 +841,10 @@ func (s *Service) buildOrder(tx *gorm.DB, currentUser *utils.AuthContext, req Cr
 		customerName = customer.FullName
 		customerPhone = customer.Phone
 	}
+	salesChannel, externalOrderNumber, err := s.resolveSalesChannel(tx, currentUser.BusinessID, cleanStringPointer(req.SalesChannelID), req.ExternalOrderNumber)
+	if err != nil {
+		return nil, nil, err
+	}
 	orderID := utils.NewUUID()
 	items := make([]BakeryOrderItem, 0, len(req.Items))
 	for _, itemReq := range req.Items {
@@ -616,7 +855,7 @@ func (s *Service) buildOrder(tx *gorm.DB, currentUser *utils.AuthContext, req Cr
 		items = append(items, *item)
 	}
 	subtotal, discount, tax, total := orderTotals(items)
-	order := &BakeryOrder{ID: orderID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, CustomerID: customerID, CustomerNameSnapshot: customerName, CustomerPhoneSnapshot: customerPhone, OrderType: orderType, OrderDate: dateOnly(time.Now().UTC()), EventDate: eventDate, PickupTime: strings.TrimSpace(req.PickupTime), DeliveryTime: strings.TrimSpace(req.DeliveryTime), DeliveryAddress: strings.TrimSpace(req.DeliveryAddr), SubtotalAmount: subtotal, DiscountAmount: discount, TaxAmount: tax, TotalAmount: total, PaidAmount: 0, BalanceAmount: total, PaymentStatus: "unpaid", OrderStatus: "new", Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}
+	order := &BakeryOrder{ID: orderID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, CustomerID: customerID, SalesChannelID: &salesChannel.ID, SalesChannelNameSnapshot: salesChannel.ChannelName, ExternalOrderNumber: externalOrderNumber, CustomerNameSnapshot: customerName, CustomerPhoneSnapshot: customerPhone, OrderType: orderType, OrderDate: dateOnly(time.Now().UTC()), EventDate: eventDate, PickupTime: strings.TrimSpace(req.PickupTime), DeliveryTime: strings.TrimSpace(req.DeliveryTime), DeliveryAddress: strings.TrimSpace(req.DeliveryAddr), SubtotalAmount: subtotal, DiscountAmount: discount, TaxAmount: tax, TotalAmount: total, PaidAmount: 0, BalanceAmount: total, PaymentStatus: "unpaid", OrderStatus: "new", Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}
 	return order, items, nil
 }
 
@@ -728,6 +967,36 @@ func (s *Service) buildOrderItem(tx *gorm.DB, businessID, branchID, orderID stri
 	return &BakeryOrderItem{ID: utils.NewUUID(), BusinessID: businessID, BakeryOrderID: orderID, ProductID: productID, ProductVariantID: productVariantID, ProductNameSnapshot: productName, ProductVariantNameSnapshot: variantName, ItemNameSnapshot: itemName, ItemSource: itemSource, Quantity: roundQuantity(req.Quantity), UnitID: req.UnitID, Weight: weight, Flavor: strings.TrimSpace(req.Flavor), DesignNotes: strings.TrimSpace(req.DesignNotes), MessageText: strings.TrimSpace(req.MessageText), CustomizationsJSON: customizations, UnitPrice: roundMoney(unitPrice), DiscountAmount: roundMoney(req.DiscountAmount), TaxRateID: taxRateID, TaxAmount: taxAmount, LineTotal: lineTotal}, nil
 }
 
+func (s *Service) resolveSalesChannel(tx *gorm.DB, businessID string, requestedID *string, requestedExternalNumber string) (*salesChannelRow, string, error) {
+	channelID := ""
+	if requestedID != nil {
+		channelID = strings.TrimSpace(*requestedID)
+	}
+
+	var channel *salesChannelRow
+	var err error
+	if channelID != "" {
+		if err := validateUUID(channelID, "sales_channel_id"); err != nil {
+			return nil, "", err
+		}
+		channel, err = s.repo.SalesChannel(tx, businessID, channelID)
+		if err != nil {
+			return nil, "", notFound(err, "sales channel not found")
+		}
+	} else {
+		channel, err = s.repo.DefaultSalesChannel(tx, businessID)
+		if err != nil {
+			return nil, "", notFound(err, "default sales channel not found")
+		}
+	}
+
+	externalNumber := strings.TrimSpace(requestedExternalNumber)
+	if channel.RequiresExternalOrderNumber && externalNumber == "" {
+		return nil, "", apperrors.BadRequest("external_order_number is required for the selected sales channel", nil)
+	}
+	return channel, externalNumber, nil
+}
+
 func (s *Service) resolveProductionRecipe(tx *gorm.DB, businessID, branchID string, item *BakeryOrderItem, requestedRecipeID string) (*recipeProductionRow, error) {
 	recipeID := strings.TrimSpace(requestedRecipeID)
 	if item.ItemSource == "custom" {
@@ -787,6 +1056,94 @@ func (s *Service) validCustomer(tx *gorm.DB, businessID, branchID, customerID st
 	return customer, nil
 }
 
+func (s *Service) lockCustomItemForConversion(tx *gorm.DB, currentUser *utils.AuthContext, orderID, itemID string) (*BakeryOrder, *BakeryOrderItem, error) {
+	order, err := s.repo.FindOrderForUpdate(tx, orderID, currentUser.BusinessID)
+	if err != nil {
+		return nil, nil, notFound(err, "bakery order not found")
+	}
+	if !currentUser.CanAccessBranch(order.BranchID) {
+		return nil, nil, apperrors.Forbidden("branch access denied")
+	}
+	if order.OrderStatus == "cancelled" {
+		return nil, nil, apperrors.BadRequest("cancelled orders cannot be converted to catalog items", nil)
+	}
+	item, err := s.repo.FindItemForUpdate(tx, currentUser.BusinessID, orderID, itemID)
+	if err != nil {
+		return nil, nil, notFound(err, "bakery order item not found")
+	}
+	if item.ItemSource != "custom" {
+		return nil, nil, apperrors.BadRequest("only custom bakery order items can be converted", nil)
+	}
+	if item.ProductID != nil || item.ProductVariantID != nil {
+		return nil, nil, apperrors.BadRequest("bakery order item is already linked to catalog", nil)
+	}
+	return order, item, nil
+}
+
+func (s *Service) validateCatalogProductCodes(tx *gorm.DB, businessID, branchID, productCode, sku, barcode string) error {
+	if strings.TrimSpace(productCode) == "" {
+		return apperrors.BadRequest("product_code is required", nil)
+	}
+	exists, err := s.repo.ProductValueExists(tx, businessID, branchID, "product_code", productCode)
+	if err != nil {
+		return apperrors.Internal("failed to validate product_code")
+	}
+	if exists {
+		return apperrors.Conflict("product_code already exists", nil)
+	}
+	for _, check := range []struct {
+		column  string
+		value   string
+		message string
+	}{
+		{column: "sku", value: sku, message: "sku already exists"},
+		{column: "barcode", value: barcode, message: "barcode already exists"},
+	} {
+		if strings.TrimSpace(check.value) == "" {
+			continue
+		}
+		productExists, err := s.repo.ProductValueExists(tx, businessID, branchID, check.column, check.value)
+		if err != nil {
+			return apperrors.Internal("failed to validate " + check.column)
+		}
+		variantExists, err := s.repo.VariantValueExists(tx, businessID, check.column, check.value)
+		if err != nil {
+			return apperrors.Internal("failed to validate " + check.column)
+		}
+		if productExists || variantExists {
+			return apperrors.Conflict(check.message, nil)
+		}
+	}
+	return nil
+}
+
+func (s *Service) validateCatalogVariantCodes(tx *gorm.DB, businessID, branchID, sku, barcode string) error {
+	for _, check := range []struct {
+		column  string
+		value   string
+		message string
+	}{
+		{column: "sku", value: sku, message: "sku already exists"},
+		{column: "barcode", value: barcode, message: "barcode already exists"},
+	} {
+		if strings.TrimSpace(check.value) == "" {
+			continue
+		}
+		productExists, err := s.repo.ProductValueExists(tx, businessID, branchID, check.column, check.value)
+		if err != nil {
+			return apperrors.Internal("failed to validate " + check.column)
+		}
+		variantExists, err := s.repo.VariantValueExists(tx, businessID, check.column, check.value)
+		if err != nil {
+			return apperrors.Internal("failed to validate " + check.column)
+		}
+		if productExists || variantExists {
+			return apperrors.Conflict(check.message, nil)
+		}
+	}
+	return nil
+}
+
 func (s *Service) recalculateOrderTotals(tx *gorm.DB, businessID, orderID string) error {
 	order, err := s.repo.FindOrderForUpdate(tx, orderID, businessID)
 	if err != nil {
@@ -804,7 +1161,7 @@ func (s *Service) recalculateOrderTotals(tx *gorm.DB, businessID, orderID string
 }
 
 func (s *Service) orderResponse(businessID string, order BakeryOrder, includeDetails bool) BakeryOrderResponse {
-	response := BakeryOrderResponse{ID: order.ID, BusinessID: order.BusinessID, BranchID: order.BranchID, BranchName: s.repo.BranchName(businessID, order.BranchID), OrderNumber: order.OrderNumber, CustomerID: order.CustomerID, CustomerNameSnapshot: order.CustomerNameSnapshot, CustomerPhoneSnapshot: order.CustomerPhoneSnapshot, OrderType: order.OrderType, OrderDate: order.OrderDate, EventDate: order.EventDate, PickupTime: order.PickupTime, DeliveryTime: order.DeliveryTime, DeliveryAddress: order.DeliveryAddress, SubtotalAmount: roundMoney(order.SubtotalAmount), DiscountAmount: roundMoney(order.DiscountAmount), TaxAmount: roundMoney(order.TaxAmount), TotalAmount: roundMoney(order.TotalAmount), PaidAmount: roundMoney(order.PaidAmount), BalanceAmount: roundMoney(order.BalanceAmount), PaymentStatus: order.PaymentStatus, OrderStatus: order.OrderStatus, Notes: order.Notes, CreatedByUserID: order.CreatedByUserID, CreatedByUserName: s.repo.UserName(order.CreatedByUserID), CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt}
+	response := BakeryOrderResponse{ID: order.ID, BusinessID: order.BusinessID, BranchID: order.BranchID, BranchName: s.repo.BranchName(businessID, order.BranchID), OrderNumber: order.OrderNumber, CustomerID: order.CustomerID, SalesChannelID: order.SalesChannelID, SalesChannelNameSnapshot: order.SalesChannelNameSnapshot, ExternalOrderNumber: order.ExternalOrderNumber, CustomerNameSnapshot: order.CustomerNameSnapshot, CustomerPhoneSnapshot: order.CustomerPhoneSnapshot, OrderType: order.OrderType, OrderDate: order.OrderDate, EventDate: order.EventDate, PickupTime: order.PickupTime, DeliveryTime: order.DeliveryTime, DeliveryAddress: order.DeliveryAddress, SubtotalAmount: roundMoney(order.SubtotalAmount), DiscountAmount: roundMoney(order.DiscountAmount), TaxAmount: roundMoney(order.TaxAmount), TotalAmount: roundMoney(order.TotalAmount), PaidAmount: roundMoney(order.PaidAmount), BalanceAmount: roundMoney(order.BalanceAmount), PaymentStatus: order.PaymentStatus, OrderStatus: order.OrderStatus, AccountingJournalEntryID: order.AccountingJournalEntryID, Notes: order.Notes, CreatedByUserID: order.CreatedByUserID, CreatedByUserName: s.repo.UserName(order.CreatedByUserID), CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt}
 	if includeDetails {
 		items, _ := s.repo.Items(businessID, order.ID)
 		response.Items = s.itemResponses(businessID, items)
@@ -838,6 +1195,10 @@ func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, 
 	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: "bakery_order", EntityID: entityID, Summary: summary, IPAddress: ipAddress, UserAgent: userAgent})
 }
 
+func (s *Service) auditEntity(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityType, entityID, summary, ipAddress, userAgent string) error {
+	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: entityType, EntityID: entityID, Summary: summary, IPAddress: ipAddress, UserAgent: userAgent})
+}
+
 func orderTotals(items []BakeryOrderItem) (float64, float64, float64, float64) {
 	subtotal, discount, tax, total := 0.0, 0.0, 0.0, 0.0
 	for _, item := range items {
@@ -865,7 +1226,7 @@ func normalizeQuery(query *OrderListQuery) {
 }
 
 func validateListQuery(query OrderListQuery) error {
-	for field, value := range map[string]string{"branch_id": query.BranchID, "customer_id": query.CustomerID} {
+	for field, value := range map[string]string{"branch_id": query.BranchID, "customer_id": query.CustomerID, "sales_channel_id": query.SalesChannelID} {
 		if strings.TrimSpace(value) != "" {
 			if err := validateUUID(value, field); err != nil {
 				return err
@@ -903,6 +1264,14 @@ func setStringUpdate(updates map[string]interface{}, column string, value *strin
 	if value != nil {
 		updates[column] = strings.TrimSpace(*value)
 	}
+}
+
+func cleanStringPointer(value string) *string {
+	cleaned := strings.TrimSpace(value)
+	if cleaned == "" {
+		return nil
+	}
+	return &cleaned
 }
 
 func normalizeJSON(raw json.RawMessage) (*string, error) {
@@ -1017,6 +1386,24 @@ func validPaymentStatus(value string) bool {
 
 func validPaymentType(value string) bool {
 	return value == "deposit" || value == "balance" || value == "full"
+}
+
+func validProductType(value string) bool {
+	switch value {
+	case "ready_to_sell", "made_to_order", "manufactured", "retail", "service":
+		return true
+	default:
+		return false
+	}
+}
+
+func validCatalogStatus(value string) bool {
+	switch value {
+	case "active", "inactive", "archived":
+		return true
+	default:
+		return false
+	}
 }
 
 func validProductionStatus(value string) bool {

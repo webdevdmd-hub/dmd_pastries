@@ -35,7 +35,7 @@ type UpdateStatusRequest struct {
 }
 
 type CopyCategoriesRequest struct {
-	CategoryType   string `json:"category_type" binding:"required,oneof=product_categories ingredient_categories packaging_categories supplier_categories"`
+	CategoryType   string `json:"category_type" binding:"required,oneof=product_categories ingredient_categories packaging_categories"`
 	SourceBranchID string `json:"source_branch_id" binding:"required,uuid"`
 }
 
@@ -181,7 +181,6 @@ type OverviewResponse struct {
 	ProductCategoriesCount    int64 `json:"product_categories_count"`
 	IngredientCategoriesCount int64 `json:"ingredient_categories_count"`
 	PackagingCategoriesCount  int64 `json:"packaging_categories_count"`
-	SupplierCategoriesCount   int64 `json:"supplier_categories_count"`
 	OrderStatusesCount        int64 `json:"order_statuses_count"`
 	PaymentStatusesCount      int64 `json:"payment_statuses_count"`
 }

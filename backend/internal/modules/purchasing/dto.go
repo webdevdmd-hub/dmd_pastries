@@ -32,6 +32,17 @@ type PaymentListQuery struct {
 	SortOrder       string
 }
 
+type ConvertPurchaseOrderToInvoiceRequest struct {
+	InvoiceDate string `json:"invoice_date"`
+	DueDate     string `json:"due_date"`
+	Notes       string `json:"notes"`
+}
+
+type ConvertPurchaseInvoiceToReceiptRequest struct {
+	ReceivedDate string `json:"received_date"`
+	Notes        string `json:"notes"`
+}
+
 type CreatePurchaseOrderRequest struct {
 	BranchID             string                   `json:"branch_id" binding:"required"`
 	SupplierID           string                   `json:"supplier_id" binding:"required"`
@@ -247,6 +258,27 @@ type PurchaseInvoicePaymentResponse struct {
 	Notes             string    `json:"notes"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+type PurchasingDocumentChainResponse struct {
+	PurchaseOrder    *PurchaseDocumentChainItem  `json:"purchase_order"`
+	PurchaseInvoices []PurchaseDocumentChainItem `json:"purchase_invoices"`
+	PurchaseReceipts []PurchaseDocumentChainItem `json:"purchase_receipts"`
+	SupplierPayments []PurchaseDocumentChainItem `json:"supplier_payments"`
+}
+
+type PurchaseDocumentChainItem struct {
+	ID                string    `json:"id"`
+	DocumentNumber    string    `json:"document_number"`
+	DocumentType      string    `json:"document_type"`
+	Status            string    `json:"status"`
+	Date              time.Time `json:"date"`
+	TotalAmount       float64   `json:"total_amount"`
+	PurchaseOrderID   *string   `json:"purchase_order_id,omitempty"`
+	PurchaseInvoiceID *string   `json:"purchase_invoice_id,omitempty"`
+	PurchaseReceiptID *string   `json:"purchase_receipt_id,omitempty"`
+	PreviousID        *string   `json:"previous_id,omitempty"`
+	NextID            *string   `json:"next_id,omitempty"`
 }
 
 type PurchaseReceiptResponse struct {
