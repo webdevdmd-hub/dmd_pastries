@@ -15,9 +15,9 @@ type AppCardProps = {
 };
 
 const toneClasses: Record<AppCardTone, string> = {
-  default: "bg-white/75",
-  warm: "bg-brand-cappuccino/30",
-  white: "bg-white/90",
+  default: "bg-workspace-panel",
+  warm: "bg-brand-latte",
+  white: "bg-workspace-panel",
   danger: "border-red-200 bg-red-50/80",
   success: "border-emerald-200 bg-emerald-50/80",
   warning: "border-amber-200 bg-amber-50/80",

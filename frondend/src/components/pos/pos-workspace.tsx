@@ -509,6 +509,7 @@ export function POSWorkspace(): JSX.Element {
     <POSCartPanel
       canSell={canSell}
       customerId={customerId}
+      externalOrderNumber={externalOrderNumber}
       isCheckingOut={checkoutMutation.isPending}
       items={cart.items}
       onCheckout={() => setCheckoutOpen(true)}
@@ -518,18 +519,22 @@ export function POSWorkspace(): JSX.Element {
         }
       }}
       onCustomerChange={setCustomerId}
+      onExternalOrderNumberChange={setExternalOrderNumber}
       onHoldSale={() => setHoldOpen(true)}
       onLineDiscountChange={cart.applyLineDiscount}
       onQuantityChange={cart.updateQuantity}
       onRemoveItem={cart.removeItem}
+      onSalesChannelChange={setSalesChannelId}
+      salesChannelId={salesChannelId}
+      salesChannels={salesChannels}
       totals={cart.totals}
     />
   );
 
   return (
-    <div className="flex h-screen min-h-[42rem] w-full flex-col overflow-hidden rounded-[2rem] border border-brand-cappuccino/70 bg-[radial-gradient(circle_at_top_left,_rgba(214,191,166,0.38),_transparent_34%),linear-gradient(135deg,_#F3E9D7_0%,_#fffaf1_48%,_#F3E9D7_100%)] text-brand-espresso shadow-soft">
+    <div className="flex h-screen min-h-[42rem] w-full flex-col overflow-hidden bg-[#f9f9fa] font-sans text-[#09090b]">
       <POSTopBar branchName={branchName} cashierName={user?.fullName ?? "Cashier"} />
-      <main className="grid min-h-0 flex-1 gap-4 p-5 lg:grid-cols-[170px_minmax(0,1fr)_440px] xl:grid-cols-[180px_minmax(0,1fr)_460px] 2xl:grid-cols-[190px_minmax(0,1fr)_480px]">
+      <main className="grid min-h-0 flex-1 border-y border-[#d4d4d8] lg:grid-cols-[88px_minmax(0,1fr)_420px] xl:grid-cols-[96px_minmax(0,1fr)_440px]">
         {!branchScope.hasBranchScope ? (
           <section className="col-span-full flex items-center justify-center">
             <div className="w-full max-w-2xl">
@@ -546,8 +551,8 @@ export function POSWorkspace(): JSX.Element {
               />
             </div>
 
-            <section className="scrollbar-hidden min-h-0 overflow-y-auto rounded-[2rem] border border-brand-cappuccino/70 bg-white/45 p-4 shadow-[0_24px_80px_rgba(59,42,34,0.08)] backdrop-blur">
-              <div className="sticky top-0 z-10 mb-5 grid gap-3 rounded-[1.7rem] bg-white/90 p-3 shadow-sm backdrop-blur md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
+            <section className="scrollbar-hidden min-h-0 overflow-y-auto border-r border-[#d4d4d8] bg-[#f9f9fa]">
+              <div className="sticky top-0 z-10 grid gap-2 border-b border-[#d4d4d8] bg-white px-4 py-3 md:grid-cols-[minmax(0,1fr)_170px_auto_auto]">
                 <POSProductSearch onChange={setSearch} value={search} />
                 <POSBarcodeInput
                   inputRef={barcodeInputRef}
@@ -556,7 +561,7 @@ export function POSWorkspace(): JSX.Element {
                   }}
                 />
                 <Button
-                  className="h-11 rounded-2xl px-3 text-xs font-black"
+                  className="h-10 rounded-md border-[#d4d4d8] bg-white px-3 text-xs font-black text-[#09090b] shadow-none hover:bg-[#f4f4f5]"
                   disabled={!canCreateBakeryOrder}
                   onClick={() => setCreateOrderOpen(true)}
                   type="button"
@@ -565,7 +570,7 @@ export function POSWorkspace(): JSX.Element {
                   <CalendarPlus className="h-4 w-4" />
                   Create Order
                 </Button>
-                <label className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-brand-cappuccino bg-brand-latte/70 px-3 text-xs font-black text-brand-mocha md:justify-start">
+                <label className="flex h-10 items-center justify-center gap-2 rounded-md border border-[#d4d4d8] bg-white px-3 text-xs font-black text-[#3f3f46] md:justify-start">
                   <Checkbox
                     checked={showPrices}
                     onCheckedChange={(checked) => setShowPrices(checked === true)}
@@ -573,9 +578,9 @@ export function POSWorkspace(): JSX.Element {
                   Show prices
                 </label>
               </div>
-              <div className="mb-5 flex gap-2 overflow-x-auto lg:hidden">
+              <div className="flex gap-2 overflow-x-auto border-b border-[#d4d4d8] bg-white px-3 py-2 lg:hidden">
                 <Button
-                  className="rounded-2xl"
+                  className="rounded-md border-[#d4d4d8]"
                   onClick={() => setCategoryId("all")}
                   type="button"
                   variant={categoryId === "all" ? "default" : "outline"}
@@ -587,7 +592,7 @@ export function POSWorkspace(): JSX.Element {
 
                   return (
                     <Button
-                      className="rounded-2xl"
+                      className="rounded-md border-[#d4d4d8]"
                       key={category.id}
                       onClick={() => setCategoryId(category.id)}
                       type="button"
@@ -599,20 +604,24 @@ export function POSWorkspace(): JSX.Element {
                   );
                 })}
               </div>
-              <POSProductGrid
-                error={productsQuery.error}
-                isLoading={
-                  productsQuery.isLoading || (referenceQuery.isLoading && categories.length === 0)
-                }
-                onProductClick={addProduct}
-                onProductVariantsClick={openVariantChooser}
-                onRetry={() => {
-                  void productsQuery.refetch();
-                }}
-                products={products}
-                showPrices={showPrices}
-                stockByProductId={stockByProductId}
-              />
+              <div className="px-4 py-4">
+                <POSProductGrid
+                  canCreateOrder={canCreateBakeryOrder}
+                  error={productsQuery.error}
+                  isLoading={
+                    productsQuery.isLoading || (referenceQuery.isLoading && categories.length === 0)
+                  }
+                  onCreateOrder={() => setCreateOrderOpen(true)}
+                  onProductClick={addProduct}
+                  onProductVariantsClick={openVariantChooser}
+                  onRetry={() => {
+                    void productsQuery.refetch();
+                  }}
+                  products={products}
+                  showPrices={showPrices}
+                  stockByProductId={stockByProductId}
+                />
+              </div>
             </section>
 
             <div className="hidden min-h-0 lg:block">{cartPanel}</div>
@@ -620,8 +629,20 @@ export function POSWorkspace(): JSX.Element {
         )}
       </main>
 
+      <footer className="hidden h-8 shrink-0 items-center justify-between border-t border-[#d4d4d8] bg-[#e4e4e7] px-5 text-sm text-[#3f3f46] md:flex">
+        <p>
+          v2.4.1 Connected to Main Server <span className="mx-1">•</span>
+          <span className="font-black text-green-700">STABLE</span>
+        </p>
+        <div className="flex items-center gap-6">
+          <span>Support</span>
+          <span>Terminal Sync</span>
+          <span>Logout</span>
+        </div>
+      </footer>
+
       <Button
-        className="fixed bottom-4 right-4 z-20 h-14 rounded-full px-5 shadow-2xl lg:hidden"
+        className="fixed bottom-4 right-4 z-20 h-14 rounded-md bg-black px-5 font-black text-white shadow-lg hover:bg-[#18181b] lg:hidden"
         onClick={() => setMobileCartOpen(true)}
         type="button"
       >
@@ -630,7 +651,7 @@ export function POSWorkspace(): JSX.Element {
       </Button>
 
       <Sheet onOpenChange={setMobileCartOpen} open={mobileCartOpen}>
-        <SheetContent className="w-full bg-brand-latte p-3 sm:max-w-md" side="right">
+        <SheetContent className="w-full border-[#d4d4d8] bg-white p-0 sm:max-w-md" side="right">
           <SheetHeader className="sr-only">
             <SheetTitle>POS cart</SheetTitle>
             <SheetDescription>Review active cart items and checkout controls.</SheetDescription>
@@ -643,13 +664,13 @@ export function POSWorkspace(): JSX.Element {
         onOpenChange={(open) => !open && setVariantProduct(null)}
         open={variantProduct !== null}
       >
-        <DialogContent className="max-w-[34rem] rounded-[2rem] border-brand-cappuccino/80 bg-white/95 p-0 shadow-[0_28px_90px_rgba(59,42,34,0.22)] backdrop-blur">
-          <div className="rounded-t-[2rem] border-b border-brand-cappuccino/70 bg-brand-latte/65 px-5 py-4">
+        <DialogContent className="max-w-[34rem] rounded-lg border-[#d4d4d8] bg-white p-0 text-[#09090b] shadow-lg">
+          <div className="border-b border-[#d4d4d8] bg-[#fafafa] px-5 py-4">
             <DialogHeader>
-              <DialogTitle className="font-display text-2xl text-brand-espresso">
+              <DialogTitle className="text-2xl font-black tracking-tight">
                 Choose a variant
               </DialogTitle>
-              <DialogDescription className="text-brand-mocha">
+              <DialogDescription className="text-[#52525b]">
                 {variantProduct?.productName}
               </DialogDescription>
             </DialogHeader>
@@ -679,7 +700,7 @@ export function POSWorkspace(): JSX.Element {
 
                 return (
                   <Button
-                    className="h-auto items-center justify-between gap-4 rounded-[1.35rem] border-brand-cappuccino/75 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-brand-caramel hover:bg-brand-latte/35 hover:shadow-md disabled:translate-y-0 disabled:border-red-200 disabled:bg-red-50 disabled:text-red-800"
+                    className="h-auto items-center justify-between gap-4 rounded-lg border-[#d4d4d8] bg-white p-3 text-left shadow-none transition hover:border-[#71717a] hover:bg-[#fafafa] disabled:border-red-200 disabled:bg-red-50 disabled:text-red-800"
                     disabled={isOutOfStock}
                     key={variant.id}
                     onClick={() => {
@@ -689,7 +710,7 @@ export function POSWorkspace(): JSX.Element {
                     type="button"
                     variant="outline"
                   >
-                    <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1rem] border border-brand-cappuccino/60 bg-brand-latte text-brand-mocha shadow-sm">
+                    <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[#d4d4d8] bg-[#f4f4f5] text-[#71717a]">
                       {variantImageUrl ? (
                         <img alt="" className="h-full w-full object-cover" src={variantImageUrl} />
                       ) : (
@@ -697,11 +718,11 @@ export function POSWorkspace(): JSX.Element {
                       )}
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
-                      <span className="line-clamp-1 text-base font-black text-brand-espresso">
+                      <span className="line-clamp-1 text-base font-black text-[#09090b]">
                         {variant.variantName}
                       </span>
                       {metadata ? (
-                        <span className="line-clamp-1 text-xs font-medium text-brand-mocha">
+                        <span className="line-clamp-1 text-xs font-medium text-[#71717a]">
                           {metadata}
                         </span>
                       ) : null}
@@ -709,7 +730,7 @@ export function POSWorkspace(): JSX.Element {
                         className={
                           isOutOfStock
                             ? "rounded-full bg-red-100 px-2 py-0.5 text-[0.68rem] font-black text-red-700"
-                            : "rounded-full bg-brand-latte px-2 py-0.5 text-[0.68rem] font-black text-brand-mocha"
+                            : "rounded-md bg-[#f4f4f5] px-2 py-0.5 text-[0.68rem] font-black text-[#52525b]"
                         }
                       >
                         {stockLabel}
@@ -717,11 +738,11 @@ export function POSWorkspace(): JSX.Element {
                     </span>
                     <span className="flex shrink-0 flex-col items-end gap-1">
                       {showPrices ? (
-                        <span className="text-base font-black text-brand-espresso">
+                        <span className="font-mono text-base font-black text-[#09090b]">
                           AED {variant.salePrice.toFixed(2)}
                         </span>
                       ) : null}
-                      <span className="rounded-full bg-brand-caramel px-3 py-1 text-[0.68rem] font-black text-white">
+                      <span className="rounded-md bg-black px-3 py-1 text-[0.68rem] font-black text-white">
                         Select
                       </span>
                     </span>
@@ -738,11 +759,9 @@ export function POSWorkspace(): JSX.Element {
         onConfirm={() => {
           void submitCheckout();
         }}
-        onExternalOrderNumberChange={setExternalOrderNumber}
         onOpenChange={setCheckoutOpen}
         onPaymentsChange={cart.setPayments}
         onSaleDiscountChange={cart.setSaleDiscount}
-        onSalesChannelChange={setSalesChannelId}
         open={checkoutOpen}
         paymentMethods={paymentMethods}
         payments={cart.payments}

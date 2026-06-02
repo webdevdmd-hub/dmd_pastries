@@ -19,12 +19,12 @@ export function PosCategoryRail(): JSX.Element {
 
         return (
           <Button
-            className="shrink-0 rounded-2xl border-brand-cappuccino bg-white/70"
+            className="shrink-0 rounded-md border-[#d4d4d8] bg-white text-[#09090b] shadow-none hover:bg-[#f4f4f5]"
             key={category.label}
             type="button"
             variant="outline"
           >
-            <Icon className="h-4 w-4 text-brand-caramel" />
+            <Icon className="h-4 w-4 text-[#52525b]" />
             {category.label}
           </Button>
         );

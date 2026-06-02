@@ -8,9 +8,9 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "border-brand-cappuccino bg-brand-cappuccino/60 text-brand-espresso",
-        outline: "border-brand-cappuccino bg-transparent text-brand-mocha",
-        secondary: "border-brand-caramel bg-brand-caramel/15 text-brand-mocha",
+        default: "border-workspace-border bg-brand-latte text-brand-espresso",
+        outline: "border-workspace-border bg-transparent text-workspace-muted",
+        secondary: "border-brand-caramel/20 bg-brand-caramel/10 text-brand-espresso",
       },
     },
     defaultVariants: {

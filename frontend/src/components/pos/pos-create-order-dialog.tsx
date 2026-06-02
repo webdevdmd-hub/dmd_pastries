@@ -193,31 +193,31 @@ export function POSCreateOrderDialog({
       }}
       open={open}
     >
-      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto rounded-[1.75rem] p-0">
-        <div className="border-b border-brand-cappuccino/60 bg-brand-latte/70 px-5 py-4 sm:px-6">
+      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto rounded-lg border-[#d4d4d8] bg-white p-0 text-[#09090b] shadow-lg">
+        <div className="border-b border-[#d4d4d8] bg-[#fafafa] px-5 py-4 sm:px-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-2xl">
-              <CalendarPlus className="h-5 w-5 text-brand-caramel" />
+            <DialogTitle className="flex items-center gap-2 text-2xl font-black tracking-tight">
+              <CalendarPlus className="h-5 w-5 text-[#09090b]" />
               Create bakery order
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-[#52525b]">
               Create custom cakes, advance orders, pickup, or delivery requests without leaving POS.
             </DialogDescription>
           </DialogHeader>
         </div>
 
         <div className="grid gap-5 p-5 sm:p-6">
-          <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
+          <section className="rounded-lg border border-[#d4d4d8] bg-white p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
-                <h2 className="text-lg font-semibold text-brand-espresso">Order source</h2>
-                <p className="mt-1 text-sm text-brand-mocha">
+                <h2 className="text-lg font-black text-[#09090b]">Order source</h2>
+                <p className="mt-1 text-sm text-[#52525b]">
                   The order is created under the active POS branch. Choose a source only when it is
                   not the default walk-in flow.
                 </p>
               </div>
-              <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte px-4 py-3 text-sm font-semibold text-brand-espresso">
-                <Store className="h-4 w-4 text-brand-mocha" />
+              <div className="flex shrink-0 items-center gap-2 rounded-md border border-[#d4d4d8] bg-[#fafafa] px-4 py-3 text-sm font-semibold text-[#09090b]">
+                <Store className="h-4 w-4 text-[#52525b]" />
                 {branchName}
               </div>
             </div>
@@ -237,7 +237,7 @@ export function POSCreateOrderDialog({
                   value={state.salesChannelId}
                 />
                 <button
-                  className="w-fit text-xs font-semibold text-brand-mocha underline-offset-4 hover:underline"
+                  className="w-fit text-xs font-semibold text-[#52525b] underline-offset-4 hover:underline"
                   onClick={() =>
                     setState((current) => ({
                       ...current,
@@ -263,7 +263,7 @@ export function POSCreateOrderDialog({
                     placeholder="Platform / partner order number"
                     value={state.externalOrderNumber}
                   />
-                  <p className="text-xs text-brand-mocha">
+                  <p className="text-xs text-[#52525b]">
                     Required for {selectedSalesChannel.channelName}.
                   </p>
                 </div>
@@ -313,14 +313,14 @@ export function POSCreateOrderDialog({
               />
             </div>
             <div className="grid content-start gap-5">
-              <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
-                <h2 className="text-lg font-semibold text-brand-espresso">POS quick order</h2>
-                <p className="mt-2 text-sm leading-6 text-brand-mocha">
+              <section className="rounded-lg border border-[#d4d4d8] bg-white p-5">
+                <h2 className="text-lg font-black text-[#09090b]">POS quick order</h2>
+                <p className="mt-2 text-sm leading-6 text-[#52525b]">
                   This creates a bakery order only. It does not add items to the current POS cart or
                   collect payment automatically.
                 </p>
-                <div className="mt-4 rounded-2xl bg-brand-latte/70 p-4 text-sm text-brand-mocha">
-                  <p className="font-semibold text-brand-espresso">After saving</p>
+                <div className="mt-4 rounded-md border border-[#d4d4d8] bg-[#fafafa] p-4 text-sm text-[#52525b]">
+                  <p className="font-semibold text-[#09090b]">After saving</p>
                   <p>Use Bakery Orders to take deposit, assign production, or update status.</p>
                 </div>
               </section>
@@ -336,8 +336,9 @@ export function POSCreateOrderDialog({
           </div>
         </div>
 
-        <DialogFooter className="sticky bottom-0 border-t border-brand-cappuccino/60 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
+        <DialogFooter className="sticky bottom-0 border-t border-[#d4d4d8] bg-white px-5 py-4 sm:px-6">
           <Button
+            className="rounded-md border-[#d4d4d8] bg-white text-[#09090b] hover:bg-[#f4f4f5]"
             disabled={isSaving}
             onClick={() => onOpenChange(false)}
             type="button"
@@ -346,6 +347,7 @@ export function POSCreateOrderDialog({
             Cancel
           </Button>
           <Button
+            className="rounded-md bg-black text-white hover:bg-[#18181b]"
             disabled={!canCreate || isSaving}
             onClick={() => void submitOrder()}
             type="button"

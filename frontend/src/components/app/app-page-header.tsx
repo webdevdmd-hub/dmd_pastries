@@ -21,8 +21,10 @@ export function AppPageHeader({
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="font-display text-4xl text-brand-espresso md:text-5xl">{title}</h1>
-        <p className="mt-3 max-w-3xl text-brand-mocha">{description}</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-brand-espresso md:text-4xl">
+          {title}
+        </h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-workspace-muted">{description}</p>
       </div>
       {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
     </header>

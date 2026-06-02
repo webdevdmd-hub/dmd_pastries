@@ -88,12 +88,12 @@ export function POSPaymentPanel({
   };
 
   return (
-    <div className="space-y-2 rounded-[1.25rem] border border-brand-cappuccino/70 bg-white p-2.5 shadow-sm">
+    <div className="space-y-3 rounded-lg border border-[#d4d4d8] bg-white p-3">
       <div className="flex items-center justify-between">
-        <p className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-brand-mocha">
+        <p className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[#71717a]">
           Payment
         </p>
-        <p className="font-bold text-brand-espresso">{formatMoney(balanceDue)}</p>
+        <p className="font-mono font-bold text-[#09090b]">{formatMoney(balanceDue)}</p>
       </div>
       <div className="grid grid-cols-2 gap-2">
         {activeMethods.map((method) => (
@@ -107,7 +107,7 @@ export function POSPaymentPanel({
         ))}
       </div>
       {unavailableMethods.length > 0 ? (
-        <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-[0.7rem] text-amber-900">
+        <p className="rounded-md border border-[#d4d4d8] bg-[#fafafa] px-3 py-2 text-[0.7rem] text-[#52525b]">
           Some payment methods are disabled because they need a default payment account in Settings.
         </p>
       ) : null}
@@ -115,14 +115,14 @@ export function POSPaymentPanel({
         <div className="space-y-2">
           {paymentRows.map((payment) => (
             <div
-              className="rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/45 p-2"
+              className="rounded-md border border-[#d4d4d8] bg-[#fafafa] p-2"
               key={payment.paymentMethodId}
             >
               <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-sm font-bold text-brand-espresso">{payment.paymentMethodName}</p>
+                <p className="text-sm font-bold text-[#09090b]">{payment.paymentMethodName}</p>
                 <Button
                   aria-label={`Remove ${payment.paymentMethodName} payment`}
-                  className="h-7 w-7 text-brand-mocha"
+                  className="h-7 w-7 text-[#52525b]"
                   onClick={() => removePayment(payment.paymentMethodId)}
                   size="icon"
                   type="button"
@@ -132,7 +132,7 @@ export function POSPaymentPanel({
                 </Button>
               </div>
               <Input
-                className="h-9 rounded-2xl border-brand-cappuccino bg-white"
+                className="h-9 rounded-md border-[#d4d4d8] bg-white font-mono shadow-none focus-visible:ring-black"
                 min={0}
                 onChange={(event) =>
                   updatePayment(payment.paymentMethodId, {
@@ -146,11 +146,11 @@ export function POSPaymentPanel({
               />
               {payment.requiresReference ? (
                 <div className="mt-2 space-y-1">
-                  <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-brand-mocha">
+                  <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[#71717a]">
                     Reference number required
                   </p>
                   <Input
-                    className="h-9 rounded-2xl border-brand-cappuccino bg-white"
+                    className="h-9 rounded-md border-[#d4d4d8] bg-white font-mono shadow-none focus-visible:ring-black"
                     onChange={(event) =>
                       updatePayment(payment.paymentMethodId, {
                         referenceNumber: event.target.value,
@@ -165,22 +165,22 @@ export function POSPaymentPanel({
           ))}
         </div>
       ) : (
-        <p className="rounded-2xl border border-dashed border-brand-cappuccino/70 bg-brand-latte/40 px-3 py-2 text-[0.7rem] text-brand-mocha">
+        <p className="rounded-md border border-dashed border-[#a1a1aa] bg-[#fafafa] px-3 py-2 text-[0.7rem] text-[#52525b]">
           Select a payment method to start. Add another method for split payments.
         </p>
       )}
       <div className="grid grid-cols-3 gap-2 text-[0.7rem]">
         <div>
-          <p className="text-brand-mocha">Paid</p>
-          <p className="font-bold text-brand-espresso">{formatMoney(paidAmount)}</p>
+          <p className="text-[#71717a]">Paid</p>
+          <p className="font-mono font-bold text-[#09090b]">{formatMoney(paidAmount)}</p>
         </div>
         <div>
-          <p className="text-brand-mocha">Balance</p>
-          <p className="font-bold text-brand-espresso">{formatMoney(balanceDue)}</p>
+          <p className="text-[#71717a]">Balance</p>
+          <p className="font-mono font-bold text-[#09090b]">{formatMoney(balanceDue)}</p>
         </div>
         <div>
-          <p className="text-brand-mocha">Change</p>
-          <p className="font-bold text-brand-espresso">{formatMoney(changeAmount)}</p>
+          <p className="text-[#71717a]">Change</p>
+          <p className="font-mono font-bold text-[#09090b]">{formatMoney(changeAmount)}</p>
         </div>
       </div>
     </div>

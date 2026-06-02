@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, LayoutDashboard, LogOut, Menu, UserRound } from "lucide-react";
+import { Bell, LogOut, Menu, UserRound } from "lucide-react";
 import Link from "next/link";
 import type { JSX } from "react";
 import { useEffect, useState } from "react";
@@ -34,12 +34,12 @@ export function POSTopBar({ branchName, cashierName, onMenuClick }: POSTopBarPro
   }, []);
 
   return (
-    <header className="flex h-[4.5rem] shrink-0 items-center justify-between border-b border-brand-cappuccino/60 bg-white/80 px-5 text-brand-espresso shadow-sm backdrop-blur-xl">
-      <div className="flex items-center gap-3">
+    <header className="grid h-16 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center border-b border-[#d4d4d8] bg-[#fafafa] px-4 text-[#09090b] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+      <div className="flex min-w-0 items-center gap-3">
         {onMenuClick ? (
           <Button
             aria-label="Open POS menu"
-            className="h-11 w-11 rounded-full border-brand-cappuccino bg-brand-latte text-brand-espresso hover:bg-brand-cappuccino/40"
+            className="h-10 w-10 rounded-md border-[#d4d4d8] bg-white text-[#18181b] hover:bg-[#f4f4f5]"
             onClick={onMenuClick}
             size="icon"
             type="button"
@@ -49,40 +49,49 @@ export function POSTopBar({ branchName, cashierName, onMenuClick }: POSTopBarPro
           </Button>
         ) : null}
         <div>
-          <p className="font-display text-3xl font-bold leading-none text-brand-espresso">
-            POS Billing
-          </p>
-          <p className="text-xs font-medium text-brand-mocha">
-            {cashierName} - {branchName}
-          </p>
+          <p className="text-base font-black tracking-tight text-[#09090b]">POS Billing</p>
+          <p className="text-xs font-medium text-[#71717a] lg:hidden">{branchName}</p>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="hidden rounded-2xl bg-brand-latte px-4 py-2 text-right text-sm sm:block">
-          <p className="font-bold text-brand-espresso">
-            {clock.toLocaleTimeString("en-AE", { hour: "2-digit", minute: "2-digit" })}
-          </p>
-          <p className="text-xs text-brand-mocha">
-            {clock.toLocaleDateString("en-AE", { dateStyle: "medium" })}
+      <div className="hidden min-w-[16rem] text-right lg:block">
+        <p className="text-sm font-black text-[#09090b]">
+          {cashierName} - {branchName}
+        </p>
+        <p className="font-mono text-xs text-[#52525b]">
+          {clock.toLocaleTimeString("en-AE", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })}
+          , {clock.toLocaleDateString("en-AE", { dateStyle: "medium" })}
+        </p>
+      </div>
+
+      <div className="flex min-w-0 items-center justify-end gap-3">
+        <div className="hidden border-l border-[#d4d4d8] pl-4 text-sm sm:block">
+          <p className="font-medium text-[#18181b]">Admin User</p>
+          <p className="flex items-center gap-1.5 text-[#52525b]">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            Connected
           </p>
         </div>
         <Button
           aria-label="Notifications"
-          className="hidden h-11 w-11 rounded-full border-brand-cappuccino bg-white text-brand-espresso hover:bg-brand-latte md:inline-flex"
+          className="hidden h-10 w-10 rounded-md border-transparent bg-transparent text-[#18181b] hover:bg-[#f4f4f5] md:inline-flex"
           size="icon"
           type="button"
-          variant="outline"
+          variant="ghost"
         >
           <Bell className="h-4 w-4" />
         </Button>
         <Button
           asChild
-          className="hidden rounded-full border-brand-cappuccino bg-white text-brand-espresso hover:bg-brand-latte sm:inline-flex"
-          variant="outline"
+          className="hidden h-10 rounded-md bg-black px-4 text-sm font-black text-white hover:bg-[#27272a] sm:inline-flex"
+          variant="default"
         >
           <Link href={ROUTES.dashboard}>
-            <LayoutDashboard className="mr-2 h-4 w-4" />
+            <LogOut className="mr-2 h-4 w-4" />
             Exit POS
           </Link>
         </Button>
@@ -90,9 +99,9 @@ export function POSTopBar({ branchName, cashierName, onMenuClick }: POSTopBarPro
           <DropdownMenuTrigger asChild>
             <Button
               aria-label="Open user menu"
-              className="h-11 w-11 rounded-full border-brand-cappuccino bg-brand-caramel text-white hover:bg-brand-mocha"
+              className="h-10 w-10 rounded-full border-[#d4d4d8] bg-white text-[#18181b] hover:bg-[#f4f4f5]"
               size="icon"
-              variant="default"
+              variant="outline"
             >
               <UserRound className="h-5 w-5" />
             </Button>
@@ -100,7 +109,7 @@ export function POSTopBar({ branchName, cashierName, onMenuClick }: POSTopBarPro
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>
               <span className="block">{user?.fullName ?? "Cashier"}</span>
-              <span className="block text-xs font-normal text-brand-mocha">
+              <span className="block text-xs font-normal text-[#71717a]">
                 {user?.email ?? "Signed in"}
               </span>
             </DropdownMenuLabel>

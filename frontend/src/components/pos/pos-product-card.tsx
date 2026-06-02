@@ -48,9 +48,9 @@ export function POSProductCard({
   };
 
   return (
-    <article className="group flex min-h-[13.25rem] flex-col rounded-[1.15rem] border border-brand-cappuccino/70 bg-white p-2 text-brand-espresso shadow-[0_12px_28px_rgba(59,42,34,0.055)] transition hover:-translate-y-0.5 hover:border-brand-caramel hover:shadow-[0_16px_36px_rgba(59,42,34,0.1)]">
+    <article className="group relative flex min-h-[14.5rem] flex-col overflow-hidden rounded-lg border border-[#d4d4d8] bg-white text-[#09090b] transition hover:border-[#71717a] focus-within:ring-2 focus-within:ring-black focus-within:ring-offset-2">
       <Button
-        className="h-full flex-1 flex-col items-stretch justify-start p-0 text-left text-brand-espresso hover:bg-transparent"
+        className="h-full flex-1 flex-col items-stretch justify-start rounded-none bg-white p-0 text-left text-[#09090b] shadow-none hover:bg-white"
         onClick={() => {
           if (ignoreNextClickRef.current) {
             ignoreNextClickRef.current = false;
@@ -77,34 +77,47 @@ export function POSProductCard({
         <div className="flex h-full flex-col text-left">
           {imageUrl ? (
             <img
-              alt=""
-              className="h-32 w-full rounded-[0.9rem] bg-brand-latte object-cover shadow-sm"
+              alt={product.productName}
+              className="h-32 w-full bg-[#f4f4f5] object-cover"
               src={imageUrl}
             />
           ) : (
-            <div className="flex h-32 w-full items-center justify-center rounded-[0.9rem] bg-brand-latte text-brand-mocha shadow-sm">
-              <PackagePlus className="h-6 w-6" />
+            <div className="flex h-32 w-full items-center justify-center bg-[#f4f4f5] text-[#71717a]">
+              <PackagePlus className="h-8 w-8" />
             </div>
           )}
-          <div className="mt-2 min-w-0">
-            <p className="line-clamp-2 whitespace-normal text-[0.74rem] font-black leading-tight">
+          <div className="flex flex-1 flex-col justify-between p-3">
+            <p className="line-clamp-2 whitespace-normal text-sm font-black leading-tight tracking-tight">
               {product.productName}
             </p>
-          </div>
-          <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2">
-            <span className="max-w-[56%] truncate rounded-full bg-brand-latte px-2 py-0.5 text-[0.53rem] font-bold text-brand-mocha">
-              {product.categoryName}
-            </span>
-            <span className="min-h-5 shrink-0 text-right text-sm font-black leading-none text-brand-espresso">
-              {showPrices ? (
-                <span aria-label={`${product.productName} price`}>
-                  {formatMoney(product.salePrice)}
-                </span>
-              ) : null}
-            </span>
+            <div className="mt-2 flex min-w-0 items-end justify-between gap-2">
+              <span className="min-w-0 truncate text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[#71717a]">
+                {product.categoryName}
+              </span>
+              <span className="min-h-5 shrink-0 text-right font-mono text-sm font-black leading-none text-[#09090b]">
+                {showPrices ? (
+                  <span aria-label={`${product.productName} price`}>
+                    {formatMoney(product.salePrice)}
+                  </span>
+                ) : null}
+              </span>
+            </div>
           </div>
         </div>
       </Button>
+      {hasVariants ? (
+        <Button
+          className="absolute right-3 top-3 h-7 rounded-md bg-black px-2.5 font-mono text-[0.62rem] font-black uppercase tracking-[0.12em] text-white shadow-none hover:bg-[#18181b]"
+          onClick={(event) => {
+            event.stopPropagation();
+            openVariants();
+          }}
+          type="button"
+          variant="default"
+        >
+          Variants
+        </Button>
+      ) : null}
     </article>
   );
 }

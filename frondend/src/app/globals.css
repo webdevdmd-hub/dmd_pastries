@@ -4,39 +4,39 @@
 
 @layer base {
   :root {
-    --brand-latte: 243 233 215;
-    --brand-cappuccino: 214 191 166;
-    --brand-caramel: 176 137 104;
-    --brand-mocha: 122 85 58;
-    --brand-espresso: 59 42 34;
-    --workspace-canvas: 248 246 241;
-    --workspace-sidebar: 59 42 34;
-    --workspace-sidebar-panel: 74 53 43;
-    --workspace-sidebar-active: 176 137 104;
-    --workspace-sidebar-muted: 214 191 166;
+    --brand-latte: 245 244 241;
+    --brand-cappuccino: 212 208 201;
+    --brand-caramel: 9 9 11;
+    --brand-mocha: 82 82 91;
+    --brand-espresso: 9 9 11;
+    --workspace-canvas: 250 250 249;
+    --workspace-sidebar: 244 244 245;
+    --workspace-sidebar-panel: 255 255 255;
+    --workspace-sidebar-active: 9 9 11;
+    --workspace-sidebar-muted: 113 113 122;
     --workspace-panel: 255 255 255;
-    --workspace-border: 226 214 200;
-    --workspace-muted: 111 91 77;
-    --background: 36 52% 90%;
-    --foreground: 20 26% 18%;
-    --card: 33 34% 98%;
-    --card-foreground: 20 26% 18%;
-    --popover: 36 43% 94%;
-    --popover-foreground: 20 26% 18%;
-    --primary: 29 30% 55%;
-    --primary-foreground: 36 52% 90%;
-    --secondary: 31 32% 75%;
-    --secondary-foreground: 20 26% 18%;
-    --muted: 35 34% 86%;
-    --muted-foreground: 24 25% 35%;
-    --accent: 24 35% 34%;
-    --accent-foreground: 36 52% 90%;
+    --workspace-border: 212 208 201;
+    --workspace-muted: 82 82 91;
+    --background: 60 12% 98%;
+    --foreground: 240 6% 6%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 6%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 6%;
+    --primary: 240 6% 6%;
+    --primary-foreground: 60 20% 96%;
+    --secondary: 40 14% 92%;
+    --secondary-foreground: 240 6% 6%;
+    --muted: 40 14% 92%;
+    --muted-foreground: 240 5% 35%;
+    --accent: 240 6% 6%;
+    --accent-foreground: 60 20% 96%;
     --destructive: 0 65% 46%;
     --destructive-foreground: 0 0% 98%;
-    --border: 31 32% 75%;
-    --input: 35 43% 92%;
-    --ring: 29 30% 55%;
-    --radius: 1rem;
+    --border: 40 10% 82%;
+    --input: 40 14% 92%;
+    --ring: 240 6% 6%;
+    --radius: 0.875rem;
   }
 
   :root[data-theme="pistachio"] {
@@ -83,11 +83,7 @@
   body {
     @apply min-h-screen text-brand-espresso antialiased;
     background-color: rgb(var(--workspace-canvas));
-    background-image: linear-gradient(
-      180deg,
-      rgb(var(--workspace-canvas)) 0%,
-      rgb(var(--brand-latte) / 0.72) 100%
-    );
+    background-image: none;
   }
 
   a {
@@ -345,8 +341,8 @@
 
   .shadow-workspace {
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      0 20px 55px rgba(13, 17, 23, 0.22);
+      inset 0 1px 0 rgba(255, 255, 255, 0.64),
+      0 1px 2px rgba(0, 0, 0, 0.04);
   }
 
   :root[data-theme="pistachio"] aside.bg-workspace-sidebar,

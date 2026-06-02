@@ -5,15 +5,15 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export function POSAccessDenied(): JSX.Element {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-brand-latte p-6">
-      <Card className="max-w-lg border-brand-cappuccino bg-white/90 text-center shadow-xl">
+    <div className="flex min-h-screen items-center justify-center bg-[#f9f9fa] p-6">
+      <Card className="max-w-lg rounded-lg border-[#d4d4d8] bg-white text-center shadow-none">
         <CardContent className="space-y-4 p-8">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 text-red-700">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-red-100 text-red-700">
             <ShieldAlert className="h-7 w-7" />
           </div>
           <div>
-            <h1 className="font-display text-3xl text-brand-espresso">POS access denied</h1>
-            <p className="mt-2 text-sm text-brand-mocha">
+            <h1 className="text-3xl font-black tracking-tight text-[#09090b]">POS access denied</h1>
+            <p className="mt-2 text-sm text-[#52525b]">
               You do not have permission to open POS Billing.
             </p>
           </div>

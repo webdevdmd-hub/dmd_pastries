@@ -17,8 +17,8 @@ export function ErrorState({
   onRetry,
 }: ErrorStateProps): JSX.Element {
   return (
-    <div className="rounded-3xl border border-red-200 bg-red-50 p-8 text-center text-red-950">
-      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100">
+    <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center text-red-950 shadow-panel">
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-red-100">
         <AlertTriangle className="h-6 w-6" />
       </div>
       <h2 className="text-lg font-semibold">{title}</h2>

@@ -64,12 +64,12 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
-        panel: "0 10px 30px rgba(59, 42, 34, 0.08)",
-        float: "0 22px 54px rgba(59, 42, 34, 0.14)",
-        workspace: "0 1px 0 rgba(255,255,255,0.04) inset, 0 20px 55px rgba(13, 17, 23, 0.22)",
+        panel: "0 1px 2px rgba(9, 9, 11, 0.04)",
+        float: "0 18px 44px rgba(9, 9, 11, 0.12)",
+        workspace: "0 1px 0 rgba(255,255,255,0.64) inset, 0 1px 2px rgba(9, 9, 11, 0.04)",
       },
       backgroundImage: {
-        "grain-warm": "radial-gradient(circle at 1px 1px, rgba(59,42,34,0.06) 1px, transparent 0)",
+        "grain-warm": "radial-gradient(circle at 1px 1px, rgba(9,9,11,0.035) 1px, transparent 0)",
       },
     },
   },

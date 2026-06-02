@@ -19,12 +19,12 @@ export function AppEmptyState({
   title,
 }: AppEmptyStateProps): JSX.Element {
   return (
-    <Card className="bg-white/80">
+    <Card className="bg-workspace-panel">
       <CardContent className="flex flex-col items-center gap-4 p-12 text-center">
-        {icon ? <div className="text-brand-mocha">{icon}</div> : null}
+        {icon ? <div className="text-workspace-muted">{icon}</div> : null}
         <div>
-          <h2 className="text-2xl font-bold text-brand-espresso">{title}</h2>
-          <p className="mt-2 max-w-xl text-sm text-brand-mocha">{description}</p>
+          <h2 className="text-2xl font-semibold text-brand-espresso">{title}</h2>
+          <p className="mt-2 max-w-xl text-sm text-workspace-muted">{description}</p>
         </div>
         {actionLabel && onAction ? (
           <AppButton onClick={onAction} type="button">

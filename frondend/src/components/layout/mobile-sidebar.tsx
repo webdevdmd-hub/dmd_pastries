@@ -30,30 +30,29 @@ export function MobileSidebar(): JSX.Element {
         </Button>
       </SheetTrigger>
       <SheetContent
-        className="flex w-[20rem] flex-col border-white/10 bg-workspace-sidebar p-4 text-white sm:w-[22rem]"
-        data-sidebar-theme="pistachio"
+        className="flex w-[20rem] flex-col border-workspace-border bg-[#f4f4f5] p-4 text-brand-espresso sm:w-[22rem]"
         side="left"
       >
         <SheetHeader>
-          <SheetTitle className="text-left text-xl font-semibold leading-none text-white">
+          <SheetTitle className="text-left text-xl font-semibold leading-none text-brand-espresso">
             COCKPIT
           </SheetTitle>
-          <SheetDescription className="text-left text-xs uppercase tracking-[0.22em] text-workspace-sidebar-muted">
+          <SheetDescription className="text-left text-xs uppercase tracking-[0.22em] text-workspace-muted">
             Operations OS
           </SheetDescription>
         </SheetHeader>
-        <div className="mt-5 w-fit rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs font-semibold text-white">
+        <div className="mt-5 w-fit rounded-full border border-workspace-border bg-workspace-panel px-3 py-1 text-xs font-semibold text-brand-espresso">
           Operations shell
         </div>
 
         <nav aria-label="Primary" className="mt-6 flex min-h-0 flex-1">
           <TooltipProvider delayDuration={150}>
-            <AppNavigationList />
+            <AppNavigationList theme="pos" />
           </TooltipProvider>
         </nav>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-xs text-workspace-sidebar-muted">
-          <p className="font-medium text-white">Protected workspace</p>
+        <div className="rounded-2xl border border-workspace-border bg-workspace-panel p-3 text-xs text-workspace-muted">
+          <p className="font-medium text-brand-espresso">Protected workspace</p>
           <p className="mt-1.5 leading-5">Modules stay grouped by operating workflow.</p>
         </div>
       </SheetContent>

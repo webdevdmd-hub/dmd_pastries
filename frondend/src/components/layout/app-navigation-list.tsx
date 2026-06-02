@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils/cn";
 type AppNavigationListProps = {
   collapsed?: boolean;
   onNavigate?: () => void;
+  theme?: "default" | "pos";
 };
 
 type VisibleNavigationGroup = {
@@ -128,8 +129,10 @@ function NavigationTooltip({
 export function AppNavigationList({
   collapsed = false,
   onNavigate,
+  theme = "default",
 }: AppNavigationListProps): JSX.Element {
   const pathname = usePathname();
+  const isPosTheme = theme === "pos";
   const { hasAnyPermission, hasPermission } = usePermission();
   const visibleGroups = useMemo(
     () => getVisibleGroups(appNavigationGroups, hasPermission, hasAnyPermission),
@@ -209,7 +212,10 @@ export function AppNavigationList({
             <button
               aria-expanded={isOpen}
               className={cn(
-                "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[0.66rem] font-semibold uppercase tracking-[0.2em] text-workspace-sidebar-muted transition-colors hover:bg-white/[0.06] hover:text-white",
+                "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[0.66rem] font-semibold uppercase tracking-[0.2em] transition-colors",
+                isPosTheme
+                  ? "text-[#71717a] hover:bg-[#e4e4e7] hover:text-[#09090b]"
+                  : "text-workspace-sidebar-muted hover:bg-white/[0.06] hover:text-white",
                 collapsed ? "justify-center px-2" : "",
               )}
               onClick={() => {
@@ -228,7 +234,12 @@ export function AppNavigationList({
               type="button"
             >
               {collapsed ? (
-                <span className="h-1.5 w-1.5 rounded-full bg-workspace-sidebar-muted" />
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    isPosTheme ? "bg-[#71717a]" : "bg-workspace-sidebar-muted",
+                  )}
+                />
               ) : (
                 <>
                   <span>{group.label}</span>
@@ -259,9 +270,13 @@ export function AppNavigationList({
                             aria-expanded={isItemOpen}
                             className={cn(
                               "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                              isParentActive
-                                ? "bg-workspace-sidebar-active text-white shadow-sm"
-                                : "text-white/78 hover:bg-white/[0.07] hover:text-white",
+                              isPosTheme
+                                ? isParentActive
+                                  ? "bg-[#09090b] text-white shadow-none"
+                                  : "text-[#3f3f46] hover:bg-[#e4e4e7] hover:text-[#09090b]"
+                                : isParentActive
+                                  ? "bg-workspace-sidebar-active text-white shadow-sm"
+                                  : "text-white/78 hover:bg-white/[0.07] hover:text-white",
                               collapsed ? "justify-center px-2.5" : "",
                             )}
                             onClick={() => {
@@ -297,7 +312,12 @@ export function AppNavigationList({
                         </NavigationTooltip>
 
                         {isItemOpen && !collapsed ? (
-                          <div className="ml-4 grid gap-1 border-l border-white/10 pl-3">
+                          <div
+                            className={cn(
+                              "ml-4 grid gap-1 border-l pl-3",
+                              isPosTheme ? "border-[#d4d4d8]" : "border-white/10",
+                            )}
+                          >
                             {item.children?.map((child) => {
                               const ChildIcon = child.icon;
                               const childIsActive = isCurrentItem(child, pathname, visibleItems);
@@ -306,9 +326,13 @@ export function AppNavigationList({
                                 <Link
                                   className={cn(
                                     "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                                    childIsActive
-                                      ? "bg-white text-workspace-sidebar shadow-sm"
-                                      : "text-white/65 hover:bg-white/[0.07] hover:text-white",
+                                    isPosTheme
+                                      ? childIsActive
+                                        ? "bg-[#09090b] text-white shadow-none"
+                                        : "text-[#52525b] hover:bg-[#e4e4e7] hover:text-[#09090b]"
+                                      : childIsActive
+                                        ? "bg-white text-workspace-sidebar shadow-sm"
+                                        : "text-white/65 hover:bg-white/[0.07] hover:text-white",
                                   )}
                                   href={child.href}
                                   key={child.href}
@@ -330,9 +354,13 @@ export function AppNavigationList({
                       <Link
                         className={cn(
                           "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                          isActive
-                            ? "bg-workspace-sidebar-active text-white shadow-sm"
-                            : "text-white/78 hover:bg-white/[0.07] hover:text-white",
+                          isPosTheme
+                            ? isActive
+                              ? "bg-[#09090b] text-white shadow-none"
+                              : "text-[#3f3f46] hover:bg-[#e4e4e7] hover:text-[#09090b]"
+                            : isActive
+                              ? "bg-workspace-sidebar-active text-white shadow-sm"
+                              : "text-white/78 hover:bg-white/[0.07] hover:text-white",
                           collapsed ? "justify-center px-2.5" : "",
                         )}
                         href={item.href}

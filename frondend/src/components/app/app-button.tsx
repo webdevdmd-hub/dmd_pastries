@@ -11,8 +11,8 @@ type AppButtonProps = ButtonProps & {
 
 const toneClasses: Record<AppButtonTone, string> = {
   default: "",
-  admin: "bg-brand-espresso text-brand-latte hover:bg-brand-mocha",
-  pos: "min-h-12 rounded-2xl text-base shadow-panel",
+  admin: "bg-brand-espresso text-white shadow-none hover:bg-brand-mocha",
+  pos: "min-h-12 rounded-xl text-base shadow-none",
   success: "bg-emerald-700 text-white hover:bg-emerald-800",
   warning: "bg-amber-700 text-white hover:bg-amber-800",
   danger: "bg-red-700 text-white hover:bg-red-800",

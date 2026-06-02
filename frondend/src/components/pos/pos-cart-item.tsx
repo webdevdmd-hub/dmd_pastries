@@ -36,17 +36,17 @@ export function POSCartItem({
     item.discountAmount > 0 ? `Discount ${formatMoney(item.discountAmount)}` : "Discount";
 
   return (
-    <div className="rounded-[1rem] border border-brand-cappuccino/70 bg-white p-1.5 shadow-sm">
+    <div className="rounded-lg border border-[#d4d4d8] bg-white p-2">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-xs font-black text-brand-espresso">{item.productName}</p>
+          <p className="truncate text-sm font-black text-[#09090b]">{item.productName}</p>
           {item.variantName ? (
-            <p className="truncate text-[0.68rem] text-brand-mocha">{item.variantName}</p>
+            <p className="truncate text-[0.68rem] text-[#71717a]">{item.variantName}</p>
           ) : null}
         </div>
         <Button
           aria-label={`Remove ${item.productName}`}
-          className="h-6 w-6 text-red-700 hover:bg-red-50"
+          className="h-7 w-7 rounded-md text-red-700 hover:bg-red-50"
           onClick={() => onRemove(item.cartItemId)}
           size="icon"
           type="button"
@@ -55,9 +55,9 @@ export function POSCartItem({
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </div>
-      <div className="mt-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+      <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <Button
-          className="h-7 justify-self-start rounded-xl px-2 text-[0.68rem]"
+          className="h-7 justify-self-start rounded-md px-2 text-[0.68rem] text-[#52525b] hover:bg-[#f4f4f5]"
           onClick={() => setDiscountOpen((current) => !current)}
           type="button"
           variant="ghost"
@@ -68,7 +68,7 @@ export function POSCartItem({
           onChange={(quantity) => onQuantityChange(item.cartItemId, quantity)}
           quantity={item.quantity}
         />
-        <p className="text-right text-xs font-black text-brand-espresso">
+        <p className="font-mono text-right text-xs font-black text-[#09090b]">
           {formatMoney(item.lineTotal)}
         </p>
       </div>

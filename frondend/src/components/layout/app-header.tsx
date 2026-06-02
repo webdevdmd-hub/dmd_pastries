@@ -133,7 +133,7 @@ export function AppHeader(): JSX.Element {
   };
 
   return (
-    <header className="sticky top-0 z-20 border-b border-workspace-border/80 bg-workspace-canvas/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-20 border-b border-workspace-border bg-workspace-panel/95 backdrop-blur-xl">
       <div className="flex flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex min-h-12 items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -150,8 +150,8 @@ export function AppHeader(): JSX.Element {
             </div>
           </div>
 
-          <div className="hidden min-w-0 items-center gap-2 rounded-2xl border border-workspace-border bg-workspace-panel px-3 py-2 text-left shadow-none md:flex">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-latte text-brand-caramel">
+          <div className="hidden min-w-0 items-center gap-2 rounded-xl border border-workspace-border bg-workspace-panel px-3 py-2 text-left shadow-none md:flex">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-latte text-brand-caramel">
               <MapPin className="h-4 w-4" />
             </span>
             <span className="min-w-0">
@@ -167,7 +167,7 @@ export function AppHeader(): JSX.Element {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                className="h-auto rounded-2xl border-workspace-border bg-workspace-panel px-2.5 py-2 shadow-none hover:bg-brand-latte/70"
+                className="h-auto rounded-xl border-workspace-border bg-workspace-panel px-2.5 py-2 shadow-none hover:bg-brand-latte/70"
                 variant="outline"
               >
                 <Avatar className="h-8 w-8">

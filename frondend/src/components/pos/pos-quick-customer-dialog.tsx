@@ -54,10 +54,12 @@ export function POSQuickCustomerDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent>
+      <DialogContent className="rounded-lg border-[#d4d4d8] bg-white text-[#09090b] shadow-lg">
         <DialogHeader>
-          <DialogTitle>Quick create customer</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-2xl font-black tracking-tight">
+            Quick create customer
+          </DialogTitle>
+          <DialogDescription className="text-[#52525b]">
             Create a customer during billing and select them for this cart.
           </DialogDescription>
         </DialogHeader>
@@ -69,35 +71,58 @@ export function POSQuickCustomerDialog({
         >
           <label className="grid gap-2">
             <Label htmlFor="pos-customer-name">Full name</Label>
-            <Input id="pos-customer-name" {...form.register("fullName")} />
+            <Input
+              className="rounded-md border-[#d4d4d8] bg-white shadow-none focus-visible:ring-black"
+              id="pos-customer-name"
+              {...form.register("fullName")}
+            />
             {form.formState.errors.fullName?.message ? (
               <span className="text-sm text-red-700">{form.formState.errors.fullName.message}</span>
             ) : null}
           </label>
           <label className="grid gap-2">
             <Label htmlFor="pos-customer-phone">Phone</Label>
-            <Input id="pos-customer-phone" {...form.register("phone")} />
+            <Input
+              className="rounded-md border-[#d4d4d8] bg-white shadow-none focus-visible:ring-black"
+              id="pos-customer-phone"
+              {...form.register("phone")}
+            />
             {form.formState.errors.phone?.message ? (
               <span className="text-sm text-red-700">{form.formState.errors.phone.message}</span>
             ) : null}
           </label>
           <label className="grid gap-2">
             <Label htmlFor="pos-customer-email">Email</Label>
-            <Input id="pos-customer-email" type="email" {...form.register("email")} />
+            <Input
+              className="rounded-md border-[#d4d4d8] bg-white shadow-none focus-visible:ring-black"
+              id="pos-customer-email"
+              type="email"
+              {...form.register("email")}
+            />
             {form.formState.errors.email?.message ? (
               <span className="text-sm text-red-700">{form.formState.errors.email.message}</span>
             ) : null}
           </label>
-          <p className="text-xs leading-5 text-brand-mocha">
+          <p className="text-xs leading-5 text-[#52525b]">
             Phone or email is optional for quick walk-in capture, but recommended for future lookup.
             If an active customer already exists with the same contact, the backend returns that
             profile and it will be selected.
           </p>
           <DialogFooter>
-            <Button disabled={isSubmitting} onClick={onClose} type="button" variant="outline">
+            <Button
+              className="rounded-md border-[#d4d4d8] bg-white text-[#09090b] hover:bg-[#f4f4f5]"
+              disabled={isSubmitting}
+              onClick={onClose}
+              type="button"
+              variant="outline"
+            >
               Cancel
             </Button>
-            <Button disabled={isSubmitting} type="submit">
+            <Button
+              className="rounded-md bg-black text-white hover:bg-[#18181b]"
+              disabled={isSubmitting}
+              type="submit"
+            >
               {isSubmitting ? "Creating..." : "Create customer"}
             </Button>
           </DialogFooter>

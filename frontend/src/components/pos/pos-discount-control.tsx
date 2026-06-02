@@ -25,7 +25,7 @@ export function POSDiscountControl({
 }: POSDiscountControlProps): JSX.Element {
   return (
     <div className="grid gap-1">
-      <span className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-brand-mocha">
+      <span className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[#71717a]">
         {label}
       </span>
       <div className="grid grid-cols-[108px_1fr] gap-2">
@@ -35,7 +35,7 @@ export function POSDiscountControl({
           }
           value={type ?? "none"}
         >
-          <SelectTrigger className="h-8 rounded-xl border-brand-cappuccino text-xs">
+          <SelectTrigger className="h-8 rounded-md border-[#d4d4d8] bg-white text-xs shadow-none focus:ring-black">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -45,7 +45,7 @@ export function POSDiscountControl({
           </SelectContent>
         </Select>
         <Input
-          className="h-8 rounded-xl border-brand-cappuccino text-xs"
+          className="h-8 rounded-md border-[#d4d4d8] bg-white text-xs shadow-none focus-visible:ring-black"
           disabled={!type}
           min={0}
           onChange={(event) => onChange(type, Number(event.target.value))}

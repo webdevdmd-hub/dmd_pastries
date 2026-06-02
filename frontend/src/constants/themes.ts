@@ -10,9 +10,9 @@ export type AppTheme = {
 export const appThemes = [
   {
     id: "latte",
-    label: "Latte",
-    description: "Warm bakery browns and creamy surfaces.",
-    swatches: ["#F3E9D7", "#D6BFA6", "#B08968", "#7A553A", "#3B2A22"],
+    label: "Operations Neutral",
+    description: "Clean POS-inspired neutrals for operational workspaces.",
+    swatches: ["#FAFAF9", "#F5F4F1", "#D4D0C9", "#52525B", "#09090B"],
   },
   {
     id: "pistachio",

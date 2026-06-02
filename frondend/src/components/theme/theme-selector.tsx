@@ -23,22 +23,24 @@ export function ThemeSelector(): JSX.Element {
       <DropdownMenuSubContent className="w-64">
         {appThemes.map((item) => (
           <button
-            className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-sm text-brand-espresso outline-none transition hover:bg-brand-cappuccino/40 focus:bg-brand-cappuccino/40"
+            className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-sm text-brand-espresso outline-none transition hover:bg-brand-latte focus:bg-brand-latte"
             key={item.id}
             onClick={() => setTheme(item.id)}
             type="button"
           >
-            <span className="flex h-8 w-14 overflow-hidden rounded-full border border-brand-cappuccino">
+            <span className="flex h-8 w-14 overflow-hidden rounded-full border border-workspace-border">
               {item.swatches.slice(1).map((swatch) => (
                 <span className="flex-1" key={swatch} style={{ backgroundColor: swatch }} />
               ))}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block font-semibold">{item.label}</span>
-              <span className="block truncate text-xs text-brand-mocha">{item.description}</span>
+              <span className="block truncate text-xs text-workspace-muted">
+                {item.description}
+              </span>
             </span>
             {theme === item.id ? (
-              <span className="text-xs font-bold text-brand-mocha">On</span>
+              <span className="text-xs font-bold text-brand-espresso">On</span>
             ) : null}
           </button>
         ))}

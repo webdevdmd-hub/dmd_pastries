@@ -14,8 +14,8 @@ const toneClasses: Record<AppBadgeTone, string> = {
   success: "border-emerald-200 bg-emerald-50 text-emerald-800",
   warning: "border-amber-200 bg-amber-50 text-amber-900",
   danger: "border-red-200 bg-red-50 text-red-800",
-  muted: "border-brand-cappuccino bg-brand-latte text-brand-mocha",
-  info: "border-brand-cappuccino bg-brand-cappuccino/30 text-brand-espresso",
+  muted: "border-workspace-border bg-brand-latte text-workspace-muted",
+  info: "border-workspace-border bg-workspace-panel text-brand-espresso",
 };
 
 export function AppBadge({

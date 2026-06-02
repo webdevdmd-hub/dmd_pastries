@@ -17,7 +17,7 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     suppressHydrationWarning
     className={cn(
-      "flex h-11 w-full items-center justify-between rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso ring-offset-background placeholder:text-brand-mocha/60 focus:outline-none focus:ring-2 focus:ring-brand-caramel focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+      "flex h-11 w-full items-center justify-between rounded-xl border border-workspace-border bg-workspace-panel px-3 py-2 text-sm text-brand-espresso ring-offset-background placeholder:text-workspace-muted/65 focus:outline-none focus:ring-2 focus:ring-brand-caramel focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-brand-latte disabled:opacity-60",
       className,
     )}
     {...props}
@@ -66,7 +66,7 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-2xl border border-brand-cappuccino bg-white/95 text-brand-espresso shadow-float data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-2xl border border-workspace-border bg-workspace-panel text-brand-espresso shadow-float data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         position === "popper"
           ? "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1"
           : undefined,
@@ -109,7 +109,7 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-xl py-2 pl-8 pr-3 text-sm outline-none focus:bg-brand-cappuccino/40 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "relative flex w-full cursor-default select-none items-center rounded-xl py-2 pl-8 pr-3 text-sm outline-none focus:bg-brand-latte data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className,
     )}
     {...props}
@@ -130,7 +130,7 @@ const SelectSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Separator
     ref={ref}
-    className={cn("-mx-1 my-1 h-px bg-brand-cappuccino", className)}
+    className={cn("-mx-1 my-1 h-px bg-workspace-border", className)}
     {...props}
   />
 ));
