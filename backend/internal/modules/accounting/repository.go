@@ -28,6 +28,8 @@ type posSaleAccountingRow struct {
 	TaxAmount                float64
 	SaleStatus               string
 	AccountingJournalEntryID *string
+	COGSJournalEntryID       *string
+	VoidJournalEntryID       *string
 	SoldAt                   time.Time
 }
 
@@ -72,6 +74,91 @@ type bakeryPaymentAccountingRow struct {
 	ChartAccountID            string
 	JournalEntryID            *string
 	PaidAt                    time.Time
+}
+
+type salesReturnAccountingRow struct {
+	ID                      string
+	BusinessID              string
+	BranchID                string
+	ReturnNumber            string
+	ReturnDate              time.Time
+	TaxAmount               float64
+	ReturnTotal             float64
+	RefundAmount            float64
+	RefundMode              string
+	Status                  string
+	RefundPaymentMethodID   *string
+	RefundPaymentMethodName string
+	DefaultPaymentAccountID *string
+	PaymentAccountBranchID  *string
+	PaymentAccountName      string
+	ChartAccountID          string
+	JournalEntryID          *string
+	InventoryJournalEntryID *string
+}
+
+type purchaseReturnAccountingRow struct {
+	ID                  string
+	BusinessID          string
+	BranchID            string
+	ReturnNumber        string
+	ReturnDate          time.Time
+	TaxAmount           float64
+	ReturnTotal         float64
+	Status              string
+	AppliedCreditAmount float64
+	OpenCreditAmount    float64
+	JournalEntryID      *string
+}
+
+type purchaseInvoiceAccountingRow struct {
+	ID             string
+	BusinessID     string
+	BranchID       string
+	InvoiceNumber  string
+	InvoiceDate    time.Time
+	Status         string
+	SubtotalAmount float64
+	TaxAmount      float64
+	TotalAmount    float64
+	JournalEntryID *string
+}
+
+type purchaseInvoiceItemAccountingRow struct {
+	ID        string
+	ItemType  string
+	Quantity  float64
+	UnitCost  float64
+	TaxAmount float64
+	LineTotal float64
+}
+
+type purchaseInvoicePaymentAccountingRow struct {
+	ID                        string
+	BusinessID                string
+	BranchID                  string
+	PurchaseInvoiceID         string
+	InvoiceNumber             string
+	PaymentMethodNameSnapshot string
+	Amount                    float64
+	PaymentStatus             string
+	DefaultPaymentAccountID   *string
+	PaymentAccountBranchID    *string
+	PaymentAccountName        string
+	ChartAccountID            string
+	JournalEntryID            *string
+	PaidAt                    time.Time
+}
+
+type purchaseReceiptAccountingRow struct {
+	ID                string
+	BusinessID        string
+	BranchID          string
+	ReceiptNumber     string
+	ReceivedDate      time.Time
+	Status            string
+	PurchaseInvoiceID *string
+	JournalEntryID    *string
 }
 
 func (r *Repository) Create(tx *gorm.DB, account *ChartAccount) error {
@@ -228,13 +315,196 @@ func (r *Repository) FindActiveAccountByCode(tx *gorm.DB, businessID, accountCod
 	return &account, err
 }
 
+func (r *Repository) ListAccountMappings(businessID string) ([]AccountMappingResponse, error) {
+	var rows []AccountMappingResponse
+	err := r.db.Table("accounting_account_mappings aam").
+		Select(`aam.id, aam.business_id, aam.mapping_key, aam.chart_account_id,
+			coa.account_code AS chart_account_code,
+			coa.account_name AS chart_account_name,
+			coa.account_type AS chart_account_type,
+			coa.account_group,
+			aam.description,
+			aam.created_at,
+			aam.updated_at`).
+		Joins("JOIN chart_of_accounts coa ON coa.id = aam.chart_account_id AND coa.business_id = aam.business_id AND coa.deleted_at IS NULL").
+		Where("aam.business_id = ? AND aam.deleted_at IS NULL", businessID).
+		Order("aam.mapping_key ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) FindAccountMapping(tx *gorm.DB, businessID, mappingKey string) (*AccountMapping, error) {
+	var mapping AccountMapping
+	err := tx.Where("business_id = ? AND mapping_key = ? AND deleted_at IS NULL", businessID, mappingKey).First(&mapping).Error
+	return &mapping, err
+}
+
+func (r *Repository) UpsertAccountMapping(tx *gorm.DB, mapping *AccountMapping) error {
+	var existing AccountMapping
+	err := tx.Where("business_id = ? AND mapping_key = ? AND deleted_at IS NULL", mapping.BusinessID, mapping.MappingKey).First(&existing).Error
+	if err == nil {
+		return tx.Model(&existing).Updates(map[string]interface{}{
+			"chart_account_id": mapping.ChartAccountID,
+			"description":      mapping.Description,
+			"updated_at":       time.Now().UTC(),
+		}).Error
+	}
+	if err != gorm.ErrRecordNotFound {
+		return err
+	}
+	return tx.Create(mapping).Error
+}
+
+func (r *Repository) FindPostedJournalBySource(tx *gorm.DB, businessID, sourceType, sourceID string) (*JournalEntry, error) {
+	var entry JournalEntry
+	err := tx.Where("business_id = ? AND source_type = ? AND source_id = ? AND status IN ? AND deleted_at IS NULL", businessID, sourceType, sourceID, []string{"posted", "reversed"}).
+		Order("created_at ASC").
+		First(&entry).Error
+	return &entry, err
+}
+
 func (r *Repository) FindPOSSaleForAccounting(tx *gorm.DB, businessID, saleID string) (*posSaleAccountingRow, error) {
 	var row posSaleAccountingRow
 	err := tx.Table("sales").
-		Select("id, business_id, branch_id, sale_number, total_amount, paid_amount, change_amount, tax_amount, sale_status, accounting_journal_entry_id, sold_at").
+		Select("id, business_id, branch_id, sale_number, total_amount, paid_amount, change_amount, tax_amount, sale_status, accounting_journal_entry_id, cogs_journal_entry_id, void_journal_entry_id, sold_at").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, saleID).
 		Take(&row).Error
 	return &row, err
+}
+
+func (r *Repository) SumStockMovementCostByReference(tx *gorm.DB, businessID, referenceType, referenceID, movementDirection string) (float64, error) {
+	var total float64
+	err := tx.Table("stock_movements").
+		Select("COALESCE(SUM(total_cost), 0)").
+		Where("business_id = ? AND reference_type = ? AND reference_id = ? AND movement_direction = ? AND deleted_at IS NULL", businessID, referenceType, referenceID, movementDirection).
+		Scan(&total).Error
+	return total, err
+}
+
+func (r *Repository) UpdateStockMovementJournalByReference(tx *gorm.DB, businessID, referenceType, referenceID, movementDirection, journalEntryID string) error {
+	return tx.Table("stock_movements").
+		Where("business_id = ? AND reference_type = ? AND reference_id = ? AND movement_direction = ? AND deleted_at IS NULL", businessID, referenceType, referenceID, movementDirection).
+		Update("accounting_journal_entry_id", journalEntryID).Error
+}
+
+func (r *Repository) UpdatePOSSaleCOGSJournalID(tx *gorm.DB, businessID, saleID, journalEntryID string) error {
+	result := tx.Table("sales").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, saleID).
+		Update("cogs_journal_entry_id", journalEntryID)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) UpdatePOSSaleVoidJournalID(tx *gorm.DB, businessID, saleID, journalEntryID string) error {
+	result := tx.Table("sales").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, saleID).
+		Update("void_journal_entry_id", journalEntryID)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) FindPurchaseInvoiceForAccounting(tx *gorm.DB, businessID, invoiceID string) (*purchaseInvoiceAccountingRow, error) {
+	var row purchaseInvoiceAccountingRow
+	err := tx.Table("purchase_invoices").
+		Select("id, business_id, branch_id, invoice_number, invoice_date, status, subtotal_amount, tax_amount, total_amount, journal_entry_id").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, invoiceID).
+		Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) ListPurchaseInvoiceItemsForAccounting(tx *gorm.DB, businessID, invoiceID string) ([]purchaseInvoiceItemAccountingRow, error) {
+	var rows []purchaseInvoiceItemAccountingRow
+	err := tx.Table("purchase_invoice_items").
+		Select("id, item_type, quantity, unit_cost, tax_amount, line_total").
+		Where("business_id = ? AND purchase_invoice_id = ? AND deleted_at IS NULL", businessID, invoiceID).
+		Order("created_at ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) UpdatePurchaseInvoiceJournalID(tx *gorm.DB, businessID, invoiceID, journalEntryID string) error {
+	result := tx.Table("purchase_invoices").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, invoiceID).
+		Update("journal_entry_id", journalEntryID)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) FindPurchaseInvoicePaymentForAccounting(tx *gorm.DB, businessID, paymentID string) (*purchaseInvoicePaymentAccountingRow, error) {
+	var row purchaseInvoicePaymentAccountingRow
+	err := tx.Table("purchase_invoice_payments pip").
+		Select(`
+			pip.id,
+			pip.business_id,
+			pip.branch_id,
+			pip.purchase_invoice_id,
+			pi.invoice_number,
+			pip.payment_method_name_snapshot,
+			pip.amount,
+			pip.payment_status,
+			pm.default_payment_account_id,
+			pa.branch_id AS payment_account_branch_id,
+			COALESCE(pa.account_name, '') AS payment_account_name,
+			COALESCE(pa.chart_account_id::text, '') AS chart_account_id,
+			pip.journal_entry_id,
+			pip.paid_at
+		`).
+		Joins("JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id AND pi.business_id = pip.business_id AND pi.deleted_at IS NULL").
+		Joins("JOIN payment_methods pm ON pm.id = pip.payment_method_id AND pm.business_id = pip.business_id AND pm.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = pip.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL").
+		Where("pip.business_id = ? AND pip.id = ? AND pip.deleted_at IS NULL", businessID, paymentID).
+		Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) UpdatePurchaseInvoicePaymentJournalID(tx *gorm.DB, businessID, paymentID, journalEntryID string) error {
+	result := tx.Table("purchase_invoice_payments").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, paymentID).
+		Update("journal_entry_id", journalEntryID)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) FindPurchaseReceiptForAccounting(tx *gorm.DB, businessID, receiptID string) (*purchaseReceiptAccountingRow, error) {
+	var row purchaseReceiptAccountingRow
+	err := tx.Table("purchase_receipts").
+		Select("id, business_id, branch_id, receipt_number, received_date, status, purchase_invoice_id, journal_entry_id").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, receiptID).
+		Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) UpdatePurchaseReceiptJournalID(tx *gorm.DB, businessID, receiptID, journalEntryID string) error {
+	result := tx.Table("purchase_receipts").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, receiptID).
+		Update("journal_entry_id", journalEntryID)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *Repository) ListPOSSalePaymentsForAccounting(tx *gorm.DB, businessID, saleID string) ([]posPaymentAccountingRow, error) {
@@ -332,6 +602,84 @@ func (r *Repository) UpdateBakeryOrderAccountingJournalID(tx *gorm.DB, businessI
 	result := tx.Table("bakery_orders").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, orderID).
 		Updates(map[string]interface{}{"accounting_journal_entry_id": journalEntryID, "updated_at": time.Now().UTC()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) FindSalesReturnForAccounting(tx *gorm.DB, businessID, salesReturnID string) (*salesReturnAccountingRow, error) {
+	var row salesReturnAccountingRow
+	err := tx.Table("sales_returns sr").
+		Select(`
+			sr.id,
+			sr.business_id,
+			sr.branch_id,
+			sr.return_number,
+			sr.return_date,
+			sr.tax_amount,
+			sr.return_total,
+			sr.refund_amount,
+			sr.refund_mode,
+			sr.status,
+			sr.refund_payment_method_id,
+			COALESCE(pm.method_name, '') AS refund_payment_method_name,
+			pm.default_payment_account_id,
+			pa.branch_id AS payment_account_branch_id,
+			COALESCE(pa.account_name, '') AS payment_account_name,
+			COALESCE(pa.chart_account_id::text, '') AS chart_account_id,
+			sr.journal_entry_id,
+			sr.inventory_journal_entry_id
+		`).
+		Joins("LEFT JOIN payment_methods pm ON pm.id = sr.refund_payment_method_id AND pm.business_id = sr.business_id AND pm.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = sr.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL").
+		Where("sr.business_id = ? AND sr.id = ? AND sr.deleted_at IS NULL", businessID, salesReturnID).
+		Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) UpdateSalesReturnJournalID(tx *gorm.DB, businessID, salesReturnID, journalEntryID string) error {
+	result := tx.Table("sales_returns").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, salesReturnID).
+		Updates(map[string]interface{}{"journal_entry_id": journalEntryID, "updated_at": time.Now().UTC()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) UpdateSalesReturnInventoryJournalID(tx *gorm.DB, businessID, salesReturnID, journalEntryID string) error {
+	result := tx.Table("sales_returns").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, salesReturnID).
+		Updates(map[string]interface{}{"inventory_journal_entry_id": journalEntryID, "updated_at": time.Now().UTC()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) FindPurchaseReturnForAccounting(tx *gorm.DB, businessID, purchaseReturnID string) (*purchaseReturnAccountingRow, error) {
+	var row purchaseReturnAccountingRow
+	err := tx.Table("purchase_returns").
+		Select("id, business_id, branch_id, return_number, return_date, tax_amount, return_total, status, applied_credit_amount, open_credit_amount, journal_entry_id").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, purchaseReturnID).
+		Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) UpdatePurchaseReturnJournalID(tx *gorm.DB, businessID, purchaseReturnID, journalEntryID string) error {
+	result := tx.Table("purchase_returns").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, purchaseReturnID).
+		Updates(map[string]interface{}{"journal_entry_id": journalEntryID, "updated_at": time.Now().UTC()})
 	if result.Error != nil {
 		return result.Error
 	}

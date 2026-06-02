@@ -124,6 +124,9 @@ type PaymentRefundResponse struct {
 	BranchID                  string    `json:"branch_id"`
 	SaleID                    string    `json:"sale_id"`
 	SalePaymentID             *string   `json:"sale_payment_id"`
+	SalesReturnID             *string   `json:"sales_return_id"`
+	SalesReturnNumber         string    `json:"sales_return_number"`
+	RefundSource              string    `json:"refund_source"`
 	RefundNumber              string    `json:"refund_number"`
 	PaymentMethodID           string    `json:"payment_method_id"`
 	PaymentMethodNameSnapshot string    `json:"payment_method_name_snapshot"`

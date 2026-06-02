@@ -14,14 +14,18 @@ import type { PurchaseReceipt } from "@/types/purchasing";
 
 export function PurchaseReceiptActionsMenu({
   canManage,
+  canReturn,
   onCancel,
   onPost,
+  onReturn,
   onView,
   receipt,
 }: {
   canManage: boolean;
+  canReturn: boolean;
   onCancel: (receipt: PurchaseReceipt) => void;
   onPost: (receipt: PurchaseReceipt) => void;
+  onReturn: (receipt: PurchaseReceipt) => void;
   onView: (receipt: PurchaseReceipt) => void;
   receipt: PurchaseReceipt;
 }): JSX.Element {
@@ -39,6 +43,14 @@ export function PurchaseReceiptActionsMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={() => onView(receipt)}>View details</DropdownMenuItem>
+        {canReturn ? (
+          <DropdownMenuItem
+            disabled={receipt.status !== "posted"}
+            onSelect={() => onReturn(receipt)}
+          >
+            Return items
+          </DropdownMenuItem>
+        ) : null}
         {canManage ? (
           <>
             <DropdownMenuItem

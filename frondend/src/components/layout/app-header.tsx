@@ -1,6 +1,15 @@
 "use client";
 
-import { Building2, Check, FileClock, GitBranch, LogOut, Settings2, UserRound } from "lucide-react";
+import {
+  Building2,
+  Check,
+  FileClock,
+  GitBranch,
+  LogOut,
+  MapPin,
+  Settings2,
+  UserRound,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Fragment, type JSX } from "react";
@@ -81,6 +90,16 @@ export function AppHeader(): JSX.Element {
   const switchBranchMutation = useSwitchBranch();
   const currentBranchId =
     branchScope.effectiveBranchId ?? onboardingQuery.data?.currentBranchId ?? null;
+  const currentBranchDisplayName =
+    branchScope.effectiveBranchName ??
+    branchesQuery.data?.find((branch) => branch.id === currentBranchId)?.name ??
+    (branchScope.canAccessAllBranches && !currentBranchId
+      ? "All branches"
+      : currentBranchId
+        ? "Branch name unavailable"
+        : "No branch assigned");
+  const currentBranchDisplayLabel =
+    branchScope.canAccessAllBranches && !currentBranchId ? "Branch scope" : "Active branch";
   const branchOptions =
     branchesQuery.data?.filter((branch) => {
       const branchIsAllowed =
@@ -129,6 +148,20 @@ export function AppHeader(): JSX.Element {
                 {businessQuery.data?.businessName ?? user?.businessName ?? "Business workspace"}
               </p>
             </div>
+          </div>
+
+          <div className="hidden min-w-0 items-center gap-2 rounded-2xl border border-workspace-border bg-workspace-panel px-3 py-2 text-left shadow-none md:flex">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-latte text-brand-caramel">
+              <MapPin className="h-4 w-4" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-workspace-muted">
+                {currentBranchDisplayLabel}
+              </span>
+              <span className="block truncate text-sm font-semibold text-brand-espresso">
+                {currentBranchDisplayName}
+              </span>
+            </span>
           </div>
 
           <DropdownMenu>

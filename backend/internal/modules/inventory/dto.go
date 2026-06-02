@@ -77,6 +77,7 @@ type OpeningStockRequest struct {
 	StockLocationID  string  `json:"stock_location_id"`
 	UnitID           string  `json:"unit_id" binding:"required"`
 	Quantity         float64 `json:"quantity"`
+	UnitCost         float64 `json:"unit_cost"`
 	ReorderLevel     float64 `json:"reorder_level"`
 	IsExpiryTracked  bool    `json:"is_expiry_tracked"`
 	ExpiryDate       string  `json:"expiry_date"`
@@ -124,6 +125,7 @@ type ManualStockMovementRequest struct {
 	InventoryItemID string  `json:"inventory_item_id" binding:"required"`
 	MovementType    string  `json:"movement_type" binding:"required"`
 	Quantity        float64 `json:"quantity" binding:"required"`
+	UnitCost        float64 `json:"unit_cost"`
 	Reason          string  `json:"reason" binding:"required"`
 	Notes           string  `json:"notes"`
 }
@@ -167,6 +169,8 @@ type InventoryItemResponse struct {
 	CurrentQuantity    float64                  `json:"current_quantity"`
 	ReservedQuantity   float64                  `json:"reserved_quantity"`
 	AvailableQuantity  float64                  `json:"available_quantity"`
+	AverageUnitCost    float64                  `json:"average_unit_cost"`
+	InventoryValue     float64                  `json:"inventory_value"`
 	ReorderLevel       float64                  `json:"reorder_level"`
 	Unit               UnitInfo                 `json:"unit"`
 	LowStock           bool                     `json:"low_stock"`
@@ -293,40 +297,44 @@ type Pagination struct {
 }
 
 type StockMovementResponse struct {
-	ID                    string    `json:"id"`
-	BusinessID            string    `json:"business_id"`
-	BranchID              string    `json:"branch_id"`
-	BranchName            string    `json:"branch_name"`
-	InventoryItemID       string    `json:"inventory_item_id"`
-	StockLocationID       *string   `json:"stock_location_id"`
-	StockLocationName     string    `json:"stock_location_name"`
-	FromStockLocationID   *string   `json:"from_stock_location_id"`
-	FromStockLocationName string    `json:"from_stock_location_name"`
-	ToStockLocationID     *string   `json:"to_stock_location_id"`
-	ToStockLocationName   string    `json:"to_stock_location_name"`
-	ItemName              string    `json:"item_name"`
-	ItemType              string    `json:"item_type"`
-	ProductID             *string   `json:"product_id"`
-	ProductVariantID      *string   `json:"product_variant_id"`
-	VariantName           string    `json:"variant_name"`
-	MovementType          string    `json:"movement_type"`
-	MovementDirection     string    `json:"movement_direction"`
-	Quantity              float64   `json:"quantity"`
-	BeforeQuantity        float64   `json:"before_quantity"`
-	AfterQuantity         float64   `json:"after_quantity"`
-	Unit                  UnitInfo  `json:"unit"`
-	ReferenceType         string    `json:"reference_type"`
-	ReferenceID           *string   `json:"reference_id"`
-	ReferenceNumber       string    `json:"reference_number"`
-	Reason                string    `json:"reason"`
-	Notes                 string    `json:"notes"`
-	IsReversal            bool      `json:"is_reversal"`
-	ReversedMovementID    *string   `json:"reversed_movement_id"`
-	IsReversed            bool      `json:"is_reversed"`
-	ReversedByMovementID  *string   `json:"reversed_by_movement_id"`
-	CreatedByUserID       string    `json:"created_by_user_id"`
-	CreatedByName         string    `json:"created_by_name"`
-	CreatedAt             time.Time `json:"created_at"`
+	ID                       string    `json:"id"`
+	BusinessID               string    `json:"business_id"`
+	BranchID                 string    `json:"branch_id"`
+	BranchName               string    `json:"branch_name"`
+	InventoryItemID          string    `json:"inventory_item_id"`
+	StockLocationID          *string   `json:"stock_location_id"`
+	StockLocationName        string    `json:"stock_location_name"`
+	FromStockLocationID      *string   `json:"from_stock_location_id"`
+	FromStockLocationName    string    `json:"from_stock_location_name"`
+	ToStockLocationID        *string   `json:"to_stock_location_id"`
+	ToStockLocationName      string    `json:"to_stock_location_name"`
+	ItemName                 string    `json:"item_name"`
+	ItemType                 string    `json:"item_type"`
+	ProductID                *string   `json:"product_id"`
+	ProductVariantID         *string   `json:"product_variant_id"`
+	VariantName              string    `json:"variant_name"`
+	MovementType             string    `json:"movement_type"`
+	MovementDirection        string    `json:"movement_direction"`
+	Quantity                 float64   `json:"quantity"`
+	BeforeQuantity           float64   `json:"before_quantity"`
+	AfterQuantity            float64   `json:"after_quantity"`
+	UnitCostSnapshot         float64   `json:"unit_cost_snapshot"`
+	TotalCost                float64   `json:"total_cost"`
+	ValuationMethod          string    `json:"valuation_method"`
+	AccountingJournalEntryID *string   `json:"accounting_journal_entry_id"`
+	Unit                     UnitInfo  `json:"unit"`
+	ReferenceType            string    `json:"reference_type"`
+	ReferenceID              *string   `json:"reference_id"`
+	ReferenceNumber          string    `json:"reference_number"`
+	Reason                   string    `json:"reason"`
+	Notes                    string    `json:"notes"`
+	IsReversal               bool      `json:"is_reversal"`
+	ReversedMovementID       *string   `json:"reversed_movement_id"`
+	IsReversed               bool      `json:"is_reversed"`
+	ReversedByMovementID     *string   `json:"reversed_by_movement_id"`
+	CreatedByUserID          string    `json:"created_by_user_id"`
+	CreatedByName            string    `json:"created_by_name"`
+	CreatedAt                time.Time `json:"created_at"`
 }
 
 type PaginatedMovementResponse struct {
@@ -376,6 +384,7 @@ type ApplyStockMovementInput struct {
 	ToStockLocationID   *string
 	MovementType        string
 	Quantity            float64
+	UnitCost            float64
 	ReferenceType       string
 	ReferenceID         *string
 	ReferenceNumber     string

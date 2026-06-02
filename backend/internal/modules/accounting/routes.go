@@ -21,6 +21,10 @@ func RegisterRoutes(
 	group.PATCH("/chart-of-accounts/:id/status", manage, handler.UpdateChartAccountStatus)
 	group.DELETE("/chart-of-accounts/:id", manage, handler.DeleteChartAccount)
 
+	group.GET("/account-mappings", view, handler.ListAccountMappings)
+	group.POST("/account-mappings/seed-defaults", manage, handler.SeedAccountMappings)
+	group.PATCH("/account-mappings", manage, handler.UpdateAccountMappings)
+
 	group.GET("/payment-accounts", view, handler.ListPaymentAccounts)
 	group.POST("/payment-accounts", manage, handler.CreatePaymentAccount)
 	group.GET("/payment-accounts/:id", view, handler.GetPaymentAccount)

@@ -181,9 +181,18 @@ func (r *Repository) DailySalesReport(filter *shared.ResolvedFilter) ([]DailySal
 	if err := r.db.Raw(query, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
+	returnTotals, err := r.salesReturnTotalsByBucket(filter)
+	if err != nil {
+		return nil, err
+	}
+	returnByBucket := make(map[string]float64, len(returnTotals))
+	for _, row := range returnTotals {
+		returnByBucket[formatBucket(row.Bucket, filter.GroupBy)] = row.Value
+	}
 	items := make([]DailySalesReportItem, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, DailySalesReportItem{Date: formatBucket(row.Bucket, filter.GroupBy), GrossSales: row.GrossSales, NetSales: row.NetSales, SalesCount: row.SalesCount, ItemsSold: row.ItemsSold, DiscountTotal: row.DiscountTotal, TaxTotal: row.TaxTotal})
+		bucket := formatBucket(row.Bucket, filter.GroupBy)
+		items = append(items, DailySalesReportItem{Date: bucket, GrossSales: row.GrossSales, NetSales: row.NetSales - returnByBucket[bucket], SalesCount: row.SalesCount, ItemsSold: row.ItemsSold, DiscountTotal: row.DiscountTotal, TaxTotal: row.TaxTotal})
 	}
 	return items, nil
 }
@@ -439,6 +448,18 @@ func (r *Repository) SalesTrend(filter *shared.ResolvedFilter) ([]trendSeriesRow
 	query += " GROUP BY bucket ORDER BY bucket ASC"
 	if err := r.db.Raw(query, args...).Scan(&rows).Error; err != nil {
 		return nil, err
+	}
+	returnTotals, err := r.salesReturnTotalsByBucket(filter)
+	if err != nil {
+		return nil, err
+	}
+	returnByBucket := make(map[string]float64, len(returnTotals))
+	for _, row := range returnTotals {
+		returnByBucket[formatBucket(row.Bucket, filter.GroupBy)] = row.Value
+	}
+	for i := range rows {
+		bucket := formatBucket(rows[i].Bucket, filter.GroupBy)
+		rows[i].NetSales -= returnByBucket[bucket]
 	}
 	return rows, nil
 }
@@ -1327,8 +1348,12 @@ func (r *Repository) FinancialRefunds(filter *shared.ResolvedFilter) ([]Financia
 	items := []FinancialRefundReportItem{}
 	query := `
 		SELECT pr.id AS refund_id,
-			'pos_sale' AS source_type,
-			s.sale_number AS source_number,
+			COALESCE(pr.refund_source, 'payment_adjustment') AS refund_source,
+			CASE WHEN COALESCE(pr.refund_source, 'payment_adjustment') = 'sales_return' THEN 'sales_return' ELSE 'pos_sale' END AS source_type,
+			CASE WHEN COALESCE(pr.refund_source, 'payment_adjustment') = 'sales_return' THEN COALESCE(sr.return_number, '') ELSE s.sale_number END AS source_number,
+			s.sale_number,
+			pr.sales_return_id,
+			COALESCE(sr.return_number, '') AS sales_return_number,
 			b.branch_name,
 			pr.payment_method_name_snapshot AS payment_method_name,
 			pr.refund_amount,
@@ -1339,6 +1364,7 @@ func (r *Repository) FinancialRefunds(filter *shared.ResolvedFilter) ([]Financia
 		FROM payment_refunds pr
 		JOIN sales s ON s.id = pr.sale_id
 		JOIN branches b ON b.id = pr.branch_id
+		LEFT JOIN sales_returns sr ON sr.id = pr.sales_return_id AND sr.business_id = pr.business_id
 		LEFT JOIN users u ON u.id = pr.created_by_user_id
 		WHERE pr.business_id = ? AND pr.refunded_at >= ? AND pr.refunded_at < ? AND pr.deleted_at IS NULL`
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
@@ -1389,6 +1415,12 @@ func (r *Repository) FinancialOutstandingBalances(filter *shared.ResolvedFilter)
 
 func (r *Repository) FinancialSupplierPayables(filter *shared.ResolvedFilter) ([]SupplierPayableReportItem, int64, error) {
 	items := []SupplierPayableReportItem{}
+	creditBranchFilter := ""
+	creditArgs := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
+	if !filter.AllBranches {
+		creditBranchFilter = " AND branch_id = ?"
+		creditArgs = append(creditArgs, filter.BranchID)
+	}
 	query := `
 		SELECT pi.supplier_id,
 			s.supplier_name,
@@ -1396,11 +1428,18 @@ func (r *Repository) FinancialSupplierPayables(filter *shared.ResolvedFilter) ([
 			COALESCE(SUM(pi.total_amount),0) AS total_invoice_amount,
 			COALESCE(SUM(pi.paid_amount),0) AS paid_amount,
 			COALESCE(SUM(pi.balance_amount),0) AS payable_balance,
+			COALESCE(MAX(vc.open_credit_amount),0) AS open_credit_amount,
 			MIN(pi.due_date)::text AS oldest_due_date
 		FROM purchase_invoices pi
 		JOIN suppliers s ON s.id = pi.supplier_id
+		LEFT JOIN (
+			SELECT supplier_id, COALESCE(SUM(open_credit_amount),0) AS open_credit_amount
+			FROM purchase_returns
+			WHERE business_id = ? AND return_date >= ? AND return_date <= ? AND status = 'posted' AND deleted_at IS NULL` + creditBranchFilter + `
+			GROUP BY supplier_id
+		) vc ON vc.supplier_id = pi.supplier_id
 		WHERE pi.business_id = ? AND pi.invoice_date >= ? AND pi.invoice_date <= ? AND pi.status <> 'cancelled' AND pi.payment_status IN ('unpaid','partial','overdue') AND pi.deleted_at IS NULL`
-	args := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
+	args := append(creditArgs, filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02"))
 	if !filter.AllBranches {
 		query += " AND pi.branch_id = ?"
 		args = append(args, filter.BranchID)
@@ -1514,11 +1553,8 @@ func (r *Repository) salesReportSummaryForRange(filter *shared.ResolvedFilter, s
 	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
 		return nil, err
 	}
-	var refundTotal float64
-	refundQuery := "SELECT COALESCE(SUM(refund_amount),0) FROM payment_refunds WHERE business_id = ? AND refunded_at >= ? AND refunded_at < ? AND refund_status = 'completed' AND deleted_at IS NULL"
-	refundArgs := []interface{}{filter.BusinessID, startUTC, endUTC}
-	refundQuery, refundArgs = addBranchCondition(refundQuery, refundArgs, filter)
-	if err := r.db.Raw(refundQuery, refundArgs...).Scan(&refundTotal).Error; err != nil {
+	returnTotal, err := r.salesReturnTotalForRange(filter, startUTC, endUTC)
+	if err != nil {
 		return nil, err
 	}
 	var voidCount int64
@@ -1530,12 +1566,12 @@ func (r *Repository) salesReportSummaryForRange(filter *shared.ResolvedFilter, s
 	}
 	response := &SalesReportSummaryResponse{
 		GrossSales:       row.GrossSales,
-		NetSales:         row.NetSales - refundTotal,
+		NetSales:         row.NetSales - returnTotal,
 		SalesCount:       row.SalesCount,
 		ItemsSold:        row.ItemsSold,
 		DiscountTotal:    row.DiscountTotal,
 		TaxTotal:         row.TaxTotal,
-		RefundTotal:      refundTotal,
+		RefundTotal:      returnTotal,
 		VoidedSalesCount: voidCount,
 	}
 	if response.SalesCount > 0 {
@@ -2094,6 +2130,65 @@ func addHeaderSalesFilters(query string, args []interface{}, filter *shared.Reso
 	if filter.SaleStatus != "" {
 		query += " AND s.sale_status = ?"
 		args = append(args, filter.SaleStatus)
+	}
+	return query, args
+}
+
+func (r *Repository) salesReturnTotalForRange(filter *shared.ResolvedFilter, startUTC, endUTC time.Time) (float64, error) {
+	var total float64
+	query := `
+		SELECT COALESCE(SUM(sri.line_total),0)
+		FROM sales_return_items sri
+		JOIN sales_returns sr ON sr.id = sri.sales_return_id
+		JOIN sales s ON s.id = sr.sale_id
+		LEFT JOIN products p ON p.id = sri.product_id
+		WHERE sr.business_id = ? AND sr.return_date >= ? AND sr.return_date < ? AND sr.status = 'posted' AND sr.deleted_at IS NULL AND sri.deleted_at IS NULL`
+	args := []interface{}{filter.BusinessID, startUTC, endUTC}
+	query, args = addSalesReturnFilters(query, args, filter)
+	err := r.db.Raw(query, args...).Scan(&total).Error
+	return total, err
+}
+
+func (r *Repository) salesReturnTotalsByBucket(filter *shared.ResolvedFilter) ([]timeSeriesRow, error) {
+	rows := []timeSeriesRow{}
+	query := fmt.Sprintf(`
+		SELECT %s AS bucket, COALESCE(SUM(sri.line_total),0) AS value
+		FROM sales_return_items sri
+		JOIN sales_returns sr ON sr.id = sri.sales_return_id
+		JOIN sales s ON s.id = sr.sale_id
+		LEFT JOIN products p ON p.id = sri.product_id
+		WHERE sr.business_id = ? AND sr.return_date >= ? AND sr.return_date < ? AND sr.status = 'posted' AND sr.deleted_at IS NULL AND sri.deleted_at IS NULL`, dateTrunc(filter.GroupBy, "sr.return_date"))
+	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
+	query, args = addSalesReturnFilters(query, args, filter)
+	query += " GROUP BY bucket ORDER BY bucket ASC"
+	err := r.db.Raw(query, args...).Scan(&rows).Error
+	return rows, err
+}
+
+func addSalesReturnFilters(query string, args []interface{}, filter *shared.ResolvedFilter) (string, []interface{}) {
+	if !filter.AllBranches {
+		query += " AND sr.branch_id = ?"
+		args = append(args, filter.BranchID)
+	}
+	if filter.CashierUserID != "" {
+		query += " AND s.cashier_user_id = ?"
+		args = append(args, filter.CashierUserID)
+	}
+	if filter.PaymentStatus != "" {
+		query += " AND s.payment_status = ?"
+		args = append(args, filter.PaymentStatus)
+	}
+	if filter.SaleStatus != "" {
+		query += " AND s.sale_status = ?"
+		args = append(args, filter.SaleStatus)
+	}
+	if filter.ProductID != "" {
+		query += " AND sri.product_id = ?"
+		args = append(args, filter.ProductID)
+	}
+	if filter.CategoryID != "" {
+		query += " AND p.category_id = ?"
+		args = append(args, filter.CategoryID)
 	}
 	return query, args
 }

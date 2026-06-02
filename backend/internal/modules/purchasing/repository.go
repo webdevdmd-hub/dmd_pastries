@@ -166,7 +166,8 @@ func (r *Repository) ListInvoicePayments(businessID, invoiceID string) ([]Purcha
 			pip.payment_method_name_snapshot AS payment_method_name,
 			pip.payment_method_type_snapshot AS payment_method_type,
 			pip.amount, pip.payment_status, pip.reference_number, pip.paid_by_user_id,
-			u.full_name AS paid_by_user_name, pip.paid_at, pip.notes, pip.created_at, pip.updated_at`).
+			u.full_name AS paid_by_user_name, pip.paid_at, pip.notes, pip.journal_entry_id,
+			pip.created_at, pip.updated_at`).
 		Joins("JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id").
 		Joins("JOIN suppliers s ON s.id = pip.supplier_id").
 		Joins("JOIN branches b ON b.id = pip.branch_id").
@@ -197,7 +198,8 @@ func (r *Repository) ListAllInvoicePayments(businessID string, query PaymentList
 			pip.payment_method_name_snapshot AS payment_method_name,
 			pip.payment_method_type_snapshot AS payment_method_type,
 			pip.amount, pip.payment_status, pip.reference_number, pip.paid_by_user_id,
-			u.full_name AS paid_by_user_name, pip.paid_at, pip.notes, pip.created_at, pip.updated_at`).
+			u.full_name AS paid_by_user_name, pip.paid_at, pip.notes, pip.journal_entry_id,
+			pip.created_at, pip.updated_at`).
 		Order("pip." + sortBy + " " + sortOrder).
 		Offset((query.Page - 1) * query.Limit).
 		Limit(query.Limit).
@@ -221,7 +223,8 @@ func (r *Repository) InvoicePaymentsForOrder(businessID, orderID string) ([]Purc
 			pip.payment_method_name_snapshot AS payment_method_name,
 			pip.payment_method_type_snapshot AS payment_method_type,
 			pip.amount, pip.payment_status, pip.reference_number, pip.paid_by_user_id,
-			u.full_name AS paid_by_user_name, pip.paid_at, pip.notes, pip.created_at, pip.updated_at`).
+			u.full_name AS paid_by_user_name, pip.paid_at, pip.notes, pip.journal_entry_id,
+			pip.created_at, pip.updated_at`).
 		Joins("JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id").
 		Joins("JOIN suppliers s ON s.id = pip.supplier_id").
 		Joins("JOIN branches b ON b.id = pip.branch_id").
@@ -313,6 +316,128 @@ func (r *Repository) UpdateReceiptItemStockMovement(tx *gorm.DB, itemID, busines
 
 func (r *Repository) UpdateReceipt(tx *gorm.DB, id, businessID string, updates map[string]interface{}) error {
 	return updateOne(tx.Model(&PurchaseReceipt{}).Where("id = ? AND business_id = ? AND deleted_at IS NULL", id, businessID).Updates(updates))
+}
+
+func (r *Repository) CreatePurchaseReturn(tx *gorm.DB, purchaseReturn *PurchaseReturn, items []PurchaseReturnItem) error {
+	if err := tx.Create(purchaseReturn).Error; err != nil {
+		return err
+	}
+	return tx.Create(&items).Error
+}
+
+func (r *Repository) UpdatePurchaseReturn(tx *gorm.DB, id, businessID string, updates map[string]interface{}, items []PurchaseReturnItem) error {
+	if err := updateOne(tx.Model(&PurchaseReturn{}).Where("id = ? AND business_id = ? AND deleted_at IS NULL", id, businessID).Updates(updates)); err != nil {
+		return err
+	}
+	if items != nil {
+		if err := tx.Model(&PurchaseReturnItem{}).
+			Where("purchase_return_id = ? AND business_id = ? AND deleted_at IS NULL", id, businessID).
+			Update("deleted_at", gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}).Error; err != nil {
+			return err
+		}
+		if len(items) > 0 {
+			return tx.Create(&items).Error
+		}
+	}
+	return nil
+}
+
+func (r *Repository) FindPurchaseReturn(id, businessID string) (*PurchaseReturn, error) {
+	var row PurchaseReturn
+	err := r.db.Where("id = ? AND business_id = ? AND deleted_at IS NULL", id, businessID).First(&row).Error
+	return &row, err
+}
+
+func (r *Repository) FindPurchaseReturnForUpdate(tx *gorm.DB, id, businessID string) (*PurchaseReturn, error) {
+	var row PurchaseReturn
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ? AND business_id = ? AND deleted_at IS NULL", id, businessID).
+		First(&row).Error
+	return &row, err
+}
+
+func (r *Repository) ListPurchaseReturns(businessID string, query PurchaseReturnListQuery) ([]PurchaseReturn, int64, error) {
+	db := r.db.Model(&PurchaseReturn{}).Where("purchase_returns.business_id = ? AND purchase_returns.deleted_at IS NULL", businessID)
+	db = applyReturnFilters(db, query)
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var rows []PurchaseReturn
+	err := db.Order(fmt.Sprintf("purchase_returns.%s %s", safeReturnSort(query.SortBy), safeOrder(query.SortOrder))).
+		Offset((query.Page - 1) * query.Limit).
+		Limit(query.Limit).
+		Find(&rows).Error
+	return rows, total, err
+}
+
+func (r *Repository) PurchaseReturnItems(returnID, businessID string) ([]PurchaseReturnItem, error) {
+	var items []PurchaseReturnItem
+	err := r.db.Where("purchase_return_id = ? AND business_id = ? AND deleted_at IS NULL", returnID, businessID).
+		Order("created_at ASC").
+		Find(&items).Error
+	return items, err
+}
+
+func (r *Repository) PurchaseReturnItemsForUpdate(tx *gorm.DB, returnID, businessID string) ([]PurchaseReturnItem, error) {
+	var items []PurchaseReturnItem
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("purchase_return_id = ? AND business_id = ? AND deleted_at IS NULL", returnID, businessID).
+		Order("created_at ASC").
+		Find(&items).Error
+	return items, err
+}
+
+func (r *Repository) PurchaseReturnsForReceipt(businessID, receiptID string) ([]PurchaseReturn, error) {
+	var rows []PurchaseReturn
+	err := r.db.Where("business_id = ? AND purchase_receipt_id = ? AND deleted_at IS NULL", businessID, receiptID).
+		Order("return_date ASC, created_at ASC").
+		Find(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) PurchaseReturnsForInvoice(businessID, invoiceID string) ([]PurchaseReturn, error) {
+	var rows []PurchaseReturn
+	err := r.db.Where("business_id = ? AND purchase_invoice_id = ? AND deleted_at IS NULL", businessID, invoiceID).
+		Order("return_date ASC, created_at ASC").
+		Find(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) PurchaseReturnsForOrder(businessID, orderID string) ([]PurchaseReturn, error) {
+	var rows []PurchaseReturn
+	err := r.db.Where("business_id = ? AND purchase_order_id = ? AND deleted_at IS NULL", businessID, orderID).
+		Order("return_date ASC, created_at ASC").
+		Find(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) PostedReturnedQuantityForReceiptItem(tx *gorm.DB, businessID, receiptItemID, excludeReturnID string) (float64, error) {
+	db := tx.Table("purchase_return_items pri").
+		Select("COALESCE(SUM(pri.quantity), 0)").
+		Joins("JOIN purchase_returns pr ON pr.id = pri.purchase_return_id AND pr.business_id = pri.business_id").
+		Where("pri.business_id = ? AND pri.purchase_receipt_item_id = ? AND pr.status = ? AND pri.deleted_at IS NULL AND pr.deleted_at IS NULL", businessID, receiptItemID, "posted")
+	if strings.TrimSpace(excludeReturnID) != "" {
+		db = db.Where("pr.id <> ?", excludeReturnID)
+	}
+	var quantity float64
+	err := db.Scan(&quantity).Error
+	return quantity, err
+}
+
+func (r *Repository) UpdatePurchaseReturnItemStockMovement(tx *gorm.DB, itemID, businessID, stockMovementID string) error {
+	return updateOne(tx.Model(&PurchaseReturnItem{}).
+		Where("id = ? AND business_id = ? AND deleted_at IS NULL", itemID, businessID).
+		Updates(map[string]interface{}{"stock_movement_id": stockMovementID, "updated_at": time.Now().UTC()}))
+}
+
+func (r *Repository) StockLocationName(stockLocationID *string, businessID string) string {
+	if stockLocationID == nil || strings.TrimSpace(*stockLocationID) == "" {
+		return ""
+	}
+	var name string
+	_ = r.db.Table("stock_locations").Select("location_name").Where("id = ? AND business_id = ?", *stockLocationID, businessID).Scan(&name).Error
+	return name
 }
 
 func (r *Repository) NextNumber(tx *gorm.DB, businessID, table, column, prefix, lockName string) (string, error) {
@@ -475,9 +600,47 @@ func applyPaymentFilters(db *gorm.DB, query PaymentListQuery) *gorm.DB {
 	return db
 }
 
+func applyReturnFilters(db *gorm.DB, query PurchaseReturnListQuery) *gorm.DB {
+	if query.BranchID != "" {
+		db = db.Where("purchase_returns.branch_id = ?", query.BranchID)
+	}
+	if query.SupplierID != "" {
+		db = db.Where("purchase_returns.supplier_id = ?", query.SupplierID)
+	}
+	if query.PurchaseInvoiceID != "" {
+		db = db.Where("purchase_returns.purchase_invoice_id = ?", query.PurchaseInvoiceID)
+	}
+	if query.PurchaseReceiptID != "" {
+		db = db.Where("purchase_returns.purchase_receipt_id = ?", query.PurchaseReceiptID)
+	}
+	if query.Status != "" {
+		db = db.Where("purchase_returns.status = ?", query.Status)
+	}
+	if query.DateFrom != "" {
+		db = db.Where("purchase_returns.return_date >= ?", query.DateFrom)
+	}
+	if query.DateTo != "" {
+		db = db.Where("purchase_returns.return_date <= ?", query.DateTo)
+	}
+	if query.Search != "" {
+		like := "%" + strings.ToLower(query.Search) + "%"
+		db = db.Where("LOWER(purchase_returns.return_number) LIKE ? OR LOWER(purchase_returns.supplier_reference_number) LIKE ? OR LOWER(purchase_returns.reason) LIKE ?", like, like, like)
+	}
+	return db
+}
+
 func safeSort(value string) string {
 	switch value {
 	case "updated_at", "status", "total_amount", "invoice_date", "order_date", "received_date":
+		return value
+	default:
+		return "created_at"
+	}
+}
+
+func safeReturnSort(value string) string {
+	switch value {
+	case "return_date", "return_total", "status", "created_at", "updated_at":
 		return value
 	default:
 		return "created_at"

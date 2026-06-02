@@ -7,6 +7,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
+import { PurchaseDocumentChain } from "@/components/purchasing/purchase-document-chain";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
 import { PurchaseInvoicePaymentsSection } from "@/components/purchasing/purchase-invoice-payments-section";
 import { PurchaseInvoiceStatusBadge } from "@/components/purchasing/purchase-invoice-status-badge";
@@ -28,7 +29,11 @@ import { Label } from "@/components/ui/label";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { usePermission } from "@/hooks/use-permission";
-import { useConvertPurchaseInvoiceToReceipt, usePurchaseInvoice } from "@/hooks/use-purchasing";
+import {
+  useConvertPurchaseInvoiceToReceipt,
+  usePurchaseInvoice,
+  usePurchaseOrderDocumentChain,
+} from "@/hooks/use-purchasing";
 import { getErrorMessage } from "@/lib/api/client";
 
 function formatCurrency(value: number): string {
@@ -59,6 +64,10 @@ export function PurchaseInvoiceDetailsPageClient({
   const [receivedDate, setReceivedDate] = useState(today());
   const [conversionNotes, setConversionNotes] = useState("");
   const invoiceQuery = usePurchaseInvoice(invoiceId, canView);
+  const chainQuery = usePurchaseOrderDocumentChain(
+    invoiceQuery.data?.purchaseOrderId ?? null,
+    canView && Boolean(invoiceQuery.data?.purchaseOrderId),
+  );
   const convertMutation = useConvertPurchaseInvoiceToReceipt();
 
   if (!canView) {
@@ -167,6 +176,16 @@ export function PurchaseInvoiceDetailsPageClient({
       </div>
       <PurchasingItemLines lines={invoice.items} title="Purchase invoice items" />
       <PurchaseInvoicePaymentsSection canManage={canManage} invoice={invoice} />
+      {invoice.purchaseOrderId ? (
+        <PurchaseDocumentChain
+          chain={chainQuery.data}
+          error={chainQuery.error}
+          isLoading={chainQuery.isLoading}
+          onRetry={() => {
+            void chainQuery.refetch();
+          }}
+        />
+      ) : null}
       <Card className="bg-white/85">
         <CardHeader>
           <CardTitle>Notes</CardTitle>

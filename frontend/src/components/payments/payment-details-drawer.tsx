@@ -1,6 +1,6 @@
 "use client";
 
-import { ReceiptText, RotateCcw } from "lucide-react";
+import { FileSearch, ReceiptText, RotateCcw, Undo2 } from "lucide-react";
 import type { JSX } from "react";
 
 import { PaymentMethodBadge } from "@/components/payments/payment-method-badge";
@@ -18,9 +18,11 @@ import type { PaymentRefund, SalePayment } from "@/types/payment";
 type PaymentDetailsDrawerProps = {
   canRefund: boolean;
   isReceiptLoading: boolean;
+  onCreateReturn: (payment: SalePayment) => void;
   onOpenChange: (open: boolean) => void;
   onRefund: (payment: SalePayment) => void;
   onViewReceipt: (payment: SalePayment) => void;
+  onViewSaleDetails: (payment: SalePayment) => void;
   open: boolean;
   payment: SalePayment | null;
   refunds: PaymentRefund[];
@@ -46,9 +48,11 @@ function DetailRow({ label, value }: { label: string; value: string }): JSX.Elem
 export function PaymentDetailsDrawer({
   canRefund,
   isReceiptLoading,
+  onCreateReturn,
   onOpenChange,
   onRefund,
   onViewReceipt,
+  onViewSaleDetails,
   open,
   payment,
   refunds,
@@ -154,6 +158,17 @@ export function PaymentDetailsDrawer({
 
             <Button
               className="w-full"
+              disabled={payment.sourceType !== "pos_sale" || !payment.sourceId}
+              onClick={() => onViewSaleDetails(payment)}
+              type="button"
+              variant="outline"
+            >
+              <FileSearch className="h-4 w-4" />
+              View sale details
+            </Button>
+
+            <Button
+              className="w-full"
               disabled={payment.sourceType !== "pos_sale" || !payment.sourceId || isReceiptLoading}
               onClick={() => onViewReceipt(payment)}
               type="button"
@@ -164,15 +179,21 @@ export function PaymentDetailsDrawer({
             </Button>
 
             {canRefund && isRefundable && remainingRefundableAmount > 0 ? (
-              <Button
-                className="w-full"
-                onClick={() => onRefund(payment)}
-                type="button"
-                variant="outline"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Refund payment
-              </Button>
+              <div className="space-y-2">
+                <Button className="w-full" onClick={() => onCreateReturn(payment)} type="button">
+                  <Undo2 className="h-4 w-4" />
+                  Return items / create credit note
+                </Button>
+                <Button
+                  className="w-full"
+                  onClick={() => onRefund(payment)}
+                  type="button"
+                  variant="outline"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Legacy payment refund
+                </Button>
+              </div>
             ) : null}
           </div>
         ) : null}

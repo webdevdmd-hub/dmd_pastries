@@ -48,6 +48,7 @@ type BackendAuthProfile = {
   user_id?: string;
   appwrite_user_id?: string;
   business_id?: string;
+  branch_id?: string | null;
   assigned_branch_id?: string | null;
   assigned_branch_name?: string | null;
   current_branch_id?: string | null;
@@ -106,6 +107,20 @@ function parseSafeUserProfile(value: unknown): SafeUserProfile {
   const businessId = typeof backendValue.business_id === "string" ? backendValue.business_id : "";
   const fullName = typeof backendValue.full_name === "string" ? backendValue.full_name : "";
   const email = typeof value.email === "string" ? value.email : "";
+  const branchId = typeof backendValue.branch_id === "string" ? backendValue.branch_id : null;
+  const branchName = typeof backendValue.branch_name === "string" ? backendValue.branch_name : null;
+  const assignedBranchId =
+    typeof backendValue.assigned_branch_id === "string"
+      ? backendValue.assigned_branch_id
+      : branchId;
+  const currentBranchId =
+    typeof backendValue.current_branch_id === "string" ? backendValue.current_branch_id : null;
+  const assignedBranchName =
+    typeof backendValue.assigned_branch_name === "string"
+      ? backendValue.assigned_branch_name
+      : branchName;
+  const currentBranchName =
+    typeof backendValue.current_branch_name === "string" ? backendValue.current_branch_name : null;
 
   if (!id || !businessId || !fullName || !email) {
     throw new Error("Backend user payload is missing required fields.");
@@ -118,20 +133,10 @@ function parseSafeUserProfile(value: unknown): SafeUserProfile {
     email,
     businessName: null,
     phone: typeof value.phone === "string" ? value.phone : null,
-    assignedBranchId:
-      typeof backendValue.assigned_branch_id === "string" ? backendValue.assigned_branch_id : null,
-    assignedBranchName:
-      typeof backendValue.assigned_branch_name === "string"
-        ? backendValue.assigned_branch_name
-        : null,
-    currentBranchId:
-      typeof backendValue.current_branch_id === "string" ? backendValue.current_branch_id : null,
-    currentBranchName:
-      typeof backendValue.current_branch_name === "string"
-        ? backendValue.current_branch_name
-        : typeof backendValue.branch_name === "string"
-          ? backendValue.branch_name
-          : null,
+    assignedBranchId,
+    assignedBranchName,
+    currentBranchId,
+    currentBranchName,
     allowedBranchIds: asStringArray(backendValue.allowed_branch_ids),
     canAccessAllBranches:
       typeof backendValue.can_access_all_branches === "boolean"

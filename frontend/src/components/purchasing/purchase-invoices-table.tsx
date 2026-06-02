@@ -28,6 +28,22 @@ function formatDate(value: string | null): string {
     : "Not set";
 }
 
+function nextStepForInvoice(invoice: PurchaseInvoice): string {
+  if (invoice.status === "draft") {
+    return "Post bill";
+  }
+
+  if (invoice.status === "cancelled") {
+    return "No action";
+  }
+
+  if (invoice.paymentStatus === "paid") {
+    return "Review receipt / vendor credit";
+  }
+
+  return invoice.balanceAmount > 0 ? "Receive stock or record payment" : "Receive stock";
+}
+
 export function PurchaseInvoicesTable({
   canConvertToReceipt,
   canManage,
@@ -64,6 +80,7 @@ export function PurchaseInvoicesTable({
           <TableHead>Payment</TableHead>
           <TableHead>Total</TableHead>
           <TableHead>Balance</TableHead>
+          <TableHead>Next Step</TableHead>
           <TableHead>Actions</TableHead>
         </TableRow>
       </TableHeader>
@@ -90,6 +107,11 @@ export function PurchaseInvoicesTable({
             </TableCell>
             <TableCell>{formatCurrency(invoice.totalAmount)}</TableCell>
             <TableCell>{formatCurrency(invoice.balanceAmount)}</TableCell>
+            <TableCell>
+              <span className="text-sm font-medium text-brand-mocha">
+                {nextStepForInvoice(invoice)}
+              </span>
+            </TableCell>
             <TableCell>
               <PurchaseInvoiceActionsMenu
                 canConvertToReceipt={canConvertToReceipt}

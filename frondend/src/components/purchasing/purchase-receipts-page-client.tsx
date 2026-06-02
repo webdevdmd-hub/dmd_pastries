@@ -10,6 +10,7 @@ import { PurchaseEmptyState } from "@/components/purchasing/purchase-empty-state
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
 import { PurchaseReceiptsTable } from "@/components/purchasing/purchase-receipts-table";
 import { PurchaseReceiveDialog } from "@/components/purchasing/purchase-receive-dialog";
+import { PurchaseReturnDialog } from "@/components/purchasing/purchase-return-dialog";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
 import { PurchasingToolbar } from "@/components/purchasing/purchasing-toolbar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { useStockLocations } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import {
   useCancelPurchaseReceipt,
@@ -73,11 +75,16 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
     PERMISSIONS.purchasingReceiptsCancel,
     PERMISSIONS.purchasingReceiveStock,
   ]);
+  const canReturn = hasAnyPermission([
+    PERMISSIONS.purchasingReturnsCreate,
+    PERMISSIONS.purchasingReturnsManage,
+  ]);
   const [filters, setFilters] = useState<PurchasingFilters>({
     ...defaultFilters,
     branchId: branchScope.defaultBranchId,
   });
   const [receiveOpen, setReceiveOpen] = useState(false);
+  const [returnReceipt, setReturnReceipt] = useState<PurchaseReceipt | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const receiptsQuery = usePurchaseReceipts(filters, canView && branchScope.hasBranchScope);
   const suppliersQuery = usePurchasingSuppliers("", canView);
@@ -86,6 +93,7 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
   const ingredientsQuery = usePurchasingIngredients(canView);
   const unitsQuery = usePurchasingUnits(canView);
   const taxRatesQuery = usePurchasingTaxRates(canView);
+  const stockLocationsQuery = useStockLocations(canView && canReturn);
   const receiveMutation = useReceivePurchase();
   const postMutation = usePostPurchaseReceipt();
   const cancelMutation = useCancelPurchaseReceipt();
@@ -199,8 +207,10 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
           <CardContent className="p-0">
             <PurchaseReceiptsTable
               canManage={canManage}
+              canReturn={canReturn}
               onCancel={(receipt) => setPendingAction({ receipt, type: "cancel" })}
               onPost={(receipt) => setPendingAction({ receipt, type: "post" })}
+              onReturn={(receipt) => setReturnReceipt(receipt)}
               receipts={receipts}
             />
           </CardContent>
@@ -218,6 +228,13 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
         suppliers={suppliersQuery.data ?? []}
         taxRates={taxRatesQuery.data ?? []}
         units={unitsQuery.data ?? []}
+      />
+
+      <PurchaseReturnDialog
+        onClose={() => setReturnReceipt(null)}
+        open={returnReceipt !== null}
+        receipt={returnReceipt}
+        stockLocations={stockLocationsQuery.data ?? []}
       />
 
       <Dialog

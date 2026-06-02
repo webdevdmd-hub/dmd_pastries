@@ -23,15 +23,31 @@ function formatDate(value: string | null): string {
     : "Not set";
 }
 
+function nextStepForReceipt(receipt: PurchaseReceipt): string {
+  if (receipt.status === "draft") {
+    return "Post receipt to update stock";
+  }
+
+  if (receipt.status === "posted") {
+    return "Return items if needed";
+  }
+
+  return "No action";
+}
+
 export function PurchaseReceiptsTable({
   canManage,
+  canReturn,
   onCancel,
   onPost,
+  onReturn,
   receipts,
 }: {
   canManage: boolean;
+  canReturn: boolean;
   onCancel: (receipt: PurchaseReceipt) => void;
   onPost: (receipt: PurchaseReceipt) => void;
+  onReturn: (receipt: PurchaseReceipt) => void;
   receipts: PurchaseReceipt[];
 }): JSX.Element {
   const router = useRouter();
@@ -48,6 +64,7 @@ export function PurchaseReceiptsTable({
           <TableHead>Linked Invoice</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Received By</TableHead>
+          <TableHead>Next Step</TableHead>
           <TableHead>Actions</TableHead>
         </TableRow>
       </TableHeader>
@@ -72,10 +89,17 @@ export function PurchaseReceiptsTable({
             </TableCell>
             <TableCell>{receipt.receivedByUserName}</TableCell>
             <TableCell>
+              <span className="text-sm font-medium text-brand-mocha">
+                {nextStepForReceipt(receipt)}
+              </span>
+            </TableCell>
+            <TableCell>
               <PurchaseReceiptActionsMenu
                 canManage={canManage}
+                canReturn={canReturn}
                 onCancel={onCancel}
                 onPost={onPost}
+                onReturn={onReturn}
                 onView={(selectedReceipt) =>
                   router.push(`${ROUTES.purchasingReceipts}/${selectedReceipt.id}`)
                 }

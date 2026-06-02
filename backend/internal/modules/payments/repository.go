@@ -413,20 +413,29 @@ func (r *Repository) GenerateRefundNumber(tx *gorm.DB, businessID string, now ti
 }
 
 func (r *Repository) ListRefunds(businessID string, query RefundListQuery) ([]PaymentRefundResponse, int64, error) {
-	db := r.db.Table("payment_refunds").Where("business_id = ? AND deleted_at IS NULL", businessID)
+	db := r.db.Table("payment_refunds").Where("payment_refunds.business_id = ? AND payment_refunds.deleted_at IS NULL", businessID)
 	db = applyRefundFilters(db, query)
 	var total int64
 	if err := db.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	var rows []PaymentRefundResponse
-	err := db.Order("refunded_at DESC").Offset((query.Page - 1) * query.Limit).Limit(query.Limit).Scan(&rows).Error
+	err := db.Select("payment_refunds.*, COALESCE(sr.return_number, '') AS sales_return_number").
+		Joins("LEFT JOIN sales_returns sr ON sr.id = payment_refunds.sales_return_id AND sr.business_id = payment_refunds.business_id").
+		Order("payment_refunds.refunded_at DESC").
+		Offset((query.Page - 1) * query.Limit).
+		Limit(query.Limit).
+		Scan(&rows).Error
 	return rows, total, err
 }
 
 func (r *Repository) FindRefund(businessID, refundID string) (*PaymentRefundResponse, error) {
 	var row PaymentRefundResponse
-	err := r.db.Table("payment_refunds").Where("id = ? AND business_id = ? AND deleted_at IS NULL", refundID, businessID).Take(&row).Error
+	err := r.db.Table("payment_refunds").
+		Select("payment_refunds.*, COALESCE(sr.return_number, '') AS sales_return_number").
+		Joins("LEFT JOIN sales_returns sr ON sr.id = payment_refunds.sales_return_id AND sr.business_id = payment_refunds.business_id").
+		Where("payment_refunds.id = ? AND payment_refunds.business_id = ? AND payment_refunds.deleted_at IS NULL", refundID, businessID).
+		Take(&row).Error
 	return &row, err
 }
 
@@ -595,22 +604,22 @@ func applyPaymentFilters(db *gorm.DB, q PaymentListQuery) *gorm.DB {
 
 func applyRefundFilters(db *gorm.DB, q RefundListQuery) *gorm.DB {
 	if q.SaleID != "" {
-		db = db.Where("sale_id = ?", q.SaleID)
+		db = db.Where("payment_refunds.sale_id = ?", q.SaleID)
 	}
 	if q.PaymentMethodID != "" {
-		db = db.Where("payment_method_id = ?", q.PaymentMethodID)
+		db = db.Where("payment_refunds.payment_method_id = ?", q.PaymentMethodID)
 	}
 	if q.RefundStatus != "" {
-		db = db.Where("refund_status = ?", q.RefundStatus)
+		db = db.Where("payment_refunds.refund_status = ?", q.RefundStatus)
 	}
 	if q.BranchID != "" {
-		db = db.Where("branch_id = ?", q.BranchID)
+		db = db.Where("payment_refunds.branch_id = ?", q.BranchID)
 	}
 	if q.DateFrom != "" {
-		db = db.Where("refunded_at >= ?", q.DateFrom)
+		db = db.Where("payment_refunds.refunded_at >= ?", q.DateFrom)
 	}
 	if q.DateTo != "" {
-		db = db.Where("refunded_at <= ?", q.DateTo)
+		db = db.Where("payment_refunds.refunded_at <= ?", q.DateTo)
 	}
 	return db
 }

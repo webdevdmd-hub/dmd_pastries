@@ -46,6 +46,10 @@ type PlatformSettlementListQuery struct {
 	SortOrder                string
 }
 
+type UpdateAccountMappingsRequest struct {
+	Mappings map[string]string `json:"mappings" binding:"required"`
+}
+
 type CreateChartAccountRequest struct {
 	ParentAccountID    *string `json:"parent_account_id" binding:"omitempty,uuid"`
 	AccountCode        string  `json:"account_code" binding:"required"`
@@ -218,6 +222,20 @@ type ChartAccountResponse struct {
 	Status             string    `json:"status"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
+}
+
+type AccountMappingResponse struct {
+	ID               string    `json:"id"`
+	BusinessID       string    `json:"business_id"`
+	MappingKey       string    `json:"mapping_key"`
+	ChartAccountID   string    `json:"chart_account_id"`
+	ChartAccountCode string    `json:"chart_account_code"`
+	ChartAccountName string    `json:"chart_account_name"`
+	ChartAccountType string    `json:"chart_account_type"`
+	AccountGroup     string    `json:"account_group"`
+	Description      string    `json:"description"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type PaymentAccountResponse struct {

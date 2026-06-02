@@ -10,12 +10,12 @@ import { SupplierContactsSection } from "@/components/suppliers/supplier-contact
 import { SupplierFormDialog } from "@/components/suppliers/supplier-form-dialog";
 import { SupplierNotesSection } from "@/components/suppliers/supplier-notes-section";
 import { SupplierProfileCard } from "@/components/suppliers/supplier-profile-card";
+import { SupplierPurchasingHistory } from "@/components/suppliers/supplier-purchasing-history";
 import { SupplierStatsCards } from "@/components/suppliers/supplier-stats-cards";
 import { SupplierStatusBadge } from "@/components/suppliers/supplier-status-badge";
 import { SuppliersErrorState } from "@/components/suppliers/suppliers-error-state";
 import { SuppliersTableSkeleton } from "@/components/suppliers/suppliers-table-skeleton";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { usePermission } from "@/hooks/use-permission";
@@ -103,17 +103,7 @@ export function SupplierDetailsPageClient({ supplierId }: { supplierId: string }
 
       <SupplierNotesSection canManage={canManage} supplierId={supplier.id} />
 
-      <Card className="bg-white/80">
-        <CardHeader>
-          <CardTitle>Purchasing history</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-brand-mocha">
-            Purchasing history will be connected in Sprint 3.4 when purchase order workflows are
-            added.
-          </p>
-        </CardContent>
-      </Card>
+      <SupplierPurchasingHistory canView={canView} supplierId={supplier.id} />
 
       <SupplierFormDialog
         isSubmitting={updateMutation.isPending}

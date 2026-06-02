@@ -26,6 +26,7 @@ func DefaultChartAccountSeeds() []defaultAccountSeed {
 		{Code: "1020", Name: "Petty Cash", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true},
 		{Code: "1100", Name: "Accounts Receivable", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "1200", Name: "Inventory / Stock", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "1210", Name: "Work in Process Inventory", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "1300", Name: "VAT Receivable", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "1400", Name: "Advance to Supplier", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "1500", Name: "Prepaid Expenses", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
@@ -38,6 +39,7 @@ func DefaultChartAccountSeeds() []defaultAccountSeed {
 		{Code: "1840", Name: "Accumulated Depreciation", Type: "asset", Group: "accumulated_depreciation", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
 		{Code: "1900", Name: "Other Non-Current Assets", Type: "asset", Group: "non_current_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
 		{Code: "2000", Name: "Accounts Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "2050", Name: "Goods Received Not Invoiced / GRNI", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "2100", Name: "VAT Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "2200", Name: "Customer Advance", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "2300", Name: "Salary Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
@@ -51,11 +53,14 @@ func DefaultChartAccountSeeds() []defaultAccountSeed {
 		{Code: "3100", Name: "Retained Earnings", Type: "equity", Group: "equity", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "3200", Name: "Current Year Profit / Loss", Type: "equity", Group: "equity", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "3300", Name: "Drawings", Type: "equity", Group: "equity", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "3400", Name: "Opening Balance Equity", Type: "equity", Group: "equity", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "4000", Name: "Sales Income", Type: "income", Group: "sales_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "4010", Name: "Bakery Order Income", Type: "income", Group: "sales_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "4020", Name: "Service Income", Type: "income", Group: "service_income", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
 		{Code: "4030", Name: "Discount Received", Type: "income", Group: "discount_income", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "4040", Name: "Sales Returns and Allowances", Type: "income", Group: "sales_income", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "4090", Name: "Other Income", Type: "income", Group: "other_income", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "4100", Name: "Inventory Adjustment Gain", Type: "income", Group: "other_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "5000", Name: "Opening Stock", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "5010", Name: "Purchase", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "5020", Name: "Purchase Return", Type: "cogs", Group: "direct_expense", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
@@ -65,6 +70,7 @@ func DefaultChartAccountSeeds() []defaultAccountSeed {
 		{Code: "5060", Name: "Manufacturing Expense", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
 		{Code: "5070", Name: "Cost of Goods Sold", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "5080", Name: "Wastage Expense", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "5090", Name: "Inventory Adjustment Loss", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "6000", Name: "Salary Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
 		{Code: "6010", Name: "Rent Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
 		{Code: "6020", Name: "Electricity Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
@@ -82,6 +88,8 @@ func DefaultChartAccountSeeds() []defaultAccountSeed {
 		{Code: "6210", Name: "Selling Expense", Type: "expense", Group: "selling_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
 		{Code: "6220", Name: "Finance Cost", Type: "expense", Group: "finance_cost", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
 		{Code: "6230", Name: "Tax Expense", Type: "expense", Group: "tax_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6240", Name: "Platform Commission Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true},
+		{Code: "6250", Name: "Delivery Platform Charges", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
 	}
 }
 
@@ -109,6 +117,63 @@ func SeedDefaultChartOfAccounts(tx *gorm.DB, businessID string) error {
 			Status:             "active",
 		}
 		if err := tx.Create(&account).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type defaultAccountMappingSeed struct {
+	Key         string
+	AccountCode string
+	Description string
+}
+
+func DefaultAccountMappingSeeds() []defaultAccountMappingSeed {
+	return []defaultAccountMappingSeed{
+		{Key: "accounts_receivable", AccountCode: "1100", Description: "Customer unpaid balances"},
+		{Key: "accounts_payable", AccountCode: "2000", Description: "Supplier unpaid balances"},
+		{Key: "inventory_stock", AccountCode: "1200", Description: "Inventory stock value"},
+		{Key: "sales_income", AccountCode: "4000", Description: "POS sales income"},
+		{Key: "bakery_income", AccountCode: "4010", Description: "Bakery order income"},
+		{Key: "customer_advance", AccountCode: "2200", Description: "Customer deposits and advances"},
+		{Key: "vat_receivable", AccountCode: "1300", Description: "Input VAT receivable"},
+		{Key: "vat_payable", AccountCode: "2100", Description: "Output VAT payable"},
+		{Key: "cogs", AccountCode: "5070", Description: "Cost of goods sold"},
+		{Key: "sales_returns", AccountCode: "4040", Description: "Sales returns and allowances"},
+		{Key: "purchase_returns", AccountCode: "5020", Description: "Purchase returns"},
+		{Key: "wip_inventory", AccountCode: "1210", Description: "Manufacturing work in process"},
+		{Key: "wastage_expense", AccountCode: "5080", Description: "Inventory and production wastage"},
+		{Key: "opening_balance_equity", AccountCode: "3400", Description: "Opening stock/equity offset"},
+		{Key: "grni", AccountCode: "2050", Description: "Goods received not invoiced"},
+		{Key: "platform_commission_expense", AccountCode: "6240", Description: "Delivery platform commissions"},
+	}
+}
+
+func SeedDefaultAccountMappings(tx *gorm.DB, businessID string) error {
+	if err := SeedDefaultChartOfAccounts(tx, businessID); err != nil {
+		return err
+	}
+	for _, seed := range DefaultAccountMappingSeeds() {
+		var account ChartAccount
+		if err := tx.Where("business_id = ? AND account_code = ? AND status = ? AND deleted_at IS NULL", businessID, seed.AccountCode, "active").First(&account).Error; err != nil {
+			return err
+		}
+		var count int64
+		if err := tx.Model(&AccountMapping{}).Where("business_id = ? AND mapping_key = ? AND deleted_at IS NULL", businessID, seed.Key).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			continue
+		}
+		mapping := AccountMapping{
+			ID:             utils.NewUUID(),
+			BusinessID:     businessID,
+			MappingKey:     seed.Key,
+			ChartAccountID: account.ID,
+			Description:    seed.Description,
+		}
+		if err := tx.Create(&mapping).Error; err != nil {
 			return err
 		}
 	}

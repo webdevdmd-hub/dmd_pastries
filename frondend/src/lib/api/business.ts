@@ -79,6 +79,7 @@ type BackendSwitchBranchResult = {
   user_id?: string;
   business_id?: string;
   current_branch_id?: string;
+  branch_id?: string;
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -243,9 +244,13 @@ function parseSwitchBranchResult(value: unknown): SwitchBranchResult {
   const userId = typeof result.user_id === "string" ? result.user_id : "";
   const businessId = typeof result.business_id === "string" ? result.business_id : "";
   const currentBranchId =
-    typeof result.current_branch_id === "string" ? result.current_branch_id : "";
+    typeof result.current_branch_id === "string"
+      ? result.current_branch_id
+      : typeof result.branch_id === "string"
+        ? result.branch_id
+        : "";
 
-  if (!userId || !businessId || !currentBranchId) {
+  if (!currentBranchId) {
     throw new Error("Backend branch switch payload is missing required fields.");
   }
 

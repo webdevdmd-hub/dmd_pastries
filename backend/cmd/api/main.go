@@ -31,6 +31,7 @@ import (
 	"pastries-pos/internal/modules/reports"
 	reportcache "pastries-pos/internal/modules/reports/cache"
 	"pastries-pos/internal/modules/roles"
+	"pastries-pos/internal/modules/salesreturns"
 	"pastries-pos/internal/modules/settings"
 	"pastries-pos/internal/modules/subscriptions"
 	"pastries-pos/internal/modules/suppliers"
@@ -83,6 +84,7 @@ func main() {
 	reportRepo := reports.NewRepository(db)
 	dashboardRepo := dashboard.NewRepository(db)
 	expenseRepo := expenses.NewRepository(db)
+	salesReturnRepo := salesreturns.NewRepository(db)
 	userRepo := users.NewRepository(db)
 	authRepo := auth.NewRepository(db)
 	accountingRepo := accounting.NewRepository(db)
@@ -151,7 +153,7 @@ func main() {
 	manufacturingHandler := manufacturing.NewHandler(manufacturingService)
 	supplierService := suppliers.NewService(db, supplierRepo, auditRepo)
 	supplierHandler := suppliers.NewHandler(supplierService)
-	purchasingService := purchasing.NewService(db, purchasingRepo, inventoryRepo, inventoryService, auditRepo)
+	purchasingService := purchasing.NewService(db, purchasingRepo, inventoryRepo, inventoryService, auditRepo, accountingService)
 	purchasingHandler := purchasing.NewHandler(purchasingService)
 	recipeService := recipes.NewService(db, recipeRepo, auditRepo)
 	recipeHandler := recipes.NewHandler(recipeService)
@@ -173,6 +175,8 @@ func main() {
 	dashboardHandler := dashboard.NewHandler(dashboardService)
 	expenseService := expenses.NewService(db, expenseRepo, auditRepo)
 	expenseHandler := expenses.NewHandler(expenseService)
+	salesReturnService := salesreturns.NewService(db, salesReturnRepo, inventoryService, auditRepo, accountingService)
+	salesReturnHandler := salesreturns.NewHandler(salesReturnService)
 
 	authMiddleware := middleware.NewAuthMiddleware(authService)
 	permissionMiddleware := middleware.NewPermissionMiddleware()
@@ -249,6 +253,16 @@ func main() {
 		permit("pos.refund"),
 		permit("pos.void", "pos.refund"),
 	)
+	salesreturns.RegisterRoutes(
+		router,
+		salesReturnHandler,
+		authMiddleware.RequireAuth(),
+		permit("sales_returns.view", "pos.view"),
+		permit("sales_returns.create", "sales_returns.manage"),
+		permit("sales_returns.edit", "sales_returns.manage"),
+		permit("sales_returns.post", "sales_returns.manage"),
+		permit("sales_returns.cancel", "sales_returns.manage"),
+	)
 	payments.RegisterRoutes(
 		router,
 		paymentHandler,
@@ -309,8 +323,8 @@ func main() {
 		router,
 		purchasingHandler,
 		authMiddleware.RequireAuth(),
-		permit("purchasing.view", "inventory.view"),
-		permit("purchasing.orders.create", "purchasing.orders.edit", "purchasing.orders.delete", "purchasing.orders.status.update", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.invoices.post", "purchasing.invoices.cancel", "purchasing.receipts.create", "purchasing.receipts.post", "purchasing.receipts.cancel", "purchasing.receive_stock", "purchasing.manage", "inventory.manage"),
+		permit("purchasing.view", "purchasing.returns.view", "inventory.view"),
+		permit("purchasing.orders.create", "purchasing.orders.edit", "purchasing.orders.delete", "purchasing.orders.status.update", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.invoices.post", "purchasing.invoices.cancel", "purchasing.receipts.create", "purchasing.receipts.post", "purchasing.receipts.cancel", "purchasing.returns.create", "purchasing.returns.edit", "purchasing.returns.post", "purchasing.returns.cancel", "purchasing.returns.manage", "purchasing.receive_stock", "purchasing.manage", "inventory.manage"),
 	)
 	recipes.RegisterRoutes(
 		router,

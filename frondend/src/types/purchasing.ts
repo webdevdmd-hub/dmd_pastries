@@ -17,6 +17,8 @@ export type PurchaseItemType = "product" | "ingredient" | "packaging";
 
 export type SupplierPaymentStatus = "completed" | "pending" | "failed";
 
+export type PurchaseReturnStatus = "draft" | "posted" | "cancelled" | "reversed";
+
 export type PurchaseOrderItem = {
   id: string;
   itemType: PurchaseItemType;
@@ -71,6 +73,44 @@ export type PurchaseReceiptItem = {
   expiryDate: string | null;
   batchNumber: string | null;
   stockMovementId: string | null;
+};
+
+export type PurchaseReturnItem = {
+  id: string;
+  purchaseReceiptItemId: string;
+  itemType: PurchaseItemType;
+  productId: string | null;
+  ingredientId: string | null;
+  packagingItemId: string | null;
+  itemNameSnapshot: string;
+  quantity: number;
+  unitId: string;
+  unitName: string;
+  unitSymbol: string;
+  unitCost: number;
+  lineTotal: number;
+  stockLocationId: string | null;
+  stockLocationName: string | null;
+  reason: string | null;
+  stockMovementId: string | null;
+};
+
+export type ReturnablePurchaseReceiptItem = {
+  purchaseReceiptItemId: string;
+  itemType: PurchaseItemType;
+  productId: string | null;
+  ingredientId: string | null;
+  packagingItemId: string | null;
+  itemNameSnapshot: string;
+  receivedQuantity: number;
+  returnedQuantity: number;
+  returnableQuantity: number;
+  unitId: string;
+  unitName: string;
+  unitSymbol: string;
+  unitCost: number;
+  batchNumber: string | null;
+  expiryDate: string | null;
 };
 
 export type PurchaseOrder = {
@@ -135,6 +175,42 @@ export type PurchaseReceipt = {
   createdAt: string;
   updatedAt: string;
   items: PurchaseReceiptItem[];
+};
+
+export type PurchaseReturn = {
+  id: string;
+  branchId: string;
+  branchName: string;
+  supplierId: string;
+  supplierName: string;
+  purchaseInvoiceId: string;
+  purchaseInvoiceNumber: string;
+  purchaseReceiptId: string;
+  purchaseReceiptNumber: string;
+  returnNumber: string;
+  returnDate: string;
+  status: PurchaseReturnStatus;
+  reason: string | null;
+  supplierReferenceNumber: string | null;
+  returnTotal: number;
+  appliedCreditAmount: number;
+  openCreditAmount: number;
+  journalEntryId: string | null;
+  createdByUserName: string;
+  postedAt: string | null;
+  cancelledAt: string | null;
+  reversedAt: string | null;
+  reversedByUserId: string | null;
+  reversedByUserName: string | null;
+  originalReturnId: string | null;
+  originalReturnNumber: string | null;
+  reversalReturnId: string | null;
+  reversalReturnNumber: string | null;
+  reversalJournalEntryId: string | null;
+  reversalReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: PurchaseReturnItem[];
 };
 
 export type PurchasingSummary = {
@@ -206,6 +282,15 @@ export type SupplierPaymentFilters = {
   search: string;
   sortBy: string;
   sortOrder: string;
+  supplierId: string;
+};
+
+export type PurchaseReturnFilters = {
+  branchId: string;
+  dateFrom: string;
+  dateTo: string;
+  search: string;
+  status: string;
   supplierId: string;
 };
 
@@ -305,9 +390,31 @@ export type ConvertPurchaseInvoiceToReceiptPayload = {
   receivedDate?: string | null;
 };
 
+export type PurchaseReturnItemPayload = {
+  purchaseReceiptItemId: string;
+  quantity: number;
+  stockLocationId: string | null;
+  reason: string | null;
+};
+
+export type CreatePurchaseReturnPayload = {
+  purchaseReceiptId: string;
+  reason: string;
+  returnDate: string;
+  supplierReferenceNumber: string | null;
+  items: PurchaseReturnItemPayload[];
+};
+
+export type UpdatePurchaseReturnPayload = Partial<CreatePurchaseReturnPayload>;
+
+export type ReversePurchaseReturnPayload = {
+  reason: string;
+};
+
 export type PurchaseDocumentChain = {
   purchaseOrder: PurchaseOrder | null;
   purchaseInvoices: PurchaseInvoice[];
   purchaseReceipts: PurchaseReceipt[];
+  purchaseReturns: PurchaseReturn[];
   supplierPayments: SupplierPayment[];
 };

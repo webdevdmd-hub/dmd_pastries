@@ -5,6 +5,7 @@ import type {
   ConvertPurchaseOrderToInvoicePayload,
   CreatePurchaseInvoicePayload,
   CreatePurchaseOrderPayload,
+  CreatePurchaseReturnPayload,
   PurchaseDocumentChain,
   PurchaseInvoice,
   PurchaseInvoiceItem,
@@ -18,6 +19,10 @@ import type {
   PurchaseReceipt,
   PurchaseReceiptItem,
   PurchaseReceiptStatus,
+  PurchaseReturn,
+  PurchaseReturnFilters,
+  PurchaseReturnItem,
+  PurchaseReturnStatus,
   PurchasingBranchOption,
   PurchasingFilters,
   PurchasingIngredientOption,
@@ -27,12 +32,15 @@ import type {
   PurchasingTaxRateOption,
   PurchasingUnitOption,
   ReceivePurchasePayload,
+  ReturnablePurchaseReceiptItem,
+  ReversePurchaseReturnPayload,
   SupplierPayment,
   SupplierPaymentFilters,
   SupplierPaymentStatus,
   UpdatePurchaseInvoicePayload,
   UpdatePurchaseOrderPayload,
   UpdatePurchaseOrderStatusPayload,
+  UpdatePurchaseReturnPayload,
 } from "@/types/purchasing";
 
 type BackendLinePayload = {
@@ -100,6 +108,21 @@ type BackendConvertPurchaseInvoiceToReceiptPayload = {
   received_date?: string | null;
 };
 
+type BackendPurchaseReturnItemPayload = {
+  purchase_receipt_item_id: string;
+  quantity: number;
+  reason: string | null;
+  stock_location_id: string | null;
+};
+
+type BackendPurchaseReturnPayload = {
+  items?: BackendPurchaseReturnItemPayload[];
+  purchase_receipt_id?: string;
+  reason?: string;
+  return_date?: string;
+  supplier_reference_number?: string | null;
+};
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -131,6 +154,8 @@ function parseList<TItem>(value: unknown, parser: (item: unknown) => TItem): TIt
       "orders",
       "invoices",
       "receipts",
+      "returns",
+      "purchase_returns",
       "suppliers",
       "products",
       "ingredients",
@@ -214,6 +239,10 @@ function isReceiptStatus(value: unknown): value is PurchaseReceiptStatus {
 
 function isSupplierPaymentStatus(value: unknown): value is SupplierPaymentStatus {
   return value === "completed" || value === "pending" || value === "failed";
+}
+
+function isPurchaseReturnStatus(value: unknown): value is PurchaseReturnStatus {
+  return value === "draft" || value === "posted" || value === "cancelled" || value === "reversed";
 }
 
 function branchStatus(value: unknown): "active" | "inactive" {
@@ -376,6 +405,101 @@ function parseReceipt(value: unknown): PurchaseReceipt {
   };
 }
 
+function parsePurchaseReturnItem(value: unknown): PurchaseReturnItem {
+  if (!isObject(value)) {
+    throw new Error("Backend purchase return item payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.id),
+    ingredientId: optionalString(value.ingredient_id),
+    itemNameSnapshot: stringValue(value.item_name_snapshot, "Returned item"),
+    itemType: isItemType(value.item_type) ? value.item_type : "product",
+    lineTotal: numberValue(value.line_total),
+    packagingItemId: optionalString(value.packaging_item_id),
+    productId: optionalString(value.product_id),
+    purchaseReceiptItemId: stringValue(value.purchase_receipt_item_id),
+    quantity: numberValue(value.quantity),
+    reason: optionalString(value.reason),
+    stockLocationId: optionalString(value.stock_location_id),
+    stockLocationName: optionalString(value.stock_location_name),
+    stockMovementId: optionalString(value.stock_movement_id),
+    unitCost: numberValue(value.unit_cost),
+    unitId: stringValue(value.unit_id),
+    unitName: stringValue(value.unit_name, "Unit"),
+    unitSymbol: stringValue(value.unit_symbol),
+  };
+}
+
+function parseReturnablePurchaseReceiptItem(value: unknown): ReturnablePurchaseReceiptItem {
+  if (!isObject(value)) {
+    throw new Error("Backend returnable purchase receipt item payload is invalid.");
+  }
+
+  return {
+    batchNumber: optionalString(value.batch_number),
+    expiryDate: optionalString(value.expiry_date),
+    ingredientId: optionalString(value.ingredient_id),
+    itemNameSnapshot: stringValue(value.item_name_snapshot, "Receipt item"),
+    itemType: isItemType(value.item_type) ? value.item_type : "product",
+    packagingItemId: optionalString(value.packaging_item_id),
+    productId: optionalString(value.product_id),
+    purchaseReceiptItemId: stringValue(value.purchase_receipt_item_id, stringValue(value.id)),
+    receivedQuantity: numberValue(value.received_quantity, numberValue(value.quantity_received)),
+    returnableQuantity: numberValue(
+      value.returnable_quantity,
+      numberValue(value.remaining_quantity),
+    ),
+    returnedQuantity: numberValue(value.returned_quantity),
+    unitCost: numberValue(value.unit_cost),
+    unitId: stringValue(value.unit_id),
+    unitName: stringValue(value.unit_name, "Unit"),
+    unitSymbol: stringValue(value.unit_symbol),
+  };
+}
+
+function parsePurchaseReturn(value: unknown): PurchaseReturn {
+  if (!isObject(value)) {
+    throw new Error("Backend purchase return payload is invalid.");
+  }
+
+  return {
+    appliedCreditAmount: numberValue(value.applied_credit_amount),
+    branchId: stringValue(value.branch_id),
+    branchName: stringValue(value.branch_name, "Branch"),
+    cancelledAt: optionalString(value.cancelled_at),
+    createdAt: stringValue(value.created_at),
+    createdByUserName: stringValue(value.created_by_user_name, "User"),
+    id: stringValue(value.id),
+    items: Array.isArray(value.items) ? value.items.map(parsePurchaseReturnItem) : [],
+    journalEntryId: optionalString(value.journal_entry_id),
+    openCreditAmount: numberValue(value.open_credit_amount),
+    postedAt: optionalString(value.posted_at),
+    purchaseInvoiceId: stringValue(value.purchase_invoice_id),
+    purchaseInvoiceNumber: stringValue(value.purchase_invoice_number, "Invoice"),
+    purchaseReceiptId: stringValue(value.purchase_receipt_id),
+    purchaseReceiptNumber: stringValue(value.purchase_receipt_number, "Receipt"),
+    reason: optionalString(value.reason),
+    returnDate: stringValue(value.return_date),
+    returnNumber: stringValue(value.return_number, "Vendor credit"),
+    returnTotal: numberValue(value.return_total, numberValue(value.total_amount)),
+    status: isPurchaseReturnStatus(value.status) ? value.status : "draft",
+    supplierId: stringValue(value.supplier_id),
+    supplierName: stringValue(value.supplier_name, "Supplier"),
+    supplierReferenceNumber: optionalString(value.supplier_reference_number),
+    reversedAt: optionalString(value.reversed_at),
+    reversedByUserId: optionalString(value.reversed_by_user_id),
+    reversedByUserName: optionalString(value.reversed_by_user_name),
+    originalReturnId: optionalString(value.original_return_id),
+    originalReturnNumber: optionalString(value.original_return_number),
+    reversalReturnId: optionalString(value.reversal_return_id),
+    reversalReturnNumber: optionalString(value.reversal_return_number),
+    reversalJournalEntryId: optionalString(value.reversal_journal_entry_id),
+    reversalReason: optionalString(value.reversal_reason),
+    updatedAt: stringValue(value.updated_at),
+  };
+}
+
 function parseSupplierPayment(value: unknown): SupplierPayment {
   if (!isObject(value)) {
     throw new Error("Backend supplier payment payload is invalid.");
@@ -420,6 +544,9 @@ function parseDocumentChain(value: unknown): PurchaseDocumentChain {
       : null,
     purchaseReceipts: Array.isArray(source.purchase_receipts)
       ? source.purchase_receipts.map(parseDocumentChainReceipt)
+      : [],
+    purchaseReturns: Array.isArray(source.purchase_returns)
+      ? source.purchase_returns.map(parseDocumentChainPurchaseReturn)
       : [],
     supplierPayments: Array.isArray(source.supplier_payments)
       ? source.supplier_payments.map(parseDocumentChainSupplierPayment)
@@ -508,6 +635,51 @@ function parseDocumentChainReceipt(value: unknown): PurchaseReceipt {
     status: isReceiptStatus(value.status) ? value.status : "draft",
     supplierId: "",
     supplierName: "",
+    updatedAt: "",
+  };
+}
+
+function parseDocumentChainPurchaseReturn(value: unknown): PurchaseReturn {
+  if (!isObject(value)) {
+    throw new Error("Backend purchase return chain payload is invalid.");
+  }
+
+  return {
+    appliedCreditAmount: numberValue(value.applied_credit_amount),
+    branchId: "",
+    branchName: "",
+    cancelledAt: null,
+    createdAt: "",
+    createdByUserName: "User",
+    id: stringValue(value.id),
+    items: [],
+    journalEntryId: optionalString(value.journal_entry_id),
+    openCreditAmount: numberValue(value.open_credit_amount),
+    postedAt: optionalString(value.posted_at),
+    purchaseInvoiceId: stringValue(value.purchase_invoice_id),
+    purchaseInvoiceNumber: stringValue(value.purchase_invoice_number, "Invoice"),
+    purchaseReceiptId: stringValue(value.purchase_receipt_id),
+    purchaseReceiptNumber: stringValue(value.purchase_receipt_number, "Receipt"),
+    reason: optionalString(value.reason),
+    returnDate: stringValue(value.date, stringValue(value.return_date)),
+    returnNumber: stringValue(
+      value.document_number,
+      stringValue(value.return_number, "Vendor credit"),
+    ),
+    returnTotal: numberValue(value.total_amount, numberValue(value.return_total)),
+    status: isPurchaseReturnStatus(value.status) ? value.status : "draft",
+    supplierId: "",
+    supplierName: "",
+    supplierReferenceNumber: optionalString(value.supplier_reference_number),
+    reversedAt: optionalString(value.reversed_at),
+    reversedByUserId: optionalString(value.reversed_by_user_id),
+    reversedByUserName: optionalString(value.reversed_by_user_name),
+    originalReturnId: optionalString(value.original_return_id),
+    originalReturnNumber: optionalString(value.original_return_number),
+    reversalReturnId: optionalString(value.reversal_return_id),
+    reversalReturnNumber: optionalString(value.reversal_return_number),
+    reversalJournalEntryId: optionalString(value.reversal_journal_entry_id),
+    reversalReason: optionalString(value.reversal_reason),
     updatedAt: "",
   };
 }
@@ -742,6 +914,31 @@ function convertInvoiceToReceiptPayload(
 
   if (payload.receivedDate !== undefined) nextPayload.received_date = payload.receivedDate;
   if (payload.notes !== undefined) nextPayload.notes = payload.notes;
+
+  return nextPayload;
+}
+
+function purchaseReturnPayload(
+  payload: CreatePurchaseReturnPayload | UpdatePurchaseReturnPayload,
+): BackendPurchaseReturnPayload {
+  const nextPayload: BackendPurchaseReturnPayload = {};
+
+  if (payload.purchaseReceiptId !== undefined) {
+    nextPayload.purchase_receipt_id = payload.purchaseReceiptId;
+  }
+  if (payload.returnDate !== undefined) nextPayload.return_date = payload.returnDate;
+  if (payload.reason !== undefined) nextPayload.reason = payload.reason;
+  if (payload.supplierReferenceNumber !== undefined) {
+    nextPayload.supplier_reference_number = payload.supplierReferenceNumber;
+  }
+  if (payload.items !== undefined) {
+    nextPayload.items = payload.items.map((item) => ({
+      purchase_receipt_item_id: item.purchaseReceiptItemId,
+      quantity: item.quantity,
+      reason: item.reason,
+      stock_location_id: item.stockLocationId,
+    }));
+  }
 
   return nextPayload;
 }
@@ -1071,11 +1268,137 @@ export async function getPurchaseReceipts(params: PurchasingFilters): Promise<Pu
   return response.data;
 }
 
+export async function getPurchaseReturns(params: PurchaseReturnFilters): Promise<PurchaseReturn[]> {
+  const response = await apiRequest<PurchaseReturn[]>(
+    `/api/v1/purchasing/returns${toQueryString({
+      branch_id: params.branchId,
+      date_from: params.dateFrom,
+      date_to: params.dateTo,
+      search: params.search,
+      status: params.status,
+      supplier_id: params.supplierId,
+    })}`,
+    {
+      authMode: "appwrite",
+      parse: (data) => parseList(data, parsePurchaseReturn),
+    },
+  );
+
+  return response.data;
+}
+
+export async function createPurchaseReturn(
+  payload: CreatePurchaseReturnPayload,
+): Promise<PurchaseReturn> {
+  const response = await apiRequest<PurchaseReturn, BackendPurchaseReturnPayload>(
+    "/api/v1/purchasing/returns",
+    {
+      authMode: "appwrite",
+      body: purchaseReturnPayload(payload),
+      method: "POST",
+      parse: parsePurchaseReturn,
+    },
+  );
+
+  return response.data;
+}
+
+export async function getPurchaseReturnById(id: string): Promise<PurchaseReturn> {
+  const response = await apiRequest<PurchaseReturn>(`/api/v1/purchasing/returns/${id}`, {
+    authMode: "appwrite",
+    parse: parsePurchaseReturn,
+  });
+
+  return response.data;
+}
+
+export async function updatePurchaseReturn(
+  id: string,
+  payload: UpdatePurchaseReturnPayload,
+): Promise<PurchaseReturn> {
+  const response = await apiRequest<PurchaseReturn, BackendPurchaseReturnPayload>(
+    `/api/v1/purchasing/returns/${id}`,
+    {
+      authMode: "appwrite",
+      body: purchaseReturnPayload(payload),
+      method: "PATCH",
+      parse: parsePurchaseReturn,
+    },
+  );
+
+  return response.data;
+}
+
+export async function postPurchaseReturn(id: string): Promise<PurchaseReturn> {
+  const response = await apiRequest<PurchaseReturn>(`/api/v1/purchasing/returns/${id}/post`, {
+    authMode: "appwrite",
+    method: "POST",
+    parse: parsePurchaseReturn,
+  });
+
+  return response.data;
+}
+
+export async function cancelPurchaseReturn(id: string): Promise<PurchaseReturn> {
+  const response = await apiRequest<PurchaseReturn>(`/api/v1/purchasing/returns/${id}/cancel`, {
+    authMode: "appwrite",
+    method: "POST",
+    parse: parsePurchaseReturn,
+  });
+
+  return response.data;
+}
+
+export async function reversePurchaseReturn(
+  id: string,
+  payload: ReversePurchaseReturnPayload,
+): Promise<PurchaseReturn> {
+  const response = await apiRequest<PurchaseReturn, { reason: string }>(
+    `/api/v1/purchasing/returns/${id}/reverse`,
+    {
+      authMode: "appwrite",
+      body: {
+        reason: payload.reason,
+      },
+      method: "POST",
+      parse: parsePurchaseReturn,
+    },
+  );
+
+  return response.data;
+}
+
 export async function getPurchaseReceiptById(id: string): Promise<PurchaseReceipt> {
   const response = await apiRequest<PurchaseReceipt>(`/api/v1/purchasing/receipts/${id}`, {
     authMode: "appwrite",
     parse: parseReceipt,
   });
+
+  return response.data;
+}
+
+export async function getPurchaseReceiptReturnableItems(
+  receiptId: string,
+): Promise<ReturnablePurchaseReceiptItem[]> {
+  const response = await apiRequest<ReturnablePurchaseReceiptItem[]>(
+    `/api/v1/purchasing/receipts/${receiptId}/returnable-items`,
+    {
+      authMode: "appwrite",
+      parse: (data) => parseList(data, parseReturnablePurchaseReceiptItem),
+    },
+  );
+
+  return response.data;
+}
+
+export async function getPurchaseReceiptReturns(receiptId: string): Promise<PurchaseReturn[]> {
+  const response = await apiRequest<PurchaseReturn[]>(
+    `/api/v1/purchasing/receipts/${receiptId}/returns`,
+    {
+      authMode: "appwrite",
+      parse: (data) => parseList(data, parsePurchaseReturn),
+    },
+  );
 
   return response.data;
 }

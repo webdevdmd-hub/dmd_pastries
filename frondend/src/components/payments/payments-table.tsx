@@ -1,4 +1,4 @@
-import { Eye, ReceiptText, RotateCcw } from "lucide-react";
+import { Eye, FileSearch, ReceiptText, Undo2 } from "lucide-react";
 import type { JSX } from "react";
 
 import { PaymentMethodBadge } from "@/components/payments/payment-method-badge";
@@ -17,9 +17,10 @@ import type { SalePayment } from "@/types/payment";
 type PaymentsTableProps = {
   canRefund: boolean;
   isReceiptLoading: boolean;
-  onRefund: (payment: SalePayment) => void;
+  onCreateReturn: (payment: SalePayment) => void;
   onView: (payment: SalePayment) => void;
   onViewReceipt: (payment: SalePayment) => void;
+  onViewSaleDetails: (payment: SalePayment) => void;
   payments: SalePayment[];
 };
 
@@ -69,9 +70,10 @@ function paymentTypeLabel(payment: SalePayment): string {
 export function PaymentsTable({
   canRefund,
   isReceiptLoading,
-  onRefund,
+  onCreateReturn,
   onView,
   onViewReceipt,
+  onViewSaleDetails,
   payments,
 }: PaymentsTableProps): JSX.Element {
   return (
@@ -126,29 +128,41 @@ export function PaymentsTable({
                   <Eye className="h-4 w-4" />
                 </Button>
                 {payment.sourceType === "pos_sale" && payment.sourceId ? (
-                  <Button
-                    aria-label={`View receipt for ${payment.sourceNumber}`}
-                    disabled={isReceiptLoading}
-                    onClick={() => onViewReceipt(payment)}
-                    size="icon"
-                    title="View receipt"
-                    type="button"
-                    variant="ghost"
-                  >
-                    <ReceiptText className="h-4 w-4" />
-                  </Button>
+                  <>
+                    <Button
+                      aria-label={`View sale details for ${payment.sourceNumber}`}
+                      onClick={() => onViewSaleDetails(payment)}
+                      size="icon"
+                      title="View sale details"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <FileSearch className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      aria-label={`View receipt for ${payment.sourceNumber}`}
+                      disabled={isReceiptLoading}
+                      onClick={() => onViewReceipt(payment)}
+                      size="icon"
+                      title="View receipt"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <ReceiptText className="h-4 w-4" />
+                    </Button>
+                  </>
                 ) : null}
                 {canRefund ? (
                   <Button
-                    aria-label={`Refund ${payment.sourceNumber}`}
+                    aria-label={`Return items for ${payment.sourceNumber}`}
                     disabled={!isRefundable(payment)}
-                    onClick={() => onRefund(payment)}
+                    onClick={() => onCreateReturn(payment)}
                     size="icon"
-                    title={refundDisabledReason(payment) ?? "Refund payment"}
+                    title={refundDisabledReason(payment) ?? "Return items / credit note"}
                     type="button"
                     variant="ghost"
                   >
-                    <RotateCcw className="h-4 w-4" />
+                    <Undo2 className="h-4 w-4" />
                   </Button>
                 ) : null}
               </div>

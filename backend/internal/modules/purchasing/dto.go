@@ -32,6 +32,21 @@ type PaymentListQuery struct {
 	SortOrder       string
 }
 
+type PurchaseReturnListQuery struct {
+	Search            string
+	BranchID          string
+	SupplierID        string
+	PurchaseInvoiceID string
+	PurchaseReceiptID string
+	Status            string
+	DateFrom          string
+	DateTo            string
+	Page              int
+	Limit             int
+	SortBy            string
+	SortOrder         string
+}
+
 type ConvertPurchaseOrderToInvoiceRequest struct {
 	InvoiceDate string `json:"invoice_date"`
 	DueDate     string `json:"due_date"`
@@ -138,8 +153,31 @@ type PurchaseReceiptItemInput struct {
 	PackagingItemID  string  `json:"packaging_item_id"`
 	QuantityReceived float64 `json:"quantity_received" binding:"required"`
 	UnitID           string  `json:"unit_id" binding:"required"`
+	UnitCost         float64 `json:"unit_cost"`
 	ExpiryDate       string  `json:"expiry_date"`
 	BatchNumber      string  `json:"batch_number"`
+}
+
+type CreatePurchaseReturnRequest struct {
+	PurchaseReceiptID       string                    `json:"purchase_receipt_id" binding:"required"`
+	ReturnDate              string                    `json:"return_date" binding:"required"`
+	Reason                  string                    `json:"reason"`
+	SupplierReferenceNumber string                    `json:"supplier_reference_number"`
+	Items                   []PurchaseReturnItemInput `json:"items" binding:"required"`
+}
+
+type UpdatePurchaseReturnRequest struct {
+	ReturnDate              string                    `json:"return_date"`
+	Reason                  string                    `json:"reason"`
+	SupplierReferenceNumber string                    `json:"supplier_reference_number"`
+	Items                   []PurchaseReturnItemInput `json:"items"`
+}
+
+type PurchaseReturnItemInput struct {
+	PurchaseReceiptItemID string  `json:"purchase_receipt_item_id" binding:"required"`
+	Quantity              float64 `json:"quantity" binding:"required"`
+	StockLocationID       string  `json:"stock_location_id"`
+	Reason                string  `json:"reason"`
 }
 
 type PaginationResponse struct {
@@ -212,6 +250,10 @@ type PurchaseInvoiceResponse struct {
 	TotalAmount     float64                          `json:"total_amount"`
 	PaidAmount      float64                          `json:"paid_amount"`
 	BalanceAmount   float64                          `json:"balance_amount"`
+	ReturnedAmount  float64                          `json:"returned_amount"`
+	CreditedAmount  float64                          `json:"credited_amount"`
+	ReturnStatus    string                           `json:"return_status"`
+	JournalEntryID  *string                          `json:"journal_entry_id"`
 	Notes           string                           `json:"notes"`
 	Items           []PurchaseInvoiceItemResponse    `json:"items,omitempty"`
 	Payments        []PurchaseInvoicePaymentResponse `json:"payments,omitempty"`
@@ -256,6 +298,7 @@ type PurchaseInvoicePaymentResponse struct {
 	PaidByUserName    string    `json:"paid_by_user_name"`
 	PaidAt            time.Time `json:"paid_at"`
 	Notes             string    `json:"notes"`
+	JournalEntryID    *string   `json:"journal_entry_id"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
@@ -264,6 +307,7 @@ type PurchasingDocumentChainResponse struct {
 	PurchaseOrder    *PurchaseDocumentChainItem  `json:"purchase_order"`
 	PurchaseInvoices []PurchaseDocumentChainItem `json:"purchase_invoices"`
 	PurchaseReceipts []PurchaseDocumentChainItem `json:"purchase_receipts"`
+	PurchaseReturns  []PurchaseDocumentChainItem `json:"purchase_returns"`
 	SupplierPayments []PurchaseDocumentChainItem `json:"supplier_payments"`
 }
 
@@ -277,6 +321,7 @@ type PurchaseDocumentChainItem struct {
 	PurchaseOrderID   *string   `json:"purchase_order_id,omitempty"`
 	PurchaseInvoiceID *string   `json:"purchase_invoice_id,omitempty"`
 	PurchaseReceiptID *string   `json:"purchase_receipt_id,omitempty"`
+	PurchaseReturnID  *string   `json:"purchase_return_id,omitempty"`
 	PreviousID        *string   `json:"previous_id,omitempty"`
 	NextID            *string   `json:"next_id,omitempty"`
 }
@@ -293,6 +338,7 @@ type PurchaseReceiptResponse struct {
 	ReceiptNumber     string                        `json:"receipt_number"`
 	ReceivedDate      time.Time                     `json:"received_date"`
 	Status            string                        `json:"status"`
+	JournalEntryID    *string                       `json:"journal_entry_id"`
 	ReceivedByUserID  string                        `json:"received_by_user_id"`
 	Notes             string                        `json:"notes"`
 	Items             []PurchaseReceiptItemResponse `json:"items,omitempty"`
@@ -310,9 +356,91 @@ type PurchaseReceiptItemResponse struct {
 	QuantityReceived float64    `json:"quantity_received"`
 	UnitID           string     `json:"unit_id"`
 	UnitSymbol       string     `json:"unit_symbol"`
+	UnitCost         float64    `json:"unit_cost"`
 	ExpiryDate       *time.Time `json:"expiry_date"`
 	BatchNumber      string     `json:"batch_number"`
 	StockMovementID  *string    `json:"stock_movement_id"`
+}
+
+type PurchaseReturnResponse struct {
+	ID                      string                       `json:"id"`
+	BusinessID              string                       `json:"business_id"`
+	BranchID                string                       `json:"branch_id"`
+	BranchName              string                       `json:"branch_name"`
+	SupplierID              string                       `json:"supplier_id"`
+	SupplierName            string                       `json:"supplier_name"`
+	PurchaseOrderID         *string                      `json:"purchase_order_id"`
+	PurchaseInvoiceID       string                       `json:"purchase_invoice_id"`
+	PurchaseInvoiceNumber   string                       `json:"purchase_invoice_number"`
+	PurchaseReceiptID       string                       `json:"purchase_receipt_id"`
+	PurchaseReceiptNumber   string                       `json:"purchase_receipt_number"`
+	ReturnNumber            string                       `json:"return_number"`
+	ReturnDate              time.Time                    `json:"return_date"`
+	SupplierReferenceNumber string                       `json:"supplier_reference_number"`
+	Reason                  string                       `json:"reason"`
+	Status                  string                       `json:"status"`
+	SubtotalAmount          float64                      `json:"subtotal_amount"`
+	TaxAmount               float64                      `json:"tax_amount"`
+	DiscountAmount          float64                      `json:"discount_amount"`
+	ReturnTotal             float64                      `json:"return_total"`
+	AppliedCreditAmount     float64                      `json:"applied_credit_amount"`
+	OpenCreditAmount        float64                      `json:"open_credit_amount"`
+	JournalEntryID          *string                      `json:"journal_entry_id"`
+	CreatedByUserID         string                       `json:"created_by_user_id"`
+	PostedByUserID          *string                      `json:"posted_by_user_id"`
+	PostedAt                *time.Time                   `json:"posted_at"`
+	CancelledByUserID       *string                      `json:"cancelled_by_user_id"`
+	CancelledAt             *time.Time                   `json:"cancelled_at"`
+	Items                   []PurchaseReturnItemResponse `json:"items,omitempty"`
+	CreatedAt               time.Time                    `json:"created_at"`
+	UpdatedAt               time.Time                    `json:"updated_at"`
+}
+
+type PurchaseReturnItemResponse struct {
+	ID                    string  `json:"id"`
+	PurchaseReceiptItemID string  `json:"purchase_receipt_item_id"`
+	ItemType              string  `json:"item_type"`
+	ProductID             *string `json:"product_id"`
+	IngredientID          *string `json:"ingredient_id"`
+	PackagingItemID       *string `json:"packaging_item_id"`
+	InventoryItemID       string  `json:"inventory_item_id"`
+	ItemNameSnapshot      string  `json:"item_name_snapshot"`
+	Quantity              float64 `json:"quantity"`
+	UnitID                string  `json:"unit_id"`
+	UnitSymbol            string  `json:"unit_symbol"`
+	UnitCost              float64 `json:"unit_cost"`
+	DiscountAmount        float64 `json:"discount_amount"`
+	TaxRateID             *string `json:"tax_rate_id"`
+	TaxAmount             float64 `json:"tax_amount"`
+	LineSubtotal          float64 `json:"line_subtotal"`
+	LineTotal             float64 `json:"line_total"`
+	StockLocationID       *string `json:"stock_location_id"`
+	StockLocationName     string  `json:"stock_location_name"`
+	StockMovementID       *string `json:"stock_movement_id"`
+	Reason                string  `json:"reason"`
+}
+
+type PurchaseReturnableItemResponse struct {
+	PurchaseReceiptItemID string     `json:"purchase_receipt_item_id"`
+	ItemType              string     `json:"item_type"`
+	ProductID             *string    `json:"product_id"`
+	IngredientID          *string    `json:"ingredient_id"`
+	PackagingItemID       *string    `json:"packaging_item_id"`
+	InventoryItemID       string     `json:"inventory_item_id"`
+	ItemNameSnapshot      string     `json:"item_name_snapshot"`
+	QuantityReceived      float64    `json:"quantity_received"`
+	QuantityReturned      float64    `json:"quantity_returned"`
+	ReturnableQuantity    float64    `json:"returnable_quantity"`
+	UnitID                string     `json:"unit_id"`
+	UnitSymbol            string     `json:"unit_symbol"`
+	UnitCost              float64    `json:"unit_cost"`
+	DiscountAmount        float64    `json:"discount_amount"`
+	TaxRateID             *string    `json:"tax_rate_id"`
+	TaxAmount             float64    `json:"tax_amount"`
+	LineSubtotal          float64    `json:"line_subtotal"`
+	LineTotal             float64    `json:"line_total"`
+	ExpiryDate            *time.Time `json:"expiry_date"`
+	BatchNumber           string     `json:"batch_number"`
 }
 
 type PurchasingSummaryResponse struct {
@@ -329,6 +457,8 @@ type SupplierHistoryResponse struct {
 	PurchaseOrders      []PurchaseOrderResponse   `json:"purchase_orders"`
 	Invoices            []PurchaseInvoiceResponse `json:"invoices"`
 	Receipts            []PurchaseReceiptResponse `json:"receipts"`
+	Returns             []PurchaseReturnResponse  `json:"returns"`
 	TotalPurchaseAmount float64                   `json:"total_purchase_amount"`
+	OpenVendorCredit    float64                   `json:"open_vendor_credit"`
 	LastPurchaseDate    *time.Time                `json:"last_purchase_date"`
 }

@@ -214,6 +214,22 @@ func (h *Handler) GetReceipt(c *gin.Context) {
 	respond(c, "purchase receipt fetched successfully", result, err)
 }
 
+func (h *Handler) ReceiptReturnableItems(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.ReceiptReturnableItems(utils.MustAuthContext(c), c.Param("id"))
+	respond(c, "purchase receipt returnable items fetched successfully", result, err)
+}
+
+func (h *Handler) ListReturnsByReceipt(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.ListReturnsByReceipt(utils.MustAuthContext(c), c.Param("id"))
+	respond(c, "purchase receipt returns fetched successfully", result, err)
+}
+
 func (h *Handler) PostReceipt(c *gin.Context) {
 	if !validParam(c, "id") {
 		return
@@ -228,6 +244,56 @@ func (h *Handler) CancelReceipt(c *gin.Context) {
 	}
 	result, err := h.service.CancelReceipt(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
 	respond(c, "purchase receipt cancelled successfully", result, err)
+}
+
+func (h *Handler) ListReturns(c *gin.Context) {
+	result, err := h.service.ListReturns(utils.MustAuthContext(c), parsePurchaseReturnListQuery(c))
+	respond(c, "purchase returns fetched successfully", result, err)
+}
+
+func (h *Handler) CreateReturn(c *gin.Context) {
+	var req CreatePurchaseReturnRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.CreateReturn(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "purchase return created successfully", result, err)
+}
+
+func (h *Handler) GetReturn(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.GetReturn(utils.MustAuthContext(c), c.Param("id"))
+	respond(c, "purchase return fetched successfully", result, err)
+}
+
+func (h *Handler) UpdateReturn(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	var req UpdatePurchaseReturnRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.UpdateReturn(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase return updated successfully", result, err)
+}
+
+func (h *Handler) PostReturn(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.PostReturn(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase return posted successfully", result, err)
+}
+
+func (h *Handler) CancelReturn(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.CancelReturn(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase return cancelled successfully", result, err)
 }
 
 func (h *Handler) Summary(c *gin.Context) {
@@ -278,6 +344,25 @@ func parsePaymentListQuery(c *gin.Context) PaymentListQuery {
 		Limit:           limit,
 		SortBy:          c.DefaultQuery("sort_by", "paid_at"),
 		SortOrder:       c.DefaultQuery("sort_order", "desc"),
+	}
+}
+
+func parsePurchaseReturnListQuery(c *gin.Context) PurchaseReturnListQuery {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	return PurchaseReturnListQuery{
+		Search:            c.Query("search"),
+		BranchID:          c.Query("branch_id"),
+		SupplierID:        c.Query("supplier_id"),
+		PurchaseInvoiceID: c.Query("purchase_invoice_id"),
+		PurchaseReceiptID: c.Query("purchase_receipt_id"),
+		Status:            c.Query("status"),
+		DateFrom:          c.Query("date_from"),
+		DateTo:            c.Query("date_to"),
+		Page:              page,
+		Limit:             limit,
+		SortBy:            c.DefaultQuery("sort_by", "created_at"),
+		SortOrder:         c.DefaultQuery("sort_order", "desc"),
 	}
 }
 

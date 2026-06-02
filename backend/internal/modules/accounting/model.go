@@ -29,6 +29,19 @@ type ChartAccount struct {
 
 func (ChartAccount) TableName() string { return "chart_of_accounts" }
 
+type AccountMapping struct {
+	ID             string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID     string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	MappingKey     string         `gorm:"size:100;not null;index" json:"mapping_key"`
+	ChartAccountID string         `gorm:"type:uuid;not null;index" json:"chart_account_id"`
+	Description    string         `json:"description"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (AccountMapping) TableName() string { return "accounting_account_mappings" }
+
 type PaymentAccount struct {
 	ID              string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID      string         `gorm:"type:uuid;not null;index" json:"business_id"`

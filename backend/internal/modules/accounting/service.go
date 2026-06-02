@@ -41,11 +41,63 @@ func (s *Service) ListChartAccounts(currentUser *utils.AuthContext, query ChartA
 
 func (s *Service) SeedDefaults(currentUser *utils.AuthContext, ipAddress, userAgent string) error {
 	return s.withTransaction(func(tx *gorm.DB) error {
-		if err := SeedDefaultChartOfAccounts(tx, currentUser.BusinessID); err != nil {
+		if err := SeedDefaultAccountMappings(tx, currentUser.BusinessID); err != nil {
 			return apperrors.Internal("failed to seed chart of accounts")
 		}
 		return s.writeAudit(tx, currentUser, "accounting.chart_accounts_seeded", currentUser.BusinessID, "Chart of accounts defaults seeded.", ipAddress, userAgent)
 	})
+}
+
+func (s *Service) ListAccountMappings(currentUser *utils.AuthContext) ([]AccountMappingResponse, error) {
+	rows, err := s.repo.ListAccountMappings(currentUser.BusinessID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to list account mappings")
+	}
+	return rows, nil
+}
+
+func (s *Service) SeedAccountMappings(currentUser *utils.AuthContext, ipAddress, userAgent string) ([]AccountMappingResponse, error) {
+	if err := s.withTransaction(func(tx *gorm.DB) error {
+		if err := SeedDefaultAccountMappings(tx, currentUser.BusinessID); err != nil {
+			return apperrors.Internal("failed to seed account mappings")
+		}
+		return s.writeAudit(tx, currentUser, "accounting.account_mappings_seeded", currentUser.BusinessID, "Account mappings defaults seeded.", ipAddress, userAgent)
+	}); err != nil {
+		return nil, err
+	}
+	return s.ListAccountMappings(currentUser)
+}
+
+func (s *Service) UpdateAccountMappings(currentUser *utils.AuthContext, req UpdateAccountMappingsRequest, ipAddress, userAgent string) ([]AccountMappingResponse, error) {
+	if len(req.Mappings) == 0 {
+		return nil, apperrors.BadRequest("mappings is required", nil)
+	}
+	if err := s.withTransaction(func(tx *gorm.DB) error {
+		for key, accountID := range req.Mappings {
+			key = strings.TrimSpace(key)
+			if !validAccountMappingKey(key) {
+				return apperrors.BadRequest("invalid account mapping key", map[string]string{"mapping_key": key})
+			}
+			account, err := s.repo.ValidateActiveAccount(tx, currentUser.BusinessID, strings.TrimSpace(accountID))
+			if err != nil {
+				return apperrors.BadRequest("invalid chart account for mapping", map[string]string{"mapping_key": key})
+			}
+			mapping := &AccountMapping{
+				ID:             utils.NewUUID(),
+				BusinessID:     currentUser.BusinessID,
+				MappingKey:     key,
+				ChartAccountID: account.ID,
+				Description:    defaultAccountMappingDescription(key),
+			}
+			if err := s.repo.UpsertAccountMapping(tx, mapping); err != nil {
+				return apperrors.Internal("failed to update account mapping")
+			}
+		}
+		return s.writeAudit(tx, currentUser, "accounting.account_mappings_updated", currentUser.BusinessID, "Account mappings updated.", ipAddress, userAgent)
+	}); err != nil {
+		return nil, err
+	}
+	return s.ListAccountMappings(currentUser)
 }
 
 func (s *Service) CreateChartAccount(currentUser *utils.AuthContext, req CreateChartAccountRequest, ipAddress, userAgent string) (*ChartAccountResponse, error) {
@@ -773,18 +825,18 @@ func (s *Service) PostPOSSaleJournal(tx *gorm.DB, currentUser *utils.AuthContext
 	if err != nil {
 		return "", apperrors.Internal("failed to load sale payments for accounting")
 	}
-	salesIncome, err := s.requiredAccount(tx, currentUser.BusinessID, "4000", "Sales Income")
+	salesIncome, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "sales_income", "4000", "Sales Income")
 	if err != nil {
 		return "", err
 	}
-	accountsReceivable, err := s.requiredAccount(tx, currentUser.BusinessID, "1100", "Accounts Receivable")
+	accountsReceivable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "accounts_receivable", "1100", "Accounts Receivable")
 	if err != nil {
 		return "", err
 	}
 	var vatPayable *ChartAccount
 	taxAmount := roundMoney(sale.TaxAmount)
 	if taxAmount > 0 {
-		vatPayable, err = s.requiredAccount(tx, currentUser.BusinessID, "2100", "VAT Payable")
+		vatPayable, err = s.requiredMappedAccount(tx, currentUser.BusinessID, "vat_payable", "2100", "VAT Payable")
 		if err != nil {
 			return "", err
 		}
@@ -855,6 +907,143 @@ func (s *Service) PostPOSSaleJournal(tx *gorm.DB, currentUser *utils.AuthContext
 	return journalID, nil
 }
 
+func (s *Service) PostPOSSaleCOGSJournal(tx *gorm.DB, currentUser *utils.AuthContext, saleID string) (string, error) {
+	sale, err := s.repo.FindPOSSaleForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(saleID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load sale for COGS accounting")
+	}
+	if sale.COGSJournalEntryID != nil && *sale.COGSJournalEntryID != "" {
+		return *sale.COGSJournalEntryID, nil
+	}
+	if sale.SaleStatus != "completed" {
+		return "", nil
+	}
+	costTotal, err := s.repo.SumStockMovementCostByReference(tx, currentUser.BusinessID, "sale", sale.ID, "out")
+	if err != nil {
+		return "", apperrors.Internal("failed to calculate sale inventory cost")
+	}
+	costTotal = roundMoney(costTotal)
+	if costTotal <= 0 {
+		return "", nil
+	}
+	cogsAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "cogs", "5070", "Cost of Goods Sold")
+	if err != nil {
+		return "", err
+	}
+	inventoryAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "inventory_stock", "1200", "Inventory / Stock")
+	if err != nil {
+		return "", err
+	}
+	lines := []JournalEntryLineRequest{
+		{AccountID: cogsAccount.ID, DebitAmount: costTotal, Description: "COGS for " + sale.SaleNumber},
+		{AccountID: inventoryAccount.ID, CreditAmount: costTotal, Description: "Inventory cost relieved for " + sale.SaleNumber},
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, sale.SoldAt, &sale.BranchID, "pos_sale_cogs", sale.ID, sale.SaleNumber, "POS sale COGS "+sale.SaleNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdatePOSSaleCOGSJournalID(tx, currentUser.BusinessID, sale.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update sale COGS journal")
+	}
+	if err := s.repo.UpdateStockMovementJournalByReference(tx, currentUser.BusinessID, "sale", sale.ID, "out", journalID); err != nil {
+		return "", apperrors.Internal("failed to link sale stock movements to COGS journal")
+	}
+	return journalID, nil
+}
+
+func (s *Service) PostPOSSaleVoidJournal(tx *gorm.DB, currentUser *utils.AuthContext, saleID string, voidDate time.Time) (string, error) {
+	sale, err := s.repo.FindPOSSaleForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(saleID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load sale for void accounting")
+	}
+	if sale.VoidJournalEntryID != nil && *sale.VoidJournalEntryID != "" {
+		return *sale.VoidJournalEntryID, nil
+	}
+	sourceJournalIDs := []string{}
+	if sale.AccountingJournalEntryID != nil && strings.TrimSpace(*sale.AccountingJournalEntryID) != "" {
+		sourceJournalIDs = append(sourceJournalIDs, strings.TrimSpace(*sale.AccountingJournalEntryID))
+	}
+	if sale.COGSJournalEntryID != nil && strings.TrimSpace(*sale.COGSJournalEntryID) != "" {
+		sourceJournalIDs = append(sourceJournalIDs, strings.TrimSpace(*sale.COGSJournalEntryID))
+	}
+	if len(sourceJournalIDs) == 0 {
+		return "", nil
+	}
+	lines := make([]JournalEntryLineRequest, 0)
+	for _, journalID := range sourceJournalIDs {
+		sourceLines, err := s.repo.ListJournalEntryLines(currentUser.BusinessID, journalID)
+		if err != nil {
+			return "", apperrors.Internal("failed to load source journal lines for void")
+		}
+		for _, line := range sourceLines {
+			if line.CreditAmount > 0 {
+				lines = append(lines, JournalEntryLineRequest{AccountID: line.AccountID, DebitAmount: roundMoney(line.CreditAmount), Description: "Void reversal: " + line.Description})
+			}
+			if line.DebitAmount > 0 {
+				lines = append(lines, JournalEntryLineRequest{AccountID: line.AccountID, CreditAmount: roundMoney(line.DebitAmount), Description: "Void reversal: " + line.Description})
+			}
+		}
+	}
+	if len(lines) == 0 {
+		return "", nil
+	}
+	if voidDate.IsZero() {
+		voidDate = time.Now().UTC()
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, voidDate, &sale.BranchID, "pos_sale_void", sale.ID, sale.SaleNumber, "POS sale void "+sale.SaleNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdatePOSSaleVoidJournalID(tx, currentUser.BusinessID, sale.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update sale void journal")
+	}
+	return journalID, nil
+}
+
+func (s *Service) PostSalesReturnInventoryJournal(tx *gorm.DB, currentUser *utils.AuthContext, salesReturnID string) (string, error) {
+	salesReturn, err := s.repo.FindSalesReturnForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(salesReturnID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load sales return for inventory accounting")
+	}
+	if salesReturn.InventoryJournalEntryID != nil && *salesReturn.InventoryJournalEntryID != "" {
+		return *salesReturn.InventoryJournalEntryID, nil
+	}
+	if salesReturn.Status != "posted" {
+		return "", nil
+	}
+	costTotal, err := s.repo.SumStockMovementCostByReference(tx, currentUser.BusinessID, "sales_return", salesReturn.ID, "in")
+	if err != nil {
+		return "", apperrors.Internal("failed to calculate sales return inventory value")
+	}
+	costTotal = roundMoney(costTotal)
+	if costTotal <= 0 {
+		return "", nil
+	}
+	inventoryAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "inventory_stock", "1200", "Inventory / Stock")
+	if err != nil {
+		return "", err
+	}
+	cogsAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "cogs", "5070", "Cost of Goods Sold")
+	if err != nil {
+		return "", err
+	}
+	lines := []JournalEntryLineRequest{
+		{AccountID: inventoryAccount.ID, DebitAmount: costTotal, Description: "Inventory restored for " + salesReturn.ReturnNumber},
+		{AccountID: cogsAccount.ID, CreditAmount: costTotal, Description: "COGS reversed for " + salesReturn.ReturnNumber},
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, salesReturn.ReturnDate, &salesReturn.BranchID, "sales_return_inventory", salesReturn.ID, salesReturn.ReturnNumber, "Sales return inventory "+salesReturn.ReturnNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdateSalesReturnInventoryJournalID(tx, currentUser.BusinessID, salesReturn.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update sales return inventory journal")
+	}
+	if err := s.repo.UpdateStockMovementJournalByReference(tx, currentUser.BusinessID, "sales_return", salesReturn.ID, "in", journalID); err != nil {
+		return "", apperrors.Internal("failed to link sales return stock movements to inventory journal")
+	}
+	return journalID, nil
+}
+
 func (s *Service) PostBakeryOrderPaymentJournal(tx *gorm.DB, currentUser *utils.AuthContext, paymentID string) (string, error) {
 	payment, err := s.repo.FindBakeryPaymentForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(paymentID))
 	if err != nil {
@@ -873,13 +1062,15 @@ func (s *Service) PostBakeryOrderPaymentJournal(tx *gorm.DB, currentUser *utils.
 	if err := validatePaymentAccountBranch(payment.PaymentAccountBranchID, payment.BranchID, payment.PaymentAccountName); err != nil {
 		return "", err
 	}
+	creditMappingKey := "customer_advance"
 	creditAccountCode := "2200"
 	creditAccountName := "Customer Advance"
 	if payment.OrderStatus == "completed" {
+		creditMappingKey = "accounts_receivable"
 		creditAccountCode = "1100"
 		creditAccountName = "Accounts Receivable"
 	}
-	creditAccount, err := s.requiredAccount(tx, currentUser.BusinessID, creditAccountCode, creditAccountName)
+	creditAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, creditMappingKey, creditAccountCode, creditAccountName)
 	if err != nil {
 		return "", err
 	}
@@ -912,22 +1103,22 @@ func (s *Service) PostBakeryOrderRevenueJournal(tx *gorm.DB, currentUser *utils.
 	if totalAmount <= 0 {
 		return "", nil
 	}
-	customerAdvance, err := s.requiredAccount(tx, currentUser.BusinessID, "2200", "Customer Advance")
+	customerAdvance, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "customer_advance", "2200", "Customer Advance")
 	if err != nil {
 		return "", err
 	}
-	accountsReceivable, err := s.requiredAccount(tx, currentUser.BusinessID, "1100", "Accounts Receivable")
+	accountsReceivable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "accounts_receivable", "1100", "Accounts Receivable")
 	if err != nil {
 		return "", err
 	}
-	bakeryIncome, err := s.requiredAccount(tx, currentUser.BusinessID, "4010", "Bakery Order Income")
+	bakeryIncome, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "bakery_income", "4010", "Bakery Order Income")
 	if err != nil {
 		return "", err
 	}
 	var vatPayable *ChartAccount
 	taxAmount := roundMoney(order.TaxAmount)
 	if taxAmount > 0 {
-		vatPayable, err = s.requiredAccount(tx, currentUser.BusinessID, "2100", "VAT Payable")
+		vatPayable, err = s.requiredMappedAccount(tx, currentUser.BusinessID, "vat_payable", "2100", "VAT Payable")
 		if err != nil {
 			return "", err
 		}
@@ -957,6 +1148,238 @@ func (s *Service) PostBakeryOrderRevenueJournal(tx *gorm.DB, currentUser *utils.
 	}
 	if err := s.repo.UpdateBakeryOrderAccountingJournalID(tx, currentUser.BusinessID, order.ID, journalID); err != nil {
 		return "", apperrors.Internal("failed to update bakery order accounting journal")
+	}
+	return journalID, nil
+}
+
+func (s *Service) PostSalesReturnJournal(tx *gorm.DB, currentUser *utils.AuthContext, salesReturnID string) (string, error) {
+	salesReturn, err := s.repo.FindSalesReturnForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(salesReturnID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load sales return for accounting")
+	}
+	if salesReturn.JournalEntryID != nil && *salesReturn.JournalEntryID != "" {
+		return *salesReturn.JournalEntryID, nil
+	}
+	if salesReturn.Status != "posted" || salesReturn.RefundMode != "refund" {
+		return "", nil
+	}
+	refundAmount := roundMoney(salesReturn.RefundAmount)
+	if refundAmount <= 0 {
+		refundAmount = roundMoney(salesReturn.ReturnTotal)
+	}
+	if refundAmount <= 0 {
+		return "", nil
+	}
+	if salesReturn.DefaultPaymentAccountID == nil || strings.TrimSpace(salesReturn.ChartAccountID) == "" {
+		return "", apperrors.BadRequest("refund payment method is not linked to an active payment account", map[string]interface{}{"payment_method": salesReturn.RefundPaymentMethodName})
+	}
+	if err := validatePaymentAccountBranch(salesReturn.PaymentAccountBranchID, salesReturn.BranchID, salesReturn.PaymentAccountName); err != nil {
+		return "", err
+	}
+	salesReturnsAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "sales_returns", "4040", "Sales Returns and Allowances")
+	if err != nil {
+		return "", err
+	}
+	taxAmount := roundMoney(salesReturn.TaxAmount)
+	netReturn := roundMoney(refundAmount - taxAmount)
+	lines := make([]JournalEntryLineRequest, 0, 3)
+	if netReturn > 0 {
+		lines = append(lines, JournalEntryLineRequest{AccountID: salesReturnsAccount.ID, DebitAmount: netReturn, Description: "Sales return allowance " + salesReturn.ReturnNumber})
+	}
+	if taxAmount > 0 {
+		vatPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "vat_payable", "2100", "VAT Payable")
+		if err != nil {
+			return "", err
+		}
+		lines = append(lines, JournalEntryLineRequest{AccountID: vatPayable.ID, DebitAmount: taxAmount, Description: "VAT reversed on sales return"})
+	}
+	lines = append(lines, JournalEntryLineRequest{AccountID: salesReturn.ChartAccountID, CreditAmount: refundAmount, Description: "Refund via " + salesReturn.RefundPaymentMethodName})
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, salesReturn.ReturnDate, &salesReturn.BranchID, "sales_return", salesReturn.ID, salesReturn.ReturnNumber, "Sales return "+salesReturn.ReturnNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdateSalesReturnJournalID(tx, currentUser.BusinessID, salesReturn.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update sales return accounting journal")
+	}
+	return journalID, nil
+}
+
+func (s *Service) PostPurchaseReturnJournal(tx *gorm.DB, currentUser *utils.AuthContext, purchaseReturnID string) (string, error) {
+	purchaseReturn, err := s.repo.FindPurchaseReturnForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(purchaseReturnID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load purchase return for accounting")
+	}
+	if purchaseReturn.JournalEntryID != nil && *purchaseReturn.JournalEntryID != "" {
+		return *purchaseReturn.JournalEntryID, nil
+	}
+	if purchaseReturn.Status != "posted" {
+		return "", nil
+	}
+	returnTotal := roundMoney(purchaseReturn.ReturnTotal)
+	if returnTotal <= 0 {
+		return "", nil
+	}
+	accountsPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "accounts_payable", "2000", "Accounts Payable")
+	if err != nil {
+		return "", err
+	}
+	purchaseReturnAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "purchase_returns", "5020", "Purchase Return")
+	if err != nil {
+		return "", err
+	}
+	taxAmount := roundMoney(purchaseReturn.TaxAmount)
+	netReturn := roundMoney(returnTotal - taxAmount)
+	lines := make([]JournalEntryLineRequest, 0, 3)
+	lines = append(lines, JournalEntryLineRequest{AccountID: accountsPayable.ID, DebitAmount: returnTotal, Description: "Vendor credit " + purchaseReturn.ReturnNumber})
+	if netReturn > 0 {
+		lines = append(lines, JournalEntryLineRequest{AccountID: purchaseReturnAccount.ID, CreditAmount: netReturn, Description: "Purchase return " + purchaseReturn.ReturnNumber})
+	}
+	if taxAmount > 0 {
+		vatReceivable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "vat_receivable", "1300", "VAT Receivable")
+		if err != nil {
+			return "", err
+		}
+		lines = append(lines, JournalEntryLineRequest{AccountID: vatReceivable.ID, CreditAmount: taxAmount, Description: "VAT receivable reversed on purchase return"})
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, purchaseReturn.ReturnDate, &purchaseReturn.BranchID, "purchase_return", purchaseReturn.ID, purchaseReturn.ReturnNumber, "Purchase return "+purchaseReturn.ReturnNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdatePurchaseReturnJournalID(tx, currentUser.BusinessID, purchaseReturn.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update purchase return accounting journal")
+	}
+	return journalID, nil
+}
+
+func (s *Service) PostPurchaseInvoiceJournal(tx *gorm.DB, currentUser *utils.AuthContext, invoiceID string) (string, error) {
+	invoice, err := s.repo.FindPurchaseInvoiceForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(invoiceID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load purchase invoice for accounting")
+	}
+	if invoice.JournalEntryID != nil && *invoice.JournalEntryID != "" {
+		return *invoice.JournalEntryID, nil
+	}
+	if invoice.Status != "posted" {
+		return "", nil
+	}
+	totalAmount := roundMoney(invoice.TotalAmount)
+	if totalAmount <= 0 {
+		return "", nil
+	}
+	inventoryAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "inventory_stock", "1200", "Inventory / Stock")
+	if err != nil {
+		return "", err
+	}
+	accountsPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "accounts_payable", "2000", "Accounts Payable")
+	if err != nil {
+		return "", err
+	}
+	taxAmount := roundMoney(invoice.TaxAmount)
+	netAmount := roundMoney(totalAmount - taxAmount)
+	lines := make([]JournalEntryLineRequest, 0, 3)
+	if netAmount > 0 {
+		lines = append(lines, JournalEntryLineRequest{AccountID: inventoryAccount.ID, DebitAmount: netAmount, Description: "Purchase invoice stock value"})
+	}
+	if taxAmount > 0 {
+		vatReceivable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "vat_receivable", "1300", "VAT Receivable")
+		if err != nil {
+			return "", err
+		}
+		lines = append(lines, JournalEntryLineRequest{AccountID: vatReceivable.ID, DebitAmount: taxAmount, Description: "VAT receivable on purchase invoice"})
+	}
+	lines = append(lines, JournalEntryLineRequest{AccountID: accountsPayable.ID, CreditAmount: totalAmount, Description: "Supplier payable " + invoice.InvoiceNumber})
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, invoice.InvoiceDate, &invoice.BranchID, "purchase_invoice", invoice.ID, invoice.InvoiceNumber, "Purchase invoice "+invoice.InvoiceNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdatePurchaseInvoiceJournalID(tx, currentUser.BusinessID, invoice.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update purchase invoice accounting journal")
+	}
+	return journalID, nil
+}
+
+func (s *Service) PostPurchaseInvoicePaymentJournal(tx *gorm.DB, currentUser *utils.AuthContext, paymentID string) (string, error) {
+	payment, err := s.repo.FindPurchaseInvoicePaymentForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(paymentID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load supplier payment for accounting")
+	}
+	if payment.JournalEntryID != nil && *payment.JournalEntryID != "" {
+		return *payment.JournalEntryID, nil
+	}
+	if payment.PaymentStatus != "completed" {
+		return "", nil
+	}
+	amount := roundMoney(payment.Amount)
+	if amount <= 0 {
+		return "", nil
+	}
+	if payment.DefaultPaymentAccountID == nil || strings.TrimSpace(payment.ChartAccountID) == "" {
+		return "", apperrors.BadRequest("payment method is not linked to an active payment account", map[string]interface{}{"payment_method": payment.PaymentMethodNameSnapshot})
+	}
+	if err := validatePaymentAccountBranch(payment.PaymentAccountBranchID, payment.BranchID, payment.PaymentAccountName); err != nil {
+		return "", err
+	}
+	accountsPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "accounts_payable", "2000", "Accounts Payable")
+	if err != nil {
+		return "", err
+	}
+	lines := []JournalEntryLineRequest{
+		{AccountID: accountsPayable.ID, DebitAmount: amount, Description: "Supplier payment for " + payment.InvoiceNumber},
+		{AccountID: payment.ChartAccountID, CreditAmount: amount, Description: "Supplier payment via " + payment.PaymentMethodNameSnapshot},
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, payment.PaidAt, &payment.BranchID, "purchase_invoice_payment", payment.ID, payment.InvoiceNumber, "Supplier payment "+payment.InvoiceNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdatePurchaseInvoicePaymentJournalID(tx, currentUser.BusinessID, payment.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update supplier payment accounting journal")
+	}
+	return journalID, nil
+}
+
+func (s *Service) PostPurchaseReceiptJournal(tx *gorm.DB, currentUser *utils.AuthContext, receiptID string) (string, error) {
+	receipt, err := s.repo.FindPurchaseReceiptForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(receiptID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load purchase receipt for accounting")
+	}
+	if receipt.JournalEntryID != nil && *receipt.JournalEntryID != "" {
+		return *receipt.JournalEntryID, nil
+	}
+	if receipt.Status != "posted" {
+		return "", nil
+	}
+	if receipt.PurchaseInvoiceID != nil && strings.TrimSpace(*receipt.PurchaseInvoiceID) != "" {
+		return "", nil
+	}
+	costTotal, err := s.repo.SumStockMovementCostByReference(tx, currentUser.BusinessID, "purchase_receipt", receipt.ID, "in")
+	if err != nil {
+		return "", apperrors.Internal("failed to calculate purchase receipt inventory value")
+	}
+	costTotal = roundMoney(costTotal)
+	if costTotal <= 0 {
+		return "", nil
+	}
+	inventoryAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "inventory_stock", "1200", "Inventory / Stock")
+	if err != nil {
+		return "", err
+	}
+	grniAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "grni", "2050", "Goods Received Not Invoiced / GRNI")
+	if err != nil {
+		return "", err
+	}
+	lines := []JournalEntryLineRequest{
+		{AccountID: inventoryAccount.ID, DebitAmount: costTotal, Description: "Uninvoiced stock received " + receipt.ReceiptNumber},
+		{AccountID: grniAccount.ID, CreditAmount: costTotal, Description: "GRNI for " + receipt.ReceiptNumber},
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, receipt.ReceivedDate, &receipt.BranchID, "purchase_receipt_grni", receipt.ID, receipt.ReceiptNumber, "Purchase receipt GRNI "+receipt.ReceiptNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdatePurchaseReceiptJournalID(tx, currentUser.BusinessID, receipt.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update purchase receipt accounting journal")
+	}
+	if err := s.repo.UpdateStockMovementJournalByReference(tx, currentUser.BusinessID, "purchase_receipt", receipt.ID, "in", journalID); err != nil {
+		return "", apperrors.Internal("failed to link purchase receipt stock movements to accounting journal")
 	}
 	return journalID, nil
 }
@@ -1913,6 +2336,15 @@ func (s *Service) createPostedTransferJournal(tx *gorm.DB, currentUser *utils.Au
 }
 
 func (s *Service) createPostedSystemJournal(tx *gorm.DB, currentUser *utils.AuthContext, entryDate time.Time, branchID *string, sourceType, sourceID, referenceNumber, narration string, lineRequests []JournalEntryLineRequest) (string, error) {
+	if sourceType != "" && sourceID != "" {
+		existing, err := s.repo.FindPostedJournalBySource(tx, currentUser.BusinessID, sourceType, sourceID)
+		if err == nil && existing.ID != "" {
+			return existing.ID, nil
+		}
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return "", apperrors.Internal("failed to validate existing accounting journal")
+		}
+	}
 	entryID := utils.NewUUID()
 	lines, totalDebit, totalCredit, err := s.buildSystemJournalLines(tx, currentUser.BusinessID, entryID, lineRequests)
 	if err != nil {
@@ -2000,6 +2432,53 @@ func (s *Service) requiredAccount(tx *gorm.DB, businessID, accountCode, accountN
 		return nil, apperrors.Internal("failed to load required accounting account")
 	}
 	return account, nil
+}
+
+func (s *Service) requiredMappedAccount(tx *gorm.DB, businessID, mappingKey, fallbackCode, fallbackName string) (*ChartAccount, error) {
+	mapping, err := s.repo.FindAccountMapping(tx, businessID, mappingKey)
+	if err == nil {
+		account, err := s.repo.ValidateActiveAccount(tx, businessID, mapping.ChartAccountID)
+		if err != nil {
+			return nil, apperrors.BadRequest("mapped accounting account is inactive or missing", map[string]interface{}{"mapping_key": mappingKey})
+		}
+		return account, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return nil, apperrors.Internal("failed to load account mapping")
+	}
+	account, err := s.requiredAccount(tx, businessID, fallbackCode, fallbackName)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.UpsertAccountMapping(tx, &AccountMapping{
+		ID:             utils.NewUUID(),
+		BusinessID:     businessID,
+		MappingKey:     mappingKey,
+		ChartAccountID: account.ID,
+		Description:    defaultAccountMappingDescription(mappingKey),
+	})
+	return account, nil
+}
+
+func validAccountMappingKey(value string) bool {
+	switch value {
+	case "accounts_receivable", "accounts_payable", "inventory_stock", "sales_income", "bakery_income",
+		"customer_advance", "vat_receivable", "vat_payable", "cogs", "sales_returns",
+		"purchase_returns", "wip_inventory", "wastage_expense", "opening_balance_equity",
+		"grni", "platform_commission_expense":
+		return true
+	default:
+		return false
+	}
+}
+
+func defaultAccountMappingDescription(value string) string {
+	for _, seed := range DefaultAccountMappingSeeds() {
+		if seed.Key == value {
+			return seed.Description
+		}
+	}
+	return value
 }
 
 func validatePaymentAccountBranch(paymentAccountBranchID *string, documentBranchID, paymentAccountName string) error {

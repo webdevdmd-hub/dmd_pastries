@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { JSX } from "react";
+import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 
@@ -33,7 +34,10 @@ import type { PaymentMethod } from "@/types/settings";
 
 type PurchaseSupplierPaymentDialogProps = {
   balanceAmount: number;
+  description?: ReactNode;
+  disabled?: boolean;
   invoiceNumber: string;
+  invoiceSelector?: ReactNode;
   isSubmitting: boolean;
   methods: PaymentMethod[];
   onClose: () => void;
@@ -48,7 +52,10 @@ function toDatetimeLocalValue(date: Date): string {
 
 export function PurchaseSupplierPaymentDialog({
   balanceAmount,
+  description,
+  disabled = false,
   invoiceNumber,
+  invoiceSelector,
   isSubmitting,
   methods,
   onClose,
@@ -119,8 +126,12 @@ export function PurchaseSupplierPaymentDialog({
         <DialogHeader>
           <DialogTitle>Add supplier payment</DialogTitle>
           <DialogDescription>
-            Record money paid out for {invoiceNumber}. Current balance is AED{" "}
-            {balanceAmount.toFixed(2)}.
+            {description ?? (
+              <>
+                Record money paid out for {invoiceNumber}. Current balance is AED{" "}
+                {balanceAmount.toFixed(2)}.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -129,13 +140,15 @@ export function PurchaseSupplierPaymentDialog({
             void form.handleSubmit(submitForm)(event);
           }}
         >
+          {invoiceSelector ? <div className="grid gap-2">{invoiceSelector}</div> : null}
+
           <div className="grid gap-2">
             <Label>Payment method</Label>
             <Controller
               control={form.control}
               name="paymentMethodId"
               render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select disabled={disabled} onValueChange={field.onChange} value={field.value}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
@@ -163,6 +176,7 @@ export function PurchaseSupplierPaymentDialog({
                 min={0}
                 step="0.01"
                 type="number"
+                disabled={disabled}
                 {...form.register("amount")}
               />
               <p className="text-xs text-red-700">{form.formState.errors.amount?.message}</p>
@@ -171,6 +185,7 @@ export function PurchaseSupplierPaymentDialog({
               <Label htmlFor="supplierPaymentPaidAt">Paid at</Label>
               <Input
                 id="supplierPaymentPaidAt"
+                disabled={disabled}
                 type="datetime-local"
                 {...form.register("paidAt")}
                 placeholder={toDatetimeLocalValue(new Date())}
@@ -184,6 +199,7 @@ export function PurchaseSupplierPaymentDialog({
             </Label>
             <Input
               id="supplierPaymentReference"
+              disabled={disabled}
               placeholder={
                 selectedMethod?.requiresReference
                   ? "Required for selected method"
@@ -198,6 +214,7 @@ export function PurchaseSupplierPaymentDialog({
             <Label htmlFor="supplierPaymentNotes">Notes</Label>
             <Input
               id="supplierPaymentNotes"
+              disabled={disabled}
               placeholder="Optional supplier payment note"
               {...form.register("notes")}
             />
@@ -207,7 +224,7 @@ export function PurchaseSupplierPaymentDialog({
             <Button onClick={onClose} type="button" variant="outline">
               Cancel
             </Button>
-            <Button disabled={isSubmitting || balanceAmount <= 0} type="submit">
+            <Button disabled={disabled || isSubmitting || balanceAmount <= 0} type="submit">
               {isSubmitting ? "Adding..." : "Add payment"}
             </Button>
           </DialogFooter>

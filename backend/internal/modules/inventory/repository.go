@@ -611,6 +611,8 @@ func (r *Repository) LoadInventoryResponse(businessID string, item InventoryItem
 		CurrentQuantity:    roundQuantity(item.CurrentQuantity),
 		ReservedQuantity:   roundQuantity(item.ReservedQuantity),
 		AvailableQuantity:  roundQuantity(item.AvailableQuantity),
+		AverageUnitCost:    roundMoney(item.AverageUnitCost),
+		InventoryValue:     roundMoney(item.InventoryValue),
 		ReorderLevel:       roundQuantity(item.ReorderLevel),
 		Unit:               unit,
 		LowStock:           item.AvailableQuantity <= item.ReorderLevel,
@@ -660,6 +662,8 @@ func (r *Repository) inventoryCatalogRowResponse(row inventoryCatalogRow) Invent
 		CurrentQuantity:    roundQuantity(row.CurrentQuantity),
 		ReservedQuantity:   roundQuantity(row.ReservedQuantity),
 		AvailableQuantity:  roundQuantity(row.AvailableQuantity),
+		AverageUnitCost:    roundMoney(row.AverageUnitCost),
+		InventoryValue:     roundMoney(row.InventoryValue),
 		ReorderLevel:       roundQuantity(row.ReorderLevel),
 		Unit:               UnitInfo{ID: row.UnitID, UnitName: row.UnitName, Symbol: row.UnitSymbol},
 		LowStock:           row.AvailableQuantity <= row.ReorderLevel,
@@ -897,6 +901,8 @@ type inventoryCatalogRow struct {
 	CurrentQuantity    float64
 	ReservedQuantity   float64
 	AvailableQuantity  float64
+	AverageUnitCost    float64
+	InventoryValue     float64
 	ReorderLevel       float64
 	UnitID             string
 	UnitName           string
@@ -939,6 +945,8 @@ WITH inventory_catalog AS (
     ii.current_quantity,
     ii.reserved_quantity,
     ii.available_quantity,
+    ii.average_unit_cost,
+    ii.inventory_value,
     ii.reorder_level,
     ii.unit_id::text AS unit_id,
     u.unit_name,
@@ -977,6 +985,8 @@ WITH inventory_catalog AS (
     0::numeric AS current_quantity,
     0::numeric AS reserved_quantity,
     0::numeric AS available_quantity,
+    0::numeric AS average_unit_cost,
+    0::numeric AS inventory_value,
     0::numeric AS reorder_level,
     p.unit_id::text AS unit_id,
     u.unit_name,
@@ -1017,6 +1027,8 @@ WITH inventory_catalog AS (
     0::numeric AS current_quantity,
     0::numeric AS reserved_quantity,
     0::numeric AS available_quantity,
+    0::numeric AS average_unit_cost,
+    0::numeric AS inventory_value,
     0::numeric AS reorder_level,
     p.unit_id::text AS unit_id,
     u.unit_name,
@@ -1058,6 +1070,8 @@ WITH inventory_catalog AS (
     0::numeric AS current_quantity,
     0::numeric AS reserved_quantity,
     0::numeric AS available_quantity,
+    0::numeric AS average_unit_cost,
+    0::numeric AS inventory_value,
     ing.reorder_level,
     ing.unit_id::text AS unit_id,
     u.unit_name,
@@ -1098,6 +1112,8 @@ WITH inventory_catalog AS (
     0::numeric AS current_quantity,
     0::numeric AS reserved_quantity,
     0::numeric AS available_quantity,
+    0::numeric AS average_unit_cost,
+    0::numeric AS inventory_value,
     pi.reorder_level,
     pi.unit_id::text AS unit_id,
     u.unit_name,
@@ -1289,40 +1305,44 @@ func safeMovementSortBy(value string) string {
 
 func toStockMovementResponse(movement StockMovement, unit UnitInfo, itemName string, productID, productVariantID *string, variantName, branchName, createdByName, stockLocationName, fromStockLocationName, toStockLocationName string) StockMovementResponse {
 	return StockMovementResponse{
-		ID:                    movement.ID,
-		BusinessID:            movement.BusinessID,
-		BranchID:              movement.BranchID,
-		BranchName:            branchName,
-		InventoryItemID:       movement.InventoryItemID,
-		StockLocationID:       movement.StockLocationID,
-		StockLocationName:     stockLocationName,
-		FromStockLocationID:   movement.FromStockLocationID,
-		FromStockLocationName: fromStockLocationName,
-		ToStockLocationID:     movement.ToStockLocationID,
-		ToStockLocationName:   toStockLocationName,
-		ItemName:              itemName,
-		ItemType:              movement.ItemType,
-		ProductID:             productID,
-		ProductVariantID:      productVariantID,
-		VariantName:           variantName,
-		MovementType:          movement.MovementType,
-		MovementDirection:     movement.MovementDirection,
-		Quantity:              roundQuantity(movement.Quantity),
-		BeforeQuantity:        roundQuantity(movement.BeforeQuantity),
-		AfterQuantity:         roundQuantity(movement.AfterQuantity),
-		Unit:                  unit,
-		ReferenceType:         movement.ReferenceType,
-		ReferenceID:           movement.ReferenceID,
-		ReferenceNumber:       movement.ReferenceNumber,
-		Reason:                movement.Reason,
-		Notes:                 movement.Notes,
-		IsReversal:            movement.IsReversal,
-		ReversedMovementID:    movement.ReversedMovementID,
-		IsReversed:            movement.IsReversed,
-		ReversedByMovementID:  movement.ReversedByMovementID,
-		CreatedByUserID:       movement.CreatedByUserID,
-		CreatedByName:         createdByName,
-		CreatedAt:             movement.CreatedAt,
+		ID:                       movement.ID,
+		BusinessID:               movement.BusinessID,
+		BranchID:                 movement.BranchID,
+		BranchName:               branchName,
+		InventoryItemID:          movement.InventoryItemID,
+		StockLocationID:          movement.StockLocationID,
+		StockLocationName:        stockLocationName,
+		FromStockLocationID:      movement.FromStockLocationID,
+		FromStockLocationName:    fromStockLocationName,
+		ToStockLocationID:        movement.ToStockLocationID,
+		ToStockLocationName:      toStockLocationName,
+		ItemName:                 itemName,
+		ItemType:                 movement.ItemType,
+		ProductID:                productID,
+		ProductVariantID:         productVariantID,
+		VariantName:              variantName,
+		MovementType:             movement.MovementType,
+		MovementDirection:        movement.MovementDirection,
+		Quantity:                 roundQuantity(movement.Quantity),
+		BeforeQuantity:           roundQuantity(movement.BeforeQuantity),
+		AfterQuantity:            roundQuantity(movement.AfterQuantity),
+		UnitCostSnapshot:         roundMoney(movement.UnitCostSnapshot),
+		TotalCost:                roundMoney(movement.TotalCost),
+		ValuationMethod:          movement.ValuationMethod,
+		AccountingJournalEntryID: movement.AccountingJournalEntryID,
+		Unit:                     unit,
+		ReferenceType:            movement.ReferenceType,
+		ReferenceID:              movement.ReferenceID,
+		ReferenceNumber:          movement.ReferenceNumber,
+		Reason:                   movement.Reason,
+		Notes:                    movement.Notes,
+		IsReversal:               movement.IsReversal,
+		ReversedMovementID:       movement.ReversedMovementID,
+		IsReversed:               movement.IsReversed,
+		ReversedByMovementID:     movement.ReversedByMovementID,
+		CreatedByUserID:          movement.CreatedByUserID,
+		CreatedByName:            createdByName,
+		CreatedAt:                movement.CreatedAt,
 	}
 }
 
@@ -1373,4 +1393,8 @@ func totalPages(total int64, limit int) int {
 
 func roundQuantity(value float64) float64 {
 	return math.Round(value*10000) / 10000
+}
+
+func roundMoney(value float64) float64 {
+	return math.Round(value*100) / 100
 }

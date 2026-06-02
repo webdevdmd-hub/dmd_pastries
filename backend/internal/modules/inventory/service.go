@@ -670,6 +670,7 @@ func (s *Service) CreateOpeningStock(currentUser *utils.AuthContext, req Opening
 			StockLocationID: nullableString(req.StockLocationID),
 			MovementType:    "opening_stock",
 			Quantity:        req.Quantity,
+			UnitCost:        req.UnitCost,
 			ReferenceType:   "opening_stock",
 			Reason:          req.Reason,
 			CreatedByUserID: currentUser.UserID,
@@ -895,6 +896,7 @@ func (s *Service) ManualStockMovement(currentUser *utils.AuthContext, req Manual
 			InventoryItemID: req.InventoryItemID,
 			MovementType:    req.MovementType,
 			Quantity:        req.Quantity,
+			UnitCost:        req.UnitCost,
 			ReferenceType:   "manual_adjustment",
 			Reason:          req.Reason,
 			Notes:           req.Notes,
@@ -1292,6 +1294,8 @@ func (s *Service) ApplyMovement(tx *gorm.DB, input ApplyStockMovementInput) (*St
 		return nil, err
 	}
 	before := item.CurrentQuantity
+	beforeValue := item.InventoryValue
+	beforeAverageCost := item.AverageUnitCost
 	after := before
 	switch direction {
 	case "in":
@@ -1308,9 +1312,12 @@ func (s *Service) ApplyMovement(tx *gorm.DB, input ApplyStockMovementInput) (*St
 	if available < 0 {
 		return nil, apperrors.BadRequest("available stock cannot go below zero", nil)
 	}
+	unitCostSnapshot, totalCost, averageUnitCost, inventoryValue := calculateValuation(direction, before, beforeValue, beforeAverageCost, input.Quantity, input.UnitCost)
 	if err := s.repo.UpdateInventoryItem(tx, item.ID, input.BusinessID, map[string]interface{}{
 		"current_quantity":   after,
 		"available_quantity": available,
+		"average_unit_cost":  averageUnitCost,
+		"inventory_value":    inventoryValue,
 		"updated_at":         time.Now().UTC(),
 	}); err != nil {
 		return nil, err
@@ -1332,6 +1339,9 @@ func (s *Service) ApplyMovement(tx *gorm.DB, input ApplyStockMovementInput) (*St
 		Quantity:            input.Quantity,
 		BeforeQuantity:      before,
 		AfterQuantity:       after,
+		UnitCostSnapshot:    unitCostSnapshot,
+		TotalCost:           totalCost,
+		ValuationMethod:     "weighted_average",
 		UnitID:              item.UnitID,
 		ReferenceType:       strings.TrimSpace(input.ReferenceType),
 		ReferenceID:         input.ReferenceID,
@@ -1527,7 +1537,7 @@ func movementDirection(movementType string) (string, error) {
 	switch movementType {
 	case "opening_stock", "purchase_in", "adjustment_in", "return_in", "transfer_in", "production_in":
 		return "in", nil
-	case "sale_out", "adjustment_out", "wastage", "transfer_out", "production_out":
+	case "sale_out", "adjustment_out", "wastage", "transfer_out", "production_out", "purchase_return_out":
 		return "out", nil
 	case "transfer":
 		return "transfer", nil
@@ -1535,6 +1545,41 @@ func movementDirection(movementType string) (string, error) {
 		return "neutral", nil
 	default:
 		return "", apperrors.BadRequest("invalid movement_type", nil)
+	}
+}
+
+func calculateValuation(direction string, beforeQuantity, beforeValue, beforeAverageCost, quantity, inputUnitCost float64) (float64, float64, float64, float64) {
+	unitCost := inputUnitCost
+	if unitCost <= 0 {
+		unitCost = beforeAverageCost
+	}
+	if unitCost < 0 {
+		unitCost = 0
+	}
+	switch direction {
+	case "in":
+		totalCost := roundMoney(unitCost * quantity)
+		afterQuantity := roundQuantity(beforeQuantity + quantity)
+		afterValue := roundMoney(beforeValue + totalCost)
+		averageCost := 0.0
+		if afterQuantity > 0 {
+			averageCost = roundQuantity(afterValue / afterQuantity)
+		}
+		return roundQuantity(unitCost), totalCost, averageCost, afterValue
+	case "out":
+		totalCost := roundMoney(unitCost * quantity)
+		afterQuantity := roundQuantity(beforeQuantity - quantity)
+		afterValue := roundMoney(beforeValue - totalCost)
+		if afterValue < 0 {
+			afterValue = 0
+		}
+		averageCost := beforeAverageCost
+		if afterQuantity <= 0 {
+			averageCost = 0
+		}
+		return roundQuantity(unitCost), totalCost, roundQuantity(averageCost), afterValue
+	default:
+		return roundQuantity(unitCost), roundMoney(unitCost * quantity), roundQuantity(beforeAverageCost), roundMoney(beforeValue)
 	}
 }
 

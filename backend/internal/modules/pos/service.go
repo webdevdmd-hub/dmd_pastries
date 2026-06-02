@@ -194,6 +194,11 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 	if err := s.deductInventoryForSale(tx, currentUser, sale, calculation.Items); err != nil {
 		return nil, err
 	}
+	if s.accountingService != nil {
+		if _, err := s.accountingService.PostPOSSaleCOGSJournal(tx, currentUser, sale.ID); err != nil {
+			return nil, err
+		}
+	}
 	if err := s.writeAudit(tx, currentUser, "sale.created", sale.ID, "Sale completed.", ipAddress, userAgent); err != nil {
 		return nil, err
 	}
@@ -587,9 +592,10 @@ func (s *Service) VoidSale(currentUser *utils.AuthContext, saleID string, req Vo
 	if err := s.repo.CreateVoid(tx, saleVoid); err != nil {
 		return nil, apperrors.Internal("failed to create void")
 	}
+	voidedAt := time.Now().UTC()
 	if err := s.repo.UpdateSale(tx, currentUser.BusinessID, sale.ID, map[string]interface{}{
 		"sale_status": "voided",
-		"updated_at":  time.Now().UTC(),
+		"updated_at":  voidedAt,
 	}); err != nil {
 		return nil, apperrors.Internal("failed to update sale")
 	}
@@ -599,6 +605,11 @@ func (s *Service) VoidSale(currentUser *utils.AuthContext, saleID string, req Vo
 	}
 	if err := s.returnInventoryForVoidedSale(tx, currentUser, sale, items, req.Reason); err != nil {
 		return nil, err
+	}
+	if s.accountingService != nil {
+		if _, err := s.accountingService.PostPOSSaleVoidJournal(tx, currentUser, sale.ID, voidedAt); err != nil {
+			return nil, err
+		}
 	}
 	if err := s.writeAudit(tx, currentUser, "sale.voided", sale.ID, "Sale voided.", ipAddress, userAgent); err != nil {
 		return nil, err
@@ -664,11 +675,16 @@ func (s *Service) returnInventoryForVoidedSale(tx *gorm.DB, currentUser *utils.A
 		if stock.InventoryItemID == nil || strings.TrimSpace(*stock.InventoryItemID) == "" {
 			return apperrors.BadRequest("inventory item not found for stock-tracked product "+itemName, nil)
 		}
+		unitCost, err := s.saleStockMovementUnitCost(tx, sale.BusinessID, sale.ID, *stock.InventoryItemID)
+		if err != nil {
+			return err
+		}
 		if _, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{
 			BusinessID:      sale.BusinessID,
 			InventoryItemID: *stock.InventoryItemID,
 			MovementType:    "return_in",
 			Quantity:        quantity,
+			UnitCost:        unitCost,
 			ReferenceType:   "sale_void",
 			ReferenceID:     &sale.ID,
 			ReferenceNumber: sale.SaleNumber,
@@ -679,6 +695,18 @@ func (s *Service) returnInventoryForVoidedSale(tx *gorm.DB, currentUser *utils.A
 		}
 	}
 	return nil
+}
+
+func (s *Service) saleStockMovementUnitCost(tx *gorm.DB, businessID, saleID, inventoryItemID string) (float64, error) {
+	var unitCost float64
+	err := tx.Table("stock_movements").
+		Select("COALESCE(SUM(total_cost) / NULLIF(SUM(quantity), 0), 0)").
+		Where("business_id = ? AND reference_type = ? AND reference_id = ? AND inventory_item_id = ? AND movement_direction = ? AND deleted_at IS NULL", businessID, "sale", saleID, inventoryItemID, "out").
+		Scan(&unitCost).Error
+	if err != nil {
+		return 0, apperrors.Internal("failed to calculate original sale stock cost")
+	}
+	return unitCost, nil
 }
 
 type saleStockKey struct {

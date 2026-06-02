@@ -36,6 +36,8 @@ type PaymentRefund struct {
 	BranchID                  string         `gorm:"type:uuid;not null;index" json:"branch_id"`
 	SaleID                    string         `gorm:"type:uuid;not null;index" json:"sale_id"`
 	SalePaymentID             *string        `gorm:"type:uuid;index" json:"sale_payment_id"`
+	SalesReturnID             *string        `gorm:"type:uuid;index" json:"sales_return_id"`
+	RefundSource              string         `gorm:"size:50;not null;default:payment_adjustment" json:"refund_source"`
 	RefundNumber              string         `gorm:"size:100;not null" json:"refund_number"`
 	PaymentMethodID           string         `gorm:"type:uuid;not null;index" json:"payment_method_id"`
 	PaymentMethodNameSnapshot string         `gorm:"size:150;not null" json:"payment_method_name_snapshot"`

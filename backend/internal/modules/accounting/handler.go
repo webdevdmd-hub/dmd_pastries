@@ -36,6 +36,38 @@ func (h *Handler) SeedDefaults(c *gin.Context) {
 	response.Success(c, 200, "chart of accounts defaults seeded successfully", gin.H{"seeded": true})
 }
 
+func (h *Handler) ListAccountMappings(c *gin.Context) {
+	result, err := h.service.ListAccountMappings(utils.MustAuthContext(c))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "account mappings fetched successfully", result)
+}
+
+func (h *Handler) SeedAccountMappings(c *gin.Context) {
+	result, err := h.service.SeedAccountMappings(utils.MustAuthContext(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "account mappings defaults seeded successfully", result)
+}
+
+func (h *Handler) UpdateAccountMappings(c *gin.Context) {
+	var req UpdateAccountMappingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.UpdateAccountMappings(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "account mappings updated successfully", result)
+}
+
 func (h *Handler) CreateChartAccount(c *gin.Context) {
 	var req CreateChartAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

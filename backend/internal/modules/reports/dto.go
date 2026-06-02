@@ -463,8 +463,12 @@ type FinancialPaymentMethodReportItem struct {
 
 type FinancialRefundReportItem struct {
 	RefundID          string  `json:"refund_id"`
+	RefundSource      string  `json:"refund_source"`
 	SourceType        string  `json:"source_type"`
 	SourceNumber      string  `json:"source_number"`
+	SaleNumber        string  `json:"sale_number"`
+	SalesReturnID     *string `json:"sales_return_id"`
+	SalesReturnNumber string  `json:"sales_return_number"`
 	BranchName        string  `json:"branch_name"`
 	PaymentMethodName string  `json:"payment_method_name"`
 	RefundAmount      float64 `json:"refund_amount"`
@@ -493,6 +497,7 @@ type SupplierPayableReportItem struct {
 	TotalInvoiceAmount float64 `json:"total_invoice_amount"`
 	PaidAmount         float64 `json:"paid_amount"`
 	PayableBalance     float64 `json:"payable_balance"`
+	OpenCreditAmount   float64 `json:"open_credit_amount"`
 	OldestDueDate      *string `json:"oldest_due_date"`
 }
 

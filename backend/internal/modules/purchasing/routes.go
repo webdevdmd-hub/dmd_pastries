@@ -36,9 +36,18 @@ func RegisterRoutes(
 
 	group.POST("/receive", manage, handler.Receive)
 	group.GET("/receipts", view, handler.ListReceipts)
+	group.GET("/receipts/:id/returnable-items", view, handler.ReceiptReturnableItems)
+	group.GET("/receipts/:id/returns", view, handler.ListReturnsByReceipt)
 	group.GET("/receipts/:id", view, handler.GetReceipt)
 	group.POST("/receipts/:id/post", manage, handler.PostReceipt)
 	group.POST("/receipts/:id/cancel", manage, handler.CancelReceipt)
+
+	group.GET("/returns", view, handler.ListReturns)
+	group.POST("/returns", manage, handler.CreateReturn)
+	group.GET("/returns/:id", view, handler.GetReturn)
+	group.PATCH("/returns/:id", manage, handler.UpdateReturn)
+	group.POST("/returns/:id/post", manage, handler.PostReturn)
+	group.POST("/returns/:id/cancel", manage, handler.CancelReturn)
 
 	group.GET("/summary", view, handler.Summary)
 	group.GET("/supplier/:supplierId/history", view, handler.SupplierHistory)

@@ -61,9 +61,21 @@ async function repairAssignedBranchContext(profile: SafeUserProfile): Promise<Sa
     return profile;
   }
 
-  await switchBranch({ branchId: profile.assignedBranchId });
+  try {
+    const switchedBranch = await switchBranch({ branchId: profile.assignedBranchId });
+    const refreshedProfile = await getCurrentProfile();
 
-  return getCurrentProfile();
+    return {
+      ...refreshedProfile,
+      currentBranchId: refreshedProfile.currentBranchId ?? switchedBranch.currentBranchId,
+      currentBranchName:
+        refreshedProfile.currentBranchName ??
+        refreshedProfile.assignedBranchName ??
+        profile.assignedBranchName,
+    };
+  } catch {
+    return profile;
+  }
 }
 
 function buildAbsoluteUrl(path: string): string {

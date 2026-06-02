@@ -1,6 +1,8 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { ArrowRight, ListChecks, Plus, ReceiptText, RotateCcw, WalletCards } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -16,14 +18,17 @@ import { PaymentsSummaryCards } from "@/components/payments/payments-summary-car
 import { PaymentsTable } from "@/components/payments/payments-table";
 import { PaymentsTableSkeleton } from "@/components/payments/payments-table-skeleton";
 import { PaymentsToolbar } from "@/components/payments/payments-toolbar";
+import { SalesReturnDialog } from "@/components/payments/sales-return-dialog";
 import { POSReceiptDialog } from "@/components/pos/pos-receipt-dialog";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
+import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/hooks/use-auth";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { useStockLocations } from "@/hooks/use-inventory";
 import {
   useAddPaymentToSale,
   useDailyPaymentSummary,
@@ -90,7 +95,16 @@ function selectReceiptLayout(
   );
 }
 
+type PaymentWorkspaceLink = {
+  description: string;
+  href: string;
+  icon: typeof WalletCards;
+  label: string;
+  visible: boolean;
+};
+
 export function PaymentsPageClient(): JSX.Element {
+  const router = useRouter();
   const { user } = useAuth();
   const branchScope = useBranchScope();
   const { hasAnyPermission, hasPermission } = usePermission();
@@ -101,11 +115,17 @@ export function PaymentsPageClient(): JSX.Element {
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<SalePayment | null>(null);
   const [refundPayment, setRefundPayment] = useState<SalePayment | null>(null);
+  const [returnPayment, setReturnPayment] = useState<SalePayment | null>(null);
   const [receipt, setReceipt] = useState<SaleReceipt | null>(null);
   const [receiptBranchId, setReceiptBranchId] = useState<string | null>(null);
   const canView = hasAnyPermission([PERMISSIONS.paymentsView, PERMISSIONS.posView]);
   const canAdd = hasAnyPermission([PERMISSIONS.paymentsAdd, PERMISSIONS.posSell]);
   const canRefund = hasAnyPermission([PERMISSIONS.paymentsRefund, PERMISSIONS.posRefund]);
+  const canReconcile = hasAnyPermission([
+    PERMISSIONS.paymentsReconcile,
+    PERMISSIONS.reportsView,
+    PERMISSIONS.paymentsView,
+  ]);
   const canViewUsers = hasPermission(PERMISSIONS.usersView);
   const canSelectRefundApprover =
     hasAnyPermission([PERMISSIONS.paymentsRefund]) || user?.roles.some(isOwnerOrAdminRole) === true;
@@ -129,6 +149,7 @@ export function PaymentsPageClient(): JSX.Element {
     canView && branchScope.hasBranchScope,
   );
   const methodsQuery = usePaymentMethods(canView);
+  const stockLocationsQuery = useStockLocations(canRefund && branchScope.hasBranchScope);
   const receiptLayoutsQuery = useReceiptLayouts(canView && branchScope.hasBranchScope);
   const usersQuery = useUsers({ search: "", status: "active" }, canRefund && canViewUsers);
   const addPaymentMutation = useAddPaymentToSale();
@@ -144,6 +165,36 @@ export function PaymentsPageClient(): JSX.Element {
     id: approver.id,
     label: `${approver.fullName} (${approver.roleName})`,
   }));
+  const workspaceLinks: PaymentWorkspaceLink[] = [
+    {
+      description: "Review incoming customer collections from POS and bakery orders.",
+      href: ROUTES.payments,
+      icon: WalletCards,
+      label: "Customer payments",
+      visible: canView,
+    },
+    {
+      description: "Track money returned to customers from completed payments.",
+      href: ROUTES.paymentRefunds,
+      icon: RotateCcw,
+      label: "Refunds",
+      visible: canRefund || canView,
+    },
+    {
+      description: "Create and review POS item returns and credit notes.",
+      href: ROUTES.paymentReturns,
+      icon: ReceiptText,
+      label: "Returns / Credit Notes",
+      visible: canRefund || canView,
+    },
+    {
+      description: "Compare expected totals with counted cash, card, and bank collections.",
+      href: ROUTES.paymentReconciliations,
+      icon: ListChecks,
+      label: "Reconciliations",
+      visible: canReconcile,
+    },
+  ];
 
   useEffect(() => {
     setFilters((currentFilters) => {
@@ -196,6 +247,14 @@ export function PaymentsPageClient(): JSX.Element {
     }
   };
 
+  const handleViewSaleDetails = (payment: SalePayment): void => {
+    if (payment.sourceType !== "pos_sale" || !payment.sourceId) {
+      return;
+    }
+
+    router.push(`/payments/sales/${payment.sourceId}`);
+  };
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
@@ -212,6 +271,49 @@ export function PaymentsPageClient(): JSX.Element {
       />
 
       <PaymentsSummaryCards summary={summaryQuery.data} />
+
+      <section className="grid gap-3 md:grid-cols-3" aria-label="Payments sections">
+        {workspaceLinks
+          .filter((link) => link.visible)
+          .map((link) => {
+            const Icon = link.icon;
+            const isCurrent = link.href === ROUTES.payments;
+
+            return (
+              <Link
+                aria-current={isCurrent ? "page" : undefined}
+                className="group rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel/70 focus-visible:ring-offset-2"
+                href={link.href}
+                key={link.href}
+              >
+                <Card
+                  className={
+                    isCurrent
+                      ? "border-brand-caramel/50 bg-brand-latte/70"
+                      : "bg-white/80 transition-colors group-hover:border-brand-caramel/40 group-hover:bg-brand-latte/50"
+                  }
+                >
+                  <CardContent className="flex items-start gap-4 p-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-cappuccino/45 text-brand-mocha">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <h2 className="truncate text-sm font-bold text-brand-espresso">
+                          {link.label}
+                        </h2>
+                        <ArrowRight className="h-4 w-4 shrink-0 text-brand-mocha transition-transform group-hover:translate-x-0.5" />
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm leading-5 text-brand-mocha">
+                        {link.description}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+      </section>
 
       <PaymentMethodSummaryCards summaries={methodSummaryQuery.data ?? []} />
 
@@ -248,11 +350,12 @@ export function PaymentsPageClient(): JSX.Element {
             <PaymentsTable
               canRefund={canRefund}
               isReceiptLoading={saleReceiptMutation.isPending}
-              onRefund={setRefundPayment}
+              onCreateReturn={setReturnPayment}
               onView={setSelectedPayment}
               onViewReceipt={(payment) => {
                 void handleViewReceipt(payment);
               }}
+              onViewSaleDetails={handleViewSaleDetails}
               payments={paymentsQuery.data ?? []}
             />
           </CardContent>
@@ -268,9 +371,11 @@ export function PaymentsPageClient(): JSX.Element {
           }
         }}
         onRefund={setRefundPayment}
+        onCreateReturn={setReturnPayment}
         onViewReceipt={(payment) => {
           void handleViewReceipt(payment);
         }}
+        onViewSaleDetails={handleViewSaleDetails}
         open={selectedPayment !== null}
         payment={selectedPayment}
         refunds={(refundsQuery.data ?? []).filter(
@@ -316,6 +421,19 @@ export function PaymentsPageClient(): JSX.Element {
         refunds={(refundsQuery.data ?? []).filter(
           (refund) => refund.salePaymentId === refundPayment?.id,
         )}
+      />
+
+      <SalesReturnDialog
+        onOpenChange={(open) => {
+          if (!open) {
+            setReturnPayment(null);
+          }
+        }}
+        open={returnPayment !== null}
+        paymentMethods={methodsQuery.data ?? []}
+        saleId={returnPayment?.sourceId ?? null}
+        saleNumber={returnPayment?.sourceNumber ?? null}
+        stockLocations={stockLocationsQuery.data ?? []}
       />
     </div>
   );

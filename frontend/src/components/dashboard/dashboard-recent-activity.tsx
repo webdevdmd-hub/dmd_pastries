@@ -39,10 +39,10 @@ export function DashboardRecentActivity({
         ) : null}
         {!error && !isLoading && activities && activities.length > 0 ? (
           <div className="scrollbar-hidden max-h-[28rem] space-y-3 overflow-y-auto pr-1">
-            {activities.map((activity) => (
+            {activities.map((activity, index) => (
               <article
                 className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-4"
-                key={`${activity.activityType}-${activity.referenceNumber}-${activity.createdAt}`}
+                key={`${activity.activityType}-${activity.referenceNumber}-${activity.createdAt}-${String(index)}`}
               >
                 <p className="font-semibold text-brand-espresso">{activity.title || "Activity"}</p>
                 <p className="mt-1 text-sm leading-6 text-brand-mocha">{activity.description}</p>

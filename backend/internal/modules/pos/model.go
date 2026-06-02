@@ -28,6 +28,8 @@ type Sale struct {
 	PaymentStatus            string         `gorm:"size:50;not null;default:unpaid" json:"payment_status"`
 	SaleStatus               string         `gorm:"size:50;not null;default:completed" json:"sale_status"`
 	AccountingJournalEntryID *string        `gorm:"type:uuid;index" json:"accounting_journal_entry_id"`
+	COGSJournalEntryID       *string        `gorm:"type:uuid;index" json:"cogs_journal_entry_id"`
+	VoidJournalEntryID       *string        `gorm:"type:uuid;index" json:"void_journal_entry_id"`
 	Notes                    string         `json:"notes"`
 	SoldAt                   time.Time      `gorm:"not null" json:"sold_at"`
 	CreatedAt                time.Time      `json:"created_at"`

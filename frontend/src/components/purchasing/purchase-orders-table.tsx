@@ -27,6 +27,26 @@ function formatDate(value: string | null): string {
     : "Not set";
 }
 
+function nextStepForOrder(order: PurchaseOrder): string {
+  if (order.status === "draft") {
+    return "Mark ordered or convert to invoice";
+  }
+
+  if (order.status === "ordered") {
+    return "Convert to invoice";
+  }
+
+  if (order.status === "partially_received") {
+    return "Receive remaining stock";
+  }
+
+  if (order.status === "received") {
+    return "Completed";
+  }
+
+  return "No action";
+}
+
 export function PurchaseOrdersTable({
   canConvertToInvoice,
   canManage,
@@ -60,6 +80,7 @@ export function PurchaseOrdersTable({
           <TableHead>Status</TableHead>
           <TableHead>Total</TableHead>
           <TableHead>Created By</TableHead>
+          <TableHead>Next Step</TableHead>
           <TableHead>Actions</TableHead>
         </TableRow>
       </TableHeader>
@@ -83,6 +104,11 @@ export function PurchaseOrdersTable({
             </TableCell>
             <TableCell>{formatCurrency(order.totalAmount)}</TableCell>
             <TableCell>{order.createdByUserName}</TableCell>
+            <TableCell>
+              <span className="text-sm font-medium text-brand-mocha">
+                {nextStepForOrder(order)}
+              </span>
+            </TableCell>
             <TableCell>
               <PurchaseOrderActionsMenu
                 canConvertToInvoice={canConvertToInvoice}

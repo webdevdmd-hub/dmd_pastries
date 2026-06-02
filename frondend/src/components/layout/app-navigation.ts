@@ -7,7 +7,6 @@ import {
   Landmark,
   LayoutDashboard,
   ListChecks,
-  MapPinned,
   NotebookTabs,
   PackageOpen,
   PackageSearch,
@@ -19,7 +18,6 @@ import {
   Truck,
   UserRound,
   Users,
-  Warehouse,
   Wheat,
 } from "lucide-react";
 
@@ -103,26 +101,6 @@ export const appNavigationGroups = [
         permissionAny: [PERMISSIONS.paymentsView, PERMISSIONS.paymentsAdd, PERMISSIONS.posView],
       },
       {
-        href: ROUTES.paymentRefunds,
-        icon: ReceiptText,
-        label: "Refunds",
-        permissionAny: [
-          PERMISSIONS.paymentsView,
-          PERMISSIONS.paymentsRefund,
-          PERMISSIONS.posRefund,
-        ],
-      },
-      {
-        href: ROUTES.paymentReconciliations,
-        icon: Landmark,
-        label: "Reconciliations",
-        permissionAny: [
-          PERMISSIONS.paymentsReconcile,
-          PERMISSIONS.reportsView,
-          PERMISSIONS.paymentsView,
-        ],
-      },
-      {
         href: ROUTES.reports,
         icon: ChartNoAxesCombined,
         label: "Reports",
@@ -142,51 +120,6 @@ export const appNavigationGroups = [
           PERMISSIONS.inventoryOpeningStock,
           PERMISSIONS.inventoryAdjust,
         ],
-      },
-      {
-        href: ROUTES.inventoryLocationBalances,
-        icon: MapPinned,
-        label: "Location Balances",
-        permissionAny: [PERMISSIONS.inventoryView],
-      },
-      {
-        href: ROUTES.inventoryStockTransfers,
-        icon: ArrowLeftRight,
-        label: "Stock Transfers",
-        permissionAny: [
-          PERMISSIONS.inventoryView,
-          PERMISSIONS.inventoryTransferCreate,
-          PERMISSIONS.inventoryTransferComplete,
-          PERMISSIONS.inventoryTransferCancel,
-        ],
-      },
-      {
-        href: ROUTES.inventoryStockLocations,
-        icon: Warehouse,
-        label: "Stock Locations",
-        permissionAny: [PERMISSIONS.inventoryView, PERMISSIONS.inventoryLocationsManage],
-      },
-      {
-        href: ROUTES.inventoryMovements,
-        icon: ListChecks,
-        label: "Stock Movements",
-        permissionAny: [
-          PERMISSIONS.stockMovementsView,
-          PERMISSIONS.inventoryMovementsView,
-          PERMISSIONS.inventoryView,
-        ],
-      },
-      {
-        href: ROUTES.inventoryLowStock,
-        icon: PackageOpen,
-        label: "Low Stock",
-        permissionAny: [PERMISSIONS.inventoryLowStockView, PERMISSIONS.inventoryView],
-      },
-      {
-        href: ROUTES.inventoryExpiryAlerts,
-        icon: Wheat,
-        label: "Expiry Alerts",
-        permissionAny: [PERMISSIONS.inventoryExpiryView, PERMISSIONS.inventoryView],
       },
     ],
   },

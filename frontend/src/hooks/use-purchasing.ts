@@ -8,10 +8,12 @@ import {
   addSupplierInvoicePayment,
   cancelPurchaseInvoice,
   cancelPurchaseReceipt,
+  cancelPurchaseReturn,
   convertPurchaseInvoiceToReceipt,
   convertPurchaseOrderToInvoice,
   createPurchaseInvoice,
   createPurchaseOrder,
+  createPurchaseReturn,
   deletePurchaseOrder,
   getBranches,
   getIngredients,
@@ -22,7 +24,11 @@ import {
   getPurchaseOrderDocumentChain,
   getPurchaseOrders,
   getPurchaseReceiptById,
+  getPurchaseReceiptReturnableItems,
+  getPurchaseReceiptReturns,
   getPurchaseReceipts,
+  getPurchaseReturnById,
+  getPurchaseReturns,
   getPurchasingSummary,
   getSupplierInvoicePayments,
   getSupplierPayments,
@@ -31,10 +37,13 @@ import {
   lookupSuppliers,
   postPurchaseInvoice,
   postPurchaseReceipt,
+  postPurchaseReturn,
   receivePurchase,
+  reversePurchaseReturn,
   updatePurchaseInvoice,
   updatePurchaseOrder,
   updatePurchaseOrderStatus,
+  updatePurchaseReturn,
 } from "@/lib/api/purchasing";
 import type {
   AddSupplierPaymentPayload,
@@ -42,10 +51,13 @@ import type {
   ConvertPurchaseOrderToInvoicePayload,
   CreatePurchaseInvoicePayload,
   CreatePurchaseOrderPayload,
+  CreatePurchaseReturnPayload,
   PurchaseDocumentChain,
   PurchaseInvoice,
   PurchaseOrder,
   PurchaseReceipt,
+  PurchaseReturn,
+  PurchaseReturnFilters,
   PurchasingBranchOption,
   PurchasingFilters,
   PurchasingIngredientOption,
@@ -55,11 +67,14 @@ import type {
   PurchasingTaxRateOption,
   PurchasingUnitOption,
   ReceivePurchasePayload,
+  ReturnablePurchaseReceiptItem,
+  ReversePurchaseReturnPayload,
   SupplierPayment,
   SupplierPaymentFilters,
   UpdatePurchaseInvoicePayload,
   UpdatePurchaseOrderPayload,
   UpdatePurchaseOrderStatusPayload,
+  UpdatePurchaseReturnPayload,
 } from "@/types/purchasing";
 
 const purchasingQueryKey = "purchasing";
@@ -165,6 +180,64 @@ export function usePurchaseReceipt(id: string | null, enabled = true) {
       return getPurchaseReceiptById(id);
     },
     enabled: enabled && id !== null,
+  });
+}
+
+export function usePurchaseReturns(filters: PurchaseReturnFilters, enabled = true) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<PurchaseReturn[]>({
+    queryKey: [purchasingQueryKey, branchQueryKey, "returns", filters],
+    queryFn: async () => getPurchaseReturns(filters),
+    enabled,
+  });
+}
+
+export function usePurchaseReturn(id: string | null, enabled = true) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<PurchaseReturn>({
+    queryKey: [purchasingQueryKey, branchQueryKey, "return", id],
+    queryFn: async () => {
+      if (!id) {
+        throw new Error("Purchase return ID is required.");
+      }
+
+      return getPurchaseReturnById(id);
+    },
+    enabled: enabled && id !== null,
+  });
+}
+
+export function usePurchaseReceiptReturnableItems(receiptId: string | null, enabled = true) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<ReturnablePurchaseReceiptItem[]>({
+    queryKey: [purchasingQueryKey, branchQueryKey, "receipt-returnable-items", receiptId],
+    queryFn: async () => {
+      if (!receiptId) {
+        throw new Error("Purchase receipt ID is required.");
+      }
+
+      return getPurchaseReceiptReturnableItems(receiptId);
+    },
+    enabled: enabled && receiptId !== null,
+  });
+}
+
+export function usePurchaseReceiptReturns(receiptId: string | null, enabled = true) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<PurchaseReturn[]>({
+    queryKey: [purchasingQueryKey, branchQueryKey, "receipt-returns", receiptId],
+    queryFn: async () => {
+      if (!receiptId) {
+        throw new Error("Purchase receipt ID is required.");
+      }
+
+      return getPurchaseReceiptReturns(receiptId);
+    },
+    enabled: enabled && receiptId !== null,
   });
 }
 
@@ -430,6 +503,74 @@ export function useCancelPurchaseReceipt() {
     mutationFn: async (id) => cancelPurchaseReceipt(id),
     onSuccess: async () => {
       await invalidatePurchasing(queryClient);
+    },
+  });
+}
+
+export function useCreatePurchaseReturn() {
+  const queryClient = useQueryClient();
+
+  return useMutation<PurchaseReturn, Error, CreatePurchaseReturnPayload>({
+    mutationFn: async (payload) => createPurchaseReturn(payload),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+    },
+  });
+}
+
+export function useUpdatePurchaseReturn() {
+  const queryClient = useQueryClient();
+
+  return useMutation<PurchaseReturn, Error, { id: string; payload: UpdatePurchaseReturnPayload }>({
+    mutationFn: async ({ id, payload }) => updatePurchaseReturn(id, payload),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+    },
+  });
+}
+
+export function usePostPurchaseReturn() {
+  const queryClient = useQueryClient();
+
+  return useMutation<PurchaseReturn, Error, string>({
+    mutationFn: async (id) => postPurchaseReturn(id),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+      await queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      await queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+      await queryClient.invalidateQueries({ queryKey: ["accounting"] });
+    },
+  });
+}
+
+export function useCancelPurchaseReturn() {
+  const queryClient = useQueryClient();
+
+  return useMutation<PurchaseReturn, Error, string>({
+    mutationFn: async (id) => cancelPurchaseReturn(id),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+    },
+  });
+}
+
+export function useReversePurchaseReturn() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    PurchaseReturn,
+    Error,
+    {
+      id: string;
+      payload: ReversePurchaseReturnPayload;
+    }
+  >({
+    mutationFn: async ({ id, payload }) => reversePurchaseReturn(id, payload),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+      await queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      await queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+      await queryClient.invalidateQueries({ queryKey: ["accounting"] });
     },
   });
 }
