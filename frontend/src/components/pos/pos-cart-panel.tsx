@@ -4,6 +4,7 @@ import type { JSX } from "react";
 import { POSCartItem } from "@/components/pos/pos-cart-item";
 import { POSCustomerSelector } from "@/components/pos/pos-customer-selector";
 import { POSEmptyCartState } from "@/components/pos/pos-empty-cart-state";
+import { DocumentChargesEditor } from "@/components/shared/document-charges-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,17 +14,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { DocumentChargeDraft } from "@/types/document-charges";
 import type { CartDiscountType, CartItem, CartTotals } from "@/types/pos";
-import type { SalesChannel } from "@/types/settings";
+import type { SalesChannel, TaxRate } from "@/types/settings";
 
 const defaultChannelValue = "__default__";
 
 type POSCartPanelProps = {
   canSell: boolean;
+  charges: DocumentChargeDraft[];
   customerId: string | null;
   isCheckingOut: boolean;
   items: CartItem[];
   onCheckout: () => void;
+  onChargesChange: (charges: DocumentChargeDraft[]) => void;
   onClear: () => void;
   onCustomerChange: (customerId: string | null) => void;
   onExternalOrderNumberChange: (value: string) => void;
@@ -39,6 +43,7 @@ type POSCartPanelProps = {
   externalOrderNumber: string;
   salesChannelId: string;
   salesChannels: SalesChannel[];
+  taxRates: TaxRate[];
   totals: CartTotals;
 };
 
@@ -51,10 +56,12 @@ function formatMoney(value: number): string {
 
 export function POSCartPanel({
   canSell,
+  charges,
   customerId,
   isCheckingOut,
   items,
   onCheckout,
+  onChargesChange,
   onClear,
   onCustomerChange,
   onExternalOrderNumberChange,
@@ -66,6 +73,7 @@ export function POSCartPanel({
   externalOrderNumber,
   salesChannelId,
   salesChannels,
+  taxRates,
   totals,
 }: POSCartPanelProps): JSX.Element {
   const itemCountLabel = items.length === 1 ? "1 item" : `${String(items.length)} items`;
@@ -152,6 +160,15 @@ export function POSCartPanel({
       </div>
 
       <div className="shrink-0 space-y-2 border-t border-[#d4d4d8] bg-white p-3">
+        {items.length > 0 ? (
+          <DocumentChargesEditor
+            charges={charges}
+            className="border-b border-[#d4d4d8] pb-2"
+            compact
+            onChange={onChargesChange}
+            taxRates={taxRates}
+          />
+        ) : null}
         <div className="space-y-1.5 border-b border-[#d4d4d8] pb-2.5">
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between">
@@ -167,11 +184,27 @@ export function POSCartPanel({
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[#52525b]">Tax</span>
+              <span className="text-[#52525b]">Item tax</span>
               <span className="font-mono font-bold text-[#09090b]">
                 {formatMoney(totals.taxAmount)}
               </span>
             </div>
+            {totals.chargeAmount > 0 || totals.chargeTaxAmount > 0 ? (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-[#52525b]">Charges</span>
+                  <span className="font-mono font-bold text-[#09090b]">
+                    {formatMoney(totals.chargeAmount)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#52525b]">Charge tax</span>
+                  <span className="font-mono font-bold text-[#09090b]">
+                    {formatMoney(totals.chargeTaxAmount)}
+                  </span>
+                </div>
+              </>
+            ) : null}
             <div className="mt-2 flex items-center justify-between border-t border-[#d4d4d8] pt-2">
               <span className="text-base font-black text-[#09090b]">Total Payable</span>
               <span className="font-mono text-lg font-black text-[#09090b]">

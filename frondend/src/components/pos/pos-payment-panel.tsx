@@ -4,10 +4,13 @@ import type { JSX } from "react";
 import { POSPaymentMethodButton } from "@/components/pos/pos-payment-method-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ApiError, getErrorMessage } from "@/lib/api/client";
 import type { PaymentInput } from "@/types/pos";
 import type { PaymentMethod } from "@/types/settings";
 
 type POSPaymentPanelProps = {
+  error: Error | null;
+  isLoading: boolean;
   methods: PaymentMethod[];
   onPaymentsChange: (payments: PaymentInput[]) => void;
   payments: PaymentInput[];
@@ -29,7 +32,21 @@ function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+function getPaymentMethodsErrorMessage(error: Error | null): string | null {
+  if (!error) {
+    return null;
+  }
+
+  if (error instanceof ApiError && error.status === 403) {
+    return "Cashier role cannot load POS payment methods. Add pos/payment method view permission.";
+  }
+
+  return getErrorMessage(error);
+}
+
 export function POSPaymentPanel({
+  error,
+  isLoading,
   methods,
   onPaymentsChange,
   payments,
@@ -37,6 +54,7 @@ export function POSPaymentPanel({
 }: POSPaymentPanelProps): JSX.Element {
   const activeMethods = methods.filter((method) => method.status === "active" && method.showInPos);
   const unavailableMethods = activeMethods.filter((method) => !method.defaultPaymentAccountId);
+  const errorMessage = getPaymentMethodsErrorMessage(error);
   const paidAmount = roundMoney(payments.reduce((sum, payment) => sum + payment.amount, 0));
   const balanceDue = roundMoney(Math.max(total - paidAmount, 0));
   const changeAmount = roundMoney(Math.max(paidAmount - total, 0));
@@ -95,20 +113,37 @@ export function POSPaymentPanel({
         </p>
         <p className="font-mono font-bold text-[#09090b]">{formatMoney(balanceDue)}</p>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        {activeMethods.map((method) => (
-          <POSPaymentMethodButton
-            key={method.id}
-            disabled={!method.defaultPaymentAccountId}
-            method={method}
-            onSelect={addOrReplacePayment}
-            selected={payments.some((payment) => payment.paymentMethodId === method.id)}
-          />
-        ))}
-      </div>
+      {isLoading ? (
+        <p className="rounded-md border border-[#d4d4d8] bg-[#fafafa] px-3 py-2 text-[0.7rem] text-[#52525b]">
+          Loading POS payment methods...
+        </p>
+      ) : null}
+      {errorMessage ? (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[0.7rem] font-semibold text-red-700">
+          {errorMessage}
+        </p>
+      ) : null}
+      {!isLoading && !errorMessage && activeMethods.length === 0 ? (
+        <p className="rounded-md border border-dashed border-[#a1a1aa] bg-[#fafafa] px-3 py-2 text-[0.7rem] text-[#52525b]">
+          No POS payment methods are available for this branch.
+        </p>
+      ) : null}
+      {activeMethods.length > 0 ? (
+        <div className="grid grid-cols-2 gap-2">
+          {activeMethods.map((method) => (
+            <POSPaymentMethodButton
+              key={method.id}
+              disabled={!method.defaultPaymentAccountId}
+              method={method}
+              onSelect={addOrReplacePayment}
+              selected={payments.some((payment) => payment.paymentMethodId === method.id)}
+            />
+          ))}
+        </div>
+      ) : null}
       {unavailableMethods.length > 0 ? (
         <p className="rounded-md border border-[#d4d4d8] bg-[#fafafa] px-3 py-2 text-[0.7rem] text-[#52525b]">
-          Some payment methods are disabled because they need a default payment account in Settings.
+          Active POS payment methods need linked default payment accounts before they can be used.
         </p>
       ) : null}
       {paymentRows.length > 0 ? (

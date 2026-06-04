@@ -18,6 +18,8 @@ type SalesReturn struct {
 	Status                  string         `gorm:"size:50;not null;default:draft" json:"status"`
 	SubtotalAmount          float64        `gorm:"not null;default:0" json:"subtotal_amount"`
 	TaxAmount               float64        `gorm:"not null;default:0" json:"tax_amount"`
+	ChargeAmount            float64        `gorm:"not null;default:0" json:"charge_amount"`
+	ChargeTaxAmount         float64        `gorm:"not null;default:0" json:"charge_tax_amount"`
 	ReturnTotal             float64        `gorm:"not null;default:0" json:"return_total"`
 	RefundMode              string         `gorm:"size:50;not null;default:none" json:"refund_mode"`
 	RefundPaymentMethodID   *string        `gorm:"type:uuid;index" json:"refund_payment_method_id"`

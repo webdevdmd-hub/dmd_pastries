@@ -59,6 +59,10 @@ func DefaultChartAccountSeeds() []defaultAccountSeed {
 		{Code: "4020", Name: "Service Income", Type: "income", Group: "service_income", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
 		{Code: "4030", Name: "Discount Received", Type: "income", Group: "discount_income", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
 		{Code: "4040", Name: "Sales Returns and Allowances", Type: "income", Group: "sales_income", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "4050", Name: "Delivery Charge Income", Type: "income", Group: "sales_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "4060", Name: "Service Charge Income", Type: "income", Group: "service_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "4070", Name: "Packing Charge Income", Type: "income", Group: "sales_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "4080", Name: "Delivery Charge Returns", Type: "income", Group: "sales_income", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "4090", Name: "Other Income", Type: "income", Group: "other_income", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true},
 		{Code: "4100", Name: "Inventory Adjustment Gain", Type: "income", Group: "other_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "5000", Name: "Opening Stock", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
@@ -144,9 +148,16 @@ func DefaultAccountMappingSeeds() []defaultAccountMappingSeed {
 		{Key: "purchase_returns", AccountCode: "5020", Description: "Purchase returns"},
 		{Key: "wip_inventory", AccountCode: "1210", Description: "Manufacturing work in process"},
 		{Key: "wastage_expense", AccountCode: "5080", Description: "Inventory and production wastage"},
+		{Key: "inventory_adjustment_gain", AccountCode: "4100", Description: "Inventory adjustment gains"},
+		{Key: "inventory_adjustment_loss", AccountCode: "5090", Description: "Inventory adjustment losses"},
 		{Key: "opening_balance_equity", AccountCode: "3400", Description: "Opening stock/equity offset"},
 		{Key: "grni", AccountCode: "2050", Description: "Goods received not invoiced"},
 		{Key: "platform_commission_expense", AccountCode: "6240", Description: "Delivery platform commissions"},
+		{Key: "delivery_charge_income", AccountCode: "4050", Description: "Customer delivery charge income"},
+		{Key: "service_charge_income", AccountCode: "4060", Description: "Customer service charge income"},
+		{Key: "packing_charge_income", AccountCode: "4070", Description: "Customer packing charge income"},
+		{Key: "charge_refund_account", AccountCode: "4080", Description: "Refunded customer charges"},
+		{Key: "freight_inward", AccountCode: "5030", Description: "Supplier freight and carriage inward"},
 	}
 }
 

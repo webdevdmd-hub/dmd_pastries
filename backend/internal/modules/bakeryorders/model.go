@@ -26,6 +26,8 @@ type BakeryOrder struct {
 	SubtotalAmount           float64        `gorm:"not null;default:0" json:"subtotal_amount"`
 	DiscountAmount           float64        `gorm:"not null;default:0" json:"discount_amount"`
 	TaxAmount                float64        `gorm:"not null;default:0" json:"tax_amount"`
+	ChargeAmount             float64        `gorm:"not null;default:0" json:"charge_amount"`
+	ChargeTaxAmount          float64        `gorm:"not null;default:0" json:"charge_tax_amount"`
 	TotalAmount              float64        `gorm:"not null;default:0" json:"total_amount"`
 	PaidAmount               float64        `gorm:"not null;default:0" json:"paid_amount"`
 	BalanceAmount            float64        `gorm:"not null;default:0" json:"balance_amount"`

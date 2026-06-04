@@ -11,6 +11,7 @@ import (
 
 	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
+	"pastries-pos/internal/modules/charges"
 	"pastries-pos/internal/modules/inventory"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
@@ -58,7 +59,7 @@ func (s *Service) ListOrders(currentUser *utils.AuthContext, query ListQuery) (*
 func (s *Service) CreateOrder(currentUser *utils.AuthContext, req CreatePurchaseOrderRequest, ipAddress, userAgent string) (*PurchaseOrderResponse, error) {
 	var orderID string
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		order, items, err := s.buildOrder(tx, currentUser, "", req.BranchID, req.SupplierID, req.OrderDate, req.ExpectedDeliveryDate, req.Items, req.Notes)
+		order, items, chargeRows, err := s.buildOrder(tx, currentUser, "", req.BranchID, req.SupplierID, req.OrderDate, req.ExpectedDeliveryDate, req.Items, req.Charges, req.Notes)
 		if err != nil {
 			return err
 		}
@@ -69,6 +70,11 @@ func (s *Service) CreateOrder(currentUser *utils.AuthContext, req CreatePurchase
 		order.PurchaseOrderNumber = number
 		if err := s.repo.CreateOrder(tx, order, items); err != nil {
 			return err
+		}
+		if len(chargeRows) > 0 {
+			if err := tx.Create(&chargeRows).Error; err != nil {
+				return apperrors.Internal("failed to create purchase order charges")
+			}
 		}
 		if err := s.audit(tx, currentUser, "purchase_order.created", order.ID, "Purchase order created", ipAddress, userAgent); err != nil {
 			return err
@@ -152,6 +158,16 @@ func (s *Service) UpdateOrder(currentUser *utils.AuthContext, id string, req Upd
 		}
 		if err := s.repo.UpdateOrder(tx, id, currentUser.BusinessID, updates, items); err != nil {
 			return err
+		}
+		if req.Charges != nil {
+			if _, err := charges.ReplaceCharges(tx, currentUser.BusinessID, branchID, "purchase_order", id, req.Charges); err != nil {
+				return err
+			}
+		}
+		if req.Items != nil || req.Charges != nil {
+			if err := s.recalculatePurchaseOrderTotals(tx, currentUser.BusinessID, id); err != nil {
+				return err
+			}
 		}
 		if err := s.audit(tx, currentUser, "purchase_order.updated", id, "Purchase order updated", ipAddress, userAgent); err != nil {
 			return err
@@ -264,6 +280,8 @@ func (s *Service) ConvertOrderToInvoice(currentUser *utils.AuthContext, id strin
 			PaymentStatus:   "unpaid",
 			SubtotalAmount:  order.SubtotalAmount,
 			TaxAmount:       order.TaxAmount,
+			ChargeAmount:    order.ChargeAmount,
+			ChargeTaxAmount: order.ChargeTaxAmount,
 			DiscountAmount:  order.DiscountAmount,
 			TotalAmount:     order.TotalAmount,
 			BalanceAmount:   order.TotalAmount,
@@ -292,6 +310,9 @@ func (s *Service) ConvertOrderToInvoice(currentUser *utils.AuthContext, id strin
 			})
 		}
 		if err := s.repo.CreateInvoice(tx, invoice, items); err != nil {
+			return err
+		}
+		if _, err := charges.CopyCharges(tx, currentUser.BusinessID, order.BranchID, "purchase_order", order.ID, "purchase_invoice", invoice.ID); err != nil {
 			return err
 		}
 		if order.Status == "draft" {
@@ -391,7 +412,7 @@ func (s *Service) ListInvoices(currentUser *utils.AuthContext, query ListQuery) 
 func (s *Service) CreateInvoice(currentUser *utils.AuthContext, req CreatePurchaseInvoiceRequest, ipAddress, userAgent string) (*PurchaseInvoiceResponse, error) {
 	var invoiceID string
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		invoice, items, err := s.buildInvoice(tx, currentUser, "", req)
+		invoice, items, chargeRows, err := s.buildInvoice(tx, currentUser, "", req)
 		if err != nil {
 			return err
 		}
@@ -402,6 +423,11 @@ func (s *Service) CreateInvoice(currentUser *utils.AuthContext, req CreatePurcha
 		}
 		if err := s.repo.CreateInvoice(tx, invoice, items); err != nil {
 			return err
+		}
+		if len(chargeRows) > 0 {
+			if err := tx.Create(&chargeRows).Error; err != nil {
+				return apperrors.Internal("failed to create purchase invoice charges")
+			}
 		}
 		if err := s.audit(tx, currentUser, "purchase_invoice.created", invoice.ID, "Purchase invoice created", ipAddress, userAgent); err != nil {
 			return err
@@ -576,6 +602,7 @@ func (s *Service) UpdateInvoice(currentUser *utils.AuthContext, id string, req U
 			InvoiceDate:     first(req.InvoiceDate, formatDate(existing.InvoiceDate)),
 			DueDate:         first(req.DueDate, optionalDateString(existing.DueDate)),
 			Items:           req.Items,
+			Charges:         req.Charges,
 			Notes:           req.Notes,
 		}
 		if createReq.Items == nil {
@@ -585,7 +612,7 @@ func (s *Service) UpdateInvoice(currentUser *utils.AuthContext, id string, req U
 			}
 			createReq.Items = invoiceInputsFromItems(oldItems)
 		}
-		invoice, items, err := s.buildInvoice(tx, currentUser, id, createReq)
+		invoice, items, _, err := s.buildInvoice(tx, currentUser, id, createReq)
 		if err != nil {
 			return err
 		}
@@ -596,6 +623,14 @@ func (s *Service) UpdateInvoice(currentUser *utils.AuthContext, id string, req U
 		}
 		updates := map[string]interface{}{"branch_id": invoice.BranchID, "supplier_id": invoice.SupplierID, "purchase_order_id": invoice.PurchaseOrderID, "invoice_number": invoice.InvoiceNumber, "invoice_date": invoice.InvoiceDate, "due_date": invoice.DueDate, "subtotal_amount": invoice.SubtotalAmount, "tax_amount": invoice.TaxAmount, "discount_amount": invoice.DiscountAmount, "total_amount": invoice.TotalAmount, "balance_amount": invoice.BalanceAmount, "notes": invoice.Notes, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
 		if err := s.repo.UpdateInvoice(tx, id, currentUser.BusinessID, updates, items); err != nil {
+			return err
+		}
+		if req.Charges != nil {
+			if _, err := charges.ReplaceCharges(tx, currentUser.BusinessID, invoice.BranchID, "purchase_invoice", id, req.Charges); err != nil {
+				return err
+			}
+		}
+		if err := s.recalculatePurchaseInvoiceTotals(tx, currentUser.BusinessID, id); err != nil {
 			return err
 		}
 		if err := s.audit(tx, currentUser, "purchase_invoice.updated", id, "Purchase invoice updated", ipAddress, userAgent); err != nil {
@@ -714,12 +749,21 @@ func (s *Service) ConvertInvoiceToReceipt(currentUser *utils.AuthContext, id str
 			Items:             receiptInputsFromInvoiceItems(invoiceItems),
 			Notes:             notes,
 		}
-		receipt, items, err := s.buildReceipt(tx, currentUser, receiveReq, "draft")
+		receipt, items, _, err := s.buildReceipt(tx, currentUser, receiveReq, "draft")
 		if err != nil {
 			return err
 		}
 		if err := s.repo.CreateReceipt(tx, receipt, items); err != nil {
 			return err
+		}
+		chargeTotals, err := charges.CopyCharges(tx, currentUser.BusinessID, invoice.BranchID, "purchase_invoice", invoice.ID, "purchase_receipt", receipt.ID)
+		if err != nil {
+			return err
+		}
+		if chargeTotals.Total > 0 {
+			if err := s.repo.UpdateReceipt(tx, receipt.ID, currentUser.BusinessID, map[string]interface{}{"charge_amount": chargeTotals.Amount, "charge_tax_amount": chargeTotals.TaxAmount, "updated_at": time.Now().UTC()}); err != nil {
+				return err
+			}
 		}
 		if err := s.audit(tx, currentUser, "purchase_invoice.converted_to_receipt", invoice.ID, "Purchase invoice converted to draft stock receipt", ipAddress, userAgent); err != nil {
 			return err
@@ -739,12 +783,17 @@ func (s *Service) Receive(currentUser *utils.AuthContext, req ReceivePurchaseReq
 	}
 	var receiptID string
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		receipt, items, err := s.buildReceipt(tx, currentUser, req, "posted")
+		receipt, items, chargeRows, err := s.buildReceipt(tx, currentUser, req, "posted")
 		if err != nil {
 			return err
 		}
 		if err := s.repo.CreateReceipt(tx, receipt, items); err != nil {
 			return err
+		}
+		if len(chargeRows) > 0 {
+			if err := tx.Create(&chargeRows).Error; err != nil {
+				return apperrors.Internal("failed to create purchase receipt charges")
+			}
 		}
 		if err := s.applyReceiptStock(tx, currentUser, receipt); err != nil {
 			return err
@@ -922,7 +971,7 @@ func (s *Service) CreateReturn(currentUser *utils.AuthContext, req CreatePurchas
 	}
 	var returnID string
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		purchaseReturn, items, err := s.buildPurchaseReturn(tx, currentUser, "", req.PurchaseReceiptID, req.ReturnDate, req.SupplierReferenceNumber, req.Reason, req.Items, "")
+		purchaseReturn, items, chargeRows, err := s.buildPurchaseReturn(tx, currentUser, "", req.PurchaseReceiptID, req.ReturnDate, req.SupplierReferenceNumber, req.Reason, req.Items, req.Charges, "")
 		if err != nil {
 			return err
 		}
@@ -933,6 +982,11 @@ func (s *Service) CreateReturn(currentUser *utils.AuthContext, req CreatePurchas
 		purchaseReturn.ReturnNumber = number
 		if err := s.repo.CreatePurchaseReturn(tx, purchaseReturn, items); err != nil {
 			return err
+		}
+		if len(chargeRows) > 0 {
+			if err := tx.Create(&chargeRows).Error; err != nil {
+				return apperrors.Internal("failed to create purchase return charges")
+			}
 		}
 		if err := s.audit(tx, currentUser, "purchase_return.created", purchaseReturn.ID, "Purchase return vendor credit created", ipAddress, userAgent); err != nil {
 			return err
@@ -982,7 +1036,7 @@ func (s *Service) UpdateReturn(currentUser *utils.AuthContext, id string, req Up
 			inputs = purchaseReturnInputsFromItems(oldItems)
 		}
 		returnDate := first(req.ReturnDate, formatDate(existing.ReturnDate))
-		purchaseReturn, items, err := s.buildPurchaseReturn(tx, currentUser, id, existing.PurchaseReceiptID, returnDate, first(req.SupplierReferenceNumber, existing.SupplierReferenceNumber), first(req.Reason, existing.Reason), inputs, existing.ID)
+		purchaseReturn, items, _, err := s.buildPurchaseReturn(tx, currentUser, id, existing.PurchaseReceiptID, returnDate, first(req.SupplierReferenceNumber, existing.SupplierReferenceNumber), first(req.Reason, existing.Reason), inputs, req.Charges, existing.ID)
 		if err != nil {
 			return err
 		}
@@ -997,6 +1051,14 @@ func (s *Service) UpdateReturn(currentUser *utils.AuthContext, id string, req Up
 			"updated_at":                time.Now().UTC(),
 		}
 		if err := s.repo.UpdatePurchaseReturn(tx, existing.ID, currentUser.BusinessID, updates, items); err != nil {
+			return err
+		}
+		if req.Charges != nil {
+			if _, err := charges.ReplaceCharges(tx, currentUser.BusinessID, purchaseReturn.BranchID, "purchase_return", existing.ID, req.Charges); err != nil {
+				return err
+			}
+		}
+		if err := s.recalculatePurchaseReturnTotals(tx, currentUser.BusinessID, existing.ID); err != nil {
 			return err
 		}
 		return s.audit(tx, currentUser, "purchase_return.updated", existing.ID, "Purchase return vendor credit updated", ipAddress, userAgent)
@@ -1266,22 +1328,22 @@ func (s *Service) SupplierHistory(currentUser *utils.AuthContext, supplierID str
 	return response, nil
 }
 
-func (s *Service) buildOrder(tx *gorm.DB, currentUser *utils.AuthContext, id, branchID, supplierID, orderDate, expectedDate string, inputItems []PurchaseOrderItemInput, notes string) (*PurchaseOrder, []PurchaseOrderItem, error) {
+func (s *Service) buildOrder(tx *gorm.DB, currentUser *utils.AuthContext, id, branchID, supplierID, orderDate, expectedDate string, inputItems []PurchaseOrderItemInput, chargeInputs []charges.ChargeInput, notes string) (*PurchaseOrder, []PurchaseOrderItem, []charges.DocumentCharge, error) {
 	resolvedBranchID, err := currentUser.ResolveOperationalBranch(branchID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	branchID = resolvedBranchID
 	if err := s.validateHeader(tx, currentUser.BusinessID, branchID, supplierID); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	parsedOrderDate, err := parseDate(orderDate, "order_date")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	parsedExpected, err := parseOptionalDate(expectedDate, "expected_delivery_date")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	orderID := id
 	if orderID == "" {
@@ -1289,9 +1351,15 @@ func (s *Service) buildOrder(tx *gorm.DB, currentUser *utils.AuthContext, id, br
 	}
 	items, totals, err := s.buildOrderItems(tx, currentUser.BusinessID, branchID, orderID, inputItems)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return &PurchaseOrder{ID: orderID, BusinessID: currentUser.BusinessID, BranchID: branchID, SupplierID: supplierID, OrderDate: parsedOrderDate, ExpectedDeliveryDate: parsedExpected, Status: "draft", SubtotalAmount: totals.Subtotal, TaxAmount: totals.Tax, DiscountAmount: totals.Discount, TotalAmount: totals.Total, Notes: strings.TrimSpace(notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}, items, nil
+	chargeRows, chargeTotals, err := charges.BuildCharges(tx, currentUser.BusinessID, branchID, "purchase_order", orderID, chargeInputs)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	taxAmount := roundMoney(totals.Tax + chargeTotals.TaxAmount)
+	totalAmount := roundMoney(totals.Total + chargeTotals.Total)
+	return &PurchaseOrder{ID: orderID, BusinessID: currentUser.BusinessID, BranchID: branchID, SupplierID: supplierID, OrderDate: parsedOrderDate, ExpectedDeliveryDate: parsedExpected, Status: "draft", SubtotalAmount: totals.Subtotal, TaxAmount: taxAmount, ChargeAmount: chargeTotals.Amount, ChargeTaxAmount: chargeTotals.TaxAmount, DiscountAmount: totals.Discount, TotalAmount: totalAmount, Notes: strings.TrimSpace(notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}, items, chargeRows, nil
 }
 
 func (s *Service) buildOrderItems(tx *gorm.DB, businessID, branchID, orderID string, inputItems []PurchaseOrderItemInput) ([]PurchaseOrderItem, totals, error) {
@@ -1311,33 +1379,33 @@ func (s *Service) buildOrderItems(tx *gorm.DB, businessID, branchID, orderID str
 	return items, total.round(), nil
 }
 
-func (s *Service) buildInvoice(tx *gorm.DB, currentUser *utils.AuthContext, id string, req CreatePurchaseInvoiceRequest) (*PurchaseInvoice, []PurchaseInvoiceItem, error) {
+func (s *Service) buildInvoice(tx *gorm.DB, currentUser *utils.AuthContext, id string, req CreatePurchaseInvoiceRequest) (*PurchaseInvoice, []PurchaseInvoiceItem, []charges.DocumentCharge, error) {
 	resolvedBranchID, err := currentUser.ResolveOperationalBranch(req.BranchID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	req.BranchID = resolvedBranchID
 	if err := s.validateHeader(tx, currentUser.BusinessID, req.BranchID, req.SupplierID); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if strings.TrimSpace(req.InvoiceNumber) == "" {
-		return nil, nil, apperrors.BadRequest("invoice_number is required", nil)
+		return nil, nil, nil, apperrors.BadRequest("invoice_number is required", nil)
 	}
 	invoiceDate, err := parseDate(req.InvoiceDate, "invoice_date")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	dueDate, err := parseOptionalDate(req.DueDate, "due_date")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if req.PurchaseOrderID != "" {
 		order, err := s.repo.FindOrder(req.PurchaseOrderID, currentUser.BusinessID)
 		if err != nil {
-			return nil, nil, notFound(err, "purchase order not found")
+			return nil, nil, nil, notFound(err, "purchase order not found")
 		}
 		if order.BranchID != req.BranchID {
-			return nil, nil, apperrors.BadRequest("purchase order branch does not match invoice branch", nil)
+			return nil, nil, nil, apperrors.BadRequest("purchase order branch does not match invoice branch", nil)
 		}
 	}
 	invoiceID := id
@@ -1346,9 +1414,15 @@ func (s *Service) buildInvoice(tx *gorm.DB, currentUser *utils.AuthContext, id s
 	}
 	items, total, err := s.buildInvoiceItems(tx, currentUser.BusinessID, req.BranchID, invoiceID, req.Items)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return &PurchaseInvoice{ID: invoiceID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, SupplierID: req.SupplierID, PurchaseOrderID: nullableString(req.PurchaseOrderID), InvoiceNumber: strings.TrimSpace(req.InvoiceNumber), InvoiceDate: invoiceDate, DueDate: dueDate, Status: "draft", PaymentStatus: "unpaid", SubtotalAmount: total.Subtotal, TaxAmount: total.Tax, DiscountAmount: total.Discount, TotalAmount: total.Total, BalanceAmount: total.Total, Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}, items, nil
+	chargeRows, chargeTotals, err := charges.BuildCharges(tx, currentUser.BusinessID, req.BranchID, "purchase_invoice", invoiceID, req.Charges)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	taxAmount := roundMoney(total.Tax + chargeTotals.TaxAmount)
+	totalAmount := roundMoney(total.Total + chargeTotals.Total)
+	return &PurchaseInvoice{ID: invoiceID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, SupplierID: req.SupplierID, PurchaseOrderID: nullableString(req.PurchaseOrderID), InvoiceNumber: strings.TrimSpace(req.InvoiceNumber), InvoiceDate: invoiceDate, DueDate: dueDate, Status: "draft", PaymentStatus: "unpaid", SubtotalAmount: total.Subtotal, TaxAmount: taxAmount, ChargeAmount: chargeTotals.Amount, ChargeTaxAmount: chargeTotals.TaxAmount, DiscountAmount: total.Discount, TotalAmount: totalAmount, BalanceAmount: totalAmount, Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}, items, chargeRows, nil
 }
 
 func (s *Service) buildInvoiceItems(tx *gorm.DB, businessID, branchID, invoiceID string, inputItems []PurchaseInvoiceItemInput) ([]PurchaseInvoiceItem, totals, error) {
@@ -1372,49 +1446,49 @@ func (s *Service) buildInvoiceItems(tx *gorm.DB, businessID, branchID, invoiceID
 	return items, total.round(), nil
 }
 
-func (s *Service) buildReceipt(tx *gorm.DB, currentUser *utils.AuthContext, req ReceivePurchaseRequest, status string) (*PurchaseReceipt, []PurchaseReceiptItem, error) {
+func (s *Service) buildReceipt(tx *gorm.DB, currentUser *utils.AuthContext, req ReceivePurchaseRequest, status string) (*PurchaseReceipt, []PurchaseReceiptItem, []charges.DocumentCharge, error) {
 	resolvedBranchID, err := currentUser.ResolveOperationalBranch(req.BranchID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	req.BranchID = resolvedBranchID
 	if err := s.validateHeader(tx, currentUser.BusinessID, req.BranchID, req.SupplierID); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	receivedDate, err := parseDate(req.ReceivedDate, "received_date")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if req.PurchaseOrderID != "" {
 		order, err := s.repo.FindOrderForUpdate(tx, req.PurchaseOrderID, currentUser.BusinessID)
 		if err != nil {
-			return nil, nil, notFound(err, "purchase order not found")
+			return nil, nil, nil, notFound(err, "purchase order not found")
 		}
 		if order.Status == "cancelled" || order.Status == "received" {
-			return nil, nil, apperrors.BadRequest("purchase order cannot receive more stock", nil)
+			return nil, nil, nil, apperrors.BadRequest("purchase order cannot receive more stock", nil)
 		}
 		if order.BranchID != req.BranchID {
-			return nil, nil, apperrors.BadRequest("purchase order branch does not match receipt branch", nil)
+			return nil, nil, nil, apperrors.BadRequest("purchase order branch does not match receipt branch", nil)
 		}
 	}
 	if req.PurchaseInvoiceID != "" {
 		invoice, err := s.repo.FindInvoiceForUpdate(tx, req.PurchaseInvoiceID, currentUser.BusinessID)
 		if err != nil {
-			return nil, nil, notFound(err, "purchase invoice not found")
+			return nil, nil, nil, notFound(err, "purchase invoice not found")
 		}
 		if invoice.Status != "posted" {
-			return nil, nil, apperrors.BadRequest("only posted invoices can be received", nil)
+			return nil, nil, nil, apperrors.BadRequest("only posted invoices can be received", nil)
 		}
 		if invoice.BranchID != req.BranchID {
-			return nil, nil, apperrors.BadRequest("purchase invoice branch does not match receipt branch", nil)
+			return nil, nil, nil, apperrors.BadRequest("purchase invoice branch does not match receipt branch", nil)
 		}
 	}
 	if len(req.Items) == 0 {
-		return nil, nil, apperrors.BadRequest("items are required", nil)
+		return nil, nil, nil, apperrors.BadRequest("items are required", nil)
 	}
 	receiptNumber, err := s.repo.NextNumber(tx, currentUser.BusinessID, "purchase_receipts", "receipt_number", "PR", "purchase_receipts")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	receipt := &PurchaseReceipt{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BranchID: req.BranchID, SupplierID: req.SupplierID, PurchaseOrderID: nullableString(req.PurchaseOrderID), PurchaseInvoiceID: nullableString(req.PurchaseInvoiceID), ReceiptNumber: receiptNumber, ReceivedDate: receivedDate, Status: "posted", ReceivedByUserID: currentUser.UserID, Notes: strings.TrimSpace(req.Notes)}
 	if status != "" {
@@ -1424,51 +1498,57 @@ func (s *Service) buildReceipt(tx *gorm.DB, currentUser *utils.AuthContext, req 
 	for _, input := range req.Items {
 		prepared, err := s.prepareReceiptItem(tx, currentUser.BusinessID, req.BranchID, input)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		inventoryItem, err := s.findOrCreateInventoryItem(tx, currentUser.BusinessID, req.BranchID, prepared)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		expiryDate, err := parseOptionalDate(input.ExpiryDate, "expiry_date")
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		items = append(items, PurchaseReceiptItem{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, PurchaseReceiptID: receipt.ID, ItemType: prepared.ItemType, ProductID: prepared.ProductID, IngredientID: prepared.IngredientID, PackagingItemID: prepared.PackagingItemID, InventoryItemID: inventoryItem.ID, QuantityReceived: input.QuantityReceived, UnitID: input.UnitID, UnitCost: input.UnitCost, ExpiryDate: expiryDate, BatchNumber: strings.TrimSpace(input.BatchNumber)})
 	}
-	return receipt, items, nil
+	chargeRows, chargeTotals, err := charges.BuildCharges(tx, currentUser.BusinessID, req.BranchID, "purchase_receipt", receipt.ID, req.Charges)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	receipt.ChargeAmount = chargeTotals.Amount
+	receipt.ChargeTaxAmount = chargeTotals.TaxAmount
+	return receipt, items, chargeRows, nil
 }
 
-func (s *Service) buildPurchaseReturn(tx *gorm.DB, currentUser *utils.AuthContext, id, receiptID, returnDate, supplierReferenceNumber, reason string, inputItems []PurchaseReturnItemInput, excludeReturnID string) (*PurchaseReturn, []PurchaseReturnItem, error) {
+func (s *Service) buildPurchaseReturn(tx *gorm.DB, currentUser *utils.AuthContext, id, receiptID, returnDate, supplierReferenceNumber, reason string, inputItems []PurchaseReturnItemInput, chargeInputs []charges.ChargeInput, excludeReturnID string) (*PurchaseReturn, []PurchaseReturnItem, []charges.DocumentCharge, error) {
 	if err := validateUUID(receiptID, "purchase_receipt_id"); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	receipt, err := s.repo.FindReceiptForUpdate(tx, receiptID, currentUser.BusinessID)
 	if err != nil {
-		return nil, nil, notFound(err, "purchase receipt not found")
+		return nil, nil, nil, notFound(err, "purchase receipt not found")
 	}
 	if !currentUser.CanAccessBranch(receipt.BranchID) {
-		return nil, nil, apperrors.Forbidden("branch access denied")
+		return nil, nil, nil, apperrors.Forbidden("branch access denied")
 	}
 	if receipt.Status != "posted" {
-		return nil, nil, apperrors.BadRequest("only posted purchase receipts can be returned", nil)
+		return nil, nil, nil, apperrors.BadRequest("only posted purchase receipts can be returned", nil)
 	}
 	if receipt.PurchaseInvoiceID == nil {
-		return nil, nil, apperrors.BadRequest("purchase receipt must be linked to a posted invoice before return", nil)
+		return nil, nil, nil, apperrors.BadRequest("purchase receipt must be linked to a posted invoice before return", nil)
 	}
 	invoice, err := s.repo.FindInvoiceForUpdate(tx, *receipt.PurchaseInvoiceID, currentUser.BusinessID)
 	if err != nil {
-		return nil, nil, notFound(err, "purchase invoice not found")
+		return nil, nil, nil, notFound(err, "purchase invoice not found")
 	}
 	if invoice.Status != "posted" {
-		return nil, nil, apperrors.BadRequest("only posted purchase invoices can receive vendor credits", nil)
+		return nil, nil, nil, apperrors.BadRequest("only posted purchase invoices can receive vendor credits", nil)
 	}
 	if invoice.BranchID != receipt.BranchID || invoice.SupplierID != receipt.SupplierID {
-		return nil, nil, apperrors.BadRequest("receipt and invoice supplier/branch do not match", nil)
+		return nil, nil, nil, apperrors.BadRequest("receipt and invoice supplier/branch do not match", nil)
 	}
 	parsedReturnDate, err := parseDate(returnDate, "return_date")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	returnID := id
 	if returnID == "" {
@@ -1476,8 +1556,14 @@ func (s *Service) buildPurchaseReturn(tx *gorm.DB, currentUser *utils.AuthContex
 	}
 	items, total, err := s.buildPurchaseReturnItems(tx, currentUser.BusinessID, receipt, invoice, returnID, inputItems, excludeReturnID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
+	chargeRows, chargeTotals, err := charges.BuildCharges(tx, currentUser.BusinessID, receipt.BranchID, "purchase_return", returnID, chargeInputs)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	taxAmount := roundMoney(total.Tax + chargeTotals.TaxAmount)
+	returnTotal := roundMoney(total.Total + chargeTotals.Total)
 	return &PurchaseReturn{
 		ID:                      returnID,
 		BusinessID:              currentUser.BusinessID,
@@ -1491,11 +1577,13 @@ func (s *Service) buildPurchaseReturn(tx *gorm.DB, currentUser *utils.AuthContex
 		Reason:                  strings.TrimSpace(reason),
 		Status:                  "draft",
 		SubtotalAmount:          total.Subtotal,
-		TaxAmount:               total.Tax,
+		TaxAmount:               taxAmount,
+		ChargeAmount:            chargeTotals.Amount,
+		ChargeTaxAmount:         chargeTotals.TaxAmount,
 		DiscountAmount:          total.Discount,
-		ReturnTotal:             total.Total,
+		ReturnTotal:             returnTotal,
 		CreatedByUserID:         currentUser.UserID,
-	}, items, nil
+	}, items, chargeRows, nil
 }
 
 func (s *Service) buildPurchaseReturnItems(tx *gorm.DB, businessID string, receipt *PurchaseReceipt, invoice *PurchaseInvoice, returnID string, inputItems []PurchaseReturnItemInput, excludeReturnID string) ([]PurchaseReturnItem, totals, error) {
@@ -1803,26 +1891,124 @@ func (s *Service) refreshOrderReceivedStatus(tx *gorm.DB, businessID, orderID st
 	return s.repo.UpdateOrder(tx, orderID, businessID, map[string]interface{}{"status": status, "updated_at": time.Now().UTC()}, nil)
 }
 
+func (s *Service) recalculatePurchaseOrderTotals(tx *gorm.DB, businessID, orderID string) error {
+	items, err := s.repo.OrderItems(orderID, businessID)
+	if err != nil {
+		return err
+	}
+	var itemTotals totals
+	for _, item := range items {
+		itemTotals.Subtotal += roundMoney(item.QuantityOrdered * item.UnitCost)
+		itemTotals.Discount += item.DiscountAmount
+		itemTotals.Tax += item.TaxAmount
+		itemTotals.Total += item.LineTotal
+	}
+	itemTotals = itemTotals.round()
+	chargeTotals, err := charges.SumCharges(tx, businessID, "purchase_order", orderID)
+	if err != nil {
+		return err
+	}
+	return s.repo.UpdateOrder(tx, orderID, businessID, map[string]interface{}{
+		"subtotal_amount":   itemTotals.Subtotal,
+		"discount_amount":   itemTotals.Discount,
+		"tax_amount":        roundMoney(itemTotals.Tax + chargeTotals.TaxAmount),
+		"charge_amount":     chargeTotals.Amount,
+		"charge_tax_amount": chargeTotals.TaxAmount,
+		"total_amount":      roundMoney(itemTotals.Total + chargeTotals.Total),
+		"updated_at":        time.Now().UTC(),
+	}, nil)
+}
+
+func (s *Service) recalculatePurchaseInvoiceTotals(tx *gorm.DB, businessID, invoiceID string) error {
+	invoice, err := s.repo.FindInvoiceForUpdate(tx, invoiceID, businessID)
+	if err != nil {
+		return err
+	}
+	items, err := s.repo.InvoiceItems(invoiceID, businessID)
+	if err != nil {
+		return err
+	}
+	var itemTotals totals
+	for _, item := range items {
+		itemTotals.Subtotal += roundMoney(item.Quantity * item.UnitCost)
+		itemTotals.Discount += item.DiscountAmount
+		itemTotals.Tax += item.TaxAmount
+		itemTotals.Total += item.LineTotal
+	}
+	itemTotals = itemTotals.round()
+	chargeTotals, err := charges.SumCharges(tx, businessID, "purchase_invoice", invoiceID)
+	if err != nil {
+		return err
+	}
+	totalAmount := roundMoney(itemTotals.Total + chargeTotals.Total)
+	settledAmount := roundMoney(invoice.PaidAmount + invoice.CreditedAmount)
+	balanceAmount := roundMoney(totalAmount - settledAmount)
+	if balanceAmount < 0 {
+		balanceAmount = 0
+	}
+	return s.repo.UpdateInvoice(tx, invoiceID, businessID, map[string]interface{}{
+		"subtotal_amount":   itemTotals.Subtotal,
+		"discount_amount":   itemTotals.Discount,
+		"tax_amount":        roundMoney(itemTotals.Tax + chargeTotals.TaxAmount),
+		"charge_amount":     chargeTotals.Amount,
+		"charge_tax_amount": chargeTotals.TaxAmount,
+		"total_amount":      totalAmount,
+		"balance_amount":    balanceAmount,
+		"payment_status":    invoicePaymentStatus(totalAmount, settledAmount),
+		"updated_at":        time.Now().UTC(),
+	}, nil)
+}
+
+func (s *Service) recalculatePurchaseReturnTotals(tx *gorm.DB, businessID, returnID string) error {
+	items, err := s.repo.PurchaseReturnItems(returnID, businessID)
+	if err != nil {
+		return err
+	}
+	var itemTotals totals
+	for _, item := range items {
+		itemTotals.Subtotal += item.LineSubtotal
+		itemTotals.Discount += item.DiscountAmount
+		itemTotals.Tax += item.TaxAmount
+		itemTotals.Total += item.LineTotal
+	}
+	itemTotals = itemTotals.round()
+	chargeTotals, err := charges.SumCharges(tx, businessID, "purchase_return", returnID)
+	if err != nil {
+		return err
+	}
+	return s.repo.UpdatePurchaseReturn(tx, returnID, businessID, map[string]interface{}{
+		"subtotal_amount":   itemTotals.Subtotal,
+		"discount_amount":   itemTotals.Discount,
+		"tax_amount":        roundMoney(itemTotals.Tax + chargeTotals.TaxAmount),
+		"charge_amount":     chargeTotals.Amount,
+		"charge_tax_amount": chargeTotals.TaxAmount,
+		"return_total":      roundMoney(itemTotals.Total + chargeTotals.Total),
+		"updated_at":        time.Now().UTC(),
+	}, nil)
+}
+
 func (s *Service) orderResponse(businessID string, order PurchaseOrder, includeItems bool) PurchaseOrderResponse {
 	branchName, supplierName := s.repo.NameLookups(businessID, order.BranchID, order.SupplierID)
-	response := PurchaseOrderResponse{ID: order.ID, BusinessID: order.BusinessID, BranchID: order.BranchID, BranchName: branchName, SupplierID: order.SupplierID, SupplierName: supplierName, PurchaseOrderNumber: order.PurchaseOrderNumber, OrderDate: order.OrderDate, ExpectedDeliveryDate: order.ExpectedDeliveryDate, Status: order.Status, SubtotalAmount: roundMoney(order.SubtotalAmount), TaxAmount: roundMoney(order.TaxAmount), DiscountAmount: roundMoney(order.DiscountAmount), TotalAmount: roundMoney(order.TotalAmount), Notes: order.Notes, CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt}
+	response := PurchaseOrderResponse{ID: order.ID, BusinessID: order.BusinessID, BranchID: order.BranchID, BranchName: branchName, SupplierID: order.SupplierID, SupplierName: supplierName, PurchaseOrderNumber: order.PurchaseOrderNumber, OrderDate: order.OrderDate, ExpectedDeliveryDate: order.ExpectedDeliveryDate, Status: order.Status, SubtotalAmount: roundMoney(order.SubtotalAmount), TaxAmount: roundMoney(order.TaxAmount), ChargeAmount: roundMoney(order.ChargeAmount), ChargeTaxAmount: roundMoney(order.ChargeTaxAmount), DiscountAmount: roundMoney(order.DiscountAmount), TotalAmount: roundMoney(order.TotalAmount), Notes: order.Notes, CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt}
 	if includeItems {
 		items, _ := s.repo.OrderItems(order.ID, businessID)
 		for _, item := range items {
 			response.Items = append(response.Items, PurchaseOrderItemResponse{ID: item.ID, ItemType: item.ItemType, ProductID: item.ProductID, IngredientID: item.IngredientID, PackagingItemID: item.PackagingItemID, ItemNameSnapshot: item.ItemNameSnapshot, QuantityOrdered: roundQuantity(item.QuantityOrdered), QuantityReceived: roundQuantity(item.QuantityReceived), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), UnitCost: roundMoney(item.UnitCost), DiscountAmount: roundMoney(item.DiscountAmount), TaxRateID: item.TaxRateID, TaxAmount: roundMoney(item.TaxAmount), LineTotal: roundMoney(item.LineTotal)})
 		}
+		response.Charges, _ = charges.ListChargeResponses(s.db, businessID, "purchase_order", order.ID)
 	}
 	return response
 }
 
 func (s *Service) invoiceResponse(businessID string, invoice PurchaseInvoice, includeItems bool) PurchaseInvoiceResponse {
 	branchName, supplierName := s.repo.NameLookups(businessID, invoice.BranchID, invoice.SupplierID)
-	response := PurchaseInvoiceResponse{ID: invoice.ID, BusinessID: invoice.BusinessID, BranchID: invoice.BranchID, BranchName: branchName, SupplierID: invoice.SupplierID, SupplierName: supplierName, PurchaseOrderID: invoice.PurchaseOrderID, InvoiceNumber: invoice.InvoiceNumber, InvoiceDate: invoice.InvoiceDate, DueDate: invoice.DueDate, Status: invoice.Status, PaymentStatus: invoice.PaymentStatus, SubtotalAmount: roundMoney(invoice.SubtotalAmount), TaxAmount: roundMoney(invoice.TaxAmount), DiscountAmount: roundMoney(invoice.DiscountAmount), TotalAmount: roundMoney(invoice.TotalAmount), PaidAmount: roundMoney(invoice.PaidAmount), BalanceAmount: roundMoney(invoice.BalanceAmount), ReturnedAmount: roundMoney(invoice.ReturnedAmount), CreditedAmount: roundMoney(invoice.CreditedAmount), ReturnStatus: invoice.ReturnStatus, JournalEntryID: invoice.JournalEntryID, Notes: invoice.Notes, CreatedAt: invoice.CreatedAt, UpdatedAt: invoice.UpdatedAt}
+	response := PurchaseInvoiceResponse{ID: invoice.ID, BusinessID: invoice.BusinessID, BranchID: invoice.BranchID, BranchName: branchName, SupplierID: invoice.SupplierID, SupplierName: supplierName, PurchaseOrderID: invoice.PurchaseOrderID, InvoiceNumber: invoice.InvoiceNumber, InvoiceDate: invoice.InvoiceDate, DueDate: invoice.DueDate, Status: invoice.Status, PaymentStatus: invoice.PaymentStatus, SubtotalAmount: roundMoney(invoice.SubtotalAmount), TaxAmount: roundMoney(invoice.TaxAmount), ChargeAmount: roundMoney(invoice.ChargeAmount), ChargeTaxAmount: roundMoney(invoice.ChargeTaxAmount), DiscountAmount: roundMoney(invoice.DiscountAmount), TotalAmount: roundMoney(invoice.TotalAmount), PaidAmount: roundMoney(invoice.PaidAmount), BalanceAmount: roundMoney(invoice.BalanceAmount), ReturnedAmount: roundMoney(invoice.ReturnedAmount), CreditedAmount: roundMoney(invoice.CreditedAmount), ReturnStatus: invoice.ReturnStatus, JournalEntryID: invoice.JournalEntryID, Notes: invoice.Notes, CreatedAt: invoice.CreatedAt, UpdatedAt: invoice.UpdatedAt}
 	if includeItems {
 		items, _ := s.repo.InvoiceItems(invoice.ID, businessID)
 		for _, item := range items {
 			response.Items = append(response.Items, PurchaseInvoiceItemResponse{ID: item.ID, ItemType: item.ItemType, ProductID: item.ProductID, IngredientID: item.IngredientID, PackagingItemID: item.PackagingItemID, ItemNameSnapshot: item.ItemNameSnapshot, Quantity: roundQuantity(item.Quantity), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), UnitCost: roundMoney(item.UnitCost), DiscountAmount: roundMoney(item.DiscountAmount), TaxRateID: item.TaxRateID, TaxAmount: roundMoney(item.TaxAmount), LineTotal: roundMoney(item.LineTotal), ExpiryDate: item.ExpiryDate, BatchNumber: item.BatchNumber})
 		}
+		response.Charges, _ = charges.ListChargeResponses(s.db, businessID, "purchase_invoice", invoice.ID)
 		payments, _ := s.repo.ListInvoicePayments(businessID, invoice.ID)
 		for i := range payments {
 			payments[i].Amount = roundMoney(payments[i].Amount)
@@ -1854,6 +2040,8 @@ func (s *Service) purchaseReturnResponse(businessID string, purchaseReturn Purch
 		Status:                  purchaseReturn.Status,
 		SubtotalAmount:          roundMoney(purchaseReturn.SubtotalAmount),
 		TaxAmount:               roundMoney(purchaseReturn.TaxAmount),
+		ChargeAmount:            roundMoney(purchaseReturn.ChargeAmount),
+		ChargeTaxAmount:         roundMoney(purchaseReturn.ChargeTaxAmount),
 		DiscountAmount:          roundMoney(purchaseReturn.DiscountAmount),
 		ReturnTotal:             roundMoney(purchaseReturn.ReturnTotal),
 		AppliedCreditAmount:     roundMoney(purchaseReturn.AppliedCreditAmount),
@@ -1894,6 +2082,7 @@ func (s *Service) purchaseReturnResponse(businessID string, purchaseReturn Purch
 				Reason:                item.Reason,
 			})
 		}
+		response.Charges, _ = charges.ListChargeResponses(s.db, businessID, "purchase_return", purchaseReturn.ID)
 	}
 	return response
 }
@@ -1912,12 +2101,13 @@ func (s *Service) purchaseReturnDocumentNumbers(businessID, invoiceID, receiptID
 
 func (s *Service) receiptResponse(businessID string, receipt PurchaseReceipt, includeItems bool) PurchaseReceiptResponse {
 	branchName, supplierName := s.repo.NameLookups(businessID, receipt.BranchID, receipt.SupplierID)
-	response := PurchaseReceiptResponse{ID: receipt.ID, BusinessID: receipt.BusinessID, BranchID: receipt.BranchID, BranchName: branchName, SupplierID: receipt.SupplierID, SupplierName: supplierName, PurchaseOrderID: receipt.PurchaseOrderID, PurchaseInvoiceID: receipt.PurchaseInvoiceID, ReceiptNumber: receipt.ReceiptNumber, ReceivedDate: receipt.ReceivedDate, Status: receipt.Status, JournalEntryID: receipt.JournalEntryID, ReceivedByUserID: receipt.ReceivedByUserID, Notes: receipt.Notes, CreatedAt: receipt.CreatedAt, UpdatedAt: receipt.UpdatedAt}
+	response := PurchaseReceiptResponse{ID: receipt.ID, BusinessID: receipt.BusinessID, BranchID: receipt.BranchID, BranchName: branchName, SupplierID: receipt.SupplierID, SupplierName: supplierName, PurchaseOrderID: receipt.PurchaseOrderID, PurchaseInvoiceID: receipt.PurchaseInvoiceID, ReceiptNumber: receipt.ReceiptNumber, ReceivedDate: receipt.ReceivedDate, Status: receipt.Status, ChargeAmount: roundMoney(receipt.ChargeAmount), ChargeTaxAmount: roundMoney(receipt.ChargeTaxAmount), JournalEntryID: receipt.JournalEntryID, ReceivedByUserID: receipt.ReceivedByUserID, Notes: receipt.Notes, CreatedAt: receipt.CreatedAt, UpdatedAt: receipt.UpdatedAt}
 	if includeItems {
 		items, _ := s.repo.ReceiptItems(receipt.ID, businessID)
 		for _, item := range items {
 			response.Items = append(response.Items, PurchaseReceiptItemResponse{ID: item.ID, ItemType: item.ItemType, ProductID: item.ProductID, IngredientID: item.IngredientID, PackagingItemID: item.PackagingItemID, InventoryItemID: item.InventoryItemID, QuantityReceived: roundQuantity(item.QuantityReceived), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), UnitCost: roundMoney(item.UnitCost), ExpiryDate: item.ExpiryDate, BatchNumber: item.BatchNumber, StockMovementID: item.StockMovementID})
 		}
+		response.Charges, _ = charges.ListChargeResponses(s.db, businessID, "purchase_receipt", receipt.ID)
 	}
 	return response
 }

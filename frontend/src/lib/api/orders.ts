@@ -1,4 +1,9 @@
 import { apiRequest } from "@/lib/api/client";
+import {
+  type BackendDocumentChargePayload,
+  parseDocumentCharges,
+  toBackendDocumentChargePayload,
+} from "@/lib/api/document-charges";
 import type {
   AddOrderPackagingPayload,
   AddOrderPaymentPayload,
@@ -36,6 +41,7 @@ type BackendOrderPayload = {
   delivery_time?: string;
   delivery_address?: string;
   items?: BackendOrderItemPayload[];
+  charges?: BackendDocumentChargePayload[];
   notes?: string;
 };
 
@@ -269,6 +275,9 @@ function parseOrder(value: unknown): BakeryOrder {
     subtotalAmount: numberValue(value.subtotal_amount),
     discountAmount: numberValue(value.discount_amount),
     taxAmount: numberValue(value.tax_amount),
+    chargeAmount: numberValue(value.charge_amount),
+    chargeTaxAmount: numberValue(value.charge_tax_amount),
+    charges: parseDocumentCharges(value.charges),
     totalAmount: numberValue(value.total_amount),
     paidAmount: numberValue(value.paid_amount),
     balanceAmount: numberValue(value.balance_amount),
@@ -456,6 +465,9 @@ function orderPayload(payload: CreateOrderPayload | UpdateOrderPayload): Backend
       ? { delivery_address: requestString(payload.deliveryAddress) }
       : {}),
     ...(payload.items !== undefined ? { items: payload.items.map(itemPayload) } : {}),
+    ...(payload.charges !== undefined
+      ? { charges: payload.charges.map(toBackendDocumentChargePayload) }
+      : {}),
     ...(payload.notes !== undefined ? { notes: requestString(payload.notes) } : {}),
   };
 }

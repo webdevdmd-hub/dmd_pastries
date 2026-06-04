@@ -26,6 +26,8 @@ type posSaleAccountingRow struct {
 	PaidAmount               float64
 	ChangeAmount             float64
 	TaxAmount                float64
+	ChargeAmount             float64
+	ChargeTaxAmount          float64
 	SaleStatus               string
 	AccountingJournalEntryID *string
 	COGSJournalEntryID       *string
@@ -54,6 +56,8 @@ type bakeryOrderAccountingRow struct {
 	PaidAmount               float64
 	BalanceAmount            float64
 	TaxAmount                float64
+	ChargeAmount             float64
+	ChargeTaxAmount          float64
 	OrderStatus              string
 	AccountingJournalEntryID *string
 }
@@ -83,6 +87,8 @@ type salesReturnAccountingRow struct {
 	ReturnNumber            string
 	ReturnDate              time.Time
 	TaxAmount               float64
+	ChargeAmount            float64
+	ChargeTaxAmount         float64
 	ReturnTotal             float64
 	RefundAmount            float64
 	RefundMode              string
@@ -104,6 +110,8 @@ type purchaseReturnAccountingRow struct {
 	ReturnNumber        string
 	ReturnDate          time.Time
 	TaxAmount           float64
+	ChargeAmount        float64
+	ChargeTaxAmount     float64
 	ReturnTotal         float64
 	Status              string
 	AppliedCreditAmount float64
@@ -112,16 +120,18 @@ type purchaseReturnAccountingRow struct {
 }
 
 type purchaseInvoiceAccountingRow struct {
-	ID             string
-	BusinessID     string
-	BranchID       string
-	InvoiceNumber  string
-	InvoiceDate    time.Time
-	Status         string
-	SubtotalAmount float64
-	TaxAmount      float64
-	TotalAmount    float64
-	JournalEntryID *string
+	ID              string
+	BusinessID      string
+	BranchID        string
+	InvoiceNumber   string
+	InvoiceDate     time.Time
+	Status          string
+	SubtotalAmount  float64
+	TaxAmount       float64
+	ChargeAmount    float64
+	ChargeTaxAmount float64
+	TotalAmount     float64
+	JournalEntryID  *string
 }
 
 type purchaseInvoiceItemAccountingRow struct {
@@ -159,6 +169,36 @@ type purchaseReceiptAccountingRow struct {
 	Status            string
 	PurchaseInvoiceID *string
 	JournalEntryID    *string
+}
+
+type stockMovementAccountingRow struct {
+	ID                       string
+	BusinessID               string
+	BranchID                 string
+	MovementType             string
+	MovementDirection        string
+	ReferenceType            string
+	ReferenceID              *string
+	ReferenceNumber          string
+	TotalCost                float64
+	AccountingJournalEntryID *string
+	CreatedAt                time.Time
+}
+
+type productionBatchAccountingRow struct {
+	ID                    string
+	BusinessID            string
+	BranchID              string
+	ProductionBatchNumber string
+	Status                string
+	CompletedAt           *time.Time
+}
+
+type documentChargeAccountingRow struct {
+	ChargeType  string
+	ChargeName  string
+	TaxAmount   float64
+	TotalAmount float64
 }
 
 func (r *Repository) Create(tx *gorm.DB, account *ChartAccount) error {
@@ -366,7 +406,7 @@ func (r *Repository) FindPostedJournalBySource(tx *gorm.DB, businessID, sourceTy
 func (r *Repository) FindPOSSaleForAccounting(tx *gorm.DB, businessID, saleID string) (*posSaleAccountingRow, error) {
 	var row posSaleAccountingRow
 	err := tx.Table("sales").
-		Select("id, business_id, branch_id, sale_number, total_amount, paid_amount, change_amount, tax_amount, sale_status, accounting_journal_entry_id, cogs_journal_entry_id, void_journal_entry_id, sold_at").
+		Select("id, business_id, branch_id, sale_number, total_amount, paid_amount, change_amount, tax_amount, charge_amount, charge_tax_amount, sale_status, accounting_journal_entry_id, cogs_journal_entry_id, void_journal_entry_id, sold_at").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, saleID).
 		Take(&row).Error
 	return &row, err
@@ -379,6 +419,40 @@ func (r *Repository) SumStockMovementCostByReference(tx *gorm.DB, businessID, re
 		Where("business_id = ? AND reference_type = ? AND reference_id = ? AND movement_direction = ? AND deleted_at IS NULL", businessID, referenceType, referenceID, movementDirection).
 		Scan(&total).Error
 	return total, err
+}
+
+func (r *Repository) SumStockMovementCostByReferenceAndType(tx *gorm.DB, businessID, referenceType, referenceID, movementType string) (float64, error) {
+	var total float64
+	err := tx.Table("stock_movements").
+		Select("COALESCE(SUM(total_cost), 0)").
+		Where("business_id = ? AND reference_type = ? AND reference_id = ? AND movement_type = ? AND deleted_at IS NULL", businessID, referenceType, referenceID, movementType).
+		Scan(&total).Error
+	return total, err
+}
+
+func (r *Repository) FindStockMovementForAccounting(tx *gorm.DB, businessID, movementID string) (*stockMovementAccountingRow, error) {
+	var row stockMovementAccountingRow
+	err := tx.Table("stock_movements").
+		Select("id, business_id, branch_id, movement_type, movement_direction, reference_type, reference_id, reference_number, total_cost, accounting_journal_entry_id, created_at").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, movementID).
+		Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) UpdateStockMovementJournalID(tx *gorm.DB, businessID, movementID, journalEntryID string) error {
+	return tx.Table("stock_movements").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, movementID).
+		Update("accounting_journal_entry_id", journalEntryID).Error
+}
+
+func (r *Repository) ListDocumentChargesForAccounting(tx *gorm.DB, businessID, documentType, documentID string) ([]documentChargeAccountingRow, error) {
+	var rows []documentChargeAccountingRow
+	err := tx.Table("document_charges").
+		Select("charge_type, charge_name, tax_amount, total_amount").
+		Where("business_id = ? AND document_type = ? AND document_id = ? AND deleted_at IS NULL", businessID, documentType, documentID).
+		Order("created_at ASC, id ASC").
+		Scan(&rows).Error
+	return rows, err
 }
 
 func (r *Repository) UpdateStockMovementJournalByReference(tx *gorm.DB, businessID, referenceType, referenceID, movementDirection, journalEntryID string) error {
@@ -416,7 +490,7 @@ func (r *Repository) UpdatePOSSaleVoidJournalID(tx *gorm.DB, businessID, saleID,
 func (r *Repository) FindPurchaseInvoiceForAccounting(tx *gorm.DB, businessID, invoiceID string) (*purchaseInvoiceAccountingRow, error) {
 	var row purchaseInvoiceAccountingRow
 	err := tx.Table("purchase_invoices").
-		Select("id, business_id, branch_id, invoice_number, invoice_date, status, subtotal_amount, tax_amount, total_amount, journal_entry_id").
+		Select("id, business_id, branch_id, invoice_number, invoice_date, status, subtotal_amount, tax_amount, charge_amount, charge_tax_amount, total_amount, journal_entry_id").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, invoiceID).
 		Take(&row).Error
 	return &row, err
@@ -507,6 +581,15 @@ func (r *Repository) UpdatePurchaseReceiptJournalID(tx *gorm.DB, businessID, rec
 	return nil
 }
 
+func (r *Repository) FindProductionBatchForAccounting(tx *gorm.DB, businessID, batchID string) (*productionBatchAccountingRow, error) {
+	var row productionBatchAccountingRow
+	err := tx.Table("production_batches").
+		Select("id, business_id, branch_id, production_batch_number, status, completed_at").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, batchID).
+		Take(&row).Error
+	return &row, err
+}
+
 func (r *Repository) ListPOSSalePaymentsForAccounting(tx *gorm.DB, businessID, saleID string) ([]posPaymentAccountingRow, error) {
 	var rows []posPaymentAccountingRow
 	err := tx.Table("sale_payments sp").
@@ -551,7 +634,7 @@ func (r *Repository) UpdatePOSSalePaymentJournalIDs(tx *gorm.DB, businessID, sal
 func (r *Repository) FindBakeryOrderForAccounting(tx *gorm.DB, businessID, orderID string) (*bakeryOrderAccountingRow, error) {
 	var row bakeryOrderAccountingRow
 	err := tx.Table("bakery_orders").
-		Select("id, business_id, branch_id, order_number, total_amount, paid_amount, balance_amount, tax_amount, order_status, accounting_journal_entry_id").
+		Select("id, business_id, branch_id, order_number, total_amount, paid_amount, balance_amount, tax_amount, charge_amount, charge_tax_amount, order_status, accounting_journal_entry_id").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, orderID).
 		Take(&row).Error
 	return &row, err
@@ -621,6 +704,8 @@ func (r *Repository) FindSalesReturnForAccounting(tx *gorm.DB, businessID, sales
 			sr.return_number,
 			sr.return_date,
 			sr.tax_amount,
+			sr.charge_amount,
+			sr.charge_tax_amount,
 			sr.return_total,
 			sr.refund_amount,
 			sr.refund_mode,
@@ -670,7 +755,7 @@ func (r *Repository) UpdateSalesReturnInventoryJournalID(tx *gorm.DB, businessID
 func (r *Repository) FindPurchaseReturnForAccounting(tx *gorm.DB, businessID, purchaseReturnID string) (*purchaseReturnAccountingRow, error) {
 	var row purchaseReturnAccountingRow
 	err := tx.Table("purchase_returns").
-		Select("id, business_id, branch_id, return_number, return_date, tax_amount, return_total, status, applied_credit_amount, open_credit_amount, journal_entry_id").
+		Select("id, business_id, branch_id, return_number, return_date, tax_amount, charge_amount, charge_tax_amount, return_total, status, applied_credit_amount, open_credit_amount, journal_entry_id").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, purchaseReturnID).
 		Take(&row).Error
 	return &row, err

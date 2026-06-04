@@ -1,6 +1,11 @@
 package pos
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+
+	"pastries-pos/internal/modules/charges"
+)
 
 type CheckoutRequest struct {
 	BranchID            string                   `json:"branch_id" binding:"required,uuid"`
@@ -8,6 +13,7 @@ type CheckoutRequest struct {
 	SalesChannelID      *string                  `json:"sales_channel_id" binding:"omitempty,uuid"`
 	ExternalOrderNumber string                   `json:"external_order_number"`
 	Items               []CheckoutItemRequest    `json:"items" binding:"required"`
+	Charges             []charges.ChargeInput    `json:"charges"`
 	SaleDiscountType    *string                  `json:"sale_discount_type"`
 	SaleDiscountValue   float64                  `json:"sale_discount_value"`
 	Payments            []CheckoutPaymentRequest `json:"payments"`
@@ -44,6 +50,7 @@ type HoldSaleRequest struct {
 	BranchID          string                `json:"branch_id" binding:"required,uuid"`
 	CustomerID        *string               `json:"customer_id" binding:"omitempty,uuid"`
 	Items             []HoldSaleItemRequest `json:"items" binding:"required"`
+	Charges           []charges.ChargeInput `json:"charges"`
 	SaleDiscountType  *string               `json:"sale_discount_type"`
 	SaleDiscountValue float64               `json:"sale_discount_value"`
 	Notes             string                `json:"notes"`
@@ -90,6 +97,104 @@ type POSProductQuery struct {
 	ProductType string
 	Page        int
 	Limit       int
+}
+
+type POSPaymentMethodResponse struct {
+	ID                        string  `json:"id"`
+	MethodName                string  `json:"method_name"`
+	MethodType                string  `json:"method_type"`
+	Status                    string  `json:"status"`
+	ShowInPOS                 bool    `json:"show_in_pos"`
+	AllowSplitPayment         bool    `json:"allow_split_payment"`
+	RequiresReference         bool    `json:"requires_reference"`
+	DefaultPaymentAccountID   string  `json:"default_payment_account_id"`
+	DefaultPaymentAccountName string  `json:"default_payment_account_name"`
+	BranchID                  *string `json:"branch_id"`
+	BranchName                string  `json:"branch_name"`
+}
+
+type POSReferenceDataResponse struct {
+	ProductCategories []POSProductCategoryOption `json:"product_categories"`
+	Units             []POSUnitOption            `json:"units"`
+	TaxRates          []POSTaxRateOption         `json:"tax_rates"`
+	SalesChannels     []POSSalesChannelOption    `json:"sales_channels"`
+	ReceiptLayouts    []POSReceiptLayoutOption   `json:"receipt_layouts"`
+}
+
+type POSProductCategoryOption struct {
+	ID               string    `json:"id"`
+	BusinessID       string    `json:"business_id"`
+	BranchID         string    `json:"branch_id"`
+	ParentCategoryID *string   `json:"parent_category_id"`
+	CategoryName     string    `json:"category_name"`
+	CategoryCode     string    `json:"category_code"`
+	Description      string    `json:"description"`
+	ImageFileID      string    `json:"image_file_id"`
+	SortOrder        int       `json:"sort_order"`
+	Status           string    `json:"status"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+type POSUnitOption struct {
+	ID               string    `json:"id"`
+	BusinessID       *string   `json:"business_id"`
+	UnitCategoryID   string    `json:"unit_category_id"`
+	UnitCategoryName string    `json:"unit_category_name"`
+	UnitName         string    `json:"unit_name"`
+	Symbol           string    `json:"symbol"`
+	BaseUnitID       *string   `json:"base_unit_id"`
+	ConversionFactor float64   `json:"conversion_factor"`
+	DecimalPrecision int       `json:"decimal_precision"`
+	IsSystemDefault  bool      `json:"is_system_default"`
+	Status           string    `json:"status"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+type POSTaxRateOption struct {
+	ID             string    `json:"id"`
+	BusinessID     string    `json:"business_id"`
+	TaxName        string    `json:"tax_name"`
+	TaxType        string    `json:"tax_type"`
+	RatePercentage float64   `json:"rate_percentage"`
+	IsInclusive    bool      `json:"is_inclusive"`
+	Country        string    `json:"country"`
+	Region         string    `json:"region"`
+	IsDefault      bool      `json:"is_default"`
+	Status         string    `json:"status"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type POSSalesChannelOption struct {
+	ID                          string    `json:"id"`
+	BusinessID                  string    `json:"business_id"`
+	ChannelName                 string    `json:"channel_name"`
+	ChannelType                 string    `json:"channel_type"`
+	RequiresExternalOrderNumber bool      `json:"requires_external_order_number"`
+	DefaultPaymentMethodID      *string   `json:"default_payment_method_id"`
+	DefaultPaymentMethodName    string    `json:"default_payment_method_name"`
+	CommissionRate              *float64  `json:"commission_rate"`
+	IsDefault                   bool      `json:"is_default"`
+	Status                      string    `json:"status"`
+	CreatedAt                   time.Time `json:"created_at"`
+	UpdatedAt                   time.Time `json:"updated_at"`
+}
+
+type POSReceiptLayoutOption struct {
+	ID           string          `json:"id"`
+	BusinessID   string          `json:"business_id"`
+	BranchID     *string         `json:"branch_id"`
+	LayoutName   string          `json:"layout_name"`
+	ReceiptType  string          `json:"receipt_type"`
+	PrinterType  string          `json:"printer_type"`
+	CounterID    string          `json:"counter_id"`
+	IsDefault    bool            `json:"is_default"`
+	Status       string          `json:"status"`
+	LayoutConfig json.RawMessage `json:"layout_config"`
+	CreatedAt    time.Time       `json:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at"`
 }
 
 type PaginatedResponse[T any] struct {
@@ -160,40 +265,43 @@ type TaxRateInfo struct {
 }
 
 type SaleResponse struct {
-	ID                       string                `json:"id"`
-	BusinessID               string                `json:"business_id"`
-	BranchID                 string                `json:"branch_id"`
-	BranchName               string                `json:"branch_name"`
-	CashierUserID            string                `json:"cashier_user_id"`
-	CashierName              string                `json:"cashier_name"`
-	CustomerID               *string               `json:"customer_id"`
-	CustomerName             string                `json:"customer_name"`
-	CustomerPhone            string                `json:"customer_phone"`
-	SalesChannelID           *string               `json:"sales_channel_id"`
-	SalesChannelNameSnapshot string                `json:"sales_channel_name_snapshot"`
-	ExternalOrderNumber      string                `json:"external_order_number"`
-	SaleNumber               string                `json:"sale_number"`
-	SubtotalAmount           float64               `json:"subtotal_amount"`
-	DiscountType             *string               `json:"discount_type"`
-	DiscountValue            float64               `json:"discount_value"`
-	DiscountAmount           float64               `json:"discount_amount"`
-	TaxableAmount            float64               `json:"taxable_amount"`
-	TaxAmount                float64               `json:"tax_amount"`
-	TotalAmount              float64               `json:"total_amount"`
-	PaidAmount               float64               `json:"paid_amount"`
-	ChangeAmount             float64               `json:"change_amount"`
-	PaymentStatus            string                `json:"payment_status"`
-	SaleStatus               string                `json:"sale_status"`
-	AccountingJournalEntryID *string               `json:"accounting_journal_entry_id"`
-	Notes                    string                `json:"notes"`
-	SoldAt                   time.Time             `json:"sold_at"`
-	Items                    []SaleItemResponse    `json:"items,omitempty"`
-	Payments                 []SalePaymentResponse `json:"payments,omitempty"`
-	Refunds                  []SaleRefundResponse  `json:"refunds,omitempty"`
-	Void                     *SaleVoidResponse     `json:"void,omitempty"`
-	Receipt                  *ReceiptReadyResponse `json:"receipt,omitempty"`
-	CreatedAt                time.Time             `json:"created_at"`
-	UpdatedAt                time.Time             `json:"updated_at"`
+	ID                       string                   `json:"id"`
+	BusinessID               string                   `json:"business_id"`
+	BranchID                 string                   `json:"branch_id"`
+	BranchName               string                   `json:"branch_name"`
+	CashierUserID            string                   `json:"cashier_user_id"`
+	CashierName              string                   `json:"cashier_name"`
+	CustomerID               *string                  `json:"customer_id"`
+	CustomerName             string                   `json:"customer_name"`
+	CustomerPhone            string                   `json:"customer_phone"`
+	SalesChannelID           *string                  `json:"sales_channel_id"`
+	SalesChannelNameSnapshot string                   `json:"sales_channel_name_snapshot"`
+	ExternalOrderNumber      string                   `json:"external_order_number"`
+	SaleNumber               string                   `json:"sale_number"`
+	SubtotalAmount           float64                  `json:"subtotal_amount"`
+	DiscountType             *string                  `json:"discount_type"`
+	DiscountValue            float64                  `json:"discount_value"`
+	DiscountAmount           float64                  `json:"discount_amount"`
+	TaxableAmount            float64                  `json:"taxable_amount"`
+	TaxAmount                float64                  `json:"tax_amount"`
+	ChargeAmount             float64                  `json:"charge_amount"`
+	ChargeTaxAmount          float64                  `json:"charge_tax_amount"`
+	TotalAmount              float64                  `json:"total_amount"`
+	PaidAmount               float64                  `json:"paid_amount"`
+	ChangeAmount             float64                  `json:"change_amount"`
+	PaymentStatus            string                   `json:"payment_status"`
+	SaleStatus               string                   `json:"sale_status"`
+	AccountingJournalEntryID *string                  `json:"accounting_journal_entry_id"`
+	Notes                    string                   `json:"notes"`
+	SoldAt                   time.Time                `json:"sold_at"`
+	Items                    []SaleItemResponse       `json:"items,omitempty"`
+	Payments                 []SalePaymentResponse    `json:"payments,omitempty"`
+	Refunds                  []SaleRefundResponse     `json:"refunds,omitempty"`
+	Charges                  []charges.ChargeResponse `json:"charges,omitempty"`
+	Void                     *SaleVoidResponse        `json:"void,omitempty"`
+	Receipt                  *ReceiptReadyResponse    `json:"receipt,omitempty"`
+	CreatedAt                time.Time                `json:"created_at"`
+	UpdatedAt                time.Time                `json:"updated_at"`
 }
 
 type SaleSummaryResponse struct {
@@ -208,6 +316,8 @@ type SaleSummaryResponse struct {
 	SalesChannelID           *string   `json:"sales_channel_id"`
 	SalesChannelNameSnapshot string    `json:"sales_channel_name_snapshot"`
 	ExternalOrderNumber      string    `json:"external_order_number"`
+	ChargeAmount             float64   `json:"charge_amount"`
+	ChargeTaxAmount          float64   `json:"charge_tax_amount"`
 	TotalAmount              float64   `json:"total_amount"`
 	PaidAmount               float64   `json:"paid_amount"`
 	PaymentStatus            string    `json:"payment_status"`
@@ -267,50 +377,56 @@ type SaleVoidResponse struct {
 }
 
 type ReceiptReadyResponse struct {
-	BusinessName  string                `json:"business_name"`
-	BranchName    string                `json:"branch_name"`
-	VATNumber     string                `json:"vat_number"`
-	ReceiptFooter string                `json:"receipt_footer"`
-	SaleNumber    string                `json:"sale_number"`
-	SoldAt        time.Time             `json:"sold_at"`
-	CashierName   string                `json:"cashier_name"`
-	CustomerID    *string               `json:"customer_id"`
-	CustomerName  string                `json:"customer_name"`
-	CustomerPhone string                `json:"customer_phone"`
-	Items         []SaleItemResponse    `json:"items"`
-	Subtotal      float64               `json:"subtotal"`
-	Discount      float64               `json:"discount"`
-	TaxAmount     float64               `json:"tax_amount"`
-	Total         float64               `json:"total"`
-	Payments      []SalePaymentResponse `json:"payments"`
-	PaidAmount    float64               `json:"paid_amount"`
-	ChangeAmount  float64               `json:"change_amount"`
-	QRPlaceholder string                `json:"qr_placeholder"`
+	BusinessName    string                   `json:"business_name"`
+	BranchName      string                   `json:"branch_name"`
+	VATNumber       string                   `json:"vat_number"`
+	ReceiptFooter   string                   `json:"receipt_footer"`
+	SaleNumber      string                   `json:"sale_number"`
+	SoldAt          time.Time                `json:"sold_at"`
+	CashierName     string                   `json:"cashier_name"`
+	CustomerID      *string                  `json:"customer_id"`
+	CustomerName    string                   `json:"customer_name"`
+	CustomerPhone   string                   `json:"customer_phone"`
+	Items           []SaleItemResponse       `json:"items"`
+	Subtotal        float64                  `json:"subtotal"`
+	Discount        float64                  `json:"discount"`
+	TaxAmount       float64                  `json:"tax_amount"`
+	ChargeAmount    float64                  `json:"charge_amount"`
+	ChargeTaxAmount float64                  `json:"charge_tax_amount"`
+	Total           float64                  `json:"total"`
+	Charges         []charges.ChargeResponse `json:"charges"`
+	Payments        []SalePaymentResponse    `json:"payments"`
+	PaidAmount      float64                  `json:"paid_amount"`
+	ChangeAmount    float64                  `json:"change_amount"`
+	QRPlaceholder   string                   `json:"qr_placeholder"`
 }
 
 type HeldSaleResponse struct {
-	ID                      string                 `json:"id"`
-	BusinessID              string                 `json:"business_id"`
-	BranchID                string                 `json:"branch_id"`
-	BranchName              string                 `json:"branch_name"`
-	CashierUserID           string                 `json:"cashier_user_id"`
-	CashierName             string                 `json:"cashier_name"`
-	CustomerID              *string                `json:"customer_id"`
-	HoldNumber              string                 `json:"hold_number"`
-	ItemCount               int                    `json:"item_count"`
-	EstimatedSubtotal       float64                `json:"estimated_subtotal"`
-	EstimatedDiscountAmount float64                `json:"estimated_discount_amount"`
-	EstimatedTaxAmount      float64                `json:"estimated_tax_amount"`
-	EstimatedTotal          float64                `json:"estimated_total"`
-	Status                  string                 `json:"status"`
-	Notes                   string                 `json:"notes"`
-	HeldAt                  time.Time              `json:"held_at"`
-	ResumedAt               *time.Time             `json:"resumed_at"`
-	CancelledAt             *time.Time             `json:"cancelled_at"`
-	ExpiresAt               *time.Time             `json:"expires_at"`
-	Items                   []HeldSaleItemResponse `json:"items,omitempty" gorm:"-"`
-	CreatedAt               time.Time              `json:"created_at"`
-	UpdatedAt               time.Time              `json:"updated_at"`
+	ID                       string                   `json:"id"`
+	BusinessID               string                   `json:"business_id"`
+	BranchID                 string                   `json:"branch_id"`
+	BranchName               string                   `json:"branch_name"`
+	CashierUserID            string                   `json:"cashier_user_id"`
+	CashierName              string                   `json:"cashier_name"`
+	CustomerID               *string                  `json:"customer_id"`
+	HoldNumber               string                   `json:"hold_number"`
+	ItemCount                int                      `json:"item_count"`
+	EstimatedSubtotal        float64                  `json:"estimated_subtotal"`
+	EstimatedDiscountAmount  float64                  `json:"estimated_discount_amount"`
+	EstimatedTaxAmount       float64                  `json:"estimated_tax_amount"`
+	EstimatedChargeAmount    float64                  `json:"estimated_charge_amount"`
+	EstimatedChargeTaxAmount float64                  `json:"estimated_charge_tax_amount"`
+	EstimatedTotal           float64                  `json:"estimated_total"`
+	Status                   string                   `json:"status"`
+	Notes                    string                   `json:"notes"`
+	HeldAt                   time.Time                `json:"held_at"`
+	ResumedAt                *time.Time               `json:"resumed_at"`
+	CancelledAt              *time.Time               `json:"cancelled_at"`
+	ExpiresAt                *time.Time               `json:"expires_at"`
+	Items                    []HeldSaleItemResponse   `json:"items,omitempty" gorm:"-"`
+	Charges                  []charges.ChargeResponse `json:"charges,omitempty" gorm:"-"`
+	CreatedAt                time.Time                `json:"created_at"`
+	UpdatedAt                time.Time                `json:"updated_at"`
 }
 
 type HeldSaleItemResponse struct {

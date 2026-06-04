@@ -137,10 +137,10 @@ func main() {
 	productHandler := products.NewHandler(productService)
 	productVariantService := productvariants.NewService(db, productVariantRepo, auditRepo)
 	productVariantHandler := productvariants.NewHandler(productVariantService)
-	inventoryService := inventory.NewService(db, inventoryRepo, auditRepo)
-	inventoryHandler := inventory.NewHandler(inventoryService)
 	accountingService := accounting.NewService(db, accountingRepo, auditRepo)
 	accountingHandler := accounting.NewHandler(accountingService)
+	inventoryService := inventory.NewService(db, inventoryRepo, auditRepo, accountingService)
+	inventoryHandler := inventory.NewHandler(inventoryService)
 	posService := pos.NewService(db, posRepo, inventoryService, auditRepo, accountingService)
 	posHandler := pos.NewHandler(posService)
 	paymentService := payments.NewService(db, paymentRepo, auditRepo)
@@ -149,7 +149,7 @@ func main() {
 	customerHandler := customers.NewHandler(customerService)
 	ingredientService := ingredients.NewService(db, ingredientRepo, inventoryRepo, auditRepo)
 	ingredientHandler := ingredients.NewHandler(ingredientService)
-	manufacturingService := manufacturing.NewService(db, manufacturingRepo, inventoryRepo, inventoryService, auditRepo)
+	manufacturingService := manufacturing.NewService(db, manufacturingRepo, inventoryRepo, inventoryService, auditRepo, accountingService)
 	manufacturingHandler := manufacturing.NewHandler(manufacturingService)
 	supplierService := suppliers.NewService(db, supplierRepo, auditRepo)
 	supplierHandler := suppliers.NewHandler(supplierService)
@@ -249,6 +249,7 @@ func main() {
 		posHandler,
 		authMiddleware.RequireAuth(),
 		permit("pos.view"),
+		permit("pos.view", "pos.sell", "pos.checkout"),
 		permit("pos.sell", "pos.checkout", "pos.hold_sale", "pos.resume_sale", "pos.cancel_held_sale"),
 		permit("pos.refund"),
 		permit("pos.void", "pos.refund"),

@@ -1,7 +1,10 @@
 import { ApiError, apiRequest } from "@/lib/api/client";
-import { getProductCategories } from "@/lib/api/master-data";
-import { getPaymentMethods as getSettingsPaymentMethods } from "@/lib/api/settings-data";
-import type { ProductCategory } from "@/types/master-data";
+import {
+  type BackendDocumentChargePayload,
+  parseDocumentCharges,
+  toBackendDocumentChargePayload,
+} from "@/lib/api/document-charges";
+import type { ProductCategory, Unit } from "@/types/master-data";
 import type {
   CartDiscountType,
   CartItem,
@@ -16,10 +19,19 @@ import type {
   POSProduct,
   POSProductFilters,
   POSProductVariant,
+  POSReferenceData,
   SaleReceipt,
 } from "@/types/pos";
 import type { ProductType } from "@/types/product";
-import type { PaymentMethod, RecordStatus } from "@/types/settings";
+import type {
+  PaymentMethod,
+  ReceiptLayout,
+  ReceiptLayoutConfig,
+  ReceiptLayoutType,
+  RecordStatus,
+  SalesChannel,
+  TaxRate,
+} from "@/types/settings";
 
 type BackendPOSProductVariant = {
   id?: string;
@@ -46,8 +58,10 @@ type BackendPOSProduct = {
   category_id?: string | null;
   category?: string | { id?: string; category_name?: string } | null;
   category_name?: string;
+  unit_id?: string | null;
   unit?: string | { unit_name?: string; symbol?: string } | null;
   unit_name?: string;
+  tax_rate_id?: string | null;
   tax_rate?: string | { tax_name?: string; rate_percentage?: number } | null;
   tax_rate_name?: string | null;
   tax_rate_percentage?: number;
@@ -72,6 +86,112 @@ type BackendPaymentPayload = {
   reference_number: string | null;
 };
 
+type BackendPOSPaymentMethod = {
+  id?: string;
+  business_id?: string;
+  method_name?: string;
+  method_type?: string;
+  status?: string;
+  show_in_pos?: boolean;
+  allow_split_payment?: boolean;
+  requires_reference?: boolean;
+  is_default?: boolean;
+  show_in_bakery_orders?: boolean;
+  show_in_purchasing?: boolean;
+  show_in_expenses?: boolean;
+  show_in_dashboard_collection?: boolean;
+  default_payment_account_id?: string | null;
+  default_payment_account_name?: string | null;
+  branch_id?: string | null;
+  branch_name?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type BackendPOSProductCategory = {
+  id?: string;
+  business_id?: string;
+  parent_category_id?: string | null;
+  category_name?: string;
+  category_code?: string;
+  description?: string;
+  image_url?: string | null;
+  sort_order?: number;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type BackendPOSUnit = {
+  id?: string;
+  business_id?: string | null;
+  unit_category_id?: string;
+  unit_category_name?: string;
+  unit_name?: string;
+  symbol?: string;
+  base_unit_id?: string | null;
+  conversion_factor?: number;
+  decimal_precision?: number;
+  is_system_default?: boolean;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type BackendPOSTaxRate = {
+  id?: string;
+  business_id?: string;
+  tax_name?: string;
+  tax_type?: string;
+  rate_percentage?: number;
+  is_inclusive?: boolean;
+  country?: string;
+  region?: string;
+  is_default?: boolean;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type BackendPOSSalesChannel = {
+  id?: string;
+  business_id?: string;
+  channel_name?: string;
+  channel_type?: string;
+  requires_external_order_number?: boolean;
+  default_payment_method_id?: string | null;
+  default_payment_method_name?: string;
+  commission_rate?: number | null;
+  is_default?: boolean;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type BackendPOSReceiptLayout = {
+  id?: string;
+  business_id?: string;
+  branch_id?: string | null;
+  branch_name?: string | null;
+  layout_name?: string;
+  receipt_type?: string;
+  printer_type?: string | null;
+  counter_id?: string | null;
+  is_default?: boolean;
+  status?: string;
+  layout_config?: unknown;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type BackendPOSReferenceData = {
+  product_categories?: unknown;
+  units?: unknown;
+  tax_rates?: unknown;
+  sales_channels?: unknown;
+  receipt_layouts?: unknown;
+};
+
 type BackendCheckoutPayload = {
   branch_id: string;
   customer_id: string | null;
@@ -86,6 +206,7 @@ type BackendCheckoutPayload = {
   sale_discount_type: string | null;
   sale_discount_value: number | null;
   payments: BackendPaymentPayload[];
+  charges: BackendDocumentChargePayload[];
   sales_channel_id: string | null;
   external_order_number: string | null;
   notes: string | null;
@@ -117,6 +238,9 @@ type BackendReceipt = {
   subtotal?: number;
   discount_amount?: number;
   tax_amount?: number;
+  charge_amount?: number;
+  charge_tax_amount?: number;
+  charges?: unknown;
   total?: number;
   payments?: unknown;
   paid_amount?: number;
@@ -170,6 +294,8 @@ type BackendHeldSale = {
   subtotal?: number;
   discount_amount?: number;
   tax_amount?: number;
+  charge_amount?: number;
+  charge_tax_amount?: number;
   total?: number;
   estimated_subtotal?: number;
   estimated_discount_amount?: number;
@@ -177,6 +303,7 @@ type BackendHeldSale = {
   estimated_total?: number;
   sale_discount_type?: string | null;
   sale_discount_value?: number | null;
+  charges?: unknown;
   status?: string;
   notes?: string | null;
   held_at?: string;
@@ -203,6 +330,7 @@ type BackendHoldSalePayload = {
   }[];
   sale_discount_type: string | null;
   sale_discount_value: number | null;
+  charges: BackendDocumentChargePayload[];
   estimated_subtotal: number;
   estimated_discount_amount: number;
   estimated_tax_amount: number;
@@ -230,8 +358,92 @@ function optionalNumber(value: unknown): number | null {
   return typeof value === "number" ? value : null;
 }
 
+function optionalBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
 function isRecordStatus(value: unknown): value is RecordStatus {
   return value === "active" || value === "inactive";
+}
+
+function isReceiptLayoutType(value: unknown): value is ReceiptLayoutType {
+  return value === "58mm" || value === "80mm" || value === "a4" || value === "custom";
+}
+
+const defaultReceiptLayoutConfig: ReceiptLayoutConfig = {
+  showLogo: true,
+  showBusinessName: true,
+  showBranchName: true,
+  showAddress: true,
+  showPhone: true,
+  showTaxNumber: true,
+  showCashier: true,
+  showCustomer: true,
+  showUnitPrice: true,
+  showDiscount: true,
+  showTax: true,
+  showPaymentMethod: true,
+  showQrCode: false,
+  fontSize: "medium",
+  alignment: "center",
+  spacing: "normal",
+  footerMessage: "Thank you for your purchase.",
+  termsText: "",
+};
+
+type ReceiptLayoutBooleanConfigKey = {
+  [TKey in keyof ReceiptLayoutConfig]: ReceiptLayoutConfig[TKey] extends boolean ? TKey : never;
+}[keyof ReceiptLayoutConfig];
+
+function booleanReceiptConfigField(
+  value: Record<string, unknown>,
+  key: ReceiptLayoutBooleanConfigKey,
+): boolean {
+  return typeof value[key] === "boolean" ? value[key] : defaultReceiptLayoutConfig[key];
+}
+
+function parseReceiptLayoutConfig(value: unknown): ReceiptLayoutConfig {
+  if (!isObject(value)) {
+    return defaultReceiptLayoutConfig;
+  }
+
+  const fontSize =
+    value.fontSize === "small" || value.fontSize === "medium" || value.fontSize === "large"
+      ? value.fontSize
+      : defaultReceiptLayoutConfig.fontSize;
+  const alignment =
+    value.alignment === "left" || value.alignment === "center"
+      ? value.alignment
+      : defaultReceiptLayoutConfig.alignment;
+  const spacing =
+    value.spacing === "compact" || value.spacing === "normal" || value.spacing === "relaxed"
+      ? value.spacing
+      : defaultReceiptLayoutConfig.spacing;
+
+  return {
+    showLogo: booleanReceiptConfigField(value, "showLogo"),
+    showBusinessName: booleanReceiptConfigField(value, "showBusinessName"),
+    showBranchName: booleanReceiptConfigField(value, "showBranchName"),
+    showAddress: booleanReceiptConfigField(value, "showAddress"),
+    showPhone: booleanReceiptConfigField(value, "showPhone"),
+    showTaxNumber: booleanReceiptConfigField(value, "showTaxNumber"),
+    showCashier: booleanReceiptConfigField(value, "showCashier"),
+    showCustomer: booleanReceiptConfigField(value, "showCustomer"),
+    showUnitPrice: booleanReceiptConfigField(value, "showUnitPrice"),
+    showDiscount: booleanReceiptConfigField(value, "showDiscount"),
+    showTax: booleanReceiptConfigField(value, "showTax"),
+    showPaymentMethod: booleanReceiptConfigField(value, "showPaymentMethod"),
+    showQrCode: booleanReceiptConfigField(value, "showQrCode"),
+    fontSize,
+    alignment,
+    spacing,
+    footerMessage:
+      typeof value.footerMessage === "string"
+        ? value.footerMessage
+        : defaultReceiptLayoutConfig.footerMessage,
+    termsText:
+      typeof value.termsText === "string" ? value.termsText : defaultReceiptLayoutConfig.termsText,
+  };
 }
 
 function isProductType(value: unknown): value is ProductType {
@@ -368,7 +580,9 @@ function parseProduct(value: unknown): POSProduct {
     barcode: optionalString(product.barcode),
     categoryId: getCategoryId(product),
     categoryName: getCategoryName(product),
+    unitId: optionalString(product.unit_id),
     unitName: getUnitName(product),
+    taxRateId: optionalString(product.tax_rate_id),
     taxRateName: getTaxRateName(product),
     taxRatePercentage: getTaxRatePercentage(product),
     productType: isProductType(product.product_type) ? product.product_type : "ready_to_sell",
@@ -398,6 +612,196 @@ function parseProductList(value: unknown): POSProduct[] {
   }
 
   throw new Error("Backend POS products payload is invalid.");
+}
+
+function parsePOSPaymentMethod(value: unknown): PaymentMethod {
+  if (!isObject(value)) {
+    throw new Error("Backend POS payment method payload is invalid.");
+  }
+
+  const method = value as BackendPOSPaymentMethod;
+
+  return {
+    id: requiredString(method.id),
+    businessId: requiredString(method.business_id),
+    methodName: requiredString(method.method_name, "Payment method"),
+    methodType: requiredString(method.method_type, "other"),
+    isDefault: optionalBoolean(method.is_default, false),
+    allowSplitPayment: optionalBoolean(method.allow_split_payment, true),
+    requiresReference: optionalBoolean(method.requires_reference, false),
+    showInPos: optionalBoolean(method.show_in_pos, true),
+    showInBakeryOrders: optionalBoolean(method.show_in_bakery_orders, false),
+    showInPurchasing: optionalBoolean(method.show_in_purchasing, false),
+    showInExpenses: optionalBoolean(method.show_in_expenses, false),
+    showInDashboardCollection: optionalBoolean(method.show_in_dashboard_collection, false),
+    defaultPaymentAccountId: optionalString(method.default_payment_account_id),
+    defaultPaymentAccountName: requiredString(method.default_payment_account_name),
+    status: isRecordStatus(method.status) ? method.status : "active",
+    createdAt: requiredString(method.created_at),
+    updatedAt: requiredString(method.updated_at),
+  };
+}
+
+function parsePOSPaymentMethodList(value: unknown): PaymentMethod[] {
+  if (Array.isArray(value)) {
+    return value.map(parsePOSPaymentMethod);
+  }
+
+  if (isObject(value) && Array.isArray(value.items)) {
+    return value.items.map(parsePOSPaymentMethod);
+  }
+
+  if (isObject(value) && Array.isArray(value.data)) {
+    return value.data.map(parsePOSPaymentMethod);
+  }
+
+  throw new Error("Backend POS payment methods payload is invalid.");
+}
+
+function parsePOSProductCategory(value: unknown): ProductCategory {
+  if (!isObject(value)) {
+    throw new Error("Backend POS product category payload is invalid.");
+  }
+
+  const category = value as BackendPOSProductCategory;
+
+  return {
+    id: requiredString(category.id),
+    businessId: requiredString(category.business_id),
+    parentCategoryId: optionalString(category.parent_category_id),
+    categoryName: requiredString(category.category_name, "Category"),
+    categoryCode: requiredString(category.category_code),
+    description: requiredString(category.description),
+    imageUrl: requiredString(category.image_url),
+    sortOrder: requiredNumber(category.sort_order),
+    status: isRecordStatus(category.status) ? category.status : "active",
+    createdAt: requiredString(category.created_at),
+    updatedAt: requiredString(category.updated_at),
+  };
+}
+
+function parsePOSUnit(value: unknown): Unit {
+  if (!isObject(value)) {
+    throw new Error("Backend POS unit payload is invalid.");
+  }
+
+  const unit = value as BackendPOSUnit;
+  const unitCategoryId = requiredString(unit.unit_category_id);
+
+  return {
+    id: requiredString(unit.id),
+    businessId: optionalString(unit.business_id),
+    unitCategoryId,
+    unitCategory: {
+      id: unitCategoryId,
+      name: requiredString(unit.unit_category_name),
+      description: "",
+      createdAt: "",
+      updatedAt: "",
+    },
+    unitName: requiredString(unit.unit_name, "Unit"),
+    symbol: requiredString(unit.symbol),
+    baseUnitId: optionalString(unit.base_unit_id),
+    conversionFactor: requiredNumber(unit.conversion_factor, 1),
+    decimalPrecision: requiredNumber(unit.decimal_precision),
+    isSystemDefault: optionalBoolean(unit.is_system_default, false),
+    status: isRecordStatus(unit.status) ? unit.status : "active",
+    createdAt: requiredString(unit.created_at),
+    updatedAt: requiredString(unit.updated_at),
+  };
+}
+
+function parsePOSTaxRate(value: unknown): TaxRate {
+  if (!isObject(value)) {
+    throw new Error("Backend POS tax rate payload is invalid.");
+  }
+
+  const taxRate = value as BackendPOSTaxRate;
+
+  return {
+    id: requiredString(taxRate.id),
+    businessId: requiredString(taxRate.business_id),
+    taxName: requiredString(taxRate.tax_name, "Tax rate"),
+    taxType: requiredString(taxRate.tax_type),
+    ratePercentage: requiredNumber(taxRate.rate_percentage),
+    isInclusive: optionalBoolean(taxRate.is_inclusive, false),
+    country: requiredString(taxRate.country),
+    region: requiredString(taxRate.region),
+    isDefault: optionalBoolean(taxRate.is_default, false),
+    status: isRecordStatus(taxRate.status) ? taxRate.status : "active",
+    createdAt: requiredString(taxRate.created_at),
+    updatedAt: requiredString(taxRate.updated_at),
+  };
+}
+
+function parsePOSSalesChannel(value: unknown): SalesChannel {
+  if (!isObject(value)) {
+    throw new Error("Backend POS sales channel payload is invalid.");
+  }
+
+  const channel = value as BackendPOSSalesChannel;
+
+  return {
+    id: requiredString(channel.id),
+    businessId: requiredString(channel.business_id),
+    channelName: requiredString(channel.channel_name, "Sales channel"),
+    channelType: requiredString(channel.channel_type, "other"),
+    requiresExternalOrderNumber: optionalBoolean(channel.requires_external_order_number, false),
+    defaultPaymentMethodId: optionalString(channel.default_payment_method_id),
+    defaultPaymentMethodName: requiredString(channel.default_payment_method_name),
+    commissionRate: optionalNumber(channel.commission_rate),
+    isDefault: optionalBoolean(channel.is_default, false),
+    status: isRecordStatus(channel.status) ? channel.status : "active",
+    createdAt: requiredString(channel.created_at),
+    updatedAt: requiredString(channel.updated_at),
+  };
+}
+
+function parsePOSReceiptLayout(value: unknown): ReceiptLayout {
+  if (!isObject(value)) {
+    throw new Error("Backend POS receipt layout payload is invalid.");
+  }
+
+  const layout = value as BackendPOSReceiptLayout;
+  const receiptType = isReceiptLayoutType(layout.receipt_type) ? layout.receipt_type : "80mm";
+
+  return {
+    id: requiredString(layout.id),
+    businessId: requiredString(layout.business_id),
+    branchId: optionalString(layout.branch_id),
+    branchName: optionalString(layout.branch_name),
+    layoutName: requiredString(layout.layout_name, "Receipt layout"),
+    receiptType,
+    printerType: optionalString(layout.printer_type),
+    counterId: optionalString(layout.counter_id),
+    isDefault: optionalBoolean(layout.is_default, false),
+    status: isRecordStatus(layout.status) ? layout.status : "active",
+    layoutConfig: parseReceiptLayoutConfig(layout.layout_config),
+    createdAt: requiredString(layout.created_at),
+    updatedAt: requiredString(layout.updated_at),
+  };
+}
+
+function parsePOSReferenceData(value: unknown): POSReferenceData {
+  if (!isObject(value)) {
+    throw new Error("Backend POS reference data payload is invalid.");
+  }
+
+  const reference = value as BackendPOSReferenceData;
+
+  return {
+    productCategories: Array.isArray(reference.product_categories)
+      ? reference.product_categories.map(parsePOSProductCategory)
+      : [],
+    units: Array.isArray(reference.units) ? reference.units.map(parsePOSUnit) : [],
+    taxRates: Array.isArray(reference.tax_rates) ? reference.tax_rates.map(parsePOSTaxRate) : [],
+    salesChannels: Array.isArray(reference.sales_channels)
+      ? reference.sales_channels.map(parsePOSSalesChannel)
+      : [],
+    receiptLayouts: Array.isArray(reference.receipt_layouts)
+      ? reference.receipt_layouts.map(parsePOSReceiptLayout)
+      : [],
+  };
 }
 
 function parseLookupProduct(value: unknown): {
@@ -472,6 +876,7 @@ function toBackendCheckoutPayload(payload: CheckoutPayload): BackendCheckoutPayl
       amount: payment.amount,
       reference_number: payment.referenceNumber,
     })),
+    charges: payload.charges.map(toBackendDocumentChargePayload),
     sales_channel_id: payload.salesChannelId,
     external_order_number: payload.externalOrderNumber,
     notes: payload.notes,
@@ -555,6 +960,9 @@ function parseReceipt(value: unknown): SaleReceipt {
     subtotal: requiredNumber(receipt.subtotal),
     discountAmount: requiredNumber(receipt.discount_amount),
     taxAmount: requiredNumber(receipt.tax_amount),
+    chargeAmount: requiredNumber(receipt.charge_amount),
+    chargeTaxAmount: requiredNumber(receipt.charge_tax_amount),
+    charges: parseDocumentCharges(receipt.charges),
     total,
     payments: payments.map(parsePayment),
     paidAmount,
@@ -600,6 +1008,7 @@ function toBackendHoldSalePayload(payload: HoldSalePayload): BackendHoldSalePayl
     })),
     sale_discount_type: payload.saleDiscountType,
     sale_discount_value: payload.saleDiscountValue,
+    charges: payload.charges.map(toBackendDocumentChargePayload),
     estimated_subtotal: payload.totals.subtotal,
     estimated_discount_amount: payload.totals.discountAmount,
     estimated_tax_amount: payload.totals.taxAmount,
@@ -625,6 +1034,8 @@ function parseHeldSale(value: unknown): HeldSale {
     subtotal: requiredNumber(heldSale.subtotal ?? heldSale.estimated_subtotal),
     discountAmount: requiredNumber(heldSale.discount_amount ?? heldSale.estimated_discount_amount),
     taxAmount: requiredNumber(heldSale.tax_amount ?? heldSale.estimated_tax_amount),
+    chargeAmount: requiredNumber(heldSale.charge_amount),
+    chargeTaxAmount: requiredNumber(heldSale.charge_tax_amount),
     total: requiredNumber(heldSale.total ?? heldSale.estimated_total),
     status: isHeldSaleStatus(heldSale.status) ? heldSale.status : "held",
     notes: optionalString(heldSale.notes),
@@ -695,6 +1106,7 @@ function parseHeldSaleResumeData(value: unknown): HeldSaleResumeData {
   const saleDiscountTypeSource = isObject(heldSaleValue)
     ? heldSaleValue.sale_discount_type
     : value.sale_discount_type;
+  const chargeSource = isObject(heldSaleValue) ? heldSaleValue.charges : value.charges;
 
   return {
     heldSale,
@@ -704,6 +1116,7 @@ function parseHeldSaleResumeData(value: unknown): HeldSaleResumeData {
       isObject(heldSaleValue) && typeof heldSaleValue.sale_discount_value === "number"
         ? heldSaleValue.sale_discount_value
         : null,
+    charges: parseDocumentCharges(chargeSource),
     customerId: heldSale.customerId,
   };
 }
@@ -836,10 +1249,26 @@ export async function getSaleReceipt(saleId: string): Promise<SaleReceipt> {
   return response.data;
 }
 
-export async function getPaymentMethods(): Promise<PaymentMethod[]> {
-  return getSettingsPaymentMethods();
+export async function getPOSPaymentMethods(branchId: string | null): Promise<PaymentMethod[]> {
+  const response = await apiRequest<PaymentMethod[]>(
+    `/api/v1/pos/payment-methods${toQueryString({ branch_id: branchId })}`,
+    {
+      authMode: "appwrite",
+      parse: parsePOSPaymentMethodList,
+    },
+  );
+
+  return response.data;
 }
 
-export async function getPOSCategories(): Promise<ProductCategory[]> {
-  return getProductCategories();
+export async function getPOSReferenceData(branchId: string | null): Promise<POSReferenceData> {
+  const response = await apiRequest<POSReferenceData>(
+    `/api/v1/pos/reference-data${toQueryString({ branch_id: branchId })}`,
+    {
+      authMode: "appwrite",
+      parse: parsePOSReferenceData,
+    },
+  );
+
+  return response.data;
 }

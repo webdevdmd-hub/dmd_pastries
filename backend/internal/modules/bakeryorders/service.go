@@ -12,6 +12,7 @@ import (
 
 	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
+	"pastries-pos/internal/modules/charges"
 	"pastries-pos/internal/modules/manufacturing"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
@@ -62,7 +63,7 @@ func (s *Service) ListOrders(currentUser *utils.AuthContext, query OrderListQuer
 func (s *Service) CreateOrder(currentUser *utils.AuthContext, req CreateOrderRequest, ipAddress, userAgent string) (*BakeryOrderResponse, error) {
 	var orderID string
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		order, items, err := s.buildOrder(tx, currentUser, req)
+		order, items, chargeRows, err := s.buildOrder(tx, currentUser, req)
 		if err != nil {
 			return err
 		}
@@ -73,6 +74,11 @@ func (s *Service) CreateOrder(currentUser *utils.AuthContext, req CreateOrderReq
 		order.OrderNumber = number
 		if err := s.repo.CreateOrder(tx, order, items); err != nil {
 			return err
+		}
+		if len(chargeRows) > 0 {
+			if err := tx.Create(&chargeRows).Error; err != nil {
+				return apperrors.Internal("failed to create bakery order charges")
+			}
 		}
 		if err := s.audit(tx, currentUser, "bakery_order.created", order.ID, "Bakery order created", ipAddress, userAgent); err != nil {
 			return err
@@ -167,11 +173,19 @@ func (s *Service) UpdateOrder(currentUser *utils.AuthContext, id string, req Upd
 		setStringUpdate(updates, "delivery_time", req.DeliveryTime)
 		setStringUpdate(updates, "delivery_address", req.DeliveryAddr)
 		setStringUpdate(updates, "notes", req.Notes)
-		if len(updates) == 2 {
+		if len(updates) == 2 && req.Charges == nil {
 			return apperrors.BadRequest("no fields to update", nil)
 		}
 		if err := s.repo.UpdateOrder(tx, id, currentUser.BusinessID, updates); err != nil {
 			return err
+		}
+		if req.Charges != nil {
+			if _, err := charges.ReplaceCharges(tx, currentUser.BusinessID, order.BranchID, "bakery_order", order.ID, req.Charges); err != nil {
+				return err
+			}
+			if err := s.recalculateOrderTotals(tx, currentUser.BusinessID, order.ID); err != nil {
+				return err
+			}
 		}
 		return s.audit(tx, currentUser, "bakery_order.updated", id, "Bakery order updated", ipAddress, userAgent)
 	})
@@ -806,28 +820,28 @@ func (s *Service) Summary(currentUser *utils.AuthContext) (*SummaryResponse, err
 	return s.repo.SummaryByBranch(currentUser.BusinessID, branchID)
 }
 
-func (s *Service) buildOrder(tx *gorm.DB, currentUser *utils.AuthContext, req CreateOrderRequest) (*BakeryOrder, []BakeryOrderItem, error) {
+func (s *Service) buildOrder(tx *gorm.DB, currentUser *utils.AuthContext, req CreateOrderRequest) (*BakeryOrder, []BakeryOrderItem, []charges.DocumentCharge, error) {
 	branchID, err := currentUser.ResolveOperationalBranch(req.BranchID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	req.BranchID = branchID
 	if err := validateUUID(req.BranchID, "branch_id"); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if err := s.repo.ValidateBranch(tx, currentUser.BusinessID, req.BranchID); err != nil {
-		return nil, nil, notFound(err, "branch not found")
+		return nil, nil, nil, notFound(err, "branch not found")
 	}
 	orderType := strings.TrimSpace(req.OrderType)
 	if !validOrderType(orderType) {
-		return nil, nil, apperrors.BadRequest("order_type must be pickup or delivery", nil)
+		return nil, nil, nil, apperrors.BadRequest("order_type must be pickup or delivery", nil)
 	}
 	eventDate, err := parseDate(req.EventDate, "event_date")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if len(req.Items) == 0 {
-		return nil, nil, apperrors.BadRequest("items are required", nil)
+		return nil, nil, nil, apperrors.BadRequest("items are required", nil)
 	}
 	customerName := strings.TrimSpace(req.CustomerName)
 	customerPhone := strings.TrimSpace(req.CustomerPhone)
@@ -835,7 +849,7 @@ func (s *Service) buildOrder(tx *gorm.DB, currentUser *utils.AuthContext, req Cr
 	if strings.TrimSpace(req.CustomerID) != "" {
 		customer, err := s.validCustomer(tx, currentUser.BusinessID, req.BranchID, req.CustomerID)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		customerID = &customer.ID
 		customerName = customer.FullName
@@ -843,20 +857,26 @@ func (s *Service) buildOrder(tx *gorm.DB, currentUser *utils.AuthContext, req Cr
 	}
 	salesChannel, externalOrderNumber, err := s.resolveSalesChannel(tx, currentUser.BusinessID, cleanStringPointer(req.SalesChannelID), req.ExternalOrderNumber)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	orderID := utils.NewUUID()
 	items := make([]BakeryOrderItem, 0, len(req.Items))
 	for _, itemReq := range req.Items {
 		item, err := s.buildOrderItem(tx, currentUser.BusinessID, req.BranchID, orderID, itemReq)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		items = append(items, *item)
 	}
 	subtotal, discount, tax, total := orderTotals(items)
-	order := &BakeryOrder{ID: orderID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, CustomerID: customerID, SalesChannelID: &salesChannel.ID, SalesChannelNameSnapshot: salesChannel.ChannelName, ExternalOrderNumber: externalOrderNumber, CustomerNameSnapshot: customerName, CustomerPhoneSnapshot: customerPhone, OrderType: orderType, OrderDate: dateOnly(time.Now().UTC()), EventDate: eventDate, PickupTime: strings.TrimSpace(req.PickupTime), DeliveryTime: strings.TrimSpace(req.DeliveryTime), DeliveryAddress: strings.TrimSpace(req.DeliveryAddr), SubtotalAmount: subtotal, DiscountAmount: discount, TaxAmount: tax, TotalAmount: total, PaidAmount: 0, BalanceAmount: total, PaymentStatus: "unpaid", OrderStatus: "new", Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}
-	return order, items, nil
+	chargeRows, chargeTotals, err := charges.BuildCharges(tx, currentUser.BusinessID, req.BranchID, "bakery_order", orderID, req.Charges)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	tax = roundMoney(tax + chargeTotals.TaxAmount)
+	total = roundMoney(total + chargeTotals.Total)
+	order := &BakeryOrder{ID: orderID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, CustomerID: customerID, SalesChannelID: &salesChannel.ID, SalesChannelNameSnapshot: salesChannel.ChannelName, ExternalOrderNumber: externalOrderNumber, CustomerNameSnapshot: customerName, CustomerPhoneSnapshot: customerPhone, OrderType: orderType, OrderDate: dateOnly(time.Now().UTC()), EventDate: eventDate, PickupTime: strings.TrimSpace(req.PickupTime), DeliveryTime: strings.TrimSpace(req.DeliveryTime), DeliveryAddress: strings.TrimSpace(req.DeliveryAddr), SubtotalAmount: subtotal, DiscountAmount: discount, TaxAmount: tax, ChargeAmount: chargeTotals.Amount, ChargeTaxAmount: chargeTotals.TaxAmount, TotalAmount: total, PaidAmount: 0, BalanceAmount: total, PaymentStatus: "unpaid", OrderStatus: "new", Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}
+	return order, items, chargeRows, nil
 }
 
 func (s *Service) buildOrderItem(tx *gorm.DB, businessID, branchID, orderID string, req OrderItemRequest) (*BakeryOrderItem, error) {
@@ -1154,17 +1174,24 @@ func (s *Service) recalculateOrderTotals(tx *gorm.DB, businessID, orderID string
 		return err
 	}
 	subtotal, discount, tax, total := orderTotals(items)
+	chargeTotals, err := charges.SumCharges(tx, businessID, "bakery_order", orderID)
+	if err != nil {
+		return err
+	}
+	tax = roundMoney(tax + chargeTotals.TaxAmount)
+	total = roundMoney(total + chargeTotals.Total)
 	if order.PaidAmount > total {
 		return apperrors.BadRequest("order total cannot be lower than already paid amount", map[string]float64{"paid_amount": order.PaidAmount, "new_total": total})
 	}
-	return s.repo.UpdateOrder(tx, orderID, businessID, map[string]interface{}{"subtotal_amount": subtotal, "discount_amount": discount, "tax_amount": tax, "total_amount": total, "balance_amount": roundMoney(total - order.PaidAmount), "payment_status": paymentStatus(total, order.PaidAmount), "updated_at": time.Now().UTC()})
+	return s.repo.UpdateOrder(tx, orderID, businessID, map[string]interface{}{"subtotal_amount": subtotal, "discount_amount": discount, "tax_amount": tax, "charge_amount": chargeTotals.Amount, "charge_tax_amount": chargeTotals.TaxAmount, "total_amount": total, "balance_amount": roundMoney(total - order.PaidAmount), "payment_status": paymentStatus(total, order.PaidAmount), "updated_at": time.Now().UTC()})
 }
 
 func (s *Service) orderResponse(businessID string, order BakeryOrder, includeDetails bool) BakeryOrderResponse {
-	response := BakeryOrderResponse{ID: order.ID, BusinessID: order.BusinessID, BranchID: order.BranchID, BranchName: s.repo.BranchName(businessID, order.BranchID), OrderNumber: order.OrderNumber, CustomerID: order.CustomerID, SalesChannelID: order.SalesChannelID, SalesChannelNameSnapshot: order.SalesChannelNameSnapshot, ExternalOrderNumber: order.ExternalOrderNumber, CustomerNameSnapshot: order.CustomerNameSnapshot, CustomerPhoneSnapshot: order.CustomerPhoneSnapshot, OrderType: order.OrderType, OrderDate: order.OrderDate, EventDate: order.EventDate, PickupTime: order.PickupTime, DeliveryTime: order.DeliveryTime, DeliveryAddress: order.DeliveryAddress, SubtotalAmount: roundMoney(order.SubtotalAmount), DiscountAmount: roundMoney(order.DiscountAmount), TaxAmount: roundMoney(order.TaxAmount), TotalAmount: roundMoney(order.TotalAmount), PaidAmount: roundMoney(order.PaidAmount), BalanceAmount: roundMoney(order.BalanceAmount), PaymentStatus: order.PaymentStatus, OrderStatus: order.OrderStatus, AccountingJournalEntryID: order.AccountingJournalEntryID, Notes: order.Notes, CreatedByUserID: order.CreatedByUserID, CreatedByUserName: s.repo.UserName(order.CreatedByUserID), CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt}
+	response := BakeryOrderResponse{ID: order.ID, BusinessID: order.BusinessID, BranchID: order.BranchID, BranchName: s.repo.BranchName(businessID, order.BranchID), OrderNumber: order.OrderNumber, CustomerID: order.CustomerID, SalesChannelID: order.SalesChannelID, SalesChannelNameSnapshot: order.SalesChannelNameSnapshot, ExternalOrderNumber: order.ExternalOrderNumber, CustomerNameSnapshot: order.CustomerNameSnapshot, CustomerPhoneSnapshot: order.CustomerPhoneSnapshot, OrderType: order.OrderType, OrderDate: order.OrderDate, EventDate: order.EventDate, PickupTime: order.PickupTime, DeliveryTime: order.DeliveryTime, DeliveryAddress: order.DeliveryAddress, SubtotalAmount: roundMoney(order.SubtotalAmount), DiscountAmount: roundMoney(order.DiscountAmount), TaxAmount: roundMoney(order.TaxAmount), ChargeAmount: roundMoney(order.ChargeAmount), ChargeTaxAmount: roundMoney(order.ChargeTaxAmount), TotalAmount: roundMoney(order.TotalAmount), PaidAmount: roundMoney(order.PaidAmount), BalanceAmount: roundMoney(order.BalanceAmount), PaymentStatus: order.PaymentStatus, OrderStatus: order.OrderStatus, AccountingJournalEntryID: order.AccountingJournalEntryID, Notes: order.Notes, CreatedByUserID: order.CreatedByUserID, CreatedByUserName: s.repo.UserName(order.CreatedByUserID), CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt}
 	if includeDetails {
 		items, _ := s.repo.Items(businessID, order.ID)
 		response.Items = s.itemResponses(businessID, items)
+		response.Charges, _ = charges.ListChargeResponses(s.db, businessID, "bakery_order", order.ID)
 		response.Payments, _ = s.repo.Payments(businessID, order.ID)
 		if production, err := s.repo.Production(businessID, order.ID); err == nil && production != nil {
 			response.Production = production

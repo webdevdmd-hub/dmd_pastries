@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 
+import { calculateDocumentChargeTotals } from "@/lib/document-charges";
+import type { DocumentChargeDraft } from "@/types/document-charges";
 import type {
   CartDiscountType,
   CartItem,
@@ -55,6 +57,7 @@ export function usePOSCart() {
   const [items, setItems] = useState<CartItem[]>([]);
   const [saleDiscountType, setSaleDiscountType] = useState<CartDiscountType | null>(null);
   const [saleDiscountValue, setSaleDiscountValue] = useState<number | null>(null);
+  const [charges, setCharges] = useState<DocumentChargeDraft[]>([]);
   const [payments, setPayments] = useState<PaymentInput[]>([]);
 
   const addProduct = ({ product, variant }: AddProductInput): void => {
@@ -131,6 +134,7 @@ export function usePOSCart() {
     setItems([]);
     setSaleDiscountType(null);
     setSaleDiscountValue(null);
+    setCharges([]);
     setPayments([]);
   };
 
@@ -138,10 +142,12 @@ export function usePOSCart() {
     nextItems: CartItem[],
     nextSaleDiscountType: CartDiscountType | null,
     nextSaleDiscountValue: number | null,
+    nextCharges: DocumentChargeDraft[] = [],
   ): void => {
     setItems(nextItems.map(calculateLine));
     setSaleDiscountType(nextSaleDiscountType);
     setSaleDiscountValue(nextSaleDiscountValue);
+    setCharges(nextCharges);
     setPayments([]);
   };
 
@@ -154,22 +160,31 @@ export function usePOSCart() {
       saleDiscountValue,
     );
     const taxAmount = roundMoney(items.reduce((sum, item) => sum + item.taxAmount, 0));
-    const total = roundMoney(Math.max(itemSubtotal - lineDiscounts - saleDiscount, 0) + taxAmount);
+    const { chargeAmount, chargeTaxAmount } = calculateDocumentChargeTotals(charges);
+    const total = roundMoney(
+      Math.max(itemSubtotal - lineDiscounts - saleDiscount, 0) +
+        taxAmount +
+        chargeAmount +
+        chargeTaxAmount,
+    );
     const paidAmount = roundMoney(payments.reduce((sum, payment) => sum + payment.amount, 0));
 
     return {
       subtotal: itemSubtotal,
       discountAmount: roundMoney(lineDiscounts + saleDiscount),
       taxAmount,
+      chargeAmount,
+      chargeTaxAmount,
       total,
       paidAmount,
       changeAmount: roundMoney(Math.max(paidAmount - total, 0)),
       balanceDue: roundMoney(Math.max(total - paidAmount, 0)),
     };
-  }, [items, payments, saleDiscountType, saleDiscountValue]);
+  }, [charges, items, payments, saleDiscountType, saleDiscountValue]);
 
   return {
     items,
+    charges,
     payments,
     saleDiscountType,
     saleDiscountValue,
@@ -195,6 +210,7 @@ export function usePOSCart() {
       setSaleDiscountValue(value);
     },
     setPayments,
+    setCharges,
     clearCart,
     restoreHeldSaleCart,
   };

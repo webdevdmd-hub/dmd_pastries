@@ -75,6 +75,30 @@ export function OrderPaymentSection({
             </strong>
           </span>
         </div>
+        {order && (order.chargeAmount > 0 || order.chargeTaxAmount > 0) ? (
+          <div className="rounded-2xl border border-brand-cappuccino/60 bg-white/80 p-4 text-sm">
+            <div className="flex justify-between">
+              <span className="text-brand-mocha">Subtotal</span>
+              <strong className="text-brand-espresso">
+                {formatCurrency(order.subtotalAmount)}
+              </strong>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-brand-mocha">Item tax</span>
+              <strong className="text-brand-espresso">{formatCurrency(order.taxAmount)}</strong>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-brand-mocha">Charges</span>
+              <strong className="text-brand-espresso">{formatCurrency(order.chargeAmount)}</strong>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-brand-mocha">Charge tax</span>
+              <strong className="text-brand-espresso">
+                {formatCurrency(order.chargeTaxAmount)}
+              </strong>
+            </div>
+          </div>
+        ) : null}
         {!order ? (
           <p className="rounded-2xl border border-dashed border-brand-cappuccino p-4 text-sm text-brand-mocha">
             Save the order before adding payments.

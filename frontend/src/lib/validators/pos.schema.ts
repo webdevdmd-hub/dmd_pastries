@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { documentChargesSchema } from "@/lib/validators/document-charges.schema";
+
 export const discountSchema = z.object({
   type: z.enum(["fixed", "percentage"]).nullable(),
   value: z.coerce.number().min(0).nullable(),
@@ -27,6 +29,7 @@ export const checkoutSchema = z.object({
   items: z.array(cartItemSchema).min(1, "Cart must not be empty."),
   saleDiscountType: z.enum(["fixed", "percentage"]).nullable(),
   saleDiscountValue: z.coerce.number().min(0).nullable(),
+  charges: documentChargesSchema,
   payments: z.array(paymentSchema).min(1, "At least one payment is required."),
   salesChannelId: z.string().nullable(),
   externalOrderNumber: z.string().nullable(),

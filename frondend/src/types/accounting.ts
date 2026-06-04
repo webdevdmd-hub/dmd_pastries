@@ -273,6 +273,7 @@ export type BalanceSheetItem = {
   accountType: AccountingAccountType;
   accountGroup: string;
   amount: number;
+  isCalculated: boolean;
 };
 
 export type BalanceSheetSection = {

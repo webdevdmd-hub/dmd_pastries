@@ -11,6 +11,7 @@ import (
 
 	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
+	"pastries-pos/internal/modules/charges"
 	"pastries-pos/internal/modules/inventory"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
@@ -65,6 +66,92 @@ func (s *Service) ListPOSProducts(currentUser *utils.AuthContext, query POSProdu
 			TotalPages: totalPages(total, query.Limit),
 		},
 	}, nil
+}
+
+func (s *Service) ListPaymentMethods(currentUser *utils.AuthContext, branchID string) ([]POSPaymentMethodResponse, error) {
+	resolvedBranchID, err := resolvePOSPaymentMethodBranch(currentUser, branchID)
+	if err != nil {
+		return nil, err
+	}
+	if ok, err := s.repo.BranchExists(s.db, currentUser.BusinessID, resolvedBranchID); err != nil {
+		return nil, apperrors.Internal("failed to validate branch")
+	} else if !ok {
+		return nil, apperrors.BadRequest("invalid branch_id", nil)
+	}
+	rows, err := s.repo.ListPOSPaymentMethods(currentUser.BusinessID, resolvedBranchID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to list POS payment methods")
+	}
+	return rows, nil
+}
+
+func (s *Service) ReferenceData(currentUser *utils.AuthContext, branchID string) (*POSReferenceDataResponse, error) {
+	resolvedBranchID, err := resolvePOSPaymentMethodBranch(currentUser, branchID)
+	if err != nil {
+		return nil, err
+	}
+	if ok, err := s.repo.BranchExists(s.db, currentUser.BusinessID, resolvedBranchID); err != nil {
+		return nil, apperrors.Internal("failed to validate branch")
+	} else if !ok {
+		return nil, apperrors.BadRequest("invalid branch_id", nil)
+	}
+
+	productCategories, err := s.repo.ListPOSProductCategories(currentUser.BusinessID, resolvedBranchID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to list POS product categories")
+	}
+	units, err := s.repo.ListPOSUnits(currentUser.BusinessID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to list POS units")
+	}
+	taxRates, err := s.repo.ListPOSTaxRates(currentUser.BusinessID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to list POS tax rates")
+	}
+	salesChannels, err := s.repo.ListPOSSalesChannels(currentUser.BusinessID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to list POS sales channels")
+	}
+	receiptLayouts, err := s.repo.ListPOSReceiptLayouts(currentUser.BusinessID, resolvedBranchID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to list POS receipt layouts")
+	}
+
+	return &POSReferenceDataResponse{
+		ProductCategories: productCategories,
+		Units:             units,
+		TaxRates:          taxRates,
+		SalesChannels:     salesChannels,
+		ReceiptLayouts:    receiptLayouts,
+	}, nil
+}
+
+func resolvePOSPaymentMethodBranch(currentUser *utils.AuthContext, requestedBranchID string) (string, error) {
+	requestedBranchID = strings.TrimSpace(requestedBranchID)
+	if requestedBranchID != "" {
+		if _, err := uuid.Parse(requestedBranchID); err != nil {
+			return "", apperrors.BadRequest("branch_id must be a valid UUID", nil)
+		}
+		if !currentUser.CanAccessBranch(requestedBranchID) {
+			return "", apperrors.Forbidden("branch access denied")
+		}
+		return requestedBranchID, nil
+	}
+	if currentUser.CurrentBranchID != nil && strings.TrimSpace(*currentUser.CurrentBranchID) != "" {
+		currentBranchID := strings.TrimSpace(*currentUser.CurrentBranchID)
+		if !currentUser.CanAccessBranch(currentBranchID) {
+			return "", apperrors.Forbidden("current branch access denied")
+		}
+		return currentBranchID, nil
+	}
+	if currentUser.AssignedBranchID != nil && strings.TrimSpace(*currentUser.AssignedBranchID) != "" {
+		assignedBranchID := strings.TrimSpace(*currentUser.AssignedBranchID)
+		if !currentUser.CanAccessBranch(assignedBranchID) {
+			return "", apperrors.Forbidden("assigned branch access denied")
+		}
+		return assignedBranchID, nil
+	}
+	return "", apperrors.Forbidden("no active branch assigned")
 }
 
 func (s *Service) LookupProduct(currentUser *utils.AuthContext, barcode, sku, productCode string) (*POSLookupResponse, error) {
@@ -125,7 +212,8 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 		return nil, err
 	}
 
-	calculation, err := s.calculateSale(tx, currentUser.BusinessID, req.BranchID, req)
+	saleID := utils.NewUUID()
+	calculation, err := s.calculateSale(tx, currentUser.BusinessID, req.BranchID, saleID, req)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +240,7 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 		changeAmount = overpayAmount
 	}
 	sale := &Sale{
-		ID:                       utils.NewUUID(),
+		ID:                       saleID,
 		BusinessID:               currentUser.BusinessID,
 		BranchID:                 req.BranchID,
 		CashierUserID:            currentUser.UserID,
@@ -167,6 +255,8 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 		DiscountAmount:           calculation.DiscountAmount,
 		TaxableAmount:            calculation.TaxableAmount,
 		TaxAmount:                calculation.TaxAmount,
+		ChargeAmount:             calculation.ChargeAmount,
+		ChargeTaxAmount:          calculation.ChargeTaxAmount,
 		TotalAmount:              calculation.TotalAmount,
 		PaidAmount:               roundMoney(paidAmount),
 		ChangeAmount:             changeAmount,
@@ -185,6 +275,11 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 
 	if err := s.repo.CreateSale(tx, sale, calculation.Items, payments); err != nil {
 		return nil, apperrors.Internal("failed to create sale")
+	}
+	if len(calculation.Charges) > 0 {
+		if err := tx.Create(&calculation.Charges).Error; err != nil {
+			return nil, apperrors.Internal("failed to create sale charges")
+		}
 	}
 	if s.accountingService != nil {
 		if _, err := s.accountingService.PostPOSSaleJournal(tx, currentUser, sale.ID); err != nil {
@@ -246,7 +341,8 @@ func (s *Service) CreateHeldSale(currentUser *utils.AuthContext, req HoldSaleReq
 		}
 	}
 
-	calculation, err := s.calculateHeldSale(tx, currentUser.BusinessID, req.BranchID, req)
+	heldSaleID := utils.NewUUID()
+	calculation, err := s.calculateHeldSale(tx, currentUser.BusinessID, req.BranchID, heldSaleID, req)
 	if err != nil {
 		return nil, err
 	}
@@ -256,27 +352,34 @@ func (s *Service) CreateHeldSale(currentUser *utils.AuthContext, req HoldSaleReq
 		return nil, apperrors.Internal("failed to generate hold number")
 	}
 	heldSale := &HeldSale{
-		ID:                      utils.NewUUID(),
-		BusinessID:              currentUser.BusinessID,
-		BranchID:                req.BranchID,
-		CashierUserID:           currentUser.UserID,
-		CustomerID:              cleanStringPointer(req.CustomerID),
-		HoldNumber:              holdNumber,
-		ItemCount:               len(calculation.Items),
-		EstimatedSubtotal:       calculation.SubtotalAmount,
-		EstimatedDiscountAmount: calculation.DiscountAmount,
-		EstimatedTaxAmount:      calculation.TaxAmount,
-		EstimatedTotal:          calculation.TotalAmount,
-		Status:                  "held",
-		Notes:                   strings.TrimSpace(req.Notes),
-		HeldAt:                  now,
-		ExpiresAt:               req.ExpiresAt,
+		ID:                       heldSaleID,
+		BusinessID:               currentUser.BusinessID,
+		BranchID:                 req.BranchID,
+		CashierUserID:            currentUser.UserID,
+		CustomerID:               cleanStringPointer(req.CustomerID),
+		HoldNumber:               holdNumber,
+		ItemCount:                len(calculation.Items),
+		EstimatedSubtotal:        calculation.SubtotalAmount,
+		EstimatedDiscountAmount:  calculation.DiscountAmount,
+		EstimatedTaxAmount:       calculation.TaxAmount,
+		EstimatedChargeAmount:    calculation.ChargeAmount,
+		EstimatedChargeTaxAmount: calculation.ChargeTaxAmount,
+		EstimatedTotal:           calculation.TotalAmount,
+		Status:                   "held",
+		Notes:                    strings.TrimSpace(req.Notes),
+		HeldAt:                   now,
+		ExpiresAt:                req.ExpiresAt,
 	}
 	for i := range calculation.Items {
 		calculation.Items[i].HeldSaleID = heldSale.ID
 	}
 	if err := s.repo.CreateHeldSale(tx, heldSale, calculation.Items); err != nil {
 		return nil, apperrors.Internal("failed to hold sale")
+	}
+	if len(calculation.Charges) > 0 {
+		if err := tx.Create(&calculation.Charges).Error; err != nil {
+			return nil, apperrors.Internal("failed to create held sale charges")
+		}
 	}
 	if err := s.writeAudit(tx, currentUser, "held_sale.created", heldSale.ID, "Held sale created.", ipAddress, userAgent); err != nil {
 		return nil, err
@@ -745,23 +848,29 @@ func stockName(stock *ProductInventoryStockRow) string {
 }
 
 type saleCalculation struct {
-	Items          []SaleItem
-	SubtotalAmount float64
-	DiscountAmount float64
-	TaxableAmount  float64
-	TaxAmount      float64
-	TotalAmount    float64
+	Items           []SaleItem
+	Charges         []charges.DocumentCharge
+	SubtotalAmount  float64
+	DiscountAmount  float64
+	TaxableAmount   float64
+	TaxAmount       float64
+	ChargeAmount    float64
+	ChargeTaxAmount float64
+	TotalAmount     float64
 }
 
 type heldSaleCalculation struct {
-	Items          []HeldSaleItem
-	SubtotalAmount float64
-	DiscountAmount float64
-	TaxAmount      float64
-	TotalAmount    float64
+	Items           []HeldSaleItem
+	Charges         []charges.DocumentCharge
+	SubtotalAmount  float64
+	DiscountAmount  float64
+	TaxAmount       float64
+	ChargeAmount    float64
+	ChargeTaxAmount float64
+	TotalAmount     float64
 }
 
-func (s *Service) calculateSale(tx *gorm.DB, businessID, branchID string, req CheckoutRequest) (*saleCalculation, error) {
+func (s *Service) calculateSale(tx *gorm.DB, businessID, branchID, saleID string, req CheckoutRequest) (*saleCalculation, error) {
 	items := make([]SaleItem, 0, len(req.Items))
 	subtotal := 0.0
 	lineNets := make([]float64, 0, len(req.Items))
@@ -849,17 +958,25 @@ func (s *Service) calculateSale(tx *gorm.DB, businessID, branchID string, req Ch
 		taxAmount += lineTax
 	}
 
+	chargeRows, chargeTotals, err := charges.BuildCharges(tx, businessID, branchID, "pos_sale", saleID, req.Charges)
+	if err != nil {
+		return nil, err
+	}
+
 	return &saleCalculation{
-		Items:          items,
-		SubtotalAmount: subtotal,
-		DiscountAmount: roundMoney(sumDiscounts(items)),
-		TaxableAmount:  roundMoney(taxableAmount),
-		TaxAmount:      roundMoney(taxAmount),
-		TotalAmount:    roundMoney(totalAmount),
+		Items:           items,
+		Charges:         chargeRows,
+		SubtotalAmount:  subtotal,
+		DiscountAmount:  roundMoney(sumDiscounts(items)),
+		TaxableAmount:   roundMoney(taxableAmount),
+		TaxAmount:       roundMoney(taxAmount + chargeTotals.TaxAmount),
+		ChargeAmount:    chargeTotals.Amount,
+		ChargeTaxAmount: chargeTotals.TaxAmount,
+		TotalAmount:     roundMoney(totalAmount + chargeTotals.Total),
 	}, nil
 }
 
-func (s *Service) calculateHeldSale(tx *gorm.DB, businessID, branchID string, req HoldSaleRequest) (*heldSaleCalculation, error) {
+func (s *Service) calculateHeldSale(tx *gorm.DB, businessID, branchID, heldSaleID string, req HoldSaleRequest) (*heldSaleCalculation, error) {
 	items := make([]HeldSaleItem, 0, len(req.Items))
 	subtotal := 0.0
 	lineNets := make([]float64, 0, len(req.Items))
@@ -945,12 +1062,20 @@ func (s *Service) calculateHeldSale(tx *gorm.DB, businessID, branchID string, re
 		taxAmount += lineTax
 	}
 
+	chargeRows, chargeTotals, err := charges.BuildCharges(tx, businessID, branchID, "held_sale", heldSaleID, req.Charges)
+	if err != nil {
+		return nil, err
+	}
+
 	return &heldSaleCalculation{
-		Items:          items,
-		SubtotalAmount: roundMoney(subtotal),
-		DiscountAmount: roundMoney(sumHeldDiscounts(items)),
-		TaxAmount:      roundMoney(taxAmount),
-		TotalAmount:    roundMoney(totalAmount),
+		Items:           items,
+		Charges:         chargeRows,
+		SubtotalAmount:  roundMoney(subtotal),
+		DiscountAmount:  roundMoney(sumHeldDiscounts(items)),
+		TaxAmount:       roundMoney(taxAmount + chargeTotals.TaxAmount),
+		ChargeAmount:    chargeTotals.Amount,
+		ChargeTaxAmount: chargeTotals.TaxAmount,
+		TotalAmount:     roundMoney(totalAmount + chargeTotals.Total),
 	}, nil
 }
 
@@ -1321,7 +1446,28 @@ func heldSaleToCart(heldSale HeldSaleResponse) HoldSaleRequest {
 		BranchID:   heldSale.BranchID,
 		CustomerID: heldSale.CustomerID,
 		Items:      items,
+		Charges:    chargeResponsesToInputs(heldSale.Charges),
 		Notes:      heldSale.Notes,
 		ExpiresAt:  heldSale.ExpiresAt,
 	}
+}
+
+func chargeResponsesToInputs(rows []charges.ChargeResponse) []charges.ChargeInput {
+	inputs := make([]charges.ChargeInput, 0, len(rows))
+	for _, row := range rows {
+		isRefundable := row.IsRefundable
+		taxRateID := ""
+		if row.TaxRateID != nil {
+			taxRateID = *row.TaxRateID
+		}
+		inputs = append(inputs, charges.ChargeInput{
+			ChargeType:   row.ChargeType,
+			ChargeName:   row.ChargeName,
+			Description:  row.Description,
+			Amount:       row.Amount,
+			TaxRateID:    taxRateID,
+			IsRefundable: &isRefundable,
+		})
+	}
+	return inputs
 }

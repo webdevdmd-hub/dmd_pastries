@@ -35,8 +35,6 @@ import {
 import { PERMISSIONS } from "@/constants/permissions";
 import { useAuth } from "@/hooks/use-auth";
 import { useBranchScope } from "@/hooks/use-branch-scope";
-import { useBranch } from "@/hooks/use-branches";
-import { useInventory } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import { usePOSCart } from "@/hooks/use-pos-cart";
 import {
@@ -46,8 +44,11 @@ import {
   usePOSCheckout,
   useResumeHeldSale,
 } from "@/hooks/use-pos-checkout";
-import { usePOSProducts, usePOSReferenceData } from "@/hooks/use-pos-products";
-import { useReceiptLayouts, useSalesChannels } from "@/hooks/use-settings-data";
+import {
+  usePOSPaymentMethods,
+  usePOSProducts,
+  usePOSReferenceData,
+} from "@/hooks/use-pos-products";
 import { getErrorMessage } from "@/lib/api/client";
 import { lookupPOSProduct } from "@/lib/api/pos";
 import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
@@ -114,11 +115,6 @@ export function POSWorkspace(): JSX.Element {
   const { hasAnyPermission, hasPermission } = usePermission();
   const canSell = hasPermission(PERMISSIONS.posSell);
   const canCreateBakeryOrder = hasAnyPermission([PERMISSIONS.ordersCreate, PERMISSIONS.posSell]);
-  const canLoadBranchNameFallback = hasAnyPermission([
-    PERMISSIONS.branchesView,
-    PERMISSIONS.branchesAccessManage,
-    PERMISSIONS.settingsView,
-  ]);
   const barcodeInputRef = useRef<HTMLInputElement | null>(null);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -135,8 +131,11 @@ export function POSWorkspace(): JSX.Element {
   const [externalOrderNumber, setExternalOrderNumber] = useState("");
   const [variantProduct, setVariantProduct] = useState<POSProduct | null>(null);
   const debouncedSearch = useDebouncedValue(search, 250);
-  const referenceQuery = usePOSReferenceData(branchScope.hasBranchScope);
-  const { refetch: refetchReferenceData } = referenceQuery;
+  const branchId = branchScope.effectiveBranchId ?? "";
+  const referenceDataQuery = usePOSReferenceData(branchId || null, branchScope.hasBranchScope);
+  const paymentMethodsQuery = usePOSPaymentMethods(branchId || null, branchScope.hasBranchScope);
+  const { refetch: refetchReferenceData } = referenceDataQuery;
+  const { refetch: refetchPaymentMethods } = paymentMethodsQuery;
   const permissionSignature = user?.permissions.join("|") ?? "";
   const productsQuery = usePOSProducts(
     {
@@ -155,8 +154,6 @@ export function POSWorkspace(): JSX.Element {
     branchScope.hasBranchScope,
   );
   const checkoutMutation = usePOSCheckout();
-  const receiptLayoutsQuery = useReceiptLayouts(branchScope.hasBranchScope);
-  const salesChannelsQuery = useSalesChannels(branchScope.hasBranchScope);
   const heldSalesQuery = useHeldSales(holdOpen);
   const holdSaleMutation = useHoldSale();
   const resumeHeldSaleMutation = useResumeHeldSale();
@@ -169,35 +166,18 @@ export function POSWorkspace(): JSX.Element {
     }
 
     void refetchReferenceData();
-  }, [branchScope.hasBranchScope, permissionSignature, refetchReferenceData]);
+    void refetchPaymentMethods();
+  }, [
+    branchId,
+    branchScope.hasBranchScope,
+    permissionSignature,
+    refetchReferenceData,
+    refetchPaymentMethods,
+  ]);
 
-  const currentBranchQuery = useBranch(
-    branchScope.effectiveBranchId,
-    Boolean(
-      branchScope.hasBranchScope && branchScope.effectiveBranchId && canLoadBranchNameFallback,
-    ),
-  );
   const branchName =
     branchScope.effectiveBranchName ??
-    currentBranchQuery.data?.name ??
-    (branchScope.effectiveBranchId ? "Branch name unavailable" : "No branch assigned");
-  const branchId = branchScope.effectiveBranchId ?? "";
-  const canViewStock = hasAnyPermission([
-    PERMISSIONS.inventoryView,
-    PERMISSIONS.inventoryMovementsView,
-  ]);
-  const inventoryQuery = useInventory(
-    {
-      branchId: branchId || "all",
-      expiryTrackedOnly: false,
-      includeUninitialized: false,
-      itemType: "product",
-      lowStockOnly: false,
-      search: "",
-      status: "active",
-    },
-    Boolean(branchScope.hasBranchScope && branchId && canViewStock),
-  );
+    (branchScope.effectiveBranchId ? "Active branch" : "No branch assigned");
 
   useEffect(() => {
     barcodeInputRef.current?.focus();
@@ -324,6 +304,7 @@ export function POSWorkspace(): JSX.Element {
       })),
       saleDiscountType: cart.saleDiscountType,
       saleDiscountValue: cart.saleDiscountValue,
+      charges: cart.charges,
       payments: cart.payments,
       salesChannelId: salesChannelId || null,
       externalOrderNumber:
@@ -381,6 +362,7 @@ export function POSWorkspace(): JSX.Element {
         items: cart.items,
         saleDiscountType: cart.saleDiscountType,
         saleDiscountValue: cart.saleDiscountValue,
+        charges: cart.charges,
         totals: cart.totals,
         notes,
       });
@@ -400,7 +382,12 @@ export function POSWorkspace(): JSX.Element {
 
     try {
       const resumed = await resumeHeldSaleMutation.mutateAsync(heldSaleId);
-      cart.restoreHeldSaleCart(resumed.items, resumed.saleDiscountType, resumed.saleDiscountValue);
+      cart.restoreHeldSaleCart(
+        resumed.items,
+        resumed.saleDiscountType,
+        resumed.saleDiscountValue,
+        resumed.charges,
+      );
       setCustomerId(resumed.customerId);
       setHoldOpen(false);
       toast.success("Held sale resumed.");
@@ -424,20 +411,24 @@ export function POSWorkspace(): JSX.Element {
   };
 
   const referenceCategories = useMemo(
-    () => referenceQuery.data?.categories ?? [],
-    [referenceQuery.data?.categories],
+    () => referenceDataQuery.data?.productCategories ?? [],
+    [referenceDataQuery.data?.productCategories],
   );
-  const paymentMethods = referenceQuery.data?.paymentMethods ?? [];
+  const paymentMethods = paymentMethodsQuery.data ?? [];
+  const chargeTaxRates = referenceDataQuery.data?.taxRates ?? [];
   const salesChannels = useMemo(
-    () => (salesChannelsQuery.data ?? []).filter((channel) => channel.status === "active"),
-    [salesChannelsQuery.data],
+    () =>
+      (referenceDataQuery.data?.salesChannels ?? []).filter(
+        (channel) => channel.status === "active",
+      ),
+    [referenceDataQuery.data?.salesChannels],
   );
   const selectedSalesChannel =
     salesChannels.find((channel) => channel.id === salesChannelId) ?? null;
   const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
   const receiptLayout = useMemo(
-    () => selectReceiptLayout(receiptLayoutsQuery.data ?? [], branchId),
-    [branchId, receiptLayoutsQuery.data],
+    () => selectReceiptLayout(referenceDataQuery.data?.receiptLayouts ?? [], branchId),
+    [branchId, referenceDataQuery.data?.receiptLayouts],
   );
   const categorySourceProducts = useMemo(
     () => categorySourceProductsQuery.data ?? [],
@@ -484,21 +475,6 @@ export function POSWorkspace(): JSX.Element {
     () => new Set(categories.map((category) => category.id)),
     [categories],
   );
-  const stockByProductId = useMemo(() => {
-    const stockMap = new Map<string, { quantity: number; unitName: string }>();
-
-    (inventoryQuery.data ?? []).forEach((item) => {
-      if (item.productId) {
-        stockMap.set(item.productId, {
-          quantity: item.availableQuantity,
-          unitName: item.unitSymbol || item.unitName,
-        });
-      }
-    });
-
-    return stockMap;
-  }, [inventoryQuery.data]);
-
   useEffect(() => {
     if (categoryId !== "all" && !categoryIds.has(categoryId)) {
       setCategoryId("all");
@@ -508,11 +484,13 @@ export function POSWorkspace(): JSX.Element {
   const cartPanel = (
     <POSCartPanel
       canSell={canSell}
+      charges={cart.charges}
       customerId={customerId}
       externalOrderNumber={externalOrderNumber}
       isCheckingOut={checkoutMutation.isPending}
       items={cart.items}
       onCheckout={() => setCheckoutOpen(true)}
+      onChargesChange={cart.setCharges}
       onClear={() => {
         if (window.confirm("Clear current POS cart?")) {
           cart.clearCart();
@@ -527,6 +505,7 @@ export function POSWorkspace(): JSX.Element {
       onSalesChannelChange={setSalesChannelId}
       salesChannelId={salesChannelId}
       salesChannels={salesChannels}
+      taxRates={chargeTaxRates}
       totals={cart.totals}
     />
   );
@@ -609,7 +588,8 @@ export function POSWorkspace(): JSX.Element {
                   canCreateOrder={canCreateBakeryOrder}
                   error={productsQuery.error}
                   isLoading={
-                    productsQuery.isLoading || (referenceQuery.isLoading && categories.length === 0)
+                    productsQuery.isLoading ||
+                    (referenceDataQuery.isLoading && categories.length === 0)
                   }
                   onCreateOrder={() => setCreateOrderOpen(true)}
                   onProductClick={addProduct}
@@ -619,7 +599,6 @@ export function POSWorkspace(): JSX.Element {
                   }}
                   products={products}
                   showPrices={showPrices}
-                  stockByProductId={stockByProductId}
                 />
               </div>
             </section>
@@ -755,20 +734,25 @@ export function POSWorkspace(): JSX.Element {
 
       <POSCheckoutDialog
         externalOrderNumber={externalOrderNumber}
+        charges={cart.charges}
         isSubmitting={checkoutMutation.isPending}
         onConfirm={() => {
           void submitCheckout();
         }}
         onOpenChange={setCheckoutOpen}
+        onChargesChange={cart.setCharges}
         onPaymentsChange={cart.setPayments}
         onSaleDiscountChange={cart.setSaleDiscount}
         open={checkoutOpen}
+        paymentMethodsError={paymentMethodsQuery.error}
+        paymentMethodsLoading={paymentMethodsQuery.isLoading}
         paymentMethods={paymentMethods}
         payments={cart.payments}
         saleDiscountType={cart.saleDiscountType}
         saleDiscountValue={cart.saleDiscountValue}
         salesChannelId={salesChannelId}
         salesChannels={salesChannels}
+        taxRates={chargeTaxRates}
         totals={cart.totals}
       />
       <POSCreateOrderDialog

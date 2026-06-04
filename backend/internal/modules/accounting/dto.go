@@ -462,6 +462,7 @@ type BalanceSheetAccountRowResponse struct {
 	AccountType  string  `json:"account_type"`
 	AccountGroup string  `json:"account_group"`
 	Amount       float64 `json:"amount"`
+	IsCalculated bool    `json:"is_calculated,omitempty"`
 }
 
 type BalanceSheetSectionResponse struct {

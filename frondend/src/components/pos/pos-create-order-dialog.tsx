@@ -22,8 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAddOrderPackaging, useCreateOrder } from "@/hooks/use-orders";
-import { useProductReferenceData, useProducts } from "@/hooks/use-products";
-import { useSalesChannels } from "@/hooks/use-settings-data";
+import { usePOSProducts, usePOSReferenceData } from "@/hooks/use-pos-products";
 import { getErrorMessage } from "@/lib/api/client";
 import { createOrderSchema } from "@/lib/validators/orders.schema";
 import type {
@@ -32,6 +31,8 @@ import type {
   CreateOrderPayload,
   OrderType,
 } from "@/types/orders";
+import type { POSProduct } from "@/types/pos";
+import type { Product } from "@/types/product";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -55,6 +56,52 @@ function initialOrderState() {
   };
 }
 
+function toOrderProducts(products: POSProduct[], fallbackUnitId: string): Product[] {
+  return products.map((product) => ({
+    id: product.id,
+    productName: product.productName,
+    productCode: product.productCode,
+    sku: product.sku,
+    barcode: product.barcode,
+    description: null,
+    categoryId: product.categoryId ?? "",
+    categoryName: product.categoryName,
+    unitId: product.unitId ?? fallbackUnitId,
+    unitName: product.unitName,
+    taxRateId: product.taxRateId,
+    taxRateName: product.taxRateName,
+    productType: product.productType,
+    salePrice: product.salePrice,
+    costPrice: null,
+    compareAtPrice: null,
+    imageUrl: product.imageUrl,
+    imageFileId: product.imageFileId,
+    isPosVisible: product.isPosVisible,
+    isStockTracked: product.isStockTracked,
+    isExpiryTracked: false,
+    isCustomOrderAvailable: true,
+    preparationTimeMinutes: null,
+    status: product.status,
+    variants: product.variants.map((variant, index) => ({
+      id: variant.id,
+      productId: variant.productId,
+      variantName: variant.variantName,
+      sku: variant.sku,
+      barcode: variant.barcode,
+      salePrice: variant.salePrice,
+      costPrice: null,
+      imageUrl: variant.imageUrl,
+      imageFileId: variant.imageFileId,
+      sortOrder: index + 1,
+      status: variant.status,
+      createdAt: "",
+      updatedAt: "",
+    })),
+    createdAt: "",
+    updatedAt: "",
+  }));
+}
+
 type POSCreateOrderDialogProps = {
   branchId: string;
   branchName: string;
@@ -71,30 +118,30 @@ export function POSCreateOrderDialog({
   open,
 }: POSCreateOrderDialogProps): JSX.Element {
   const [state, setState] = useState(initialOrderState);
-  const productsQuery = useProducts(
+  const productsQuery = usePOSProducts(
     {
-      categoryId: "",
-      isPosVisible: "all",
+      categoryId: "all",
       limit: 100,
-      page: 1,
-      productType: "all",
       search: "",
-      sortBy: "product_name",
-      sortOrder: "asc",
-      status: "active",
     },
     open && canCreate,
   );
-  const referenceQuery = useProductReferenceData(open && canCreate);
-  const salesChannelsQuery = useSalesChannels(open && canCreate);
+  const referenceDataQuery = usePOSReferenceData(branchId || null, open && canCreate);
   const createOrderMutation = useCreateOrder();
   const addPackagingMutation = useAddOrderPackaging();
   const salesChannels = useMemo(
-    () => (salesChannelsQuery.data ?? []).filter((channel) => channel.status === "active"),
-    [salesChannelsQuery.data],
+    () =>
+      (referenceDataQuery.data?.salesChannels ?? []).filter(
+        (channel) => channel.status === "active",
+      ),
+    [referenceDataQuery.data?.salesChannels],
   );
   const selectedSalesChannel =
     salesChannels.find((channel) => channel.id === state.salesChannelId) ?? null;
+  const orderProducts = useMemo(
+    () => toOrderProducts(productsQuery.data ?? [], referenceDataQuery.data?.units[0]?.id ?? ""),
+    [productsQuery.data, referenceDataQuery.data?.units],
+  );
   const salesChannelOptions = useMemo<SearchableComboboxOption[]>(
     () =>
       salesChannels.map((channel) => ({
@@ -140,6 +187,7 @@ export function POSCreateOrderDialog({
     deliveryTime: state.orderType === "delivery" ? state.deliveryTime || null : null,
     eventDate: state.eventDate,
     items: state.items,
+    charges: [],
     notes: state.notes || null,
     orderType: state.orderType,
     pickupTime: state.orderType === "pickup" ? state.pickupTime || null : null,
@@ -225,9 +273,9 @@ export function POSCreateOrderDialog({
               <div className="grid gap-2">
                 <SearchableCombobox
                   emptyMessage="No active sales channels found."
-                  isLoading={salesChannelsQuery.isLoading}
+                  isLoading={referenceDataQuery.isLoading}
                   loadingMessage="Loading sales channels..."
-                  onRetry={() => void salesChannelsQuery.refetch()}
+                  onRetry={() => void referenceDataQuery.refetch()}
                   onValueChange={(salesChannelId) =>
                     setState((current) => ({ ...current, salesChannelId }))
                   }
@@ -308,8 +356,8 @@ export function POSCreateOrderDialog({
               <OrderItemsSection
                 items={state.items}
                 onChange={(items) => setState((current) => ({ ...current, items }))}
-                products={productsQuery.data?.items ?? []}
-                units={referenceQuery.data?.units ?? []}
+                products={orderProducts}
+                units={referenceDataQuery.data?.units ?? []}
               />
             </div>
             <div className="grid content-start gap-5">

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"pastries-pos/internal/modules/charges"
 )
 
 type Repository struct {
@@ -37,6 +39,112 @@ func (r *Repository) ListPOSProducts(businessID, branchID string, query POSProdu
 		Limit(query.Limit).
 		Scan(&rows).Error
 	return rows, total, err
+}
+
+func (r *Repository) ListPOSPaymentMethods(businessID, branchID string) ([]POSPaymentMethodResponse, error) {
+	var rows []POSPaymentMethodResponse
+	err := r.db.Table("payment_methods pm").
+		Select(`
+			pm.id,
+			pm.method_name,
+			pm.method_type,
+			pm.status,
+			pm.show_in_pos,
+			pm.allow_split_payment,
+			pm.requires_reference,
+			pa.id AS default_payment_account_id,
+			pa.account_name AS default_payment_account_name,
+			pa.branch_id,
+			COALESCE(account_branch.branch_name, checkout_branch.branch_name, '') AS branch_name
+		`).
+		Joins("JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = pm.business_id AND pa.status = ? AND pa.deleted_at IS NULL", "active").
+		Joins("LEFT JOIN branches account_branch ON account_branch.id = pa.branch_id AND account_branch.business_id = pm.business_id AND account_branch.deleted_at IS NULL").
+		Joins("LEFT JOIN branches checkout_branch ON checkout_branch.id = ? AND checkout_branch.business_id = pm.business_id AND checkout_branch.deleted_at IS NULL", branchID).
+		Where("pm.business_id = ? AND pm.status = ? AND pm.show_in_pos = ? AND pm.default_payment_account_id IS NOT NULL AND pm.deleted_at IS NULL", businessID, "active", true).
+		Where("(pa.branch_id IS NULL OR pa.branch_id = ?)", branchID).
+		Order("pm.is_default DESC, pm.method_name ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) ListPOSProductCategories(businessID, branchID string) ([]POSProductCategoryOption, error) {
+	var rows []POSProductCategoryOption
+	err := r.db.Table("product_categories").
+		Select("id, business_id, branch_id, parent_category_id, category_name, category_code, description, image_file_id, sort_order, status, created_at, updated_at").
+		Where("business_id = ? AND branch_id = ? AND status = ? AND deleted_at IS NULL", businessID, branchID, "active").
+		Order("sort_order ASC, category_name ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) ListPOSUnits(businessID string) ([]POSUnitOption, error) {
+	var rows []POSUnitOption
+	err := r.db.Table("units u").
+		Select(`
+			u.id,
+			u.business_id,
+			u.unit_category_id,
+			uc.name AS unit_category_name,
+			u.unit_name,
+			u.symbol,
+			u.base_unit_id,
+			u.conversion_factor,
+			u.decimal_precision,
+			u.is_system_default,
+			u.status,
+			u.created_at,
+			u.updated_at
+		`).
+		Joins("JOIN unit_categories uc ON uc.id = u.unit_category_id").
+		Where("(u.business_id IS NULL OR u.business_id = ?) AND u.status = ? AND u.deleted_at IS NULL", businessID, "active").
+		Order("u.is_system_default DESC, u.unit_name ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) ListPOSTaxRates(businessID string) ([]POSTaxRateOption, error) {
+	var rows []POSTaxRateOption
+	err := r.db.Table("tax_rates").
+		Select("id, business_id, tax_name, tax_type, rate_percentage, is_inclusive, country, region, is_default, status, created_at, updated_at").
+		Where("business_id = ? AND status = ? AND deleted_at IS NULL", businessID, "active").
+		Order("is_default DESC, tax_name ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) ListPOSSalesChannels(businessID string) ([]POSSalesChannelOption, error) {
+	var rows []POSSalesChannelOption
+	err := r.db.Table("sales_channels sc").
+		Select(`
+			sc.id,
+			sc.business_id,
+			sc.channel_name,
+			sc.channel_type,
+			sc.requires_external_order_number,
+			sc.default_payment_method_id,
+			COALESCE(pm.method_name, '') AS default_payment_method_name,
+			sc.commission_rate,
+			sc.is_default,
+			sc.status,
+			sc.created_at,
+			sc.updated_at
+		`).
+		Joins("LEFT JOIN payment_methods pm ON pm.id = sc.default_payment_method_id AND pm.business_id = sc.business_id AND pm.deleted_at IS NULL").
+		Where("sc.business_id = ? AND sc.status = ? AND sc.deleted_at IS NULL", businessID, "active").
+		Order("sc.is_default DESC, sc.channel_name ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) ListPOSReceiptLayouts(businessID, branchID string) ([]POSReceiptLayoutOption, error) {
+	var rows []POSReceiptLayoutOption
+	err := r.db.Table("receipt_layouts").
+		Select("id, business_id, branch_id, layout_name, receipt_type, printer_type, counter_id, is_default, status, layout_config, created_at, updated_at").
+		Where("business_id = ? AND status = ? AND deleted_at IS NULL", businessID, "active").
+		Where("(branch_id IS NULL OR branch_id = ?)", branchID).
+		Order("branch_id ASC NULLS LAST, is_default DESC, layout_name ASC").
+		Scan(&rows).Error
+	return rows, err
 }
 
 func (r *Repository) FindPOSProductByID(tx *gorm.DB, businessID, branchID, productID string) (*ProductRow, error) {
@@ -279,7 +387,7 @@ func (r *Repository) ListSales(businessID string, query SalesListQuery) ([]SaleS
 		sortOrder = "asc"
 	}
 	var rows []SaleSummaryResponse
-	err := db.Select("s.id, s.sale_number, s.branch_id, b.branch_name, s.cashier_user_id, u.full_name AS cashier_name, s.customer_id, COALESCE(c.full_name, '') AS customer_name, s.sales_channel_id, s.sales_channel_name_snapshot, s.external_order_number, s.total_amount, s.paid_amount, s.payment_status, s.sale_status, s.sold_at").
+	err := db.Select("s.id, s.sale_number, s.branch_id, b.branch_name, s.cashier_user_id, u.full_name AS cashier_name, s.customer_id, COALESCE(c.full_name, '') AS customer_name, s.sales_channel_id, s.sales_channel_name_snapshot, s.external_order_number, s.charge_amount, s.charge_tax_amount, s.total_amount, s.paid_amount, s.payment_status, s.sale_status, s.sold_at").
 		Order("s." + sortBy + " " + sortOrder).
 		Offset((query.Page - 1) * query.Limit).
 		Limit(query.Limit).
@@ -327,6 +435,8 @@ func (r *Repository) toSaleResponse(sale Sale, includeChildren bool) (*SaleRespo
 		DiscountAmount:           sale.DiscountAmount,
 		TaxableAmount:            sale.TaxableAmount,
 		TaxAmount:                sale.TaxAmount,
+		ChargeAmount:             sale.ChargeAmount,
+		ChargeTaxAmount:          sale.ChargeTaxAmount,
 		TotalAmount:              sale.TotalAmount,
 		PaidAmount:               sale.PaidAmount,
 		ChangeAmount:             sale.ChangeAmount,
@@ -364,6 +474,11 @@ func (r *Repository) toSaleResponse(sale Sale, includeChildren bool) (*SaleRespo
 	if err := r.db.Table("sale_refunds").Where("sale_id = ? AND business_id = ?", sale.ID, sale.BusinessID).Order("created_at ASC").Scan(&response.Refunds).Error; err != nil {
 		return nil, err
 	}
+	chargeRows, err := charges.ListChargeResponses(r.db, sale.BusinessID, "pos_sale", sale.ID)
+	if err != nil {
+		return nil, err
+	}
+	response.Charges = chargeRows
 	var saleVoid SaleVoidResponse
 	result := r.db.Table("sale_voids").Where("sale_id = ? AND business_id = ?", sale.ID, sale.BusinessID).Limit(1).Scan(&saleVoid)
 	if result.Error != nil {
@@ -391,25 +506,28 @@ func (r *Repository) LoadReceipt(sale Sale) (*ReceiptReadyResponse, error) {
 		Take(&company).Error
 
 	return &ReceiptReadyResponse{
-		BusinessName:  company.BusinessDisplayName,
-		BranchName:    response.BranchName,
-		VATNumber:     company.VATNumber,
-		ReceiptFooter: company.ReceiptFooter,
-		SaleNumber:    sale.SaleNumber,
-		SoldAt:        sale.SoldAt,
-		CashierName:   response.CashierName,
-		CustomerID:    sale.CustomerID,
-		CustomerName:  response.CustomerName,
-		CustomerPhone: response.CustomerPhone,
-		Items:         response.Items,
-		Subtotal:      sale.SubtotalAmount,
-		Discount:      sale.DiscountAmount,
-		TaxAmount:     sale.TaxAmount,
-		Total:         sale.TotalAmount,
-		Payments:      response.Payments,
-		PaidAmount:    sale.PaidAmount,
-		ChangeAmount:  sale.ChangeAmount,
-		QRPlaceholder: "",
+		BusinessName:    company.BusinessDisplayName,
+		BranchName:      response.BranchName,
+		VATNumber:       company.VATNumber,
+		ReceiptFooter:   company.ReceiptFooter,
+		SaleNumber:      sale.SaleNumber,
+		SoldAt:          sale.SoldAt,
+		CashierName:     response.CashierName,
+		CustomerID:      sale.CustomerID,
+		CustomerName:    response.CustomerName,
+		CustomerPhone:   response.CustomerPhone,
+		Items:           response.Items,
+		Subtotal:        sale.SubtotalAmount,
+		Discount:        sale.DiscountAmount,
+		TaxAmount:       sale.TaxAmount,
+		ChargeAmount:    sale.ChargeAmount,
+		ChargeTaxAmount: sale.ChargeTaxAmount,
+		Total:           sale.TotalAmount,
+		Charges:         response.Charges,
+		Payments:        response.Payments,
+		PaidAmount:      sale.PaidAmount,
+		ChangeAmount:    sale.ChangeAmount,
+		QRPlaceholder:   "",
 	}, nil
 }
 
@@ -483,6 +601,11 @@ func (r *Repository) LoadHeldSaleDetails(businessID, heldSaleID string) (*HeldSa
 	if err := r.db.Table("held_sale_items").Where("held_sale_id = ? AND business_id = ?", heldSaleID, businessID).Order("sort_order ASC, created_at ASC").Scan(&response.Items).Error; err != nil {
 		return nil, err
 	}
+	chargeRows, err := charges.ListChargeResponses(r.db, businessID, "held_sale", heldSaleID)
+	if err != nil {
+		return nil, err
+	}
+	response.Charges = chargeRows
 	return &response, nil
 }
 
@@ -578,52 +701,56 @@ type SalesChannelRow struct {
 }
 
 type heldSaleScanRow struct {
-	ID                      string
-	BusinessID              string
-	BranchID                string
-	BranchName              string
-	CashierUserID           string
-	CashierName             string
-	CustomerID              *string
-	HoldNumber              string
-	ItemCount               int
-	EstimatedSubtotal       float64
-	EstimatedDiscountAmount float64
-	EstimatedTaxAmount      float64
-	EstimatedTotal          float64
-	Status                  string
-	Notes                   string
-	HeldAt                  time.Time
-	ResumedAt               *time.Time
-	CancelledAt             *time.Time
-	ExpiresAt               *time.Time
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
+	ID                       string
+	BusinessID               string
+	BranchID                 string
+	BranchName               string
+	CashierUserID            string
+	CashierName              string
+	CustomerID               *string
+	HoldNumber               string
+	ItemCount                int
+	EstimatedSubtotal        float64
+	EstimatedDiscountAmount  float64
+	EstimatedTaxAmount       float64
+	EstimatedChargeAmount    float64
+	EstimatedChargeTaxAmount float64
+	EstimatedTotal           float64
+	Status                   string
+	Notes                    string
+	HeldAt                   time.Time
+	ResumedAt                *time.Time
+	CancelledAt              *time.Time
+	ExpiresAt                *time.Time
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
 }
 
 func (row heldSaleScanRow) toResponse() HeldSaleResponse {
 	return HeldSaleResponse{
-		ID:                      row.ID,
-		BusinessID:              row.BusinessID,
-		BranchID:                row.BranchID,
-		BranchName:              row.BranchName,
-		CashierUserID:           row.CashierUserID,
-		CashierName:             row.CashierName,
-		CustomerID:              row.CustomerID,
-		HoldNumber:              row.HoldNumber,
-		ItemCount:               row.ItemCount,
-		EstimatedSubtotal:       row.EstimatedSubtotal,
-		EstimatedDiscountAmount: row.EstimatedDiscountAmount,
-		EstimatedTaxAmount:      row.EstimatedTaxAmount,
-		EstimatedTotal:          row.EstimatedTotal,
-		Status:                  row.Status,
-		Notes:                   row.Notes,
-		HeldAt:                  row.HeldAt,
-		ResumedAt:               row.ResumedAt,
-		CancelledAt:             row.CancelledAt,
-		ExpiresAt:               row.ExpiresAt,
-		CreatedAt:               row.CreatedAt,
-		UpdatedAt:               row.UpdatedAt,
+		ID:                       row.ID,
+		BusinessID:               row.BusinessID,
+		BranchID:                 row.BranchID,
+		BranchName:               row.BranchName,
+		CashierUserID:            row.CashierUserID,
+		CashierName:              row.CashierName,
+		CustomerID:               row.CustomerID,
+		HoldNumber:               row.HoldNumber,
+		ItemCount:                row.ItemCount,
+		EstimatedSubtotal:        row.EstimatedSubtotal,
+		EstimatedDiscountAmount:  row.EstimatedDiscountAmount,
+		EstimatedTaxAmount:       row.EstimatedTaxAmount,
+		EstimatedChargeAmount:    row.EstimatedChargeAmount,
+		EstimatedChargeTaxAmount: row.EstimatedChargeTaxAmount,
+		EstimatedTotal:           row.EstimatedTotal,
+		Status:                   row.Status,
+		Notes:                    row.Notes,
+		HeldAt:                   row.HeldAt,
+		ResumedAt:                row.ResumedAt,
+		CancelledAt:              row.CancelledAt,
+		ExpiresAt:                row.ExpiresAt,
+		CreatedAt:                row.CreatedAt,
+		UpdatedAt:                row.UpdatedAt,
 	}
 }
 

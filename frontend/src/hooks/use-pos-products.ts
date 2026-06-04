@@ -3,8 +3,9 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { useBranchQueryKey } from "@/hooks/use-branch-scope";
-import { getPaymentMethods, getPOSCategories, getPOSProducts } from "@/lib/api/pos";
+import { getPOSPaymentMethods, getPOSProducts, getPOSReferenceData } from "@/lib/api/pos";
 import type { POSProductFilters, POSReferenceData } from "@/types/pos";
+import type { PaymentMethod } from "@/types/settings";
 
 const posQueryKey = "pos";
 
@@ -18,22 +19,22 @@ export function usePOSProducts(filters: POSProductFilters, enabled = true) {
   });
 }
 
-export function usePOSReferenceData(enabled = true) {
+export function usePOSPaymentMethods(branchId: string | null, enabled = true) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<PaymentMethod[]>({
+    queryKey: [posQueryKey, branchQueryKey, "payment-methods", branchId ?? "current"],
+    queryFn: async () => getPOSPaymentMethods(branchId),
+    enabled,
+  });
+}
+
+export function usePOSReferenceData(branchId: string | null, enabled = true) {
   const branchQueryKey = useBranchQueryKey();
 
   return useQuery<POSReferenceData>({
-    queryKey: [posQueryKey, branchQueryKey, "reference-data"],
-    queryFn: async () => {
-      const [categories, paymentMethods] = await Promise.all([
-        getPOSCategories(),
-        getPaymentMethods(),
-      ]);
-
-      return {
-        categories,
-        paymentMethods,
-      };
-    },
+    queryKey: [posQueryKey, branchQueryKey, "reference-data", branchId ?? "current"],
+    queryFn: async () => getPOSReferenceData(branchId),
     enabled,
   });
 }

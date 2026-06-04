@@ -3,6 +3,8 @@ package bakeryorders
 import (
 	"encoding/json"
 	"time"
+
+	"pastries-pos/internal/modules/charges"
 )
 
 type OrderListQuery struct {
@@ -38,33 +40,35 @@ type OrderItemRequest struct {
 }
 
 type CreateOrderRequest struct {
-	BranchID            string             `json:"branch_id"`
-	CustomerID          string             `json:"customer_id"`
-	SalesChannelID      string             `json:"sales_channel_id"`
-	ExternalOrderNumber string             `json:"external_order_number"`
-	CustomerName        string             `json:"customer_name"`
-	CustomerPhone       string             `json:"customer_phone"`
-	OrderType           string             `json:"order_type"`
-	EventDate           string             `json:"event_date"`
-	PickupTime          string             `json:"pickup_time"`
-	DeliveryTime        string             `json:"delivery_time"`
-	DeliveryAddr        string             `json:"delivery_address"`
-	Items               []OrderItemRequest `json:"items"`
-	Notes               string             `json:"notes"`
+	BranchID            string                `json:"branch_id"`
+	CustomerID          string                `json:"customer_id"`
+	SalesChannelID      string                `json:"sales_channel_id"`
+	ExternalOrderNumber string                `json:"external_order_number"`
+	CustomerName        string                `json:"customer_name"`
+	CustomerPhone       string                `json:"customer_phone"`
+	OrderType           string                `json:"order_type"`
+	EventDate           string                `json:"event_date"`
+	PickupTime          string                `json:"pickup_time"`
+	DeliveryTime        string                `json:"delivery_time"`
+	DeliveryAddr        string                `json:"delivery_address"`
+	Items               []OrderItemRequest    `json:"items"`
+	Charges             []charges.ChargeInput `json:"charges"`
+	Notes               string                `json:"notes"`
 }
 
 type UpdateOrderRequest struct {
-	CustomerID          *string `json:"customer_id"`
-	SalesChannelID      *string `json:"sales_channel_id"`
-	ExternalOrderNumber *string `json:"external_order_number"`
-	CustomerName        *string `json:"customer_name"`
-	CustomerPhone       *string `json:"customer_phone"`
-	OrderType           *string `json:"order_type"`
-	EventDate           *string `json:"event_date"`
-	PickupTime          *string `json:"pickup_time"`
-	DeliveryTime        *string `json:"delivery_time"`
-	DeliveryAddr        *string `json:"delivery_address"`
-	Notes               *string `json:"notes"`
+	CustomerID          *string               `json:"customer_id"`
+	SalesChannelID      *string               `json:"sales_channel_id"`
+	ExternalOrderNumber *string               `json:"external_order_number"`
+	CustomerName        *string               `json:"customer_name"`
+	CustomerPhone       *string               `json:"customer_phone"`
+	OrderType           *string               `json:"order_type"`
+	EventDate           *string               `json:"event_date"`
+	PickupTime          *string               `json:"pickup_time"`
+	DeliveryTime        *string               `json:"delivery_time"`
+	DeliveryAddr        *string               `json:"delivery_address"`
+	Charges             []charges.ChargeInput `json:"charges"`
+	Notes               *string               `json:"notes"`
 }
 
 type UpdateStatusRequest struct {
@@ -161,6 +165,8 @@ type BakeryOrderResponse struct {
 	SubtotalAmount           float64                         `json:"subtotal_amount"`
 	DiscountAmount           float64                         `json:"discount_amount"`
 	TaxAmount                float64                         `json:"tax_amount"`
+	ChargeAmount             float64                         `json:"charge_amount"`
+	ChargeTaxAmount          float64                         `json:"charge_tax_amount"`
 	TotalAmount              float64                         `json:"total_amount"`
 	PaidAmount               float64                         `json:"paid_amount"`
 	BalanceAmount            float64                         `json:"balance_amount"`
@@ -174,6 +180,7 @@ type BakeryOrderResponse struct {
 	UpdatedAt                time.Time                       `json:"updated_at"`
 	Items                    []BakeryOrderItemResponse       `json:"items,omitempty"`
 	Payments                 []BakeryOrderPaymentResponse    `json:"payments,omitempty"`
+	Charges                  []charges.ChargeResponse        `json:"charges,omitempty"`
 	Production               *BakeryOrderProductionResponse  `json:"production,omitempty"`
 	Productions              []BakeryOrderProductionResponse `json:"productions,omitempty"`
 	Packaging                []BakeryOrderPackagingResponse  `json:"packaging,omitempty"`

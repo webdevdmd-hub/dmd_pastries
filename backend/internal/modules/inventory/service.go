@@ -8,19 +8,25 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
 
 type Service struct {
-	db        *gorm.DB
-	repo      *Repository
-	auditRepo *audit.Repository
+	db                *gorm.DB
+	repo              *Repository
+	auditRepo         *audit.Repository
+	accountingService *accounting.Service
 }
 
-func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository) *Service {
-	return &Service{db: db, repo: repo, auditRepo: auditRepo}
+func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository, accountingService ...*accounting.Service) *Service {
+	service := &Service{db: db, repo: repo, auditRepo: auditRepo}
+	if len(accountingService) > 0 {
+		service.accountingService = accountingService[0]
+	}
+	return service
 }
 
 func (s *Service) ListInventory(currentUser *utils.AuthContext, query InventoryListQuery) (*PaginatedInventoryResponse, error) {
@@ -678,6 +684,11 @@ func (s *Service) CreateOpeningStock(currentUser *utils.AuthContext, req Opening
 		if err != nil {
 			return err
 		}
+		if s.accountingService != nil {
+			if _, err := s.accountingService.PostInventoryMovementJournal(tx, currentUser, movement.ID); err != nil {
+				return err
+			}
+		}
 		item.CurrentQuantity = movement.AfterQuantity
 		item.AvailableQuantity = movement.AfterQuantity - item.ReservedQuantity
 		if req.ExpiryDate != "" {
@@ -762,6 +773,11 @@ func (s *Service) AdjustStock(currentUser *utils.AuthContext, id string, req Adj
 		})
 		if err != nil {
 			return err
+		}
+		if s.accountingService != nil {
+			if _, err := s.accountingService.PostInventoryMovementJournal(tx, currentUser, movement.ID); err != nil {
+				return err
+			}
 		}
 		item.CurrentQuantity = movement.AfterQuantity
 		item.AvailableQuantity = movement.AfterQuantity - item.ReservedQuantity
@@ -904,6 +920,11 @@ func (s *Service) ManualStockMovement(currentUser *utils.AuthContext, req Manual
 		})
 		if err != nil {
 			return err
+		}
+		if s.accountingService != nil {
+			if _, err := s.accountingService.PostInventoryMovementJournal(tx, currentUser, movement.ID); err != nil {
+				return err
+			}
 		}
 		if err := s.auditStockMovement(tx, currentUser, "stock_movement.manual_created", movement.ID, "Manual stock movement created", ipAddress, userAgent); err != nil {
 			return err

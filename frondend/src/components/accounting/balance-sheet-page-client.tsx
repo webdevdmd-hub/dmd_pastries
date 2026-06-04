@@ -97,6 +97,39 @@ function groupSectionItems(section: BalanceSheetSection): GroupedBalanceSheetRow
   }));
 }
 
+function getBalanceSheetItemLabel(item: BalanceSheetItem): string {
+  if (!item.isCalculated || item.accountName !== "Current Year Profit / Loss") {
+    return item.accountName;
+  }
+
+  if (item.amount > 0) {
+    return "Current Year Profit";
+  }
+
+  if (item.amount < 0) {
+    return "Current Year Loss";
+  }
+
+  return item.accountName;
+}
+
+function getBalanceSheetItemKey(
+  item: BalanceSheetItem,
+  itemIndex: number,
+  group: string,
+  title: string,
+): string {
+  return [
+    title,
+    group,
+    item.accountId || "calculated",
+    item.accountCode,
+    item.accountName,
+    String(item.amount),
+    String(itemIndex),
+  ].join("-");
+}
+
 function AmountCell({ strong = false, value }: { strong?: boolean; value: number }): JSX.Element {
   return (
     <td
@@ -131,12 +164,26 @@ function BalanceSheetRows({
             <td className="px-10 py-3 font-bold text-slate-950">{formatGroupName(group.group)}</td>
             <AmountCell value={0} />
           </tr>
-          {group.items.map((item) => (
+          {group.items.map((item, itemIndex) => (
             <tr
               className="border-b border-slate-100 transition-colors hover:bg-slate-50"
-              key={item.accountId}
+              key={getBalanceSheetItemKey(item, itemIndex, group.group, title)}
             >
-              <td className="px-14 py-3 font-medium text-[#2563eb]">{item.accountName}</td>
+              <td className="px-14 py-3">
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-2 font-medium",
+                    item.isCalculated ? "text-slate-700" : "text-[#2563eb]",
+                  )}
+                >
+                  {getBalanceSheetItemLabel(item)}
+                  {item.isCalculated ? (
+                    <Badge className="text-[0.65rem]" variant="secondary">
+                      Calculated
+                    </Badge>
+                  ) : null}
+                </span>
+              </td>
               <AmountCell value={item.amount} />
             </tr>
           ))}

@@ -1,6 +1,7 @@
-import type { ProductCategory } from "@/types/master-data";
+import type { DocumentCharge, DocumentChargeDraft } from "@/types/document-charges";
+import type { ProductCategory, Unit } from "@/types/master-data";
 import type { ProductType } from "@/types/product";
-import type { PaymentMethod, RecordStatus } from "@/types/settings";
+import type { ReceiptLayout, RecordStatus, SalesChannel, TaxRate } from "@/types/settings";
 
 export type POSProductVariant = {
   id: string;
@@ -24,7 +25,9 @@ export type POSProduct = {
   barcode: string | null;
   categoryId: string | null;
   categoryName: string;
+  unitId: string | null;
   unitName: string;
+  taxRateId: string | null;
   taxRateName: string | null;
   taxRatePercentage: number;
   productType: ProductType;
@@ -43,6 +46,14 @@ export type POSProductFilters = {
   categoryId: string;
   search: string;
   limit: number;
+};
+
+export type POSReferenceData = {
+  productCategories: ProductCategory[];
+  units: Unit[];
+  taxRates: TaxRate[];
+  salesChannels: SalesChannel[];
+  receiptLayouts: ReceiptLayout[];
 };
 
 export type POSLookupParams = {
@@ -83,6 +94,8 @@ export type CartTotals = {
   subtotal: number;
   discountAmount: number;
   taxAmount: number;
+  chargeAmount: number;
+  chargeTaxAmount: number;
   total: number;
   paidAmount: number;
   changeAmount: number;
@@ -102,6 +115,7 @@ export type CheckoutPayload = {
   }[];
   saleDiscountType: CartDiscountType | null;
   saleDiscountValue: number | null;
+  charges: DocumentChargeDraft[];
   payments: PaymentInput[];
   salesChannelId: string | null;
   externalOrderNumber: string | null;
@@ -116,6 +130,7 @@ export type HoldSalePayload = {
   items: CartItem[];
   saleDiscountType: CartDiscountType | null;
   saleDiscountValue: number | null;
+  charges: DocumentChargeDraft[];
   totals: CartTotals;
   notes: string | null;
 };
@@ -130,6 +145,8 @@ export type HeldSale = {
   subtotal: number;
   discountAmount: number;
   taxAmount: number;
+  chargeAmount: number;
+  chargeTaxAmount: number;
   total: number;
   status: HeldSaleStatus;
   notes: string | null;
@@ -142,6 +159,7 @@ export type HeldSaleResumeData = {
   items: CartItem[];
   saleDiscountType: CartDiscountType | null;
   saleDiscountValue: number | null;
+  charges: DocumentChargeDraft[];
   customerId: string | null;
 };
 
@@ -164,6 +182,9 @@ export type SaleReceipt = {
   subtotal: number;
   discountAmount: number;
   taxAmount: number;
+  chargeAmount: number;
+  chargeTaxAmount: number;
+  charges: DocumentCharge[];
   total: number;
   payments: PaymentInput[];
   paidAmount: number;
@@ -178,9 +199,4 @@ export type CheckoutResponse = {
     accountingJournalEntryId: string | null;
   };
   receipt: SaleReceipt;
-};
-
-export type POSReferenceData = {
-  categories: ProductCategory[];
-  paymentMethods: PaymentMethod[];
 };

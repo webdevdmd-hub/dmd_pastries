@@ -7,6 +7,7 @@ func RegisterRoutes(
 	handler *Handler,
 	authGuard gin.HandlerFunc,
 	posView gin.HandlerFunc,
+	posPaymentMethods gin.HandlerFunc,
 	posSell gin.HandlerFunc,
 	posRefund gin.HandlerFunc,
 	posVoid gin.HandlerFunc,
@@ -14,6 +15,8 @@ func RegisterRoutes(
 	group := router.Group("/api/v1/pos")
 	group.Use(authGuard)
 
+	group.GET("/payment-methods", posPaymentMethods, handler.ListPaymentMethods)
+	group.GET("/reference-data", posPaymentMethods, handler.ReferenceData)
 	group.GET("/products", posView, handler.ListProducts)
 	group.GET("/products/lookup", posView, handler.LookupProduct)
 	group.POST("/held-sales", posSell, handler.CreateHeldSale)

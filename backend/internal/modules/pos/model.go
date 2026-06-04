@@ -22,6 +22,8 @@ type Sale struct {
 	DiscountAmount           float64        `gorm:"not null;default:0" json:"discount_amount"`
 	TaxableAmount            float64        `gorm:"not null;default:0" json:"taxable_amount"`
 	TaxAmount                float64        `gorm:"not null;default:0" json:"tax_amount"`
+	ChargeAmount             float64        `gorm:"not null;default:0" json:"charge_amount"`
+	ChargeTaxAmount          float64        `gorm:"not null;default:0" json:"charge_tax_amount"`
 	TotalAmount              float64        `gorm:"not null;default:0" json:"total_amount"`
 	PaidAmount               float64        `gorm:"not null;default:0" json:"paid_amount"`
 	ChangeAmount             float64        `gorm:"not null;default:0" json:"change_amount"`
@@ -124,26 +126,28 @@ func (SaleVoid) TableName() string {
 }
 
 type HeldSale struct {
-	ID                      string         `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID              string         `gorm:"type:uuid;not null;index" json:"business_id"`
-	BranchID                string         `gorm:"type:uuid;not null;index" json:"branch_id"`
-	CashierUserID           string         `gorm:"type:uuid;not null;index" json:"cashier_user_id"`
-	CustomerID              *string        `gorm:"type:uuid;index" json:"customer_id"`
-	HoldNumber              string         `gorm:"size:100;not null" json:"hold_number"`
-	ItemCount               int            `gorm:"not null;default:0" json:"item_count"`
-	EstimatedSubtotal       float64        `gorm:"not null;default:0" json:"estimated_subtotal"`
-	EstimatedDiscountAmount float64        `gorm:"not null;default:0" json:"estimated_discount_amount"`
-	EstimatedTaxAmount      float64        `gorm:"not null;default:0" json:"estimated_tax_amount"`
-	EstimatedTotal          float64        `gorm:"not null;default:0" json:"estimated_total"`
-	Status                  string         `gorm:"size:50;not null;default:held" json:"status"`
-	Notes                   string         `json:"notes"`
-	HeldAt                  time.Time      `gorm:"not null" json:"held_at"`
-	ResumedAt               *time.Time     `json:"resumed_at"`
-	CancelledAt             *time.Time     `json:"cancelled_at"`
-	ExpiresAt               *time.Time     `json:"expires_at"`
-	CreatedAt               time.Time      `json:"created_at"`
-	UpdatedAt               time.Time      `json:"updated_at"`
-	DeletedAt               gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	ID                       string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID               string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID                 string         `gorm:"type:uuid;not null;index" json:"branch_id"`
+	CashierUserID            string         `gorm:"type:uuid;not null;index" json:"cashier_user_id"`
+	CustomerID               *string        `gorm:"type:uuid;index" json:"customer_id"`
+	HoldNumber               string         `gorm:"size:100;not null" json:"hold_number"`
+	ItemCount                int            `gorm:"not null;default:0" json:"item_count"`
+	EstimatedSubtotal        float64        `gorm:"not null;default:0" json:"estimated_subtotal"`
+	EstimatedDiscountAmount  float64        `gorm:"not null;default:0" json:"estimated_discount_amount"`
+	EstimatedTaxAmount       float64        `gorm:"not null;default:0" json:"estimated_tax_amount"`
+	EstimatedChargeAmount    float64        `gorm:"not null;default:0" json:"estimated_charge_amount"`
+	EstimatedChargeTaxAmount float64        `gorm:"not null;default:0" json:"estimated_charge_tax_amount"`
+	EstimatedTotal           float64        `gorm:"not null;default:0" json:"estimated_total"`
+	Status                   string         `gorm:"size:50;not null;default:held" json:"status"`
+	Notes                    string         `json:"notes"`
+	HeldAt                   time.Time      `gorm:"not null" json:"held_at"`
+	ResumedAt                *time.Time     `json:"resumed_at"`
+	CancelledAt              *time.Time     `json:"cancelled_at"`
+	ExpiresAt                *time.Time     `json:"expires_at"`
+	CreatedAt                time.Time      `json:"created_at"`
+	UpdatedAt                time.Time      `json:"updated_at"`
+	DeletedAt                gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 func (HeldSale) TableName() string {

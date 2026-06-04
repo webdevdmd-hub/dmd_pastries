@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { documentChargesSchema } from "@/lib/validators/document-charges.schema";
+
 const nullableTrimmedString = z
   .string()
   .trim()
@@ -62,6 +64,7 @@ export const createOrderSchema = z.object({
   deliveryTime: nullableTrimmedString,
   deliveryAddress: nullableTrimmedString,
   items: z.array(orderItemSchema).min(1, "At least one order item is required."),
+  charges: documentChargesSchema,
   notes: nullableTrimmedString,
 });
 

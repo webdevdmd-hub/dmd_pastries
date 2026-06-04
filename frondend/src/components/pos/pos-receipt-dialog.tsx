@@ -90,7 +90,14 @@ function buildReceiptText(receipt: SaleReceipt, config: ReceiptLayoutConfig): st
     "",
     `Subtotal: ${formatMoney(receipt.subtotal)}`,
     config.showDiscount ? `Discount: ${formatMoney(receipt.discountAmount)}` : null,
-    config.showTax ? `Tax: ${formatMoney(receipt.taxAmount)}` : null,
+    config.showTax ? `Item tax: ${formatMoney(receipt.taxAmount)}` : null,
+    receipt.chargeAmount > 0 ? `Charges: ${formatMoney(receipt.chargeAmount)}` : null,
+    receipt.charges.length > 0
+      ? receipt.charges
+          .map((charge) => `  ${charge.chargeName}: ${formatMoney(charge.totalAmount)}`)
+          .join("\n")
+      : null,
+    receipt.chargeTaxAmount > 0 ? `Charge tax: ${formatMoney(receipt.chargeTaxAmount)}` : null,
     `Total: ${formatMoney(receipt.total)}`,
     `Paid: ${formatMoney(receipt.paidAmount)}`,
     receipt.balanceDue > 0 ? `Balance due: ${formatMoney(receipt.balanceDue)}` : null,
@@ -219,9 +226,34 @@ export function POSReceiptDialog({
               ) : null}
               {config.showTax ? (
                 <div className="flex justify-between">
-                  <span>Tax</span>
+                  <span>Item tax</span>
                   <span>{formatMoney(receipt.taxAmount)}</span>
                 </div>
+              ) : null}
+              {receipt.chargeAmount > 0 || receipt.chargeTaxAmount > 0 ? (
+                <>
+                  {receipt.charges.length > 0 ? (
+                    <div className="grid gap-1 text-left text-xs text-[#52525b]">
+                      {receipt.charges.map((charge) => (
+                        <div
+                          className="flex justify-between gap-3"
+                          key={charge.id || charge.chargeName}
+                        >
+                          <span>{charge.chargeName}</span>
+                          <span>{formatMoney(charge.totalAmount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between">
+                    <span>Charges</span>
+                    <span>{formatMoney(receipt.chargeAmount)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Charge tax</span>
+                    <span>{formatMoney(receipt.chargeTaxAmount)}</span>
+                  </div>
+                </>
               ) : null}
               <div className="flex justify-between text-lg font-black">
                 <span>Total</span>

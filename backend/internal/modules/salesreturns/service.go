@@ -11,6 +11,7 @@ import (
 
 	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
+	"pastries-pos/internal/modules/charges"
 	"pastries-pos/internal/modules/inventory"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
@@ -36,6 +37,7 @@ type normalizedRequest struct {
 	RefundPaymentMethodID *string
 	RefundReferenceNumber string
 	Items                 []SalesReturnItemRequest
+	RefundCharges         []charges.ChargeRefundInput
 }
 
 func (s *Service) List(currentUser *utils.AuthContext, query SalesReturnListQuery) (*PaginatedResponse[SalesReturnResponse], error) {
@@ -94,10 +96,17 @@ func (s *Service) Create(currentUser *utils.AuthContext, req CreateSalesReturnRe
 		if err != nil {
 			return err
 		}
-		items, subtotal, tax, total, err := s.buildReturnItems(tx, currentUser.BusinessID, sale.ID, "", "", normalized.Items)
+		returnID := utils.NewUUID()
+		items, subtotal, tax, total, err := s.buildReturnItems(tx, currentUser.BusinessID, sale.ID, returnID, "", normalized.Items)
 		if err != nil {
 			return err
 		}
+		chargeRows, chargeTotals, err := s.buildChargeRefunds(tx, currentUser.BusinessID, sale.ID, sale.BranchID, returnID, "", normalized.RefundCharges)
+		if err != nil {
+			return err
+		}
+		tax = roundMoney(tax + chargeTotals.TaxAmount)
+		total = roundMoney(total + chargeTotals.Total)
 		if normalized.RefundMode == "refund" {
 			if err := s.validateRefundRequest(tx, currentUser.BusinessID, sale.ID, sale.BranchID, normalized.RefundPaymentMethodID, normalized.RefundReferenceNumber, total); err != nil {
 				return err
@@ -113,7 +122,7 @@ func (s *Service) Create(currentUser *utils.AuthContext, req CreateSalesReturnRe
 			refundAmount = total
 		}
 		created = SalesReturn{
-			ID:                    utils.NewUUID(),
+			ID:                    returnID,
 			BusinessID:            currentUser.BusinessID,
 			BranchID:              sale.BranchID,
 			SaleID:                sale.ID,
@@ -124,6 +133,8 @@ func (s *Service) Create(currentUser *utils.AuthContext, req CreateSalesReturnRe
 			Status:                "draft",
 			SubtotalAmount:        subtotal,
 			TaxAmount:             tax,
+			ChargeAmount:          chargeTotals.Amount,
+			ChargeTaxAmount:       chargeTotals.TaxAmount,
 			ReturnTotal:           total,
 			RefundMode:            normalized.RefundMode,
 			RefundPaymentMethodID: normalized.RefundPaymentMethodID,
@@ -138,6 +149,11 @@ func (s *Service) Create(currentUser *utils.AuthContext, req CreateSalesReturnRe
 		}
 		if err := s.repo.Create(tx, &created, items); err != nil {
 			return apperrors.Internal("failed to create sales return")
+		}
+		if len(chargeRows) > 0 {
+			if err := tx.Create(&chargeRows).Error; err != nil {
+				return apperrors.Internal("failed to create sales return charges")
+			}
 		}
 		return s.writeAudit(tx, currentUser, "sales_return.created", created.ID, "Sales return draft created.", ipAddress, userAgent)
 	})
@@ -176,6 +192,12 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateSa
 		if err != nil {
 			return err
 		}
+		chargeRows, chargeTotals, err := s.buildChargeRefunds(tx, currentUser.BusinessID, sale.ID, sale.BranchID, existing.ID, existing.ID, normalized.RefundCharges)
+		if err != nil {
+			return err
+		}
+		tax = roundMoney(tax + chargeTotals.TaxAmount)
+		total = roundMoney(total + chargeTotals.Total)
 		if normalized.RefundMode == "refund" {
 			if err := s.validateRefundRequest(tx, currentUser.BusinessID, sale.ID, sale.BranchID, normalized.RefundPaymentMethodID, normalized.RefundReferenceNumber, total); err != nil {
 				return err
@@ -191,6 +213,8 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateSa
 			"reason":                   normalized.Reason,
 			"subtotal_amount":          subtotal,
 			"tax_amount":               tax,
+			"charge_amount":            chargeTotals.Amount,
+			"charge_tax_amount":        chargeTotals.TaxAmount,
 			"return_total":             total,
 			"refund_mode":              normalized.RefundMode,
 			"refund_payment_method_id": normalized.RefundPaymentMethodID,
@@ -206,6 +230,9 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateSa
 		}
 		if err := s.repo.ReplaceItems(tx, currentUser.BusinessID, existing.ID, items); err != nil {
 			return apperrors.Internal("failed to update sales return items")
+		}
+		if err := s.replaceChargeRefunds(tx, currentUser.BusinessID, existing.ID, chargeRows); err != nil {
+			return err
 		}
 		refreshed, err := s.repo.FindByID(tx, currentUser.BusinessID, existing.ID)
 		if err != nil {
@@ -252,6 +279,9 @@ func (s *Service) Post(currentUser *utils.AuthContext, id string, ipAddress, use
 			return apperrors.BadRequest("sales return must have at least one item", nil)
 		}
 		if err := s.validateStoredReturnItems(tx, currentUser.BusinessID, sale.ID, salesReturn.ID, items); err != nil {
+			return err
+		}
+		if err := s.validateStoredChargeRefunds(tx, currentUser.BusinessID, sale.ID, salesReturn.ID); err != nil {
 			return err
 		}
 		if salesReturn.RefundMode == "refund" {
@@ -505,6 +535,139 @@ func (s *Service) buildReturnItems(tx *gorm.DB, businessID, saleID, salesReturnI
 	return items, roundMoney(subtotal), roundMoney(tax), roundMoney(total), nil
 }
 
+func (s *Service) buildChargeRefunds(tx *gorm.DB, businessID, saleID, branchID, salesReturnID, excludeReturnID string, requests []charges.ChargeRefundInput) ([]charges.DocumentCharge, charges.ChargeTotals, error) {
+	if len(requests) == 0 {
+		return nil, charges.ChargeTotals{}, nil
+	}
+	seen := map[string]struct{}{}
+	now := time.Now().UTC()
+	rows := make([]charges.DocumentCharge, 0, len(requests))
+	totals := charges.ChargeTotals{}
+	for _, req := range requests {
+		sourceID := strings.TrimSpace(req.SourceChargeID)
+		if _, ok := seen[sourceID]; ok {
+			return nil, charges.ChargeTotals{}, apperrors.BadRequest("duplicate source_charge_id in refund_charges", map[string]interface{}{"source_charge_id": sourceID})
+		}
+		seen[sourceID] = struct{}{}
+		if _, err := uuid.Parse(sourceID); err != nil {
+			return nil, charges.ChargeTotals{}, apperrors.BadRequest("source_charge_id must be a valid UUID", nil)
+		}
+		refundAmount := roundMoney(req.RefundAmount)
+		if refundAmount <= 0 {
+			return nil, charges.ChargeTotals{}, apperrors.BadRequest("charge refund_amount must be greater than zero", map[string]interface{}{"source_charge_id": sourceID})
+		}
+		source, remaining, err := s.sourceChargeRemaining(tx, businessID, saleID, sourceID, excludeReturnID)
+		if err != nil {
+			return nil, charges.ChargeTotals{}, err
+		}
+		if source.BranchID != branchID {
+			return nil, charges.ChargeTotals{}, apperrors.BadRequest("source charge branch does not match sale branch", map[string]interface{}{"source_charge_id": sourceID})
+		}
+		if refundAmount > remaining+0.0001 {
+			return nil, charges.ChargeTotals{}, apperrors.BadRequest("charge refund exceeds refundable charge balance", map[string]interface{}{
+				"source_charge_id":            sourceID,
+				"refund_amount":               refundAmount,
+				"remaining_refundable_amount": roundMoney(remaining),
+			})
+		}
+		if source.TotalAmount <= 0 {
+			return nil, charges.ChargeTotals{}, apperrors.BadRequest("source charge has no refundable amount", map[string]interface{}{"source_charge_id": sourceID})
+		}
+		ratio := refundAmount / source.TotalAmount
+		taxAmount := roundMoney(source.TaxAmount * ratio)
+		netAmount := roundMoney(refundAmount - taxAmount)
+		if netAmount < 0 {
+			netAmount = 0
+		}
+		row := charges.DocumentCharge{
+			ID:                        utils.NewUUID(),
+			BusinessID:                businessID,
+			BranchID:                  branchID,
+			DocumentType:              "sales_return",
+			DocumentID:                salesReturnID,
+			ChargeType:                source.ChargeType,
+			ChargeName:                source.ChargeName,
+			Description:               cleanReason(req.Reason, "Charge refund"),
+			Amount:                    netAmount,
+			TaxRateID:                 source.TaxRateID,
+			TaxRateNameSnapshot:       source.TaxRateNameSnapshot,
+			TaxRatePercentageSnapshot: source.TaxRatePercentageSnapshot,
+			TaxAmount:                 taxAmount,
+			TotalAmount:               refundAmount,
+			IsRefundable:              false,
+			SourceChargeID:            &source.ID,
+			CreatedAt:                 now,
+			UpdatedAt:                 now,
+		}
+		rows = append(rows, row)
+		totals.Amount = roundMoney(totals.Amount + row.Amount)
+		totals.TaxAmount = roundMoney(totals.TaxAmount + row.TaxAmount)
+		totals.Total = roundMoney(totals.Total + row.TotalAmount)
+	}
+	return rows, totals, nil
+}
+
+func (s *Service) replaceChargeRefunds(tx *gorm.DB, businessID, salesReturnID string, rows []charges.DocumentCharge) error {
+	if err := tx.Model(&charges.DocumentCharge{}).
+		Where("business_id = ? AND document_type = ? AND document_id = ? AND deleted_at IS NULL", businessID, "sales_return", salesReturnID).
+		Update("deleted_at", gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}).Error; err != nil {
+		return apperrors.Internal("failed to replace sales return charges")
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	if err := tx.Create(&rows).Error; err != nil {
+		return apperrors.Internal("failed to replace sales return charges")
+	}
+	return nil
+}
+
+func (s *Service) sourceChargeRemaining(tx *gorm.DB, businessID, saleID, sourceChargeID, excludeReturnID string) (*charges.DocumentCharge, float64, error) {
+	var source charges.DocumentCharge
+	if err := tx.Where("business_id = ? AND document_type = ? AND document_id = ? AND id = ? AND is_refundable = ? AND deleted_at IS NULL", businessID, "pos_sale", saleID, sourceChargeID, true).Take(&source).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, 0, apperrors.BadRequest("refundable source charge not found", map[string]interface{}{"source_charge_id": sourceChargeID})
+		}
+		return nil, 0, apperrors.Internal("failed to validate source charge")
+	}
+	var refunded float64
+	query := tx.Table("document_charges dc").
+		Select("COALESCE(SUM(dc.total_amount), 0)").
+		Joins("JOIN sales_returns sr ON sr.id = dc.document_id AND sr.business_id = dc.business_id").
+		Where("dc.business_id = ? AND dc.document_type = ? AND dc.source_charge_id = ? AND dc.deleted_at IS NULL AND sr.deleted_at IS NULL AND sr.status <> ?", businessID, "sales_return", sourceChargeID, "cancelled")
+	if strings.TrimSpace(excludeReturnID) != "" {
+		query = query.Where("sr.id <> ?", excludeReturnID)
+	}
+	if err := query.Scan(&refunded).Error; err != nil {
+		return nil, 0, apperrors.Internal("failed to calculate refunded charge amount")
+	}
+	return &source, roundMoney(source.TotalAmount - refunded), nil
+}
+
+func (s *Service) validateStoredChargeRefunds(tx *gorm.DB, businessID, saleID, salesReturnID string) error {
+	rows, err := charges.ListChargeRows(tx, businessID, "sales_return", salesReturnID)
+	if err != nil {
+		return apperrors.Internal("failed to load sales return charges")
+	}
+	for _, row := range rows {
+		if row.SourceChargeID == nil || strings.TrimSpace(*row.SourceChargeID) == "" {
+			return apperrors.BadRequest("sales return charge is missing source_charge_id", map[string]interface{}{"charge_id": row.ID})
+		}
+		_, remaining, err := s.sourceChargeRemaining(tx, businessID, saleID, *row.SourceChargeID, salesReturnID)
+		if err != nil {
+			return err
+		}
+		if row.TotalAmount > remaining+0.0001 {
+			return apperrors.BadRequest("charge refund exceeds refundable charge balance", map[string]interface{}{
+				"source_charge_id":            *row.SourceChargeID,
+				"refund_amount":               roundMoney(row.TotalAmount),
+				"remaining_refundable_amount": roundMoney(remaining),
+			})
+		}
+	}
+	return nil
+}
+
 func (s *Service) validateStoredReturnItems(tx *gorm.DB, businessID, saleID, excludeReturnID string, items []SalesReturnItem) error {
 	for _, item := range items {
 		saleItem, err := s.repo.FindSaleItem(tx, businessID, saleID, item.SaleItemID)
@@ -640,14 +803,14 @@ func (s *Service) createPaymentRefund(tx *gorm.DB, currentUser *utils.AuthContex
 }
 
 func normalizeCreateRequest(req CreateSalesReturnRequest) (normalizedRequest, error) {
-	return normalizeRequest(req.SaleID, req.ReturnDate, req.Reason, req.RefundMode, req.RefundPaymentMethodID, req.RefundReferenceNumber, req.Items)
+	return normalizeRequest(req.SaleID, req.ReturnDate, req.Reason, req.RefundMode, req.RefundPaymentMethodID, req.RefundReferenceNumber, req.Items, req.RefundCharges)
 }
 
 func normalizeUpdateRequest(req UpdateSalesReturnRequest) (normalizedRequest, error) {
-	return normalizeRequest("", req.ReturnDate, req.Reason, req.RefundMode, req.RefundPaymentMethodID, req.RefundReferenceNumber, req.Items)
+	return normalizeRequest("", req.ReturnDate, req.Reason, req.RefundMode, req.RefundPaymentMethodID, req.RefundReferenceNumber, req.Items, req.RefundCharges)
 }
 
-func normalizeRequest(saleID, returnDate, reason, refundMode string, refundPaymentMethodID *string, refundReferenceNumber string, items []SalesReturnItemRequest) (normalizedRequest, error) {
+func normalizeRequest(saleID, returnDate, reason, refundMode string, refundPaymentMethodID *string, refundReferenceNumber string, items []SalesReturnItemRequest, refundCharges []charges.ChargeRefundInput) (normalizedRequest, error) {
 	if strings.TrimSpace(saleID) != "" {
 		if _, err := uuid.Parse(strings.TrimSpace(saleID)); err != nil {
 			return normalizedRequest{}, apperrors.BadRequest("sale_id must be a valid UUID", nil)
@@ -661,6 +824,9 @@ func normalizeRequest(saleID, returnDate, reason, refundMode string, refundPayme
 	if mode != "none" && mode != "refund" {
 		return normalizedRequest{}, apperrors.BadRequest("invalid refund_mode", nil)
 	}
+	if mode != "refund" && len(refundCharges) > 0 {
+		return normalizedRequest{}, apperrors.BadRequest("refund_charges are only allowed when refund_mode=refund", nil)
+	}
 	return normalizedRequest{
 		SaleID:                strings.TrimSpace(saleID),
 		ReturnDate:            parsedDate,
@@ -669,6 +835,7 @@ func normalizeRequest(saleID, returnDate, reason, refundMode string, refundPayme
 		RefundPaymentMethodID: cleanStringPointer(refundPaymentMethodID),
 		RefundReferenceNumber: strings.TrimSpace(refundReferenceNumber),
 		Items:                 items,
+		RefundCharges:         refundCharges,
 	}, nil
 }
 

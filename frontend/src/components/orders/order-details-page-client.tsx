@@ -163,6 +163,35 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
               </div>
             ))}
           </div>
+          {order.chargeAmount > 0 || order.chargeTaxAmount > 0 ? (
+            <div className="mt-5 rounded-2xl border border-brand-cappuccino/60 bg-brand-latte/60 p-4">
+              <h3 className="font-semibold text-brand-espresso">Charges</h3>
+              <div className="mt-3 grid gap-2 text-sm">
+                {order.charges.map((charge) => (
+                  <div
+                    className="flex items-start justify-between gap-3"
+                    key={charge.id || charge.chargeName}
+                  >
+                    <div>
+                      <p className="font-medium text-brand-espresso">{charge.chargeName}</p>
+                      {charge.description ? (
+                        <p className="text-xs text-brand-mocha">{charge.description}</p>
+                      ) : null}
+                    </div>
+                    <p className="font-semibold text-brand-espresso">
+                      {formatCurrency(charge.totalAmount)}
+                    </p>
+                  </div>
+                ))}
+                <div className="flex justify-between border-t border-brand-cappuccino/60 pt-2">
+                  <span className="text-brand-mocha">Charge tax</span>
+                  <strong className="text-brand-espresso">
+                    {formatCurrency(order.chargeTaxAmount)}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          ) : null}
           <div className="mt-5 flex flex-wrap gap-2">
             {transitions.map((status) => (
               <Button

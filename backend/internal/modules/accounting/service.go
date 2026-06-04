@@ -877,7 +877,12 @@ func (s *Service) PostPOSSaleJournal(tx *gorm.DB, currentUser *utils.AuthContext
 		}
 	}
 
-	lines := make([]JournalEntryLineRequest, 0, len(paymentDebits)+3)
+	chargeLines, chargeNetAmount, err := s.buildChargeCreditLines(tx, currentUser.BusinessID, "pos_sale", sale.ID, "POS sale charge")
+	if err != nil {
+		return "", err
+	}
+
+	lines := make([]JournalEntryLineRequest, 0, len(paymentDebits)+3+len(chargeLines))
 	for accountID, amount := range paymentDebits {
 		if amount > 0 {
 			lines = append(lines, JournalEntryLineRequest{AccountID: accountID, DebitAmount: amount, Description: paymentDescriptions[accountID]})
@@ -887,10 +892,11 @@ func (s *Service) PostPOSSaleJournal(tx *gorm.DB, currentUser *utils.AuthContext
 	if balanceAmount > 0 {
 		lines = append(lines, JournalEntryLineRequest{AccountID: accountsReceivable.ID, DebitAmount: balanceAmount, Description: "POS sale receivable"})
 	}
-	revenueAmount := roundMoney(totalAmount - taxAmount)
+	revenueAmount := roundMoney(totalAmount - taxAmount - chargeNetAmount)
 	if revenueAmount > 0 {
 		lines = append(lines, JournalEntryLineRequest{AccountID: salesIncome.ID, CreditAmount: revenueAmount, Description: "POS sale income"})
 	}
+	lines = append(lines, chargeLines...)
 	if vatPayable != nil {
 		lines = append(lines, JournalEntryLineRequest{AccountID: vatPayable.ID, CreditAmount: taxAmount, Description: "VAT payable on POS sale"})
 	}
@@ -1128,17 +1134,23 @@ func (s *Service) PostBakeryOrderRevenueJournal(tx *gorm.DB, currentUser *utils.
 		paidAmount = totalAmount
 	}
 	balanceAmount := roundMoney(totalAmount - paidAmount)
-	lines := make([]JournalEntryLineRequest, 0, 4)
+	chargeLines, chargeNetAmount, err := s.buildChargeCreditLines(tx, currentUser.BusinessID, "bakery_order", order.ID, "Bakery order charge")
+	if err != nil {
+		return "", err
+	}
+
+	lines := make([]JournalEntryLineRequest, 0, 4+len(chargeLines))
 	if paidAmount > 0 {
 		lines = append(lines, JournalEntryLineRequest{AccountID: customerAdvance.ID, DebitAmount: paidAmount, Description: "Recognize paid bakery order advance"})
 	}
 	if balanceAmount > 0 {
 		lines = append(lines, JournalEntryLineRequest{AccountID: accountsReceivable.ID, DebitAmount: balanceAmount, Description: "Bakery order receivable"})
 	}
-	revenueAmount := roundMoney(totalAmount - taxAmount)
+	revenueAmount := roundMoney(totalAmount - taxAmount - chargeNetAmount)
 	if revenueAmount > 0 {
 		lines = append(lines, JournalEntryLineRequest{AccountID: bakeryIncome.ID, CreditAmount: revenueAmount, Description: "Bakery order income"})
 	}
+	lines = append(lines, chargeLines...)
 	if vatPayable != nil {
 		lines = append(lines, JournalEntryLineRequest{AccountID: vatPayable.ID, CreditAmount: taxAmount, Description: "VAT payable on bakery order"})
 	}
@@ -1181,11 +1193,16 @@ func (s *Service) PostSalesReturnJournal(tx *gorm.DB, currentUser *utils.AuthCon
 		return "", err
 	}
 	taxAmount := roundMoney(salesReturn.TaxAmount)
-	netReturn := roundMoney(refundAmount - taxAmount)
-	lines := make([]JournalEntryLineRequest, 0, 3)
+	chargeLines, chargeNetAmount, err := s.buildChargeRefundDebitLines(tx, currentUser.BusinessID, "sales_return", salesReturn.ID, "Refunded customer charge")
+	if err != nil {
+		return "", err
+	}
+	netReturn := roundMoney(refundAmount - taxAmount - chargeNetAmount)
+	lines := make([]JournalEntryLineRequest, 0, 3+len(chargeLines))
 	if netReturn > 0 {
 		lines = append(lines, JournalEntryLineRequest{AccountID: salesReturnsAccount.ID, DebitAmount: netReturn, Description: "Sales return allowance " + salesReturn.ReturnNumber})
 	}
+	lines = append(lines, chargeLines...)
 	if taxAmount > 0 {
 		vatPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "vat_payable", "2100", "VAT Payable")
 		if err != nil {
@@ -1228,12 +1245,17 @@ func (s *Service) PostPurchaseReturnJournal(tx *gorm.DB, currentUser *utils.Auth
 		return "", err
 	}
 	taxAmount := roundMoney(purchaseReturn.TaxAmount)
-	netReturn := roundMoney(returnTotal - taxAmount)
-	lines := make([]JournalEntryLineRequest, 0, 3)
+	chargeLines, chargeNetAmount, err := s.buildPurchaseChargeCreditLines(tx, currentUser.BusinessID, "purchase_return", purchaseReturn.ID, "Vendor credit charge")
+	if err != nil {
+		return "", err
+	}
+	netReturn := roundMoney(returnTotal - taxAmount - chargeNetAmount)
+	lines := make([]JournalEntryLineRequest, 0, 3+len(chargeLines))
 	lines = append(lines, JournalEntryLineRequest{AccountID: accountsPayable.ID, DebitAmount: returnTotal, Description: "Vendor credit " + purchaseReturn.ReturnNumber})
 	if netReturn > 0 {
 		lines = append(lines, JournalEntryLineRequest{AccountID: purchaseReturnAccount.ID, CreditAmount: netReturn, Description: "Purchase return " + purchaseReturn.ReturnNumber})
 	}
+	lines = append(lines, chargeLines...)
 	if taxAmount > 0 {
 		vatReceivable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "vat_receivable", "1300", "VAT Receivable")
 		if err != nil {
@@ -1275,11 +1297,16 @@ func (s *Service) PostPurchaseInvoiceJournal(tx *gorm.DB, currentUser *utils.Aut
 		return "", err
 	}
 	taxAmount := roundMoney(invoice.TaxAmount)
-	netAmount := roundMoney(totalAmount - taxAmount)
-	lines := make([]JournalEntryLineRequest, 0, 3)
+	chargeLines, chargeNetAmount, err := s.buildPurchaseChargeDebitLines(tx, currentUser.BusinessID, "purchase_invoice", invoice.ID, "Purchase invoice charge")
+	if err != nil {
+		return "", err
+	}
+	netAmount := roundMoney(totalAmount - taxAmount - chargeNetAmount)
+	lines := make([]JournalEntryLineRequest, 0, 3+len(chargeLines))
 	if netAmount > 0 {
 		lines = append(lines, JournalEntryLineRequest{AccountID: inventoryAccount.ID, DebitAmount: netAmount, Description: "Purchase invoice stock value"})
 	}
+	lines = append(lines, chargeLines...)
 	if taxAmount > 0 {
 		vatReceivable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "vat_receivable", "1300", "VAT Receivable")
 		if err != nil {
@@ -1380,6 +1407,156 @@ func (s *Service) PostPurchaseReceiptJournal(tx *gorm.DB, currentUser *utils.Aut
 	}
 	if err := s.repo.UpdateStockMovementJournalByReference(tx, currentUser.BusinessID, "purchase_receipt", receipt.ID, "in", journalID); err != nil {
 		return "", apperrors.Internal("failed to link purchase receipt stock movements to accounting journal")
+	}
+	return journalID, nil
+}
+
+func (s *Service) PostInventoryMovementJournal(tx *gorm.DB, currentUser *utils.AuthContext, movementID string) (string, error) {
+	movement, err := s.repo.FindStockMovementForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(movementID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load stock movement for accounting")
+	}
+	if movement.AccountingJournalEntryID != nil && strings.TrimSpace(*movement.AccountingJournalEntryID) != "" {
+		return strings.TrimSpace(*movement.AccountingJournalEntryID), nil
+	}
+	cost := roundMoney(movement.TotalCost)
+	if cost <= 0 {
+		return "", nil
+	}
+	inventoryAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "inventory_stock", "1200", "Inventory / Stock")
+	if err != nil {
+		return "", err
+	}
+	var lines []JournalEntryLineRequest
+	sourceType := "stock_movement"
+	switch movement.MovementType {
+	case "opening_stock":
+		openingEquity, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "opening_balance_equity", "3400", "Opening Balance Equity")
+		if err != nil {
+			return "", err
+		}
+		lines = []JournalEntryLineRequest{
+			{AccountID: inventoryAccount.ID, DebitAmount: cost, Description: "Opening stock value"},
+			{AccountID: openingEquity.ID, CreditAmount: cost, Description: "Opening stock equity offset"},
+		}
+		sourceType = "inventory_opening_stock"
+	case "adjustment_in":
+		gainAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "inventory_adjustment_gain", "4100", "Inventory Adjustment Gain")
+		if err != nil {
+			return "", err
+		}
+		lines = []JournalEntryLineRequest{
+			{AccountID: inventoryAccount.ID, DebitAmount: cost, Description: "Inventory adjustment increase"},
+			{AccountID: gainAccount.ID, CreditAmount: cost, Description: "Inventory adjustment gain"},
+		}
+		sourceType = "inventory_adjustment"
+	case "adjustment_out":
+		lossAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "inventory_adjustment_loss", "5090", "Inventory Adjustment Loss")
+		if err != nil {
+			return "", err
+		}
+		lines = []JournalEntryLineRequest{
+			{AccountID: lossAccount.ID, DebitAmount: cost, Description: "Inventory adjustment loss"},
+			{AccountID: inventoryAccount.ID, CreditAmount: cost, Description: "Inventory adjustment decrease"},
+		}
+		sourceType = "inventory_adjustment"
+	case "wastage":
+		wastageAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "wastage_expense", "5080", "Wastage Expense")
+		if err != nil {
+			return "", err
+		}
+		lines = []JournalEntryLineRequest{
+			{AccountID: wastageAccount.ID, DebitAmount: cost, Description: "Inventory wastage"},
+			{AccountID: inventoryAccount.ID, CreditAmount: cost, Description: "Inventory wastage out"},
+		}
+		sourceType = "inventory_wastage"
+	default:
+		return "", nil
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, movement.CreatedAt, &movement.BranchID, sourceType, movement.ID, movement.ReferenceNumber, "Inventory movement "+movement.MovementType, lines)
+	if err != nil {
+		return "", err
+	}
+	if journalID != "" {
+		if err := s.repo.UpdateStockMovementJournalID(tx, currentUser.BusinessID, movement.ID, journalID); err != nil {
+			return "", apperrors.Internal("failed to link stock movement accounting journal")
+		}
+	}
+	return journalID, nil
+}
+
+func (s *Service) PostManufacturingBatchJournal(tx *gorm.DB, currentUser *utils.AuthContext, batchID string) (string, error) {
+	batch, err := s.repo.FindProductionBatchForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(batchID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load production batch for accounting")
+	}
+	if batch.Status != "completed" {
+		return "", apperrors.BadRequest("only completed production batches can post accounting journals", nil)
+	}
+	consumptionCost, err := s.repo.SumStockMovementCostByReferenceAndType(tx, currentUser.BusinessID, "production_batch", batch.ID, "production_out")
+	if err != nil {
+		return "", apperrors.Internal("failed to calculate production consumption cost")
+	}
+	outputCost, err := s.repo.SumStockMovementCostByReferenceAndType(tx, currentUser.BusinessID, "production_batch", batch.ID, "production_in")
+	if err != nil {
+		return "", apperrors.Internal("failed to calculate production output cost")
+	}
+	wastageCost, err := s.repo.SumStockMovementCostByReferenceAndType(tx, currentUser.BusinessID, "production_batch", batch.ID, "wastage")
+	if err != nil {
+		return "", apperrors.Internal("failed to calculate production wastage cost")
+	}
+	consumptionCost = roundMoney(consumptionCost)
+	outputCost = roundMoney(outputCost)
+	wastageCost = roundMoney(wastageCost)
+	if consumptionCost <= 0 && outputCost <= 0 && wastageCost <= 0 {
+		return "", nil
+	}
+	inventoryAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "inventory_stock", "1200", "Inventory / Stock")
+	if err != nil {
+		return "", err
+	}
+	wipAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "wip_inventory", "1210", "Work in Process Inventory")
+	if err != nil {
+		return "", err
+	}
+	lines := make([]JournalEntryLineRequest, 0, 6)
+	if consumptionCost > 0 {
+		lines = append(lines,
+			JournalEntryLineRequest{AccountID: wipAccount.ID, DebitAmount: consumptionCost, Description: "Production ingredient/packaging consumption"},
+			JournalEntryLineRequest{AccountID: inventoryAccount.ID, CreditAmount: consumptionCost, Description: "Inventory consumed for production"},
+		)
+	}
+	if outputCost > 0 {
+		lines = append(lines,
+			JournalEntryLineRequest{AccountID: inventoryAccount.ID, DebitAmount: outputCost, Description: "Finished goods received from production"},
+			JournalEntryLineRequest{AccountID: wipAccount.ID, CreditAmount: outputCost, Description: "WIP transferred to finished goods"},
+		)
+	}
+	if wastageCost > 0 {
+		wastageAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "wastage_expense", "5080", "Wastage Expense")
+		if err != nil {
+			return "", err
+		}
+		lines = append(lines,
+			JournalEntryLineRequest{AccountID: wastageAccount.ID, DebitAmount: wastageCost, Description: "Production wastage"},
+			JournalEntryLineRequest{AccountID: inventoryAccount.ID, CreditAmount: wastageCost, Description: "Inventory wasted during production"},
+		)
+	}
+	entryDate := time.Now().UTC()
+	if batch.CompletedAt != nil {
+		entryDate = *batch.CompletedAt
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, entryDate, &batch.BranchID, "manufacturing_batch", batch.ID, batch.ProductionBatchNumber, "Manufacturing batch "+batch.ProductionBatchNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if journalID != "" {
+		if err := s.repo.UpdateStockMovementJournalByReference(tx, currentUser.BusinessID, "production_batch", batch.ID, "out", journalID); err != nil {
+			return "", apperrors.Internal("failed to link production stock movements to accounting journal")
+		}
+		if err := s.repo.UpdateStockMovementJournalByReference(tx, currentUser.BusinessID, "production_batch", batch.ID, "in", journalID); err != nil {
+			return "", apperrors.Internal("failed to link production stock movements to accounting journal")
+		}
 	}
 	return journalID, nil
 }
@@ -1545,6 +1722,14 @@ func (s *Service) GetBalanceSheet(currentUser *utils.AuthContext, query BalanceS
 			equity.Total = roundMoney(equity.Total + row.Amount)
 		}
 	}
+	currentYearProfitLoss, err := s.currentYearProfitLossForBalanceSheet(currentUser.BusinessID, query)
+	if err != nil {
+		return nil, err
+	}
+	if currentYearProfitLoss.Amount != 0 {
+		equity.Items = append(equity.Items, currentYearProfitLoss)
+		equity.Total = roundMoney(equity.Total + currentYearProfitLoss.Amount)
+	}
 	totalLiabilitiesAndEquity := roundMoney(liabilities.Total + equity.Total)
 	difference := roundMoney(assets.Total - totalLiabilitiesAndEquity)
 	_ = s.writeReportAudit(currentUser, "accounting.balance_sheet_viewed", "balance_sheet", query, ipAddress, userAgent)
@@ -1560,6 +1745,54 @@ func (s *Service) GetBalanceSheet(currentUser *utils.AuthContext, query BalanceS
 		IsBalanced:                difference == 0,
 		Difference:                difference,
 	}, nil
+}
+
+func (s *Service) currentYearProfitLossForBalanceSheet(businessID string, query BalanceSheetQuery) (BalanceSheetAccountRowResponse, error) {
+	asOfDate, err := time.Parse("2006-01-02", strings.TrimSpace(query.AsOfDate))
+	if err != nil {
+		return BalanceSheetAccountRowResponse{}, apperrors.BadRequest("as_of_date must be YYYY-MM-DD", nil)
+	}
+	dateFrom := financialYearStartFor(asOfDate).Format("2006-01-02")
+	rows, err := s.repo.ListProfitLossRows(businessID, ProfitLossQuery{
+		BranchID: query.BranchID,
+		DateFrom: dateFrom,
+		DateTo:   query.AsOfDate,
+	})
+	if err != nil {
+		return BalanceSheetAccountRowResponse{}, apperrors.Internal("failed to calculate current year profit/loss")
+	}
+	netProfit := 0.0
+	for _, row := range rows {
+		switch row.AccountType {
+		case "income":
+			netProfit = roundMoney(netProfit + row.Amount)
+		case "cogs", "expense":
+			netProfit = roundMoney(netProfit - row.Amount)
+		}
+	}
+	if netProfit == 0 {
+		return BalanceSheetAccountRowResponse{}, nil
+	}
+	account, err := s.repo.FindActiveAccountByCode(s.db, businessID, "3200")
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return BalanceSheetAccountRowResponse{}, apperrors.Internal("failed to load current year profit/loss account")
+	}
+	row := BalanceSheetAccountRowResponse{
+		AccountCode:  "3200",
+		AccountName:  "Current Year Profit / Loss",
+		AccountType:  "equity",
+		AccountGroup: "equity",
+		Amount:       roundMoney(netProfit),
+		IsCalculated: true,
+	}
+	if err == nil {
+		row.AccountID = account.ID
+		row.AccountCode = account.AccountCode
+		row.AccountName = account.AccountName
+		row.AccountType = account.AccountType
+		row.AccountGroup = account.AccountGroup
+	}
+	return row, nil
 }
 
 func (s *Service) CreateJournalEntry(currentUser *utils.AuthContext, req CreateJournalEntryRequest, ipAddress, userAgent string) (*JournalEntryResponse, error) {
@@ -2201,6 +2434,10 @@ func defaultLedgerDetailsDateRange(dateFrom, dateTo string) (string, string) {
 	return dateFrom, dateTo
 }
 
+func financialYearStartFor(asOfDate time.Time) time.Time {
+	return time.Date(asOfDate.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
+}
+
 func balanceLabel(value float64) string {
 	if value < 0 {
 		return "Cr"
@@ -2460,12 +2697,119 @@ func (s *Service) requiredMappedAccount(tx *gorm.DB, businessID, mappingKey, fal
 	return account, nil
 }
 
+func (s *Service) buildChargeCreditLines(tx *gorm.DB, businessID, documentType, documentID, descriptionPrefix string) ([]JournalEntryLineRequest, float64, error) {
+	rows, err := s.repo.ListDocumentChargesForAccounting(tx, businessID, documentType, documentID)
+	if err != nil {
+		return nil, 0, apperrors.Internal("failed to load document charges for accounting")
+	}
+	lines := make([]JournalEntryLineRequest, 0, len(rows))
+	totalNet := 0.0
+	for _, row := range rows {
+		netAmount := roundMoney(row.TotalAmount - row.TaxAmount)
+		if netAmount <= 0 {
+			continue
+		}
+		account, err := s.chargeIncomeAccount(tx, businessID, row.ChargeType)
+		if err != nil {
+			return nil, 0, err
+		}
+		lines = append(lines, JournalEntryLineRequest{AccountID: account.ID, CreditAmount: netAmount, Description: descriptionPrefix + ": " + row.ChargeName})
+		totalNet = roundMoney(totalNet + netAmount)
+	}
+	return lines, totalNet, nil
+}
+
+func (s *Service) buildChargeRefundDebitLines(tx *gorm.DB, businessID, documentType, documentID, descriptionPrefix string) ([]JournalEntryLineRequest, float64, error) {
+	rows, err := s.repo.ListDocumentChargesForAccounting(tx, businessID, documentType, documentID)
+	if err != nil {
+		return nil, 0, apperrors.Internal("failed to load charge refunds for accounting")
+	}
+	if len(rows) == 0 {
+		return nil, 0, nil
+	}
+	account, err := s.requiredMappedAccount(tx, businessID, "charge_refund_account", "4080", "Delivery Charge Returns")
+	if err != nil {
+		return nil, 0, err
+	}
+	lines := make([]JournalEntryLineRequest, 0, len(rows))
+	totalNet := 0.0
+	for _, row := range rows {
+		netAmount := roundMoney(row.TotalAmount - row.TaxAmount)
+		if netAmount <= 0 {
+			continue
+		}
+		lines = append(lines, JournalEntryLineRequest{AccountID: account.ID, DebitAmount: netAmount, Description: descriptionPrefix + ": " + row.ChargeName})
+		totalNet = roundMoney(totalNet + netAmount)
+	}
+	return lines, totalNet, nil
+}
+
+func (s *Service) buildPurchaseChargeDebitLines(tx *gorm.DB, businessID, documentType, documentID, descriptionPrefix string) ([]JournalEntryLineRequest, float64, error) {
+	rows, err := s.repo.ListDocumentChargesForAccounting(tx, businessID, documentType, documentID)
+	if err != nil {
+		return nil, 0, apperrors.Internal("failed to load purchase charges for accounting")
+	}
+	lines := make([]JournalEntryLineRequest, 0, len(rows))
+	totalNet := 0.0
+	for _, row := range rows {
+		netAmount := roundMoney(row.TotalAmount - row.TaxAmount)
+		if netAmount <= 0 {
+			continue
+		}
+		account, err := s.purchaseChargeAccount(tx, businessID, row.ChargeType)
+		if err != nil {
+			return nil, 0, err
+		}
+		lines = append(lines, JournalEntryLineRequest{AccountID: account.ID, DebitAmount: netAmount, Description: descriptionPrefix + ": " + row.ChargeName})
+		totalNet = roundMoney(totalNet + netAmount)
+	}
+	return lines, totalNet, nil
+}
+
+func (s *Service) buildPurchaseChargeCreditLines(tx *gorm.DB, businessID, documentType, documentID, descriptionPrefix string) ([]JournalEntryLineRequest, float64, error) {
+	rows, err := s.repo.ListDocumentChargesForAccounting(tx, businessID, documentType, documentID)
+	if err != nil {
+		return nil, 0, apperrors.Internal("failed to load purchase charge credits for accounting")
+	}
+	lines := make([]JournalEntryLineRequest, 0, len(rows))
+	totalNet := 0.0
+	for _, row := range rows {
+		netAmount := roundMoney(row.TotalAmount - row.TaxAmount)
+		if netAmount <= 0 {
+			continue
+		}
+		account, err := s.purchaseChargeAccount(tx, businessID, row.ChargeType)
+		if err != nil {
+			return nil, 0, err
+		}
+		lines = append(lines, JournalEntryLineRequest{AccountID: account.ID, CreditAmount: netAmount, Description: descriptionPrefix + ": " + row.ChargeName})
+		totalNet = roundMoney(totalNet + netAmount)
+	}
+	return lines, totalNet, nil
+}
+
+func (s *Service) chargeIncomeAccount(tx *gorm.DB, businessID, chargeType string) (*ChartAccount, error) {
+	switch chargeType {
+	case "delivery":
+		return s.requiredMappedAccount(tx, businessID, "delivery_charge_income", "4050", "Delivery Charge Income")
+	case "packing":
+		return s.requiredMappedAccount(tx, businessID, "packing_charge_income", "4070", "Packing Charge Income")
+	default:
+		return s.requiredMappedAccount(tx, businessID, "service_charge_income", "4060", "Service Charge Income")
+	}
+}
+
+func (s *Service) purchaseChargeAccount(tx *gorm.DB, businessID, chargeType string) (*ChartAccount, error) {
+	return s.requiredMappedAccount(tx, businessID, "freight_inward", "5030", "Freight / Carriage Inward")
+}
+
 func validAccountMappingKey(value string) bool {
 	switch value {
 	case "accounts_receivable", "accounts_payable", "inventory_stock", "sales_income", "bakery_income",
 		"customer_advance", "vat_receivable", "vat_payable", "cogs", "sales_returns",
 		"purchase_returns", "wip_inventory", "wastage_expense", "opening_balance_equity",
-		"grni", "platform_commission_expense":
+		"grni", "platform_commission_expense", "delivery_charge_income", "service_charge_income",
+		"packing_charge_income", "freight_inward", "charge_refund_account":
 		return true
 	default:
 		return false

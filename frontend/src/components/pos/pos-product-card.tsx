@@ -11,8 +11,6 @@ type POSProductCardProps = {
   onOpenVariants: (product: POSProduct) => void;
   product: POSProduct;
   showPrices: boolean;
-  stockQuantity?: number | null;
-  stockUnitName?: string | null;
 };
 
 function formatMoney(value: number): string {
@@ -27,13 +25,11 @@ export function POSProductCard({
   onOpenVariants,
   product,
   showPrices,
-  stockQuantity,
 }: POSProductCardProps): JSX.Element {
   const longPressTimerRef = useRef<number | null>(null);
   const ignoreNextClickRef = useRef(false);
   const imageUrl = getProductImagePreviewUrl(product.imageFileId) ?? product.imageUrl;
   const hasVariants = product.variants.length > 0;
-  void stockQuantity;
 
   const clearLongPressTimer = (): void => {
     if (longPressTimerRef.current) {

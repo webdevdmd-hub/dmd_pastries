@@ -1,6 +1,10 @@
 package salesreturns
 
-import "time"
+import (
+	"time"
+
+	"pastries-pos/internal/modules/charges"
+)
 
 type SalesReturnListQuery struct {
 	Search     string
@@ -24,22 +28,24 @@ type SalesReturnItemRequest struct {
 }
 
 type CreateSalesReturnRequest struct {
-	SaleID                string                   `json:"sale_id" binding:"required,uuid"`
-	ReturnDate            string                   `json:"return_date" binding:"required"`
-	Reason                string                   `json:"reason"`
-	RefundMode            string                   `json:"refund_mode" binding:"required"`
-	RefundPaymentMethodID *string                  `json:"refund_payment_method_id" binding:"omitempty,uuid"`
-	RefundReferenceNumber string                   `json:"refund_reference_number"`
-	Items                 []SalesReturnItemRequest `json:"items" binding:"required"`
+	SaleID                string                      `json:"sale_id" binding:"required,uuid"`
+	ReturnDate            string                      `json:"return_date" binding:"required"`
+	Reason                string                      `json:"reason"`
+	RefundMode            string                      `json:"refund_mode" binding:"required"`
+	RefundPaymentMethodID *string                     `json:"refund_payment_method_id" binding:"omitempty,uuid"`
+	RefundReferenceNumber string                      `json:"refund_reference_number"`
+	Items                 []SalesReturnItemRequest    `json:"items" binding:"required"`
+	RefundCharges         []charges.ChargeRefundInput `json:"refund_charges"`
 }
 
 type UpdateSalesReturnRequest struct {
-	ReturnDate            string                   `json:"return_date" binding:"required"`
-	Reason                string                   `json:"reason"`
-	RefundMode            string                   `json:"refund_mode" binding:"required"`
-	RefundPaymentMethodID *string                  `json:"refund_payment_method_id" binding:"omitempty,uuid"`
-	RefundReferenceNumber string                   `json:"refund_reference_number"`
-	Items                 []SalesReturnItemRequest `json:"items" binding:"required"`
+	ReturnDate            string                      `json:"return_date" binding:"required"`
+	Reason                string                      `json:"reason"`
+	RefundMode            string                      `json:"refund_mode" binding:"required"`
+	RefundPaymentMethodID *string                     `json:"refund_payment_method_id" binding:"omitempty,uuid"`
+	RefundReferenceNumber string                      `json:"refund_reference_number"`
+	Items                 []SalesReturnItemRequest    `json:"items" binding:"required"`
+	RefundCharges         []charges.ChargeRefundInput `json:"refund_charges"`
 }
 
 type SalesReturnResponse struct {
@@ -57,6 +63,8 @@ type SalesReturnResponse struct {
 	Status                  string                    `json:"status"`
 	SubtotalAmount          float64                   `json:"subtotal_amount"`
 	TaxAmount               float64                   `json:"tax_amount"`
+	ChargeAmount            float64                   `json:"charge_amount"`
+	ChargeTaxAmount         float64                   `json:"charge_tax_amount"`
 	ReturnTotal             float64                   `json:"return_total"`
 	RefundMode              string                    `json:"refund_mode"`
 	RefundPaymentMethodID   *string                   `json:"refund_payment_method_id"`
@@ -75,6 +83,7 @@ type SalesReturnResponse struct {
 	CancelledByUserID       *string                   `json:"cancelled_by_user_id"`
 	CancelledAt             *time.Time                `json:"cancelled_at"`
 	Items                   []SalesReturnItemResponse `json:"items"`
+	Charges                 []charges.ChargeResponse  `json:"charges"`
 	CreatedAt               time.Time                 `json:"created_at"`
 	UpdatedAt               time.Time                 `json:"updated_at"`
 }

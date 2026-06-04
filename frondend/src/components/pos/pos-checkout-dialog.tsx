@@ -4,6 +4,7 @@ import type { JSX } from "react";
 
 import { POSDiscountControl } from "@/components/pos/pos-discount-control";
 import { POSPaymentPanel } from "@/components/pos/pos-payment-panel";
+import { DocumentChargesEditor } from "@/components/shared/document-charges-editor";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,23 +14,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type { DocumentChargeDraft } from "@/types/document-charges";
 import type { CartDiscountType, CartTotals, PaymentInput } from "@/types/pos";
-import type { PaymentMethod, SalesChannel } from "@/types/settings";
+import type { PaymentMethod, SalesChannel, TaxRate } from "@/types/settings";
 
 type POSCheckoutDialogProps = {
+  charges: DocumentChargeDraft[];
   isSubmitting: boolean;
+  onChargesChange: (charges: DocumentChargeDraft[]) => void;
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
   onPaymentsChange: (payments: PaymentInput[]) => void;
   onSaleDiscountChange: (type: CartDiscountType | null, value: number | null) => void;
   open: boolean;
   externalOrderNumber: string;
+  paymentMethodsError: Error | null;
+  paymentMethodsLoading: boolean;
   paymentMethods: PaymentMethod[];
   payments: PaymentInput[];
   saleDiscountType: CartDiscountType | null;
   saleDiscountValue: number | null;
   salesChannelId: string;
   salesChannels: SalesChannel[];
+  taxRates: TaxRate[];
   totals: CartTotals;
 };
 
@@ -41,22 +48,38 @@ function formatMoney(value: number): string {
 }
 
 export function POSCheckoutDialog({
+  charges,
   isSubmitting,
+  onChargesChange,
   onConfirm,
   onOpenChange,
   onPaymentsChange,
   onSaleDiscountChange,
   open,
   externalOrderNumber,
+  paymentMethodsError,
+  paymentMethodsLoading,
   paymentMethods,
   payments,
   saleDiscountType,
   saleDiscountValue,
   salesChannelId,
   salesChannels,
+  taxRates,
   totals,
 }: POSCheckoutDialogProps): JSX.Element {
   const selectedChannel = salesChannels.find((channel) => channel.id === salesChannelId) ?? null;
+  const selectablePaymentMethodIds = new Set(
+    paymentMethods
+      .filter(
+        (method) =>
+          method.status === "active" && method.showInPos && method.defaultPaymentAccountId,
+      )
+      .map((method) => method.id),
+  );
+  const hasUnavailableSelectedPayment = payments.some(
+    (payment) => !selectablePaymentMethodIds.has(payment.paymentMethodId),
+  );
   const hasMissingRequiredReference = payments.some((payment) => {
     const method = paymentMethods.find((entry) => entry.id === payment.paymentMethodId);
     return method?.requiresReference === true && !payment.referenceNumber?.trim();
@@ -66,7 +89,10 @@ export function POSCheckoutDialog({
     externalOrderNumber.trim().length === 0;
   const cannotConfirm =
     isSubmitting ||
+    paymentMethodsLoading ||
+    paymentMethodsError !== null ||
     payments.length === 0 ||
+    hasUnavailableSelectedPayment ||
     hasMissingRequiredReference ||
     hasMissingExternalOrderNumber;
 
@@ -90,7 +116,18 @@ export function POSCheckoutDialog({
             />
           </div>
 
+          <div className="rounded-lg border border-[#d4d4d8] bg-[#fafafa] p-4">
+            <DocumentChargesEditor
+              charges={charges}
+              compact
+              onChange={onChargesChange}
+              taxRates={taxRates}
+            />
+          </div>
+
           <POSPaymentPanel
+            error={paymentMethodsError}
+            isLoading={paymentMethodsLoading}
             methods={paymentMethods}
             onPaymentsChange={onPaymentsChange}
             payments={payments}
@@ -107,9 +144,21 @@ export function POSCheckoutDialog({
               <strong>{formatMoney(totals.discountAmount)}</strong>
             </div>
             <div className="flex justify-between">
-              <span>Tax</span>
+              <span>Item tax</span>
               <strong>{formatMoney(totals.taxAmount)}</strong>
             </div>
+            {totals.chargeAmount > 0 || totals.chargeTaxAmount > 0 ? (
+              <>
+                <div className="flex justify-between">
+                  <span>Charges</span>
+                  <strong>{formatMoney(totals.chargeAmount)}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Charge tax</span>
+                  <strong>{formatMoney(totals.chargeTaxAmount)}</strong>
+                </div>
+              </>
+            ) : null}
             <div className="mt-3 flex justify-between border-t border-[#d4d4d8] pt-3 text-lg">
               <span>Total</span>
               <strong>{formatMoney(totals.total)}</strong>
@@ -146,11 +195,17 @@ export function POSCheckoutDialog({
           >
             {isSubmitting
               ? "Processing..."
-              : hasMissingExternalOrderNumber
-                ? "Order number required"
-                : hasMissingRequiredReference
-                  ? "Reference required"
-                  : "Confirm sale"}
+              : paymentMethodsLoading
+                ? "Loading methods..."
+                : paymentMethodsError
+                  ? "Payment methods unavailable"
+                  : hasUnavailableSelectedPayment
+                    ? "Select valid payment"
+                    : hasMissingExternalOrderNumber
+                      ? "Order number required"
+                      : hasMissingRequiredReference
+                        ? "Reference required"
+                        : "Confirm sale"}
           </Button>
         </DialogFooter>
       </DialogContent>

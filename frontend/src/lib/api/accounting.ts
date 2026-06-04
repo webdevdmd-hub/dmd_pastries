@@ -634,6 +634,7 @@ function parseBalanceSheetItem(value: unknown): BalanceSheetItem {
     accountType: isAccountType(value.account_type) ? value.account_type : "asset",
     accountGroup: stringValue(value.account_group),
     amount: numberValue(value.amount, 0),
+    isCalculated: booleanValue(value.is_calculated),
   };
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
 	"pastries-pos/internal/modules/inventory"
 	apperrors "pastries-pos/internal/shared/errors"
@@ -15,15 +16,20 @@ import (
 )
 
 type Service struct {
-	db               *gorm.DB
-	repo             *Repository
-	inventoryRepo    *inventory.Repository
-	inventoryService *inventory.Service
-	auditRepo        *audit.Repository
+	db                *gorm.DB
+	repo              *Repository
+	inventoryRepo     *inventory.Repository
+	inventoryService  *inventory.Service
+	auditRepo         *audit.Repository
+	accountingService *accounting.Service
 }
 
-func NewService(db *gorm.DB, repo *Repository, inventoryRepo *inventory.Repository, inventoryService *inventory.Service, auditRepo *audit.Repository) *Service {
-	return &Service{db: db, repo: repo, inventoryRepo: inventoryRepo, inventoryService: inventoryService, auditRepo: auditRepo}
+func NewService(db *gorm.DB, repo *Repository, inventoryRepo *inventory.Repository, inventoryService *inventory.Service, auditRepo *audit.Repository, accountingService ...*accounting.Service) *Service {
+	service := &Service{db: db, repo: repo, inventoryRepo: inventoryRepo, inventoryService: inventoryService, auditRepo: auditRepo}
+	if len(accountingService) > 0 {
+		service.accountingService = accountingService[0]
+	}
+	return service
 }
 
 func (s *Service) ListBatches(currentUser *utils.AuthContext, query BatchListQuery) (*PaginatedBatchResponse, error) {
@@ -449,6 +455,7 @@ func (s *Service) CompleteBatch(currentUser *utils.AuthContext, id string, req C
 		if err != nil {
 			return err
 		}
+		consumedCost := 0.0
 		for _, line := range ingredients {
 			if line.ActualQuantity <= 0 {
 				return apperrors.BadRequest("all ingredient actual quantities must be greater than zero", map[string]string{"line_id": line.ID})
@@ -456,6 +463,12 @@ func (s *Service) CompleteBatch(currentUser *utils.AuthContext, id string, req C
 			movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: line.InventoryItemID, MovementType: "production_out", Quantity: line.ActualQuantity, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production ingredient consumed", CreatedByUserID: currentUser.UserID})
 			if err != nil {
 				return err
+			}
+			consumedCost = roundMoney(consumedCost + movement.TotalCost)
+			if line.WastageQuantity > 0 {
+				if _, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: line.InventoryItemID, MovementType: "wastage", Quantity: line.WastageQuantity, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production ingredient wastage", CreatedByUserID: currentUser.UserID}); err != nil {
+					return err
+				}
 			}
 			if err := s.repo.UpdateIngredient(tx, line.ID, id, currentUser.BusinessID, map[string]interface{}{"stock_movement_id": movement.ID, "updated_at": time.Now().UTC()}); err != nil {
 				return err
@@ -479,6 +492,7 @@ func (s *Service) CompleteBatch(currentUser *utils.AuthContext, id string, req C
 			if err != nil {
 				return err
 			}
+			consumedCost = roundMoney(consumedCost + movement.TotalCost)
 			if err := s.repo.UpdatePackaging(tx, line.ID, id, currentUser.BusinessID, map[string]interface{}{"stock_movement_id": movement.ID, "updated_at": time.Now().UTC()}); err != nil {
 				return err
 			}
@@ -487,7 +501,11 @@ func (s *Service) CompleteBatch(currentUser *utils.AuthContext, id string, req C
 		if err != nil {
 			return err
 		}
-		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: outputItem.ID, MovementType: "production_in", Quantity: producedQuantity, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production finished goods received", CreatedByUserID: currentUser.UserID})
+		outputUnitCost := 0.0
+		if producedQuantity > 0 {
+			outputUnitCost = roundMoney(consumedCost / producedQuantity)
+		}
+		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: outputItem.ID, MovementType: "production_in", Quantity: producedQuantity, UnitCost: outputUnitCost, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production finished goods received", CreatedByUserID: currentUser.UserID})
 		if err != nil {
 			return err
 		}
@@ -512,6 +530,11 @@ func (s *Service) CompleteBatch(currentUser *utils.AuthContext, id string, req C
 		total := roundMoney(ingredientCost + packagingCost)
 		if err := s.repo.UpdateBatch(tx, id, currentUser.BusinessID, map[string]interface{}{"status": "completed", "produced_quantity": producedQuantity, "completed_at": now, "completed_by_user_id": currentUser.UserID, "ingredient_cost": ingredientCost, "packaging_cost": packagingCost, "total_production_cost": total, "cost_per_unit": roundQuantity(total / producedQuantity), "wastage_quantity": wastageQuantity, "wastage_reason": wastageReason, "notes": notes, "updated_by_user_id": currentUser.UserID, "updated_at": now}); err != nil {
 			return err
+		}
+		if s.accountingService != nil {
+			if _, err := s.accountingService.PostManufacturingBatchJournal(tx, currentUser, id); err != nil {
+				return err
+			}
 		}
 		return s.audit(tx, currentUser, "production_batch.completed", id, "Production batch completed", ipAddress, userAgent)
 	})

@@ -1,3 +1,5 @@
+import type { DocumentCharge, DocumentChargeDraft } from "@/types/document-charges";
+
 export type OrderStatus =
   | "new"
   | "confirmed"
@@ -33,6 +35,9 @@ export type BakeryOrder = {
   subtotalAmount: number;
   discountAmount: number;
   taxAmount: number;
+  chargeAmount: number;
+  chargeTaxAmount: number;
+  charges: DocumentCharge[];
   totalAmount: number;
   paidAmount: number;
   balanceAmount: number;
@@ -136,6 +141,7 @@ export type CreateOrderPayload = {
   deliveryTime: string | null;
   deliveryAddress: string | null;
   items: CreateOrderItemPayload[];
+  charges: DocumentChargeDraft[];
   notes: string | null;
 };
 

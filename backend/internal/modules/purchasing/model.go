@@ -18,6 +18,8 @@ type PurchaseOrder struct {
 	SubtotalAmount       float64        `gorm:"not null;default:0" json:"subtotal_amount"`
 	TaxAmount            float64        `gorm:"not null;default:0" json:"tax_amount"`
 	DiscountAmount       float64        `gorm:"not null;default:0" json:"discount_amount"`
+	ChargeAmount         float64        `gorm:"not null;default:0" json:"charge_amount"`
+	ChargeTaxAmount      float64        `gorm:"not null;default:0" json:"charge_tax_amount"`
 	TotalAmount          float64        `gorm:"not null;default:0" json:"total_amount"`
 	Notes                string         `json:"notes"`
 	CreatedByUserID      string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
@@ -67,6 +69,8 @@ type PurchaseInvoice struct {
 	SubtotalAmount  float64        `gorm:"not null;default:0" json:"subtotal_amount"`
 	TaxAmount       float64        `gorm:"not null;default:0" json:"tax_amount"`
 	DiscountAmount  float64        `gorm:"not null;default:0" json:"discount_amount"`
+	ChargeAmount    float64        `gorm:"not null;default:0" json:"charge_amount"`
+	ChargeTaxAmount float64        `gorm:"not null;default:0" json:"charge_tax_amount"`
 	TotalAmount     float64        `gorm:"not null;default:0" json:"total_amount"`
 	PaidAmount      float64        `gorm:"not null;default:0" json:"paid_amount"`
 	BalanceAmount   float64        `gorm:"not null;default:0" json:"balance_amount"`
@@ -142,6 +146,8 @@ type PurchaseReceipt struct {
 	ReceiptNumber     string         `gorm:"size:100;not null" json:"receipt_number"`
 	ReceivedDate      time.Time      `gorm:"type:date;not null" json:"received_date"`
 	Status            string         `gorm:"size:50;not null;default:posted" json:"status"`
+	ChargeAmount      float64        `gorm:"not null;default:0" json:"charge_amount"`
+	ChargeTaxAmount   float64        `gorm:"not null;default:0" json:"charge_tax_amount"`
 	JournalEntryID    *string        `gorm:"type:uuid;index" json:"journal_entry_id"`
 	ReceivedByUserID  string         `gorm:"type:uuid;not null;index" json:"received_by_user_id"`
 	Notes             string         `json:"notes"`
@@ -190,6 +196,8 @@ type PurchaseReturn struct {
 	SubtotalAmount          float64        `gorm:"not null;default:0" json:"subtotal_amount"`
 	TaxAmount               float64        `gorm:"not null;default:0" json:"tax_amount"`
 	DiscountAmount          float64        `gorm:"not null;default:0" json:"discount_amount"`
+	ChargeAmount            float64        `gorm:"not null;default:0" json:"charge_amount"`
+	ChargeTaxAmount         float64        `gorm:"not null;default:0" json:"charge_tax_amount"`
 	ReturnTotal             float64        `gorm:"not null;default:0" json:"return_total"`
 	AppliedCreditAmount     float64        `gorm:"not null;default:0" json:"applied_credit_amount"`
 	OpenCreditAmount        float64        `gorm:"not null;default:0" json:"open_credit_amount"`

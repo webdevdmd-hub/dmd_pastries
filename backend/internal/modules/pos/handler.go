@@ -39,6 +39,26 @@ func (h *Handler) LookupProduct(c *gin.Context) {
 	response.Success(c, 200, "POS product lookup fetched successfully", result)
 }
 
+func (h *Handler) ListPaymentMethods(c *gin.Context) {
+	currentUser := utils.MustAuthContext(c)
+	result, err := h.service.ListPaymentMethods(currentUser, c.Query("branch_id"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "POS payment methods fetched successfully", result)
+}
+
+func (h *Handler) ReferenceData(c *gin.Context) {
+	currentUser := utils.MustAuthContext(c)
+	result, err := h.service.ReferenceData(currentUser, c.Query("branch_id"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "POS reference data fetched successfully", result)
+}
+
 func (h *Handler) Checkout(c *gin.Context) {
 	var req CheckoutRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

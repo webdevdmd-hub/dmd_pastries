@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"pastries-pos/internal/modules/charges"
 )
 
 type Repository struct {
@@ -433,6 +435,7 @@ func (r *Repository) LoadResponses(businessID string, returns []SalesReturn, inc
 	}
 
 	itemsByReturn := map[string][]SalesReturnItemResponse{}
+	chargesByReturn := map[string][]charges.ChargeResponse{}
 	if includeItems {
 		var itemRows []SalesReturnItemResponse
 		if err := r.db.Table("sales_return_items sri").
@@ -470,6 +473,13 @@ func (r *Repository) LoadResponses(businessID string, returns []SalesReturn, inc
 		for _, row := range itemRows {
 			itemsByReturn[row.SalesReturnID] = append(itemsByReturn[row.SalesReturnID], row)
 		}
+		for _, returnID := range ids {
+			chargeRows, err := charges.ListChargeResponses(r.db, businessID, "sales_return", returnID)
+			if err != nil {
+				return nil, err
+			}
+			chargesByReturn[returnID] = chargeRows
+		}
 	}
 
 	result := make([]SalesReturnResponse, 0, len(returns))
@@ -490,6 +500,8 @@ func (r *Repository) LoadResponses(businessID string, returns []SalesReturn, inc
 			Status:                  row.Status,
 			SubtotalAmount:          row.SubtotalAmount,
 			TaxAmount:               row.TaxAmount,
+			ChargeAmount:            row.ChargeAmount,
+			ChargeTaxAmount:         row.ChargeTaxAmount,
 			ReturnTotal:             row.ReturnTotal,
 			RefundMode:              row.RefundMode,
 			RefundPaymentMethodID:   row.RefundPaymentMethodID,
@@ -508,6 +520,7 @@ func (r *Repository) LoadResponses(businessID string, returns []SalesReturn, inc
 			CancelledByUserID:       row.CancelledByUserID,
 			CancelledAt:             row.CancelledAt,
 			Items:                   itemsByReturn[row.ID],
+			Charges:                 chargesByReturn[row.ID],
 			CreatedAt:               row.CreatedAt,
 			UpdatedAt:               row.UpdatedAt,
 		})

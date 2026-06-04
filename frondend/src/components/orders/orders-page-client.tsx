@@ -1,12 +1,13 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { LayoutGrid, List, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/orders/access-denied-card";
+import { OrdersCardGrid } from "@/components/orders/orders-card-grid";
 import { OrdersEmptyState } from "@/components/orders/orders-empty-state";
 import { OrdersErrorState } from "@/components/orders/orders-error-state";
 import { OrdersSummaryCards } from "@/components/orders/orders-summary-cards";
@@ -44,10 +45,18 @@ const defaultFilters: BakeryOrderFilters = {
   status: "all",
 };
 
+type OrdersViewMode = "card" | "list";
+
 type PendingAction =
   | { order: BakeryOrder; status: OrderStatus; type: "status" }
   | { order: BakeryOrder; type: "delete" }
   | null;
+
+const ordersViewModeStorageKey = "bakery-orders.view-mode";
+
+function isOrdersViewMode(value: string | null): value is OrdersViewMode {
+  return value === "card" || value === "list";
+}
 
 export function OrdersPageClient(): JSX.Element {
   const router = useRouter();
@@ -65,12 +74,26 @@ export function OrdersPageClient(): JSX.Element {
   ]);
   const [filters, setFilters] = useState<BakeryOrderFilters>(defaultFilters);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [viewMode, setViewMode] = useState<OrdersViewMode>("list");
   const ordersQuery = useOrders(filters, canView);
   const summaryQuery = useOrderSummary(canView);
   const statusMutation = useUpdateOrderStatus();
   const deleteMutation = useDeleteOrder();
   const isPermissionDenied =
     ordersQuery.error instanceof ApiError && ordersQuery.error.status === 403;
+
+  useEffect(() => {
+    const savedViewMode = window.localStorage.getItem(ordersViewModeStorageKey);
+
+    if (isOrdersViewMode(savedViewMode)) {
+      setViewMode(savedViewMode);
+    }
+  }, []);
+
+  const updateViewMode = (nextViewMode: OrdersViewMode): void => {
+    setViewMode(nextViewMode);
+    window.localStorage.setItem(ordersViewModeStorageKey, nextViewMode);
+  };
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -110,12 +133,50 @@ export function OrdersPageClient(): JSX.Element {
         title="Bakery Orders"
         description="Manage custom cake orders, scheduling, payments, and production."
         actions={
-          canManage ? (
-            <Button onClick={openCreate} type="button">
-              <Plus className="h-4 w-4" />
-              Create Order
-            </Button>
-          ) : undefined
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              aria-label="Order view"
+              className="inline-flex rounded-xl border border-workspace-border bg-workspace-panel p-1"
+              role="group"
+            >
+              <Button
+                aria-label="Card view"
+                aria-pressed={viewMode === "card"}
+                className={
+                  viewMode === "card"
+                    ? "h-9 rounded-lg px-3"
+                    : "h-9 rounded-lg px-3 text-workspace-muted"
+                }
+                onClick={() => updateViewMode("card")}
+                type="button"
+                variant={viewMode === "card" ? "default" : "ghost"}
+              >
+                <LayoutGrid className="h-4 w-4" />
+                <span className="hidden sm:inline">Card</span>
+              </Button>
+              <Button
+                aria-label="List view"
+                aria-pressed={viewMode === "list"}
+                className={
+                  viewMode === "list"
+                    ? "h-9 rounded-lg px-3"
+                    : "h-9 rounded-lg px-3 text-workspace-muted"
+                }
+                onClick={() => updateViewMode("list")}
+                type="button"
+                variant={viewMode === "list" ? "default" : "ghost"}
+              >
+                <List className="h-4 w-4" />
+                <span className="hidden sm:inline">List</span>
+              </Button>
+            </div>
+            {canManage ? (
+              <Button onClick={openCreate} type="button">
+                <Plus className="h-4 w-4" />
+                Create Order
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
@@ -141,7 +202,7 @@ export function OrdersPageClient(): JSX.Element {
         <OrdersEmptyState canManage={canManage} onCreate={openCreate} />
       ) : null}
 
-      {!ordersQuery.isLoading && !ordersQuery.error && orders.length > 0 ? (
+      {!ordersQuery.isLoading && !ordersQuery.error && orders.length > 0 && viewMode === "list" ? (
         <Card>
           <CardContent className="p-0">
             <OrdersTable
@@ -154,6 +215,15 @@ export function OrdersPageClient(): JSX.Element {
             />
           </CardContent>
         </Card>
+      ) : null}
+
+      {!ordersQuery.isLoading && !ordersQuery.error && orders.length > 0 && viewMode === "card" ? (
+        <OrdersCardGrid
+          canManage={canManage}
+          onDelete={(order) => setPendingAction({ order, type: "delete" })}
+          onStatusChange={(order, status) => setPendingAction({ order, status, type: "status" })}
+          orders={orders}
+        />
       ) : null}
 
       <Dialog

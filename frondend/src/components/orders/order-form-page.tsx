@@ -15,6 +15,7 @@ import { OrderPaymentSection } from "@/components/orders/order-payment-section";
 import { OrderProductionSection } from "@/components/orders/order-production-section";
 import { OrderScheduleCard } from "@/components/orders/order-schedule-card";
 import { OrdersErrorState } from "@/components/orders/orders-error-state";
+import { DocumentChargesEditor } from "@/components/shared/document-charges-editor";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
@@ -29,6 +30,7 @@ import { useSalesChannels } from "@/hooks/use-settings-data";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import { createOrderSchema } from "@/lib/validators/orders.schema";
 import type { Branch } from "@/types/branch";
+import type { DocumentChargeDraft } from "@/types/document-charges";
 import type {
   AddOrderPackagingPayload,
   CreateOrderItemPayload,
@@ -163,6 +165,7 @@ export function OrderFormPage({ orderId }: { orderId: string | null }): JSX.Elem
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<CreateOrderItemPayload[]>([]);
+  const [charges, setCharges] = useState<DocumentChargeDraft[]>([]);
   const [draftPackaging, setDraftPackaging] = useState<AddOrderPackagingPayload[]>([]);
 
   useEffect(() => {
@@ -188,6 +191,7 @@ export function OrderFormPage({ orderId }: { orderId: string | null }): JSX.Elem
     setDeliveryTime(order.deliveryTime ?? "");
     setDeliveryAddress(order.deliveryAddress ?? "");
     setNotes(order.notes ?? "");
+    setCharges(order.charges);
     setDraftPackaging([]);
     setItems(
       mapOrderToItems(
@@ -230,6 +234,7 @@ export function OrderFormPage({ orderId }: { orderId: string | null }): JSX.Elem
     deliveryTime: orderType === "delivery" ? deliveryTime || null : null,
     eventDate,
     items,
+    charges,
     notes: notes || null,
     orderType,
     pickupTime: orderType === "pickup" ? pickupTime || null : null,
@@ -402,6 +407,13 @@ export function OrderFormPage({ orderId }: { orderId: string | null }): JSX.Elem
               products={productsQuery.data?.items ?? []}
               units={referenceQuery.data?.units ?? []}
             />
+            <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
+              <DocumentChargesEditor
+                charges={charges}
+                onChange={setCharges}
+                taxRates={referenceQuery.data?.taxRates ?? []}
+              />
+            </section>
           </div>
           <div className="grid content-start gap-6">
             <OrderPaymentSection canManage={canManage} order={order} />

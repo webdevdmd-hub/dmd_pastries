@@ -1,6 +1,10 @@
 package purchasing
 
-import "time"
+import (
+	"time"
+
+	"pastries-pos/internal/modules/charges"
+)
 
 type ListQuery struct {
 	Search        string
@@ -64,6 +68,7 @@ type CreatePurchaseOrderRequest struct {
 	OrderDate            string                   `json:"order_date" binding:"required"`
 	ExpectedDeliveryDate string                   `json:"expected_delivery_date"`
 	Items                []PurchaseOrderItemInput `json:"items" binding:"required"`
+	Charges              []charges.ChargeInput    `json:"charges"`
 	Notes                string                   `json:"notes"`
 }
 
@@ -73,6 +78,7 @@ type UpdatePurchaseOrderRequest struct {
 	OrderDate            string                   `json:"order_date"`
 	ExpectedDeliveryDate string                   `json:"expected_delivery_date"`
 	Items                []PurchaseOrderItemInput `json:"items"`
+	Charges              []charges.ChargeInput    `json:"charges"`
 	Notes                string                   `json:"notes"`
 }
 
@@ -100,6 +106,7 @@ type CreatePurchaseInvoiceRequest struct {
 	InvoiceDate     string                     `json:"invoice_date" binding:"required"`
 	DueDate         string                     `json:"due_date"`
 	Items           []PurchaseInvoiceItemInput `json:"items" binding:"required"`
+	Charges         []charges.ChargeInput      `json:"charges"`
 	Notes           string                     `json:"notes"`
 }
 
@@ -111,6 +118,7 @@ type UpdatePurchaseInvoiceRequest struct {
 	InvoiceDate     string                     `json:"invoice_date"`
 	DueDate         string                     `json:"due_date"`
 	Items           []PurchaseInvoiceItemInput `json:"items"`
+	Charges         []charges.ChargeInput      `json:"charges"`
 	Notes           string                     `json:"notes"`
 }
 
@@ -135,6 +143,7 @@ type ReceivePurchaseRequest struct {
 	PurchaseInvoiceID string                     `json:"purchase_invoice_id"`
 	ReceivedDate      string                     `json:"received_date" binding:"required"`
 	Items             []PurchaseReceiptItemInput `json:"items" binding:"required"`
+	Charges           []charges.ChargeInput      `json:"charges"`
 	Notes             string                     `json:"notes"`
 }
 
@@ -164,6 +173,7 @@ type CreatePurchaseReturnRequest struct {
 	Reason                  string                    `json:"reason"`
 	SupplierReferenceNumber string                    `json:"supplier_reference_number"`
 	Items                   []PurchaseReturnItemInput `json:"items" binding:"required"`
+	Charges                 []charges.ChargeInput     `json:"charges"`
 }
 
 type UpdatePurchaseReturnRequest struct {
@@ -171,6 +181,7 @@ type UpdatePurchaseReturnRequest struct {
 	Reason                  string                    `json:"reason"`
 	SupplierReferenceNumber string                    `json:"supplier_reference_number"`
 	Items                   []PurchaseReturnItemInput `json:"items"`
+	Charges                 []charges.ChargeInput     `json:"charges"`
 }
 
 type PurchaseReturnItemInput struct {
@@ -206,9 +217,12 @@ type PurchaseOrderResponse struct {
 	SubtotalAmount       float64                     `json:"subtotal_amount"`
 	TaxAmount            float64                     `json:"tax_amount"`
 	DiscountAmount       float64                     `json:"discount_amount"`
+	ChargeAmount         float64                     `json:"charge_amount"`
+	ChargeTaxAmount      float64                     `json:"charge_tax_amount"`
 	TotalAmount          float64                     `json:"total_amount"`
 	Notes                string                      `json:"notes"`
 	Items                []PurchaseOrderItemResponse `json:"items,omitempty"`
+	Charges              []charges.ChargeResponse    `json:"charges,omitempty"`
 	CreatedAt            time.Time                   `json:"created_at"`
 	UpdatedAt            time.Time                   `json:"updated_at"`
 }
@@ -247,6 +261,8 @@ type PurchaseInvoiceResponse struct {
 	SubtotalAmount  float64                          `json:"subtotal_amount"`
 	TaxAmount       float64                          `json:"tax_amount"`
 	DiscountAmount  float64                          `json:"discount_amount"`
+	ChargeAmount    float64                          `json:"charge_amount"`
+	ChargeTaxAmount float64                          `json:"charge_tax_amount"`
 	TotalAmount     float64                          `json:"total_amount"`
 	PaidAmount      float64                          `json:"paid_amount"`
 	BalanceAmount   float64                          `json:"balance_amount"`
@@ -256,6 +272,7 @@ type PurchaseInvoiceResponse struct {
 	JournalEntryID  *string                          `json:"journal_entry_id"`
 	Notes           string                           `json:"notes"`
 	Items           []PurchaseInvoiceItemResponse    `json:"items,omitempty"`
+	Charges         []charges.ChargeResponse         `json:"charges,omitempty"`
 	Payments        []PurchaseInvoicePaymentResponse `json:"payments,omitempty"`
 	CreatedAt       time.Time                        `json:"created_at"`
 	UpdatedAt       time.Time                        `json:"updated_at"`
@@ -338,10 +355,13 @@ type PurchaseReceiptResponse struct {
 	ReceiptNumber     string                        `json:"receipt_number"`
 	ReceivedDate      time.Time                     `json:"received_date"`
 	Status            string                        `json:"status"`
+	ChargeAmount      float64                       `json:"charge_amount"`
+	ChargeTaxAmount   float64                       `json:"charge_tax_amount"`
 	JournalEntryID    *string                       `json:"journal_entry_id"`
 	ReceivedByUserID  string                        `json:"received_by_user_id"`
 	Notes             string                        `json:"notes"`
 	Items             []PurchaseReceiptItemResponse `json:"items,omitempty"`
+	Charges           []charges.ChargeResponse      `json:"charges,omitempty"`
 	CreatedAt         time.Time                     `json:"created_at"`
 	UpdatedAt         time.Time                     `json:"updated_at"`
 }
@@ -382,6 +402,8 @@ type PurchaseReturnResponse struct {
 	SubtotalAmount          float64                      `json:"subtotal_amount"`
 	TaxAmount               float64                      `json:"tax_amount"`
 	DiscountAmount          float64                      `json:"discount_amount"`
+	ChargeAmount            float64                      `json:"charge_amount"`
+	ChargeTaxAmount         float64                      `json:"charge_tax_amount"`
 	ReturnTotal             float64                      `json:"return_total"`
 	AppliedCreditAmount     float64                      `json:"applied_credit_amount"`
 	OpenCreditAmount        float64                      `json:"open_credit_amount"`
@@ -392,6 +414,7 @@ type PurchaseReturnResponse struct {
 	CancelledByUserID       *string                      `json:"cancelled_by_user_id"`
 	CancelledAt             *time.Time                   `json:"cancelled_at"`
 	Items                   []PurchaseReturnItemResponse `json:"items,omitempty"`
+	Charges                 []charges.ChargeResponse     `json:"charges,omitempty"`
 	CreatedAt               time.Time                    `json:"created_at"`
 	UpdatedAt               time.Time                    `json:"updated_at"`
 }

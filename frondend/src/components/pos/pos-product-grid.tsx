@@ -6,11 +6,6 @@ import { POSProductGridSkeleton } from "@/components/pos/pos-product-grid-skelet
 import { Button } from "@/components/ui/button";
 import type { POSProduct } from "@/types/pos";
 
-type POSProductStock = {
-  quantity: number;
-  unitName: string;
-};
-
 type POSProductGridProps = {
   canCreateOrder?: boolean;
   error: Error | null;
@@ -21,7 +16,6 @@ type POSProductGridProps = {
   onRetry: () => void;
   products: POSProduct[];
   showPrices: boolean;
-  stockByProductId?: Map<string, POSProductStock>;
 };
 
 export function POSProductGrid({
@@ -34,7 +28,6 @@ export function POSProductGrid({
   onRetry,
   products,
   showPrices,
-  stockByProductId,
 }: POSProductGridProps): JSX.Element {
   if (isLoading) {
     return <POSProductGridSkeleton />;
@@ -73,25 +66,15 @@ export function POSProductGrid({
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-      {products.map((product) => {
-        const stock = stockByProductId?.get(product.id);
-
-        return (
-          <POSProductCard
-            key={product.id}
-            onAdd={onProductClick}
-            onOpenVariants={onProductVariantsClick}
-            product={product}
-            showPrices={showPrices}
-            {...(stock
-              ? {
-                  stockQuantity: stock.quantity,
-                  stockUnitName: stock.unitName,
-                }
-              : {})}
-          />
-        );
-      })}
+      {products.map((product) => (
+        <POSProductCard
+          key={product.id}
+          onAdd={onProductClick}
+          onOpenVariants={onProductVariantsClick}
+          product={product}
+          showPrices={showPrices}
+        />
+      ))}
       {canCreateOrder && onCreateOrder ? (
         <Button
           className="flex min-h-[14.5rem] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#a1a1aa] bg-[#fafafa] text-[#52525b] shadow-none hover:border-black hover:bg-white hover:text-black"
