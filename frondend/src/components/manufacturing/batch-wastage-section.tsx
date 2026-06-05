@@ -1,5 +1,9 @@
 import type { JSX } from "react";
 
+import {
+  AccountingJournalLink,
+  StockMovementLink,
+} from "@/components/shared/accounting-reference-links";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ProductionWastage } from "@/types/manufacturing";
@@ -10,6 +14,13 @@ function formatDate(value: string): string {
         new Date(value),
       )
     : "Not recorded";
+}
+
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    style: "currency",
+  }).format(value);
 }
 
 export function BatchWastageSection({
@@ -36,12 +47,26 @@ export function BatchWastageSection({
           <p className="text-sm text-brand-mocha">No wastage recorded yet.</p>
         ) : (
           wastage.map((item) => (
-            <div className="rounded-2xl border border-red-100 bg-red-50/50 p-4" key={item.id}>
-              <p className="font-semibold text-brand-espresso">{item.itemName}</p>
-              <p className="text-sm text-brand-mocha">
-                {item.quantity} {item.unitName} · {item.wastageType} · {item.reason}
-              </p>
-              <p className="mt-1 text-xs text-brand-mocha">{formatDate(item.createdAt)}</p>
+            <div
+              className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-red-100 bg-red-50/50 p-4"
+              key={item.id}
+            >
+              <div>
+                <p className="font-semibold text-brand-espresso">{item.itemName}</p>
+                <p className="text-sm text-brand-mocha">
+                  {item.quantity} {item.unitName} / {item.wastageType} / {item.reason}
+                </p>
+                <p className="mt-1 text-xs text-brand-mocha">{formatDate(item.createdAt)}</p>
+                {item.totalCost > 0 ? (
+                  <p className="mt-1 text-xs font-semibold text-brand-espresso">
+                    Cost {formatMoney(item.totalCost)}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <StockMovementLink id={item.stockMovementId} />
+                <AccountingJournalLink id={item.accountingJournalEntryId} />
+              </div>
             </div>
           ))
         )}

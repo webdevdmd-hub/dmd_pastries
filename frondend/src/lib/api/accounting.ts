@@ -2,7 +2,20 @@ import { apiRequest } from "@/lib/api/client";
 import type {
   AccountingAccountStatus,
   AccountingAccountType,
+  AccountingBackfillFilters,
+  AccountingBackfillPayload,
+  AccountingBackfillReadinessIssue,
+  AccountingBackfillReadinessResponse,
+  AccountingBackfillReadinessTarget,
+  AccountingBackfillResponse,
+  AccountingBackfillTargetResult,
   AccountingNormalBalance,
+  AccountingReconciliationFilters,
+  AccountingReconciliationItem,
+  AccountingReconciliationResponse,
+  AccountingSettings,
+  AccountMapping,
+  AccountMappingsResponse,
   AccountTransfer,
   AccountTransferPayload,
   AccountTransfersFilters,
@@ -44,6 +57,8 @@ import type {
   TrialBalanceFilters,
   TrialBalanceItem,
   TrialBalanceResponse,
+  UpdateAccountingSettingsPayload,
+  UpdateAccountMappingsPayload,
   UpdateChartAccountPayload,
   UpdateChartAccountStatusPayload,
   UpdateJournalEntryPayload,
@@ -659,6 +674,7 @@ function parseBalanceSheetResponse(value: unknown): BalanceSheetResponse {
 
   return {
     asOfDate: stringValue(value.as_of_date),
+    financialYearStartDate: stringValue(value.financial_year_start_date),
     assets: parseBalanceSheetSection(value.assets),
     liabilities: parseBalanceSheetSection(value.liabilities),
     equity: parseBalanceSheetSection(value.equity),
@@ -668,6 +684,242 @@ function parseBalanceSheetResponse(value: unknown): BalanceSheetResponse {
     totalLiabilitiesAndEquity: numberValue(value.total_liabilities_and_equity, 0),
     isBalanced: booleanValue(value.is_balanced),
     difference: numberValue(value.difference, 0),
+  };
+}
+
+function parseAccountingSettings(value: unknown): AccountingSettings {
+  if (!isObject(value)) {
+    throw new Error("Backend accounting settings payload is invalid.");
+  }
+
+  return {
+    financialYearStartMonth: numberValue(value.financial_year_start_month, 1),
+    financialYearStartDay: numberValue(value.financial_year_start_day, 1),
+    financialYearStartLabel: stringValue(value.financial_year_start_label, "January 1"),
+    usesDefaultFinancialYear: booleanValue(value.uses_default_financial_year, true),
+  };
+}
+
+function parseAccountMapping(value: unknown): AccountMapping {
+  if (!isObject(value)) {
+    throw new Error("Backend account mapping payload is invalid.");
+  }
+
+  const chartAccountId = optionalString(value.chart_account_id);
+
+  return {
+    mappingKey: stringValue(value.mapping_key, stringValue(value.key)),
+    description: stringValue(value.description),
+    chartAccountId,
+    chartAccountCode: stringValue(value.chart_account_code),
+    chartAccountName: stringValue(value.chart_account_name),
+    chartAccountType: isAccountType(value.chart_account_type) ? value.chart_account_type : null,
+    chartAccountGroup: stringValue(value.chart_account_group),
+    isMapped: booleanValue(value.is_mapped, chartAccountId !== null),
+    isRequired: booleanValue(value.is_required),
+  };
+}
+
+function parseAccountMappingsResponse(value: unknown): AccountMappingsResponse {
+  const source = isObject(value) ? (value.mappings ?? value.items ?? value.data) : value;
+
+  if (Array.isArray(source)) {
+    return {
+      items: source.map(parseAccountMapping),
+    };
+  }
+
+  if (isObject(source)) {
+    return {
+      items: Object.entries(source).map(([mappingKey, mappingValue]) => {
+        if (isObject(mappingValue)) {
+          return parseAccountMapping({
+            mapping_key: mappingKey,
+            ...mappingValue,
+          });
+        }
+
+        return parseAccountMapping({
+          chart_account_id: mappingValue,
+          mapping_key: mappingKey,
+        });
+      }),
+    };
+  }
+
+  throw new Error("Backend account mappings payload is invalid.");
+}
+
+function parseReconciliationItem(value: unknown): AccountingReconciliationItem {
+  if (!isObject(value)) {
+    throw new Error("Backend reconciliation item payload is invalid.");
+  }
+
+  const fallbackId = stringValue(value.key, stringValue(value.name, "check"));
+  const status = stringValue(
+    value.status,
+    booleanValue(value.is_matched) ? "matched" : "unmatched",
+  );
+  const difference = numberValue(value.difference, 0);
+
+  return {
+    id: stringValue(value.id, fallbackId),
+    label: stringValue(value.label, stringValue(value.name, fallbackId.replace(/_/g, " "))),
+    status,
+    isMatched: booleanValue(
+      value.is_matched,
+      status.toLowerCase() === "matched" || difference === 0,
+    ),
+    difference,
+    operationalAmount: numberValue(
+      value.operational_amount,
+      numberValue(value.source_amount, numberValue(value.document_amount, 0)),
+    ),
+    ledgerAmount: numberValue(value.ledger_amount, numberValue(value.accounting_amount, 0)),
+    details: stringValue(value.details, stringValue(value.message)),
+  };
+}
+
+function parseReconciliationItems(value: unknown): AccountingReconciliationItem[] {
+  if (Array.isArray(value)) {
+    return value.map(parseReconciliationItem);
+  }
+
+  if (!isObject(value)) {
+    return [];
+  }
+
+  const directItems = value.items ?? value.checks ?? value.results;
+  if (Array.isArray(directItems)) {
+    return directItems.map(parseReconciliationItem);
+  }
+
+  return Object.entries(value)
+    .filter(([, item]) => isObject(item))
+    .map(([key, item]) =>
+      parseReconciliationItem({
+        key,
+        ...(item as Record<string, unknown>),
+      }),
+    );
+}
+
+function parseReconciliationResponse(value: unknown): AccountingReconciliationResponse {
+  if (!isObject(value)) {
+    throw new Error("Backend reconciliation payload is invalid.");
+  }
+
+  return {
+    asOfDate: stringValue(value.as_of_date),
+    branchId: optionalString(value.branch_id),
+    items: parseReconciliationItems(value),
+  };
+}
+
+function parseBackfillReadinessIssue(value: unknown): AccountingBackfillReadinessIssue {
+  if (!isObject(value)) {
+    throw new Error("Backend backfill readiness issue payload is invalid.");
+  }
+
+  return {
+    severity: stringValue(value.severity, "warning"),
+    code: stringValue(value.code),
+    message: stringValue(value.message, "Readiness issue"),
+    target: stringValue(value.target),
+    details: stringValue(value.details),
+  };
+}
+
+function parseBackfillReadinessTarget(value: unknown): AccountingBackfillReadinessTarget {
+  if (!isObject(value)) {
+    throw new Error("Backend backfill readiness target payload is invalid.");
+  }
+
+  return {
+    target: stringValue(value.target, stringValue(value.key)),
+    candidateCount: numberValue(value.candidate_count, numberValue(value.candidates, 0)),
+    wouldPostCount: numberValue(value.would_post_count, numberValue(value.would_post, 0)),
+    blockedCount: numberValue(value.blocked_count, numberValue(value.blocked, 0)),
+  };
+}
+
+function parseBackfillReadinessTargets(value: unknown): AccountingBackfillReadinessTarget[] {
+  if (Array.isArray(value)) {
+    return value.map(parseBackfillReadinessTarget);
+  }
+
+  if (!isObject(value)) {
+    return [];
+  }
+
+  return Object.entries(value).map(([key, target]) => {
+    if (isObject(target)) {
+      return parseBackfillReadinessTarget({
+        key,
+        ...target,
+      });
+    }
+
+    return parseBackfillReadinessTarget({
+      candidate_count: target,
+      key,
+    });
+  });
+}
+
+function parseBackfillReadinessResponse(value: unknown): AccountingBackfillReadinessResponse {
+  if (!isObject(value)) {
+    throw new Error("Backend backfill readiness payload is invalid.");
+  }
+
+  const issues = Array.isArray(value.issues) ? value.issues.map(parseBackfillReadinessIssue) : [];
+
+  return {
+    ready: booleanValue(
+      value.ready,
+      issues.every((issue) => issue.severity !== "blocking"),
+    ),
+    issues,
+    targets: parseBackfillReadinessTargets(value.targets ?? value.target_counts),
+  };
+}
+
+function parseBackfillTargetResult(value: unknown): AccountingBackfillTargetResult {
+  if (!isObject(value)) {
+    throw new Error("Backend backfill target result payload is invalid.");
+  }
+
+  const rawErrors = Array.isArray(value.errors) ? value.errors : [];
+
+  return {
+    target: stringValue(value.target, stringValue(value.key)),
+    scannedCount: numberValue(value.scanned_count, numberValue(value.scanned, 0)),
+    wouldPostCount: numberValue(value.would_post_count, numberValue(value.would_post, 0)),
+    postedCount: numberValue(value.posted_count, numberValue(value.posted, 0)),
+    skippedCount: numberValue(value.skipped_count, numberValue(value.skipped, 0)),
+    failedCount: numberValue(value.failed_count, numberValue(value.failed, 0)),
+    errors: rawErrors.map((error) => stringValue(error, "Backfill error")),
+  };
+}
+
+function parseBackfillResponse(value: unknown): AccountingBackfillResponse {
+  if (!isObject(value)) {
+    throw new Error("Backend backfill payload is invalid.");
+  }
+
+  const source = value.results ?? value.targets ?? value.target_results;
+  const results = Array.isArray(source)
+    ? source.map(parseBackfillTargetResult)
+    : parseBackfillReadinessTargets(source).map((target) =>
+        parseBackfillTargetResult({
+          target: target.target,
+          would_post_count: target.wouldPostCount,
+        }),
+      );
+
+  return {
+    dryRun: booleanValue(value.dry_run, true),
+    results,
   };
 }
 
@@ -805,6 +1057,61 @@ function platformSettlementPayload(
   };
 }
 
+function accountingSettingsPayload(payload: UpdateAccountingSettingsPayload): {
+  financial_year_start_day: number;
+  financial_year_start_month: number;
+} {
+  return {
+    financial_year_start_day: payload.financialYearStartDay,
+    financial_year_start_month: payload.financialYearStartMonth,
+  };
+}
+
+function backfillQueryString(filters: AccountingBackfillFilters): string {
+  const searchParams = new URLSearchParams();
+
+  if (filters.branchId) {
+    searchParams.set("branch_id", filters.branchId);
+  }
+
+  if (filters.dateFrom) {
+    searchParams.set("date_from", filters.dateFrom);
+  }
+
+  if (filters.dateTo) {
+    searchParams.set("date_to", filters.dateTo);
+  }
+
+  if (filters.limit > 0) {
+    searchParams.set("limit", String(filters.limit));
+  }
+
+  filters.targets.forEach((target) => {
+    searchParams.append("targets", target);
+  });
+
+  const query = searchParams.toString();
+  return query ? `?${query}` : "";
+}
+
+function backfillPayload(payload: AccountingBackfillPayload): {
+  branch_id?: string;
+  date_from?: string;
+  date_to?: string;
+  dry_run: boolean;
+  limit: number;
+  targets: string[];
+} {
+  return {
+    ...(payload.branchId ? { branch_id: payload.branchId } : {}),
+    ...(payload.dateFrom ? { date_from: payload.dateFrom } : {}),
+    ...(payload.dateTo ? { date_to: payload.dateTo } : {}),
+    dry_run: payload.dryRun,
+    limit: payload.limit,
+    targets: payload.targets,
+  };
+}
+
 export async function getChartAccounts(
   filters: ChartAccountsFilters,
 ): Promise<ChartAccountsResponse> {
@@ -904,6 +1211,187 @@ export async function deleteChartAccount(id: string): Promise<void> {
     method: "DELETE",
     parse: () => undefined,
   });
+}
+
+export async function getAccountingSettings(): Promise<AccountingSettings> {
+  const response = await apiRequest<AccountingSettings>("/api/v1/accounting/settings", {
+    authMode: "appwrite",
+    parse: parseAccountingSettings,
+  });
+
+  return response.data;
+}
+
+export async function updateAccountingSettings(
+  payload: UpdateAccountingSettingsPayload,
+): Promise<AccountingSettings> {
+  const response = await apiRequest<
+    AccountingSettings,
+    ReturnType<typeof accountingSettingsPayload>
+  >("/api/v1/accounting/settings", {
+    authMode: "appwrite",
+    body: accountingSettingsPayload(payload),
+    method: "PATCH",
+    parse: parseAccountingSettings,
+  });
+
+  return response.data;
+}
+
+export async function getAccountMappings(): Promise<AccountMappingsResponse> {
+  const response = await apiRequest<AccountMappingsResponse>(
+    "/api/v1/accounting/account-mappings",
+    {
+      authMode: "appwrite",
+      parse: parseAccountMappingsResponse,
+    },
+  );
+
+  return response.data;
+}
+
+export async function seedDefaultAccountMappings(): Promise<AccountMappingsResponse> {
+  const response = await apiRequest<AccountMappingsResponse>(
+    "/api/v1/accounting/account-mappings/seed-defaults",
+    {
+      authMode: "appwrite",
+      method: "POST",
+      parse: parseAccountMappingsResponse,
+    },
+  );
+
+  return response.data;
+}
+
+export async function updateAccountMappings(
+  payload: UpdateAccountMappingsPayload,
+): Promise<AccountMappingsResponse> {
+  const response = await apiRequest<AccountMappingsResponse, UpdateAccountMappingsPayload>(
+    "/api/v1/accounting/account-mappings",
+    {
+      authMode: "appwrite",
+      body: payload,
+      method: "PATCH",
+      parse: parseAccountMappingsResponse,
+    },
+  );
+
+  return response.data;
+}
+
+export async function getAccountingReconciliationHealthCheck(
+  filters: AccountingReconciliationFilters,
+): Promise<AccountingReconciliationResponse> {
+  const response = await apiRequest<AccountingReconciliationResponse>(
+    `/api/v1/accounting/reconciliation/health-check${toQueryString({
+      as_of_date: filters.asOfDate,
+      branch_id: filters.branchId,
+    })}`,
+    {
+      authMode: "appwrite",
+      parse: parseReconciliationResponse,
+    },
+  );
+
+  return response.data;
+}
+
+export async function getAccountingReconciliationInventory(
+  filters: AccountingReconciliationFilters,
+): Promise<AccountingReconciliationResponse> {
+  const response = await apiRequest<AccountingReconciliationResponse>(
+    `/api/v1/accounting/reconciliation/inventory${toQueryString({
+      as_of_date: filters.asOfDate,
+      branch_id: filters.branchId,
+    })}`,
+    {
+      authMode: "appwrite",
+      parse: parseReconciliationResponse,
+    },
+  );
+
+  return response.data;
+}
+
+export async function getAccountingReconciliationAp(
+  filters: AccountingReconciliationFilters,
+): Promise<AccountingReconciliationResponse> {
+  const response = await apiRequest<AccountingReconciliationResponse>(
+    `/api/v1/accounting/reconciliation/ap${toQueryString({
+      as_of_date: filters.asOfDate,
+      branch_id: filters.branchId,
+    })}`,
+    {
+      authMode: "appwrite",
+      parse: parseReconciliationResponse,
+    },
+  );
+
+  return response.data;
+}
+
+export async function getAccountingReconciliationAr(
+  filters: AccountingReconciliationFilters,
+): Promise<AccountingReconciliationResponse> {
+  const response = await apiRequest<AccountingReconciliationResponse>(
+    `/api/v1/accounting/reconciliation/ar${toQueryString({
+      as_of_date: filters.asOfDate,
+      branch_id: filters.branchId,
+    })}`,
+    {
+      authMode: "appwrite",
+      parse: parseReconciliationResponse,
+    },
+  );
+
+  return response.data;
+}
+
+export async function getAccountingReconciliationPaymentAccounts(
+  filters: AccountingReconciliationFilters,
+): Promise<AccountingReconciliationResponse> {
+  const response = await apiRequest<AccountingReconciliationResponse>(
+    `/api/v1/accounting/reconciliation/payment-accounts${toQueryString({
+      as_of_date: filters.asOfDate,
+      branch_id: filters.branchId,
+    })}`,
+    {
+      authMode: "appwrite",
+      parse: parseReconciliationResponse,
+    },
+  );
+
+  return response.data;
+}
+
+export async function getAccountingBackfillReadiness(
+  filters: AccountingBackfillFilters,
+): Promise<AccountingBackfillReadinessResponse> {
+  const response = await apiRequest<AccountingBackfillReadinessResponse>(
+    `/api/v1/accounting/backfill-journals/readiness${backfillQueryString(filters)}`,
+    {
+      authMode: "appwrite",
+      parse: parseBackfillReadinessResponse,
+    },
+  );
+
+  return response.data;
+}
+
+export async function runAccountingBackfill(
+  payload: AccountingBackfillPayload,
+): Promise<AccountingBackfillResponse> {
+  const response = await apiRequest<AccountingBackfillResponse, ReturnType<typeof backfillPayload>>(
+    "/api/v1/accounting/backfill-journals",
+    {
+      authMode: "appwrite",
+      body: backfillPayload(payload),
+      method: "POST",
+      parse: parseBackfillResponse,
+    },
+  );
+
+  return response.data;
 }
 
 export async function getJournalEntries(

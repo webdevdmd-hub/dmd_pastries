@@ -92,6 +92,7 @@ function shortId(value: string): string {
 export function ExpiryAlertsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
+  const { normalizeBranchId } = branchScope;
   const canView = hasAnyPermission([PERMISSIONS.inventoryExpiryView, PERMISSIONS.inventoryView]);
   const [filters, setFilters] = useState<ExpiryAlertFilters>({
     ...defaultFilters,
@@ -119,12 +120,12 @@ export function ExpiryAlertsPageClient(): JSX.Element {
 
   useEffect(() => {
     setFilters((currentFilters) => {
-      const branchId = branchScope.normalizeBranchId(currentFilters.branchId);
+      const branchId = normalizeBranchId(currentFilters.branchId);
       return branchId === currentFilters.branchId
         ? currentFilters
         : { ...currentFilters, branchId };
     });
-  }, [branchScope]);
+  }, [normalizeBranchId]);
 
   if (!canView) {
     return <AccessDeniedCard />;

@@ -59,6 +59,10 @@ function optionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
+function nullableString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
 function requestString(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
@@ -163,6 +167,9 @@ function parseIngredient(value: unknown): ProductionBatchIngredient {
     unitSymbol: stringValue(value.unit_symbol),
     totalCost: numberValue(value.total_cost),
     wastagePercentage: numberValue(value.wastage_percentage),
+    unitCostSnapshot: numberValue(value.unit_cost_snapshot),
+    stockMovementId: nullableString(value.stock_movement_id),
+    accountingJournalEntryId: nullableString(value.accounting_journal_entry_id),
   };
 }
 
@@ -179,6 +186,10 @@ function parsePackaging(value: unknown): ProductionBatchPackaging {
     consumedQuantity: numberValue(value.consumed_quantity),
     unitName: stringValue(value.unit_name, "Unit"),
     unitSymbol: stringValue(value.unit_symbol),
+    unitCostSnapshot: numberValue(value.unit_cost_snapshot),
+    totalCost: numberValue(value.total_cost),
+    stockMovementId: nullableString(value.stock_movement_id),
+    accountingJournalEntryId: nullableString(value.accounting_journal_entry_id),
   };
 }
 
@@ -191,6 +202,10 @@ function parseOutput(value: unknown): ProductionOutput {
     id: stringValue(value.id),
     quantityProduced: numberValue(value.quantity_produced),
     unitName: stringValue(value.unit_name, "Unit"),
+    unitCostSnapshot: numberValue(value.unit_cost_snapshot),
+    totalCost: numberValue(value.total_cost),
+    stockMovementId: nullableString(value.stock_movement_id),
+    accountingJournalEntryId: nullableString(value.accounting_journal_entry_id),
     createdAt: stringValue(value.created_at),
   };
 }
@@ -207,6 +222,10 @@ function parseWastage(value: unknown): ProductionWastage {
     quantity: numberValue(value.quantity),
     unitName: stringValue(value.unit_name, "Unit"),
     reason: stringValue(value.reason, "No reason recorded"),
+    unitCostSnapshot: numberValue(value.unit_cost_snapshot),
+    totalCost: numberValue(value.total_cost),
+    stockMovementId: nullableString(value.stock_movement_id),
+    accountingJournalEntryId: nullableString(value.accounting_journal_entry_id),
     createdAt: stringValue(value.created_at),
   };
 }

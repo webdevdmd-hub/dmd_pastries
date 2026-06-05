@@ -1,4 +1,5 @@
 import { PERMISSIONS } from "@/constants/permissions";
+import { ROUTES } from "@/constants/routes";
 import type { SettingsSection } from "@/types/settings";
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
@@ -77,6 +78,19 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     status: "available",
     category: "system",
     actionLabel: "Configure",
+  },
+  {
+    id: "api-health",
+    title: "API Monitor",
+    description:
+      "View backend API route health, response times, status codes, and live frontend request history.",
+    iconName: "Activity",
+    permission: PERMISSIONS.settingsView,
+    managePermission: PERMISSIONS.settingsView,
+    route: ROUTES.settingsApiHealth,
+    status: "available",
+    category: "system",
+    actionLabel: "Open Monitor",
   },
   {
     id: "hardware",

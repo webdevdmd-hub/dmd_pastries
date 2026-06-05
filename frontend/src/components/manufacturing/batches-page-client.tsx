@@ -71,6 +71,7 @@ type PendingAction = {
 export function BatchesPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
+  const { normalizeBranchId } = branchScope;
   const canView = hasAnyPermission([PERMISSIONS.manufacturingView, PERMISSIONS.inventoryView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.manufacturingBatchesCreate,
@@ -111,12 +112,12 @@ export function BatchesPageClient(): JSX.Element {
 
   useEffect(() => {
     setFilters((currentFilters) => {
-      const branchId = branchScope.normalizeBranchId(currentFilters.branchId);
+      const branchId = normalizeBranchId(currentFilters.branchId);
       return branchId === currentFilters.branchId
         ? currentFilters
         : { ...currentFilters, branchId };
     });
-  }, [branchScope]);
+  }, [normalizeBranchId]);
 
   if (!canView) {
     return <AccessDeniedCard />;

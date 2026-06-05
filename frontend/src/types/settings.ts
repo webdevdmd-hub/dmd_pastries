@@ -4,6 +4,7 @@ export type SettingsSectionStatus = "available" | "coming_soon" | "disabled";
 export type SettingsSectionCategory = "system" | "master_data";
 
 export type SettingsIconName =
+  | "Activity"
   | "Archive"
   | "BadgeDollarSign"
   | "Bell"

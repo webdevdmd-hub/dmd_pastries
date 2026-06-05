@@ -83,6 +83,7 @@ function buildDefaultFilters(branchId: string): InventoryFilters {
 export function InventoryPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
+  const { normalizeBranchId } = branchScope;
   const canView = hasAnyPermission([
     PERMISSIONS.inventoryView,
     PERMISSIONS.inventoryMovementsView,
@@ -213,7 +214,7 @@ export function InventoryPageClient(): JSX.Element {
 
   useEffect(() => {
     setFilters((currentFilters) => {
-      const normalizedBranchId = branchScope.normalizeBranchId(currentFilters.branchId);
+      const normalizedBranchId = normalizeBranchId(currentFilters.branchId);
 
       if (currentFilters.branchId === normalizedBranchId) {
         return currentFilters;
@@ -221,7 +222,7 @@ export function InventoryPageClient(): JSX.Element {
 
       return { ...currentFilters, branchId: normalizedBranchId };
     });
-  }, [branchScope]);
+  }, [normalizeBranchId]);
 
   if (!canView) {
     return <AccessDeniedCard />;

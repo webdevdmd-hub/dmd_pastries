@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
+import type { JSX } from "react";
 
-import { ROUTES } from "@/constants/routes";
+import { AccountingPageClient } from "@/components/accounting/accounting-page-client";
 
-export default function AccountingPage(): never {
-  redirect(ROUTES.accountingJournalEntries);
+export default function AccountingPage(): JSX.Element {
+  return <AccountingPageClient />;
 }

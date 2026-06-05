@@ -580,6 +580,7 @@ function ExpenseFormDialog({
 export function ExpensesPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
+  const { normalizeBranchId } = branchScope;
   const canView = hasAnyPermission([
     PERMISSIONS.expensesView,
     PERMISSIONS.expensesManage,
@@ -679,12 +680,12 @@ export function ExpensesPageClient(): JSX.Element {
 
   useEffect(() => {
     setFilters((currentFilters) => {
-      const branchId = branchScope.normalizeBranchId(currentFilters.branchId);
+      const branchId = normalizeBranchId(currentFilters.branchId);
       return branchId === currentFilters.branchId
         ? currentFilters
         : { ...currentFilters, branchId };
     });
-  }, [branchScope]);
+  }, [normalizeBranchId]);
 
   if (!canView) {
     return <AccessDeniedCard message="You need `expenses.view` to view Expenses." />;

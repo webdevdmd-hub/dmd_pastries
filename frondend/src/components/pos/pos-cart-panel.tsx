@@ -1,19 +1,13 @@
-import { ArrowRight, ChevronDown, PauseCircle, RotateCcw, Store } from "lucide-react";
+import { ArrowRight, PauseCircle, RotateCcw, Store } from "lucide-react";
 import type { JSX } from "react";
 
 import { POSCartItem } from "@/components/pos/pos-cart-item";
 import { POSCustomerSelector } from "@/components/pos/pos-customer-selector";
 import { POSEmptyCartState } from "@/components/pos/pos-empty-cart-state";
 import { DocumentChargesEditor } from "@/components/shared/document-charges-editor";
+import { SearchableSelect } from "@/components/shared/searchable-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { DocumentChargeDraft } from "@/types/document-charges";
 import type { CartDiscountType, CartItem, CartTotals } from "@/types/pos";
 import type { SalesChannel, TaxRate } from "@/types/settings";
@@ -97,29 +91,41 @@ export function POSCartPanel({
                 {selectedChannel?.channelName ?? "Default channel"}
               </p>
             </div>
-            <ChevronDown className="h-4 w-4" />
           </div>
-          <Select
-            value={salesChannelId || defaultChannelValue}
+          <SearchableSelect
+            ariaLabel="Select sales channel"
+            clearable={false}
+            contentClassName="rounded-md border-[#d4d4d8] bg-white"
+            emptyMessage="No sales channels found."
             onValueChange={(value) =>
-              onSalesChannelChange(value === defaultChannelValue ? "" : value)
+              onSalesChannelChange(!value || value === defaultChannelValue ? "" : value)
             }
-          >
-            <SelectTrigger className="h-9 rounded-md border-[#d4d4d8] bg-[#fafafa] text-sm font-semibold shadow-none">
-              <SelectValue placeholder="Default channel" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={defaultChannelValue}>Default channel</SelectItem>
-              {salesChannels
+            options={[
+              {
+                description: "Use the normal branch billing flow",
+                label: "Default channel",
+                value: defaultChannelValue,
+              },
+              ...salesChannels
                 .filter((channel) => channel.status === "active")
-                .map((channel) => (
-                  <SelectItem key={channel.id} value={channel.id}>
-                    {channel.channelName}
-                    {channel.isDefault ? " (default)" : ""}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+                .map((channel) => ({
+                  description: channel.requiresExternalOrderNumber
+                    ? "External order number required"
+                    : channel.defaultPaymentMethodName || "No default payment method",
+                  keywords: [
+                    channel.channelType,
+                    channel.defaultPaymentMethodName,
+                    channel.isDefault ? "default" : "",
+                  ],
+                  label: `${channel.channelName}${channel.isDefault ? " (default)" : ""}`,
+                  value: channel.id,
+                })),
+            ]}
+            placeholder="Default channel"
+            searchPlaceholder="Search channels..."
+            triggerClassName="h-9 rounded-md border-[#d4d4d8] bg-[#fafafa] text-sm font-semibold shadow-none hover:bg-white focus-visible:ring-black"
+            value={salesChannelId || defaultChannelValue}
+          />
           {selectedChannel?.requiresExternalOrderNumber ? (
             <Input
               className="mt-2 h-9 rounded-md border-[#d4d4d8] bg-white font-mono text-sm shadow-none focus-visible:ring-black"

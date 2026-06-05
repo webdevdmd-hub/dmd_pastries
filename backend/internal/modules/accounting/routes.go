@@ -25,6 +25,9 @@ func RegisterRoutes(
 	group.POST("/account-mappings/seed-defaults", manage, handler.SeedAccountMappings)
 	group.PATCH("/account-mappings", manage, handler.UpdateAccountMappings)
 
+	group.GET("/settings", view, handler.GetAccountingSettings)
+	group.PATCH("/settings", manage, handler.UpdateAccountingSettings)
+
 	group.GET("/payment-accounts", view, handler.ListPaymentAccounts)
 	group.POST("/payment-accounts", manage, handler.CreatePaymentAccount)
 	group.GET("/payment-accounts/:id", view, handler.GetPaymentAccount)
@@ -44,6 +47,15 @@ func RegisterRoutes(
 	group.GET("/reports/trial-balance", view, handler.GetTrialBalance)
 	group.GET("/reports/profit-loss", view, handler.GetProfitLoss)
 	group.GET("/reports/balance-sheet", view, handler.GetBalanceSheet)
+
+	group.GET("/reconciliation/health-check", view, handler.GetReconciliationHealth)
+	group.GET("/reconciliation/inventory", view, handler.GetInventoryReconciliation)
+	group.GET("/reconciliation/ap", view, handler.GetAPReconciliation)
+	group.GET("/reconciliation/ar", view, handler.GetARReconciliation)
+	group.GET("/reconciliation/payment-accounts", view, handler.GetPaymentAccountReconciliation)
+
+	group.GET("/backfill-journals/readiness", manage, handler.GetBackfillReadiness)
+	group.POST("/backfill-journals", manage, handler.BackfillJournals)
 
 	group.GET("/journal-entries", view, handler.ListJournalEntries)
 	group.POST("/journal-entries", manage, handler.CreateJournalEntry)

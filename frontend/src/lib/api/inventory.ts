@@ -240,6 +240,10 @@ function parseStockMovement(value: unknown): StockMovement {
     referenceType: nullableString(value.reference_type),
     referenceId: nullableString(value.reference_id),
     reason: nullableString(value.reason),
+    unitCostSnapshot: numberValue(value.unit_cost_snapshot),
+    totalCost: numberValue(value.total_cost),
+    valuationMethod: nullableString(value.valuation_method),
+    accountingJournalEntryId: nullableString(value.accounting_journal_entry_id),
     createdByUserName: stringValue(value.created_by_user_name, "System"),
     createdAt: stringValue(value.created_at),
   };

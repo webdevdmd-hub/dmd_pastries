@@ -1,6 +1,7 @@
 "use client";
 
 import { Filter, RefreshCw, Scale, Settings2 } from "lucide-react";
+import Link from "next/link";
 import { Fragment, type JSX, useState } from "react";
 
 import { AccountingAccessDeniedCard } from "@/components/accounting/accounting-access-denied-card";
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PERMISSIONS } from "@/constants/permissions";
+import { ROUTES } from "@/constants/routes";
 import { useBalanceSheetReport } from "@/hooks/use-accounting";
 import { useBranches } from "@/hooks/use-branches";
 import { usePermission } from "@/hooks/use-permission";
@@ -229,8 +231,16 @@ export function BalanceSheetPageClient(): JSX.Element {
   return (
     <div className="mx-auto flex max-w-[96rem] flex-col gap-4">
       <PageHeader
+        actions={
+          <Button asChild variant="outline">
+            <Link href={ROUTES.accountingSettings}>
+              <Settings2 className="h-4 w-4" />
+              Accounting Settings
+            </Link>
+          </Button>
+        }
         description="Business overview"
-        title={`Balance Sheet • As of ${formatDate(filters.asOfDate)}`}
+        title={`Balance Sheet - As of ${formatDate(filters.asOfDate)}`}
       />
 
       <div className="rounded-2xl border border-workspace-panel-border bg-workspace-panel shadow-sm">
@@ -331,6 +341,11 @@ export function BalanceSheetPageClient(): JSX.Element {
                   <p className="mt-1 text-sm text-slate-600">
                     As of {formatDate(balanceSheet.asOfDate)}
                   </p>
+                  {balanceSheet.financialYearStartDate ? (
+                    <p className="mt-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                      Financial year starts {formatDate(balanceSheet.financialYearStartDate)}
+                    </p>
+                  ) : null}
                   {balanceSheet.isBalanced ? (
                     <Badge className="mt-3" variant="secondary">
                       Balanced
@@ -382,7 +397,9 @@ export function BalanceSheetPageClient(): JSX.Element {
                 </table>
 
                 <p className="mt-6 text-xs text-slate-500">
-                  Amounts are shown in AED. Draft journal entries are excluded.
+                  Amounts are shown in AED. Draft journal entries are excluded. Current year
+                  profit/loss rows are calculated by the backend from the configured financial year
+                  start.
                 </p>
               </div>
             </div>

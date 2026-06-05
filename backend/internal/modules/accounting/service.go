@@ -100,6 +100,46 @@ func (s *Service) UpdateAccountMappings(currentUser *utils.AuthContext, req Upda
 	return s.ListAccountMappings(currentUser)
 }
 
+func (s *Service) GetAccountingSettings(currentUser *utils.AuthContext) (*AccountingSettingsResponse, error) {
+	row, err := s.repo.EnsureAccountingSettings(s.db, currentUser.BusinessID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load accounting settings")
+	}
+	response := toAccountingSettingsResponse(row)
+	return &response, nil
+}
+
+func (s *Service) UpdateAccountingSettings(currentUser *utils.AuthContext, req UpdateAccountingSettingsRequest, ipAddress, userAgent string) (*AccountingSettingsResponse, error) {
+	current, err := s.repo.EnsureAccountingSettings(s.db, currentUser.BusinessID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load accounting settings")
+	}
+	month := current.FinancialYearStartMonth
+	day := current.FinancialYearStartDay
+	if req.FinancialYearStartMonth != nil {
+		month = *req.FinancialYearStartMonth
+	}
+	if req.FinancialYearStartDay != nil {
+		day = *req.FinancialYearStartDay
+	}
+	if err := validateFinancialYearStart(month, day); err != nil {
+		return nil, err
+	}
+	if err := s.withTransaction(func(tx *gorm.DB) error {
+		if err := s.repo.UpdateAccountingSettings(tx, currentUser.BusinessID, map[string]interface{}{
+			"financial_year_start_month": month,
+			"financial_year_start_day":   day,
+			"updated_at":                 time.Now().UTC(),
+		}); err != nil {
+			return apperrors.Internal("failed to update accounting settings")
+		}
+		return s.writeAudit(tx, currentUser, "accounting.settings.updated", currentUser.BusinessID, "Accounting settings updated.", ipAddress, userAgent)
+	}); err != nil {
+		return nil, err
+	}
+	return s.GetAccountingSettings(currentUser)
+}
+
 func (s *Service) CreateChartAccount(currentUser *utils.AuthContext, req CreateChartAccountRequest, ipAddress, userAgent string) (*ChartAccountResponse, error) {
 	if err := validateCreateChartAccountRequest(req); err != nil {
 		return nil, err
@@ -1429,6 +1469,25 @@ func (s *Service) PostInventoryMovementJournal(tx *gorm.DB, currentUser *utils.A
 	}
 	var lines []JournalEntryLineRequest
 	sourceType := "stock_movement"
+	if movement.IsReversal && movement.ReversedMovementID != nil && strings.TrimSpace(*movement.ReversedMovementID) != "" {
+		lines, sourceType, err = s.buildInventoryMovementReversalLines(tx, currentUser.BusinessID, movement, inventoryAccount)
+		if err != nil {
+			return "", err
+		}
+		if len(lines) == 0 {
+			return "", nil
+		}
+		journalID, err := s.createPostedSystemJournal(tx, currentUser, movement.CreatedAt, &movement.BranchID, sourceType, movement.ID, movement.ReferenceNumber, "Inventory movement reversal "+movement.MovementType, lines)
+		if err != nil {
+			return "", err
+		}
+		if journalID != "" {
+			if err := s.repo.UpdateStockMovementJournalID(tx, currentUser.BusinessID, movement.ID, journalID); err != nil {
+				return "", apperrors.Internal("failed to link stock movement accounting journal")
+			}
+		}
+		return journalID, nil
+	}
 	switch movement.MovementType {
 	case "opening_stock":
 		openingEquity, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "opening_balance_equity", "3400", "Opening Balance Equity")
@@ -1483,6 +1542,57 @@ func (s *Service) PostInventoryMovementJournal(tx *gorm.DB, currentUser *utils.A
 		}
 	}
 	return journalID, nil
+}
+
+func (s *Service) buildInventoryMovementReversalLines(tx *gorm.DB, businessID string, movement *stockMovementAccountingRow, inventoryAccount *ChartAccount) ([]JournalEntryLineRequest, string, error) {
+	original, err := s.repo.FindStockMovementForAccounting(tx, businessID, strings.TrimSpace(*movement.ReversedMovementID))
+	if err != nil {
+		return nil, "", apperrors.Internal("failed to load original stock movement for accounting reversal")
+	}
+	cost := roundMoney(movement.TotalCost)
+	if cost <= 0 {
+		return nil, "", nil
+	}
+	switch original.MovementType {
+	case "opening_stock":
+		openingEquity, err := s.requiredMappedAccount(tx, businessID, "opening_balance_equity", "3400", "Opening Balance Equity")
+		if err != nil {
+			return nil, "", err
+		}
+		return []JournalEntryLineRequest{
+			{AccountID: openingEquity.ID, DebitAmount: cost, Description: "Reverse opening stock equity offset"},
+			{AccountID: inventoryAccount.ID, CreditAmount: cost, Description: "Reverse opening stock value"},
+		}, "inventory_opening_stock_reversal", nil
+	case "adjustment_in":
+		gainAccount, err := s.requiredMappedAccount(tx, businessID, "inventory_adjustment_gain", "4100", "Inventory Adjustment Gain")
+		if err != nil {
+			return nil, "", err
+		}
+		return []JournalEntryLineRequest{
+			{AccountID: gainAccount.ID, DebitAmount: cost, Description: "Reverse inventory adjustment gain"},
+			{AccountID: inventoryAccount.ID, CreditAmount: cost, Description: "Reverse inventory adjustment increase"},
+		}, "inventory_adjustment_reversal", nil
+	case "adjustment_out":
+		lossAccount, err := s.requiredMappedAccount(tx, businessID, "inventory_adjustment_loss", "5090", "Inventory Adjustment Loss")
+		if err != nil {
+			return nil, "", err
+		}
+		return []JournalEntryLineRequest{
+			{AccountID: inventoryAccount.ID, DebitAmount: cost, Description: "Reverse inventory adjustment decrease"},
+			{AccountID: lossAccount.ID, CreditAmount: cost, Description: "Reverse inventory adjustment loss"},
+		}, "inventory_adjustment_reversal", nil
+	case "wastage":
+		wastageAccount, err := s.requiredMappedAccount(tx, businessID, "wastage_expense", "5080", "Wastage Expense")
+		if err != nil {
+			return nil, "", err
+		}
+		return []JournalEntryLineRequest{
+			{AccountID: inventoryAccount.ID, DebitAmount: cost, Description: "Reverse inventory wastage out"},
+			{AccountID: wastageAccount.ID, CreditAmount: cost, Description: "Reverse inventory wastage"},
+		}, "inventory_wastage_reversal", nil
+	default:
+		return nil, "", nil
+	}
 }
 
 func (s *Service) PostManufacturingBatchJournal(tx *gorm.DB, currentUser *utils.AuthContext, batchID string) (string, error) {
@@ -1559,6 +1669,238 @@ func (s *Service) PostManufacturingBatchJournal(tx *gorm.DB, currentUser *utils.
 		}
 	}
 	return journalID, nil
+}
+
+func (s *Service) PostExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext, expenseID string) (string, error) {
+	expense, err := s.repo.FindExpenseForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(expenseID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load expense for accounting")
+	}
+	if expense.JournalEntryID != nil && strings.TrimSpace(*expense.JournalEntryID) != "" {
+		return strings.TrimSpace(*expense.JournalEntryID), nil
+	}
+	if expense.Status != "posted" {
+		return "", nil
+	}
+	amount := roundMoney(expense.Amount)
+	if amount <= 0 {
+		return "", nil
+	}
+	lines := []JournalEntryLineRequest{
+		{AccountID: expense.ExpenseAccountID, DebitAmount: amount, Description: coalesceText(expense.Notes, "Expense "+expense.ExpenseNumber)},
+		{AccountID: expense.PaidThroughAccountID, CreditAmount: amount, Description: "Paid through account"},
+	}
+	reference := coalesceText(expense.ReferenceNumber, expense.ExpenseNumber)
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, expense.ExpenseDate, &expense.BranchID, "expense", expense.ID, reference, "Expense "+expense.ExpenseNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if journalID != "" {
+		if err := s.repo.UpdateExpenseJournalID(tx, currentUser.BusinessID, expense.ID, journalID); err != nil {
+			return "", apperrors.Internal("failed to update expense accounting journal")
+		}
+	}
+	return journalID, nil
+}
+
+func (s *Service) BackfillJournals(currentUser *utils.AuthContext, req BackfillJournalsRequest, ipAddress, userAgent string) (*BackfillJournalsResponse, error) {
+	req = normalizeBackfillRequest(req)
+	if err := s.validateBackfillRequest(currentUser, req); err != nil {
+		return nil, err
+	}
+
+	startedAt := time.Now().UTC()
+	results := make([]BackfillTargetResult, 0, len(req.Targets))
+	for _, target := range req.Targets {
+		result := BackfillTargetResult{Target: target}
+		ids, err := s.repo.ListBackfillCandidateIDs(s.db, currentUser.BusinessID, target, req)
+		if err != nil {
+			result.Failed = 1
+			result.Errors = append(result.Errors, err.Error())
+			results = append(results, result)
+			continue
+		}
+		result.Scanned = len(ids)
+		result.WouldPost = len(ids)
+		if req.DryRun {
+			result.Skipped = len(ids)
+			results = append(results, result)
+			continue
+		}
+		for _, id := range ids {
+			posted, err := s.backfillOneJournal(currentUser, target, id)
+			if err != nil {
+				result.Failed++
+				if len(result.Errors) < 20 {
+					result.Errors = append(result.Errors, id+": "+err.Error())
+				}
+				continue
+			}
+			if posted {
+				result.Posted++
+			} else {
+				result.Skipped++
+			}
+		}
+		results = append(results, result)
+	}
+	endedAt := time.Now().UTC()
+
+	if !req.DryRun {
+		_ = s.withTransaction(func(tx *gorm.DB) error {
+			return s.writeAudit(tx, currentUser, "accounting.backfill_journals_run", currentUser.BusinessID, "Accounting journal backfill executed.", ipAddress, userAgent)
+		})
+	}
+
+	return &BackfillJournalsResponse{
+		DryRun:    req.DryRun,
+		DateFrom:  req.DateFrom,
+		DateTo:    req.DateTo,
+		BranchID:  req.BranchID,
+		Limit:     req.Limit,
+		Results:   results,
+		StartedAt: startedAt,
+		EndedAt:   endedAt,
+	}, nil
+}
+
+func (s *Service) GetBackfillReadiness(currentUser *utils.AuthContext, query BackfillReadinessQuery, ipAddress, userAgent string) (*BackfillReadinessResponse, error) {
+	req := normalizeBackfillRequest(BackfillJournalsRequest{
+		Targets:  defaultBackfillTargets(),
+		BranchID: query.BranchID,
+		DateFrom: query.DateFrom,
+		DateTo:   query.DateTo,
+		Limit:    0,
+		DryRun:   true,
+	})
+	req.Limit = 0
+	if err := s.validateBackfillRequest(currentUser, req); err != nil {
+		return nil, err
+	}
+
+	issues := make([]BackfillReadinessIssue, 0)
+	missingMappings, err := s.repo.ListMissingRequiredAccountMappings(s.db, currentUser.BusinessID, backfillRequiredMappingKeys())
+	if err != nil {
+		return nil, apperrors.Internal("failed to check account mappings")
+	}
+	if len(missingMappings) > 0 {
+		issues = append(issues, BackfillReadinessIssue{
+			Severity: "error",
+			CheckKey: "account_mappings_missing",
+			Message:  "Required account mappings are missing or linked to inactive chart accounts.",
+			Details:  map[string]interface{}{"mapping_keys": missingMappings},
+		})
+	}
+
+	paymentIssues, err := s.repo.ListPaymentMethodReadinessIssues(s.db, currentUser.BusinessID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to check payment method setup")
+	}
+	issues = append(issues, paymentIssues...)
+
+	missingCostCount, err := s.repo.CountValueMovementsMissingCost(s.db, currentUser.BusinessID, req)
+	if err != nil {
+		return nil, apperrors.Internal("failed to check inventory valuation costs")
+	}
+	if missingCostCount > 0 {
+		issues = append(issues, BackfillReadinessIssue{
+			Severity: "warning",
+			CheckKey: "stock_movement_cost_missing",
+			Message:  "Some value-affecting stock movements have zero or missing total_cost; COGS/inventory backfill may skip or understate value.",
+			Details:  map[string]interface{}{"movement_count": missingCostCount},
+		})
+	}
+
+	targets := make([]BackfillReadinessTarget, 0, len(req.Targets))
+	for _, target := range req.Targets {
+		count, err := s.repo.CountBackfillCandidates(s.db, currentUser.BusinessID, target, req)
+		if err != nil {
+			issues = append(issues, BackfillReadinessIssue{
+				Severity: "error",
+				CheckKey: "backfill_candidate_scan_failed",
+				Message:  "Failed to scan backfill candidates for target.",
+				Details:  map[string]interface{}{"target": target, "error": err.Error()},
+			})
+			continue
+		}
+		targets = append(targets, BackfillReadinessTarget{Target: target, CandidateCount: count})
+	}
+
+	ready := true
+	for _, issue := range issues {
+		if issue.Severity == "error" {
+			ready = false
+			break
+		}
+	}
+	_ = s.writeReportAudit(currentUser, "accounting.backfill_readiness_viewed", "backfill_readiness", query, ipAddress, userAgent)
+	return &BackfillReadinessResponse{
+		Ready:     ready,
+		BranchID:  req.BranchID,
+		DateFrom:  req.DateFrom,
+		DateTo:    req.DateTo,
+		Targets:   targets,
+		Issues:    issues,
+		CheckedAt: time.Now().UTC(),
+	}, nil
+}
+
+func (s *Service) backfillOneJournal(currentUser *utils.AuthContext, target, id string) (bool, error) {
+	var journalID string
+	err := s.withTransaction(func(tx *gorm.DB) error {
+		var err error
+		switch target {
+		case "pos_sales":
+			journalID, err = s.PostPOSSaleJournal(tx, currentUser, id)
+			if err != nil {
+				return err
+			}
+			cogsJournalID, cogsErr := s.PostPOSSaleCOGSJournal(tx, currentUser, id)
+			if cogsErr != nil {
+				return cogsErr
+			}
+			if journalID == "" {
+				journalID = cogsJournalID
+			}
+		case "bakery_orders":
+			journalID, err = s.PostBakeryOrderRevenueJournal(tx, currentUser, id)
+		case "bakery_order_payments":
+			journalID, err = s.PostBakeryOrderPaymentJournal(tx, currentUser, id)
+		case "purchase_invoices":
+			journalID, err = s.PostPurchaseInvoiceJournal(tx, currentUser, id)
+		case "supplier_payments":
+			journalID, err = s.PostPurchaseInvoicePaymentJournal(tx, currentUser, id)
+		case "purchase_receipts":
+			journalID, err = s.PostPurchaseReceiptJournal(tx, currentUser, id)
+		case "stock_movements":
+			journalID, err = s.PostInventoryMovementJournal(tx, currentUser, id)
+		case "manufacturing_batches":
+			journalID, err = s.PostManufacturingBatchJournal(tx, currentUser, id)
+		case "sales_returns":
+			journalID, err = s.PostSalesReturnJournal(tx, currentUser, id)
+			if err != nil {
+				return err
+			}
+			inventoryJournalID, inventoryErr := s.PostSalesReturnInventoryJournal(tx, currentUser, id)
+			if inventoryErr != nil {
+				return inventoryErr
+			}
+			if journalID == "" {
+				journalID = inventoryJournalID
+			}
+		case "purchase_returns":
+			journalID, err = s.PostPurchaseReturnJournal(tx, currentUser, id)
+		case "expenses":
+			journalID, err = s.PostExpenseJournal(tx, currentUser, id)
+		default:
+			err = apperrors.BadRequest("unsupported backfill target", map[string]string{"target": target})
+		}
+		return err
+	})
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(journalID) != "", nil
 }
 
 func (s *Service) ListJournalEntries(currentUser *utils.AuthContext, query JournalEntryListQuery) (*PaginatedResponse[JournalEntryResponse], error) {
@@ -1722,7 +2064,7 @@ func (s *Service) GetBalanceSheet(currentUser *utils.AuthContext, query BalanceS
 			equity.Total = roundMoney(equity.Total + row.Amount)
 		}
 	}
-	currentYearProfitLoss, err := s.currentYearProfitLossForBalanceSheet(currentUser.BusinessID, query)
+	currentYearProfitLoss, financialYearStartDate, err := s.currentYearProfitLossForBalanceSheet(currentUser.BusinessID, query)
 	if err != nil {
 		return nil, err
 	}
@@ -1735,6 +2077,7 @@ func (s *Service) GetBalanceSheet(currentUser *utils.AuthContext, query BalanceS
 	_ = s.writeReportAudit(currentUser, "accounting.balance_sheet_viewed", "balance_sheet", query, ipAddress, userAgent)
 	return &BalanceSheetResponse{
 		AsOfDate:                  query.AsOfDate,
+		FinancialYearStartDate:    financialYearStartDate,
 		Assets:                    assets,
 		Liabilities:               liabilities,
 		Equity:                    equity,
@@ -1747,19 +2090,194 @@ func (s *Service) GetBalanceSheet(currentUser *utils.AuthContext, query BalanceS
 	}, nil
 }
 
-func (s *Service) currentYearProfitLossForBalanceSheet(businessID string, query BalanceSheetQuery) (BalanceSheetAccountRowResponse, error) {
+func (s *Service) GetReconciliationHealth(currentUser *utils.AuthContext, query ReconciliationQuery, ipAddress, userAgent string) (*ReconciliationHealthResponse, error) {
+	query = normalizeReconciliationQuery(query)
+	if err := s.validateReconciliationQuery(currentUser, query); err != nil {
+		return nil, err
+	}
+	trialBalance, err := s.reconcileTrialBalance(currentUser, query)
+	if err != nil {
+		return nil, err
+	}
+	balanceSheet, err := s.reconcileBalanceSheet(currentUser, query, ipAddress, userAgent)
+	if err != nil {
+		return nil, err
+	}
+	checks := make([]ReconciliationCheckResponse, 0, 3)
+	inventoryCheck, err := s.GetInventoryReconciliation(currentUser, query, ipAddress, userAgent)
+	if err != nil {
+		return nil, err
+	}
+	checks = append(checks, *inventoryCheck)
+	apCheck, err := s.GetAPReconciliation(currentUser, query, ipAddress, userAgent)
+	if err != nil {
+		return nil, err
+	}
+	checks = append(checks, *apCheck)
+	arCheck, err := s.GetARReconciliation(currentUser, query, ipAddress, userAgent)
+	if err != nil {
+		return nil, err
+	}
+	checks = append(checks, *arCheck)
+	unmatched := 0
+	if !trialBalance.IsMatched {
+		unmatched++
+	}
+	if !balanceSheet.IsMatched {
+		unmatched++
+	}
+	for _, check := range checks {
+		if !check.IsMatched {
+			unmatched++
+		}
+	}
+	_ = s.writeReportAudit(currentUser, "accounting.reconciliation_health_viewed", "reconciliation_health", query, ipAddress, userAgent)
+	return &ReconciliationHealthResponse{
+		AsOfDate:        query.AsOfDate,
+		BranchID:        query.BranchID,
+		IsHealthy:       unmatched == 0,
+		TrialBalance:    trialBalance,
+		BalanceSheet:    balanceSheet,
+		Checks:          checks,
+		UnmatchedChecks: unmatched,
+	}, nil
+}
+
+func (s *Service) GetInventoryReconciliation(currentUser *utils.AuthContext, query ReconciliationQuery, ipAddress, userAgent string) (*ReconciliationCheckResponse, error) {
+	query = normalizeReconciliationQuery(query)
+	if err := s.validateReconciliationQuery(currentUser, query); err != nil {
+		return nil, err
+	}
+	operational, err := s.repo.SumInventoryOperationalValue(currentUser.BusinessID, query.BranchID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to calculate operational inventory value")
+	}
+	ledger, err := s.mappedLedgerBalance(currentUser.BusinessID, "inventory_stock", "1200", query.BranchID, query.AsOfDate)
+	if err != nil {
+		return nil, err
+	}
+	check := reconciliationCheck("inventory", "Inventory valuation vs Inventory ledger", operational, ledger, "Compares inventory_items.inventory_value with the mapped Inventory / Stock ledger.")
+	_ = s.writeReportAudit(currentUser, "accounting.reconciliation_inventory_viewed", "reconciliation_inventory", query, ipAddress, userAgent)
+	return &check, nil
+}
+
+func (s *Service) GetAPReconciliation(currentUser *utils.AuthContext, query ReconciliationQuery, ipAddress, userAgent string) (*ReconciliationCheckResponse, error) {
+	query = normalizeReconciliationQuery(query)
+	if err := s.validateReconciliationQuery(currentUser, query); err != nil {
+		return nil, err
+	}
+	operational, err := s.repo.SumAccountsPayableOperational(currentUser.BusinessID, query.BranchID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to calculate operational accounts payable")
+	}
+	ledger, err := s.mappedLedgerBalance(currentUser.BusinessID, "accounts_payable", "2000", query.BranchID, query.AsOfDate)
+	if err != nil {
+		return nil, err
+	}
+	check := reconciliationCheck("accounts_payable", "Open supplier invoices vs Accounts Payable ledger", operational, ledger, "Compares posted purchase invoice balances with the mapped Accounts Payable ledger.")
+	_ = s.writeReportAudit(currentUser, "accounting.reconciliation_ap_viewed", "reconciliation_ap", query, ipAddress, userAgent)
+	return &check, nil
+}
+
+func (s *Service) GetARReconciliation(currentUser *utils.AuthContext, query ReconciliationQuery, ipAddress, userAgent string) (*ReconciliationCheckResponse, error) {
+	query = normalizeReconciliationQuery(query)
+	if err := s.validateReconciliationQuery(currentUser, query); err != nil {
+		return nil, err
+	}
+	operational, err := s.repo.SumAccountsReceivableOperational(currentUser.BusinessID, query.BranchID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to calculate operational accounts receivable")
+	}
+	ledger, err := s.mappedLedgerBalance(currentUser.BusinessID, "accounts_receivable", "1100", query.BranchID, query.AsOfDate)
+	if err != nil {
+		return nil, err
+	}
+	check := reconciliationCheck("accounts_receivable", "Unpaid customer balances vs Accounts Receivable ledger", operational, ledger, "Compares unpaid completed POS/bakery balances with the mapped Accounts Receivable ledger.")
+	_ = s.writeReportAudit(currentUser, "accounting.reconciliation_ar_viewed", "reconciliation_ar", query, ipAddress, userAgent)
+	return &check, nil
+}
+
+func (s *Service) GetPaymentAccountReconciliation(currentUser *utils.AuthContext, query ReconciliationQuery, ipAddress, userAgent string) (*PaymentAccountReconciliationResponse, error) {
+	query = normalizeReconciliationQuery(query)
+	if err := s.validateReconciliationQuery(currentUser, query); err != nil {
+		return nil, err
+	}
+	rows, err := s.repo.ListPaymentAccountReconciliationRows(currentUser.BusinessID, query.BranchID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load payment account reconciliation")
+	}
+	for i := range rows {
+		account, err := s.repo.FindByID(currentUser.BusinessID, rows[i].ChartAccountID)
+		if err != nil {
+			return nil, mapChartAccountNotFound(err)
+		}
+		ledger, err := s.repo.LedgerBalanceForAccount(currentUser.BusinessID, rows[i].ChartAccountID, account.NormalBalance, query.BranchID, query.AsOfDate)
+		if err != nil {
+			return nil, apperrors.Internal("failed to calculate payment account ledger balance")
+		}
+		rows[i].LedgerAmount = ledger
+	}
+	_ = s.writeReportAudit(currentUser, "accounting.reconciliation_payment_accounts_viewed", "reconciliation_payment_accounts", query, ipAddress, userAgent)
+	return &PaymentAccountReconciliationResponse{AsOfDate: query.AsOfDate, BranchID: query.BranchID, Items: rows}, nil
+}
+
+func (s *Service) reconcileTrialBalance(currentUser *utils.AuthContext, query ReconciliationQuery) (ReconciliationCheckResponse, error) {
+	rows, err := s.repo.ListTrialBalanceRows(currentUser.BusinessID, TrialBalanceQuery{
+		BranchID:            query.BranchID,
+		DateFrom:            "1900-01-01",
+		DateTo:              query.AsOfDate,
+		IncludeZeroBalances: false,
+	})
+	if err != nil {
+		return ReconciliationCheckResponse{}, apperrors.Internal("failed to calculate trial balance health")
+	}
+	totalDebit := 0.0
+	totalCredit := 0.0
+	for _, row := range rows {
+		totalDebit = roundMoney(totalDebit + row.ClosingDebit)
+		totalCredit = roundMoney(totalCredit + row.ClosingCredit)
+	}
+	return reconciliationCheck("trial_balance", "Trial Balance debit vs credit", totalDebit, totalCredit, "Checks whether posted journal debit and credit balances are equal."), nil
+}
+
+func (s *Service) reconcileBalanceSheet(currentUser *utils.AuthContext, query ReconciliationQuery, ipAddress, userAgent string) (ReconciliationCheckResponse, error) {
+	balanceSheet, err := s.GetBalanceSheet(currentUser, BalanceSheetQuery{BranchID: query.BranchID, AsOfDate: query.AsOfDate}, ipAddress, userAgent)
+	if err != nil {
+		return ReconciliationCheckResponse{}, err
+	}
+	return reconciliationCheck("balance_sheet", "Assets vs Liabilities + Equity", balanceSheet.TotalAssets, balanceSheet.TotalLiabilitiesAndEquity, "Checks whether Balance Sheet totals match after calculated current-year profit/loss."), nil
+}
+
+func (s *Service) mappedLedgerBalance(businessID, mappingKey, fallbackCode, branchID, asOfDate string) (float64, error) {
+	account, err := s.requiredMappedAccount(s.db, businessID, mappingKey, fallbackCode, defaultAccountMappingDescription(mappingKey))
+	if err != nil {
+		return 0, err
+	}
+	ledger, err := s.repo.LedgerBalanceForAccount(businessID, account.ID, account.NormalBalance, branchID, asOfDate)
+	if err != nil {
+		return 0, apperrors.Internal("failed to calculate mapped ledger balance")
+	}
+	return ledger, nil
+}
+
+func (s *Service) currentYearProfitLossForBalanceSheet(businessID string, query BalanceSheetQuery) (BalanceSheetAccountRowResponse, string, error) {
 	asOfDate, err := time.Parse("2006-01-02", strings.TrimSpace(query.AsOfDate))
 	if err != nil {
-		return BalanceSheetAccountRowResponse{}, apperrors.BadRequest("as_of_date must be YYYY-MM-DD", nil)
+		return BalanceSheetAccountRowResponse{}, "", apperrors.BadRequest("as_of_date must be YYYY-MM-DD", nil)
 	}
-	dateFrom := financialYearStartFor(asOfDate).Format("2006-01-02")
+	settings, err := s.repo.EnsureAccountingSettings(s.db, businessID)
+	if err != nil {
+		return BalanceSheetAccountRowResponse{}, "", apperrors.Internal("failed to load accounting settings")
+	}
+	financialYearStart := financialYearStartFor(asOfDate, settings.FinancialYearStartMonth, settings.FinancialYearStartDay)
+	dateFrom := financialYearStart.Format("2006-01-02")
 	rows, err := s.repo.ListProfitLossRows(businessID, ProfitLossQuery{
 		BranchID: query.BranchID,
 		DateFrom: dateFrom,
 		DateTo:   query.AsOfDate,
 	})
 	if err != nil {
-		return BalanceSheetAccountRowResponse{}, apperrors.Internal("failed to calculate current year profit/loss")
+		return BalanceSheetAccountRowResponse{}, "", apperrors.Internal("failed to calculate current year profit/loss")
 	}
 	netProfit := 0.0
 	for _, row := range rows {
@@ -1771,11 +2289,11 @@ func (s *Service) currentYearProfitLossForBalanceSheet(businessID string, query 
 		}
 	}
 	if netProfit == 0 {
-		return BalanceSheetAccountRowResponse{}, nil
+		return BalanceSheetAccountRowResponse{}, dateFrom, nil
 	}
 	account, err := s.repo.FindActiveAccountByCode(s.db, businessID, "3200")
 	if err != nil && err != gorm.ErrRecordNotFound {
-		return BalanceSheetAccountRowResponse{}, apperrors.Internal("failed to load current year profit/loss account")
+		return BalanceSheetAccountRowResponse{}, "", apperrors.Internal("failed to load current year profit/loss account")
 	}
 	row := BalanceSheetAccountRowResponse{
 		AccountCode:  "3200",
@@ -1792,7 +2310,7 @@ func (s *Service) currentYearProfitLossForBalanceSheet(businessID string, query 
 		row.AccountType = account.AccountType
 		row.AccountGroup = account.AccountGroup
 	}
-	return row, nil
+	return row, dateFrom, nil
 }
 
 func (s *Service) CreateJournalEntry(currentUser *utils.AuthContext, req CreateJournalEntryRequest, ipAddress, userAgent string) (*JournalEntryResponse, error) {
@@ -2434,8 +2952,196 @@ func defaultLedgerDetailsDateRange(dateFrom, dateTo string) (string, string) {
 	return dateFrom, dateTo
 }
 
-func financialYearStartFor(asOfDate time.Time) time.Time {
-	return time.Date(asOfDate.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
+func normalizeReconciliationQuery(query ReconciliationQuery) ReconciliationQuery {
+	query.BranchID = strings.TrimSpace(query.BranchID)
+	query.AsOfDate = strings.TrimSpace(query.AsOfDate)
+	if query.AsOfDate == "" {
+		query.AsOfDate = time.Now().UTC().Format("2006-01-02")
+	}
+	return query
+}
+
+func (s *Service) validateReconciliationQuery(currentUser *utils.AuthContext, query ReconciliationQuery) error {
+	if _, err := parseRequiredDate(query.AsOfDate, "as_of_date"); err != nil {
+		return err
+	}
+	branchID := cleanStringPointer(&query.BranchID)
+	return s.validateJournalBranch(s.db, currentUser, branchID)
+}
+
+func reconciliationCheck(key, label string, operational, ledger float64, notes string) ReconciliationCheckResponse {
+	operational = roundMoney(operational)
+	ledger = roundMoney(ledger)
+	difference := roundMoney(operational - ledger)
+	matched := absMoney(difference) <= 0.01
+	status := "matched"
+	if !matched {
+		status = "unmatched"
+	}
+	return ReconciliationCheckResponse{
+		CheckKey:          key,
+		Label:             label,
+		OperationalAmount: operational,
+		LedgerAmount:      ledger,
+		Difference:        difference,
+		IsMatched:         matched,
+		Status:            status,
+		Notes:             notes,
+	}
+}
+
+func normalizeBackfillRequest(req BackfillJournalsRequest) BackfillJournalsRequest {
+	req.BranchID = strings.TrimSpace(req.BranchID)
+	req.DateFrom = strings.TrimSpace(req.DateFrom)
+	req.DateTo = strings.TrimSpace(req.DateTo)
+	if req.Limit <= 0 {
+		req.Limit = 100
+	}
+	if req.Limit > 500 {
+		req.Limit = 500
+	}
+	if len(req.Targets) == 0 {
+		req.Targets = defaultBackfillTargets()
+	}
+	normalized := make([]string, 0, len(req.Targets))
+	seen := map[string]struct{}{}
+	for _, target := range req.Targets {
+		target = strings.ToLower(strings.TrimSpace(target))
+		if target == "" {
+			continue
+		}
+		if _, exists := seen[target]; exists {
+			continue
+		}
+		seen[target] = struct{}{}
+		normalized = append(normalized, target)
+	}
+	req.Targets = normalized
+	return req
+}
+
+func (s *Service) validateBackfillRequest(currentUser *utils.AuthContext, req BackfillJournalsRequest) error {
+	if len(req.Targets) == 0 {
+		return apperrors.BadRequest("targets is required", nil)
+	}
+	for _, target := range req.Targets {
+		if !validBackfillTarget(target) {
+			return apperrors.BadRequest("invalid backfill target", map[string]string{"target": target})
+		}
+	}
+	if req.DateFrom != "" {
+		if _, err := parseRequiredDate(req.DateFrom, "date_from"); err != nil {
+			return err
+		}
+	}
+	if req.DateTo != "" {
+		if _, err := parseRequiredDate(req.DateTo, "date_to"); err != nil {
+			return err
+		}
+	}
+	if req.DateFrom != "" && req.DateTo != "" && req.DateFrom > req.DateTo {
+		return apperrors.BadRequest("date_from must be before or equal to date_to", nil)
+	}
+	if req.BranchID != "" {
+		return s.validateJournalBranch(s.db, currentUser, &req.BranchID)
+	}
+	return nil
+}
+
+func defaultBackfillTargets() []string {
+	return []string{
+		"pos_sales",
+		"bakery_order_payments",
+		"bakery_orders",
+		"purchase_invoices",
+		"supplier_payments",
+		"purchase_receipts",
+		"stock_movements",
+		"manufacturing_batches",
+		"sales_returns",
+		"purchase_returns",
+		"expenses",
+	}
+}
+
+func validBackfillTarget(value string) bool {
+	switch value {
+	case "pos_sales", "bakery_orders", "bakery_order_payments", "purchase_invoices", "supplier_payments", "purchase_receipts", "stock_movements", "manufacturing_batches", "sales_returns", "purchase_returns", "expenses":
+		return true
+	default:
+		return false
+	}
+}
+
+func backfillRequiredMappingKeys() []string {
+	return []string{
+		"accounts_receivable",
+		"accounts_payable",
+		"inventory_stock",
+		"sales_income",
+		"bakery_income",
+		"customer_advance",
+		"vat_receivable",
+		"vat_payable",
+		"cogs",
+		"sales_returns",
+		"purchase_returns",
+		"wip_inventory",
+		"wastage_expense",
+		"opening_balance_equity",
+		"grni",
+		"platform_commission_expense",
+		"inventory_adjustment_gain",
+		"inventory_adjustment_loss",
+		"delivery_charge_income",
+		"service_charge_income",
+		"packing_charge_income",
+		"freight_inward",
+		"charge_refund_account",
+	}
+}
+
+func coalesceText(value, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value != "" {
+		return value
+	}
+	return fallback
+}
+
+func validateFinancialYearStart(month, day int) error {
+	if month < 1 || month > 12 {
+		return apperrors.BadRequest("financial_year_start_month must be between 1 and 12", nil)
+	}
+	if day < 1 || day > 31 {
+		return apperrors.BadRequest("financial_year_start_day must be between 1 and 31", nil)
+	}
+	parsed := time.Date(2001, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+	if int(parsed.Month()) != month || parsed.Day() != day {
+		return apperrors.BadRequest("financial year start date is invalid", nil)
+	}
+	return nil
+}
+
+func toAccountingSettingsResponse(row *accountingSettingsRow) AccountingSettingsResponse {
+	labelDate := time.Date(2001, time.Month(row.FinancialYearStartMonth), row.FinancialYearStartDay, 0, 0, 0, 0, time.UTC)
+	return AccountingSettingsResponse{
+		BusinessID:               row.BusinessID,
+		FinancialYearStartMonth:  row.FinancialYearStartMonth,
+		FinancialYearStartDay:    row.FinancialYearStartDay,
+		FinancialYearStartLabel:  labelDate.Format("January 2"),
+		UsesDefaultFinancialYear: row.FinancialYearStartMonth == 1 && row.FinancialYearStartDay == 1,
+		CreatedAt:                row.CreatedAt,
+		UpdatedAt:                row.UpdatedAt,
+	}
+}
+
+func financialYearStartFor(asOfDate time.Time, month, day int) time.Time {
+	start := time.Date(asOfDate.Year(), time.Month(month), day, 0, 0, 0, 0, time.UTC)
+	if start.After(asOfDate) {
+		start = start.AddDate(-1, 0, 0)
+	}
+	return start
 }
 
 func balanceLabel(value float64) string {

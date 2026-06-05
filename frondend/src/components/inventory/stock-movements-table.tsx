@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 
 import { MovementTypeBadge } from "@/components/inventory/movement-type-badge";
+import { AccountingJournalLink } from "@/components/shared/accounting-reference-links";
 import {
   Table,
   TableBody,
@@ -23,6 +24,13 @@ function formatQuantity(value: number): string {
   return new Intl.NumberFormat("en-AE", { maximumFractionDigits: 3 }).format(value);
 }
 
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    style: "currency",
+  }).format(value);
+}
+
 export function StockMovementsTable({ movements }: StockMovementsTableProps): JSX.Element {
   return (
     <Table>
@@ -36,6 +44,8 @@ export function StockMovementsTable({ movements }: StockMovementsTableProps): JS
           <TableHead>Before</TableHead>
           <TableHead>After</TableHead>
           <TableHead>Unit</TableHead>
+          <TableHead>Cost</TableHead>
+          <TableHead>Journal</TableHead>
           <TableHead>Reference</TableHead>
           <TableHead>Reason</TableHead>
           <TableHead>Created By</TableHead>
@@ -54,6 +64,22 @@ export function StockMovementsTable({ movements }: StockMovementsTableProps): JS
             <TableCell>{formatQuantity(movement.beforeQuantity)}</TableCell>
             <TableCell>{formatQuantity(movement.afterQuantity)}</TableCell>
             <TableCell>{movement.unitSymbol}</TableCell>
+            <TableCell>
+              {movement.totalCost > 0 ? (
+                <div>
+                  <p className="font-semibold">{formatMoney(movement.totalCost)}</p>
+                  <p className="text-xs text-brand-mocha">
+                    Unit {formatMoney(movement.unitCostSnapshot)}
+                    {movement.valuationMethod ? ` / ${movement.valuationMethod}` : ""}
+                  </p>
+                </div>
+              ) : (
+                "-"
+              )}
+            </TableCell>
+            <TableCell>
+              <AccountingJournalLink id={movement.accountingJournalEntryId} />
+            </TableCell>
             <TableCell>{movement.referenceType ?? "Manual"}</TableCell>
             <TableCell>{movement.reason ?? "No reason"}</TableCell>
             <TableCell>{movement.createdByUserName}</TableCell>

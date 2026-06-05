@@ -44,6 +44,9 @@ export type ProductionBatchIngredient = {
   unitSymbol: string;
   totalCost: number;
   wastagePercentage: number;
+  unitCostSnapshot: number;
+  stockMovementId: string | null;
+  accountingJournalEntryId: string | null;
 };
 
 export type ProductionBatchPackaging = {
@@ -54,12 +57,20 @@ export type ProductionBatchPackaging = {
   consumedQuantity: number;
   unitName: string;
   unitSymbol: string;
+  unitCostSnapshot: number;
+  totalCost: number;
+  stockMovementId: string | null;
+  accountingJournalEntryId: string | null;
 };
 
 export type ProductionOutput = {
   id: string;
   quantityProduced: number;
   unitName: string;
+  unitCostSnapshot: number;
+  totalCost: number;
+  stockMovementId: string | null;
+  accountingJournalEntryId: string | null;
   createdAt: string;
 };
 
@@ -70,6 +81,10 @@ export type ProductionWastage = {
   quantity: number;
   unitName: string;
   reason: string;
+  unitCostSnapshot: number;
+  totalCost: number;
+  stockMovementId: string | null;
+  accountingJournalEntryId: string | null;
   createdAt: string;
 };
 

@@ -1,5 +1,9 @@
 import type { JSX } from "react";
 
+import {
+  AccountingJournalLink,
+  StockMovementLink,
+} from "@/components/shared/accounting-reference-links";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -11,6 +15,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { ProductionBatchIngredient } from "@/types/manufacturing";
+
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    style: "currency",
+  }).format(value);
+}
 
 export function BatchIngredientsSection({
   canManage,
@@ -41,6 +52,8 @@ export function BatchIngredientsSection({
               <TableHead>Unit</TableHead>
               <TableHead>Cost</TableHead>
               <TableHead>Wastage %</TableHead>
+              <TableHead>Stock</TableHead>
+              <TableHead>Journal</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -52,8 +65,23 @@ export function BatchIngredientsSection({
                 <TableCell>{ingredient.requiredQuantity}</TableCell>
                 <TableCell>{ingredient.consumedQuantity}</TableCell>
                 <TableCell>{ingredient.unitSymbol || ingredient.unitName}</TableCell>
-                <TableCell>AED {ingredient.totalCost.toFixed(2)}</TableCell>
+                <TableCell>
+                  <div>
+                    <p>{formatMoney(ingredient.totalCost)}</p>
+                    {ingredient.unitCostSnapshot > 0 ? (
+                      <p className="text-xs text-brand-mocha">
+                        Unit {formatMoney(ingredient.unitCostSnapshot)}
+                      </p>
+                    ) : null}
+                  </div>
+                </TableCell>
                 <TableCell>{ingredient.wastagePercentage}%</TableCell>
+                <TableCell>
+                  <StockMovementLink id={ingredient.stockMovementId} />
+                </TableCell>
+                <TableCell>
+                  <AccountingJournalLink id={ingredient.accountingJournalEntryId} />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

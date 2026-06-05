@@ -37,6 +37,10 @@ export type StockMovement = {
   notes: string | null;
   isReversal: boolean;
   reversedMovementId: string | null;
+  unitCostSnapshot: number;
+  totalCost: number;
+  valuationMethod: string | null;
+  accountingJournalEntryId: string | null;
   createdByUserName: string;
   createdAt: string;
 };

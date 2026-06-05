@@ -470,7 +470,12 @@ func (s *Service) CompleteBatch(currentUser *utils.AuthContext, id string, req C
 					return err
 				}
 			}
-			if err := s.repo.UpdateIngredient(tx, line.ID, id, currentUser.BusinessID, map[string]interface{}{"stock_movement_id": movement.ID, "updated_at": time.Now().UTC()}); err != nil {
+			if err := s.repo.UpdateIngredient(tx, line.ID, id, currentUser.BusinessID, map[string]interface{}{
+				"stock_movement_id":  movement.ID,
+				"unit_cost_snapshot": movement.UnitCostSnapshot,
+				"total_cost":         movement.TotalCost,
+				"updated_at":         time.Now().UTC(),
+			}); err != nil {
 				return err
 			}
 		}
@@ -493,7 +498,12 @@ func (s *Service) CompleteBatch(currentUser *utils.AuthContext, id string, req C
 				return err
 			}
 			consumedCost = roundMoney(consumedCost + movement.TotalCost)
-			if err := s.repo.UpdatePackaging(tx, line.ID, id, currentUser.BusinessID, map[string]interface{}{"stock_movement_id": movement.ID, "updated_at": time.Now().UTC()}); err != nil {
+			if err := s.repo.UpdatePackaging(tx, line.ID, id, currentUser.BusinessID, map[string]interface{}{
+				"stock_movement_id":  movement.ID,
+				"unit_cost_snapshot": movement.UnitCostSnapshot,
+				"total_cost":         movement.TotalCost,
+				"updated_at":         time.Now().UTC(),
+			}); err != nil {
 				return err
 			}
 		}

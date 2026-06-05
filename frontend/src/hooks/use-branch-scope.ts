@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
 
@@ -21,26 +21,32 @@ function uniqueNonEmpty(values: (string | null | undefined)[]): string[] {
 
 export function useBranchScope(): BranchScope {
   const { user } = useAuth();
+  const assignedBranchId = user?.assignedBranchId ?? null;
+  const assignedBranchName = user?.assignedBranchName ?? null;
+  const currentBranchId = user?.currentBranchId ?? null;
+  const currentBranchName = user?.currentBranchName ?? null;
+  const effectiveBranchId = currentBranchId ?? assignedBranchId;
+  const effectiveBranchName = currentBranchName ?? assignedBranchName;
+  const canAccessAllBranches = user?.canAccessAllBranches === true;
+  const allowedBranchIdsKey = (user?.allowedBranchIds ?? []).join("|");
 
-  return useMemo(() => {
-    const effectiveBranchId = user?.currentBranchId ?? user?.assignedBranchId ?? null;
-    const effectiveBranchName = user?.currentBranchName ?? user?.assignedBranchName ?? null;
-    const canAccessAllBranches = user?.canAccessAllBranches === true;
-    const allowedBranchIds = uniqueNonEmpty([
-      ...(user?.allowedBranchIds ?? []),
-      user?.assignedBranchId,
-      user?.currentBranchId,
-    ]);
+  const allowedBranchIds = useMemo(() => {
+    const profileBranchIds = allowedBranchIdsKey ? allowedBranchIdsKey.split("|") : [];
 
-    const isBranchAllowed = (branchId: string): boolean => {
-      if (branchId === "all") {
-        return canAccessAllBranches;
-      }
+    return uniqueNonEmpty([...profileBranchIds, assignedBranchId, currentBranchId]);
+  }, [allowedBranchIdsKey, assignedBranchId, currentBranchId]);
+
+  const isBranchAllowed = useCallback(
+    (branchId: string): boolean => {
+      if (branchId === "all") return canAccessAllBranches;
 
       return canAccessAllBranches || allowedBranchIds.includes(branchId);
-    };
+    },
+    [allowedBranchIds, canAccessAllBranches],
+  );
 
-    const normalizeBranchId = (branchId: string): string => {
+  const normalizeBranchId = useCallback(
+    (branchId: string): string => {
       if (branchId === "all") {
         return canAccessAllBranches ? "all" : (effectiveBranchId ?? "");
       }
@@ -50,8 +56,11 @@ export function useBranchScope(): BranchScope {
       }
 
       return isBranchAllowed(branchId) ? branchId : (effectiveBranchId ?? "");
-    };
+    },
+    [canAccessAllBranches, effectiveBranchId, isBranchAllowed],
+  );
 
+  return useMemo(() => {
     return {
       allowedBranchIds,
       canAccessAllBranches,
@@ -63,12 +72,12 @@ export function useBranchScope(): BranchScope {
       normalizeBranchId,
     };
   }, [
-    user?.allowedBranchIds,
-    user?.assignedBranchId,
-    user?.assignedBranchName,
-    user?.canAccessAllBranches,
-    user?.currentBranchId,
-    user?.currentBranchName,
+    allowedBranchIds,
+    canAccessAllBranches,
+    effectiveBranchId,
+    effectiveBranchName,
+    isBranchAllowed,
+    normalizeBranchId,
   ]);
 }
 

@@ -39,6 +39,7 @@ const defaultFilters: LowStockFilters = {
 export function LowStockPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
+  const { normalizeBranchId } = branchScope;
   const canView = hasAnyPermission([PERMISSIONS.inventoryLowStockView, PERMISSIONS.inventoryView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.inventoryAdjust,
@@ -63,12 +64,12 @@ export function LowStockPageClient(): JSX.Element {
 
   useEffect(() => {
     setFilters((currentFilters) => {
-      const branchId = branchScope.normalizeBranchId(currentFilters.branchId);
+      const branchId = normalizeBranchId(currentFilters.branchId);
       return branchId === currentFilters.branchId
         ? currentFilters
         : { ...currentFilters, branchId };
     });
-  }, [branchScope]);
+  }, [normalizeBranchId]);
 
   if (!canView) {
     return <AccessDeniedCard />;

@@ -1,7 +1,9 @@
+import { classifyApiMonitorStatus, recordApiMonitorEvent } from "@/lib/api-monitor/store";
 import { createAppwriteJwt } from "@/lib/appwrite/auth";
 import { notifySessionExpired } from "@/lib/auth/session-events";
 import { getPublicEnvValue } from "@/lib/public-env";
 import type { ApiFailure, ApiResponse, ApiSuccess, FieldErrorMap } from "@/types/api";
+import type { ApiProbeResult } from "@/types/api-monitor";
 
 type RequestMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 type AuthMode = "none" | "appwrite";
@@ -55,6 +57,62 @@ function getApiBaseUrl(): string {
       "NEXT_PUBLIC_API_BASE_URL must be a full absolute URL, for example http://localhost:8080.",
     );
   }
+}
+
+function nowMs(): number {
+  return typeof performance !== "undefined" ? performance.now() : Date.now();
+}
+
+function recordApiRequestEvent({
+  endpoint,
+  errorMessage,
+  method,
+  responseTimeMs,
+  source,
+  statusCode,
+  success,
+}: {
+  endpoint: string;
+  errorMessage?: string | null;
+  method: RequestMethod;
+  responseTimeMs: number;
+  source: "live" | "safe_probe";
+  statusCode: number;
+  success: boolean;
+}): ApiProbeResult {
+  const roundedResponseTime = Math.max(0, Math.round(responseTimeMs));
+
+  if (typeof window === "undefined") {
+    return {
+      endpoint,
+      errorMessage: errorMessage ?? null,
+      method,
+      responseTimeMs: roundedResponseTime,
+      status: classifyApiMonitorStatus(statusCode, roundedResponseTime, success),
+      statusCode,
+      success,
+    };
+  }
+
+  const event = recordApiMonitorEvent({
+    endpoint,
+    errorMessage: errorMessage ?? null,
+    method,
+    responseTimeMs,
+    source,
+    statusCode,
+    success,
+  });
+
+  return {
+    endpoint: event.endpoint,
+    errorMessage: event.errorMessage,
+    method: event.method,
+    responseTimeMs: event.responseTimeMs,
+    status: event.status,
+    statusCode: event.statusCode,
+    success: event.success,
+  };
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -176,7 +234,27 @@ export async function apiRequest<TResponse, TBody = undefined>(
 ): Promise<ApiSuccess<TResponse>> {
   const method = options.method ?? "GET";
   const url = `${getApiBaseUrl()}${path}`;
-  const headers = await buildHeaders(options.authMode ?? "none");
+  const startedAt = nowMs();
+  let headers: HeadersInit;
+
+  try {
+    headers = await buildHeaders(options.authMode ?? "none");
+  } catch (error) {
+    if (error instanceof ApiError) {
+      recordApiRequestEvent({
+        endpoint: path,
+        errorMessage: error.message,
+        method,
+        responseTimeMs: nowMs() - startedAt,
+        source: "live",
+        statusCode: error.status,
+        success: false,
+      });
+    }
+
+    throw error;
+  }
+
   const requestInit: RequestInit = {
     method,
     headers,
@@ -184,7 +262,32 @@ export async function apiRequest<TResponse, TBody = undefined>(
     ...(options.body ? { body: JSON.stringify(options.body) } : {}),
     ...(options.signal ? { signal: options.signal } : {}),
   };
-  const response = await fetch(url, requestInit);
+  let response: Response;
+
+  try {
+    response = await fetch(url, requestInit);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
+
+    recordApiRequestEvent({
+      endpoint: path,
+      errorMessage:
+        "Unable to reach the backend API. Check that the backend server is running and CORS is configured.",
+      method,
+      responseTimeMs: nowMs() - startedAt,
+      source: "live",
+      statusCode: 0,
+      success: false,
+    });
+
+    throw new ApiError({
+      message:
+        "Unable to reach the backend API. Check that the backend server is running and CORS is configured.",
+      status: 0,
+    });
+  }
 
   const responseText = await response.text();
   let payload: unknown = { success: true, message: "Request completed." };
@@ -194,10 +297,20 @@ export async function apiRequest<TResponse, TBody = undefined>(
       payload = JSON.parse(responseText) as unknown;
     } catch {
       const excerpt = responseText.slice(0, 240);
+      const message = excerpt
+        ? `Backend returned a non-JSON response: ${excerpt}`
+        : "Backend returned a non-JSON response.";
+      recordApiRequestEvent({
+        endpoint: path,
+        errorMessage: message,
+        method,
+        responseTimeMs: nowMs() - startedAt,
+        source: "live",
+        statusCode: response.status,
+        success: false,
+      });
       throw new ApiError({
-        message: excerpt
-          ? `Backend returned a non-JSON response: ${excerpt}`
-          : "Backend returned a non-JSON response.",
+        message,
         status: response.status,
       });
     }
@@ -211,6 +324,16 @@ export async function apiRequest<TResponse, TBody = undefined>(
       notifySessionExpired();
     }
 
+    recordApiRequestEvent({
+      endpoint: path,
+      errorMessage: normalized.message,
+      method,
+      responseTimeMs: nowMs() - startedAt,
+      source: "live",
+      statusCode: response.status,
+      success: false,
+    });
+
     throw new ApiError({
       message: normalized.message,
       status: response.status,
@@ -218,6 +341,15 @@ export async function apiRequest<TResponse, TBody = undefined>(
       ...(errorDetails ? { errorDetails } : {}),
     });
   }
+
+  recordApiRequestEvent({
+    endpoint: path,
+    method,
+    responseTimeMs: nowMs() - startedAt,
+    source: "live",
+    statusCode: response.status,
+    success: true,
+  });
 
   return {
     ...normalized,
@@ -231,7 +363,27 @@ export async function apiBlobRequest<TBody = undefined>(
 ): Promise<Blob> {
   const method = options.method ?? "GET";
   const url = `${getApiBaseUrl()}${path}`;
-  const headers = await buildHeaders(options.authMode ?? "none");
+  const startedAt = nowMs();
+  let headers: HeadersInit;
+
+  try {
+    headers = await buildHeaders(options.authMode ?? "none");
+  } catch (error) {
+    if (error instanceof ApiError) {
+      recordApiRequestEvent({
+        endpoint: path,
+        errorMessage: error.message,
+        method,
+        responseTimeMs: nowMs() - startedAt,
+        source: "live",
+        statusCode: error.status,
+        success: false,
+      });
+    }
+
+    throw error;
+  }
+
   const requestInit: RequestInit = {
     method,
     headers,
@@ -239,7 +391,32 @@ export async function apiBlobRequest<TBody = undefined>(
     ...(options.body ? { body: JSON.stringify(options.body) } : {}),
     ...(options.signal ? { signal: options.signal } : {}),
   };
-  const response = await fetch(url, requestInit);
+  let response: Response;
+
+  try {
+    response = await fetch(url, requestInit);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
+
+    recordApiRequestEvent({
+      endpoint: path,
+      errorMessage:
+        "Unable to reach the backend API. Check that the backend server is running and CORS is configured.",
+      method,
+      responseTimeMs: nowMs() - startedAt,
+      source: "live",
+      statusCode: 0,
+      success: false,
+    });
+
+    throw new ApiError({
+      message:
+        "Unable to reach the backend API. Check that the backend server is running and CORS is configured.",
+      status: 0,
+    });
+  }
 
   if (!response.ok) {
     const responseText = await response.text();
@@ -263,6 +440,16 @@ export async function apiBlobRequest<TBody = undefined>(
       notifySessionExpired();
     }
 
+    recordApiRequestEvent({
+      endpoint: path,
+      errorMessage: message,
+      method,
+      responseTimeMs: nowMs() - startedAt,
+      source: "live",
+      statusCode: response.status,
+      success: false,
+    });
+
     throw new ApiError({
       message,
       status: response.status,
@@ -271,7 +458,90 @@ export async function apiBlobRequest<TBody = undefined>(
     });
   }
 
+  recordApiRequestEvent({
+    endpoint: path,
+    method,
+    responseTimeMs: nowMs() - startedAt,
+    source: "live",
+    statusCode: response.status,
+    success: true,
+  });
+
   return response.blob();
+}
+
+export async function apiProbeRequest(path: string, signal?: AbortSignal): Promise<ApiProbeResult> {
+  const method: RequestMethod = "GET";
+  const url = `${getApiBaseUrl()}${path}`;
+  const startedAt = nowMs();
+  let headers: HeadersInit;
+
+  try {
+    headers = await buildHeaders("appwrite");
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return recordApiRequestEvent({
+        endpoint: path,
+        errorMessage: error.message,
+        method,
+        responseTimeMs: nowMs() - startedAt,
+        source: "safe_probe",
+        statusCode: error.status,
+        success: false,
+      });
+    }
+
+    throw error;
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers,
+      method,
+      ...(signal ? { signal } : {}),
+    });
+    let errorMessage: string | null = null;
+
+    if (!response.ok) {
+      const responseText = await response.text();
+      errorMessage = "Backend request failed.";
+
+      if (responseText.length > 0) {
+        try {
+          const payload = JSON.parse(responseText) as unknown;
+          const normalized = normalizeApiResponse(payload);
+          errorMessage = normalized.message;
+        } catch {
+          errorMessage = responseText.slice(0, 240);
+        }
+      }
+    }
+
+    return recordApiRequestEvent({
+      endpoint: path,
+      errorMessage,
+      method,
+      responseTimeMs: nowMs() - startedAt,
+      source: "safe_probe",
+      statusCode: response.status,
+      success: response.ok,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
+
+    return recordApiRequestEvent({
+      endpoint: path,
+      errorMessage:
+        "Unable to reach the backend API. Check that the backend server is running and CORS is configured.",
+      method,
+      responseTimeMs: nowMs() - startedAt,
+      source: "safe_probe",
+      statusCode: 0,
+      success: false,
+    });
+  }
 }
 
 export function getErrorMessage(error: unknown): string {

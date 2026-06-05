@@ -283,6 +283,7 @@ export type BalanceSheetSection = {
 
 export type BalanceSheetResponse = {
   asOfDate: string;
+  financialYearStartDate: string;
   assets: BalanceSheetSection;
   liabilities: BalanceSheetSection;
   equity: BalanceSheetSection;
@@ -325,6 +326,121 @@ export type LedgerDetailsResponse = {
   limit: number;
   total: number;
   totalPages: number;
+};
+
+export type AccountingSettings = {
+  financialYearStartMonth: number;
+  financialYearStartDay: number;
+  financialYearStartLabel: string;
+  usesDefaultFinancialYear: boolean;
+};
+
+export type UpdateAccountingSettingsPayload = {
+  financialYearStartMonth: number;
+  financialYearStartDay: number;
+};
+
+export type AccountMapping = {
+  mappingKey: string;
+  description: string;
+  chartAccountId: string | null;
+  chartAccountCode: string;
+  chartAccountName: string;
+  chartAccountType: AccountingAccountType | null;
+  chartAccountGroup: string;
+  isMapped: boolean;
+  isRequired: boolean;
+};
+
+export type AccountMappingsResponse = {
+  items: AccountMapping[];
+};
+
+export type UpdateAccountMappingsPayload = {
+  mappings: Record<string, string>;
+};
+
+export type AccountingReconciliationFilters = {
+  asOfDate: string;
+  branchId: string;
+};
+
+export type AccountingReconciliationItem = {
+  id: string;
+  label: string;
+  status: string;
+  isMatched: boolean;
+  difference: number;
+  operationalAmount: number;
+  ledgerAmount: number;
+  details: string;
+};
+
+export type AccountingReconciliationResponse = {
+  asOfDate: string;
+  branchId: string | null;
+  items: AccountingReconciliationItem[];
+};
+
+export type AccountingBackfillTarget =
+  | "bakery_order_payments"
+  | "bakery_orders"
+  | "expenses"
+  | "manufacturing_batches"
+  | "pos_sales"
+  | "purchase_invoices"
+  | "purchase_receipts"
+  | "purchase_returns"
+  | "sales_returns"
+  | "stock_movements"
+  | "supplier_payments";
+
+export type AccountingBackfillFilters = {
+  branchId: string;
+  dateFrom: string;
+  dateTo: string;
+  limit: number;
+  targets: AccountingBackfillTarget[];
+};
+
+export type AccountingBackfillReadinessIssue = {
+  severity: string;
+  code: string;
+  message: string;
+  target: string;
+  details: string;
+};
+
+export type AccountingBackfillReadinessTarget = {
+  target: string;
+  candidateCount: number;
+  wouldPostCount: number;
+  blockedCount: number;
+};
+
+export type AccountingBackfillReadinessResponse = {
+  ready: boolean;
+  issues: AccountingBackfillReadinessIssue[];
+  targets: AccountingBackfillReadinessTarget[];
+};
+
+export type AccountingBackfillPayload = AccountingBackfillFilters & {
+  dryRun: boolean;
+};
+
+export type AccountingBackfillTargetResult = {
+  target: string;
+  scannedCount: number;
+  wouldPostCount: number;
+  postedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  errors: string[];
+};
+
+export type AccountingBackfillResponse = {
+  dryRun: boolean;
+  results: AccountingBackfillTargetResult[];
 };
 
 export type PaymentAccountType =

@@ -139,6 +139,10 @@ function parseStockMovement(value: unknown): StockMovement {
     notes: nullableString(value.notes),
     isReversal: booleanValue(value.is_reversal, movementType === "reversal"),
     reversedMovementId: nullableString(value.reversed_movement_id),
+    unitCostSnapshot: numberValue(value.unit_cost_snapshot),
+    totalCost: numberValue(value.total_cost),
+    valuationMethod: nullableString(value.valuation_method),
+    accountingJournalEntryId: nullableString(value.accounting_journal_entry_id),
     createdByUserName: stringValue(value.created_by_user_name, "System"),
     createdAt: stringValue(value.created_at),
   };

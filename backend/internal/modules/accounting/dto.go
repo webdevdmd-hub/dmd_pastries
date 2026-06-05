@@ -50,6 +50,21 @@ type UpdateAccountMappingsRequest struct {
 	Mappings map[string]string `json:"mappings" binding:"required"`
 }
 
+type AccountingSettingsResponse struct {
+	BusinessID               string    `json:"business_id"`
+	FinancialYearStartMonth  int       `json:"financial_year_start_month"`
+	FinancialYearStartDay    int       `json:"financial_year_start_day"`
+	FinancialYearStartLabel  string    `json:"financial_year_start_label"`
+	UsesDefaultFinancialYear bool      `json:"uses_default_financial_year"`
+	CreatedAt                time.Time `json:"created_at"`
+	UpdatedAt                time.Time `json:"updated_at"`
+}
+
+type UpdateAccountingSettingsRequest struct {
+	FinancialYearStartMonth *int `json:"financial_year_start_month"`
+	FinancialYearStartDay   *int `json:"financial_year_start_day"`
+}
+
 type CreateChartAccountRequest struct {
 	ParentAccountID    *string `json:"parent_account_id" binding:"omitempty,uuid"`
 	AccountCode        string  `json:"account_code" binding:"required"`
@@ -472,6 +487,7 @@ type BalanceSheetSectionResponse struct {
 
 type BalanceSheetResponse struct {
 	AsOfDate                  string                      `json:"as_of_date"`
+	FinancialYearStartDate    string                      `json:"financial_year_start_date"`
 	Assets                    BalanceSheetSectionResponse `json:"assets"`
 	Liabilities               BalanceSheetSectionResponse `json:"liabilities"`
 	Equity                    BalanceSheetSectionResponse `json:"equity"`
@@ -481,6 +497,110 @@ type BalanceSheetResponse struct {
 	TotalLiabilitiesAndEquity float64                     `json:"total_liabilities_and_equity"`
 	IsBalanced                bool                        `json:"is_balanced"`
 	Difference                float64                     `json:"difference"`
+}
+
+type BackfillJournalsRequest struct {
+	Targets  []string `json:"targets"`
+	BranchID string   `json:"branch_id"`
+	DateFrom string   `json:"date_from"`
+	DateTo   string   `json:"date_to"`
+	Limit    int      `json:"limit"`
+	DryRun   bool     `json:"dry_run"`
+}
+
+type BackfillTargetResult struct {
+	Target    string   `json:"target"`
+	Scanned   int      `json:"scanned"`
+	WouldPost int      `json:"would_post"`
+	Posted    int      `json:"posted"`
+	Skipped   int      `json:"skipped"`
+	Failed    int      `json:"failed"`
+	Errors    []string `json:"errors,omitempty"`
+}
+
+type BackfillJournalsResponse struct {
+	DryRun    bool                   `json:"dry_run"`
+	DateFrom  string                 `json:"date_from,omitempty"`
+	DateTo    string                 `json:"date_to,omitempty"`
+	BranchID  string                 `json:"branch_id,omitempty"`
+	Limit     int                    `json:"limit"`
+	Results   []BackfillTargetResult `json:"results"`
+	StartedAt time.Time              `json:"started_at"`
+	EndedAt   time.Time              `json:"ended_at"`
+}
+
+type BackfillReadinessQuery struct {
+	BranchID string
+	DateFrom string
+	DateTo   string
+}
+
+type BackfillReadinessIssue struct {
+	Severity string                 `json:"severity"`
+	CheckKey string                 `json:"check_key"`
+	Message  string                 `json:"message"`
+	Details  map[string]interface{} `json:"details,omitempty"`
+}
+
+type BackfillReadinessTarget struct {
+	Target         string `json:"target"`
+	CandidateCount int64  `json:"candidate_count"`
+}
+
+type BackfillReadinessResponse struct {
+	Ready     bool                      `json:"ready"`
+	BranchID  string                    `json:"branch_id,omitempty"`
+	DateFrom  string                    `json:"date_from,omitempty"`
+	DateTo    string                    `json:"date_to,omitempty"`
+	Targets   []BackfillReadinessTarget `json:"targets"`
+	Issues    []BackfillReadinessIssue  `json:"issues"`
+	CheckedAt time.Time                 `json:"checked_at"`
+}
+
+type ReconciliationQuery struct {
+	BranchID string
+	AsOfDate string
+}
+
+type ReconciliationCheckResponse struct {
+	CheckKey          string  `json:"check_key"`
+	Label             string  `json:"label"`
+	OperationalAmount float64 `json:"operational_amount"`
+	LedgerAmount      float64 `json:"ledger_amount"`
+	Difference        float64 `json:"difference"`
+	IsMatched         bool    `json:"is_matched"`
+	Status            string  `json:"status"`
+	Notes             string  `json:"notes,omitempty"`
+}
+
+type ReconciliationHealthResponse struct {
+	AsOfDate        string                        `json:"as_of_date"`
+	BranchID        string                        `json:"branch_id,omitempty"`
+	IsHealthy       bool                          `json:"is_healthy"`
+	TrialBalance    ReconciliationCheckResponse   `json:"trial_balance"`
+	BalanceSheet    ReconciliationCheckResponse   `json:"balance_sheet"`
+	Checks          []ReconciliationCheckResponse `json:"checks"`
+	UnmatchedChecks int                           `json:"unmatched_checks"`
+}
+
+type PaymentAccountReconciliationItem struct {
+	PaymentAccountID   string  `json:"payment_account_id"`
+	PaymentAccountName string  `json:"payment_account_name"`
+	AccountType        string  `json:"account_type"`
+	BranchID           *string `json:"branch_id"`
+	BranchName         string  `json:"branch_name"`
+	ChartAccountID     string  `json:"chart_account_id"`
+	ChartAccountCode   string  `json:"chart_account_code"`
+	ChartAccountName   string  `json:"chart_account_name"`
+	LedgerAmount       float64 `json:"ledger_amount"`
+	Status             string  `json:"status"`
+	Notes              string  `json:"notes,omitempty"`
+}
+
+type PaymentAccountReconciliationResponse struct {
+	AsOfDate string                             `json:"as_of_date"`
+	BranchID string                             `json:"branch_id,omitempty"`
+	Items    []PaymentAccountReconciliationItem `json:"items"`
 }
 
 type PaginatedResponse[T any] struct {

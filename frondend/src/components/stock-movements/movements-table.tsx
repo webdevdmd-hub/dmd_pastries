@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 
+import { AccountingJournalLink } from "@/components/shared/accounting-reference-links";
 import { MovementActionsMenu } from "@/components/stock-movements/movement-actions-menu";
 import { MovementDirectionBadge } from "@/components/stock-movements/movement-direction-badge";
 import { MovementTypeBadge } from "@/components/stock-movements/movement-type-badge";
@@ -28,6 +29,13 @@ function formatQuantity(value: number): string {
   return new Intl.NumberFormat("en-AE", { maximumFractionDigits: 3 }).format(value);
 }
 
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    style: "currency",
+  }).format(value);
+}
+
 function rowClassName(movement: StockMovement): string | undefined {
   if (movement.movementType === "reversal" || movement.isReversal) return "bg-violet-50/60";
   if (movement.movementDirection === "in") return "bg-emerald-50/40";
@@ -54,6 +62,8 @@ export function MovementsTable({
           <TableHead>Before</TableHead>
           <TableHead>After</TableHead>
           <TableHead>Unit</TableHead>
+          <TableHead>Cost</TableHead>
+          <TableHead>Journal</TableHead>
           <TableHead>Reference</TableHead>
           <TableHead>Reason</TableHead>
           <TableHead>Created By</TableHead>
@@ -81,6 +91,22 @@ export function MovementsTable({
             <TableCell>{formatQuantity(movement.beforeQuantity)}</TableCell>
             <TableCell>{formatQuantity(movement.afterQuantity)}</TableCell>
             <TableCell>{movement.unitSymbol}</TableCell>
+            <TableCell>
+              {movement.totalCost > 0 ? (
+                <div>
+                  <p className="font-semibold">{formatMoney(movement.totalCost)}</p>
+                  <p className="text-xs text-brand-mocha">
+                    Unit {formatMoney(movement.unitCostSnapshot)}
+                    {movement.valuationMethod ? ` / ${movement.valuationMethod}` : ""}
+                  </p>
+                </div>
+              ) : (
+                "-"
+              )}
+            </TableCell>
+            <TableCell>
+              <AccountingJournalLink id={movement.accountingJournalEntryId} />
+            </TableCell>
             <TableCell>{movement.referenceNumber ?? movement.referenceType ?? "Manual"}</TableCell>
             <TableCell>{movement.reason ?? "No reason"}</TableCell>
             <TableCell>{movement.createdByUserName}</TableCell>

@@ -11,6 +11,14 @@ import {
   deleteChartAccount,
   deleteJournalEntry,
   deletePaymentAccount,
+  getAccountingBackfillReadiness,
+  getAccountingReconciliationAp,
+  getAccountingReconciliationAr,
+  getAccountingReconciliationHealthCheck,
+  getAccountingReconciliationInventory,
+  getAccountingReconciliationPaymentAccounts,
+  getAccountingSettings,
+  getAccountMappings,
   getAccountTransferById,
   getAccountTransfers,
   getBalanceSheetReport,
@@ -28,7 +36,11 @@ import {
   getTrialBalanceReport,
   postJournalEntry,
   reverseJournalEntry,
+  runAccountingBackfill,
+  seedDefaultAccountMappings,
   seedDefaultChartAccounts,
+  updateAccountingSettings,
+  updateAccountMappings,
   updateChartAccount,
   updateChartAccountStatus,
   updateJournalEntry,
@@ -36,6 +48,14 @@ import {
   updatePaymentAccountStatus,
 } from "@/lib/api/accounting";
 import type {
+  AccountingBackfillFilters,
+  AccountingBackfillPayload,
+  AccountingBackfillReadinessResponse,
+  AccountingBackfillResponse,
+  AccountingReconciliationFilters,
+  AccountingReconciliationResponse,
+  AccountingSettings,
+  AccountMappingsResponse,
   AccountTransfer,
   AccountTransferPayload,
   AccountTransfersFilters,
@@ -66,6 +86,8 @@ import type {
   ProfitLossResponse,
   TrialBalanceFilters,
   TrialBalanceResponse,
+  UpdateAccountingSettingsPayload,
+  UpdateAccountMappingsPayload,
   UpdateChartAccountPayload,
   UpdateChartAccountStatusPayload,
   UpdateJournalEntryPayload,
@@ -150,6 +172,129 @@ export function useDeleteChartAccount() {
 
   return useMutation<void, Error, string>({
     mutationFn: async (id) => deleteChartAccount(id),
+    onSuccess: async () => {
+      await invalidateAccounting(queryClient);
+    },
+  });
+}
+
+export function useAccountingSettings(enabled = true) {
+  return useQuery<AccountingSettings>({
+    queryKey: [accountingQueryKey, "settings"],
+    queryFn: async () => getAccountingSettings(),
+    enabled,
+  });
+}
+
+export function useUpdateAccountingSettings() {
+  const queryClient = useQueryClient();
+
+  return useMutation<AccountingSettings, Error, UpdateAccountingSettingsPayload>({
+    mutationFn: async (payload) => updateAccountingSettings(payload),
+    onSuccess: async () => {
+      await invalidateAccounting(queryClient);
+    },
+  });
+}
+
+export function useAccountMappings(enabled = true) {
+  return useQuery<AccountMappingsResponse>({
+    queryKey: [accountingQueryKey, "account-mappings"],
+    queryFn: async () => getAccountMappings(),
+    enabled,
+  });
+}
+
+export function useSeedDefaultAccountMappings() {
+  const queryClient = useQueryClient();
+
+  return useMutation<AccountMappingsResponse>({
+    mutationFn: async () => seedDefaultAccountMappings(),
+    onSuccess: async () => {
+      await invalidateAccounting(queryClient);
+    },
+  });
+}
+
+export function useUpdateAccountMappings() {
+  const queryClient = useQueryClient();
+
+  return useMutation<AccountMappingsResponse, Error, UpdateAccountMappingsPayload>({
+    mutationFn: async (payload) => updateAccountMappings(payload),
+    onSuccess: async () => {
+      await invalidateAccounting(queryClient);
+    },
+  });
+}
+
+export function useAccountingReconciliationHealthCheck(
+  filters: AccountingReconciliationFilters,
+  enabled = true,
+) {
+  return useQuery<AccountingReconciliationResponse>({
+    queryKey: [accountingQueryKey, "reconciliation", "health-check", filters],
+    queryFn: async () => getAccountingReconciliationHealthCheck(filters),
+    enabled,
+  });
+}
+
+export function useAccountingReconciliationInventory(
+  filters: AccountingReconciliationFilters,
+  enabled = true,
+) {
+  return useQuery<AccountingReconciliationResponse>({
+    queryKey: [accountingQueryKey, "reconciliation", "inventory", filters],
+    queryFn: async () => getAccountingReconciliationInventory(filters),
+    enabled,
+  });
+}
+
+export function useAccountingReconciliationAp(
+  filters: AccountingReconciliationFilters,
+  enabled = true,
+) {
+  return useQuery<AccountingReconciliationResponse>({
+    queryKey: [accountingQueryKey, "reconciliation", "ap", filters],
+    queryFn: async () => getAccountingReconciliationAp(filters),
+    enabled,
+  });
+}
+
+export function useAccountingReconciliationAr(
+  filters: AccountingReconciliationFilters,
+  enabled = true,
+) {
+  return useQuery<AccountingReconciliationResponse>({
+    queryKey: [accountingQueryKey, "reconciliation", "ar", filters],
+    queryFn: async () => getAccountingReconciliationAr(filters),
+    enabled,
+  });
+}
+
+export function useAccountingReconciliationPaymentAccounts(
+  filters: AccountingReconciliationFilters,
+  enabled = true,
+) {
+  return useQuery<AccountingReconciliationResponse>({
+    queryKey: [accountingQueryKey, "reconciliation", "payment-accounts", filters],
+    queryFn: async () => getAccountingReconciliationPaymentAccounts(filters),
+    enabled,
+  });
+}
+
+export function useAccountingBackfillReadiness(filters: AccountingBackfillFilters, enabled = true) {
+  return useQuery<AccountingBackfillReadinessResponse>({
+    queryKey: [accountingQueryKey, "backfill", "readiness", filters],
+    queryFn: async () => getAccountingBackfillReadiness(filters),
+    enabled,
+  });
+}
+
+export function useRunAccountingBackfill() {
+  const queryClient = useQueryClient();
+
+  return useMutation<AccountingBackfillResponse, Error, AccountingBackfillPayload>({
+    mutationFn: async (payload) => runAccountingBackfill(payload),
     onSuccess: async () => {
       await invalidateAccounting(queryClient);
     },

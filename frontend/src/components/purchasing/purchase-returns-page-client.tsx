@@ -58,6 +58,7 @@ type PendingAction = { purchaseReturn: PurchaseReturn; type: "post" | "cancel" }
 export function PurchaseReturnsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
+  const { normalizeBranchId } = branchScope;
   const canView = hasAnyPermission([PERMISSIONS.purchasingReturnsView, PERMISSIONS.purchasingView]);
   const canPost = hasAnyPermission([
     PERMISSIONS.purchasingReturnsPost,
@@ -96,12 +97,12 @@ export function PurchaseReturnsPageClient(): JSX.Element {
 
   useEffect(() => {
     setFilters((currentFilters) => {
-      const branchId = branchScope.normalizeBranchId(currentFilters.branchId);
+      const branchId = normalizeBranchId(currentFilters.branchId);
       return branchId === currentFilters.branchId
         ? currentFilters
         : { ...currentFilters, branchId };
     });
-  }, [branchScope]);
+  }, [normalizeBranchId]);
 
   if (!canView) {
     return <AccessDeniedCard />;

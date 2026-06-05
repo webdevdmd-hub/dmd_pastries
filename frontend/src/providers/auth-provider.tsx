@@ -151,7 +151,9 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
 
     const refreshOnFocus = (): void => {
       if (document.visibilityState === "visible") {
-        void refreshCurrentProfile();
+        void refreshCurrentProfile().catch(() => {
+          // Keep the current session state if a background profile refresh fails.
+        });
       }
     };
 

@@ -2,11 +2,12 @@
 
 import { BookOpenText } from "lucide-react";
 import type { Dispatch, JSX, SetStateAction } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { AccountingAccessDeniedCard } from "@/components/accounting/accounting-access-denied-card";
 import { ChartAccountTypeBadge } from "@/components/accounting/chart-account-badges";
 import { PageHeader } from "@/components/shared/page-header";
+import { SearchableSelect } from "@/components/shared/searchable-select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -100,11 +101,46 @@ export function GeneralLedgerPageClient(): JSX.Element {
     canView,
   );
   const branchesQuery = useBranches(canView && canLoadBranches);
-  const accounts = accountsQuery.data?.items ?? [];
-  const branches = (branchesQuery.data ?? []).filter((branch) => branch.status === "active");
+  const accounts = useMemo(() => accountsQuery.data?.items ?? [], [accountsQuery.data?.items]);
+  const branches = useMemo(
+    () => (branchesQuery.data ?? []).filter((branch) => branch.status === "active"),
+    [branchesQuery.data],
+  );
   const ledger = ledgerQuery.data;
   const currentPage = ledger?.page ?? filters.page;
   const totalPages = ledger?.totalPages ?? 1;
+  const accountOptions = useMemo(
+    () => [
+      {
+        description: "Combined ledger activity",
+        label: "All accounts",
+        value: allValue,
+      },
+      ...accounts.map((account) => ({
+        description: account.accountType.replace(/_/g, " "),
+        keywords: [account.accountCode, account.accountName, account.accountGroup],
+        label: `${account.accountCode} - ${account.accountName}`,
+        value: account.id,
+      })),
+    ],
+    [accounts],
+  );
+  const branchOptions = useMemo(
+    () => [
+      {
+        description: "Business-wide ledger activity",
+        label: "All branches",
+        value: allValue,
+      },
+      ...branches.map((branch) => ({
+        description: branch.code,
+        keywords: [branch.code, branch.name],
+        label: branch.name,
+        value: branch.id,
+      })),
+    ],
+    [branches],
+  );
 
   if (!canView) {
     return (
@@ -129,43 +165,35 @@ export function GeneralLedgerPageClient(): JSX.Element {
       </Alert>
 
       <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-white/80 p-4 lg:grid-cols-[1.2fr_1fr_1fr_1fr_0.8fr]">
-        <Select
+        <SearchableSelect
+          ariaLabel="Filter General Ledger by account"
+          clearable={false}
+          emptyMessage="No accounts found."
+          loading={accountsQuery.isLoading}
+          loadingMessage="Loading accounts..."
           onValueChange={(value) =>
-            updateFilters(setFilters, { accountId: value === allValue ? "" : value })
+            updateFilters(setFilters, { accountId: !value || value === allValue ? "" : value })
           }
+          options={accountOptions}
+          placeholder="All accounts"
+          searchPlaceholder="Search by account name or code..."
           value={filters.accountId || allValue}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="All accounts" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={allValue}>All accounts</SelectItem>
-            {accounts.map((account) => (
-              <SelectItem key={account.id} value={account.id}>
-                {account.accountCode} - {account.accountName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
+        />
+        <SearchableSelect
+          ariaLabel="Filter General Ledger by branch"
+          clearable={false}
           disabled={!canLoadBranches}
+          emptyMessage="No branches found."
+          loading={branchesQuery.isLoading}
+          loadingMessage="Loading branches..."
           onValueChange={(value) =>
-            updateFilters(setFilters, { branchId: value === allValue ? "" : value })
+            updateFilters(setFilters, { branchId: !value || value === allValue ? "" : value })
           }
+          options={branchOptions}
+          placeholder="All branches"
+          searchPlaceholder="Search by branch name or code..."
           value={filters.branchId || allValue}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="All branches" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={allValue}>All branches</SelectItem>
-            {branches.map((branch) => (
-              <SelectItem key={branch.id} value={branch.id}>
-                {branch.name} ({branch.code})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
         <Input
           aria-label="Date from"
           onChange={(event) => updateFilters(setFilters, { dateFrom: event.target.value })}

@@ -68,6 +68,52 @@ func (h *Handler) UpdateAccountMappings(c *gin.Context) {
 	response.Success(c, 200, "account mappings updated successfully", result)
 }
 
+func (h *Handler) GetAccountingSettings(c *gin.Context) {
+	result, err := h.service.GetAccountingSettings(utils.MustAuthContext(c))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "accounting settings fetched successfully", result)
+}
+
+func (h *Handler) UpdateAccountingSettings(c *gin.Context) {
+	var req UpdateAccountingSettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.UpdateAccountingSettings(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "accounting settings updated successfully", result)
+}
+
+func (h *Handler) BackfillJournals(c *gin.Context) {
+	var req BackfillJournalsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.BackfillJournals(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "accounting journal backfill completed", result)
+}
+
+func (h *Handler) GetBackfillReadiness(c *gin.Context) {
+	result, err := h.service.GetBackfillReadiness(utils.MustAuthContext(c), parseBackfillReadinessQuery(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "accounting backfill readiness fetched successfully", result)
+}
+
 func (h *Handler) CreateChartAccount(c *gin.Context) {
 	var req CreateChartAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -346,6 +392,51 @@ func (h *Handler) GetBalanceSheet(c *gin.Context) {
 	response.Success(c, 200, "balance sheet fetched successfully", result)
 }
 
+func (h *Handler) GetReconciliationHealth(c *gin.Context) {
+	result, err := h.service.GetReconciliationHealth(utils.MustAuthContext(c), parseReconciliationQuery(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "accounting reconciliation health fetched successfully", result)
+}
+
+func (h *Handler) GetInventoryReconciliation(c *gin.Context) {
+	result, err := h.service.GetInventoryReconciliation(utils.MustAuthContext(c), parseReconciliationQuery(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "inventory reconciliation fetched successfully", result)
+}
+
+func (h *Handler) GetAPReconciliation(c *gin.Context) {
+	result, err := h.service.GetAPReconciliation(utils.MustAuthContext(c), parseReconciliationQuery(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "accounts payable reconciliation fetched successfully", result)
+}
+
+func (h *Handler) GetARReconciliation(c *gin.Context) {
+	result, err := h.service.GetARReconciliation(utils.MustAuthContext(c), parseReconciliationQuery(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "accounts receivable reconciliation fetched successfully", result)
+}
+
+func (h *Handler) GetPaymentAccountReconciliation(c *gin.Context) {
+	result, err := h.service.GetPaymentAccountReconciliation(utils.MustAuthContext(c), parseReconciliationQuery(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "payment account reconciliation fetched successfully", result)
+}
+
 func (h *Handler) CreateJournalEntry(c *gin.Context) {
 	var req CreateJournalEntryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -555,6 +646,21 @@ func parseBalanceSheetQuery(c *gin.Context) BalanceSheetQuery {
 	return BalanceSheetQuery{
 		BranchID: c.Query("branch_id"),
 		AsOfDate: c.Query("as_of_date"),
+	}
+}
+
+func parseReconciliationQuery(c *gin.Context) ReconciliationQuery {
+	return ReconciliationQuery{
+		BranchID: c.Query("branch_id"),
+		AsOfDate: c.Query("as_of_date"),
+	}
+}
+
+func parseBackfillReadinessQuery(c *gin.Context) BackfillReadinessQuery {
+	return BackfillReadinessQuery{
+		BranchID: c.Query("branch_id"),
+		DateFrom: c.Query("date_from"),
+		DateTo:   c.Query("date_to"),
 	}
 }
 

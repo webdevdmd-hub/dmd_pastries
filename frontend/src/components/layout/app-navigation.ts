@@ -1,6 +1,5 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  ArrowLeftRight,
   ChartNoAxesCombined,
   Croissant,
   FileMinus2,
@@ -217,43 +216,17 @@ export const appNavigationGroups = [
     ],
   },
   {
-    label: "Accountant",
+    label: "Finance",
     items: [
       {
-        href: ROUTES.accountingChartOfAccounts,
+        href: ROUTES.accounting,
         icon: Landmark,
-        label: "Chart of Accounts",
-        permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingAccountsManage],
-      },
-      {
-        href: ROUTES.accountingJournalEntries,
-        icon: ListChecks,
-        label: "Journal Entries",
-        permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingJournalEntriesManage],
-      },
-      {
-        href: ROUTES.accountingPaymentAccounts,
-        icon: Landmark,
-        label: "Payment Accounts",
-        permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingAccountsManage],
-      },
-      {
-        href: ROUTES.accountingAccountTransfers,
-        icon: ArrowLeftRight,
-        label: "Account Transfers",
-        permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingJournalEntriesManage],
-      },
-      {
-        href: ROUTES.accountingPlatformSettlements,
-        icon: ReceiptText,
-        label: "Platform Settlements",
-        permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingJournalEntriesManage],
-      },
-      {
-        href: ROUTES.accountingReports,
-        icon: ChartNoAxesCombined,
-        label: "Reports",
-        permissionAny: [PERMISSIONS.accountingView],
+        label: "Accounting",
+        permissionAny: [
+          PERMISSIONS.accountingView,
+          PERMISSIONS.accountingAccountsManage,
+          PERMISSIONS.accountingJournalEntriesManage,
+        ],
       },
     ],
   },

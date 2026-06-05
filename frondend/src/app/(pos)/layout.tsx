@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import type { JSX, ReactNode } from "react";
 import { useEffect } from "react";
 
-import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/hooks/use-auth";
@@ -31,5 +30,7 @@ export default function POSLayout({
     );
   }
 
-  return <DashboardShell>{children}</DashboardShell>;
+  return (
+    <div className="h-screen w-screen overflow-hidden bg-[#f9f9fa] text-[#09090b]">{children}</div>
+  );
 }

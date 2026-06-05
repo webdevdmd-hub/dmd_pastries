@@ -35,6 +35,7 @@ import (
 	"pastries-pos/internal/modules/settings"
 	"pastries-pos/internal/modules/subscriptions"
 	"pastries-pos/internal/modules/suppliers"
+	"pastries-pos/internal/modules/systemhealth"
 	"pastries-pos/internal/modules/users"
 	"pastries-pos/internal/server"
 	"pastries-pos/internal/shared/utils"
@@ -393,6 +394,12 @@ func main() {
 		permissionHandler,
 		authMiddleware.RequireAuth(),
 		permit("roles.permissions.view", "roles.view", "roles.manage"),
+	)
+	systemhealth.RegisterRoutes(
+		router,
+		systemhealth.NewHandler(router),
+		authMiddleware.RequireAuth(),
+		permit("settings.view", "settings.manage"),
 	)
 
 	if err := server.Run(router, cfg.Port); err != nil {

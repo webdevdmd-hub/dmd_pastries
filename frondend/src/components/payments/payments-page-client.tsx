@@ -107,6 +107,7 @@ export function PaymentsPageClient(): JSX.Element {
   const router = useRouter();
   const { user } = useAuth();
   const branchScope = useBranchScope();
+  const { normalizeBranchId } = branchScope;
   const { hasAnyPermission, hasPermission } = usePermission();
   const [filters, setFilters] = useState<PaymentFilters>({
     ...defaultFilters,
@@ -198,12 +199,12 @@ export function PaymentsPageClient(): JSX.Element {
 
   useEffect(() => {
     setFilters((currentFilters) => {
-      const branchId = branchScope.normalizeBranchId(currentFilters.branchId);
+      const branchId = normalizeBranchId(currentFilters.branchId);
       return branchId === currentFilters.branchId
         ? currentFilters
         : { ...currentFilters, branchId };
     });
-  }, [branchScope]);
+  }, [normalizeBranchId]);
 
   if (!canView) {
     return <AccessDeniedCard message="You need `payments.view` or `pos.view` to view Payments." />;

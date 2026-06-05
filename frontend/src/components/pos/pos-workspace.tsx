@@ -608,18 +608,6 @@ export function POSWorkspace(): JSX.Element {
         )}
       </main>
 
-      <footer className="hidden h-8 shrink-0 items-center justify-between border-t border-[#d4d4d8] bg-[#e4e4e7] px-5 text-sm text-[#3f3f46] md:flex">
-        <p>
-          v2.4.1 Connected to Main Server <span className="mx-1">•</span>
-          <span className="font-black text-green-700">STABLE</span>
-        </p>
-        <div className="flex items-center gap-6">
-          <span>Support</span>
-          <span>Terminal Sync</span>
-          <span>Logout</span>
-        </div>
-      </footer>
-
       <Button
         className="fixed bottom-4 right-4 z-20 h-14 rounded-md bg-black px-5 font-black text-white shadow-lg hover:bg-[#18181b] lg:hidden"
         onClick={() => setMobileCartOpen(true)}

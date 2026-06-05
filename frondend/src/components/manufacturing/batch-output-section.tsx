@@ -1,5 +1,9 @@
 import type { JSX } from "react";
 
+import {
+  AccountingJournalLink,
+  StockMovementLink,
+} from "@/components/shared/accounting-reference-links";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ProductionOutput } from "@/types/manufacturing";
@@ -10,6 +14,13 @@ function formatDate(value: string): string {
         new Date(value),
       )
     : "Not recorded";
+}
+
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    style: "currency",
+  }).format(value);
 }
 
 export function BatchOutputSection({
@@ -45,6 +56,15 @@ export function BatchOutputSection({
                   {output.quantityProduced} {output.unitName}
                 </p>
                 <p className="text-sm text-brand-mocha">{formatDate(output.createdAt)}</p>
+                {output.totalCost > 0 ? (
+                  <p className="mt-1 text-xs font-semibold text-brand-espresso">
+                    Cost {formatMoney(output.totalCost)}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <StockMovementLink id={output.stockMovementId} />
+                <AccountingJournalLink id={output.accountingJournalEntryId} />
               </div>
             </div>
           ))

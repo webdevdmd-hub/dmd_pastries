@@ -985,6 +985,11 @@ func (s *Service) ReverseStockMovement(currentUser *utils.AuthContext, id string
 		if err := s.repo.MarkMovementReversed(tx, original.ID, currentUser.BusinessID, movement.ID); err != nil {
 			return err
 		}
+		if s.accountingService != nil {
+			if _, err := s.accountingService.PostInventoryMovementJournal(tx, currentUser, movement.ID); err != nil {
+				return err
+			}
+		}
 		if err := s.auditStockMovement(tx, currentUser, "stock_movement.reversed", original.ID, "Stock movement reversed", ipAddress, userAgent); err != nil {
 			return err
 		}

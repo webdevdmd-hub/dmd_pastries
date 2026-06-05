@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 
+import { AccountingJournalLink } from "@/components/shared/accounting-reference-links";
 import { MovementDirectionBadge } from "@/components/stock-movements/movement-direction-badge";
 import { MovementTypeBadge } from "@/components/stock-movements/movement-type-badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,13 @@ function formatDate(value: string): string {
 
 function formatQuantity(value: number, unit: string): string {
   return `${new Intl.NumberFormat("en-AE", { maximumFractionDigits: 3 }).format(value)} ${unit}`;
+}
+
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    style: "currency",
+  }).format(value);
 }
 
 function formatItemType(value: StockMovement["itemType"]): string {
@@ -81,9 +89,36 @@ export function MovementDetailsDrawer({
               />
               <DetailRow label="Reference type" value={movement.referenceType ?? "Manual"} />
               <DetailRow label="Reference number" value={movement.referenceNumber ?? "None"} />
+              <DetailRow
+                label="Total cost"
+                value={movement.totalCost > 0 ? formatMoney(movement.totalCost) : "Not costed"}
+              />
+              <DetailRow
+                label="Unit cost"
+                value={
+                  movement.unitCostSnapshot > 0
+                    ? formatMoney(movement.unitCostSnapshot)
+                    : "Not costed"
+                }
+              />
+              <DetailRow label="Valuation" value={movement.valuationMethod ?? "Not available"} />
               <DetailRow label="Created by" value={movement.createdByUserName} />
               <DetailRow label="Created at" value={formatDate(movement.createdAt)} />
             </div>
+            {movement.accountingJournalEntryId ? (
+              <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">
+                  Accounting journal
+                </p>
+                <p className="mt-2 text-sm text-brand-espresso">
+                  This movement was posted to accounting journal {movement.accountingJournalEntryId}
+                  .
+                </p>
+                <div className="mt-3">
+                  <AccountingJournalLink id={movement.accountingJournalEntryId} />
+                </div>
+              </div>
+            ) : null}
             <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
               <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">Reason</p>
               <p className="mt-2 text-sm text-brand-espresso">{movement.reason ?? "No reason"}</p>

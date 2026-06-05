@@ -119,6 +119,21 @@ type purchaseReturnAccountingRow struct {
 	JournalEntryID      *string
 }
 
+type expenseAccountingRow struct {
+	ID                   string
+	BusinessID           string
+	BranchID             string
+	ExpenseNumber        string
+	ExpenseDate          time.Time
+	ExpenseAccountID     string
+	PaidThroughAccountID string
+	Amount               float64
+	ReferenceNumber      string
+	Notes                string
+	Status               string
+	JournalEntryID       *string
+}
+
 type purchaseInvoiceAccountingRow struct {
 	ID              string
 	BusinessID      string
@@ -182,6 +197,8 @@ type stockMovementAccountingRow struct {
 	ReferenceNumber          string
 	TotalCost                float64
 	AccountingJournalEntryID *string
+	IsReversal               bool
+	ReversedMovementID       *string
 	CreatedAt                time.Time
 }
 
@@ -192,6 +209,16 @@ type productionBatchAccountingRow struct {
 	ProductionBatchNumber string
 	Status                string
 	CompletedAt           *time.Time
+}
+
+type accountingSettingsRow struct {
+	BusinessID                    string
+	FinancialYearStartMonth       int
+	FinancialYearStartDay         int
+	FinancialYearStartMonthIsNull bool
+	FinancialYearStartDayIsNull   bool
+	CreatedAt                     time.Time
+	UpdatedAt                     time.Time
 }
 
 type documentChargeAccountingRow struct {
@@ -379,6 +406,76 @@ func (r *Repository) FindAccountMapping(tx *gorm.DB, businessID, mappingKey stri
 	return &mapping, err
 }
 
+func (r *Repository) EnsureAccountingSettings(tx *gorm.DB, businessID string) (*accountingSettingsRow, error) {
+	if err := tx.Exec(`
+		INSERT INTO company_settings (
+			id,
+			business_id,
+			business_display_name,
+			vat_number,
+			currency,
+			timezone,
+			financial_year_start_month,
+			financial_year_start_day,
+			created_at,
+			updated_at
+		)
+		SELECT
+			gen_random_uuid(),
+			b.id,
+			b.business_name,
+			b.vat_number,
+			b.currency,
+			b.timezone,
+			1,
+			1,
+			NOW(),
+			NOW()
+		FROM businesses b
+		WHERE b.id = ?
+		  AND b.deleted_at IS NULL
+		  AND NOT EXISTS (
+			  SELECT 1
+			  FROM company_settings cs
+			  WHERE cs.business_id = b.id
+			    AND cs.deleted_at IS NULL
+		  )
+	`, businessID).Error; err != nil {
+		return nil, err
+	}
+	return r.FindAccountingSettings(tx, businessID)
+}
+
+func (r *Repository) FindAccountingSettings(tx *gorm.DB, businessID string) (*accountingSettingsRow, error) {
+	var row accountingSettingsRow
+	err := tx.Table("company_settings").
+		Select(`
+			business_id,
+			COALESCE(financial_year_start_month, 1) AS financial_year_start_month,
+			COALESCE(financial_year_start_day, 1) AS financial_year_start_day,
+			financial_year_start_month IS NULL AS financial_year_start_month_is_null,
+			financial_year_start_day IS NULL AS financial_year_start_day_is_null,
+			created_at,
+			updated_at
+		`).
+		Where("business_id = ? AND deleted_at IS NULL", businessID).
+		Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) UpdateAccountingSettings(tx *gorm.DB, businessID string, updates map[string]interface{}) error {
+	result := tx.Table("company_settings").
+		Where("business_id = ? AND deleted_at IS NULL", businessID).
+		Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func (r *Repository) UpsertAccountMapping(tx *gorm.DB, mapping *AccountMapping) error {
 	var existing AccountMapping
 	err := tx.Where("business_id = ? AND mapping_key = ? AND deleted_at IS NULL", mapping.BusinessID, mapping.MappingKey).First(&existing).Error
@@ -416,7 +513,7 @@ func (r *Repository) SumStockMovementCostByReference(tx *gorm.DB, businessID, re
 	var total float64
 	err := tx.Table("stock_movements").
 		Select("COALESCE(SUM(total_cost), 0)").
-		Where("business_id = ? AND reference_type = ? AND reference_id = ? AND movement_direction = ? AND deleted_at IS NULL", businessID, referenceType, referenceID, movementDirection).
+		Where("business_id = ? AND reference_type = ? AND reference_id = ? AND movement_direction = ?", businessID, referenceType, referenceID, movementDirection).
 		Scan(&total).Error
 	return total, err
 }
@@ -425,7 +522,7 @@ func (r *Repository) SumStockMovementCostByReferenceAndType(tx *gorm.DB, busines
 	var total float64
 	err := tx.Table("stock_movements").
 		Select("COALESCE(SUM(total_cost), 0)").
-		Where("business_id = ? AND reference_type = ? AND reference_id = ? AND movement_type = ? AND deleted_at IS NULL", businessID, referenceType, referenceID, movementType).
+		Where("business_id = ? AND reference_type = ? AND reference_id = ? AND movement_type = ?", businessID, referenceType, referenceID, movementType).
 		Scan(&total).Error
 	return total, err
 }
@@ -433,15 +530,15 @@ func (r *Repository) SumStockMovementCostByReferenceAndType(tx *gorm.DB, busines
 func (r *Repository) FindStockMovementForAccounting(tx *gorm.DB, businessID, movementID string) (*stockMovementAccountingRow, error) {
 	var row stockMovementAccountingRow
 	err := tx.Table("stock_movements").
-		Select("id, business_id, branch_id, movement_type, movement_direction, reference_type, reference_id, reference_number, total_cost, accounting_journal_entry_id, created_at").
-		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, movementID).
+		Select("id, business_id, branch_id, movement_type, movement_direction, reference_type, reference_id, reference_number, total_cost, accounting_journal_entry_id, is_reversal, reversed_movement_id, created_at").
+		Where("business_id = ? AND id = ?", businessID, movementID).
 		Take(&row).Error
 	return &row, err
 }
 
 func (r *Repository) UpdateStockMovementJournalID(tx *gorm.DB, businessID, movementID, journalEntryID string) error {
 	return tx.Table("stock_movements").
-		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, movementID).
+		Where("business_id = ? AND id = ?", businessID, movementID).
 		Update("accounting_journal_entry_id", journalEntryID).Error
 }
 
@@ -457,7 +554,7 @@ func (r *Repository) ListDocumentChargesForAccounting(tx *gorm.DB, businessID, d
 
 func (r *Repository) UpdateStockMovementJournalByReference(tx *gorm.DB, businessID, referenceType, referenceID, movementDirection, journalEntryID string) error {
 	return tx.Table("stock_movements").
-		Where("business_id = ? AND reference_type = ? AND reference_id = ? AND movement_direction = ? AND deleted_at IS NULL", businessID, referenceType, referenceID, movementDirection).
+		Where("business_id = ? AND reference_type = ? AND reference_id = ? AND movement_direction = ?", businessID, referenceType, referenceID, movementDirection).
 		Update("accounting_journal_entry_id", journalEntryID).Error
 }
 
@@ -759,6 +856,239 @@ func (r *Repository) FindPurchaseReturnForAccounting(tx *gorm.DB, businessID, pu
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, purchaseReturnID).
 		Take(&row).Error
 	return &row, err
+}
+
+func (r *Repository) FindExpenseForAccounting(tx *gorm.DB, businessID, expenseID string) (*expenseAccountingRow, error) {
+	var row expenseAccountingRow
+	err := tx.Table("expenses").
+		Select("id, business_id, branch_id, expense_number, expense_date, expense_account_id, paid_through_account_id, amount, reference_number, notes, status, journal_entry_id").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, expenseID).
+		Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) UpdateExpenseJournalID(tx *gorm.DB, businessID, expenseID, journalEntryID string) error {
+	result := tx.Table("expenses").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, expenseID).
+		Updates(map[string]interface{}{"journal_entry_id": journalEntryID, "updated_at": time.Now().UTC()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) ListBackfillCandidateIDs(tx *gorm.DB, businessID, target string, req BackfillJournalsRequest) ([]string, error) {
+	query, idColumn, dateColumn, err := r.backfillCandidateQuery(tx, businessID, target, req)
+	if err != nil {
+		return nil, err
+	}
+	if req.Limit > 0 {
+		query = query.Limit(req.Limit)
+	}
+
+	var ids []string
+	err = query.Select(idColumn).Order(dateColumn+" ASC, created_at ASC, "+idColumn+" ASC").Pluck(idColumn, &ids).Error
+	return ids, err
+}
+
+func (r *Repository) CountBackfillCandidates(tx *gorm.DB, businessID, target string, req BackfillJournalsRequest) (int64, error) {
+	query, _, _, err := r.backfillCandidateQuery(tx, businessID, target, req)
+	if err != nil {
+		return 0, err
+	}
+	var count int64
+	err = query.Count(&count).Error
+	return count, err
+}
+
+func (r *Repository) backfillCandidateQuery(tx *gorm.DB, businessID, target string, req BackfillJournalsRequest) (*gorm.DB, string, string, error) {
+	table, idColumn, businessColumn, branchColumn, deletedCondition, dateColumn, statusColumn, statusValue, missingCondition, extraCondition := backfillTargetQuery(target)
+	if table == "" {
+		return nil, "", "", fmt.Errorf("unsupported backfill target %s", target)
+	}
+
+	query := tx.Table(table).
+		Where(businessColumn+" = ?", businessID)
+	if deletedCondition != "" {
+		query = query.Where(deletedCondition)
+	}
+	if statusColumn != "" {
+		query = query.Where(statusColumn+" = ?", statusValue)
+	}
+	if missingCondition != "" {
+		query = query.Where(missingCondition)
+	}
+	if extraCondition != "" {
+		query = query.Where(extraCondition)
+	}
+	if strings.TrimSpace(req.BranchID) != "" {
+		branchID := strings.TrimSpace(req.BranchID)
+		if target == "bakery_order_payments" {
+			query = query.Where(`EXISTS (
+				SELECT 1 FROM bakery_orders bo
+				WHERE bo.id = bakery_order_payments.bakery_order_id
+				  AND bo.business_id = bakery_order_payments.business_id
+				  AND bo.branch_id = ?
+				  AND bo.deleted_at IS NULL
+			)`, branchID)
+		} else {
+			query = query.Where(branchColumn+" = ?", branchID)
+		}
+	}
+	if strings.TrimSpace(req.DateFrom) != "" {
+		query = query.Where(dateColumn+" >= ?", strings.TrimSpace(req.DateFrom))
+	}
+	if strings.TrimSpace(req.DateTo) != "" {
+		query = query.Where(dateColumn+" <= ?", strings.TrimSpace(req.DateTo))
+	}
+	return query, idColumn, dateColumn, nil
+}
+
+func backfillTargetQuery(target string) (table, idColumn, businessColumn, branchColumn, deletedCondition, dateColumn, statusColumn, statusValue, missingCondition, extraCondition string) {
+	switch target {
+	case "pos_sales":
+		return "sales", "id", "business_id", "branch_id", "deleted_at IS NULL", "sold_at", "sale_status", "completed", "(accounting_journal_entry_id IS NULL OR cogs_journal_entry_id IS NULL)", ""
+	case "bakery_orders":
+		return "bakery_orders", "id", "business_id", "branch_id", "deleted_at IS NULL", "created_at", "order_status", "completed", "accounting_journal_entry_id IS NULL", ""
+	case "bakery_order_payments":
+		return "bakery_order_payments", "id", "business_id", "", "", "paid_at", "", "", "journal_entry_id IS NULL", ""
+	case "purchase_invoices":
+		return "purchase_invoices", "id", "business_id", "branch_id", "deleted_at IS NULL", "invoice_date", "status", "posted", "journal_entry_id IS NULL", ""
+	case "supplier_payments":
+		return "purchase_invoice_payments", "id", "business_id", "branch_id", "deleted_at IS NULL", "paid_at", "payment_status", "completed", "journal_entry_id IS NULL", ""
+	case "purchase_receipts":
+		return "purchase_receipts", "id", "business_id", "branch_id", "deleted_at IS NULL", "received_date", "status", "posted", "journal_entry_id IS NULL", "purchase_invoice_id IS NULL"
+	case "stock_movements":
+		return "stock_movements", "id", "business_id", "branch_id", "", "created_at", "", "", "accounting_journal_entry_id IS NULL", "movement_type IN ('opening_stock','adjustment_in','adjustment_out','wastage')"
+	case "manufacturing_batches":
+		return "production_batches pb", "pb.id", "pb.business_id", "pb.branch_id", "pb.deleted_at IS NULL", "pb.completed_at", "pb.status", "completed", "", "NOT EXISTS (SELECT 1 FROM journal_entries je WHERE je.business_id = pb.business_id AND je.source_type = 'manufacturing_batch' AND je.source_id = pb.id AND je.status IN ('posted','reversed') AND je.deleted_at IS NULL)"
+	case "sales_returns":
+		return "sales_returns", "id", "business_id", "branch_id", "deleted_at IS NULL", "return_date", "status", "posted", "(journal_entry_id IS NULL OR inventory_journal_entry_id IS NULL)", ""
+	case "purchase_returns":
+		return "purchase_returns", "id", "business_id", "branch_id", "deleted_at IS NULL", "return_date", "status", "posted", "journal_entry_id IS NULL", ""
+	case "expenses":
+		return "expenses", "id", "business_id", "branch_id", "deleted_at IS NULL", "expense_date", "status", "posted", "journal_entry_id IS NULL", ""
+	default:
+		return "", "", "", "", "", "", "", "", "", ""
+	}
+}
+
+func (r *Repository) ListMissingRequiredAccountMappings(tx *gorm.DB, businessID string, keys []string) ([]string, error) {
+	if len(keys) == 0 {
+		return []string{}, nil
+	}
+	var existing []string
+	err := tx.Table("accounting_account_mappings aam").
+		Select("aam.mapping_key").
+		Joins("JOIN chart_of_accounts coa ON coa.id = aam.chart_account_id AND coa.business_id = aam.business_id AND coa.status = 'active' AND coa.deleted_at IS NULL").
+		Where("aam.business_id = ? AND aam.mapping_key IN ? AND aam.deleted_at IS NULL", businessID, keys).
+		Pluck("aam.mapping_key", &existing).Error
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]struct{}{}
+	for _, key := range existing {
+		seen[key] = struct{}{}
+	}
+	missing := make([]string, 0)
+	for _, key := range keys {
+		if _, ok := seen[key]; !ok {
+			missing = append(missing, key)
+		}
+	}
+	return missing, nil
+}
+
+func (r *Repository) ListPaymentMethodReadinessIssues(tx *gorm.DB, businessID string) ([]BackfillReadinessIssue, error) {
+	var rows []struct {
+		ID               string
+		MethodName       string
+		MethodType       string
+		DefaultAccountID *string
+		PaymentAccount   string
+		AccountStatus    string
+		ChartAccountID   *string
+		ShowInPOS        bool
+		ShowInBakery     bool
+		ShowInPurchasing bool
+		ShowInExpenses   bool
+	}
+	err := tx.Table("payment_methods pm").
+		Select(`
+			pm.id,
+			pm.method_name,
+			pm.method_type,
+			pm.default_payment_account_id,
+			COALESCE(pa.account_name, '') AS payment_account,
+			COALESCE(pa.status, '') AS account_status,
+			pa.chart_account_id,
+			pm.show_in_pos,
+			pm.show_in_bakery_orders AS show_in_bakery,
+			pm.show_in_purchasing,
+			pm.show_in_expenses
+		`).
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = pm.business_id AND pa.deleted_at IS NULL").
+		Where("pm.business_id = ? AND pm.status = 'active' AND pm.deleted_at IS NULL", businessID).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	issues := make([]BackfillReadinessIssue, 0)
+	for _, row := range rows {
+		usedByPosting := row.ShowInPOS || row.ShowInBakery || row.ShowInPurchasing || row.ShowInExpenses
+		if !usedByPosting {
+			continue
+		}
+		if row.DefaultAccountID == nil || strings.TrimSpace(*row.DefaultAccountID) == "" {
+			issues = append(issues, BackfillReadinessIssue{
+				Severity: "error",
+				CheckKey: "payment_method_account_missing",
+				Message:  "Active payment method used by operational posting has no default payment account.",
+				Details:  map[string]interface{}{"payment_method_id": row.ID, "method_name": row.MethodName, "method_type": row.MethodType},
+			})
+			continue
+		}
+		if row.AccountStatus != "active" {
+			issues = append(issues, BackfillReadinessIssue{
+				Severity: "error",
+				CheckKey: "payment_account_inactive",
+				Message:  "Payment method is linked to an inactive or missing payment account.",
+				Details:  map[string]interface{}{"payment_method_id": row.ID, "method_name": row.MethodName, "payment_account_id": *row.DefaultAccountID, "payment_account_name": row.PaymentAccount},
+			})
+			continue
+		}
+		if row.ChartAccountID == nil || strings.TrimSpace(*row.ChartAccountID) == "" {
+			issues = append(issues, BackfillReadinessIssue{
+				Severity: "error",
+				CheckKey: "payment_account_chart_account_missing",
+				Message:  "Linked payment account has no Chart of Accounts ledger.",
+				Details:  map[string]interface{}{"payment_method_id": row.ID, "method_name": row.MethodName, "payment_account_id": *row.DefaultAccountID, "payment_account_name": row.PaymentAccount},
+			})
+		}
+	}
+	return issues, nil
+}
+
+func (r *Repository) CountValueMovementsMissingCost(tx *gorm.DB, businessID string, req BackfillJournalsRequest) (int64, error) {
+	query := tx.Table("stock_movements").
+		Where("business_id = ?", businessID).
+		Where("movement_type IN ?", []string{"opening_stock", "adjustment_in", "adjustment_out", "wastage", "purchase_in", "sale_out", "production_in", "production_out", "purchase_return_out", "return_in"}).
+		Where("COALESCE(total_cost, 0) <= 0")
+	if strings.TrimSpace(req.BranchID) != "" {
+		query = query.Where("branch_id = ?", strings.TrimSpace(req.BranchID))
+	}
+	if strings.TrimSpace(req.DateFrom) != "" {
+		query = query.Where("created_at >= ?", strings.TrimSpace(req.DateFrom))
+	}
+	if strings.TrimSpace(req.DateTo) != "" {
+		query = query.Where("created_at <= ?", strings.TrimSpace(req.DateTo))
+	}
+	var count int64
+	err := query.Count(&count).Error
+	return count, err
 }
 
 func (r *Repository) UpdatePurchaseReturnJournalID(tx *gorm.DB, businessID, purchaseReturnID, journalEntryID string) error {
@@ -1455,6 +1785,106 @@ func (r *Repository) ListBalanceSheetRows(businessID string, query BalanceSheetQ
 	for i := range rows {
 		rows[i].Amount = roundMoney(rows[i].Amount)
 	}
+	return rows, err
+}
+
+func (r *Repository) LedgerBalanceForAccount(businessID, accountID, normalBalance, branchID, asOfDate string) (float64, error) {
+	branchFilter := ""
+	args := []interface{}{strings.TrimSpace(normalBalance), businessID, accountID, asOfDate}
+	if strings.TrimSpace(branchID) != "" {
+		branchFilter = "AND je.branch_id = ?"
+		args = append(args, strings.TrimSpace(branchID))
+	}
+	var balance float64
+	err := r.db.Raw(`
+		SELECT COALESCE(SUM(
+			CASE WHEN ? = 'credit'
+				THEN jel.credit_amount - jel.debit_amount
+				ELSE jel.debit_amount - jel.credit_amount
+			END
+		), 0)
+		FROM journal_entry_lines jel
+		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
+		WHERE jel.business_id = ?
+		  AND jel.account_id = ?
+		  AND jel.deleted_at IS NULL
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted', 'reversed')
+		  AND je.entry_date <= ?
+		  `+branchFilter+`
+	`, args...).Scan(&balance).Error
+	return roundMoney(balance), err
+}
+
+func (r *Repository) SumInventoryOperationalValue(businessID, branchID string) (float64, error) {
+	var total float64
+	db := r.db.Table("inventory_items").
+		Select("COALESCE(SUM(inventory_value), 0)").
+		Where("business_id = ? AND deleted_at IS NULL", businessID)
+	if strings.TrimSpace(branchID) != "" {
+		db = db.Where("branch_id = ?", strings.TrimSpace(branchID))
+	}
+	err := db.Scan(&total).Error
+	return roundMoney(total), err
+}
+
+func (r *Repository) SumAccountsPayableOperational(businessID, branchID string) (float64, error) {
+	var total float64
+	db := r.db.Table("purchase_invoices").
+		Select("COALESCE(SUM(balance_amount), 0)").
+		Where("business_id = ? AND deleted_at IS NULL AND status = ? AND payment_status <> ? AND balance_amount > 0", businessID, "posted", "paid")
+	if strings.TrimSpace(branchID) != "" {
+		db = db.Where("branch_id = ?", strings.TrimSpace(branchID))
+	}
+	err := db.Scan(&total).Error
+	return roundMoney(total), err
+}
+
+func (r *Repository) SumAccountsReceivableOperational(businessID, branchID string) (float64, error) {
+	var posTotal float64
+	posDB := r.db.Table("sales").
+		Select("COALESCE(SUM(GREATEST(total_amount - paid_amount, 0)), 0)").
+		Where("business_id = ? AND deleted_at IS NULL AND sale_status = ? AND payment_status <> ?", businessID, "completed", "paid")
+	if strings.TrimSpace(branchID) != "" {
+		posDB = posDB.Where("branch_id = ?", strings.TrimSpace(branchID))
+	}
+	if err := posDB.Scan(&posTotal).Error; err != nil {
+		return 0, err
+	}
+	var bakeryTotal float64
+	bakeryDB := r.db.Table("bakery_orders").
+		Select("COALESCE(SUM(balance_amount), 0)").
+		Where("business_id = ? AND deleted_at IS NULL AND order_status = ? AND payment_status <> ? AND balance_amount > 0", businessID, "completed", "paid")
+	if strings.TrimSpace(branchID) != "" {
+		bakeryDB = bakeryDB.Where("branch_id = ?", strings.TrimSpace(branchID))
+	}
+	if err := bakeryDB.Scan(&bakeryTotal).Error; err != nil {
+		return 0, err
+	}
+	return roundMoney(posTotal + bakeryTotal), nil
+}
+
+func (r *Repository) ListPaymentAccountReconciliationRows(businessID, branchID string) ([]PaymentAccountReconciliationItem, error) {
+	var rows []PaymentAccountReconciliationItem
+	db := r.db.Table("payment_accounts pa").
+		Select(`pa.id AS payment_account_id,
+			pa.account_name AS payment_account_name,
+			pa.account_type,
+			pa.branch_id,
+			COALESCE(b.branch_name, '') AS branch_name,
+			coa.id AS chart_account_id,
+			coa.account_code AS chart_account_code,
+			coa.account_name AS chart_account_name,
+			0::numeric AS ledger_amount,
+			'ledger_only' AS status,
+			'Payment accounts do not store a separate operational balance yet; compare using the linked chart account ledger.' AS notes`).
+		Joins("JOIN chart_of_accounts coa ON coa.id = pa.chart_account_id AND coa.business_id = pa.business_id AND coa.deleted_at IS NULL").
+		Joins("LEFT JOIN branches b ON b.id = pa.branch_id AND b.business_id = pa.business_id").
+		Where("pa.business_id = ? AND pa.deleted_at IS NULL AND pa.status = ?", businessID, "active")
+	if strings.TrimSpace(branchID) != "" {
+		db = db.Where("(pa.branch_id = ? OR pa.branch_id IS NULL)", strings.TrimSpace(branchID))
+	}
+	err := db.Order("pa.account_name ASC").Scan(&rows).Error
 	return rows, err
 }
 

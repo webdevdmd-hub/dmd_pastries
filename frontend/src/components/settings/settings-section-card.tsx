@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Activity,
   Archive,
   BadgeDollarSign,
   Bell,
@@ -28,6 +29,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { SettingsIconName, SettingsSection } from "@/types/settings";
 
 const icons: Record<SettingsIconName, LucideIcon> = {
+  Activity,
   Archive,
   BadgeDollarSign,
   Bell,

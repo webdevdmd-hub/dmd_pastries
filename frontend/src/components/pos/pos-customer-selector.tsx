@@ -1,12 +1,14 @@
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import type { JSX } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { CustomerStatusBadge } from "@/components/customers/customer-status-badge";
 import { POSQuickCustomerDialog } from "@/components/pos/pos-quick-customer-dialog";
+import {
+  SearchableSelect,
+  type SearchableSelectOption,
+} from "@/components/shared/searchable-select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useCustomerLookup, useQuickCreateCustomer } from "@/hooks/use-customers";
 import { getErrorMessage } from "@/lib/api/client";
 import type { Customer, QuickCreateCustomerPayload } from "@/types/customer";
@@ -22,7 +24,38 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const lookupQuery = useCustomerLookup(search, true);
   const quickCreateMutation = useQuickCreateCustomer();
-  const results = lookupQuery.data ?? [];
+  const results = useMemo(() => lookupQuery.data ?? [], [lookupQuery.data]);
+  const customerOptions = useMemo<SearchableSelectOption[]>(() => {
+    const optionMap = new Map<string, SearchableSelectOption>();
+
+    if (selectedCustomer) {
+      optionMap.set(selectedCustomer.id, {
+        description: selectedCustomer.phone ?? selectedCustomer.email ?? "No contact",
+        keywords: [
+          selectedCustomer.customerCode,
+          selectedCustomer.phone ?? "",
+          selectedCustomer.email ?? "",
+        ],
+        label: selectedCustomer.fullName,
+        meta: selectedCustomer.customerCode,
+        value: selectedCustomer.id,
+      });
+    }
+
+    results.forEach((customer) => {
+      const contact = customer.phone ?? customer.email ?? "No contact";
+      optionMap.set(customer.id, {
+        description: `${contact} - ${customer.status}`,
+        disabled: customer.status !== "active",
+        keywords: [customer.customerCode, customer.phone ?? "", customer.email ?? ""],
+        label: customer.fullName,
+        meta: customer.customerCode,
+        value: customer.id,
+      });
+    });
+
+    return Array.from(optionMap.values());
+  }, [results, selectedCustomer]);
 
   const selectCustomer = (customer: Customer): void => {
     setSelectedCustomer(customer);
@@ -42,7 +75,7 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
   };
 
   return (
-    <div className="relative grid gap-1">
+    <div className="grid gap-1">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#71717a]">
           Customer
@@ -57,72 +90,41 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
           New
         </Button>
       </div>
-      {value && selectedCustomer ? (
-        <div className="flex h-9 items-center justify-between rounded-md border border-[#d4d4d8] bg-white px-3 text-sm">
-          <span>
-            <span className="font-semibold text-[#09090b]">{selectedCustomer.fullName}</span>
-            <span className="ml-2 text-[#71717a]">
-              {selectedCustomer.phone ?? selectedCustomer.email}
-            </span>
-          </span>
-          <Button
-            aria-label="Clear selected customer"
-            className="h-6 w-6"
-            onClick={() => {
-              setSelectedCustomer(null);
-              onChange(null);
-            }}
-            size="icon"
-            type="button"
-            variant="ghost"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      ) : (
-        <Input
-          className="h-9 rounded-md border-[#d4d4d8] bg-white text-sm shadow-none focus-visible:ring-black"
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Walk-in customer or search..."
-          value={search}
-        />
-      )}
-      {!value && search.trim().length >= 2 ? (
-        <div className="scrollbar-hidden absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto rounded-md border border-[#d4d4d8] bg-white p-2 shadow-lg">
-          {lookupQuery.isLoading ? (
-            <p className="px-3 py-2 text-sm text-[#71717a]">Searching...</p>
-          ) : null}
-          {!lookupQuery.isLoading && results.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-[#71717a]">No customers found.</p>
-          ) : null}
-          {results.map((customer) => {
-            const isSelectable = customer.status === "active";
 
-            return (
-              <button
-                className="block w-full rounded-md px-3 py-2 text-left text-sm transition hover:bg-[#f4f4f5] disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={!isSelectable}
-                key={customer.id}
-                onClick={() => selectCustomer(customer)}
-                title={
-                  isSelectable
-                    ? `Select ${customer.fullName}`
-                    : `${customer.status} customers cannot be selected for POS billing.`
-                }
-                type="button"
-              >
-                <span className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-[#09090b]">{customer.fullName}</span>
-                  <CustomerStatusBadge status={customer.status} />
-                </span>
-                <span className="mt-1 block text-xs text-[#71717a]">
-                  {customer.customerCode} · {customer.phone ?? customer.email ?? "No contact"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
+      <SearchableSelect
+        ariaLabel="Select POS customer"
+        contentClassName="rounded-md border-[#d4d4d8] bg-white"
+        emptyMessage={
+          search.trim().length < 2
+            ? "Type at least 2 characters to search customers."
+            : "No customers found."
+        }
+        loading={search.trim().length >= 2 && lookupQuery.isLoading}
+        loadingMessage="Searching customers..."
+        onSearchChange={setSearch}
+        onValueChange={(nextCustomerId) => {
+          if (!nextCustomerId) {
+            setSelectedCustomer(null);
+            onChange(null);
+            return;
+          }
+
+          const customer =
+            results.find((result) => result.id === nextCustomerId) ??
+            (selectedCustomer?.id === nextCustomerId ? selectedCustomer : null);
+
+          if (customer) {
+            selectCustomer(customer);
+          }
+        }}
+        options={customerOptions}
+        placeholder="Walk-in customer or search..."
+        searchPlaceholder="Search by name, code, phone, or email..."
+        searchValue={search}
+        triggerClassName="min-h-9 rounded-md border-[#d4d4d8] bg-white text-sm shadow-none hover:bg-[#fafafa] focus-visible:ring-black"
+        value={value}
+      />
+
       <POSQuickCustomerDialog
         isSubmitting={quickCreateMutation.isPending}
         onClose={() => setQuickCreateOpen(false)}

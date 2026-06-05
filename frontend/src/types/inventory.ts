@@ -83,6 +83,10 @@ export type StockMovement = {
   referenceType: string | null;
   referenceId: string | null;
   reason: string | null;
+  unitCostSnapshot: number;
+  totalCost: number;
+  valuationMethod: string | null;
+  accountingJournalEntryId: string | null;
   createdByUserName: string;
   createdAt: string;
 };
