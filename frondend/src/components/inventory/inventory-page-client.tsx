@@ -34,7 +34,6 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useBranches } from "@/hooks/use-branches";
-import { useIngredients } from "@/hooks/use-ingredients";
 import {
   useAdjustStock,
   useCreateExpiryBatch,
@@ -46,7 +45,6 @@ import {
   useStockLocations,
   useUpdateExpiryBatchStatus,
 } from "@/hooks/use-inventory";
-import { usePackaging } from "@/hooks/use-packaging";
 import { usePermission } from "@/hooks/use-permission";
 import { useProductReferenceData, useProducts } from "@/hooks/use-products";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
@@ -73,6 +71,7 @@ function buildDefaultFilters(branchId: string): InventoryFilters {
     search: "",
     branchId,
     itemType: "all",
+    productType: "all",
     status: "all",
     lowStockOnly: false,
     expiryTrackedOnly: false,
@@ -128,7 +127,13 @@ export function InventoryPageClient(): JSX.Element {
   const [openingStockItem, setOpeningStockItem] = useState<InventoryItem | null>(null);
   const inventoryQuery = useInventory(filters, canView && branchScope.hasBranchScope);
   const expiryAlertsQuery = useExpiryAlerts(
-    { branchId: filters.branchId, itemType: "all", status: "all", days: 30 },
+    {
+      branchId: filters.branchId,
+      itemType: "all",
+      productType: "all",
+      status: "all",
+      days: 30,
+    },
     canView && branchScope.hasBranchScope,
   );
   const branchesQuery = useBranches(canView);
@@ -137,32 +142,13 @@ export function InventoryPageClient(): JSX.Element {
       search: "",
       categoryId: "all",
       productType: "all",
+      itemStructure: "all",
       status: "active",
       isPosVisible: "all",
       page: 1,
       limit: 200,
       sortBy: "product_name",
       sortOrder: "asc",
-    },
-    canView,
-  );
-  const ingredientsQuery = useIngredients(
-    {
-      categoryId: "all",
-      search: "",
-      status: "active",
-      stockTracked: "all",
-      supplierId: "all",
-    },
-    canView,
-  );
-  const packagingQuery = usePackaging(
-    {
-      categoryId: "all",
-      search: "",
-      status: "active",
-      stockTracked: "all",
-      supplierId: "all",
     },
     canView,
   );
@@ -422,7 +408,6 @@ export function InventoryPageClient(): JSX.Element {
       <OpeningStockDialog
         branches={branchOptions}
         isSubmitting={openingStockMutation.isPending}
-        ingredients={ingredientsQuery.data ?? []}
         onClose={() => {
           setOpeningStockOpen(false);
           setOpeningStockItem(null);
@@ -430,7 +415,6 @@ export function InventoryPageClient(): JSX.Element {
         onSubmit={handleOpeningStock}
         open={openingStockOpen}
         preselectedItem={openingStockItem}
-        packagingItems={packagingQuery.data ?? []}
         products={productsQuery.data?.items ?? []}
         stockLocations={stockLocationsQuery.data ?? []}
         units={referencesQuery.data?.units ?? []}

@@ -10,9 +10,47 @@ import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAddOrderPackaging, useOrderPackaging } from "@/hooks/use-orders";
-import { usePackaging } from "@/hooks/use-packaging";
+import { useProducts } from "@/hooks/use-products";
 import { getErrorMessage } from "@/lib/api/client";
 import type { AddOrderPackagingPayload, BakeryOrder } from "@/types/orders";
+import type { Product, ProductListFilters } from "@/types/product";
+
+type PackagingOptionMeta = {
+  product: Product;
+  variantId: string | null;
+  variantName: string | null;
+};
+
+const PACKAGING_PRODUCT_FILTERS: ProductListFilters = {
+  search: "",
+  categoryId: "all",
+  productType: "packaging",
+  itemStructure: "all",
+  status: "active",
+  isPosVisible: "all",
+  page: 1,
+  limit: 100,
+  sortBy: "product_name",
+  sortOrder: "asc",
+};
+
+function optionValue(productId: string, variantId: string | null): string {
+  return variantId ? `${productId}:${variantId}` : productId;
+}
+
+function compactStrings(values: (string | null | undefined)[]): string[] {
+  return values.filter((value): value is string => Boolean(value && value.length > 0));
+}
+
+function packagingDisplayName(meta: PackagingOptionMeta | undefined): string | null {
+  if (!meta) {
+    return null;
+  }
+
+  return meta.variantName
+    ? `${meta.product.productName} / ${meta.variantName}`
+    : meta.product.productName;
+}
 
 export function OrderPackagingSection({
   canManage,
@@ -25,37 +63,88 @@ export function OrderPackagingSection({
   onDraftPackagingChange?: (lines: AddOrderPackagingPayload[]) => void;
   order: BakeryOrder | null;
 }): JSX.Element {
-  const [packagingItemId, setPackagingItemId] = useState("");
+  const [selectedPackagingValue, setSelectedPackagingValue] = useState("");
   const [quantityRequired, setQuantityRequired] = useState(1);
-  const packagingQuery = usePackaging(
-    { categoryId: "", search: "", status: "active", stockTracked: "all", supplierId: "" },
-    canManage,
-  );
+  const packagingProductsQuery = useProducts(PACKAGING_PRODUCT_FILTERS, canManage);
   const orderPackagingQuery = useOrderPackaging(order?.id ?? null, order !== null);
   const addPackagingMutation = useAddOrderPackaging();
-  const selectedPackaging = (packagingQuery.data ?? []).find((item) => item.id === packagingItemId);
-  const packagingOptions = useMemo<SearchableComboboxOption[]>(
-    () =>
-      (packagingQuery.data ?? []).map((item) => ({
-        value: item.id,
-        label: item.packagingName,
-        description: [
-          item.packagingCode,
-          item.packagingCategoryName,
-          item.unitName ? `${item.unitName}${item.unitSymbol ? ` (${item.unitSymbol})` : ""}` : "",
-        ]
-          .filter((part) => part.length > 0)
-          .join(" - "),
-        keywords: [
-          item.packagingName,
-          item.packagingCode,
-          item.packagingCategoryName,
-          item.unitName,
-          item.unitSymbol,
-        ],
-      })),
-    [packagingQuery.data],
+  const packagingProducts = useMemo(
+    () => packagingProductsQuery.data?.items ?? [],
+    [packagingProductsQuery.data?.items],
   );
+  const packagingOptionLookup = useMemo<Map<string, PackagingOptionMeta>>(() => {
+    const lookup = new Map<string, PackagingOptionMeta>();
+
+    packagingProducts.forEach((product) => {
+      lookup.set(optionValue(product.id, null), {
+        product,
+        variantId: null,
+        variantName: null,
+      });
+
+      product.variants
+        .filter((variant) => variant.status === "active")
+        .forEach((variant) => {
+          lookup.set(optionValue(product.id, variant.id), {
+            product,
+            variantId: variant.id,
+            variantName: variant.variantName,
+          });
+        });
+    });
+
+    return lookup;
+  }, [packagingProducts]);
+  const selectedPackaging = packagingOptionLookup.get(selectedPackagingValue);
+  const packagingOptions = useMemo<SearchableComboboxOption[]>(() => {
+    const options: SearchableComboboxOption[] = [];
+
+    packagingProducts.forEach((product) => {
+      options.push({
+        value: optionValue(product.id, null),
+        label: product.productName,
+        description: compactStrings([
+          product.productCode,
+          product.categoryName,
+          product.unitName,
+          product.itemStructure === "variant" ? "Parent product" : "",
+        ]).join(" - "),
+        keywords: compactStrings([
+          product.productName,
+          product.productCode,
+          product.sku,
+          product.barcode,
+          product.categoryName,
+          product.unitName,
+        ]),
+      });
+
+      product.variants
+        .filter((variant) => variant.status === "active")
+        .forEach((variant) => {
+          options.push({
+            value: optionValue(product.id, variant.id),
+            label: `${product.productName} / ${variant.variantName}`,
+            description: compactStrings([
+              product.productCode,
+              variant.sku,
+              product.categoryName,
+              product.unitName,
+            ]).join(" - "),
+            keywords: compactStrings([
+              product.productName,
+              product.productCode,
+              product.categoryName,
+              variant.variantName,
+              variant.sku,
+              variant.barcode,
+            ]),
+          });
+        });
+    });
+
+    return options;
+  }, [packagingProducts]);
 
   const addDraftPackaging = (): void => {
     if (!selectedPackaging || !onDraftPackagingChange) {
@@ -65,18 +154,29 @@ export function OrderPackagingSection({
     onDraftPackagingChange([
       ...draftPackaging,
       {
-        packagingItemId: selectedPackaging.id,
+        componentProductId: selectedPackaging.product.id,
+        componentVariantId: selectedPackaging.variantId,
         quantityRequired,
-        unitId: selectedPackaging.unitId,
+        unitId: selectedPackaging.product.unitId,
       },
     ]);
-    setPackagingItemId("");
+    setSelectedPackagingValue("");
     setQuantityRequired(1);
   };
 
-  const packagingName = (packagingId: string): string =>
-    (packagingQuery.data ?? []).find((item) => item.id === packagingId)?.packagingName ??
-    "Packaging item";
+  const packagingName = (
+    componentProductId: string,
+    componentVariantId: string | null = null,
+  ): string => {
+    const exactMatch = packagingOptionLookup.get(
+      optionValue(componentProductId, componentVariantId),
+    );
+    const baseMatch = packagingOptionLookup.get(optionValue(componentProductId, null));
+
+    return (
+      packagingDisplayName(exactMatch) ?? packagingDisplayName(baseMatch) ?? "Packaging product"
+    );
+  };
 
   return (
     <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
@@ -87,15 +187,15 @@ export function OrderPackagingSection({
       <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_140px_auto]">
         <SearchableCombobox
           disabled={!canManage}
-          emptyMessage="No matching packaging items found."
-          isLoading={packagingQuery.isLoading}
-          loadingMessage="Loading packaging items..."
-          onRetry={() => void packagingQuery.refetch()}
-          onValueChange={setPackagingItemId}
+          emptyMessage="No matching Product Master packaging products found."
+          isLoading={packagingProductsQuery.isLoading}
+          loadingMessage="Loading packaging products..."
+          onRetry={() => void packagingProductsQuery.refetch()}
+          onValueChange={setSelectedPackagingValue}
           options={packagingOptions}
-          placeholder="Select packaging"
-          searchPlaceholder="Search packaging, code, category..."
-          value={packagingItemId}
+          placeholder="Select packaging product"
+          searchPlaceholder="Search packaging product, code, SKU..."
+          value={selectedPackagingValue}
         />
         <Input
           min={1}
@@ -104,10 +204,10 @@ export function OrderPackagingSection({
           value={quantityRequired}
         />
         <Button
-          disabled={!canManage || !packagingItemId || addPackagingMutation.isPending}
+          disabled={!canManage || !selectedPackagingValue || addPackagingMutation.isPending}
           onClick={() => {
             void (async () => {
-              if (!packagingItemId) {
+              if (!selectedPackagingValue || !selectedPackaging) {
                 return;
               }
               if (!order) {
@@ -118,12 +218,13 @@ export function OrderPackagingSection({
                 await addPackagingMutation.mutateAsync({
                   orderId: order.id,
                   payload: {
-                    packagingItemId,
+                    componentProductId: selectedPackaging.product.id,
+                    componentVariantId: selectedPackaging.variantId,
                     quantityRequired,
-                    unitId: selectedPackaging?.unitId ?? "",
+                    unitId: selectedPackaging.product.unitId,
                   },
                 });
-                setPackagingItemId("");
+                setSelectedPackagingValue("");
                 setQuantityRequired(1);
                 toast.success("Packaging added.");
               } catch (error: unknown) {
@@ -142,10 +243,10 @@ export function OrderPackagingSection({
           ? draftPackaging.map((entry, index) => (
               <div
                 className="flex items-center justify-between rounded-2xl border border-brand-cappuccino/60 p-3 text-sm"
-                key={`${entry.packagingItemId}-${String(index)}`}
+                key={`${entry.componentProductId}-${entry.componentVariantId ?? "base"}-${String(index)}`}
               >
                 <span className="font-medium text-brand-espresso">
-                  {packagingName(entry.packagingItemId)}
+                  {packagingName(entry.componentProductId, entry.componentVariantId)}
                 </span>
                 <span className="flex items-center gap-3 text-brand-mocha">
                   Qty {entry.quantityRequired}
@@ -171,7 +272,11 @@ export function OrderPackagingSection({
             className="flex items-center justify-between rounded-2xl border border-brand-cappuccino/60 p-3 text-sm"
             key={entry.id}
           >
-            <span className="font-medium text-brand-espresso">{entry.packagingName}</span>
+            <span className="font-medium text-brand-espresso">
+              {entry.componentProductName ??
+                (entry.packagingItemId ? entry.packagingName : "Packaging product")}
+              {entry.componentVariantName ? ` / ${entry.componentVariantName}` : ""}
+            </span>
             <span className="text-brand-mocha">Qty {entry.quantityRequired}</span>
           </div>
         ))}

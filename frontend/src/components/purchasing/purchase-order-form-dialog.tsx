@@ -29,7 +29,6 @@ import type {
   PurchaseItemLineDraft,
   PurchaseOrder,
   PurchasingBranchOption,
-  PurchasingIngredientOption,
   PurchasingProductOption,
   PurchasingSupplierOption,
   PurchasingTaxRateOption,
@@ -51,6 +50,7 @@ function emptyLine(): PurchaseItemLineDraft {
     lineId: crypto.randomUUID(),
     packagingItemId: null,
     productId: null,
+    productVariantId: null,
     quantity: 1,
     taxRateId: null,
     unitCost: 0,
@@ -66,7 +66,6 @@ export function PurchaseOrderFormDialog({
   onUpdate,
   open,
   order,
-  ingredients,
   products,
   suppliers,
   taxRates,
@@ -79,7 +78,6 @@ export function PurchaseOrderFormDialog({
   onUpdate: (id: string, payload: UpdatePurchaseOrderPayload) => Promise<void>;
   open: boolean;
   order: PurchaseOrder | null;
-  ingredients: PurchasingIngredientOption[];
   products: PurchasingProductOption[];
   suppliers: PurchasingSupplierOption[];
   taxRates: PurchasingTaxRateOption[];
@@ -116,11 +114,12 @@ export function PurchaseOrderFormDialog({
             discountAmount: item.discountAmount,
             expiryDate: null,
             ingredientId: item.ingredientId,
-            itemType: item.itemType,
+            itemType: "product",
             itemNameSnapshot: item.itemNameSnapshot,
             lineId: item.id || crypto.randomUUID(),
             packagingItemId: item.packagingItemId,
             productId: item.productId,
+            productVariantId: item.productVariantId,
             quantity: item.quantityOrdered,
             taxRateId: item.taxRateId,
             unitCost: item.unitCost,
@@ -198,7 +197,6 @@ export function PurchaseOrderFormDialog({
           />
         </div>
         <PurchasingItemLineEditor
-          ingredients={ingredients}
           lines={lines}
           onLinesChange={setLines}
           products={products}

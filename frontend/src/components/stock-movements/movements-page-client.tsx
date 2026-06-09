@@ -42,6 +42,7 @@ const defaultFilters: StockMovementFilters = {
   search: "",
   branchId: "",
   itemType: "all",
+  productType: "all",
   movementType: "all",
   direction: "all",
   dateFrom: "",
@@ -74,6 +75,7 @@ export function MovementsPageClient(): JSX.Element {
     {
       branchId: filters.branchId,
       itemType: filters.itemType,
+      productType: filters.productType,
       movementType: filters.movementType,
       direction: filters.direction,
       dateFrom: filters.dateFrom,
@@ -87,6 +89,7 @@ export function MovementsPageClient(): JSX.Element {
       search: "",
       branchId: branchScope.defaultBranchId,
       itemType: "all",
+      productType: "all",
       status: "active",
       lowStockOnly: false,
       expiryTrackedOnly: false,

@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PRODUCT_TYPE_LABELS } from "@/types/product";
 import type { RecipePackagingLine } from "@/types/recipes";
 
 type RecipePackagingTableProps = {
@@ -24,6 +25,10 @@ type RecipePackagingTableProps = {
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
+}
+
+function componentLabel(line: RecipePackagingLine): string {
+  return line.componentProductName ?? line.packagingNameSnapshot;
 }
 
 export function RecipePackagingTable({
@@ -47,8 +52,14 @@ export function RecipePackagingTable({
       <TableBody>
         {lines.map((line) => (
           <TableRow key={line.id}>
-            <TableCell className="font-semibold text-brand-espresso">
-              {line.packagingNameSnapshot}
+            <TableCell>
+              <p className="font-semibold text-brand-espresso">{componentLabel(line)}</p>
+              <p className="text-xs text-brand-mocha">
+                {line.componentProductType
+                  ? PRODUCT_TYPE_LABELS[line.componentProductType]
+                  : "Legacy item"}
+                {line.componentVariantName ? ` · ${line.componentVariantName}` : ""}
+              </p>
             </TableCell>
             <TableCell>
               {line.quantityRequired} {line.unitSymbol}

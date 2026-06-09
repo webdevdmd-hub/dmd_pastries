@@ -1,7 +1,5 @@
-import type { JSX } from "react";
+import { redirect } from "next/navigation";
 
-import { MasterDataPageClient } from "@/components/master-data/master-data-page-client";
-
-export default function PackagingCategoriesPage(): JSX.Element {
-  return <MasterDataPageClient collection="packaging-categories" />;
+export default function PackagingCategoriesPage(): never {
+  redirect("/settings/master-data/product-categories?product_type=packaging");
 }

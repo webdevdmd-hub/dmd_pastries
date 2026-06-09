@@ -15,7 +15,18 @@ export const reversalSchema = z.object({
 export const movementFiltersSchema = z.object({
   search: z.string(),
   branchId: z.string(),
-  itemType: z.enum(["all", "product", "product_variant", "ingredient", "packaging"]),
+  itemType: z.enum(["all", "product", "product_variant"]),
+  productType: z.enum([
+    "all",
+    "finished_product",
+    "ingredient",
+    "packaging",
+    "raw_material",
+    "semi_finished",
+    "consumable",
+    "equipment",
+    "service",
+  ]),
   movementType: z.enum([
     "all",
     "opening_stock",

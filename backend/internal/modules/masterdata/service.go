@@ -69,10 +69,6 @@ func (s *Service) CopyCategories(currentUser *utils.AuthContext, req CopyCategor
 	switch req.CategoryType {
 	case "product_categories":
 		result, err = s.copyProductCategoriesTx(tx, currentUser.BusinessID, sourceBranchID, targetBranchID)
-	case "ingredient_categories":
-		result, err = s.copySimpleCategoriesTx(tx, ingredientConfig(), currentUser.BusinessID, sourceBranchID, targetBranchID)
-	case "packaging_categories":
-		result, err = s.copySimpleCategoriesTx(tx, packagingConfig(), currentUser.BusinessID, sourceBranchID, targetBranchID)
 	default:
 		tx.Rollback()
 		return nil, apperrors.BadRequest("invalid category_type", nil)
@@ -603,18 +599,28 @@ func (s *Service) wouldCreateCircularUnitReference(businessID, unitID, baseUnitI
 	return true, nil
 }
 
-func (s *Service) ListProductCategories(currentUser *utils.AuthContext) ([]ProductCategoryResponse, error) {
+func (s *Service) ListProductCategories(currentUser *utils.AuthContext, productType string) ([]ProductCategoryResponse, error) {
 	branchID, err := currentUser.ResolveOperationalBranch("")
 	if err != nil {
 		return nil, err
 	}
-	categories, err := s.repo.ListProductCategories(currentUser.BusinessID, branchID)
+	productType = strings.TrimSpace(productType)
+	if productType != "" {
+		if err := validateProductCategoryProductType(productType); err != nil {
+			return nil, err
+		}
+	}
+	categories, err := s.repo.ListProductCategories(currentUser.BusinessID, branchID, productType)
 	if err != nil {
 		return nil, apperrors.Internal("failed to list product categories")
 	}
+	allowedTypes, err := s.loadAllowedTypes(currentUser.BusinessID, branchID, categories)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load product category types")
+	}
 	response := make([]ProductCategoryResponse, 0, len(categories))
 	for _, category := range categories {
-		response = append(response, toProductCategoryResponse(category))
+		response = append(response, toProductCategoryResponse(category, allowedTypes[category.ID]))
 	}
 	return response, nil
 }
@@ -631,7 +637,11 @@ func (s *Service) GetProductCategory(currentUser *utils.AuthContext, id string) 
 		}
 		return nil, apperrors.Internal("failed to fetch product category")
 	}
-	response := toProductCategoryResponse(*category)
+	allowedTypes, err := s.repo.ProductCategoryAllowedTypes(currentUser.BusinessID, branchID, []string{category.ID})
+	if err != nil {
+		return nil, apperrors.Internal("failed to load product category types")
+	}
+	response := toProductCategoryResponse(*category, allowedTypes[category.ID])
 	return &response, nil
 }
 
@@ -666,6 +676,10 @@ func (s *Service) CreateProductCategory(currentUser *utils.AuthContext, req Crea
 	if codeExists {
 		return nil, apperrors.Conflict("category code already exists", nil)
 	}
+	allowedProductTypes, err := normalizeProductCategoryAllowedTypes(req.AllowedProductTypes)
+	if err != nil {
+		return nil, err
+	}
 
 	category := &ProductCategory{
 		ID:               utils.NewUUID(),
@@ -688,6 +702,10 @@ func (s *Service) CreateProductCategory(currentUser *utils.AuthContext, req Crea
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to create product category")
 	}
+	if err := s.repo.ReplaceProductCategoryAllowedTypes(tx, currentUser.BusinessID, branchID, category.ID, allowedProductTypes); err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("failed to save product category types")
+	}
 	if err := s.writeAudit(tx, currentUser, "product_category.created", "product_category", category.ID, "Product category created.", ipAddress, userAgent); err != nil {
 		tx.Rollback()
 		return nil, err
@@ -695,7 +713,7 @@ func (s *Service) CreateProductCategory(currentUser *utils.AuthContext, req Crea
 	if err := tx.Commit().Error; err != nil {
 		return nil, apperrors.Internal("failed to commit product category creation")
 	}
-	response := toProductCategoryResponse(*category)
+	response := toProductCategoryResponse(*category, allowedProductTypes)
 	return &response, nil
 }
 
@@ -757,13 +775,35 @@ func (s *Service) UpdateProductCategory(currentUser *utils.AuthContext, id strin
 	if req.SortOrder != nil {
 		updates["sort_order"] = *req.SortOrder
 	}
-	if len(updates) == 0 {
-		response := toProductCategoryResponse(*category)
+	allowedProductTypes := []string(nil)
+	replaceAllowedTypes := req.AllowedProductTypes != nil
+	if replaceAllowedTypes {
+		allowedProductTypes, err = normalizeProductCategoryAllowedTypes(req.AllowedProductTypes)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(updates) == 0 && !replaceAllowedTypes {
+		allowedTypes, err := s.repo.ProductCategoryAllowedTypes(currentUser.BusinessID, branchID, []string{category.ID})
+		if err != nil {
+			return nil, apperrors.Internal("failed to load product category types")
+		}
+		response := toProductCategoryResponse(*category, allowedTypes[category.ID])
 		return &response, nil
 	}
 	updates["updated_at"] = time.Now().UTC()
 	if err := s.updateWithAudit(currentUser, "product_category.updated", "product_category", id, "Product category updated.", ipAddress, userAgent, func(tx *gorm.DB) error {
-		return s.repo.UpdateProductCategory(tx, id, currentUser.BusinessID, branchID, updates)
+		if len(updates) > 1 {
+			if err := s.repo.UpdateProductCategory(tx, id, currentUser.BusinessID, branchID, updates); err != nil {
+				return err
+			}
+		}
+		if replaceAllowedTypes {
+			if err := s.repo.ReplaceProductCategoryAllowedTypes(tx, currentUser.BusinessID, branchID, id, allowedProductTypes); err != nil {
+				return apperrors.Internal("failed to save product category types")
+			}
+		}
+		return nil
 	}); err != nil {
 		return nil, err
 	}
@@ -930,14 +970,6 @@ func (s *Service) Overview(currentUser *utils.AuthContext) (*OverviewResponse, e
 	if err != nil {
 		return nil, apperrors.Internal("failed to count product categories")
 	}
-	ingredientCount, err := s.repo.CountActive("ingredient_categories", currentUser.BusinessID, branchID)
-	if err != nil {
-		return nil, apperrors.Internal("failed to count ingredient categories")
-	}
-	packagingCount, err := s.repo.CountActive("packaging_categories", currentUser.BusinessID, branchID)
-	if err != nil {
-		return nil, apperrors.Internal("failed to count packaging categories")
-	}
 	orderStatusCount, err := s.repo.CountActiveShared("order_statuses", currentUser.BusinessID)
 	if err != nil {
 		return nil, apperrors.Internal("failed to count order statuses")
@@ -947,12 +979,10 @@ func (s *Service) Overview(currentUser *utils.AuthContext) (*OverviewResponse, e
 		return nil, apperrors.Internal("failed to count payment statuses")
 	}
 	return &OverviewResponse{
-		UnitsCount:                unitsCount,
-		ProductCategoriesCount:    productCount,
-		IngredientCategoriesCount: ingredientCount,
-		PackagingCategoriesCount:  packagingCount,
-		OrderStatusesCount:        orderStatusCount,
-		PaymentStatusesCount:      paymentStatusCount,
+		UnitsCount:             unitsCount,
+		ProductCategoriesCount: productCount,
+		OrderStatusesCount:     orderStatusCount,
+		PaymentStatusesCount:   paymentStatusCount,
 	}, nil
 }
 
@@ -1035,6 +1065,17 @@ func (s *Service) copyProductCategoriesTx(tx *gorm.DB, businessID, sourceBranchI
 			}
 			if err := s.repo.CreateProductCategory(tx, newCategory); err != nil {
 				return nil, apperrors.Internal("failed to copy product category")
+			}
+			allowedTypes, err := s.repo.ProductCategoryAllowedTypes(businessID, sourceBranchID, []string{category.ID})
+			if err != nil {
+				return nil, apperrors.Internal("failed to load product category types")
+			}
+			sourceAllowedTypes := allowedTypes[category.ID]
+			if len(sourceAllowedTypes) == 0 {
+				sourceAllowedTypes = allProductCategoryTypes()
+			}
+			if err := s.repo.ReplaceProductCategoryAllowedTypes(tx, businessID, targetBranchID, newCategory.ID, sourceAllowedTypes); err != nil {
+				return nil, apperrors.Internal("failed to copy product category types")
 			}
 			idMap[category.ID] = newCategory.ID
 			result.CreatedCategoryIDs = append(result.CreatedCategoryIDs, newCategory.ID)
@@ -1182,21 +1223,69 @@ func toPaymentStatusResponse(status PaymentStatus) PaymentStatusResponse {
 	}
 }
 
-func toProductCategoryResponse(category ProductCategory) ProductCategoryResponse {
+func toProductCategoryResponse(category ProductCategory, allowedProductTypes []string) ProductCategoryResponse {
 	return ProductCategoryResponse{
-		ID:               category.ID,
-		BusinessID:       category.BusinessID,
-		BranchID:         category.BranchID,
-		ParentCategoryID: category.ParentCategoryID,
-		CategoryName:     category.CategoryName,
-		CategoryCode:     category.CategoryCode,
-		Description:      category.Description,
-		ImageFileID:      category.ImageFileID,
-		SortOrder:        category.SortOrder,
-		Status:           category.Status,
-		CreatedAt:        category.CreatedAt,
-		UpdatedAt:        category.UpdatedAt,
+		ID:                  category.ID,
+		BusinessID:          category.BusinessID,
+		BranchID:            category.BranchID,
+		ParentCategoryID:    category.ParentCategoryID,
+		CategoryName:        category.CategoryName,
+		CategoryCode:        category.CategoryCode,
+		Description:         category.Description,
+		ImageFileID:         category.ImageFileID,
+		SortOrder:           category.SortOrder,
+		AllowedProductTypes: allowedProductTypes,
+		Status:              category.Status,
+		CreatedAt:           category.CreatedAt,
+		UpdatedAt:           category.UpdatedAt,
 	}
+}
+
+func (s *Service) loadAllowedTypes(businessID, branchID string, categories []ProductCategory) (map[string][]string, error) {
+	ids := make([]string, 0, len(categories))
+	for _, category := range categories {
+		ids = append(ids, category.ID)
+	}
+	return s.repo.ProductCategoryAllowedTypes(businessID, branchID, ids)
+}
+
+func normalizeProductCategoryAllowedTypes(values []string) ([]string, error) {
+	if len(values) == 0 {
+		return nil, apperrors.BadRequest("allowed_product_types is required", nil)
+	}
+	seen := map[string]bool{}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		productType := strings.TrimSpace(value)
+		if productType == "" {
+			continue
+		}
+		if err := validateProductCategoryProductType(productType); err != nil {
+			return nil, err
+		}
+		if seen[productType] {
+			continue
+		}
+		seen[productType] = true
+		result = append(result, productType)
+	}
+	if len(result) == 0 {
+		return nil, apperrors.BadRequest("allowed_product_types is required", nil)
+	}
+	return result, nil
+}
+
+func validateProductCategoryProductType(value string) error {
+	switch strings.TrimSpace(value) {
+	case "finished_product", "ingredient", "packaging", "raw_material", "semi_finished", "consumable", "equipment", "service":
+		return nil
+	default:
+		return apperrors.BadRequest("invalid product_type", nil)
+	}
+}
+
+func allProductCategoryTypes() []string {
+	return []string{"finished_product", "ingredient", "packaging", "raw_material", "semi_finished", "consumable", "equipment", "service"}
 }
 
 func normalizeCode(values ...string) string {
@@ -1213,10 +1302,6 @@ func categoryManagePermission(categoryType string) string {
 	switch categoryType {
 	case "product_categories":
 		return "master_data.product_categories.manage"
-	case "ingredient_categories":
-		return "master_data.ingredient_categories.manage"
-	case "packaging_categories":
-		return "master_data.packaging_categories.manage"
 	default:
 		return ""
 	}

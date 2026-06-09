@@ -1,12 +1,9 @@
 import { z } from "zod";
 
-const productTypeSchema = z.enum([
-  "ready_to_sell",
-  "made_to_order",
-  "manufactured",
-  "retail",
-  "service",
-]);
+import { ITEM_STRUCTURES, PRODUCT_TYPES } from "@/types/product";
+
+const productTypeSchema = z.enum(PRODUCT_TYPES);
+const itemStructureSchema = z.enum(ITEM_STRUCTURES);
 
 const recordStatusSchema = z.enum(["active", "inactive"]);
 
@@ -16,6 +13,7 @@ export const productSchema = z.object({
   unitId: z.string().trim().min(1, "Unit is required."),
   taxRateId: z.string().trim().optional(),
   productType: productTypeSchema,
+  itemStructure: itemStructureSchema,
   salePrice: z.coerce.number().min(0, "Sale price must be at least 0."),
   costPrice: z
     .union([z.coerce.number().min(0, "Cost price must be at least 0."), z.null()])

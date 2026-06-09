@@ -457,6 +457,7 @@ export function POSWorkspace(): JSX.Element {
         businessId: referenceCategory?.businessId ?? user?.businessId ?? "",
         categoryCode: referenceCategory?.categoryCode ?? product.categoryId,
         categoryName: referenceCategory?.categoryName ?? product.categoryName,
+        allowedProductTypes: referenceCategory?.allowedProductTypes ?? [],
         createdAt: referenceCategory?.createdAt ?? "",
         description: referenceCategory?.description ?? "",
         id: product.categoryId,

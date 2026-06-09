@@ -15,11 +15,27 @@ import {
 import { Input } from "@/components/ui/input";
 import { consumeSchema } from "@/lib/validators/manufacturing.schema";
 import type { ConsumePayload, ProductionBatchIngredient } from "@/types/manufacturing";
+import { PRODUCT_TYPE_LABELS } from "@/types/product";
 
 type ConsumeLine = {
   batchIngredientId: string;
   consumedQuantity: number;
 };
+
+function componentName(ingredient: ProductionBatchIngredient): string {
+  return ingredient.componentProductName ?? ingredient.itemName;
+}
+
+function componentMeta(ingredient: ProductionBatchIngredient): string {
+  const parts = [
+    ingredient.componentProductType
+      ? PRODUCT_TYPE_LABELS[ingredient.componentProductType]
+      : "Legacy item",
+    ingredient.componentVariantName,
+  ].filter((part): part is string => Boolean(part));
+
+  return parts.join(" / ");
+}
 
 export function BatchIngredientConsumeDialog({
   ingredients,
@@ -89,14 +105,15 @@ export function BatchIngredientConsumeDialog({
                 key={ingredient.id}
               >
                 <div>
-                  <p className="font-semibold text-brand-espresso">{ingredient.itemName}</p>
+                  <p className="font-semibold text-brand-espresso">{componentName(ingredient)}</p>
+                  <p className="text-xs text-brand-mocha">{componentMeta(ingredient)}</p>
                   <p className="text-sm text-brand-mocha">
                     Required {ingredient.requiredQuantity} {ingredient.unitSymbol}, consumed{" "}
                     {ingredient.consumedQuantity} {ingredient.unitSymbol}
                   </p>
                 </div>
                 <Input
-                  aria-label={`Consumed quantity for ${ingredient.itemName}`}
+                  aria-label={`Consumed quantity for ${componentName(ingredient)}`}
                   min="0"
                   onChange={(event) => updateLine(ingredient.id, Number(event.target.value))}
                   type="number"

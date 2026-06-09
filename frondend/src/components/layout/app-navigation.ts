@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   ListChecks,
   NotebookTabs,
-  PackageOpen,
   PackageSearch,
   ReceiptText,
   Settings,
@@ -17,7 +16,6 @@ import {
   Truck,
   UserRound,
   Users,
-  Wheat,
 } from "lucide-react";
 
 import { PERMISSIONS } from "@/constants/permissions";
@@ -167,28 +165,6 @@ export const appNavigationGroups = [
   {
     label: "Production",
     items: [
-      {
-        href: ROUTES.ingredients,
-        icon: Wheat,
-        label: "Ingredients",
-        permissionAny: [
-          PERMISSIONS.ingredientsView,
-          PERMISSIONS.ingredientsCreate,
-          PERMISSIONS.ingredientsEdit,
-          PERMISSIONS.inventoryView,
-        ],
-      },
-      {
-        href: ROUTES.packaging,
-        icon: PackageOpen,
-        label: "Packaging",
-        permissionAny: [
-          PERMISSIONS.packagingView,
-          PERMISSIONS.packagingCreate,
-          PERMISSIONS.packagingEdit,
-          PERMISSIONS.masterDataView,
-        ],
-      },
       {
         href: ROUTES.recipes,
         icon: ListChecks,

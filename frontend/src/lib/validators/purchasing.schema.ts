@@ -10,8 +10,9 @@ const optionalNullableString = z.union([z.string(), z.null(), z.undefined()]).tr
 
 export const purchaseItemLineSchema = z
   .object({
-    itemType: z.enum(["product", "ingredient", "packaging"]),
+    itemType: z.literal("product"),
     productId: optionalNullableString,
+    productVariantId: optionalNullableString,
     ingredientId: optionalNullableString,
     packagingItemId: optionalNullableString,
     quantity: z.coerce.number().positive("Quantity must be greater than 0."),
@@ -23,24 +24,8 @@ export const purchaseItemLineSchema = z
     batchNumber: optionalNullableString,
   })
   .superRefine((value, context) => {
-    if (value.itemType === "product" && !value.productId) {
+    if (!value.productId) {
       context.addIssue({ code: "custom", message: "Product is required.", path: ["productId"] });
-    }
-
-    if (value.itemType === "ingredient" && !value.ingredientId) {
-      context.addIssue({
-        code: "custom",
-        message: "Ingredient is required.",
-        path: ["ingredientId"],
-      });
-    }
-
-    if (value.itemType === "packaging" && !value.packagingItemId) {
-      context.addIssue({
-        code: "custom",
-        message: "Packaging item is required.",
-        path: ["packagingItemId"],
-      });
     }
   });
 

@@ -28,8 +28,16 @@ import {
 } from "@/components/ui/select";
 import { getProductImagePreviewUrl, uploadProductImage } from "@/lib/appwrite/storage";
 import { type ProductSchema, productSchema } from "@/lib/validators/product.schema";
-import type { CreateProductPayload, Product, UpdateProductPayload } from "@/types/product";
 import type { ProductReferenceData } from "@/types/product";
+import {
+  type CreateProductPayload,
+  ITEM_STRUCTURE_LABELS,
+  ITEM_STRUCTURES,
+  type Product,
+  PRODUCT_TYPE_LABELS,
+  PRODUCT_TYPES,
+  type UpdateProductPayload,
+} from "@/types/product";
 
 type ProductFormDialogProps = {
   onClose: () => void;
@@ -51,7 +59,8 @@ function toDefaultValues(product: Product | null): ProductSchema {
     categoryId: product?.categoryId ?? "",
     unitId: product?.unitId ?? "",
     taxRateId: product?.taxRateId ?? "",
-    productType: product?.productType ?? "ready_to_sell",
+    productType: product?.productType ?? "finished_product",
+    itemStructure: product?.itemStructure ?? "single",
     salePrice: product?.salePrice ?? 0,
     costPrice: product?.costPrice ?? null,
     sku: product?.sku ?? "",
@@ -82,11 +91,31 @@ export function ProductFormDialog({
     defaultValues: toDefaultValues(product),
   });
   const watchedTaxRateId = form.watch("taxRateId") ?? "";
+  const watchedItemStructure = form.watch("itemStructure");
+  const watchedProductType = form.watch("productType");
+
+  const compatibleCategories = useMemo(
+    () =>
+      referenceData.categories.filter(
+        (category) =>
+          category.allowedProductTypes.length === 0 ||
+          category.allowedProductTypes.includes(watchedProductType),
+      ),
+    [referenceData.categories, watchedProductType],
+  );
 
   useEffect(() => {
     form.reset(toDefaultValues(product));
     setSelectedImage(null);
   }, [form, product]);
+
+  useEffect(() => {
+    const categoryId = form.getValues("categoryId");
+
+    if (categoryId && !compatibleCategories.some((category) => category.id === categoryId)) {
+      form.setValue("categoryId", "");
+    }
+  }, [compatibleCategories, form]);
 
   const previewUrl = useMemo(() => {
     if (selectedImage) {
@@ -126,6 +155,7 @@ export function ProductFormDialog({
       unitId: values.unitId,
       taxRateId: values.taxRateId?.trim() ? values.taxRateId : null,
       productType: values.productType,
+      itemStructure: values.itemStructure,
       salePrice: values.salePrice,
       costPrice: values.costPrice ?? null,
       sku: values.sku?.trim() ? values.sku : null,
@@ -191,13 +221,38 @@ export function ProductFormDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ready_to_sell">Ready to Sell</SelectItem>
-                      <SelectItem value="made_to_order">Made to Order</SelectItem>
-                      <SelectItem value="manufactured">Manufactured</SelectItem>
-                      <SelectItem value="retail">Retail</SelectItem>
-                      <SelectItem value="service">Service</SelectItem>
+                      {PRODUCT_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {PRODUCT_TYPE_LABELS[type]}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label>Item structure</Label>
+                  <Select
+                    onValueChange={(value) =>
+                      form.setValue("itemStructure", value as ProductSchema["itemStructure"])
+                    }
+                    value={form.watch("itemStructure")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ITEM_STRUCTURES.map((itemStructure) => (
+                        <SelectItem key={itemStructure} value={itemStructure}>
+                          {ITEM_STRUCTURE_LABELS[itemStructure]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {watchedItemStructure === "recipe_based" ? (
+                    <p className="text-xs text-brand-mocha">
+                      This product should be linked to a recipe in a later step.
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex flex-col gap-1">
                   <Label>Category</Label>
@@ -209,13 +264,21 @@ export function ProductFormDialog({
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {referenceData.categories.map((category) => (
+                      {compatibleCategories.length === 0 ? (
+                        <SelectItem disabled value="__no_categories">
+                          No compatible categories
+                        </SelectItem>
+                      ) : null}
+                      {compatibleCategories.map((category) => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.categoryName}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-brand-mocha">
+                    Categories are filtered by the selected product type.
+                  </p>
                   <FieldError message={form.formState.errors.categoryId?.message} />
                 </div>
                 <div className="flex flex-col gap-1">

@@ -18,6 +18,7 @@ const defaultFilters: ProductListFilters = {
   search: "",
   categoryId: "all",
   productType: "all",
+  itemStructure: "all",
   status: "all",
   isPosVisible: "all",
   page: 1,
@@ -35,6 +36,7 @@ export function ProductsToolbar({
     filters.search.trim().length > 0,
     filters.categoryId !== "all",
     filters.productType !== "all",
+    filters.itemStructure !== "all",
     filters.status !== "all",
     filters.isPosVisible !== "all",
   ].filter(Boolean).length;

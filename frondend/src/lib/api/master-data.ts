@@ -24,6 +24,7 @@ import type {
   UpdateSimpleCategoryPayload,
   UpdateUnitPayload,
 } from "@/types/master-data";
+import { PRODUCT_TYPES, type ProductType } from "@/types/product";
 import type { RecordStatus } from "@/types/settings";
 
 type BackendOverview = {
@@ -69,6 +70,7 @@ type BackendUnitPayload = {
 };
 
 type BackendProductCategory = {
+  allowed_product_types?: unknown;
   id?: string;
   business_id?: string;
   parent_category_id?: string | null;
@@ -83,6 +85,7 @@ type BackendProductCategory = {
 };
 
 type BackendProductCategoryPayload = {
+  allowed_product_types?: ProductType[];
   parent_category_id?: string | null;
   category_name?: string;
   category_code?: string;
@@ -169,6 +172,18 @@ function isRecordStatus(value: unknown): value is RecordStatus {
   return value === "active" || value === "inactive";
 }
 
+function isProductType(value: unknown): value is ProductType {
+  return PRODUCT_TYPES.includes(value as ProductType);
+}
+
+function parseAllowedProductTypes(value: unknown): ProductType[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isProductType);
+}
+
 function isCategoryCopyType(value: unknown): value is CategoryCopyType {
   return (
     value === "product_categories" ||
@@ -214,14 +229,14 @@ function parseOverview(value: unknown): MasterDataOverview {
       overview.product_categories_count,
       "Product categories count is missing.",
     ),
-    ingredientCategoriesCount: requiredNumber(
-      overview.ingredient_categories_count,
-      "Ingredient categories count is missing.",
-    ),
-    packagingCategoriesCount: requiredNumber(
-      overview.packaging_categories_count,
-      "Packaging categories count is missing.",
-    ),
+    ingredientCategoriesCount:
+      typeof overview.ingredient_categories_count === "number"
+        ? overview.ingredient_categories_count
+        : 0,
+    packagingCategoriesCount:
+      typeof overview.packaging_categories_count === "number"
+        ? overview.packaging_categories_count
+        : 0,
     orderStatusesCount: requiredNumber(
       overview.order_statuses_count,
       "Order statuses count is missing.",
@@ -289,6 +304,7 @@ function parseProductCategory(value: unknown): ProductCategory {
   }
 
   return {
+    allowedProductTypes: parseAllowedProductTypes(category.allowed_product_types),
     id: requiredString(category.id, "Product category ID is missing."),
     businessId: requiredString(category.business_id, "Product category business ID is missing."),
     parentCategoryId:
@@ -533,8 +549,23 @@ export async function deleteUnit(id: string): Promise<void> {
   });
 }
 
-export async function getProductCategories(): Promise<ProductCategory[]> {
-  const response = await apiRequest<ProductCategory[]>(collectionPaths["product-categories"], {
+export type ProductCategoryFilters = {
+  productType?: ProductType | "all";
+};
+
+export async function getProductCategories(
+  filters: ProductCategoryFilters = {},
+): Promise<ProductCategory[]> {
+  const searchParams = new URLSearchParams();
+
+  if (filters.productType && filters.productType !== "all") {
+    searchParams.set("product_type", filters.productType);
+  }
+
+  const query = searchParams.toString();
+  const url = `${collectionPaths["product-categories"]}${query ? `?${query}` : ""}`;
+
+  const response = await apiRequest<ProductCategory[]>(url, {
     authMode: "appwrite",
     parse: (data) => parseList(data, parseProductCategory),
   });
@@ -546,6 +577,9 @@ function toBackendProductCategoryPayload(
   payload: CreateProductCategoryPayload | UpdateProductCategoryPayload,
 ): BackendProductCategoryPayload {
   return {
+    ...(payload.allowedProductTypes !== undefined
+      ? { allowed_product_types: payload.allowedProductTypes }
+      : {}),
     ...(payload.parentCategoryId !== undefined
       ? { parent_category_id: payload.parentCategoryId }
       : {}),

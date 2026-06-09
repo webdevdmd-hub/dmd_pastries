@@ -69,7 +69,8 @@ type BackendOrderPaymentPayload = {
 };
 
 type BackendOrderPackagingPayload = {
-  packaging_item_id: string;
+  component_product_id: string;
+  component_variant_id?: string | null;
   quantity_required: number;
   unit_id: string;
 };
@@ -82,7 +83,8 @@ type BackendOrderItemProductConversionPayload = {
   barcode?: string;
   sale_price: number;
   unit_id: string;
-  product_type: "made_to_order";
+  product_type: "finished_product";
+  item_structure: "custom";
   is_stock_tracked: boolean;
   is_expiry_tracked: boolean;
   is_custom_order_available: boolean;
@@ -321,9 +323,22 @@ function parsePackaging(value: unknown): BakeryOrderPackaging {
 
   return {
     id: stringValue(value.id),
-    packagingItemId: stringValue(value.packaging_item_id),
-    packagingName: stringValue(value.packaging_name, "Packaging item"),
+    componentProductId:
+      optionalString(value.component_product_id) ?? optionalString(value.product_id),
+    componentVariantId:
+      optionalString(value.component_variant_id) ?? optionalString(value.product_variant_id),
+    componentProductName:
+      optionalString(value.component_product_name) ?? optionalString(value.product_name),
+    componentVariantName:
+      optionalString(value.component_variant_name) ?? optionalString(value.product_variant_name),
+    packagingItemId: optionalString(value.packaging_item_id),
+    packagingName: stringValue(
+      value.component_product_name,
+      stringValue(value.product_name, stringValue(value.packaging_name, "Packaging item")),
+    ),
     quantityRequired: numberValue(value.quantity_required),
+    unitId: stringValue(value.unit_id),
+    unitName: stringValue(value.unit_name, "Unit"),
     createdAt: stringValue(value.created_at),
   };
 }
@@ -389,6 +404,7 @@ function productConversionPayload(
     sale_price: payload.salePrice,
     unit_id: payload.unitId,
     product_type: payload.productType,
+    item_structure: payload.itemStructure,
     is_stock_tracked: payload.isStockTracked,
     is_expiry_tracked: payload.isExpiryTracked,
     is_custom_order_available: payload.isCustomOrderAvailable,
@@ -718,7 +734,8 @@ export async function addOrderPackaging(
       authMode: "appwrite",
       method: "POST",
       body: {
-        packaging_item_id: payload.packagingItemId,
+        component_product_id: payload.componentProductId,
+        component_variant_id: payload.componentVariantId,
         quantity_required: payload.quantityRequired,
         unit_id: payload.unitId,
       },

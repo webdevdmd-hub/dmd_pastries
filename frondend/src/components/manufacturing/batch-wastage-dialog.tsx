@@ -22,6 +22,20 @@ import {
 } from "@/components/ui/select";
 import { wastageSchema } from "@/lib/validators/manufacturing.schema";
 import type { ManufacturingInventoryOption, WastagePayload } from "@/types/manufacturing";
+import { PRODUCT_TYPE_LABELS } from "@/types/product";
+
+function inventoryLabel(item: ManufacturingInventoryOption): string {
+  return item.productVariantName ?? item.productName ?? item.itemName;
+}
+
+function inventoryMeta(item: ManufacturingInventoryOption): string {
+  const parts = [
+    item.productType ? PRODUCT_TYPE_LABELS[item.productType] : null,
+    item.unitSymbol || item.unitName,
+  ].filter((part): part is string => Boolean(part));
+
+  return parts.join(" / ");
+}
 
 export function BatchWastageDialog({
   inventory,
@@ -78,7 +92,8 @@ export function BatchWastageDialog({
             <SelectItem value="none">Select item</SelectItem>
             {inventory.map((item) => (
               <SelectItem key={item.id} value={item.id}>
-                {item.itemName}
+                {inventoryLabel(item)}
+                {inventoryMeta(item) ? ` (${inventoryMeta(item)})` : ""}
               </SelectItem>
             ))}
           </SelectContent>

@@ -1,4 +1,5 @@
 import type { BranchStatus } from "@/types/branch";
+import type { ItemStructure, ProductType } from "@/types/product";
 
 export type BatchStatus =
   | "draft"
@@ -36,6 +37,11 @@ export type ProductionBatch = {
 
 export type ProductionBatchIngredient = {
   id: string;
+  componentProductId: string | null;
+  componentVariantId: string | null;
+  componentProductName: string | null;
+  componentVariantName: string | null;
+  componentProductType: ProductType | null;
   inventoryItemId: string;
   itemName: string;
   requiredQuantity: number;
@@ -51,6 +57,11 @@ export type ProductionBatchIngredient = {
 
 export type ProductionBatchPackaging = {
   id: string;
+  componentProductId: string | null;
+  componentVariantId: string | null;
+  componentProductName: string | null;
+  componentVariantName: string | null;
+  componentProductType: ProductType | null;
   packagingItemId: string;
   packagingName: string;
   requiredQuantity: number;
@@ -65,6 +76,10 @@ export type ProductionBatchPackaging = {
 
 export type ProductionOutput = {
   id: string;
+  productId: string | null;
+  productName: string | null;
+  productVariantId: string | null;
+  productVariantName: string | null;
   quantityProduced: number;
   unitName: string;
   unitCostSnapshot: number;
@@ -76,6 +91,12 @@ export type ProductionOutput = {
 
 export type ProductionWastage = {
   id: string;
+  componentProductId: string | null;
+  componentVariantId: string | null;
+  componentProductName: string | null;
+  componentVariantName: string | null;
+  componentProductType: ProductType | null;
+  inventoryItemId: string;
   itemName: string;
   wastageType: string;
   quantity: number;
@@ -99,6 +120,8 @@ export type ManufacturingProductOption = {
   id: string;
   productName: string;
   productCode: string;
+  productType: ProductType;
+  itemStructure: ItemStructure;
 };
 
 export type ManufacturingRecipeOption = {
@@ -116,6 +139,11 @@ export type ManufacturingRecipeOption = {
 
 export type ManufacturingInventoryOption = {
   id: string;
+  productId: string | null;
+  productName: string | null;
+  productVariantId: string | null;
+  productVariantName: string | null;
+  productType: ProductType | null;
   itemName: string;
   itemCode: string;
   unitName: string;

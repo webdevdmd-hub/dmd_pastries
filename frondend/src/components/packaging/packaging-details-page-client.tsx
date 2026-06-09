@@ -12,6 +12,7 @@ import { PackagingProfileCard } from "@/components/packaging/packaging-profile-c
 import { PackagingStatusBadge } from "@/components/packaging/packaging-status-badge";
 import { PackagingTableSkeleton } from "@/components/packaging/packaging-table-skeleton";
 import { PackagingUsageSection } from "@/components/packaging/packaging-usage-section";
+import { LegacyProductMasterNotice } from "@/components/shared/legacy-product-master-notice";
 import { Button } from "@/components/ui/button";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
@@ -106,6 +107,8 @@ export function PackagingDetailsPageClient({ packagingId }: { packagingId: strin
           </Button>
         ) : null}
       </div>
+
+      <LegacyProductMasterNotice kind="packaging" />
 
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <PackagingProfileCard item={item} />

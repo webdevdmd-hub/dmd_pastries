@@ -24,6 +24,7 @@ func DefaultChartAccountSeeds() []defaultAccountSeed {
 		{Code: "1000", Name: "Cash in Hand", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true},
 		{Code: "1010", Name: "Bank Account", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true},
 		{Code: "1020", Name: "Petty Cash", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true},
+		{Code: "1030", Name: "Card Clearing Account", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "1100", Name: "Accounts Receivable", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "1200", Name: "Inventory / Stock", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "1210", Name: "Work in Process Inventory", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},

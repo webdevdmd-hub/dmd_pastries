@@ -21,16 +21,6 @@ const overviewCards = [
     href: "/settings/master-data/product-categories",
   },
   {
-    label: "Ingredient Categories",
-    key: "ingredientCategoriesCount",
-    href: "/settings/master-data/ingredient-categories",
-  },
-  {
-    label: "Packaging Categories",
-    key: "packagingCategoriesCount",
-    href: "/settings/master-data/packaging-categories",
-  },
-  {
     label: "Order Statuses",
     key: "orderStatusesCount",
     href: "/settings/master-data/order-statuses",

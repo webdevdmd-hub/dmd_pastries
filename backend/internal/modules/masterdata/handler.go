@@ -261,7 +261,7 @@ func (h *Handler) UpdatePaymentStatusStatus(c *gin.Context) {
 
 func (h *Handler) ListProductCategories(c *gin.Context) {
 	currentUser := utils.MustAuthContext(c)
-	categories, err := h.service.ListProductCategories(currentUser)
+	categories, err := h.service.ListProductCategories(currentUser, c.Query("product_type"))
 	if err != nil {
 		handleError(c, err)
 		return

@@ -124,7 +124,7 @@ func (r *Repository) ActiveRecipe(tx *gorm.DB, businessID, branchID, recipeID st
 
 func (r *Repository) RecipeIngredients(tx *gorm.DB, businessID, branchID, recipeID string) ([]recipeIngredientInfo, error) {
 	var items []recipeIngredientInfo
-	err := tx.Table("recipe_ingredients").Select("id, ingredient_id, inventory_item_id, item_name_snapshot, quantity_required, unit_id, unit_cost_snapshot, total_cost, wastage_percentage").
+	err := tx.Table("recipe_ingredients").Select("id, component_product_id, component_variant_id, ingredient_id, inventory_item_id, item_name_snapshot, quantity_required, unit_id, unit_cost_snapshot, total_cost, wastage_percentage").
 		Where("recipe_id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", recipeID, businessID, branchID).
 		Order("sort_order ASC, created_at ASC").
 		Scan(&items).Error
@@ -133,7 +133,7 @@ func (r *Repository) RecipeIngredients(tx *gorm.DB, businessID, branchID, recipe
 
 func (r *Repository) RecipePackaging(tx *gorm.DB, businessID, branchID, recipeID string) ([]recipePackagingInfo, error) {
 	var items []recipePackagingInfo
-	err := tx.Table("recipe_packaging").Select("id, packaging_item_id, packaging_name_snapshot, quantity_required, unit_id, unit_cost_snapshot, total_cost, is_optional").
+	err := tx.Table("recipe_packaging").Select("id, component_product_id, component_variant_id, packaging_item_id, packaging_name_snapshot, quantity_required, unit_id, unit_cost_snapshot, total_cost, is_optional").
 		Where("recipe_id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", recipeID, businessID, branchID).
 		Order("sort_order ASC, created_at ASC").
 		Scan(&items).Error
@@ -142,7 +142,10 @@ func (r *Repository) RecipePackaging(tx *gorm.DB, businessID, branchID, recipeID
 
 func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string) (*productInfo, error) {
 	var product productInfo
-	err := tx.Table("products").Select("id, product_name, unit_id, is_expiry_tracked").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", productID, businessID, branchID).Take(&product).Error
+	err := tx.Table("products").
+		Select("id, product_name, unit_id, is_stock_tracked, is_expiry_tracked").
+		Where("id = ? AND business_id = ? AND branch_id = ? AND status = ? AND deleted_at IS NULL", productID, businessID, branchID, "active").
+		Take(&product).Error
 	return &product, err
 }
 
@@ -314,20 +317,24 @@ type productVariantInfo struct {
 }
 
 type recipeIngredientInfo struct {
-	ID                string
-	IngredientID      *string
-	InventoryItemID   *string
-	ItemNameSnapshot  string
-	QuantityRequired  float64
-	UnitID            string
-	UnitCostSnapshot  float64
-	TotalCost         float64
-	WastagePercentage float64
+	ID                 string
+	ComponentProductID *string
+	ComponentVariantID *string
+	IngredientID       *string
+	InventoryItemID    *string
+	ItemNameSnapshot   string
+	QuantityRequired   float64
+	UnitID             string
+	UnitCostSnapshot   float64
+	TotalCost          float64
+	WastagePercentage  float64
 }
 
 type recipePackagingInfo struct {
 	ID                    string
-	PackagingItemID       string
+	ComponentProductID    *string
+	ComponentVariantID    *string
+	PackagingItemID       *string
 	PackagingNameSnapshot string
 	QuantityRequired      float64
 	UnitID                string
@@ -340,6 +347,7 @@ type productInfo struct {
 	ID              string
 	ProductName     string
 	UnitID          string
+	IsStockTracked  bool
 	IsExpiryTracked bool
 }
 

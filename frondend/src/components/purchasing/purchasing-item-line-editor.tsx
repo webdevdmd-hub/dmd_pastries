@@ -15,10 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PRODUCT_TYPE_LABELS } from "@/types/product";
 import type {
   PurchaseItemLineDraft,
-  PurchaseItemType,
-  PurchasingIngredientOption,
   PurchasingProductOption,
   PurchasingTaxRateOption,
   PurchasingUnitOption,
@@ -28,7 +27,6 @@ type PurchasingItemLineEditorProps = {
   allowBatchFields?: boolean;
   lines: PurchaseItemLineDraft[];
   onLinesChange: (lines: PurchaseItemLineDraft[]) => void;
-  ingredients: PurchasingIngredientOption[];
   products: PurchasingProductOption[];
   taxRates: PurchasingTaxRateOption[];
   units: PurchasingUnitOption[];
@@ -40,11 +38,12 @@ function createLine(): PurchaseItemLineDraft {
     discountAmount: 0,
     expiryDate: null,
     ingredientId: null,
-    itemType: "product",
     itemNameSnapshot: null,
+    itemType: "product",
     lineId: crypto.randomUUID(),
     packagingItemId: null,
     productId: null,
+    productVariantId: null,
     quantity: 1,
     taxRateId: null,
     unitCost: 0,
@@ -85,7 +84,7 @@ function withSnapshotOption(
 
   return [
     {
-      description: "Saved from purchase document",
+      description: "Saved purchase item",
       keywords: [label],
       label,
       value: selectedValue,
@@ -98,7 +97,6 @@ export function PurchasingItemLineEditor({
   allowBatchFields = false,
   lines,
   onLinesChange,
-  ingredients,
   products,
   taxRates,
   units,
@@ -107,284 +105,264 @@ export function PurchasingItemLineEditor({
   const productOptions = useMemo<SearchableComboboxOption[]>(
     () =>
       products.map((product) => ({
-        value: product.id,
+        description: [
+          PRODUCT_TYPE_LABELS[product.productType],
+          product.productCode,
+          product.sku,
+          product.unitSymbol,
+        ]
+          .filter(Boolean)
+          .join(" / "),
+        keywords: [
+          product.productName,
+          product.productCode,
+          product.sku ?? "",
+          product.barcode ?? "",
+          PRODUCT_TYPE_LABELS[product.productType],
+        ],
         label: product.productName,
-        description: product.productCode,
-        keywords: [product.productName, product.productCode],
+        value: product.id,
       })),
     [products],
-  );
-  const ingredientOptions = useMemo<SearchableComboboxOption[]>(
-    () =>
-      ingredients.map((ingredient) => ({
-        value: ingredient.id,
-        label: ingredient.ingredientName,
-        description: [
-          ingredient.ingredientCode,
-          `${ingredient.unitName} (${ingredient.unitSymbol})`,
-          `AED ${ingredient.costPerUnit.toFixed(2)}`,
-        ].join(" · "),
-        keywords: [
-          ingredient.ingredientName,
-          ingredient.ingredientCode,
-          ingredient.unitName,
-          ingredient.unitSymbol,
-        ],
-      })),
-    [ingredients],
   );
   const unitOptions = useMemo<SearchableComboboxOption[]>(
     () =>
       units.map((unit) => ({
-        value: unit.id,
-        label: `${unit.unitName} (${unit.symbol})`,
         description: unit.symbol,
         keywords: [unit.unitName, unit.symbol],
+        label: `${unit.unitName} (${unit.symbol})`,
+        value: unit.id,
       })),
     [units],
   );
 
   return (
     <div className="space-y-3">
-      {safeLines.map((line, index) => (
-        <div
-          className="rounded-2xl border border-brand-cappuccino/60 bg-white/75 p-4"
-          key={line.lineId}
-        >
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-brand-espresso">Item line {index + 1}</p>
-            <Button
-              aria-label={`Remove item line ${String(index + 1)}`}
-              disabled={safeLines.length === 1}
-              onClick={() => onLinesChange(safeLines.filter((item) => item.lineId !== line.lineId))}
-              size="icon"
-              type="button"
-              variant="ghost"
-            >
-              <Trash2 className="h-4 w-4 text-red-700" />
-            </Button>
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <Select
-              value={line.itemType}
-              onValueChange={(itemType: PurchaseItemType) =>
-                onLinesChange(
-                  updateLine(safeLines, line.lineId, {
-                    ingredientId: null,
-                    itemType,
-                    itemNameSnapshot: null,
-                    packagingItemId: null,
-                    productId: null,
-                    unitCost: 0,
-                    unitId: "",
-                  }),
-                )
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Item type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="product">Product</SelectItem>
-                <SelectItem value="ingredient">Ingredient</SelectItem>
-                <SelectItem value="packaging">Packaging placeholder</SelectItem>
-              </SelectContent>
-            </Select>
-            {line.itemType === "ingredient" ? (
+      {safeLines.map((line, index) => {
+        const selectedProduct = products.find((product) => product.id === line.productId) ?? null;
+        const activeVariants =
+          selectedProduct?.variants.filter((variant) => variant.status === "active") ?? [];
+        const variantOptions = activeVariants.map((variant) => ({
+          description: [variant.sku, variant.barcode].filter(Boolean).join(" / "),
+          keywords: [variant.variantName, variant.sku ?? "", variant.barcode ?? ""],
+          label: variant.variantName,
+          value: variant.id,
+        }));
+        const isLegacyLine =
+          line.itemType !== "product" || (!line.productId && Boolean(line.itemNameSnapshot));
+
+        return (
+          <div
+            className="rounded-2xl border border-brand-cappuccino/60 bg-white/75 p-4"
+            key={line.lineId}
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-brand-espresso">Item line {index + 1}</p>
+                {isLegacyLine ? (
+                  <p className="text-xs text-amber-700">
+                    Legacy item saved as {line.itemNameSnapshot ?? "purchase item"}. Select a
+                    Product Master item before saving changes.
+                  </p>
+                ) : null}
+              </div>
+              <Button
+                aria-label={`Remove item line ${String(index + 1)}`}
+                disabled={safeLines.length === 1}
+                onClick={() =>
+                  onLinesChange(safeLines.filter((item) => item.lineId !== line.lineId))
+                }
+                size="icon"
+                type="button"
+                variant="ghost"
+              >
+                <Trash2 className="h-4 w-4 text-red-700" />
+              </Button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
               <SearchableCombobox
-                emptyMessage="No matching ingredients found."
-                onValueChange={(ingredientId) => {
-                  const selected = ingredients.find((ingredient) => ingredient.id === ingredientId);
+                emptyMessage="No matching Product Master items found."
+                onValueChange={(productId) => {
+                  const selected = products.find((product) => product.id === productId);
                   onLinesChange(
                     updateLine(safeLines, line.lineId, {
-                      ingredientId: ingredientId.length === 0 ? null : ingredientId,
+                      ingredientId: null,
                       itemNameSnapshot:
-                        ingredientId.length === 0 ? null : (selected?.ingredientName ?? null),
-                      unitCost: selected?.costPerUnit ?? line.unitCost,
+                        productId.length === 0 ? null : (selected?.productName ?? null),
+                      itemType: "product",
+                      packagingItemId: null,
+                      productId: productId.length === 0 ? null : productId,
+                      productVariantId: null,
+                      unitCost: selected?.costPrice ?? line.unitCost,
                       unitId: selected?.unitId ?? line.unitId,
                     }),
                   );
                 }}
                 options={withSnapshotOption(
-                  ingredientOptions,
-                  line.ingredientId ?? "",
+                  productOptions,
+                  line.productId ?? "",
                   line.itemNameSnapshot,
                 )}
-                placeholder="Select ingredient"
-                searchPlaceholder="Search ingredient, code, unit..."
-                value={line.ingredientId ?? ""}
+                placeholder={line.itemNameSnapshot ?? "Select Product Master item"}
+                searchPlaceholder="Search product, code, SKU, barcode..."
+                value={line.productId ?? ""}
               />
-            ) : (
+              {selectedProduct && activeVariants.length > 0 ? (
+                <SearchableCombobox
+                  emptyMessage="No matching variants found."
+                  onValueChange={(productVariantId) => {
+                    const selectedVariant = activeVariants.find(
+                      (variant) => variant.id === productVariantId,
+                    );
+                    onLinesChange(
+                      updateLine(safeLines, line.lineId, {
+                        itemNameSnapshot:
+                          productVariantId.length === 0
+                            ? selectedProduct.productName
+                            : `${selectedProduct.productName} / ${selectedVariant?.variantName ?? "Variant"}`,
+                        productVariantId: productVariantId.length === 0 ? null : productVariantId,
+                        unitCost: selectedVariant?.costPrice ?? line.unitCost,
+                      }),
+                    );
+                  }}
+                  options={variantOptions}
+                  placeholder="Select variant"
+                  searchPlaceholder="Search variant, SKU, barcode..."
+                  value={line.productVariantId ?? ""}
+                />
+              ) : null}
               <SearchableCombobox
-                disabled={line.itemType === "packaging"}
-                emptyMessage={
-                  line.itemType === "packaging"
-                    ? "Packaging item was saved from the purchase document."
-                    : "No matching products found."
+                emptyMessage="No matching units found."
+                onValueChange={(unitId) =>
+                  onLinesChange(updateLine(safeLines, line.lineId, { unitId }))
                 }
-                onValueChange={(productId) => {
-                  const selected = products.find((product) => product.id === productId);
+                options={unitOptions}
+                placeholder="Select unit"
+                searchPlaceholder="Search unit..."
+                value={line.unitId}
+              />
+              <div className="space-y-2">
+                <label
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha"
+                  htmlFor={`purchase-line-${line.lineId}-quantity`}
+                >
+                  Quantity
+                </label>
+                <Input
+                  aria-label="Quantity"
+                  id={`purchase-line-${line.lineId}-quantity`}
+                  min="0"
+                  onChange={(event) =>
+                    onLinesChange(
+                      updateLine(safeLines, line.lineId, { quantity: Number(event.target.value) }),
+                    )
+                  }
+                  placeholder="Enter quantity"
+                  type="number"
+                  value={line.quantity}
+                />
+              </div>
+              <div className="space-y-2">
+                <label
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha"
+                  htmlFor={`purchase-line-${line.lineId}-unit-cost`}
+                >
+                  Unit cost
+                </label>
+                <Input
+                  aria-label="Unit cost"
+                  id={`purchase-line-${line.lineId}-unit-cost`}
+                  min="0"
+                  onChange={(event) =>
+                    onLinesChange(
+                      updateLine(safeLines, line.lineId, { unitCost: Number(event.target.value) }),
+                    )
+                  }
+                  placeholder="Cost per unit"
+                  type="number"
+                  value={line.unitCost}
+                />
+              </div>
+              <div className="space-y-2">
+                <label
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha"
+                  htmlFor={`purchase-line-${line.lineId}-discount`}
+                >
+                  Discount amount
+                </label>
+                <Input
+                  aria-label="Discount amount"
+                  id={`purchase-line-${line.lineId}-discount`}
+                  min="0"
+                  onChange={(event) =>
+                    onLinesChange(
+                      updateLine(safeLines, line.lineId, {
+                        discountAmount: Number(event.target.value),
+                      }),
+                    )
+                  }
+                  placeholder="Optional discount"
+                  type="number"
+                  value={line.discountAmount}
+                />
+              </div>
+              <Select
+                value={line.taxRateId ?? "none"}
+                onValueChange={(taxRateId) =>
                   onLinesChange(
                     updateLine(safeLines, line.lineId, {
-                      itemNameSnapshot:
-                        productId.length === 0 ? null : (selected?.productName ?? null),
-                      productId: productId.length === 0 ? null : productId,
+                      taxRateId: taxRateId === "none" ? null : taxRateId,
                     }),
-                  );
-                }}
-                options={
-                  line.itemType === "product"
-                    ? withSnapshotOption(
-                        productOptions,
-                        line.productId ?? "",
-                        line.itemNameSnapshot,
+                  )
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Tax rate" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No tax</SelectItem>
+                  {taxRates.map((rate) => (
+                    <SelectItem key={rate.id} value={rate.id}>
+                      {rate.taxName} ({rate.taxPercentage}%)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {allowBatchFields ? (
+                <>
+                  <Input
+                    aria-label="Expiry date"
+                    onChange={(event) =>
+                      onLinesChange(
+                        updateLine(safeLines, line.lineId, {
+                          expiryDate: event.target.value || null,
+                        }),
                       )
-                    : withSnapshotOption([], line.packagingItemId ?? "", line.itemNameSnapshot)
-                }
-                placeholder={
-                  line.itemType === "packaging"
-                    ? (line.itemNameSnapshot ?? "Packaging item pending")
-                    : "Select product"
-                }
-                searchPlaceholder="Search product, code..."
-                value={
-                  line.itemType === "packaging"
-                    ? (line.packagingItemId ?? "")
-                    : (line.productId ?? "")
-                }
-              />
-            )}
-            <SearchableCombobox
-              emptyMessage="No matching units found."
-              onValueChange={(unitId) =>
-                onLinesChange(updateLine(safeLines, line.lineId, { unitId }))
-              }
-              options={unitOptions}
-              placeholder="Select unit"
-              searchPlaceholder="Search unit..."
-              value={line.unitId}
-            />
-            <div className="space-y-2">
-              <label
-                className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha"
-                htmlFor={`purchase-line-${line.lineId}-quantity`}
-              >
-                Quantity
-              </label>
-              <Input
-                aria-label="Quantity"
-                id={`purchase-line-${line.lineId}-quantity`}
-                min="0"
-                onChange={(event) =>
-                  onLinesChange(
-                    updateLine(safeLines, line.lineId, { quantity: Number(event.target.value) }),
-                  )
-                }
-                placeholder="Enter quantity"
-                type="number"
-                value={line.quantity}
-              />
+                    }
+                    type="date"
+                    value={line.expiryDate ?? ""}
+                  />
+                  <Input
+                    aria-label="Batch number"
+                    onChange={(event) =>
+                      onLinesChange(
+                        updateLine(safeLines, line.lineId, {
+                          batchNumber: event.target.value || null,
+                        }),
+                      )
+                    }
+                    placeholder="Batch number"
+                    value={line.batchNumber ?? ""}
+                  />
+                </>
+              ) : null}
             </div>
-            <div className="space-y-2">
-              <label
-                className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha"
-                htmlFor={`purchase-line-${line.lineId}-unit-cost`}
-              >
-                Unit cost
-              </label>
-              <Input
-                aria-label="Unit cost"
-                id={`purchase-line-${line.lineId}-unit-cost`}
-                min="0"
-                onChange={(event) =>
-                  onLinesChange(
-                    updateLine(safeLines, line.lineId, { unitCost: Number(event.target.value) }),
-                  )
-                }
-                placeholder="Cost per unit"
-                type="number"
-                value={line.unitCost}
-              />
-            </div>
-            <div className="space-y-2">
-              <label
-                className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha"
-                htmlFor={`purchase-line-${line.lineId}-discount`}
-              >
-                Discount amount
-              </label>
-              <Input
-                aria-label="Discount amount"
-                id={`purchase-line-${line.lineId}-discount`}
-                min="0"
-                onChange={(event) =>
-                  onLinesChange(
-                    updateLine(safeLines, line.lineId, {
-                      discountAmount: Number(event.target.value),
-                    }),
-                  )
-                }
-                placeholder="Optional discount"
-                type="number"
-                value={line.discountAmount}
-              />
-            </div>
-            <Select
-              value={line.taxRateId ?? "none"}
-              onValueChange={(taxRateId) =>
-                onLinesChange(
-                  updateLine(safeLines, line.lineId, {
-                    taxRateId: taxRateId === "none" ? null : taxRateId,
-                  }),
-                )
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Tax rate" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No tax</SelectItem>
-                {taxRates.map((rate) => (
-                  <SelectItem key={rate.id} value={rate.id}>
-                    {rate.taxName} ({rate.taxPercentage}%)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {allowBatchFields ? (
-              <>
-                <Input
-                  aria-label="Expiry date"
-                  onChange={(event) =>
-                    onLinesChange(
-                      updateLine(safeLines, line.lineId, {
-                        expiryDate: event.target.value || null,
-                      }),
-                    )
-                  }
-                  type="date"
-                  value={line.expiryDate ?? ""}
-                />
-                <Input
-                  aria-label="Batch number"
-                  onChange={(event) =>
-                    onLinesChange(
-                      updateLine(safeLines, line.lineId, {
-                        batchNumber: event.target.value || null,
-                      }),
-                    )
-                  }
-                  placeholder="Batch number"
-                  value={line.batchNumber ?? ""}
-                />
-              </>
-            ) : null}
+            <p className="mt-3 text-right text-sm font-semibold text-brand-espresso">
+              Estimated line total: AED {lineTotal(line, taxRates).toFixed(2)}
+            </p>
           </div>
-          <p className="mt-3 text-right text-sm font-semibold text-brand-espresso">
-            Estimated line total: AED {lineTotal(line, taxRates).toFixed(2)}
-          </p>
-        </div>
-      ))}
+        );
+      })}
       <Button
         onClick={() => onLinesChange([...safeLines, createLine()])}
         type="button"

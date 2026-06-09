@@ -220,6 +220,15 @@ func (h *Handler) CreatePaymentAccount(c *gin.Context) {
 	response.Success(c, 201, "payment account created successfully", result)
 }
 
+func (h *Handler) SeedDefaultPaymentAccounts(c *gin.Context) {
+	result, err := h.service.SeedDefaultPaymentAccounts(utils.MustAuthContext(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "default payment accounts seeded successfully", result)
+}
+
 func (h *Handler) GetPaymentAccount(c *gin.Context) {
 	if !validUUIDParam(c, "id") {
 		return

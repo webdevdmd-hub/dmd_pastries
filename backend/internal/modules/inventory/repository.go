@@ -532,11 +532,25 @@ func (r *Repository) ValidateProduct(businessID, productID string) error {
 	return nil
 }
 
+func (r *Repository) ValidateStockTrackedProduct(businessID, branchID, productID string) error {
+	var count int64
+	err := r.db.Table("products").
+		Where("id = ? AND business_id = ? AND branch_id = ? AND status = ? AND is_stock_tracked = true AND deleted_at IS NULL", productID, businessID, branchID, "active").
+		Count(&count).Error
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func (r *Repository) ValidateProductVariant(businessID, branchID, productID, variantID string) error {
 	var count int64
 	err := r.db.Table("product_variants pv").
 		Joins("JOIN products p ON p.id = pv.product_id AND p.business_id = pv.business_id").
-		Where("pv.id = ? AND pv.product_id = ? AND pv.business_id = ? AND p.branch_id = ? AND pv.status = ? AND pv.deleted_at IS NULL AND p.deleted_at IS NULL", variantID, productID, businessID, branchID, "active").
+		Where("pv.id = ? AND pv.product_id = ? AND pv.business_id = ? AND p.branch_id = ? AND pv.status = ? AND p.status = ? AND p.is_stock_tracked = true AND pv.deleted_at IS NULL AND p.deleted_at IS NULL", variantID, productID, businessID, branchID, "active", "active").
 		Count(&count).Error
 	if err != nil {
 		return err
@@ -916,7 +930,7 @@ type inventoryCatalogRow struct {
 }
 
 func inventoryCatalogUnionSQL(businessID string, query InventoryListQuery, countOnly bool) (string, []interface{}) {
-	args := []interface{}{businessID, businessID, businessID, businessID, businessID}
+	args := []interface{}{businessID, businessID, businessID}
 	selectClause := "*"
 	if countOnly {
 		selectClause = "COUNT(*)"
@@ -1049,90 +1063,6 @@ WITH inventory_catalog AS (
       WHERE ii.business_id = pv.business_id AND ii.branch_id = p.branch_id
         AND ii.item_type = 'product_variant' AND ii.product_id = p.id
         AND ii.product_variant_id = pv.id AND ii.deleted_at IS NULL
-    )
-
-  UNION ALL
-
-  SELECT
-    '' AS id,
-    ing.business_id::text AS business_id,
-    ing.branch_id::text AS branch_id,
-    b.branch_name,
-    NULL AS product_id,
-    NULL AS product_variant_id,
-    '' AS variant_name,
-    ing.id::text AS ingredient_id,
-    NULL AS packaging_item_id,
-    'ingredient' AS item_type,
-    ing.ingredient_name AS item_name,
-    COALESCE(ing.ingredient_code, '') AS sku,
-    '' AS barcode,
-    0::numeric AS current_quantity,
-    0::numeric AS reserved_quantity,
-    0::numeric AS available_quantity,
-    0::numeric AS average_unit_cost,
-    0::numeric AS inventory_value,
-    ing.reorder_level,
-    ing.unit_id::text AS unit_id,
-    u.unit_name,
-    u.symbol AS unit_symbol,
-    ing.is_expiry_tracked,
-    ing.status,
-    'not_initialized' AS inventory_status,
-    true AS can_add_opening_stock,
-    ing.created_at,
-    ing.updated_at
-  FROM ingredients ing
-  JOIN branches b ON b.id = ing.branch_id
-  JOIN units u ON u.id = ing.unit_id
-  WHERE ing.business_id = ? AND ing.is_stock_tracked = true AND ing.deleted_at IS NULL
-    AND NOT EXISTS (
-      SELECT 1 FROM inventory_items ii
-      WHERE ii.business_id = ing.business_id AND ii.branch_id = ing.branch_id
-        AND ii.item_type = 'ingredient' AND ii.ingredient_id = ing.id
-        AND ii.deleted_at IS NULL
-    )
-
-  UNION ALL
-
-  SELECT
-    '' AS id,
-    pi.business_id::text AS business_id,
-    pi.branch_id::text AS branch_id,
-    b.branch_name,
-    NULL AS product_id,
-    NULL AS product_variant_id,
-    '' AS variant_name,
-    NULL AS ingredient_id,
-    pi.id::text AS packaging_item_id,
-    'packaging' AS item_type,
-    pi.packaging_name AS item_name,
-    COALESCE(pi.packaging_code, '') AS sku,
-    '' AS barcode,
-    0::numeric AS current_quantity,
-    0::numeric AS reserved_quantity,
-    0::numeric AS available_quantity,
-    0::numeric AS average_unit_cost,
-    0::numeric AS inventory_value,
-    pi.reorder_level,
-    pi.unit_id::text AS unit_id,
-    u.unit_name,
-    u.symbol AS unit_symbol,
-    false AS is_expiry_tracked,
-    pi.status,
-    'not_initialized' AS inventory_status,
-    true AS can_add_opening_stock,
-    pi.created_at,
-    pi.updated_at
-  FROM packaging_items pi
-  JOIN branches b ON b.id = pi.branch_id
-  JOIN units u ON u.id = pi.unit_id
-  WHERE pi.business_id = ? AND pi.is_stock_tracked = true AND pi.deleted_at IS NULL
-    AND NOT EXISTS (
-      SELECT 1 FROM inventory_items ii
-      WHERE ii.business_id = pi.business_id AND ii.branch_id = pi.branch_id
-        AND ii.item_type = 'packaging' AND ii.packaging_item_id = pi.id
-        AND ii.deleted_at IS NULL
     )
 )
 SELECT ` + selectClause + ` FROM inventory_catalog WHERE 1 = 1`

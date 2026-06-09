@@ -604,7 +604,7 @@ func (s *Service) LoginSync(jwt, ipAddress, userAgent string) (*AuthProfileRespo
 }
 
 func (s *Service) Me(currentUser *utils.AuthContext) (*AuthProfileResponse, error) {
-	return s.buildProfile(currentUser.AppwriteUserID)
+	return s.buildProfileByUserID(currentUser.UserID, currentUser.BusinessID)
 }
 
 func (s *Service) RequestPasswordReset(req PasswordResetRequest) error {
@@ -631,24 +631,37 @@ func (s *Service) AuthenticateToken(token string) (*utils.AuthContext, error) {
 		return nil, apperrors.Unauthorized("invalid Appwrite token")
 	}
 
-	user, err := s.resolveLocalUserForIdentity(s.db, identity)
+	tx := s.db.Begin()
+	if tx.Error != nil {
+		return nil, apperrors.Internal("failed to start auth transaction")
+	}
+
+	user, err := s.resolveLocalUserForIdentity(tx, identity)
 	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
 	if user.Status != "active" {
+		tx.Rollback()
 		return nil, apperrors.Forbidden("user is inactive")
 	}
 
 	if err := s.ensureEmailVerification(identity); err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
 	if user.EmailVerified != identity.EmailVerified {
-		if err := s.userRepo.UpdateEmailVerified(s.db, user.ID, identity.EmailVerified); err != nil {
+		if err := s.userRepo.UpdateEmailVerified(tx, user.ID, identity.EmailVerified); err != nil {
+			tx.Rollback()
 			return nil, apperrors.Internal("failed to sync email verification status")
 		}
 		user.EmailVerified = identity.EmailVerified
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, apperrors.Internal("failed to commit auth transaction")
 	}
 
 	permissionKeys, err := s.roleRepo.GetPermissionKeysByRoleID(user.RoleID)
@@ -717,13 +730,16 @@ func (s *Service) syncProfile(identity *utils.AppwriteIdentity, ipAddress, userA
 		return nil, apperrors.Internal("failed to commit login sync")
 	}
 
-	return s.buildProfile(identity.ID)
+	return s.buildProfileByUserID(user.ID, user.BusinessID)
 }
 
 func (s *Service) resolveLocalUserForIdentity(tx *gorm.DB, identity *utils.AppwriteIdentity) (*users.User, error) {
-	user, err := s.repo.FindUserByAppwriteUserID(identity.ID)
+	var user users.User
+	err := tx.Preload("Role").
+		Where("appwrite_user_id = ?", identity.ID).
+		First(&user).Error
 	if err == nil {
-		return user, nil
+		return &user, nil
 	}
 	if err != gorm.ErrRecordNotFound {
 		return nil, apperrors.Internal("failed to load local user")
@@ -731,21 +747,25 @@ func (s *Service) resolveLocalUserForIdentity(tx *gorm.DB, identity *utils.Appwr
 
 	email := strings.ToLower(strings.TrimSpace(identity.Email))
 	if email == "" {
-		return nil, apperrors.Unauthorized("user is not registered locally")
+		return nil, apperrors.Unauthorized("authenticated Appwrite user is not linked to a local employee account")
 	}
 
-	matches, err := s.repo.FindUsersByEmail(email)
-	if err != nil {
+	var matches []users.User
+	if err := tx.Preload("Role").
+		Where("LOWER(email) = ?", email).
+		Order("created_at DESC").
+		Limit(2).
+		Find(&matches).Error; err != nil {
 		return nil, apperrors.Internal("failed to load local user")
 	}
 	if len(matches) == 0 {
-		return nil, apperrors.Unauthorized("user is not registered locally")
+		return nil, apperrors.Unauthorized("authenticated Appwrite user is not registered in this business")
 	}
 	if len(matches) > 1 {
 		return nil, apperrors.Unauthorized("multiple local users found for this email; contact support")
 	}
 
-	user = &matches[0]
+	user = matches[0]
 	if user.AppwriteUserID != identity.ID {
 		if err := s.userRepo.UpdateAppwriteUserID(tx, user.ID, identity.ID); err != nil {
 			return nil, apperrors.Internal("failed to relink local user")
@@ -753,7 +773,7 @@ func (s *Service) resolveLocalUserForIdentity(tx *gorm.DB, identity *utils.Appwr
 		user.AppwriteUserID = identity.ID
 	}
 
-	return user, nil
+	return &user, nil
 }
 
 func (s *Service) LogoutSync(currentUser *utils.AuthContext, ipAddress, userAgent string) error {
@@ -786,8 +806,8 @@ func (s *Service) ensureEmailVerification(identity *utils.AppwriteIdentity) erro
 	return nil
 }
 
-func (s *Service) buildProfile(appwriteUserID string) (*AuthProfileResponse, error) {
-	user, err := s.repo.FindUserByAppwriteUserID(appwriteUserID)
+func (s *Service) buildProfileByUserID(userID, businessID string) (*AuthProfileResponse, error) {
+	user, err := s.userRepo.FindByIDAndBusinessID(userID, businessID)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, apperrors.NotFound("user not found")

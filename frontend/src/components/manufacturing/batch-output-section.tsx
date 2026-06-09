@@ -23,6 +23,11 @@ function formatMoney(value: number): string {
   }).format(value);
 }
 
+function outputMeta(output: ProductionOutput): string | null {
+  const label = output.productVariantName ?? output.productName;
+  return label ?? null;
+}
+
 export function BatchOutputSection({
   canManage,
   onProduce,
@@ -55,6 +60,9 @@ export function BatchOutputSection({
                 <p className="font-semibold text-brand-espresso">
                   {output.quantityProduced} {output.unitName}
                 </p>
+                {outputMeta(output) ? (
+                  <p className="text-sm text-brand-mocha">{outputMeta(output)}</p>
+                ) : null}
                 <p className="text-sm text-brand-mocha">{formatDate(output.createdAt)}</p>
                 {output.totalCost > 0 ? (
                   <p className="mt-1 text-xs font-semibold text-brand-espresso">

@@ -4,6 +4,7 @@ import (
 	"gorm.io/gorm"
 
 	apperrors "pastries-pos/internal/shared/errors"
+	"pastries-pos/internal/shared/utils"
 )
 
 type Repository struct {
@@ -16,6 +17,26 @@ func NewRepository(db *gorm.DB) *Repository {
 
 func (r *Repository) CreateProductCategory(tx *gorm.DB, category *ProductCategory) error {
 	return tx.Create(category).Error
+}
+
+func (r *Repository) ReplaceProductCategoryAllowedTypes(tx *gorm.DB, businessID, branchID, categoryID string, productTypes []string) error {
+	if err := tx.Where("product_category_id = ? AND business_id = ? AND branch_id = ?", categoryID, businessID, branchID).Delete(&ProductCategoryAllowedType{}).Error; err != nil {
+		return err
+	}
+	rows := make([]ProductCategoryAllowedType, 0, len(productTypes))
+	for _, productType := range productTypes {
+		rows = append(rows, ProductCategoryAllowedType{
+			ID:                utils.NewUUID(),
+			BusinessID:        businessID,
+			BranchID:          branchID,
+			ProductCategoryID: categoryID,
+			ProductType:       productType,
+		})
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	return tx.Create(&rows).Error
 }
 
 func (r *Repository) ListUnitCategories() ([]UnitCategory, error) {
@@ -169,9 +190,14 @@ func (r *Repository) UpdatePaymentStatus(tx *gorm.DB, id, businessID string, upd
 	return nil
 }
 
-func (r *Repository) ListProductCategories(businessID, branchID string) ([]ProductCategory, error) {
+func (r *Repository) ListProductCategories(businessID, branchID, productType string) ([]ProductCategory, error) {
 	var categories []ProductCategory
-	err := r.db.Where("business_id = ? AND branch_id = ? AND deleted_at IS NULL", businessID, branchID).Order("sort_order ASC, category_name ASC").Find(&categories).Error
+	query := r.db.Model(&ProductCategory{}).
+		Where("product_categories.business_id = ? AND product_categories.branch_id = ? AND product_categories.deleted_at IS NULL", businessID, branchID)
+	if productType != "" {
+		query = query.Joins("JOIN product_category_allowed_types pcat ON pcat.product_category_id = product_categories.id AND pcat.product_type = ?", productType)
+	}
+	err := query.Order("sort_order ASC, category_name ASC").Find(&categories).Error
 	return categories, err
 }
 
@@ -190,6 +216,32 @@ func (r *Repository) FindProductCategory(id, businessID, branchID string) (*Prod
 		return nil, err
 	}
 	return &category, nil
+}
+
+func (r *Repository) ProductCategoryAllowedTypes(businessID, branchID string, categoryIDs []string) (map[string][]string, error) {
+	result := make(map[string][]string, len(categoryIDs))
+	if len(categoryIDs) == 0 {
+		return result, nil
+	}
+	var rows []ProductCategoryAllowedType
+	err := r.db.Where("business_id = ? AND branch_id = ? AND product_category_id IN ?", businessID, branchID, categoryIDs).
+		Order("product_type ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.ProductCategoryID] = append(result[row.ProductCategoryID], row.ProductType)
+	}
+	return result, nil
+}
+
+func (r *Repository) CategoryAllowsProductType(businessID, branchID, categoryID, productType string) (bool, error) {
+	var count int64
+	err := r.db.Table("product_category_allowed_types").
+		Where("business_id = ? AND branch_id = ? AND product_category_id = ? AND product_type = ?", businessID, branchID, categoryID, productType).
+		Count(&count).Error
+	return count > 0, err
 }
 
 func (r *Repository) FindActiveBranchTx(tx *gorm.DB, branchID, businessID string) error {

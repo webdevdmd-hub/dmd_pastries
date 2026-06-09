@@ -37,7 +37,6 @@ import {
   usePostPurchaseInvoice,
   usePurchaseInvoices,
   usePurchasingBranches,
-  usePurchasingIngredients,
   usePurchasingProducts,
   usePurchasingSuppliers,
   usePurchasingTaxRates,
@@ -110,7 +109,6 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const branchesQuery = usePurchasingBranches(canView);
   const productsQuery = usePurchasingProducts(canView);
-  const ingredientsQuery = usePurchasingIngredients(canView);
   const unitsQuery = usePurchasingUnits(canView);
   const taxRatesQuery = usePurchasingTaxRates(canView);
   const createMutation = useCreatePurchaseInvoice();
@@ -315,7 +313,6 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
 
       <PurchaseInvoiceFormDialog
         branches={branchesQuery.data ?? []}
-        ingredients={ingredientsQuery.data ?? []}
         invoice={editingInvoice}
         isSubmitting={
           createMutation.isPending || updateMutation.isPending || loadingInvoiceDetailId !== null
@@ -335,7 +332,6 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
 
       <PurchaseReceiveDialog
         branches={branchesQuery.data ?? []}
-        ingredients={ingredientsQuery.data ?? []}
         invoice={receivingInvoice}
         isSubmitting={receiveMutation.isPending || loadingInvoiceDetailId !== null}
         onClose={() => setReceivingInvoice(null)}

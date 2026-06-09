@@ -23,28 +23,6 @@ func SeedDefaults(tx *gorm.DB, businessID, branchID string) error {
 	if err := seedProductCategories(tx, businessID, branchID); err != nil {
 		return err
 	}
-	if err := seedSimpleCategoryDefaults(tx, "ingredient_categories", businessID, branchID, []simpleCategorySeed{
-		{Name: "Flour"},
-		{Name: "Sugar"},
-		{Name: "Dairy"},
-		{Name: "Chocolate"},
-		{Name: "Flavoring"},
-		{Name: "Fruits"},
-		{Name: "Dry Ingredients"},
-	}); err != nil {
-		return err
-	}
-	if err := seedSimpleCategoryDefaults(tx, "packaging_categories", businessID, branchID, []simpleCategorySeed{
-		{Name: "Cake Boxes"},
-		{Name: "Cups"},
-		{Name: "Trays"},
-		{Name: "Bags"},
-		{Name: "Stickers"},
-		{Name: "Candles"},
-		{Name: "Labels"},
-	}); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -194,42 +172,65 @@ func EnsureWorkflowStatusDefaults(tx *gorm.DB) error {
 
 func seedProductCategories(tx *gorm.DB, businessID, branchID string) error {
 	seeds := []struct {
-		Name      string
-		Code      string
-		SortOrder int
+		Name                string
+		Code                string
+		SortOrder           int
+		AllowedProductTypes []string
 	}{
-		{Name: "Cakes", Code: "CAKES", SortOrder: 10},
-		{Name: "Pastries", Code: "PASTRIES", SortOrder: 20},
-		{Name: "Beverages", Code: "BEVERAGES", SortOrder: 30},
-		{Name: "Snacks", Code: "SNACKS", SortOrder: 40},
-		{Name: "Retail Items", Code: "RETAIL_ITEMS", SortOrder: 50},
+		{Name: "Cakes", Code: "CAKES", SortOrder: 10, AllowedProductTypes: []string{"finished_product"}},
+		{Name: "Pastries", Code: "PASTRIES", SortOrder: 20, AllowedProductTypes: []string{"finished_product"}},
+		{Name: "Beverages", Code: "BEVERAGES", SortOrder: 30, AllowedProductTypes: []string{"finished_product"}},
+		{Name: "Ingredients", Code: "INGREDIENTS", SortOrder: 40, AllowedProductTypes: []string{"ingredient", "raw_material"}},
+		{Name: "Packaging", Code: "PACKAGING", SortOrder: 50, AllowedProductTypes: []string{"packaging"}},
+		{Name: "Semi Finished", Code: "SEMI_FINISHED", SortOrder: 60, AllowedProductTypes: []string{"semi_finished"}},
+		{Name: "Consumables", Code: "CONSUMABLES", SortOrder: 70, AllowedProductTypes: []string{"consumable"}},
 	}
 
 	now := time.Now().UTC()
 	for _, seed := range seeds {
-		var count int64
+		var category ProductCategory
 		if err := tx.Model(&ProductCategory{}).
 			Where("business_id = ? AND branch_id = ? AND LOWER(category_name) = LOWER(?) AND deleted_at IS NULL", businessID, branchID, seed.Name).
-			Count(&count).Error; err != nil {
+			First(&category).Error; err != nil && err != gorm.ErrRecordNotFound {
 			return err
+		} else if err == gorm.ErrRecordNotFound {
+			category = ProductCategory{
+				ID:           utils.NewUUID(),
+				BusinessID:   businessID,
+				BranchID:     branchID,
+				CategoryName: seed.Name,
+				CategoryCode: seed.Code,
+				SortOrder:    seed.SortOrder,
+				Status:       "active",
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			}
+			if err := tx.Create(&category).Error; err != nil {
+				return err
+			}
 		}
-		if count > 0 {
-			continue
-		}
-
-		category := ProductCategory{
-			ID:           utils.NewUUID(),
-			BusinessID:   businessID,
-			BranchID:     branchID,
-			CategoryName: seed.Name,
-			CategoryCode: seed.Code,
-			SortOrder:    seed.SortOrder,
-			Status:       "active",
-			CreatedAt:    now,
-			UpdatedAt:    now,
-		}
-		if err := tx.Create(&category).Error; err != nil {
-			return err
+		for _, productType := range seed.AllowedProductTypes {
+			var count int64
+			if err := tx.Model(&ProductCategoryAllowedType{}).
+				Where("product_category_id = ? AND product_type = ?", category.ID, productType).
+				Count(&count).Error; err != nil {
+				return err
+			}
+			if count > 0 {
+				continue
+			}
+			allowedType := ProductCategoryAllowedType{
+				ID:                utils.NewUUID(),
+				BusinessID:        businessID,
+				BranchID:          branchID,
+				ProductCategoryID: category.ID,
+				ProductType:       productType,
+				CreatedAt:         now,
+				UpdatedAt:         now,
+			}
+			if err := tx.Create(&allowedType).Error; err != nil {
+				return err
+			}
 		}
 	}
 	return nil

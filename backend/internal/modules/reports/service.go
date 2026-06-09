@@ -255,6 +255,7 @@ func (s *Service) PackagingStock(currentUser *utils.AuthContext, values url.Valu
 	if err != nil {
 		return nil, err
 	}
+	filter.ItemType = ""
 	return s.repo.PackagingStock(filter)
 }
 

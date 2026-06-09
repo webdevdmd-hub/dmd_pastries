@@ -14,11 +14,10 @@ import {
   deleteRecipePackaging,
   getRecipeById,
   getRecipeByProduct,
+  getRecipeComponentProducts,
   getRecipeCost,
   getRecipeIngredients,
-  getRecipeInventoryItems,
   getRecipePackaging,
-  getRecipePackagingItems,
   getRecipeProducts,
   getRecipes,
   getRecipeUnits,
@@ -38,9 +37,7 @@ import type {
   RecipeFilters,
   RecipeIngredientLine,
   RecipeIngredientPayload,
-  RecipeInventoryItemOption,
   RecipePackagingLine,
-  RecipePackagingOption,
   RecipePackagingPayload,
   RecipeProductOption,
   RecipeUnitOption,
@@ -177,21 +174,19 @@ export function useRecipeReferenceData(enabled = true) {
   const branchQueryKey = useBranchQueryKey();
 
   return useQuery<{
-    inventoryItems: RecipeInventoryItemOption[];
-    packagingItems: RecipePackagingOption[];
+    componentProducts: RecipeProductOption[];
     products: RecipeProductOption[];
     units: RecipeUnitOption[];
   }>({
     queryKey: [recipeQueryKey, branchQueryKey, "reference-data"],
     queryFn: async () => {
-      const [products, inventoryItems, packagingItems, units] = await Promise.all([
+      const [products, componentProducts, units] = await Promise.all([
         getRecipeProducts(),
-        getRecipeInventoryItems(),
-        getRecipePackagingItems(),
+        getRecipeComponentProducts(),
         getRecipeUnits(),
       ]);
 
-      return { inventoryItems, packagingItems, products, units };
+      return { componentProducts, products, units };
     },
     enabled,
   });

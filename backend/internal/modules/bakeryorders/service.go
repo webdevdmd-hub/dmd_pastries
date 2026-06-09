@@ -355,18 +355,18 @@ func (s *Service) ConvertItemToProduct(currentUser *utils.AuthContext, orderID, 
 		if err := validateUUID(req.UnitID, "unit_id"); err != nil {
 			return err
 		}
-		if err := s.repo.ValidateProductCategory(tx, currentUser.BusinessID, order.BranchID, req.CategoryID); err != nil {
-			return notFound(err, "product category not found")
-		}
 		if err := s.repo.ValidateUnit(tx, currentUser.BusinessID, req.UnitID); err != nil {
 			return notFound(err, "unit not found")
 		}
 		productType := strings.TrimSpace(req.ProductType)
 		if productType == "" {
-			productType = "made_to_order"
+			productType = "finished_product"
 		}
 		if !validProductType(productType) {
 			return apperrors.BadRequest("invalid product_type", nil)
+		}
+		if err := s.repo.ValidateProductCategory(tx, currentUser.BusinessID, order.BranchID, req.CategoryID, productType); err != nil {
+			return notFound(err, "product category not found or not allowed for selected product_type")
 		}
 		status := strings.TrimSpace(req.Status)
 		if status == "" {
@@ -410,6 +410,7 @@ func (s *Service) ConvertItemToProduct(currentUser *utils.AuthContext, orderID, 
 			Barcode:                strings.TrimSpace(req.Barcode),
 			Description:            strings.TrimSpace(req.Description),
 			ProductType:            productType,
+			ItemStructure:          "custom",
 			SalePrice:              roundMoney(req.SalePrice),
 			CostPrice:              req.CostPrice,
 			IsPOSVisible:           showInPOS,
@@ -770,11 +771,20 @@ func (s *Service) ListPackaging(currentUser *utils.AuthContext, orderID string) 
 }
 
 func (s *Service) AddPackaging(currentUser *utils.AuthContext, orderID string, req AddPackagingRequest, ipAddress, userAgent string) (*BakeryOrderResponse, error) {
-	if err := validateUUID(req.PackagingItemID, "packaging_item_id"); err != nil {
+	if strings.TrimSpace(req.PackagingItemID) != "" {
+		return nil, apperrors.BadRequest("packaging_item_id is legacy-only; use component_product_id for new bakery packaging", nil)
+	}
+	if err := validateUUID(req.ComponentProductID, "component_product_id"); err != nil {
 		return nil, err
 	}
 	if err := validateUUID(req.UnitID, "unit_id"); err != nil {
 		return nil, err
+	}
+	componentVariantID := strings.TrimSpace(req.ComponentVariantID)
+	if componentVariantID != "" {
+		if err := validateUUID(componentVariantID, "component_variant_id"); err != nil {
+			return nil, err
+		}
 	}
 	if req.QuantityRequired <= 0 {
 		return nil, apperrors.BadRequest("quantity_required must be greater than zero", nil)
@@ -787,17 +797,34 @@ func (s *Service) AddPackaging(currentUser *utils.AuthContext, orderID string, r
 		if !currentUser.CanAccessBranch(order.BranchID) {
 			return apperrors.Forbidden("branch access denied")
 		}
-		item, err := s.repo.PackagingItem(tx, currentUser.BusinessID, order.BranchID, req.PackagingItemID)
+		product, err := s.repo.Product(tx, currentUser.BusinessID, order.BranchID, req.ComponentProductID)
 		if err != nil {
-			return notFound(err, "packaging item not found")
+			return notFound(err, "packaging product not found")
 		}
-		if item.Status != "active" {
-			return apperrors.BadRequest("packaging item is not active", nil)
+		if product.Status != "active" {
+			return apperrors.BadRequest("packaging product is not active", nil)
 		}
-		if req.UnitID != item.UnitID {
-			return apperrors.BadRequest("unit conversion is not available yet; packaging unit must match packaging item unit", nil)
+		if product.ProductType != "packaging" {
+			return apperrors.BadRequest("component_product_id must reference a Product Master packaging item", nil)
 		}
-		packaging := &BakeryOrderPackaging{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BakeryOrderID: orderID, PackagingItemID: item.ID, PackagingNameSnapshot: item.PackagingName, QuantityRequired: roundQuantity(req.QuantityRequired), UnitID: req.UnitID}
+		if req.UnitID != product.UnitID {
+			return apperrors.BadRequest("unit conversion is not available yet; packaging unit must match packaging product unit", nil)
+		}
+		componentProductID := product.ID
+		packagingName := product.ProductName
+		var componentVariantIDPtr *string
+		if componentVariantID != "" {
+			variant, err := s.repo.ProductVariant(tx, currentUser.BusinessID, order.BranchID, product.ID, componentVariantID)
+			if err != nil {
+				return notFound(err, "packaging product variant not found")
+			}
+			if variant.Status != "active" {
+				return apperrors.BadRequest("packaging product variant is not active", nil)
+			}
+			componentVariantIDPtr = &variant.ID
+			packagingName = strings.TrimSpace(product.ProductName + " - " + variant.VariantName)
+		}
+		packaging := &BakeryOrderPackaging{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BakeryOrderID: orderID, ComponentProductID: &componentProductID, ComponentVariantID: componentVariantIDPtr, PackagingNameSnapshot: packagingName, QuantityRequired: roundQuantity(req.QuantityRequired), UnitID: req.UnitID}
 		if err := s.repo.CreatePackaging(tx, packaging); err != nil {
 			return err
 		}
@@ -1416,8 +1443,8 @@ func validPaymentType(value string) bool {
 }
 
 func validProductType(value string) bool {
-	switch value {
-	case "ready_to_sell", "made_to_order", "manufactured", "retail", "service":
+	switch strings.TrimSpace(value) {
+	case "finished_product", "ingredient", "packaging", "raw_material", "semi_finished", "consumable", "equipment", "service":
 		return true
 	default:
 		return false

@@ -29,7 +29,6 @@ import type {
   PurchaseItemLineDraft,
   PurchaseOrder,
   PurchasingBranchOption,
-  PurchasingIngredientOption,
   PurchasingProductOption,
   PurchasingSupplierOption,
   PurchasingTaxRateOption,
@@ -51,6 +50,7 @@ function emptyLine(): PurchaseItemLineDraft {
     lineId: crypto.randomUUID(),
     packagingItemId: null,
     productId: null,
+    productVariantId: null,
     quantity: 1,
     taxRateId: null,
     unitCost: 0,
@@ -64,11 +64,12 @@ function linesFromOrder(order: PurchaseOrder): PurchaseItemLineDraft[] {
     discountAmount: item.discountAmount,
     expiryDate: null,
     ingredientId: item.ingredientId,
-    itemType: item.itemType,
+    itemType: "product",
     itemNameSnapshot: item.itemNameSnapshot,
     lineId: item.id || crypto.randomUUID(),
     packagingItemId: item.packagingItemId,
     productId: item.productId,
+    productVariantId: item.productVariantId,
     quantity: Math.max(item.quantityOrdered - item.quantityReceived, 1),
     taxRateId: item.taxRateId,
     unitCost: item.unitCost,
@@ -82,11 +83,12 @@ function linesFromInvoice(invoice: PurchaseInvoice): PurchaseItemLineDraft[] {
     discountAmount: item.discountAmount,
     expiryDate: item.expiryDate,
     ingredientId: item.ingredientId,
-    itemType: item.itemType,
+    itemType: "product",
     itemNameSnapshot: item.itemNameSnapshot,
     lineId: item.id || crypto.randomUUID(),
     packagingItemId: item.packagingItemId,
     productId: item.productId,
+    productVariantId: item.productVariantId,
     quantity: item.quantity,
     taxRateId: item.taxRateId,
     unitCost: item.unitCost,
@@ -97,7 +99,6 @@ function linesFromInvoice(invoice: PurchaseInvoice): PurchaseItemLineDraft[] {
 export function PurchaseReceiveDialog({
   branches,
   invoice,
-  ingredients,
   isSubmitting,
   onClose,
   onReceive,
@@ -110,7 +111,6 @@ export function PurchaseReceiveDialog({
 }: {
   branches: PurchasingBranchOption[];
   invoice?: PurchaseInvoice | null;
-  ingredients: PurchasingIngredientOption[];
   isSubmitting: boolean;
   onClose: () => void;
   onReceive: (payload: ReceivePurchasePayload) => Promise<void>;
@@ -229,7 +229,6 @@ export function PurchaseReceiveDialog({
         </div>
         <PurchasingItemLineEditor
           allowBatchFields
-          ingredients={ingredients}
           lines={lines}
           onLinesChange={setLines}
           products={products}

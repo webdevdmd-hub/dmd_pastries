@@ -4,6 +4,7 @@ import { CheckCircle2, Clock3, EyeOff, PackageSearch } from "lucide-react";
 import type { JSX } from "react";
 
 import { ProductActionsMenu } from "@/components/products/product-actions-menu";
+import { ProductItemStructureBadge } from "@/components/products/product-item-structure-badge";
 import { ProductStatusBadge } from "@/components/products/product-status-badge";
 import { ProductTypeBadge } from "@/components/products/product-type-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -128,6 +129,7 @@ export function ProductsTable({
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <ProductStatusBadge status={product.status} />
               <ProductTypeBadge type={product.productType} />
+              <ProductItemStructureBadge itemStructure={product.itemStructure} />
               <ProductCapabilityBadges product={product} />
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -156,6 +158,7 @@ export function ProductsTable({
               <TableHead className="min-w-[280px]">Product</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Type</TableHead>
+              <TableHead>Structure</TableHead>
               <TableHead>Price</TableHead>
               <TableHead>Behavior</TableHead>
               <TableHead>Status</TableHead>
@@ -203,6 +206,9 @@ export function ProductsTable({
                 </TableCell>
                 <TableCell>
                   <ProductTypeBadge type={product.productType} />
+                </TableCell>
+                <TableCell>
+                  <ProductItemStructureBadge itemStructure={product.itemStructure} />
                 </TableCell>
                 <TableCell>
                   <p className="font-semibold text-brand-espresso">

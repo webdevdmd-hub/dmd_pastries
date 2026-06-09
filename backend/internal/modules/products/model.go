@@ -19,6 +19,7 @@ type Product struct {
 	Barcode                string         `gorm:"size:150" json:"barcode"`
 	Description            string         `gorm:"size:1000" json:"description"`
 	ProductType            string         `gorm:"size:50;not null" json:"product_type"`
+	ItemStructure          string         `gorm:"size:50;not null;default:single" json:"item_structure"`
 	SalePrice              float64        `gorm:"not null" json:"sale_price"`
 	CostPrice              *float64       `json:"cost_price"`
 	CompareAtPrice         *float64       `json:"compare_at_price"`

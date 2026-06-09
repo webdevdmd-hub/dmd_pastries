@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PRODUCT_TYPE_LABELS } from "@/types/product";
 import type { RecipeIngredientLine } from "@/types/recipes";
 
 type RecipeIngredientTableProps = {
@@ -23,6 +24,10 @@ type RecipeIngredientTableProps = {
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
+}
+
+function componentLabel(line: RecipeIngredientLine): string {
+  return line.componentProductName ?? line.itemNameSnapshot;
 }
 
 export function RecipeIngredientTable({
@@ -47,7 +52,13 @@ export function RecipeIngredientTable({
         {lines.map((line) => (
           <TableRow key={line.id}>
             <TableCell>
-              <p className="font-semibold text-brand-espresso">{line.itemNameSnapshot}</p>
+              <p className="font-semibold text-brand-espresso">{componentLabel(line)}</p>
+              <p className="text-xs text-brand-mocha">
+                {line.componentProductType
+                  ? PRODUCT_TYPE_LABELS[line.componentProductType]
+                  : "Legacy item"}
+                {line.componentVariantName ? ` · ${line.componentVariantName}` : ""}
+              </p>
               {line.notes ? <p className="text-xs text-brand-mocha">{line.notes}</p> : null}
             </TableCell>
             <TableCell>

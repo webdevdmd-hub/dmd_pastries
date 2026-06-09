@@ -1339,11 +1339,19 @@ func toPOSProduct(row ProductRow) POSProductResponse {
 		},
 		TaxRate:        taxRate,
 		ProductType:    row.ProductType,
+		ItemStructure:  defaultItemStructure(row.ItemStructure),
 		SalePrice:      row.SalePrice,
 		ImageFileID:    row.ImageFileID,
 		IsStockTracked: row.IsStockTracked,
 		Status:         row.Status,
 	}
+}
+
+func defaultItemStructure(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "single"
+	}
+	return value
 }
 
 func toPOSVariant(row VariantRow) POSVariantResponse {

@@ -15,12 +15,28 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { ProductionBatchIngredient } from "@/types/manufacturing";
+import { PRODUCT_TYPE_LABELS } from "@/types/product";
 
 function formatMoney(value: number): string {
   return new Intl.NumberFormat("en-AE", {
     currency: "AED",
     style: "currency",
   }).format(value);
+}
+
+function componentName(ingredient: ProductionBatchIngredient): string {
+  return ingredient.componentProductName ?? ingredient.itemName;
+}
+
+function componentMeta(ingredient: ProductionBatchIngredient): string {
+  const parts = [
+    ingredient.componentProductType
+      ? PRODUCT_TYPE_LABELS[ingredient.componentProductType]
+      : "Legacy item",
+    ingredient.componentVariantName,
+  ].filter((part): part is string => Boolean(part));
+
+  return parts.join(" / ");
 }
 
 export function BatchIngredientsSection({
@@ -59,8 +75,9 @@ export function BatchIngredientsSection({
           <TableBody>
             {ingredients.map((ingredient) => (
               <TableRow key={ingredient.id}>
-                <TableCell className="font-semibold text-brand-espresso">
-                  {ingredient.itemName}
+                <TableCell>
+                  <p className="font-semibold text-brand-espresso">{componentName(ingredient)}</p>
+                  <p className="text-xs text-brand-mocha">{componentMeta(ingredient)}</p>
                 </TableCell>
                 <TableCell>{ingredient.requiredQuantity}</TableCell>
                 <TableCell>{ingredient.consumedQuantity}</TableCell>

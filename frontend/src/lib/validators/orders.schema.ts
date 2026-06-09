@@ -90,8 +90,10 @@ export const orderPaymentSchema = z.object({
 });
 
 export const orderPackagingSchema = z.object({
-  packagingItemId: z.string().min(1, "Packaging item is required."),
+  componentProductId: z.string().min(1, "Packaging product is required."),
+  componentVariantId: nullableTrimmedString,
   quantityRequired: z.coerce.number().positive("Packaging quantity must be greater than 0."),
+  unitId: z.string().min(1, "Unit is required."),
 });
 
 export type OrderItemFormValues = z.infer<typeof orderItemSchema>;

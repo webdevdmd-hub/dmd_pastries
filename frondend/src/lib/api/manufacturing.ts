@@ -20,6 +20,12 @@ import type {
   UpdateBatchStatusPayload,
   WastagePayload,
 } from "@/types/manufacturing";
+import {
+  ITEM_STRUCTURES,
+  type ItemStructure,
+  PRODUCT_TYPES,
+  type ProductType,
+} from "@/types/product";
 
 type BackendBatchPayload = {
   branch_id?: string;
@@ -61,6 +67,24 @@ function optionalString(value: unknown): string | null {
 
 function nullableString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function productTypeValue(value: unknown, fallback: ProductType = "finished_product"): ProductType {
+  return typeof value === "string" && PRODUCT_TYPES.includes(value as ProductType)
+    ? (value as ProductType)
+    : fallback;
+}
+
+function optionalProductType(value: unknown): ProductType | null {
+  return typeof value === "string" && PRODUCT_TYPES.includes(value as ProductType)
+    ? (value as ProductType)
+    : null;
+}
+
+function itemStructureValue(value: unknown, fallback: ItemStructure = "single"): ItemStructure {
+  return typeof value === "string" && ITEM_STRUCTURES.includes(value as ItemStructure)
+    ? (value as ItemStructure)
+    : fallback;
 }
 
 function requestString(value: string | null | undefined): string {
@@ -159,8 +183,13 @@ function parseIngredient(value: unknown): ProductionBatchIngredient {
 
   return {
     id: stringValue(value.id),
+    componentProductId: nullableString(value.component_product_id),
+    componentVariantId: nullableString(value.component_variant_id),
+    componentProductName: nullableString(value.component_product_name),
+    componentVariantName: nullableString(value.component_variant_name),
+    componentProductType: optionalProductType(value.component_product_type),
     inventoryItemId: stringValue(value.inventory_item_id),
-    itemName: stringValue(value.item_name, "Ingredient"),
+    itemName: stringValue(value.component_product_name, stringValue(value.item_name, "Ingredient")),
     requiredQuantity: numberValue(value.required_quantity),
     consumedQuantity: numberValue(value.consumed_quantity),
     unitName: stringValue(value.unit_name, "Unit"),
@@ -180,8 +209,16 @@ function parsePackaging(value: unknown): ProductionBatchPackaging {
 
   return {
     id: stringValue(value.id),
+    componentProductId: nullableString(value.component_product_id),
+    componentVariantId: nullableString(value.component_variant_id),
+    componentProductName: nullableString(value.component_product_name),
+    componentVariantName: nullableString(value.component_variant_name),
+    componentProductType: optionalProductType(value.component_product_type),
     packagingItemId: stringValue(value.packaging_item_id),
-    packagingName: stringValue(value.packaging_name, "Packaging"),
+    packagingName: stringValue(
+      value.component_product_name,
+      stringValue(value.packaging_name, "Packaging"),
+    ),
     requiredQuantity: numberValue(value.required_quantity),
     consumedQuantity: numberValue(value.consumed_quantity),
     unitName: stringValue(value.unit_name, "Unit"),
@@ -200,6 +237,10 @@ function parseOutput(value: unknown): ProductionOutput {
 
   return {
     id: stringValue(value.id),
+    productId: nullableString(value.product_id),
+    productName: nullableString(value.product_name),
+    productVariantId: nullableString(value.product_variant_id),
+    productVariantName: nullableString(value.product_variant_name),
     quantityProduced: numberValue(value.quantity_produced),
     unitName: stringValue(value.unit_name, "Unit"),
     unitCostSnapshot: numberValue(value.unit_cost_snapshot),
@@ -217,7 +258,13 @@ function parseWastage(value: unknown): ProductionWastage {
 
   return {
     id: stringValue(value.id),
-    itemName: stringValue(value.item_name, "Item"),
+    componentProductId: nullableString(value.component_product_id),
+    componentVariantId: nullableString(value.component_variant_id),
+    componentProductName: nullableString(value.component_product_name),
+    componentVariantName: nullableString(value.component_variant_name),
+    componentProductType: optionalProductType(value.component_product_type),
+    inventoryItemId: stringValue(value.inventory_item_id),
+    itemName: stringValue(value.component_product_name, stringValue(value.item_name, "Item")),
     wastageType: stringValue(value.wastage_type, "wastage"),
     quantity: numberValue(value.quantity),
     unitName: stringValue(value.unit_name, "Unit"),
@@ -252,6 +299,8 @@ function parseProduct(value: unknown): ManufacturingProductOption {
     id: stringValue(value.id),
     productName: stringValue(value.product_name, "Product"),
     productCode: stringValue(value.product_code),
+    productType: productTypeValue(value.product_type),
+    itemStructure: itemStructureValue(value.item_structure),
   };
 }
 
@@ -284,6 +333,11 @@ function parseInventory(value: unknown): ManufacturingInventoryOption {
 
   return {
     id: stringValue(value.id),
+    productId: nullableString(value.product_id),
+    productName: nullableString(value.product_name),
+    productVariantId: nullableString(value.product_variant_id),
+    productVariantName: nullableString(value.product_variant_name),
+    productType: optionalProductType(value.product_type),
     itemName: stringValue(value.item_name, "Inventory item"),
     itemCode: stringValue(value.item_code),
     unitName: stringValue(value.unit_name, "Unit"),
@@ -571,7 +625,10 @@ export async function getManufacturingProducts(): Promise<ManufacturingProductOp
     parse: (data) => parseList(data, parseProduct),
   });
 
-  return response.data;
+  return response.data.filter(
+    (product) =>
+      product.productType === "finished_product" || product.productType === "semi_finished",
+  );
 }
 
 export async function getManufacturingRecipeByProduct(

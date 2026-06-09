@@ -30,12 +30,14 @@ import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useLocationBalances, useStockLocations } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
-import type { InventoryItemType, LocationBalanceFilters } from "@/types/inventory";
+import type { LocationBalanceFilters } from "@/types/inventory";
+import { PRODUCT_TYPE_LABELS, PRODUCT_TYPES } from "@/types/product";
 
 function defaultFilters(): LocationBalanceFilters {
   return {
     search: "",
     itemType: "all",
+    productType: "all",
     stockLocationId: "all",
     page: 1,
     limit: 100,
@@ -75,7 +77,7 @@ export function LocationBalancesPageClient(): JSX.Element {
       />
 
       <Card>
-        <CardContent className="grid gap-4 p-5 md:grid-cols-3">
+        <CardContent className="grid gap-4 p-5 md:grid-cols-4">
           <div className="space-y-1">
             <Label>Search item</Label>
             <Input
@@ -93,7 +95,7 @@ export function LocationBalancesPageClient(): JSX.Element {
               onValueChange={(value) =>
                 setFilters((current) => ({
                   ...current,
-                  itemType: value as InventoryItemType | "all",
+                  itemType: value as LocationBalanceFilters["itemType"],
                   page: 1,
                 }))
               }
@@ -105,8 +107,31 @@ export function LocationBalancesPageClient(): JSX.Element {
                 <SelectItem value="all">All item types</SelectItem>
                 <SelectItem value="product">Products</SelectItem>
                 <SelectItem value="product_variant">Variants</SelectItem>
-                <SelectItem value="ingredient">Ingredients</SelectItem>
-                <SelectItem value="packaging">Packaging</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Product type</Label>
+            <Select
+              value={filters.productType}
+              onValueChange={(value) =>
+                setFilters((current) => ({
+                  ...current,
+                  productType: value as LocationBalanceFilters["productType"],
+                  page: 1,
+                }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All product types</SelectItem>
+                {PRODUCT_TYPES.map((productType) => (
+                  <SelectItem key={productType} value={productType}>
+                    {PRODUCT_TYPE_LABELS[productType]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

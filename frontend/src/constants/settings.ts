@@ -156,31 +156,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     actionLabel: "Configure",
   },
   {
-    id: "ingredient-categories",
-    title: "Ingredient Categories",
-    description:
-      "Group raw materials like flour, sugar, dairy, flavorings, and production ingredients.",
-    iconName: "Wheat",
-    permission: PERMISSIONS.masterDataView,
-    managePermission: PERMISSIONS.masterDataIngredientCategoriesManage,
-    route: "/settings/master-data/ingredient-categories",
-    status: "available",
-    category: "master_data",
-    actionLabel: "Configure",
-  },
-  {
-    id: "packaging-categories",
-    title: "Packaging Categories",
-    description: "Manage boxes, cups, trays, bags, labels, stickers, candles, and packaging types.",
-    iconName: "Archive",
-    permission: PERMISSIONS.masterDataView,
-    managePermission: PERMISSIONS.masterDataPackagingCategoriesManage,
-    route: "/settings/master-data/packaging-categories",
-    status: "available",
-    category: "master_data",
-    actionLabel: "Configure",
-  },
-  {
     id: "order-statuses",
     title: "Order Statuses",
     description:

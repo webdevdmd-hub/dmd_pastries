@@ -18,23 +18,31 @@ import {
 import { getErrorMessage } from "@/lib/api/client";
 import type {
   RecipePackagingLine,
-  RecipePackagingOption,
   RecipePackagingPayload,
+  RecipeProductOption,
   RecipeUnitOption,
 } from "@/types/recipes";
 
+function componentKey(line: {
+  componentProductId: string | null;
+  componentVariantId: string | null;
+  packagingItemId?: string;
+}): string {
+  return `${line.componentProductId ?? line.packagingItemId ?? ""}:${line.componentVariantId ?? ""}`;
+}
+
 export function RecipePackagingSection({
   canManage,
+  componentProducts,
   draftLines = [],
   onDraftLinesChange,
-  packagingItems,
   recipeId,
   units,
 }: {
   canManage: boolean;
+  componentProducts: RecipeProductOption[];
   draftLines?: RecipePackagingPayload[];
   onDraftLinesChange?: (lines: RecipePackagingPayload[]) => void;
-  packagingItems: RecipePackagingOption[];
   recipeId: string | null;
   units: RecipeUnitOption[];
 }): JSX.Element {
@@ -51,14 +59,22 @@ export function RecipePackagingSection({
     line: RecipePackagingPayload,
     index: number,
   ): RecipePackagingLine => {
-    const item = packagingItems.find((packagingItem) => packagingItem.id === line.packagingItemId);
+    const item = componentProducts.find((component) => component.id === line.componentProductId);
+    const variant =
+      item?.variants.find((productVariant) => productVariant.id === line.componentVariantId) ??
+      null;
     const unit = units.find((unitOption) => unitOption.id === line.unitId);
 
     return {
       id: `draft-${String(index)}`,
+      componentProductId: line.componentProductId,
+      componentProductName: item?.productName ?? null,
+      componentProductType: item?.productType ?? null,
+      componentVariantId: line.componentVariantId,
+      componentVariantName: variant?.variantName ?? null,
       isOptional: line.isOptional,
-      packagingItemId: line.packagingItemId,
-      packagingNameSnapshot: item?.packagingName ?? "Packaging item",
+      packagingItemId: "",
+      packagingNameSnapshot: item?.productName ?? "Packaging product",
       quantityRequired: line.quantityRequired,
       sortOrder: line.sortOrder,
       totalCost: 0,
@@ -73,7 +89,7 @@ export function RecipePackagingSection({
     if (!recipeId) {
       const duplicate = draftLines.some(
         (line, index) =>
-          line.packagingItemId === payload.packagingItemId && index !== editingDraftIndex,
+          componentKey(line) === componentKey(payload) && index !== editingDraftIndex,
       );
 
       if (duplicate) {
@@ -93,7 +109,7 @@ export function RecipePackagingSection({
     }
 
     const duplicate = lines.some(
-      (line) => line.packagingItemId === payload.packagingItemId && line.id !== editingLine?.id,
+      (line) => componentKey(line) === componentKey(payload) && line.id !== editingLine?.id,
     );
 
     if (duplicate) {
@@ -164,6 +180,7 @@ export function RecipePackagingSection({
         ) : null}
         {editorOpen ? (
           <RecipePackagingLineEditor
+            componentProducts={componentProducts}
             line={editingLine}
             onCancel={() => {
               setEditingDraftIndex(null);
@@ -171,7 +188,6 @@ export function RecipePackagingSection({
               setEditorOpen(false);
             }}
             onSubmit={saveLine}
-            packagingItems={packagingItems}
             submitting={addMutation.isPending || updateMutation.isPending}
             units={units}
           />

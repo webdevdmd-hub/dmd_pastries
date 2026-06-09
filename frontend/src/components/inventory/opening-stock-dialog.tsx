@@ -30,11 +30,9 @@ import {
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { type OpeningStockSchema, openingStockSchema } from "@/lib/validators/inventory.schema";
 import type { Branch } from "@/types/branch";
-import type { Ingredient } from "@/types/ingredient";
 import type { InventoryItem, OpeningStockPayload, StockLocation } from "@/types/inventory";
 import type { Unit } from "@/types/master-data";
-import type { PackagingItem } from "@/types/packaging";
-import type { Product } from "@/types/product";
+import { type Product, PRODUCT_TYPE_LABELS } from "@/types/product";
 
 type OpeningStockDialogProps = {
   branches: Branch[];
@@ -43,12 +41,20 @@ type OpeningStockDialogProps = {
   onSubmit: (payload: OpeningStockPayload) => Promise<void>;
   open: boolean;
   preselectedItem?: InventoryItem | null;
-  ingredients: Ingredient[];
-  packagingItems: PackagingItem[];
   products: Product[];
   stockLocations: StockLocation[];
   units: Unit[];
 };
+
+const STOCK_RELEVANT_PRODUCT_TYPES = new Set([
+  "finished_product",
+  "ingredient",
+  "packaging",
+  "raw_material",
+  "semi_finished",
+  "consumable",
+  "equipment",
+]);
 
 export function OpeningStockDialog({
   branches,
@@ -57,8 +63,6 @@ export function OpeningStockDialog({
   onSubmit,
   open,
   preselectedItem = null,
-  ingredients,
-  packagingItems,
   products,
   stockLocations,
   units,
@@ -100,6 +104,16 @@ export function OpeningStockDialog({
     () => products.find((product) => product.id === selectedProductId) ?? null,
     [products, selectedProductId],
   );
+  const stockTrackedProducts = useMemo(
+    () =>
+      products.filter(
+        (product) =>
+          product.isStockTracked &&
+          product.status === "active" &&
+          STOCK_RELEVANT_PRODUCT_TYPES.has(product.productType),
+      ),
+    [products],
+  );
   const activeProductVariants = useMemo(
     () => selectedProduct?.variants.filter((variant) => variant.status === "active") ?? [],
     [selectedProduct],
@@ -120,16 +134,23 @@ export function OpeningStockDialog({
   );
   const productOptions = useMemo<SearchableComboboxOption[]>(
     () =>
-      products.map((product) => ({
+      stockTrackedProducts.map((product) => ({
         value: product.id,
         label: product.productName,
-        description: [product.categoryName, product.sku, product.barcode, product.productCode]
+        description: [
+          PRODUCT_TYPE_LABELS[product.productType],
+          product.categoryName,
+          product.sku,
+          product.barcode,
+          product.productCode,
+        ]
           .filter((part): part is string => typeof part === "string" && part.length > 0)
           .join(" / "),
         keywords: [
           product.productName,
           product.productCode,
           product.categoryName,
+          PRODUCT_TYPE_LABELS[product.productType],
           product.sku ?? "",
           product.barcode ?? "",
           product.status,
@@ -140,7 +161,7 @@ export function OpeningStockDialog({
           ]),
         ],
       })),
-    [products],
+    [stockTrackedProducts],
   );
   const variantOptions = useMemo<SearchableComboboxOption[]>(
     () =>
@@ -153,40 +174,6 @@ export function OpeningStockDialog({
         keywords: [variant.variantName, variant.sku ?? "", variant.barcode ?? ""],
       })),
     [activeProductVariants],
-  );
-  const ingredientOptions = useMemo<SearchableComboboxOption[]>(
-    () =>
-      ingredients.map((ingredient) => ({
-        value: ingredient.id,
-        label: ingredient.ingredientName,
-        description: [ingredient.ingredientCategoryName, ingredient.unitName]
-          .filter((part): part is string => typeof part === "string" && part.length > 0)
-          .join(" / "),
-        keywords: [
-          ingredient.ingredientName,
-          ingredient.ingredientCategoryName,
-          ingredient.unitName,
-          ingredient.supplierName ?? "",
-        ],
-      })),
-    [ingredients],
-  );
-  const packagingOptions = useMemo<SearchableComboboxOption[]>(
-    () =>
-      packagingItems.map((packagingItem) => ({
-        value: packagingItem.id,
-        label: packagingItem.packagingName,
-        description: [packagingItem.packagingCategoryName, packagingItem.unitName]
-          .filter((part): part is string => typeof part === "string" && part.length > 0)
-          .join(" / "),
-        keywords: [
-          packagingItem.packagingName,
-          packagingItem.packagingCategoryName,
-          packagingItem.unitName,
-          packagingItem.supplierName ?? "",
-        ],
-      })),
-    [packagingItems],
   );
   const stockLocationOptions = useMemo<SearchableComboboxOption[]>(
     () =>
@@ -217,41 +204,29 @@ export function OpeningStockDialog({
 
   useEffect(() => {
     if (open) {
-      const itemType = preselectedItem?.itemType ?? "product";
-      const productId = preselectedItem?.productId ?? "";
-      const ingredientId = preselectedItem?.ingredientId ?? "";
-      const packagingItemId = preselectedItem?.packagingItemId ?? "";
+      const itemType =
+        preselectedItem?.itemType === "product_variant" ? "product_variant" : "product";
+      const productId =
+        preselectedItem?.itemType === "product" || preselectedItem?.itemType === "product_variant"
+          ? (preselectedItem.productId ?? "")
+          : "";
       const selectedProduct = products.find((product) => product.id === productId);
       const selectedVariant = selectedProduct?.variants.find(
         (variant) => variant.id === preselectedItem?.productVariantId,
-      );
-      const selectedIngredient = ingredients.find((ingredient) => ingredient.id === ingredientId);
-      const selectedPackagingItem = packagingItems.find(
-        (packagingItem) => packagingItem.id === packagingItemId,
       );
 
       form.reset({
         branchId: branchScope.normalizeBranchId(activeBranches[0]?.id ?? ""),
         itemType,
         productId,
-        unitId:
-          preselectedItem?.unitId ??
-          selectedProduct?.unitId ??
-          selectedIngredient?.unitId ??
-          selectedPackagingItem?.unitId ??
-          "",
+        unitId: preselectedItem?.unitId ?? selectedProduct?.unitId ?? "",
         stockLocationId: defaultStockLocation?.id ?? "",
         quantity: 0,
         reorderLevel: preselectedItem?.reorderLevel ?? 0,
         isExpiryTracked:
-          preselectedItem?.isExpiryTracked ??
-          selectedProduct?.isExpiryTracked ??
-          selectedIngredient?.isExpiryTracked ??
-          false,
+          preselectedItem?.isExpiryTracked ?? selectedProduct?.isExpiryTracked ?? false,
         expiryDate: "",
         productVariantId: selectedVariant?.id ?? preselectedItem?.productVariantId ?? "",
-        ingredientId,
-        packagingItemId,
         reason: "",
       });
     }
@@ -260,9 +235,7 @@ export function OpeningStockDialog({
     branchScope,
     defaultStockLocation?.id,
     form,
-    ingredients,
     open,
-    packagingItems,
     preselectedItem,
     products,
   ]);
@@ -277,30 +250,10 @@ export function OpeningStockDialog({
     }
   };
 
-  const handleIngredientChange = (ingredientId: string): void => {
-    const ingredient = ingredients.find((item) => item.id === ingredientId);
-    form.setValue("ingredientId", ingredientId);
-    if (ingredient?.unitId) {
-      form.setValue("unitId", ingredient.unitId);
-      form.setValue("isExpiryTracked", ingredient.isExpiryTracked);
-    }
-  };
-
-  const handlePackagingChange = (packagingItemId: string): void => {
-    const packagingItem = packagingItems.find((item) => item.id === packagingItemId);
-    form.setValue("packagingItemId", packagingItemId);
-    if (packagingItem?.unitId) {
-      form.setValue("unitId", packagingItem.unitId);
-      form.setValue("isExpiryTracked", false);
-    }
-  };
-
   const handleItemTypeChange = (value: OpeningStockSchema["itemType"]): void => {
     form.setValue("itemType", value);
     form.setValue("productId", "");
     form.setValue("productVariantId", "");
-    form.setValue("ingredientId", "");
-    form.setValue("packagingItemId", "");
     form.setValue("unitId", "");
     form.setValue("isExpiryTracked", false);
   };
@@ -311,8 +264,6 @@ export function OpeningStockDialog({
       itemType: values.itemType,
       ...(values.productId ? { productId: values.productId } : {}),
       ...(values.productVariantId ? { productVariantId: values.productVariantId } : {}),
-      ...(values.ingredientId ? { ingredientId: values.ingredientId } : {}),
-      ...(values.packagingItemId ? { packagingItemId: values.packagingItemId } : {}),
       unitId: values.unitId,
       ...(values.stockLocationId ? { stockLocationId: values.stockLocationId } : {}),
       quantity: values.quantity,
@@ -329,8 +280,7 @@ export function OpeningStockDialog({
         <DialogHeader>
           <DialogTitle>Create opening stock</DialogTitle>
           <DialogDescription>
-            Start branch-level stock tracking for products, variants, ingredients, and packaging
-            items.
+            Start branch-level stock tracking for Product Master products and variants.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -367,27 +317,23 @@ export function OpeningStockDialog({
                 <SelectContent>
                   <SelectItem value="product">Product</SelectItem>
                   <SelectItem value="product_variant">Variant</SelectItem>
-                  <SelectItem value="ingredient">Ingredient</SelectItem>
-                  <SelectItem value="packaging">Packaging</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {itemType === "product" || itemType === "product_variant" ? (
-              <div className="space-y-1">
-                <Label>Product</Label>
-                <SearchableCombobox
-                  emptyMessage="No matching products found."
-                  onValueChange={handleProductChange}
-                  options={productOptions}
-                  placeholder="Select product"
-                  searchPlaceholder="Search product, SKU, barcode, category..."
-                  value={form.watch("productId") ?? ""}
-                />
-                {form.formState.errors.productId ? (
-                  <p className="text-sm text-red-800">{form.formState.errors.productId.message}</p>
-                ) : null}
-              </div>
-            ) : null}
+            <div className="space-y-1">
+              <Label>Product</Label>
+              <SearchableCombobox
+                emptyMessage="No matching products found."
+                onValueChange={handleProductChange}
+                options={productOptions}
+                placeholder="Select product"
+                searchPlaceholder="Search product, SKU, barcode, category..."
+                value={form.watch("productId") ?? ""}
+              />
+              {form.formState.errors.productId ? (
+                <p className="text-sm text-red-800">{form.formState.errors.productId.message}</p>
+              ) : null}
+            </div>
             {itemType === "product_variant" ? (
               <div className="space-y-1">
                 <Label>Variant</Label>
@@ -408,42 +354,6 @@ export function OpeningStockDialog({
                   </p>
                 ) : selectedProductId && activeProductVariants.length === 0 ? (
                   <p className="text-sm text-brand-mocha">This product has no active variants.</p>
-                ) : null}
-              </div>
-            ) : null}
-            {itemType === "ingredient" ? (
-              <div className="space-y-1">
-                <Label>Ingredient</Label>
-                <SearchableCombobox
-                  emptyMessage="No matching ingredients found."
-                  onValueChange={handleIngredientChange}
-                  options={ingredientOptions}
-                  placeholder="Select ingredient"
-                  searchPlaceholder="Search ingredient, category, supplier..."
-                  value={form.watch("ingredientId") ?? ""}
-                />
-                {form.formState.errors.ingredientId ? (
-                  <p className="text-sm text-red-800">
-                    {form.formState.errors.ingredientId.message}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-            {itemType === "packaging" ? (
-              <div className="space-y-1">
-                <Label>Packaging</Label>
-                <SearchableCombobox
-                  emptyMessage="No matching packaging items found."
-                  onValueChange={handlePackagingChange}
-                  options={packagingOptions}
-                  placeholder="Select packaging item"
-                  searchPlaceholder="Search packaging, category, supplier..."
-                  value={form.watch("packagingItemId") ?? ""}
-                />
-                {form.formState.errors.packagingItemId ? (
-                  <p className="text-sm text-red-800">
-                    {form.formState.errors.packagingItemId.message}
-                  </p>
                 ) : null}
               </div>
             ) : null}

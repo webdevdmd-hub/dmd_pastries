@@ -1,4 +1,10 @@
+import type { ProductType } from "@/types/product";
+
 export type InventoryItemType = "product" | "product_variant" | "ingredient" | "packaging";
+export type InventoryItemTypeFilter =
+  | Extract<InventoryItemType, "product" | "product_variant">
+  | "all";
+export type InventoryProductTypeFilter = ProductType | "all";
 
 export type InventoryStatus = "active" | "inactive";
 export type InventoryRecordStatus = InventoryStatus | "not_initialized";
@@ -40,6 +46,7 @@ export type InventoryItem = {
   productId: string | null;
   productVariantId: string | null;
   variantName: string | null;
+  productType: ProductType | null;
   ingredientId: string | null;
   packagingItemId: string | null;
   itemType: InventoryItemType;
@@ -49,6 +56,8 @@ export type InventoryItem = {
   reservedQuantity: number;
   availableQuantity: number;
   reorderLevel: number;
+  averageCost: number;
+  inventoryValue: number;
   unitId: string;
   unitName: string;
   unitSymbol: string;
@@ -112,11 +121,9 @@ export type ExpiryBatch = {
 
 export type OpeningStockPayload = {
   branchId: string;
-  itemType: InventoryItemType;
+  itemType: Extract<InventoryItemType, "product" | "product_variant">;
   productId?: string;
   productVariantId?: string;
-  ingredientId?: string;
-  packagingItemId?: string;
   unitId: string;
   stockLocationId?: string;
   quantity: number;
@@ -243,7 +250,8 @@ export type UpdateExpiryBatchStatusPayload = {
 export type InventoryFilters = {
   search: string;
   branchId: string;
-  itemType: InventoryItemType | "all";
+  itemType: InventoryItemTypeFilter;
+  productType: InventoryProductTypeFilter;
   status: InventoryStatus | "all";
   lowStockOnly: boolean;
   expiryTrackedOnly: boolean;
@@ -253,7 +261,8 @@ export type InventoryFilters = {
 export type StockMovementFilters = {
   search: string;
   branchId: string;
-  itemType: InventoryItemType | "all";
+  itemType: InventoryItemTypeFilter;
+  productType: InventoryProductTypeFilter;
   movementType: MovementType | "all";
   dateFrom: string;
   dateTo: string;
@@ -262,19 +271,22 @@ export type StockMovementFilters = {
 export type LowStockFilters = {
   search: string;
   branchId: string;
-  itemType: InventoryItemType | "all";
+  itemType: InventoryItemTypeFilter;
+  productType: InventoryProductTypeFilter;
 };
 
 export type ExpiryAlertFilters = {
   branchId: string;
-  itemType: InventoryItemType | "all";
+  itemType: InventoryItemTypeFilter;
+  productType: InventoryProductTypeFilter;
   status: ExpiryBatchStatus | "all";
   days: number;
 };
 
 export type LocationBalanceFilters = {
   search: string;
-  itemType: InventoryItemType | "all";
+  itemType: InventoryItemTypeFilter;
+  productType: InventoryProductTypeFilter;
   stockLocationId: string;
   page: number;
   limit: number;
@@ -285,7 +297,8 @@ export type LocationBalanceFilters = {
 export type StockTransferFilters = {
   search: string;
   status: StockTransferStatus | "all";
-  itemType: InventoryItemType | "all";
+  itemType: InventoryItemTypeFilter;
+  productType: InventoryProductTypeFilter;
   stockLocationId: string;
   page: number;
   limit: number;

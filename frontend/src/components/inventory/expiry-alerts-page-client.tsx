@@ -35,10 +35,12 @@ import { useExpiryAlerts } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 import type { ExpiryAlertFilters, ExpiryBatch, ExpiryBatchStatus } from "@/types/inventory";
+import { PRODUCT_TYPE_LABELS, PRODUCT_TYPES } from "@/types/product";
 
 const defaultFilters: ExpiryAlertFilters = {
   branchId: "",
   itemType: "all",
+  productType: "all",
   status: "all",
   days: 30,
 };
@@ -141,7 +143,7 @@ export function ExpiryAlertsPageClient(): JSX.Element {
         title="Expiry Alerts"
         description="Track stock batches that are expiring soon or already expired."
       />
-      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/70 p-4 shadow-soft md:grid-cols-5">
+      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/70 p-4 shadow-soft md:grid-cols-6">
         <Select
           onValueChange={(branchId) => setFilters({ ...filters, branchId })}
           value={filters.branchId}
@@ -173,8 +175,27 @@ export function ExpiryAlertsPageClient(): JSX.Element {
             <SelectItem value="all">All types</SelectItem>
             <SelectItem value="product">Products</SelectItem>
             <SelectItem value="product_variant">Variants</SelectItem>
-            <SelectItem value="ingredient">Ingredients</SelectItem>
-            <SelectItem value="packaging">Packaging</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          onValueChange={(productType) =>
+            setFilters({
+              ...filters,
+              productType: productType as ExpiryAlertFilters["productType"],
+            })
+          }
+          value={filters.productType}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All product types</SelectItem>
+            {PRODUCT_TYPES.map((productType) => (
+              <SelectItem key={productType} value={productType}>
+                {PRODUCT_TYPE_LABELS[productType]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select

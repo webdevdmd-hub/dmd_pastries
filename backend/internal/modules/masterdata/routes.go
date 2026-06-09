@@ -39,9 +39,6 @@ func RegisterRoutes(
 	group.PATCH("/product-categories/:id", masterDataManage, handler.UpdateProductCategory)
 	group.PATCH("/product-categories/:id/status", masterDataManage, handler.UpdateProductCategoryStatus)
 	group.DELETE("/product-categories/:id", masterDataManage, handler.DeleteProductCategory)
-
-	registerSimpleRoutes(group, "/ingredient-categories", handler, ingredientConfig(), masterDataView, masterDataManage, "ingredient")
-	registerSimpleRoutes(group, "/packaging-categories", handler, packagingConfig(), masterDataView, masterDataManage, "packaging")
 }
 
 func registerSimpleRoutes(group *gin.RouterGroup, path string, handler *Handler, cfg simpleCategoryConfig, view gin.HandlerFunc, manage gin.HandlerFunc, label string) {

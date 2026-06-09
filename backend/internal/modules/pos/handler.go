@@ -213,11 +213,12 @@ func parsePOSProductQuery(c *gin.Context) POSProductQuery {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	return POSProductQuery{
-		Search:      c.Query("search"),
-		CategoryID:  c.Query("category_id"),
-		ProductType: c.Query("product_type"),
-		Page:        page,
-		Limit:       limit,
+		Search:        c.Query("search"),
+		CategoryID:    c.Query("category_id"),
+		ProductType:   c.Query("product_type"),
+		ItemStructure: c.Query("item_structure"),
+		Page:          page,
+		Limit:         limit,
 	}
 }
 

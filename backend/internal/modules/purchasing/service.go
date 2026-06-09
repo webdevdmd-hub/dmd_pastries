@@ -245,6 +245,9 @@ func (s *Service) ConvertOrderToInvoice(currentUser *utils.AuthContext, id strin
 		if len(orderItems) == 0 {
 			return apperrors.BadRequest("purchase order has no items to convert", nil)
 		}
+		if err := validateUnifiedPurchaseItems(orderItems); err != nil {
+			return err
+		}
 		invoiceDate, err := parseDate(defaultDate(req.InvoiceDate), "invoice_date")
 		if err != nil {
 			return err
@@ -297,8 +300,6 @@ func (s *Service) ConvertOrderToInvoice(currentUser *utils.AuthContext, id strin
 				PurchaseInvoiceID: invoiceID,
 				ItemType:          item.ItemType,
 				ProductID:         item.ProductID,
-				IngredientID:      item.IngredientID,
-				PackagingItemID:   item.PackagingItemID,
 				ItemNameSnapshot:  item.ItemNameSnapshot,
 				Quantity:          item.QuantityOrdered,
 				UnitID:            item.UnitID,
@@ -1500,6 +1501,9 @@ func (s *Service) buildReceipt(tx *gorm.DB, currentUser *utils.AuthContext, req 
 		if err != nil {
 			return nil, nil, nil, err
 		}
+		if err := s.validateReceiptProduct(tx, currentUser.BusinessID, req.BranchID, prepared); err != nil {
+			return nil, nil, nil, err
+		}
 		inventoryItem, err := s.findOrCreateInventoryItem(tx, currentUser.BusinessID, req.BranchID, prepared)
 		if err != nil {
 			return nil, nil, nil, err
@@ -1785,8 +1789,11 @@ func (s *Service) prepareReceiptItem(tx *gorm.DB, businessID, branchID string, i
 }
 
 func (s *Service) prepareItemIdentity(tx *gorm.DB, businessID, branchID, itemType, productID, ingredientID, packagingID, unitID string) (preparedItem, error) {
+	if strings.TrimSpace(ingredientID) != "" || strings.TrimSpace(packagingID) != "" {
+		return preparedItem{}, apperrors.BadRequest("purchase items must use product_id from Product Master; ingredient_id and packaging_item_id are no longer supported for new purchasing documents", nil)
+	}
 	if !validItemType(itemType) {
-		return preparedItem{}, apperrors.BadRequest("invalid item_type", nil)
+		return preparedItem{}, apperrors.BadRequest("item_type must be product", nil)
 	}
 	if err := validateUUID(unitID, "unit_id"); err != nil {
 		return preparedItem{}, err
@@ -1795,45 +1802,39 @@ func (s *Service) prepareItemIdentity(tx *gorm.DB, businessID, branchID, itemTyp
 		return preparedItem{}, notFound(err, "unit not found")
 	}
 	prepared := preparedItem{ItemType: itemType, UnitID: unitID}
-	switch itemType {
-	case "product":
-		if err := validateUUID(productID, "product_id"); err != nil {
-			return preparedItem{}, err
-		}
-		product, err := s.repo.Product(tx, businessID, branchID, productID)
-		if err != nil {
-			return preparedItem{}, notFound(err, "product not found")
-		}
-		prepared.ProductID = &productID
-		prepared.ItemName = product.ProductName
-	case "ingredient":
-		if err := validateUUID(ingredientID, "ingredient_id"); err != nil {
-			return preparedItem{}, err
-		}
-		ingredient, err := s.repo.IngredientItem(tx, businessID, branchID, ingredientID)
-		if err != nil {
-			return preparedItem{}, notFound(err, "ingredient not found")
-		}
-		if ingredient.UnitID != unitID {
-			return preparedItem{}, apperrors.BadRequest("unit conversion is not available yet; ingredient unit must match purchase unit", nil)
-		}
-		prepared.IngredientID = &ingredientID
-		prepared.ItemName = ingredient.IngredientName
-	case "packaging":
-		if err := validateUUID(packagingID, "packaging_item_id"); err != nil {
-			return preparedItem{}, err
-		}
-		packaging, err := s.repo.PackagingItem(tx, businessID, branchID, packagingID)
-		if err != nil {
-			return preparedItem{}, notFound(err, "packaging item not found")
-		}
-		prepared.PackagingItemID = &packagingID
-		prepared.ItemName = packaging.PackagingName
+	if err := validateUUID(productID, "product_id"); err != nil {
+		return preparedItem{}, err
 	}
+	product, err := s.repo.Product(tx, businessID, branchID, productID)
+	if err != nil {
+		return preparedItem{}, notFound(err, "product not found")
+	}
+	if product.UnitID != unitID {
+		return preparedItem{}, apperrors.BadRequest("unit conversion is not available yet; product unit must match purchase unit", nil)
+	}
+	prepared.ProductID = &productID
+	prepared.ItemName = product.ProductName
 	return prepared, nil
 }
 
+func (s *Service) validateReceiptProduct(tx *gorm.DB, businessID, branchID string, item preparedItem) error {
+	if item.ProductID == nil {
+		return apperrors.BadRequest("purchase receipts require product_id from Product Master", nil)
+	}
+	product, err := s.repo.Product(tx, businessID, branchID, *item.ProductID)
+	if err != nil {
+		return notFound(err, "product not found")
+	}
+	if !product.IsStockTracked {
+		return apperrors.BadRequest("purchase receipts require stock-tracked products", map[string]interface{}{"product_id": product.ID, "product_name": product.ProductName})
+	}
+	return nil
+}
+
 func (s *Service) findOrCreateInventoryItem(tx *gorm.DB, businessID, branchID string, item preparedItem) (*inventory.InventoryItem, error) {
+	if item.ItemType != "product" || item.ProductID == nil {
+		return nil, apperrors.BadRequest("inventory receiving now supports Product Master products only", nil)
+	}
 	itemID := item.itemID()
 	existing, err := s.inventoryRepo.FindExistingItem(tx, businessID, branchID, item.ItemType, itemID)
 	if err == nil {
@@ -1842,7 +1843,7 @@ func (s *Service) findOrCreateInventoryItem(tx *gorm.DB, businessID, branchID st
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
-	inventoryItem := &inventory.InventoryItem{ID: utils.NewUUID(), BusinessID: businessID, BranchID: branchID, ProductID: item.ProductID, IngredientID: item.IngredientID, PackagingItemID: item.PackagingItemID, ItemType: item.ItemType, UnitID: item.UnitID, CurrentQuantity: 0, ReservedQuantity: 0, AvailableQuantity: 0, ReorderLevel: 0, IsExpiryTracked: true, Status: "active"}
+	inventoryItem := &inventory.InventoryItem{ID: utils.NewUUID(), BusinessID: businessID, BranchID: branchID, ProductID: item.ProductID, ItemType: item.ItemType, UnitID: item.UnitID, CurrentQuantity: 0, ReservedQuantity: 0, AvailableQuantity: 0, ReorderLevel: 0, IsExpiryTracked: true, Status: "active"}
 	if err := s.inventoryRepo.CreateInventoryItem(tx, inventoryItem); err != nil {
 		return nil, err
 	}
@@ -2277,7 +2278,7 @@ func validateUUID(value, field string) error {
 }
 
 func validItemType(value string) bool {
-	return value == "product" || value == "ingredient" || value == "packaging"
+	return value == "product"
 }
 
 func validOrderStatus(value string) bool {
@@ -2342,6 +2343,15 @@ func equalStringPtr(a, b *string) bool {
 		return a == nil && b == nil
 	}
 	return *a == *b
+}
+
+func validateUnifiedPurchaseItems(items []PurchaseOrderItem) error {
+	for _, item := range items {
+		if item.ItemType != "product" || item.ProductID == nil || item.IngredientID != nil || item.PackagingItemID != nil {
+			return apperrors.BadRequest("purchase order contains legacy ingredient/packaging items; recreate the document using Product Master products before conversion", map[string]interface{}{"purchase_order_item_id": item.ID})
+		}
+	}
+	return nil
 }
 
 func notFound(err error, message string) error {

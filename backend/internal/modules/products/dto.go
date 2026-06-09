@@ -9,6 +9,7 @@ type CreateProductRequest struct {
 	UnitID                 string   `json:"unit_id" binding:"required,uuid"`
 	TaxRateID              *string  `json:"tax_rate_id" binding:"omitempty,uuid"`
 	ProductType            string   `json:"product_type" binding:"required"`
+	ItemStructure          string   `json:"item_structure"`
 	SalePrice              float64  `json:"sale_price"`
 	CostPrice              *float64 `json:"cost_price"`
 	CompareAtPrice         *float64 `json:"compare_at_price"`
@@ -30,6 +31,7 @@ type UpdateProductRequest struct {
 	TaxRateID              *string  `json:"tax_rate_id" binding:"omitempty,uuid"`
 	Description            string   `json:"description"`
 	ProductType            string   `json:"product_type"`
+	ItemStructure          string   `json:"item_structure"`
 	SalePrice              *float64 `json:"sale_price"`
 	CostPrice              *float64 `json:"cost_price"`
 	CompareAtPrice         *float64 `json:"compare_at_price"`
@@ -52,6 +54,7 @@ type ProductListQuery struct {
 	Search         string
 	CategoryID     string
 	ProductType    string
+	ItemStructure  string
 	Status         string
 	IsPOSVisible   *bool
 	IsStockTracked *bool
@@ -85,6 +88,7 @@ type ProductResponse struct {
 	Unit                   ProductUnitInfo      `json:"unit"`
 	TaxRate                *ProductTaxRateInfo  `json:"tax_rate"`
 	ProductType            string               `json:"product_type"`
+	ItemStructure          string               `json:"item_structure"`
 	SalePrice              float64              `json:"sale_price"`
 	CostPrice              *float64             `json:"cost_price"`
 	CompareAtPrice         *float64             `json:"compare_at_price"`

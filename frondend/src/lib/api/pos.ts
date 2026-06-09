@@ -22,7 +22,12 @@ import type {
   POSReferenceData,
   SaleReceipt,
 } from "@/types/pos";
-import type { ProductType } from "@/types/product";
+import {
+  ITEM_STRUCTURES,
+  type ItemStructure,
+  PRODUCT_TYPES,
+  type ProductType,
+} from "@/types/product";
 import type {
   PaymentMethod,
   ReceiptLayout,
@@ -66,6 +71,7 @@ type BackendPOSProduct = {
   tax_rate_name?: string | null;
   tax_rate_percentage?: number;
   product_type?: string;
+  item_structure?: string;
   sale_price?: number;
   is_stock_tracked?: boolean;
   current_stock_quantity?: number | null;
@@ -81,7 +87,6 @@ type BackendPOSProduct = {
 
 type BackendPaymentPayload = {
   payment_method_id: string;
-  payment_method_name: string;
   amount: number;
   reference_number: string | null;
 };
@@ -116,6 +121,7 @@ type BackendPOSProductCategory = {
   category_code?: string;
   description?: string;
   image_url?: string | null;
+  allowed_product_types?: unknown;
   sort_order?: number;
   status?: string;
   created_at?: string;
@@ -447,13 +453,19 @@ function parseReceiptLayoutConfig(value: unknown): ReceiptLayoutConfig {
 }
 
 function isProductType(value: unknown): value is ProductType {
-  return (
-    value === "ready_to_sell" ||
-    value === "made_to_order" ||
-    value === "manufactured" ||
-    value === "retail" ||
-    value === "service"
-  );
+  return PRODUCT_TYPES.includes(value as ProductType);
+}
+
+function parseAllowedProductTypes(value: unknown): ProductType[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isProductType);
+}
+
+function isItemStructure(value: unknown): value is ItemStructure {
+  return ITEM_STRUCTURES.includes(value as ItemStructure);
 }
 
 function isCartDiscountType(value: unknown): value is CartDiscountType {
@@ -585,7 +597,8 @@ function parseProduct(value: unknown): POSProduct {
     taxRateId: optionalString(product.tax_rate_id),
     taxRateName: getTaxRateName(product),
     taxRatePercentage: getTaxRatePercentage(product),
-    productType: isProductType(product.product_type) ? product.product_type : "ready_to_sell",
+    productType: isProductType(product.product_type) ? product.product_type : "finished_product",
+    itemStructure: isItemStructure(product.item_structure) ? product.item_structure : "single",
     salePrice: requiredNumber(product.sale_price),
     isStockTracked: product.is_stock_tracked === true,
     currentStockQuantity: optionalNumber(
@@ -636,6 +649,8 @@ function parsePOSPaymentMethod(value: unknown): PaymentMethod {
     showInDashboardCollection: optionalBoolean(method.show_in_dashboard_collection, false),
     defaultPaymentAccountId: optionalString(method.default_payment_account_id),
     defaultPaymentAccountName: requiredString(method.default_payment_account_name),
+    branchId: optionalString(method.branch_id),
+    branchName: optionalString(method.branch_name),
     status: isRecordStatus(method.status) ? method.status : "active",
     createdAt: requiredString(method.created_at),
     updatedAt: requiredString(method.updated_at),
@@ -673,6 +688,7 @@ function parsePOSProductCategory(value: unknown): ProductCategory {
     categoryCode: requiredString(category.category_code),
     description: requiredString(category.description),
     imageUrl: requiredString(category.image_url),
+    allowedProductTypes: parseAllowedProductTypes(category.allowed_product_types),
     sortOrder: requiredNumber(category.sort_order),
     status: isRecordStatus(category.status) ? category.status : "active",
     createdAt: requiredString(category.created_at),
@@ -827,6 +843,7 @@ function filterPOSProducts(products: POSProduct[], params: POSProductFilters): P
   return products
     .filter((product) => product.status === "active" && product.isPosVisible)
     .filter((product) => params.categoryId === "all" || product.categoryId === params.categoryId)
+    .filter((product) => !params.itemStructure || product.itemStructure === params.itemStructure)
     .filter((product) => {
       if (!normalizedSearch) {
         return true;
@@ -872,7 +889,6 @@ function toBackendCheckoutPayload(payload: CheckoutPayload): BackendCheckoutPayl
     sale_discount_value: payload.saleDiscountValue,
     payments: payload.payments.map((payment) => ({
       payment_method_id: payment.paymentMethodId,
-      payment_method_name: payment.paymentMethodName,
       amount: payment.amount,
       reference_number: payment.referenceNumber,
     })),
@@ -1122,10 +1138,20 @@ function parseHeldSaleResumeData(value: unknown): HeldSaleResumeData {
 }
 
 export async function getPOSProducts(params: POSProductFilters): Promise<POSProduct[]> {
-  const response = await apiRequest<POSProduct[]>("/api/v1/products/pos", {
-    authMode: "appwrite",
-    parse: parseProductList,
-  });
+  const searchParams = new URLSearchParams();
+
+  if (params.itemStructure) {
+    searchParams.set("item_structure", params.itemStructure);
+  }
+
+  const query = searchParams.toString();
+  const response = await apiRequest<POSProduct[]>(
+    `/api/v1/products/pos${query ? `?${query}` : ""}`,
+    {
+      authMode: "appwrite",
+      parse: parseProductList,
+    },
+  );
 
   return filterPOSProducts(response.data, params);
 }

@@ -1,7 +1,40 @@
 import type { Unit } from "@/types/master-data";
 import type { RecordStatus, TaxRate } from "@/types/settings";
 
-export type ProductType = "ready_to_sell" | "made_to_order" | "manufactured" | "retail" | "service";
+export const PRODUCT_TYPES = [
+  "finished_product",
+  "ingredient",
+  "packaging",
+  "raw_material",
+  "semi_finished",
+  "consumable",
+  "equipment",
+  "service",
+] as const;
+
+export type ProductType = (typeof PRODUCT_TYPES)[number];
+
+export const ITEM_STRUCTURES = ["single", "variant", "recipe_based", "custom"] as const;
+
+export type ItemStructure = (typeof ITEM_STRUCTURES)[number];
+
+export const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {
+  finished_product: "Finished Product",
+  ingredient: "Ingredient",
+  packaging: "Packaging",
+  raw_material: "Raw Material",
+  semi_finished: "Semi-Finished",
+  consumable: "Consumable",
+  equipment: "Equipment",
+  service: "Service",
+};
+
+export const ITEM_STRUCTURE_LABELS: Record<ItemStructure, string> = {
+  single: "Single",
+  variant: "Variant",
+  recipe_based: "Recipe-Based",
+  custom: "Custom",
+};
 
 export type ProductStatus = RecordStatus | "archived";
 
@@ -35,6 +68,7 @@ export type Product = {
   taxRateId: string | null;
   taxRateName: string | null;
   productType: ProductType;
+  itemStructure: ItemStructure;
   salePrice: number;
   costPrice: number | null;
   compareAtPrice: number | null;
@@ -55,6 +89,7 @@ export type ProductListFilters = {
   search: string;
   categoryId: string;
   productType: ProductType | "all";
+  itemStructure: ItemStructure | "all";
   status: ProductStatus | "all";
   isPosVisible: "all" | "true" | "false";
   page: number;
@@ -69,6 +104,7 @@ export type CreateProductPayload = {
   unitId: string;
   taxRateId: string | null;
   productType: ProductType;
+  itemStructure: ItemStructure;
   salePrice: number;
   costPrice: number | null;
   sku: string | null;
@@ -115,7 +151,7 @@ export type ProductListResponse = {
 };
 
 export type ProductReferenceData = {
-  categories: { id: string; categoryName: string }[];
+  categories: { allowedProductTypes: ProductType[]; categoryName: string; id: string }[];
   units: Unit[];
   taxRates: TaxRate[];
 };

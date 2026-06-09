@@ -87,9 +87,15 @@ export type BakeryOrderPayment = {
 
 export type BakeryOrderPackaging = {
   id: string;
-  packagingItemId: string;
+  componentProductId: string | null;
+  componentVariantId: string | null;
+  componentProductName: string | null;
+  componentVariantName: string | null;
+  packagingItemId: string | null;
   packagingName: string;
   quantityRequired: number;
+  unitId: string;
+  unitName: string;
   createdAt: string;
 };
 
@@ -167,7 +173,8 @@ export type UpdateOrderProductionStatusPayload = {
 };
 
 export type AddOrderPackagingPayload = {
-  packagingItemId: string;
+  componentProductId: string;
+  componentVariantId: string | null;
   quantityRequired: number;
   unitId: string;
 };
@@ -180,7 +187,8 @@ export type ConvertOrderItemToProductPayload = {
   barcode: string | null;
   salePrice: number;
   unitId: string;
-  productType: "made_to_order";
+  productType: "finished_product";
+  itemStructure: "custom";
   isStockTracked: boolean;
   isExpiryTracked: boolean;
   isCustomOrderAvailable: boolean;

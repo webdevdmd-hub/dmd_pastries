@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import type { Branch } from "@/types/branch";
 import type { InventoryFilters } from "@/types/inventory";
+import { PRODUCT_TYPE_LABELS, PRODUCT_TYPES } from "@/types/product";
 
 type InventoryToolbarProps = {
   allowAllBranches?: boolean;
@@ -36,7 +37,7 @@ export function InventoryToolbar({
   };
 
   return (
-    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/70 p-4 shadow-soft lg:grid-cols-[1.3fr_repeat(3,1fr)_auto]">
+    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/70 p-4 shadow-soft lg:grid-cols-[1.3fr_repeat(4,1fr)_auto]">
       <Input
         aria-label="Search inventory"
         onChange={(event) => updateFilters({ search: event.target.value })}
@@ -66,11 +67,27 @@ export function InventoryToolbar({
           <SelectValue placeholder="Item type" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All types</SelectItem>
+          <SelectItem value="all">All item types</SelectItem>
           <SelectItem value="product">Products</SelectItem>
           <SelectItem value="product_variant">Variants</SelectItem>
-          <SelectItem value="ingredient">Ingredients</SelectItem>
-          <SelectItem value="packaging">Packaging</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select
+        onValueChange={(productType) =>
+          updateFilters({ productType: productType as InventoryFilters["productType"] })
+        }
+        value={filters.productType}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Product type" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All product types</SelectItem>
+          {PRODUCT_TYPES.map((productType) => (
+            <SelectItem key={productType} value={productType}>
+              {PRODUCT_TYPE_LABELS[productType]}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
       <Select
@@ -92,6 +109,7 @@ export function InventoryToolbar({
             search: "",
             branchId: resetBranchId,
             itemType: "all",
+            productType: "all",
             status: "all",
             lowStockOnly: false,
             expiryTrackedOnly: false,
@@ -103,7 +121,7 @@ export function InventoryToolbar({
       >
         Reset
       </Button>
-      <div className="flex flex-wrap items-center gap-4 lg:col-span-5">
+      <div className="flex flex-wrap items-center gap-4 lg:col-span-6">
         <label className="flex items-center gap-2 text-sm text-brand-mocha">
           <Checkbox
             checked={filters.lowStockOnly}

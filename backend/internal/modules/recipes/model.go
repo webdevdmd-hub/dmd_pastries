@@ -36,23 +36,25 @@ type Recipe struct {
 func (Recipe) TableName() string { return "recipes" }
 
 type RecipeIngredient struct {
-	ID                string         `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID        string         `gorm:"type:uuid;not null;index" json:"business_id"`
-	BranchID          string         `gorm:"type:uuid;not null;index" json:"branch_id"`
-	RecipeID          string         `gorm:"type:uuid;not null;index" json:"recipe_id"`
-	IngredientID      *string        `gorm:"type:uuid;index" json:"ingredient_id"`
-	InventoryItemID   *string        `gorm:"type:uuid;index" json:"inventory_item_id"`
-	ItemNameSnapshot  string         `gorm:"size:255;not null" json:"item_name_snapshot"`
-	QuantityRequired  float64        `gorm:"not null" json:"quantity_required"`
-	UnitID            string         `gorm:"type:uuid;not null;index" json:"unit_id"`
-	UnitCostSnapshot  float64        `gorm:"not null;default:0" json:"unit_cost_snapshot"`
-	TotalCost         float64        `gorm:"not null;default:0" json:"total_cost"`
-	WastagePercentage float64        `gorm:"not null;default:0" json:"wastage_percentage"`
-	SortOrder         int            `gorm:"not null;default:0" json:"sort_order"`
-	Notes             string         `json:"notes"`
-	CreatedAt         time.Time      `json:"created_at"`
-	UpdatedAt         time.Time      `json:"updated_at"`
-	DeletedAt         gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	ID                 string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID         string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID           string         `gorm:"type:uuid;not null;index" json:"branch_id"`
+	RecipeID           string         `gorm:"type:uuid;not null;index" json:"recipe_id"`
+	ComponentProductID *string        `gorm:"type:uuid;index" json:"component_product_id"`
+	ComponentVariantID *string        `gorm:"type:uuid;index" json:"component_variant_id"`
+	IngredientID       *string        `gorm:"type:uuid;index" json:"ingredient_id"`
+	InventoryItemID    *string        `gorm:"type:uuid;index" json:"inventory_item_id"`
+	ItemNameSnapshot   string         `gorm:"size:255;not null" json:"item_name_snapshot"`
+	QuantityRequired   float64        `gorm:"not null" json:"quantity_required"`
+	UnitID             string         `gorm:"type:uuid;not null;index" json:"unit_id"`
+	UnitCostSnapshot   float64        `gorm:"not null;default:0" json:"unit_cost_snapshot"`
+	TotalCost          float64        `gorm:"not null;default:0" json:"total_cost"`
+	WastagePercentage  float64        `gorm:"not null;default:0" json:"wastage_percentage"`
+	SortOrder          int            `gorm:"not null;default:0" json:"sort_order"`
+	Notes              string         `json:"notes"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 func (RecipeIngredient) TableName() string { return "recipe_ingredients" }
@@ -62,7 +64,9 @@ type RecipePackaging struct {
 	BusinessID            string         `gorm:"type:uuid;not null;index" json:"business_id"`
 	BranchID              string         `gorm:"type:uuid;not null;index" json:"branch_id"`
 	RecipeID              string         `gorm:"type:uuid;not null;index" json:"recipe_id"`
-	PackagingItemID       string         `gorm:"type:uuid;not null;index" json:"packaging_item_id"`
+	ComponentProductID    *string        `gorm:"type:uuid;index" json:"component_product_id"`
+	ComponentVariantID    *string        `gorm:"type:uuid;index" json:"component_variant_id"`
+	PackagingItemID       *string        `gorm:"type:uuid;index" json:"packaging_item_id"`
 	PackagingNameSnapshot string         `gorm:"size:255;not null" json:"packaging_name_snapshot"`
 	QuantityRequired      float64        `gorm:"not null" json:"quantity_required"`
 	UnitID                string         `gorm:"type:uuid;not null;index" json:"unit_id"`

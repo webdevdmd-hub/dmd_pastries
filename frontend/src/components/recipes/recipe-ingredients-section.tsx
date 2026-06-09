@@ -19,21 +19,29 @@ import { getErrorMessage } from "@/lib/api/client";
 import type {
   RecipeIngredientLine,
   RecipeIngredientPayload,
-  RecipeInventoryItemOption,
+  RecipeProductOption,
   RecipeUnitOption,
 } from "@/types/recipes";
 
+function componentKey(line: {
+  componentProductId: string | null;
+  componentVariantId: string | null;
+  inventoryItemId?: string;
+}): string {
+  return `${line.componentProductId ?? line.inventoryItemId ?? ""}:${line.componentVariantId ?? ""}`;
+}
+
 export function RecipeIngredientsSection({
   canManage,
+  componentProducts,
   draftLines = [],
-  inventoryItems,
   onDraftLinesChange,
   recipeId,
   units,
 }: {
   canManage: boolean;
+  componentProducts: RecipeProductOption[];
   draftLines?: RecipeIngredientPayload[];
-  inventoryItems: RecipeInventoryItemOption[];
   onDraftLinesChange?: (lines: RecipeIngredientPayload[]) => void;
   recipeId: string | null;
   units: RecipeUnitOption[];
@@ -51,13 +59,21 @@ export function RecipeIngredientsSection({
     line: RecipeIngredientPayload,
     index: number,
   ): RecipeIngredientLine => {
-    const item = inventoryItems.find((inventoryItem) => inventoryItem.id === line.inventoryItemId);
+    const item = componentProducts.find((component) => component.id === line.componentProductId);
+    const variant =
+      item?.variants.find((productVariant) => productVariant.id === line.componentVariantId) ??
+      null;
     const unit = units.find((unitOption) => unitOption.id === line.unitId);
 
     return {
       id: `draft-${String(index)}`,
-      inventoryItemId: line.inventoryItemId,
-      itemNameSnapshot: item?.itemName ?? "Ingredient",
+      componentProductId: line.componentProductId,
+      componentProductName: item?.productName ?? null,
+      componentProductType: item?.productType ?? null,
+      componentVariantId: line.componentVariantId,
+      componentVariantName: variant?.variantName ?? null,
+      inventoryItemId: "",
+      itemNameSnapshot: item?.productName ?? "Component product",
       notes: line.notes,
       quantityRequired: line.quantityRequired,
       sortOrder: line.sortOrder,
@@ -74,7 +90,7 @@ export function RecipeIngredientsSection({
     if (!recipeId) {
       const duplicate = draftLines.some(
         (line, index) =>
-          line.inventoryItemId === payload.inventoryItemId && index !== editingDraftIndex,
+          componentKey(line) === componentKey(payload) && index !== editingDraftIndex,
       );
 
       if (duplicate) {
@@ -94,7 +110,7 @@ export function RecipeIngredientsSection({
     }
 
     const duplicate = lines.some(
-      (line) => line.inventoryItemId === payload.inventoryItemId && line.id !== editingLine?.id,
+      (line) => componentKey(line) === componentKey(payload) && line.id !== editingLine?.id,
     );
 
     if (duplicate) {
@@ -165,7 +181,7 @@ export function RecipeIngredientsSection({
         ) : null}
         {editorOpen ? (
           <RecipeIngredientLineEditor
-            inventoryItems={inventoryItems}
+            componentProducts={componentProducts}
             line={editingLine}
             onCancel={() => {
               setEditingDraftIndex(null);

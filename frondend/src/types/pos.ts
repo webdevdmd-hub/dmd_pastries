@@ -1,6 +1,6 @@
 import type { DocumentCharge, DocumentChargeDraft } from "@/types/document-charges";
 import type { ProductCategory, Unit } from "@/types/master-data";
-import type { ProductType } from "@/types/product";
+import type { ItemStructure, ProductType } from "@/types/product";
 import type { ReceiptLayout, RecordStatus, SalesChannel, TaxRate } from "@/types/settings";
 
 export type POSProductVariant = {
@@ -31,6 +31,7 @@ export type POSProduct = {
   taxRateName: string | null;
   taxRatePercentage: number;
   productType: ProductType;
+  itemStructure: ItemStructure;
   salePrice: number;
   isStockTracked: boolean;
   currentStockQuantity: number | null;
@@ -44,6 +45,7 @@ export type POSProduct = {
 
 export type POSProductFilters = {
   categoryId: string;
+  itemStructure?: ItemStructure;
   search: string;
   limit: number;
 };

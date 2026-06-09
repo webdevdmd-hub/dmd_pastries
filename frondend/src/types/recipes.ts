@@ -1,3 +1,5 @@
+import type { ItemStructure, ProductType } from "@/types/product";
+
 export type RecipeStatus = "draft" | "active" | "inactive" | "archived";
 
 export type Recipe = {
@@ -29,6 +31,11 @@ export type Recipe = {
 
 export type RecipeIngredientLine = {
   id: string;
+  componentProductId: string | null;
+  componentVariantId: string | null;
+  componentProductName: string | null;
+  componentVariantName: string | null;
+  componentProductType: ProductType | null;
   inventoryItemId: string;
   itemNameSnapshot: string;
   quantityRequired: number;
@@ -44,6 +51,11 @@ export type RecipeIngredientLine = {
 
 export type RecipePackagingLine = {
   id: string;
+  componentProductId: string | null;
+  componentVariantId: string | null;
+  componentProductName: string | null;
+  componentVariantName: string | null;
+  componentProductType: ProductType | null;
   packagingItemId: string;
   packagingNameSnapshot: string;
   quantityRequired: number;
@@ -74,7 +86,8 @@ export type RecipeVersion = {
 };
 
 export type RecipeIngredientPayload = {
-  inventoryItemId: string;
+  componentProductId: string;
+  componentVariantId: string | null;
   quantityRequired: number;
   unitId: string;
   wastagePercentage: number;
@@ -83,7 +96,8 @@ export type RecipeIngredientPayload = {
 };
 
 export type RecipePackagingPayload = {
-  packagingItemId: string;
+  componentProductId: string;
+  componentVariantId: string | null;
   quantityRequired: number;
   unitId: string;
   isOptional: boolean;
@@ -130,7 +144,14 @@ export type RecipeFilters = {
 
 export type RecipeProductOption = {
   id: string;
+  productCode: string;
   productName: string;
+  productType: ProductType;
+  itemStructure: ItemStructure;
+  unitId: string;
+  unitName: string;
+  unitSymbol: string;
+  isStockTracked: boolean;
   variants: RecipeProductVariantOption[];
 };
 
@@ -139,23 +160,6 @@ export type RecipeProductVariantOption = {
   variantName: string;
   sku: string | null;
   salePrice: number;
-};
-
-export type RecipeInventoryItemOption = {
-  id: string;
-  itemName: string;
-  unitId: string;
-  unitName: string;
-  unitSymbol: string;
-  currentQuantity: number;
-};
-
-export type RecipePackagingOption = {
-  id: string;
-  packagingName: string;
-  unitId: string;
-  unitName: string;
-  unitSymbol: string;
 };
 
 export type RecipeUnitOption = {

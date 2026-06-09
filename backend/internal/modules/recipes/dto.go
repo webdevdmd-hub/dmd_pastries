@@ -55,21 +55,25 @@ type UpdateStatusRequest struct {
 }
 
 type RecipeIngredientInput struct {
-	IngredientID      string  `json:"ingredient_id"`
-	InventoryItemID   string  `json:"inventory_item_id"`
-	QuantityRequired  float64 `json:"quantity_required" binding:"required"`
-	UnitID            string  `json:"unit_id" binding:"required"`
-	WastagePercentage float64 `json:"wastage_percentage"`
-	SortOrder         int     `json:"sort_order"`
-	Notes             string  `json:"notes"`
+	ComponentProductID string  `json:"component_product_id"`
+	ComponentVariantID string  `json:"component_variant_id"`
+	IngredientID       string  `json:"ingredient_id"`
+	InventoryItemID    string  `json:"inventory_item_id"`
+	QuantityRequired   float64 `json:"quantity_required" binding:"required"`
+	UnitID             string  `json:"unit_id" binding:"required"`
+	WastagePercentage  float64 `json:"wastage_percentage"`
+	SortOrder          int     `json:"sort_order"`
+	Notes              string  `json:"notes"`
 }
 
 type RecipePackagingInput struct {
-	PackagingItemID  string  `json:"packaging_item_id" binding:"required"`
-	QuantityRequired float64 `json:"quantity_required" binding:"required"`
-	UnitID           string  `json:"unit_id" binding:"required"`
-	IsOptional       bool    `json:"is_optional"`
-	SortOrder        int     `json:"sort_order"`
+	ComponentProductID string  `json:"component_product_id"`
+	ComponentVariantID string  `json:"component_variant_id"`
+	PackagingItemID    string  `json:"packaging_item_id"`
+	QuantityRequired   float64 `json:"quantity_required" binding:"required"`
+	UnitID             string  `json:"unit_id" binding:"required"`
+	IsOptional         bool    `json:"is_optional"`
+	SortOrder          int     `json:"sort_order"`
 }
 
 type CreateVersionRequest struct {
@@ -119,25 +123,29 @@ type RecipeResponse struct {
 }
 
 type RecipeIngredientResponse struct {
-	ID                string    `json:"id"`
-	IngredientID      *string   `json:"ingredient_id"`
-	InventoryItemID   *string   `json:"inventory_item_id"`
-	ItemNameSnapshot  string    `json:"item_name_snapshot"`
-	QuantityRequired  float64   `json:"quantity_required"`
-	UnitID            string    `json:"unit_id"`
-	UnitSymbol        string    `json:"unit_symbol"`
-	UnitCostSnapshot  float64   `json:"unit_cost_snapshot"`
-	TotalCost         float64   `json:"total_cost"`
-	WastagePercentage float64   `json:"wastage_percentage"`
-	SortOrder         int       `json:"sort_order"`
-	Notes             string    `json:"notes"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                 string    `json:"id"`
+	ComponentProductID *string   `json:"component_product_id"`
+	ComponentVariantID *string   `json:"component_variant_id"`
+	IngredientID       *string   `json:"ingredient_id"`
+	InventoryItemID    *string   `json:"inventory_item_id"`
+	ItemNameSnapshot   string    `json:"item_name_snapshot"`
+	QuantityRequired   float64   `json:"quantity_required"`
+	UnitID             string    `json:"unit_id"`
+	UnitSymbol         string    `json:"unit_symbol"`
+	UnitCostSnapshot   float64   `json:"unit_cost_snapshot"`
+	TotalCost          float64   `json:"total_cost"`
+	WastagePercentage  float64   `json:"wastage_percentage"`
+	SortOrder          int       `json:"sort_order"`
+	Notes              string    `json:"notes"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 type RecipePackagingResponse struct {
 	ID                    string    `json:"id"`
-	PackagingItemID       string    `json:"packaging_item_id"`
+	ComponentProductID    *string   `json:"component_product_id"`
+	ComponentVariantID    *string   `json:"component_variant_id"`
+	PackagingItemID       *string   `json:"packaging_item_id"`
 	PackagingNameSnapshot string    `json:"packaging_name_snapshot"`
 	QuantityRequired      float64   `json:"quantity_required"`
 	UnitID                string    `json:"unit_id"`

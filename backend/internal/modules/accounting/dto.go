@@ -25,6 +25,11 @@ type PaymentAccountListQuery struct {
 	SortOrder   string
 }
 
+type SeedPaymentAccountsResponse struct {
+	CreatedPaymentAccounts int `json:"created_payment_accounts"`
+	LinkedPaymentMethods   int `json:"linked_payment_methods"`
+}
+
 type AccountTransferListQuery struct {
 	BranchID         string
 	PaymentAccountID string

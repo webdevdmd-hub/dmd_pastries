@@ -1,4 +1,5 @@
 import type { BranchStatus } from "@/types/branch";
+import type { ItemStructure, ProductType } from "@/types/product";
 
 export type PurchaseOrderStatus =
   | "draft"
@@ -23,6 +24,7 @@ export type PurchaseOrderItem = {
   id: string;
   itemType: PurchaseItemType;
   productId: string | null;
+  productVariantId: string | null;
   ingredientId: string | null;
   packagingItemId: string | null;
   itemNameSnapshot: string;
@@ -42,6 +44,7 @@ export type PurchaseInvoiceItem = {
   id: string;
   itemType: PurchaseItemType;
   productId: string | null;
+  productVariantId: string | null;
   ingredientId: string | null;
   packagingItemId: string | null;
   itemNameSnapshot: string;
@@ -62,6 +65,7 @@ export type PurchaseReceiptItem = {
   id: string;
   itemType: PurchaseItemType;
   productId: string | null;
+  productVariantId: string | null;
   ingredientId: string | null;
   packagingItemId: string | null;
   inventoryItemId: string | null;
@@ -80,6 +84,7 @@ export type PurchaseReturnItem = {
   purchaseReceiptItemId: string;
   itemType: PurchaseItemType;
   productId: string | null;
+  productVariantId: string | null;
   ingredientId: string | null;
   packagingItemId: string | null;
   itemNameSnapshot: string;
@@ -99,6 +104,7 @@ export type ReturnablePurchaseReceiptItem = {
   purchaseReceiptItemId: string;
   itemType: PurchaseItemType;
   productId: string | null;
+  productVariantId: string | null;
   ingredientId: string | null;
   packagingItemId: string | null;
   itemNameSnapshot: string;
@@ -231,6 +237,25 @@ export type PurchasingProductOption = {
   id: string;
   productName: string;
   productCode: string;
+  sku: string | null;
+  barcode: string | null;
+  productType: ProductType;
+  itemStructure: ItemStructure;
+  unitId: string;
+  unitName: string;
+  unitSymbol: string;
+  costPrice: number | null;
+  isStockTracked: boolean;
+  variants: PurchasingProductVariantOption[];
+};
+
+export type PurchasingProductVariantOption = {
+  id: string;
+  variantName: string;
+  sku: string | null;
+  barcode: string | null;
+  costPrice: number | null;
+  status: "active" | "inactive";
 };
 
 export type PurchasingIngredientOption = {
@@ -317,6 +342,7 @@ export type SupplierPayment = {
 export type PurchaseItemLinePayload = {
   itemType: PurchaseItemType;
   productId: string | null;
+  productVariantId: string | null;
   ingredientId: string | null;
   packagingItemId: string | null;
   quantity: number;

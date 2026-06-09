@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/api/client";
+import { PRODUCT_TYPES, type ProductType } from "@/types/product";
 import type {
   CreateRecipePayload,
   CreateRecipeVersionPayload,
@@ -7,10 +8,8 @@ import type {
   RecipeFilters,
   RecipeIngredientLine,
   RecipeIngredientPayload,
-  RecipeInventoryItemOption,
   RecipeNewProductVariantPayload,
   RecipePackagingLine,
-  RecipePackagingOption,
   RecipePackagingPayload,
   RecipeProductOption,
   RecipeProductVariantOption,
@@ -42,8 +41,8 @@ type BackendNewProductVariantPayload = {
 };
 
 type BackendIngredientPayload = {
-  ingredient_id?: string;
-  inventory_item_id?: string;
+  component_product_id?: string;
+  component_variant_id?: string | null;
   quantity_required?: number;
   unit_id?: string;
   wastage_percentage?: number;
@@ -52,7 +51,8 @@ type BackendIngredientPayload = {
 };
 
 type BackendPackagingPayload = {
-  packaging_item_id?: string;
+  component_product_id?: string;
+  component_variant_id?: string | null;
   quantity_required?: number;
   unit_id?: string;
   is_optional?: boolean;
@@ -77,6 +77,18 @@ function numberValue(value: unknown, fallback = 0): number {
 
 function booleanValue(value: unknown, fallback = false): boolean {
   return typeof value === "boolean" ? value : fallback;
+}
+
+function productTypeValue(value: unknown, fallback: ProductType = "finished_product"): ProductType {
+  return typeof value === "string" && PRODUCT_TYPES.includes(value as ProductType)
+    ? (value as ProductType)
+    : fallback;
+}
+
+function optionalProductType(value: unknown): ProductType | null {
+  return typeof value === "string" && PRODUCT_TYPES.includes(value as ProductType)
+    ? (value as ProductType)
+    : null;
 }
 
 function isRecipeStatus(value: unknown): value is RecipeStatus {
@@ -152,10 +164,18 @@ function parseIngredientLine(value: unknown): RecipeIngredientLine {
 
   return {
     id: stringValue(value.id),
+    componentProductId: optionalString(value.component_product_id),
+    componentVariantId: optionalString(value.component_variant_id),
+    componentProductName: optionalString(value.component_product_name),
+    componentVariantName: optionalString(value.component_variant_name),
+    componentProductType: optionalProductType(value.component_product_type),
     inventoryItemId: stringValue(value.ingredient_id, stringValue(value.inventory_item_id)),
     itemNameSnapshot: stringValue(
       value.item_name_snapshot,
-      stringValue(value.ingredient_name_snapshot, "Ingredient"),
+      stringValue(
+        value.component_product_name,
+        stringValue(value.ingredient_name_snapshot, "Ingredient"),
+      ),
     ),
     quantityRequired: numberValue(value.quantity_required),
     unitId: stringValue(value.unit_id),
@@ -176,8 +196,16 @@ function parsePackagingLine(value: unknown): RecipePackagingLine {
 
   return {
     id: stringValue(value.id),
+    componentProductId: optionalString(value.component_product_id),
+    componentVariantId: optionalString(value.component_variant_id),
+    componentProductName: optionalString(value.component_product_name),
+    componentVariantName: optionalString(value.component_variant_name),
+    componentProductType: optionalProductType(value.component_product_type),
     packagingItemId: stringValue(value.packaging_item_id),
-    packagingNameSnapshot: stringValue(value.packaging_name_snapshot, "Packaging item"),
+    packagingNameSnapshot: stringValue(
+      value.packaging_name_snapshot,
+      stringValue(value.component_product_name, "Packaging item"),
+    ),
     quantityRequired: numberValue(value.quantity_required),
     unitId: stringValue(value.unit_id),
     unitName: stringValue(value.unit_name, "Unit"),
@@ -238,39 +266,22 @@ function parseProductOption(value: unknown): RecipeProductOption {
 
   return {
     id: stringValue(value.id),
+    productCode: stringValue(value.product_code),
     productName: stringValue(value.product_name, "Product"),
+    productType: productTypeValue(value.product_type),
+    itemStructure:
+      value.item_structure === "variant" ||
+      value.item_structure === "recipe_based" ||
+      value.item_structure === "custom"
+        ? value.item_structure
+        : "single",
+    unitId: stringValue(value.unit_id),
+    unitName: stringValue(value.unit_name, "Unit"),
+    unitSymbol: stringValue(value.unit_symbol),
+    isStockTracked: booleanValue(value.is_stock_tracked),
     variants: Array.isArray(value.variants)
       ? value.variants.map(parseProductVariantOption).filter((variant) => variant.id.length > 0)
       : [],
-  };
-}
-
-function parseInventoryOption(value: unknown): RecipeInventoryItemOption {
-  if (!isObject(value)) {
-    throw new Error("Backend inventory option payload is invalid.");
-  }
-
-  return {
-    id: stringValue(value.id),
-    itemName: stringValue(value.ingredient_name, stringValue(value.item_name, "Ingredient")),
-    unitId: stringValue(value.unit_id),
-    unitName: stringValue(value.unit_name, "Unit"),
-    unitSymbol: stringValue(value.unit_symbol),
-    currentQuantity: numberValue(value.current_quantity),
-  };
-}
-
-function parsePackagingOption(value: unknown): RecipePackagingOption {
-  if (!isObject(value)) {
-    throw new Error("Backend packaging option payload is invalid.");
-  }
-
-  return {
-    id: stringValue(value.id),
-    packagingName: stringValue(value.packaging_name, "Packaging item"),
-    unitId: stringValue(value.unit_id),
-    unitName: stringValue(value.unit_name, "Unit"),
-    unitSymbol: stringValue(value.unit_symbol),
   };
 }
 
@@ -301,7 +312,8 @@ function queryString(params: Record<string, string | number | null | undefined>)
 
 function ingredientPayload(payload: RecipeIngredientPayload): BackendIngredientPayload {
   return {
-    ingredient_id: payload.inventoryItemId,
+    component_product_id: payload.componentProductId,
+    ...(payload.componentVariantId ? { component_variant_id: payload.componentVariantId } : {}),
     quantity_required: payload.quantityRequired,
     unit_id: payload.unitId,
     wastage_percentage: payload.wastagePercentage,
@@ -312,7 +324,8 @@ function ingredientPayload(payload: RecipeIngredientPayload): BackendIngredientP
 
 function packagingPayload(payload: RecipePackagingPayload): BackendPackagingPayload {
   return {
-    packaging_item_id: payload.packagingItemId,
+    component_product_id: payload.componentProductId,
+    ...(payload.componentVariantId ? { component_variant_id: payload.componentVariantId } : {}),
     quantity_required: payload.quantityRequired,
     unit_id: payload.unitId,
     is_optional: payload.isOptional,
@@ -617,25 +630,23 @@ export async function getRecipeProducts(): Promise<RecipeProductOption[]> {
     parse: (data) => parseList(data, parseProductOption),
   });
 
-  return response.data;
+  return response.data.filter(
+    (product) =>
+      product.productType === "finished_product" || product.productType === "semi_finished",
+  );
 }
 
-export async function getRecipeInventoryItems(): Promise<RecipeInventoryItemOption[]> {
-  const response = await apiRequest<RecipeInventoryItemOption[]>("/api/v1/ingredients?limit=100", {
+export async function getRecipeComponentProducts(): Promise<RecipeProductOption[]> {
+  const response = await apiRequest<RecipeProductOption[]>("/api/v1/products?limit=100", {
     authMode: "appwrite",
-    parse: (data) => parseList(data, parseInventoryOption),
+    parse: (data) => parseList(data, parseProductOption),
   });
 
-  return response.data;
-}
-
-export async function getRecipePackagingItems(): Promise<RecipePackagingOption[]> {
-  const response = await apiRequest<RecipePackagingOption[]>("/api/v1/packaging?limit=100", {
-    authMode: "appwrite",
-    parse: (data) => parseList(data, parsePackagingOption),
-  });
-
-  return response.data;
+  return response.data.filter((product) =>
+    ["ingredient", "packaging", "raw_material", "semi_finished", "consumable"].includes(
+      product.productType,
+    ),
+  );
 }
 
 export async function getRecipeUnits(): Promise<RecipeUnitOption[]> {

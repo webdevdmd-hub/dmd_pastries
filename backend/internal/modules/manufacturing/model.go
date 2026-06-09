@@ -43,6 +43,8 @@ type ProductionIngredientConsumption struct {
 	ID                 string    `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID         string    `gorm:"type:uuid;not null;index" json:"business_id"`
 	ProductionBatchID  string    `gorm:"type:uuid;not null;index" json:"production_batch_id"`
+	ComponentProductID *string   `gorm:"type:uuid;index" json:"component_product_id"`
+	ComponentVariantID *string   `gorm:"type:uuid;index" json:"component_variant_id"`
 	InventoryItemID    string    `gorm:"type:uuid;not null;index" json:"inventory_item_id"`
 	RecipeIngredientID string    `gorm:"type:uuid;not null;index" json:"recipe_ingredient_id"`
 	ItemNameSnapshot   string    `gorm:"size:255;not null" json:"item_name_snapshot"`
@@ -65,7 +67,10 @@ type ProductionPackagingConsumption struct {
 	ID                    string    `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID            string    `gorm:"type:uuid;not null;index" json:"business_id"`
 	ProductionBatchID     string    `gorm:"type:uuid;not null;index" json:"production_batch_id"`
-	PackagingItemID       string    `gorm:"type:uuid;not null;index" json:"packaging_item_id"`
+	ComponentProductID    *string   `gorm:"type:uuid;index" json:"component_product_id"`
+	ComponentVariantID    *string   `gorm:"type:uuid;index" json:"component_variant_id"`
+	InventoryItemID       *string   `gorm:"type:uuid;index" json:"inventory_item_id"`
+	PackagingItemID       *string   `gorm:"type:uuid;index" json:"packaging_item_id"`
 	RecipePackagingID     string    `gorm:"type:uuid;not null;index" json:"recipe_packaging_id"`
 	PackagingNameSnapshot string    `gorm:"size:255;not null" json:"packaging_name_snapshot"`
 	PlannedQuantity       float64   `gorm:"not null" json:"planned_quantity"`

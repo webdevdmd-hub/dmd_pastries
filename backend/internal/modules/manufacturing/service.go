@@ -486,9 +486,9 @@ func (s *Service) CompleteBatch(currentUser *utils.AuthContext, id string, req C
 				}
 				return apperrors.BadRequest("required packaging actual quantities must be greater than zero", map[string]string{"line_id": line.ID})
 			}
-			inventoryItem, err := s.inventoryRepo.FindExistingItem(tx, currentUser.BusinessID, batch.BranchID, "packaging", &line.PackagingItemID)
+			inventoryItem, err := s.resolveProductionPackagingInventoryItem(tx, currentUser.BusinessID, batch.BranchID, line)
 			if err != nil {
-				return notFound(err, "packaging inventory item not found")
+				return err
 			}
 			if inventoryItem.UnitID != line.UnitID {
 				return apperrors.BadRequest("unit conversion is not available yet; packaging unit must match inventory unit", nil)
@@ -731,11 +731,16 @@ func (s *Service) buildIngredientLines(tx *gorm.DB, businessID, batchID, branchI
 		planned := roundQuantity(recipeLine.QuantityRequired * ratio)
 		actual := planned
 		lines = append(lines, ProductionIngredientConsumption{ID: utils.NewUUID(), BusinessID: businessID, ProductionBatchID: batchID, InventoryItemID: item.ID, RecipeIngredientID: recipeLine.ID, ItemNameSnapshot: recipeLine.ItemNameSnapshot, PlannedQuantity: planned, ActualQuantity: actual, UnitID: recipeLine.UnitID, UnitCostSnapshot: recipeLine.UnitCostSnapshot, TotalCost: roundMoney(actual * recipeLine.UnitCostSnapshot), WastageQuantity: roundQuantity(recipeLine.QuantityRequired * ratio * recipeLine.WastagePercentage / 100)})
+		lines[len(lines)-1].ComponentProductID = recipeLine.ComponentProductID
+		lines[len(lines)-1].ComponentVariantID = recipeLine.ComponentVariantID
 	}
 	return lines, nil
 }
 
 func (s *Service) resolveRecipeIngredientInventoryItem(tx *gorm.DB, businessID, branchID string, recipeLine recipeIngredientInfo) (*inventory.InventoryItem, error) {
+	if recipeLine.ComponentProductID != nil {
+		return s.findOrCreateProductInventoryItem(tx, businessID, branchID, *recipeLine.ComponentProductID, recipeLine.ComponentVariantID, recipeLine.UnitID)
+	}
 	if recipeLine.InventoryItemID != nil {
 		item, err := s.inventoryRepo.FindInventoryItem(*recipeLine.InventoryItemID, businessID)
 		if err != nil {
@@ -794,11 +799,32 @@ func (s *Service) buildPackagingLines(tx *gorm.DB, businessID, batchID, branchID
 	}
 	lines := make([]ProductionPackagingConsumption, 0, len(recipeLines))
 	for _, recipeLine := range recipeLines {
+		item, err := s.resolveRecipePackagingInventoryItem(tx, businessID, branchID, recipeLine)
+		if err != nil {
+			return nil, err
+		}
+		if item.UnitID != recipeLine.UnitID {
+			return nil, apperrors.BadRequest("unit conversion is not available yet; recipe packaging unit must match inventory unit", nil)
+		}
 		planned := roundQuantity(recipeLine.QuantityRequired * ratio)
 		actual := planned
-		lines = append(lines, ProductionPackagingConsumption{ID: utils.NewUUID(), BusinessID: businessID, ProductionBatchID: batchID, PackagingItemID: recipeLine.PackagingItemID, RecipePackagingID: recipeLine.ID, PackagingNameSnapshot: recipeLine.PackagingNameSnapshot, PlannedQuantity: planned, ActualQuantity: actual, UnitID: recipeLine.UnitID, UnitCostSnapshot: recipeLine.UnitCostSnapshot, TotalCost: roundMoney(actual * recipeLine.UnitCostSnapshot), IsOptional: recipeLine.IsOptional})
+		lines = append(lines, ProductionPackagingConsumption{ID: utils.NewUUID(), BusinessID: businessID, ProductionBatchID: batchID, ComponentProductID: recipeLine.ComponentProductID, ComponentVariantID: recipeLine.ComponentVariantID, InventoryItemID: &item.ID, PackagingItemID: recipeLine.PackagingItemID, RecipePackagingID: recipeLine.ID, PackagingNameSnapshot: recipeLine.PackagingNameSnapshot, PlannedQuantity: planned, ActualQuantity: actual, UnitID: recipeLine.UnitID, UnitCostSnapshot: recipeLine.UnitCostSnapshot, TotalCost: roundMoney(actual * recipeLine.UnitCostSnapshot), IsOptional: recipeLine.IsOptional})
 	}
 	return lines, nil
+}
+
+func (s *Service) resolveRecipePackagingInventoryItem(tx *gorm.DB, businessID, branchID string, recipeLine recipePackagingInfo) (*inventory.InventoryItem, error) {
+	if recipeLine.ComponentProductID != nil {
+		return s.findOrCreateProductInventoryItem(tx, businessID, branchID, *recipeLine.ComponentProductID, recipeLine.ComponentVariantID, recipeLine.UnitID)
+	}
+	if recipeLine.PackagingItemID == nil {
+		return nil, apperrors.BadRequest("recipe packaging must be linked to component_product_id for manufacturing", map[string]string{"recipe_packaging_id": recipeLine.ID})
+	}
+	item, err := s.inventoryRepo.FindExistingItem(tx, businessID, branchID, "packaging", recipeLine.PackagingItemID)
+	if err != nil {
+		return nil, notFound(err, "packaging inventory item not found")
+	}
+	return item, nil
 }
 
 func (s *Service) recalculateBatchCosts(tx *gorm.DB, businessID, batchID string) error {
@@ -850,6 +876,9 @@ func (s *Service) findOrCreateProductInventoryItem(tx *gorm.DB, businessID, bran
 	if err != nil {
 		return nil, notFound(err, "product not found")
 	}
+	if !product.IsStockTracked {
+		return nil, apperrors.BadRequest("manufacturing inventory movement requires stock-tracked products", map[string]interface{}{"product_id": product.ID, "product_name": product.ProductName})
+	}
 	if variant, err := s.repo.ProductVariant(tx, businessID, branchID, productID, productVariantID); err != nil {
 		return nil, notFound(err, "product variant not found")
 	} else if variant != nil && variant.Status != "active" {
@@ -859,6 +888,27 @@ func (s *Service) findOrCreateProductInventoryItem(tx *gorm.DB, businessID, bran
 	item = &inventory.InventoryItem{ID: utils.NewUUID(), BusinessID: businessID, BranchID: branchID, ProductID: &productIDPtr, ProductVariantID: productVariantID, ItemType: itemType, CurrentQuantity: 0, ReservedQuantity: 0, AvailableQuantity: 0, ReorderLevel: 0, UnitID: unitID, IsExpiryTracked: product.IsExpiryTracked, Status: "active"}
 	if err := s.inventoryRepo.CreateInventoryItem(tx, item); err != nil {
 		return nil, err
+	}
+	return item, nil
+}
+
+func (s *Service) resolveProductionPackagingInventoryItem(tx *gorm.DB, businessID, branchID string, line ProductionPackagingConsumption) (*inventory.InventoryItem, error) {
+	if line.InventoryItemID != nil {
+		item, err := s.inventoryRepo.FindInventoryItem(*line.InventoryItemID, businessID)
+		if err != nil {
+			return nil, notFound(err, "packaging inventory item not found")
+		}
+		if item.BranchID != branchID {
+			return nil, apperrors.BadRequest("packaging inventory item branch does not match production batch branch", nil)
+		}
+		return item, nil
+	}
+	if line.PackagingItemID == nil {
+		return nil, apperrors.BadRequest("production packaging line must have inventory_item_id", map[string]string{"line_id": line.ID})
+	}
+	item, err := s.inventoryRepo.FindExistingItem(tx, businessID, branchID, "packaging", line.PackagingItemID)
+	if err != nil {
+		return nil, notFound(err, "packaging inventory item not found")
 	}
 	return item, nil
 }
@@ -895,7 +945,7 @@ func (s *Service) batchResponse(businessID string, batch ProductionBatch, includ
 func (s *Service) ingredientResponses(items []ProductionIngredientConsumption) []ProductionIngredientResponse {
 	result := make([]ProductionIngredientResponse, 0, len(items))
 	for _, item := range items {
-		result = append(result, ProductionIngredientResponse{ID: item.ID, InventoryItemID: item.InventoryItemID, RecipeIngredientID: item.RecipeIngredientID, ItemNameSnapshot: item.ItemNameSnapshot, PlannedQuantity: roundQuantity(item.PlannedQuantity), ActualQuantity: roundQuantity(item.ActualQuantity), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), UnitCostSnapshot: roundMoney(item.UnitCostSnapshot), TotalCost: roundMoney(item.TotalCost), WastageQuantity: roundQuantity(item.WastageQuantity), StockMovementID: item.StockMovementID, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
+		result = append(result, ProductionIngredientResponse{ID: item.ID, ComponentProductID: item.ComponentProductID, ComponentVariantID: item.ComponentVariantID, InventoryItemID: item.InventoryItemID, RecipeIngredientID: item.RecipeIngredientID, ItemNameSnapshot: item.ItemNameSnapshot, PlannedQuantity: roundQuantity(item.PlannedQuantity), ActualQuantity: roundQuantity(item.ActualQuantity), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), UnitCostSnapshot: roundMoney(item.UnitCostSnapshot), TotalCost: roundMoney(item.TotalCost), WastageQuantity: roundQuantity(item.WastageQuantity), StockMovementID: item.StockMovementID, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
 	}
 	return result
 }
@@ -903,7 +953,7 @@ func (s *Service) ingredientResponses(items []ProductionIngredientConsumption) [
 func (s *Service) packagingResponses(items []ProductionPackagingConsumption) []ProductionPackagingResponse {
 	result := make([]ProductionPackagingResponse, 0, len(items))
 	for _, item := range items {
-		result = append(result, ProductionPackagingResponse{ID: item.ID, PackagingItemID: item.PackagingItemID, RecipePackagingID: item.RecipePackagingID, PackagingNameSnapshot: item.PackagingNameSnapshot, PlannedQuantity: roundQuantity(item.PlannedQuantity), ActualQuantity: roundQuantity(item.ActualQuantity), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), UnitCostSnapshot: roundMoney(item.UnitCostSnapshot), TotalCost: roundMoney(item.TotalCost), IsOptional: item.IsOptional, StockMovementID: item.StockMovementID, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
+		result = append(result, ProductionPackagingResponse{ID: item.ID, ComponentProductID: item.ComponentProductID, ComponentVariantID: item.ComponentVariantID, InventoryItemID: item.InventoryItemID, PackagingItemID: item.PackagingItemID, RecipePackagingID: item.RecipePackagingID, PackagingNameSnapshot: item.PackagingNameSnapshot, PlannedQuantity: roundQuantity(item.PlannedQuantity), ActualQuantity: roundQuantity(item.ActualQuantity), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), UnitCostSnapshot: roundMoney(item.UnitCostSnapshot), TotalCost: roundMoney(item.TotalCost), IsOptional: item.IsOptional, StockMovementID: item.StockMovementID, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
 	}
 	return result
 }

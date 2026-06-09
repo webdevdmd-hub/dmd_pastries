@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { InventoryItem } from "@/types/inventory";
+import { PRODUCT_TYPE_LABELS } from "@/types/product";
 
 type InventoryTableProps = {
   canManage: boolean;
@@ -28,14 +29,22 @@ type InventoryTableProps = {
 };
 
 function typeLabel(value: InventoryItem["itemType"]): string {
-  if (value === "product") return "Product";
-  if (value === "product_variant") return "Variant";
-  if (value === "ingredient") return "Ingredient";
-  return "Packaging";
+  if (value === "product") return "Product Master";
+  if (value === "product_variant") return "Product Variant";
+  if (value === "ingredient") return "Legacy Ingredient";
+  return "Legacy Packaging";
 }
 
 function formatQuantity(value: number): string {
   return new Intl.NumberFormat("en-AE", { maximumFractionDigits: 3 }).format(value);
+}
+
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    maximumFractionDigits: 2,
+    style: "currency",
+  }).format(value);
 }
 
 export function InventoryTable({
@@ -60,6 +69,8 @@ export function InventoryTable({
           <TableHead>Current Qty</TableHead>
           <TableHead>Reserved</TableHead>
           <TableHead>Available</TableHead>
+          <TableHead>Avg Cost</TableHead>
+          <TableHead>Value</TableHead>
           <TableHead>
             <ReorderLevelHeader>Reorder</ReorderLevelHeader>
           </TableHead>
@@ -73,6 +84,10 @@ export function InventoryTable({
       <TableBody>
         {items.map((item) => {
           const isNotInitialized = item.status === "not_initialized" || item.id.length === 0;
+          const canCreateProductMasterOpeningStock =
+            isNotInitialized &&
+            item.canAddOpeningStock &&
+            (item.itemType === "product" || item.itemType === "product_variant");
           const rowKey =
             item.id ||
             `${item.itemType}-${
@@ -101,13 +116,27 @@ export function InventoryTable({
                     {item.itemCode ||
                       (isNotInitialized ? "Catalog item without stock" : item.id.slice(0, 8))}
                   </p>
+                  {item.variantName ? (
+                    <p className="text-xs text-brand-mocha">Variant: {item.variantName}</p>
+                  ) : null}
                 </div>
               </TableCell>
-              <TableCell>{typeLabel(item.itemType)}</TableCell>
+              <TableCell>
+                <div className="space-y-1">
+                  <p>{typeLabel(item.itemType)}</p>
+                  {item.productType ? (
+                    <p className="text-xs text-brand-mocha">
+                      {PRODUCT_TYPE_LABELS[item.productType]}
+                    </p>
+                  ) : null}
+                </div>
+              </TableCell>
               <TableCell>{item.branchName}</TableCell>
               <TableCell>{formatQuantity(item.currentQuantity)}</TableCell>
               <TableCell>{formatQuantity(item.reservedQuantity)}</TableCell>
               <TableCell className="font-bold">{formatQuantity(item.availableQuantity)}</TableCell>
+              <TableCell>{formatMoney(item.averageCost)}</TableCell>
+              <TableCell className="font-semibold">{formatMoney(item.inventoryValue)}</TableCell>
               <TableCell>{formatQuantity(item.reorderLevel)}</TableCell>
               <TableCell>{item.unitSymbol || item.unitName}</TableCell>
               <TableCell>
@@ -142,7 +171,7 @@ export function InventoryTable({
                       </Link>
                     </Button>
                   ) : null}
-                  {canManage && isNotInitialized && item.canAddOpeningStock ? (
+                  {canManage && canCreateProductMasterOpeningStock ? (
                     <Button
                       aria-label={`Add opening stock for ${item.itemName}`}
                       onClick={() => onAddOpeningStock(item)}
@@ -153,6 +182,14 @@ export function InventoryTable({
                       <Plus className="h-4 w-4" />
                       Add Opening Stock
                     </Button>
+                  ) : null}
+                  {canManage &&
+                  isNotInitialized &&
+                  item.canAddOpeningStock &&
+                  !canCreateProductMasterOpeningStock ? (
+                    <span className="rounded-full border border-brand-cappuccino px-2 py-1 text-xs text-brand-mocha">
+                      Legacy read-only
+                    </span>
                   ) : null}
                   {canManage && !isNotInitialized ? (
                     <>

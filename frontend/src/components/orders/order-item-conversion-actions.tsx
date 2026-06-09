@@ -150,6 +150,7 @@ export function OrderItemConversionActions({
       limit: 250,
       page: 1,
       productType: "all",
+      itemStructure: "all",
       search: "",
       sortBy: "product_name",
       sortOrder: "asc",
@@ -235,7 +236,8 @@ export function OrderItemConversionActions({
       isStockTracked: productForm.isStockTracked,
       productCode: nullableText(productForm.productCode),
       productName: productForm.productName.trim(),
-      productType: "made_to_order",
+      productType: "finished_product",
+      itemStructure: "custom",
       salePrice: numberOrZero(productForm.salePrice),
       showInPos: productForm.showInPos,
       sku: nullableText(productForm.sku),
@@ -395,7 +397,11 @@ export function OrderItemConversionActions({
             </label>
             <label className="grid gap-1.5">
               <span className="text-sm font-medium text-brand-espresso">Product type</span>
-              <Input disabled value="Made to order" />
+              <Input disabled value="Finished Product" />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="text-sm font-medium text-brand-espresso">Item structure</span>
+              <Input disabled value="Custom" />
             </label>
             <label className="grid gap-1.5 md:col-span-2">
               <span className="text-sm font-medium text-brand-espresso">Description</span>

@@ -454,6 +454,77 @@ func (s *Service) CreatePaymentAccount(currentUser *utils.AuthContext, req Creat
 	return s.GetPaymentAccount(currentUser, createdID)
 }
 
+func (s *Service) SeedDefaultPaymentAccounts(currentUser *utils.AuthContext, ipAddress, userAgent string) (*SeedPaymentAccountsResponse, error) {
+	var result SeedPaymentAccountsResponse
+	type seed struct {
+		MethodName        string
+		MethodType        string
+		AccountNamePrefix string
+		AccountType       string
+		ChartCode         string
+		IsDefault         bool
+		RequiresReference bool
+	}
+	seeds := []seed{
+		{MethodName: "Cash", MethodType: "cash", AccountNamePrefix: "Cash Box", AccountType: "cash", ChartCode: "1000", IsDefault: true, RequiresReference: false},
+		{MethodName: "Card", MethodType: "card", AccountNamePrefix: "Card Clearing", AccountType: "card_clearing", ChartCode: "1030", RequiresReference: true},
+		{MethodName: "Bank Transfer", MethodType: "bank_transfer", AccountNamePrefix: "Bank Account", AccountType: "bank", ChartCode: "1010", RequiresReference: true},
+	}
+	if err := s.withTransaction(func(tx *gorm.DB) error {
+		if err := SeedDefaultChartOfAccounts(tx, currentUser.BusinessID); err != nil {
+			return apperrors.Internal("failed to seed chart of accounts")
+		}
+		branches, err := s.repo.ActiveBranches(tx, currentUser.BusinessID)
+		if err != nil {
+			return apperrors.Internal("failed to load branches")
+		}
+		if len(branches) == 0 {
+			return apperrors.BadRequest("at least one active branch is required to seed payment accounts", nil)
+		}
+		for _, branch := range branches {
+			if !currentUser.CanAccessBranch(branch.ID) {
+				continue
+			}
+			for _, seed := range seeds {
+				method, err := s.repo.EnsurePaymentMethod(tx, currentUser.BusinessID, seed.MethodName, seed.MethodType, seed.IsDefault, seed.RequiresReference)
+				if err != nil {
+					return apperrors.Internal("failed to seed payment methods")
+				}
+				chart, err := s.repo.FindChartAccountByCode(tx, currentUser.BusinessID, seed.ChartCode)
+				if err != nil {
+					return apperrors.Internal("failed to load chart account for payment account")
+				}
+				accountName := strings.TrimSpace(seed.AccountNamePrefix + " - " + branch.BranchName)
+				account, created, err := s.repo.FindOrCreatePaymentAccount(tx, currentUser.BusinessID, branch.ID, accountName, seed.AccountType, chart.ID, currentUser.UserID)
+				if err != nil {
+					return apperrors.Internal("failed to seed payment accounts")
+				}
+				if created {
+					result.CreatedPaymentAccounts++
+				}
+				linked, err := s.repo.UpsertPaymentMethodAccountMapping(tx, currentUser.BusinessID, branch.ID, method.ID, account.ID)
+				if err != nil {
+					return apperrors.Internal("failed to link payment method to payment account")
+				}
+				if linked {
+					result.LinkedPaymentMethods++
+				}
+				if branch.ID == branches[0].ID {
+					if err := tx.Table("payment_methods").
+						Where("id = ? AND business_id = ?", method.ID, currentUser.BusinessID).
+						Update("default_payment_account_id", account.ID).Error; err != nil {
+						return apperrors.Internal("failed to update default payment account")
+					}
+				}
+			}
+		}
+		return s.writeEntityAudit(tx, currentUser, "payment_accounts.seed_defaults", "payment_account", currentUser.BusinessID, "Default payment accounts seeded and linked.", ipAddress, userAgent)
+	}); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (s *Service) GetPaymentAccount(currentUser *utils.AuthContext, id string) (*PaymentAccountResponse, error) {
 	account, err := s.repo.FindPaymentAccountByID(currentUser.BusinessID, id)
 	if err != nil {

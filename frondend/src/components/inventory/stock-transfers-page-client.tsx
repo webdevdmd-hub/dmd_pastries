@@ -51,17 +51,18 @@ import {
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 import type {
-  InventoryItemType,
   StockTransferFilters,
   StockTransferPayload,
   StockTransferStatus,
 } from "@/types/inventory";
+import { PRODUCT_TYPE_LABELS, PRODUCT_TYPES } from "@/types/product";
 
 function defaultFilters(): StockTransferFilters {
   return {
     search: "",
     status: "all",
     itemType: "all",
+    productType: "all",
     stockLocationId: "all",
     page: 1,
     limit: 100,
@@ -108,6 +109,7 @@ export function StockTransfersPageClient(): JSX.Element {
       search: "",
       branchId: branchScope.defaultBranchId,
       itemType: "all",
+      productType: "all",
       status: "active",
       lowStockOnly: false,
       expiryTrackedOnly: false,
@@ -134,7 +136,14 @@ export function StockTransfersPageClient(): JSX.Element {
         ]
           .filter((part) => part.length > 0)
           .join(" / "),
-        keywords: [item.itemName, item.itemCode, item.itemType, item.branchName, item.unitSymbol],
+        keywords: [
+          item.itemName,
+          item.itemCode,
+          item.itemType,
+          item.productType ?? "",
+          item.branchName,
+          item.unitSymbol,
+        ],
         disabled: item.availableQuantity <= 0,
       })),
     [inventoryQuery.data],
@@ -228,7 +237,7 @@ export function StockTransfersPageClient(): JSX.Element {
       />
 
       <Card>
-        <CardContent className="grid gap-4 p-5 md:grid-cols-3">
+        <CardContent className="grid gap-4 p-5 md:grid-cols-4">
           <div className="space-y-1">
             <Label>Search</Label>
             <Input
@@ -269,7 +278,7 @@ export function StockTransfersPageClient(): JSX.Element {
               onValueChange={(value) =>
                 setFilters((current) => ({
                   ...current,
-                  itemType: value as InventoryItemType | "all",
+                  itemType: value as StockTransferFilters["itemType"],
                   page: 1,
                 }))
               }
@@ -281,8 +290,31 @@ export function StockTransfersPageClient(): JSX.Element {
                 <SelectItem value="all">All item types</SelectItem>
                 <SelectItem value="product">Products</SelectItem>
                 <SelectItem value="product_variant">Variants</SelectItem>
-                <SelectItem value="ingredient">Ingredients</SelectItem>
-                <SelectItem value="packaging">Packaging</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Product type</Label>
+            <Select
+              value={filters.productType}
+              onValueChange={(value) =>
+                setFilters((current) => ({
+                  ...current,
+                  productType: value as StockTransferFilters["productType"],
+                  page: 1,
+                }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All product types</SelectItem>
+                {PRODUCT_TYPES.map((productType) => (
+                  <SelectItem key={productType} value={productType}>
+                    {PRODUCT_TYPE_LABELS[productType]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

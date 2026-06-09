@@ -36,7 +36,6 @@ import {
   useDeletePurchaseOrder,
   usePurchaseOrders,
   usePurchasingBranches,
-  usePurchasingIngredients,
   usePurchasingProducts,
   usePurchasingSuppliers,
   usePurchasingTaxRates,
@@ -103,7 +102,6 @@ export function PurchaseOrdersPageClient(): JSX.Element {
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const branchesQuery = usePurchasingBranches(canView);
   const productsQuery = usePurchasingProducts(canView);
-  const ingredientsQuery = usePurchasingIngredients(canView);
   const unitsQuery = usePurchasingUnits(canView);
   const taxRatesQuery = usePurchasingTaxRates(canView);
   const createMutation = useCreatePurchaseOrder();
@@ -285,7 +283,6 @@ export function PurchaseOrdersPageClient(): JSX.Element {
 
       <PurchaseOrderFormDialog
         branches={branchesQuery.data ?? []}
-        ingredients={ingredientsQuery.data ?? []}
         isSubmitting={createMutation.isPending || updateMutation.isPending}
         onClose={() => {
           setEditingOrder(null);
@@ -303,7 +300,6 @@ export function PurchaseOrdersPageClient(): JSX.Element {
 
       <PurchaseReceiveDialog
         branches={branchesQuery.data ?? []}
-        ingredients={ingredientsQuery.data ?? []}
         isSubmitting={receiveMutation.isPending}
         onClose={() => setReceivingOrder(null)}
         onReceive={handleReceive}

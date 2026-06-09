@@ -31,6 +31,7 @@ import type {
   ProductionBatch,
   UpdateBatchPayload,
 } from "@/types/manufacturing";
+import { ITEM_STRUCTURE_LABELS, PRODUCT_TYPE_LABELS } from "@/types/product";
 
 export function BatchFormDialog({
   batch,
@@ -190,7 +191,8 @@ export function BatchFormDialog({
               <SelectItem value="none">Select product</SelectItem>
               {products.map((product) => (
                 <SelectItem key={product.id} value={product.id}>
-                  {product.productName}
+                  {product.productName} / {PRODUCT_TYPE_LABELS[product.productType]} /{" "}
+                  {ITEM_STRUCTURE_LABELS[product.itemStructure]}
                 </SelectItem>
               ))}
             </SelectContent>

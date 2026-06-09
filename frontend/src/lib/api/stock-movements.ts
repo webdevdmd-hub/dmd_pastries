@@ -244,6 +244,7 @@ function movementQuery(params: Partial<StockMovementFilters>): string {
     search: params.search,
     branch_id: params.branchId,
     item_type: params.itemType,
+    product_type: params.productType,
     movement_type: params.movementType,
     direction: params.direction,
     date_from: params.dateFrom,
@@ -332,6 +333,7 @@ export async function getStockMovementSummary(
     `/api/v1/stock-movements/summary${queryString({
       branch_id: params.branchId,
       item_type: params.itemType,
+      product_type: params.productType,
       movement_type: params.movementType,
       direction: params.direction,
       date_from: params.dateFrom,

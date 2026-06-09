@@ -27,14 +27,13 @@ import type {
   UpdateExpiryBatchPayload,
   UpdateExpiryBatchStatusPayload,
 } from "@/types/inventory";
+import { PRODUCT_TYPES, type ProductType } from "@/types/product";
 
 type BackendOpeningStockPayload = {
   branch_id: string;
-  item_type: InventoryItemType;
+  item_type: OpeningStockPayload["itemType"];
   product_id?: string;
   product_variant_id?: string;
-  ingredient_id?: string;
-  packaging_item_id?: string;
   unit_id: string;
   stock_location_id?: string;
   quantity: number;
@@ -111,6 +110,10 @@ function isInventoryItemType(value: unknown): value is InventoryItemType {
     value === "ingredient" ||
     value === "packaging"
   );
+}
+
+function isProductType(value: unknown): value is ProductType {
+  return PRODUCT_TYPES.includes(value as ProductType);
 }
 
 function isInventoryStatus(value: unknown): value is InventoryStatus {
@@ -191,6 +194,7 @@ function parseInventoryItem(value: unknown): InventoryItem {
     productId: nullableString(value.product_id),
     productVariantId: nullableString(value.product_variant_id),
     variantName: nullableString(value.variant_name),
+    productType: isProductType(value.product_type) ? value.product_type : null,
     ingredientId: nullableString(value.ingredient_id),
     packagingItemId: nullableString(value.packaging_item_id),
     itemType: isInventoryItemType(value.item_type) ? value.item_type : "product",
@@ -200,6 +204,10 @@ function parseInventoryItem(value: unknown): InventoryItem {
     reservedQuantity: numberValue(value.reserved_quantity),
     availableQuantity: numberValue(value.available_quantity),
     reorderLevel: numberValue(value.reorder_level),
+    averageCost: numberValue(value.average_cost ?? value.avg_cost),
+    inventoryValue: numberValue(
+      value.inventory_value ?? value.total_value ?? value.stock_value ?? value.current_value,
+    ),
     unitId: stringValue(value.unit_id),
     unitName: stringValue(value.unit_name, "Unit"),
     unitSymbol: stringValue(value.unit_symbol),
@@ -412,8 +420,6 @@ function openingStockPayload(payload: OpeningStockPayload): BackendOpeningStockP
     item_type: payload.itemType,
     ...(payload.productId ? { product_id: payload.productId } : {}),
     ...(payload.productVariantId ? { product_variant_id: payload.productVariantId } : {}),
-    ...(payload.ingredientId ? { ingredient_id: payload.ingredientId } : {}),
-    ...(payload.packagingItemId ? { packaging_item_id: payload.packagingItemId } : {}),
     unit_id: payload.unitId,
     ...(payload.stockLocationId ? { stock_location_id: payload.stockLocationId } : {}),
     quantity: payload.quantity,
@@ -463,6 +469,7 @@ export async function getInventory(params: InventoryFilters): Promise<InventoryI
       search: params.search,
       branch_id: params.branchId,
       item_type: params.itemType,
+      product_type: params.productType,
       status: params.status,
       low_stock: params.lowStockOnly,
       expiry_tracked: params.expiryTrackedOnly,
@@ -529,6 +536,7 @@ export async function getInventoryMovements(
       search: params.search,
       branch_id: params.branchId,
       item_type: params.itemType,
+      product_type: params.productType,
       movement_type: params.movementType,
       date_from: params.dateFrom,
       date_to: params.dateTo,
@@ -567,6 +575,7 @@ export async function getLowStock(params: LowStockFilters): Promise<InventoryIte
       search: params.search,
       branch_id: params.branchId,
       item_type: params.itemType,
+      product_type: params.productType,
     })}`,
     {
       authMode: "appwrite",
@@ -582,6 +591,7 @@ export async function getExpiryAlerts(params: ExpiryAlertFilters): Promise<Expir
     `/api/v1/inventory/expiry-alerts${queryString({
       branch_id: params.branchId,
       item_type: params.itemType,
+      product_type: params.productType,
       status: params.status,
       days: params.days,
     })}`,
@@ -754,6 +764,7 @@ export async function getLocationBalances(
     `/api/v1/inventory/location-balances${queryString({
       search: filters.search,
       item_type: filters.itemType,
+      product_type: filters.productType,
       stock_location_id: filters.stockLocationId,
       page: filters.page,
       limit: filters.limit,
@@ -789,6 +800,7 @@ export async function getStockTransfers(filters: StockTransferFilters): Promise<
       search: filters.search,
       status: filters.status,
       item_type: filters.itemType,
+      product_type: filters.productType,
       stock_location_id: filters.stockLocationId,
       page: filters.page,
       limit: filters.limit,

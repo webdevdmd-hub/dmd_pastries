@@ -3,21 +3,23 @@ package masterdata
 import "time"
 
 type CreateProductCategoryRequest struct {
-	ParentCategoryID *string `json:"parent_category_id" binding:"omitempty,uuid"`
-	CategoryName     string  `json:"category_name" binding:"required"`
-	CategoryCode     string  `json:"category_code"`
-	Description      string  `json:"description"`
-	ImageFileID      string  `json:"image_file_id"`
-	SortOrder        int     `json:"sort_order"`
+	ParentCategoryID    *string  `json:"parent_category_id" binding:"omitempty,uuid"`
+	CategoryName        string   `json:"category_name" binding:"required"`
+	CategoryCode        string   `json:"category_code"`
+	Description         string   `json:"description"`
+	ImageFileID         string   `json:"image_file_id"`
+	SortOrder           int      `json:"sort_order"`
+	AllowedProductTypes []string `json:"allowed_product_types"`
 }
 
 type UpdateProductCategoryRequest struct {
-	ParentCategoryID *string `json:"parent_category_id" binding:"omitempty,uuid"`
-	CategoryName     string  `json:"category_name"`
-	CategoryCode     string  `json:"category_code"`
-	Description      string  `json:"description"`
-	ImageFileID      string  `json:"image_file_id"`
-	SortOrder        *int    `json:"sort_order"`
+	ParentCategoryID    *string  `json:"parent_category_id" binding:"omitempty,uuid"`
+	CategoryName        string   `json:"category_name"`
+	CategoryCode        string   `json:"category_code"`
+	Description         string   `json:"description"`
+	ImageFileID         string   `json:"image_file_id"`
+	SortOrder           *int     `json:"sort_order"`
+	AllowedProductTypes []string `json:"allowed_product_types"`
 }
 
 type CreateSimpleCategoryRequest struct {
@@ -35,7 +37,7 @@ type UpdateStatusRequest struct {
 }
 
 type CopyCategoriesRequest struct {
-	CategoryType   string `json:"category_type" binding:"required,oneof=product_categories ingredient_categories packaging_categories"`
+	CategoryType   string `json:"category_type" binding:"required,oneof=product_categories"`
 	SourceBranchID string `json:"source_branch_id" binding:"required,uuid"`
 }
 
@@ -151,18 +153,19 @@ type PaymentStatusResponse struct {
 }
 
 type ProductCategoryResponse struct {
-	ID               string    `json:"id"`
-	BusinessID       string    `json:"business_id"`
-	BranchID         string    `json:"branch_id"`
-	ParentCategoryID *string   `json:"parent_category_id"`
-	CategoryName     string    `json:"category_name"`
-	CategoryCode     string    `json:"category_code"`
-	Description      string    `json:"description"`
-	ImageFileID      string    `json:"image_file_id"`
-	SortOrder        int       `json:"sort_order"`
-	Status           string    `json:"status"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID                  string    `json:"id"`
+	BusinessID          string    `json:"business_id"`
+	BranchID            string    `json:"branch_id"`
+	ParentCategoryID    *string   `json:"parent_category_id"`
+	CategoryName        string    `json:"category_name"`
+	CategoryCode        string    `json:"category_code"`
+	Description         string    `json:"description"`
+	ImageFileID         string    `json:"image_file_id"`
+	SortOrder           int       `json:"sort_order"`
+	AllowedProductTypes []string  `json:"allowed_product_types"`
+	Status              string    `json:"status"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 type SimpleCategoryResponse struct {
@@ -177,10 +180,8 @@ type SimpleCategoryResponse struct {
 }
 
 type OverviewResponse struct {
-	UnitsCount                int64 `json:"units_count"`
-	ProductCategoriesCount    int64 `json:"product_categories_count"`
-	IngredientCategoriesCount int64 `json:"ingredient_categories_count"`
-	PackagingCategoriesCount  int64 `json:"packaging_categories_count"`
-	OrderStatusesCount        int64 `json:"order_statuses_count"`
-	PaymentStatusesCount      int64 `json:"payment_statuses_count"`
+	UnitsCount             int64 `json:"units_count"`
+	ProductCategoriesCount int64 `json:"product_categories_count"`
+	OrderStatusesCount     int64 `json:"order_statuses_count"`
+	PaymentStatusesCount   int64 `json:"payment_statuses_count"`
 }

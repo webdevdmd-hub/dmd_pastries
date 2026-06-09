@@ -1,3 +1,4 @@
+import type { ProductType } from "@/types/product";
 import type { RecordStatus } from "@/types/settings";
 
 export type MasterDataOverview = {
@@ -52,6 +53,7 @@ export type ProductCategory = {
   categoryCode: string;
   description: string;
   imageUrl: string;
+  allowedProductTypes: ProductType[];
   sortOrder: number;
   status: RecordStatus;
   createdAt: string;
@@ -64,6 +66,7 @@ export type CreateProductCategoryPayload = {
   categoryCode: string;
   description: string;
   imageUrl: string;
+  allowedProductTypes: ProductType[];
   sortOrder: number;
 };
 

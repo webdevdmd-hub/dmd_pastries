@@ -15,7 +15,12 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
-import type { Product, ProductVariant } from "@/types/product";
+import {
+  ITEM_STRUCTURE_LABELS,
+  type Product,
+  PRODUCT_TYPE_LABELS,
+  type ProductVariant,
+} from "@/types/product";
 
 type ProductDetailsDrawerProps = {
   canManage: boolean;
@@ -148,7 +153,12 @@ export function ProductDetailsDrawer({
                 <DetailMetric
                   icon={Store}
                   label="Product type"
-                  value={product.productType.replaceAll("_", " ")}
+                  value={PRODUCT_TYPE_LABELS[product.productType]}
+                />
+                <DetailMetric
+                  icon={Package}
+                  label="Item structure"
+                  value={ITEM_STRUCTURE_LABELS[product.itemStructure]}
                 />
                 <DetailMetric
                   icon={ReceiptText}

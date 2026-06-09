@@ -124,6 +124,8 @@ export type PaymentMethod = {
   showInDashboardCollection: boolean;
   defaultPaymentAccountId: string | null;
   defaultPaymentAccountName: string;
+  branchId: string | null;
+  branchName: string | null;
   status: RecordStatus;
   createdAt: string;
   updatedAt: string;

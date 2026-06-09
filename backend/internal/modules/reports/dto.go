@@ -258,6 +258,10 @@ type WastageReportItem struct {
 type PackagingStockReportItem struct {
 	PackagingItemID   string  `json:"packaging_item_id"`
 	PackagingName     string  `json:"packaging_name"`
+	ProductID         string  `json:"product_id"`
+	ProductVariantID  *string `json:"product_variant_id"`
+	ProductName       string  `json:"product_name"`
+	ProductCode       string  `json:"product_code"`
 	CategoryName      string  `json:"category_name"`
 	BranchName        string  `json:"branch_name"`
 	CurrentQuantity   float64 `json:"current_quantity"`

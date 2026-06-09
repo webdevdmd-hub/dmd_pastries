@@ -107,7 +107,9 @@ type BakeryOrderPackaging struct {
 	ID                    string    `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID            string    `gorm:"type:uuid;not null;index" json:"business_id"`
 	BakeryOrderID         string    `gorm:"type:uuid;not null;index" json:"bakery_order_id"`
-	PackagingItemID       string    `gorm:"type:uuid;not null;index" json:"packaging_item_id"`
+	PackagingItemID       *string   `gorm:"type:uuid;index" json:"packaging_item_id"`
+	ComponentProductID    *string   `gorm:"type:uuid;index" json:"component_product_id"`
+	ComponentVariantID    *string   `gorm:"type:uuid;index" json:"component_variant_id"`
 	PackagingNameSnapshot string    `gorm:"size:255;not null" json:"packaging_name_snapshot"`
 	QuantityRequired      float64   `gorm:"not null" json:"quantity_required"`
 	UnitID                string    `gorm:"type:uuid;not null;index" json:"unit_id"`

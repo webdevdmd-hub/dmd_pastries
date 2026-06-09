@@ -56,6 +56,7 @@ import type {
   UpdateSimpleCategoryPayload,
   UpdateUnitPayload,
 } from "@/types/master-data";
+import type { ProductType } from "@/types/product";
 
 const masterDataQueryKey = "master-data";
 
@@ -164,12 +165,21 @@ export function useDeleteUnit() {
   });
 }
 
-export function useProductCategories(enabled = true) {
+type ProductCategoryFilters = {
+  productType?: ProductType | "all";
+};
+
+export function useProductCategories(enabled = true, filters: ProductCategoryFilters = {}) {
   const branchQueryKey = useBranchQueryKey();
 
   return useQuery({
-    queryKey: [masterDataQueryKey, branchQueryKey, "product-categories"],
-    queryFn: async () => getProductCategories(),
+    queryKey: [
+      masterDataQueryKey,
+      branchQueryKey,
+      "product-categories",
+      filters.productType ?? "all",
+    ],
+    queryFn: async () => getProductCategories(filters),
     enabled,
   });
 }

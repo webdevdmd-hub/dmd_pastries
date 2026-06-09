@@ -26,6 +26,20 @@ func (ProductCategory) TableName() string {
 	return "product_categories"
 }
 
+type ProductCategoryAllowedType struct {
+	ID                string    `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID        string    `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID          string    `gorm:"type:uuid;not null;index" json:"branch_id"`
+	ProductCategoryID string    `gorm:"type:uuid;not null;index" json:"product_category_id"`
+	ProductType       string    `gorm:"size:50;not null" json:"product_type"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+func (ProductCategoryAllowedType) TableName() string {
+	return "product_category_allowed_types"
+}
+
 type UnitCategory struct {
 	ID          string    `gorm:"type:uuid;primaryKey" json:"id"`
 	Name        string    `gorm:"size:100;not null;uniqueIndex" json:"name"`

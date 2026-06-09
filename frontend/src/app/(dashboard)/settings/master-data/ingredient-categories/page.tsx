@@ -1,7 +1,5 @@
-import type { JSX } from "react";
+import { redirect } from "next/navigation";
 
-import { MasterDataPageClient } from "@/components/master-data/master-data-page-client";
-
-export default function IngredientCategoriesPage(): JSX.Element {
-  return <MasterDataPageClient collection="ingredient-categories" />;
+export default function IngredientCategoriesPage(): never {
+  redirect("/settings/master-data/product-categories?product_type=ingredient");
 }

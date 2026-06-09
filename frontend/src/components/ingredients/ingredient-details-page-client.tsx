@@ -11,6 +11,7 @@ import { IngredientFormDialog } from "@/components/ingredients/ingredient-form-d
 import { IngredientStatusBadge } from "@/components/ingredients/ingredient-status-badge";
 import { IngredientsErrorState } from "@/components/ingredients/ingredients-error-state";
 import { IngredientsTableSkeleton } from "@/components/ingredients/ingredients-table-skeleton";
+import { LegacyProductMasterNotice } from "@/components/shared/legacy-product-master-notice";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReorderLevelHeader } from "@/components/shared/reorder-level-help";
 import { Badge } from "@/components/ui/badge";
@@ -127,6 +128,8 @@ export function IngredientDetailsPageClient({
         }
       />
 
+      <LegacyProductMasterNotice kind="ingredient" />
+
       <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
         <Card>
           <CardHeader>
@@ -185,7 +188,7 @@ export function IngredientDetailsPageClient({
               Inventory to manage branch quantities, adjustments, movements, and expiry batches.
             </p>
             <Button asChild type="button" variant="outline">
-              <Link href={`${ROUTES.inventory}?itemType=ingredient`}>Open Inventory</Link>
+              <Link href={`${ROUTES.inventory}?productType=ingredient`}>Open Inventory</Link>
             </Button>
           </CardContent>
         </Card>

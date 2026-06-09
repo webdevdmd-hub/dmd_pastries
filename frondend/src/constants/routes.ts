@@ -39,6 +39,8 @@ export const ROUTES = {
   users: "/users",
   roles: "/roles",
   products: "/products",
+  productsIngredients: "/products?product_type=ingredient",
+  productsPackaging: "/products?product_type=packaging",
   purchasing: "/purchasing",
   purchasingExpenses: "/purchasing/expenses",
   purchasingInvoices: "/purchasing/invoices",

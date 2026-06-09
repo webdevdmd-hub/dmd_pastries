@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"pastries-pos/internal/shared/utils"
 )
 
 type Repository struct {
@@ -1170,6 +1172,163 @@ func (r *Repository) LoadResponse(businessID string, account ChartAccount) (Char
 
 func (r *Repository) CreatePaymentAccount(tx *gorm.DB, account *PaymentAccount) error {
 	return tx.Create(account).Error
+}
+
+type defaultPaymentBranchRow struct {
+	ID         string
+	BranchName string
+}
+
+type defaultPaymentMethodRow struct {
+	ID         string
+	MethodName string
+	MethodType string
+}
+
+func (r *Repository) ActiveBranches(tx *gorm.DB, businessID string) ([]defaultPaymentBranchRow, error) {
+	var rows []defaultPaymentBranchRow
+	err := tx.Table("branches").
+		Select("id, branch_name").
+		Where("business_id = ? AND status = ? AND deleted_at IS NULL", businessID, "active").
+		Order("branch_name ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) FindChartAccountByCode(tx *gorm.DB, businessID, code string) (*ChartAccount, error) {
+	var account ChartAccount
+	err := tx.Where("business_id = ? AND account_code = ? AND status = ? AND deleted_at IS NULL", businessID, code, "active").First(&account).Error
+	return &account, err
+}
+
+func (r *Repository) EnsurePaymentMethod(tx *gorm.DB, businessID, methodName, methodType string, isDefault, requiresReference bool) (*defaultPaymentMethodRow, error) {
+	var row defaultPaymentMethodRow
+	err := tx.Table("payment_methods").
+		Select("id, method_name, method_type").
+		Where("business_id = ? AND LOWER(method_name) = LOWER(?) AND deleted_at IS NULL", businessID, methodName).
+		Take(&row).Error
+	if err == nil {
+		updates := map[string]interface{}{
+			"method_type":                  methodType,
+			"show_in_pos":                  true,
+			"show_in_bakery_orders":        true,
+			"show_in_dashboard_collection": true,
+			"allow_split_payment":          true,
+			"requires_reference":           requiresReference,
+			"status":                       "active",
+			"updated_at":                   time.Now().UTC(),
+		}
+		if methodType == "cash" || methodType == "bank_transfer" {
+			updates["show_in_purchasing"] = true
+			updates["show_in_expenses"] = true
+		}
+		if err := tx.Table("payment_methods").Where("id = ? AND business_id = ?", row.ID, businessID).Updates(updates).Error; err != nil {
+			return nil, err
+		}
+		return &row, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return nil, err
+	}
+	if isDefault {
+		if err := tx.Table("payment_methods").Where("business_id = ? AND is_default = ? AND deleted_at IS NULL", businessID, true).Update("is_default", false).Error; err != nil {
+			return nil, err
+		}
+	}
+	id := utils.NewUUID()
+	method := map[string]interface{}{
+		"id":                           id,
+		"business_id":                  businessID,
+		"method_name":                  methodName,
+		"method_type":                  methodType,
+		"is_default":                   isDefault,
+		"allow_split_payment":          true,
+		"requires_reference":           requiresReference,
+		"show_in_pos":                  true,
+		"show_in_bakery_orders":        true,
+		"show_in_purchasing":           methodType == "cash" || methodType == "bank_transfer",
+		"show_in_expenses":             methodType == "cash" || methodType == "bank_transfer",
+		"show_in_dashboard_collection": true,
+		"status":                       "active",
+		"created_at":                   time.Now().UTC(),
+		"updated_at":                   time.Now().UTC(),
+	}
+	if err := tx.Table("payment_methods").Create(method).Error; err != nil {
+		return nil, err
+	}
+	return &defaultPaymentMethodRow{ID: id, MethodName: methodName, MethodType: methodType}, nil
+}
+
+func (r *Repository) FindOrCreatePaymentAccount(tx *gorm.DB, businessID, branchID, accountName, accountType, chartAccountID, userID string) (*PaymentAccount, bool, error) {
+	var account PaymentAccount
+	err := tx.Where("business_id = ? AND branch_id = ? AND chart_account_id = ? AND deleted_at IS NULL", businessID, branchID, chartAccountID).First(&account).Error
+	if err == nil {
+		updates := map[string]interface{}{"account_type": accountType, "status": "active", "updated_by_user_id": userID, "updated_at": time.Now().UTC()}
+		if err := tx.Model(&PaymentAccount{}).Where("id = ? AND business_id = ?", account.ID, businessID).Updates(updates).Error; err != nil {
+			return nil, false, err
+		}
+		account.AccountType = accountType
+		account.Status = "active"
+		return &account, false, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return nil, false, err
+	}
+	err = tx.Where("business_id = ? AND branch_id = ? AND LOWER(account_name) = LOWER(?) AND deleted_at IS NULL", businessID, branchID, accountName).First(&account).Error
+	if err == nil {
+		updates := map[string]interface{}{"account_type": accountType, "chart_account_id": chartAccountID, "status": "active", "updated_by_user_id": userID, "updated_at": time.Now().UTC()}
+		if err := tx.Model(&PaymentAccount{}).Where("id = ? AND business_id = ?", account.ID, businessID).Updates(updates).Error; err != nil {
+			return nil, false, err
+		}
+		account.AccountType = accountType
+		account.ChartAccountID = chartAccountID
+		account.Status = "active"
+		return &account, false, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return nil, false, err
+	}
+	account = PaymentAccount{
+		ID:              utils.NewUUID(),
+		BusinessID:      businessID,
+		BranchID:        &branchID,
+		AccountName:     accountName,
+		AccountType:     accountType,
+		ChartAccountID:  chartAccountID,
+		Status:          "active",
+		CreatedByUserID: &userID,
+		UpdatedByUserID: &userID,
+	}
+	if err := tx.Create(&account).Error; err != nil {
+		return nil, false, err
+	}
+	return &account, true, nil
+}
+
+func (r *Repository) UpsertPaymentMethodAccountMapping(tx *gorm.DB, businessID, branchID, methodID, accountID string) (bool, error) {
+	var id string
+	err := tx.Table("payment_method_account_mappings").
+		Select("id").
+		Where("business_id = ? AND branch_id = ? AND payment_method_id = ? AND deleted_at IS NULL", businessID, branchID, methodID).
+		Take(&id).Error
+	if err == nil {
+		return false, tx.Table("payment_method_account_mappings").
+			Where("id = ? AND business_id = ?", id, businessID).
+			Updates(map[string]interface{}{"payment_account_id": accountID, "status": "active", "updated_at": time.Now().UTC()}).Error
+	}
+	if err != gorm.ErrRecordNotFound {
+		return false, err
+	}
+	return true, tx.Table("payment_method_account_mappings").Create(map[string]interface{}{
+		"id":                 utils.NewUUID(),
+		"business_id":        businessID,
+		"branch_id":          branchID,
+		"payment_method_id":  methodID,
+		"payment_account_id": accountID,
+		"status":             "active",
+		"created_at":         time.Now().UTC(),
+		"updated_at":         time.Now().UTC(),
+	}).Error
 }
 
 func (r *Repository) ListPaymentAccounts(businessID string, query PaymentAccountListQuery) ([]PaymentAccount, int64, error) {

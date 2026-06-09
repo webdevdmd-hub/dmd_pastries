@@ -12,7 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ProductListFilters, ProductType } from "@/types/product";
+import {
+  ITEM_STRUCTURE_LABELS,
+  ITEM_STRUCTURES,
+  PRODUCT_TYPE_LABELS,
+  PRODUCT_TYPES,
+  type ProductListFilters,
+} from "@/types/product";
 
 type ProductFiltersProps = {
   categories: { id: string; categoryName: string }[];
@@ -20,21 +26,13 @@ type ProductFiltersProps = {
   onFiltersChange: (filters: ProductListFilters) => void;
 };
 
-const productTypes: ProductType[] = [
-  "ready_to_sell",
-  "made_to_order",
-  "manufactured",
-  "retail",
-  "service",
-];
-
 export function ProductFilters({
   categories,
   filters,
   onFiltersChange,
 }: ProductFiltersProps): JSX.Element {
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
       <div className="md:col-span-2 xl:col-span-2">
         <Label htmlFor="products-search">Search</Label>
         <div className="relative mt-1">
@@ -86,9 +84,34 @@ export function ProductFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All types</SelectItem>
-            {productTypes.map((type) => (
+            {PRODUCT_TYPES.map((type) => (
               <SelectItem key={type} value={type}>
-                {type.replaceAll("_", " ")}
+                {PRODUCT_TYPE_LABELS[type]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label>Structure</Label>
+        <Select
+          onValueChange={(value) =>
+            onFiltersChange({
+              ...filters,
+              page: 1,
+              itemStructure: value as ProductListFilters["itemStructure"],
+            })
+          }
+          value={filters.itemStructure}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder="All structures" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All structures</SelectItem>
+            {ITEM_STRUCTURES.map((itemStructure) => (
+              <SelectItem key={itemStructure} value={itemStructure}>
+                {ITEM_STRUCTURE_LABELS[itemStructure]}
               </SelectItem>
             ))}
           </SelectContent>

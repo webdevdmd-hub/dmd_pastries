@@ -271,7 +271,7 @@ func (s *Service) UpdateIngredient(currentUser *utils.AuthContext, recipeID, lin
 		if err != nil {
 			return err
 		}
-		updates := map[string]interface{}{"ingredient_id": line.IngredientID, "inventory_item_id": line.InventoryItemID, "item_name_snapshot": line.ItemNameSnapshot, "quantity_required": line.QuantityRequired, "unit_id": line.UnitID, "unit_cost_snapshot": line.UnitCostSnapshot, "total_cost": line.TotalCost, "wastage_percentage": line.WastagePercentage, "sort_order": line.SortOrder, "notes": line.Notes, "updated_at": time.Now().UTC()}
+		updates := map[string]interface{}{"component_product_id": line.ComponentProductID, "component_variant_id": line.ComponentVariantID, "ingredient_id": line.IngredientID, "inventory_item_id": line.InventoryItemID, "item_name_snapshot": line.ItemNameSnapshot, "quantity_required": line.QuantityRequired, "unit_id": line.UnitID, "unit_cost_snapshot": line.UnitCostSnapshot, "total_cost": line.TotalCost, "wastage_percentage": line.WastagePercentage, "sort_order": line.SortOrder, "notes": line.Notes, "updated_at": time.Now().UTC()}
 		if err := s.repo.UpdateIngredient(tx, lineID, recipeID, currentUser.BusinessID, branchID, updates); err != nil {
 			return notFound(err, "recipe ingredient not found")
 		}
@@ -359,7 +359,7 @@ func (s *Service) UpdatePackaging(currentUser *utils.AuthContext, recipeID, line
 		if err != nil {
 			return err
 		}
-		updates := map[string]interface{}{"packaging_item_id": line.PackagingItemID, "packaging_name_snapshot": line.PackagingNameSnapshot, "quantity_required": line.QuantityRequired, "unit_id": line.UnitID, "unit_cost_snapshot": line.UnitCostSnapshot, "total_cost": line.TotalCost, "is_optional": line.IsOptional, "sort_order": line.SortOrder, "updated_at": time.Now().UTC()}
+		updates := map[string]interface{}{"component_product_id": line.ComponentProductID, "component_variant_id": line.ComponentVariantID, "packaging_item_id": line.PackagingItemID, "packaging_name_snapshot": line.PackagingNameSnapshot, "quantity_required": line.QuantityRequired, "unit_id": line.UnitID, "unit_cost_snapshot": line.UnitCostSnapshot, "total_cost": line.TotalCost, "is_optional": line.IsOptional, "sort_order": line.SortOrder, "updated_at": time.Now().UTC()}
 		if err := s.repo.UpdatePackaging(tx, lineID, recipeID, currentUser.BusinessID, branchID, updates); err != nil {
 			return notFound(err, "recipe packaging line not found")
 		}
@@ -689,10 +689,33 @@ func (s *Service) validateProduct(tx *gorm.DB, businessID, branchID, productID s
 	if err != nil {
 		return nil, notFound(err, "product not found")
 	}
-	if product.ProductType != "manufactured" && product.ProductType != "made_to_order" {
-		return nil, apperrors.BadRequest("recipe product must be manufactured or made_to_order", nil)
+	if !validRecipeOutputProductType(product.ProductType) {
+		return nil, apperrors.BadRequest("recipe product must be finished_product or semi_finished", nil)
 	}
 	return product, nil
+}
+
+func validRecipeOutputProductType(value string) bool {
+	switch strings.TrimSpace(value) {
+	case "finished_product", "semi_finished":
+		return true
+	default:
+		return false
+	}
+}
+
+func validRecipeComponentProductType(value, role string) bool {
+	switch strings.TrimSpace(role) {
+	case "packaging":
+		return strings.TrimSpace(value) == "packaging"
+	default:
+		switch strings.TrimSpace(value) {
+		case "ingredient", "raw_material", "semi_finished", "finished_product", "consumable":
+			return true
+		default:
+			return false
+		}
+	}
 }
 
 func (s *Service) buildIngredientLine(tx *gorm.DB, businessID, branchID, recipeID string, req RecipeIngredientInput) (*RecipeIngredient, error) {
@@ -708,65 +731,71 @@ func (s *Service) buildIngredientLine(tx *gorm.DB, businessID, branchID, recipeI
 	if err := s.repo.ValidateUnit(tx, businessID, req.UnitID); err != nil {
 		return nil, notFound(err, "unit not found")
 	}
-	var ingredientID *string
-	var inventoryItemID *string
-	itemName := "Ingredient"
-	unitCost := 0.0
-	if strings.TrimSpace(req.InventoryItemID) != "" {
-		if err := validateUUID(req.InventoryItemID, "inventory_item_id"); err != nil {
-			return nil, err
-		}
-		item, err := s.repo.InventoryItem(tx, businessID, branchID, req.InventoryItemID)
-		if err != nil {
-			return nil, notFound(err, "inventory item not found")
-		}
-		if item.UnitID != req.UnitID {
-			return nil, apperrors.BadRequest("unit conversion is not available yet; ingredient unit must match inventory item unit", nil)
-		}
-		itemName, unitCost = s.repo.ItemNameAndCost(tx, businessID, item)
-		inventoryItemID = &req.InventoryItemID
-		if item.IngredientID != nil {
-			ingredientID = item.IngredientID
-		}
-	} else if strings.TrimSpace(req.IngredientID) != "" {
-		if err := validateUUID(req.IngredientID, "ingredient_id"); err != nil {
-			return nil, err
-		}
-		ingredient, err := s.repo.IngredientItem(tx, businessID, branchID, req.IngredientID)
-		if err != nil {
-			return nil, notFound(err, "ingredient not found")
-		}
-		if ingredient.UnitID != req.UnitID {
-			return nil, apperrors.BadRequest("unit conversion is not available yet; ingredient unit must match ingredient unit", nil)
-		}
-		ingredientID = &req.IngredientID
-		itemName = ingredient.IngredientName
-		unitCost = ingredient.CostPerUnit
-	} else {
-		return nil, apperrors.BadRequest("inventory_item_id or ingredient_id is required", nil)
+	if strings.TrimSpace(req.IngredientID) != "" || strings.TrimSpace(req.InventoryItemID) != "" {
+		return nil, apperrors.BadRequest("recipe components must use component_product_id from Product Master; ingredient_id and inventory_item_id are no longer supported for new recipe lines", nil)
+	}
+	component, err := s.resolveRecipeComponentProduct(tx, businessID, branchID, req.ComponentProductID, req.ComponentVariantID, req.UnitID, "ingredient")
+	if err != nil {
+		return nil, err
 	}
 	effectiveQty := req.QuantityRequired * (1 + req.WastagePercentage/100)
-	return &RecipeIngredient{ID: utils.NewUUID(), BusinessID: businessID, BranchID: branchID, RecipeID: recipeID, IngredientID: ingredientID, InventoryItemID: inventoryItemID, ItemNameSnapshot: itemName, QuantityRequired: req.QuantityRequired, UnitID: req.UnitID, UnitCostSnapshot: roundMoney(unitCost), TotalCost: roundMoney(effectiveQty * unitCost), WastagePercentage: req.WastagePercentage, SortOrder: req.SortOrder, Notes: strings.TrimSpace(req.Notes)}, nil
+	return &RecipeIngredient{ID: utils.NewUUID(), BusinessID: businessID, BranchID: branchID, RecipeID: recipeID, ComponentProductID: &component.ProductID, ComponentVariantID: component.VariantID, ItemNameSnapshot: component.Name, QuantityRequired: req.QuantityRequired, UnitID: req.UnitID, UnitCostSnapshot: roundMoney(component.UnitCost), TotalCost: roundMoney(effectiveQty * component.UnitCost), WastagePercentage: req.WastagePercentage, SortOrder: req.SortOrder, Notes: strings.TrimSpace(req.Notes)}, nil
 }
 
 func (s *Service) buildPackagingLine(tx *gorm.DB, businessID, branchID, recipeID string, req RecipePackagingInput) (*RecipePackaging, error) {
-	if err := validateUUID(req.PackagingItemID, "packaging_item_id"); err != nil {
-		return nil, err
-	}
 	if req.QuantityRequired <= 0 {
 		return nil, apperrors.BadRequest("quantity_required must be greater than zero", nil)
 	}
 	if err := validateUUID(req.UnitID, "unit_id"); err != nil {
 		return nil, err
 	}
-	item, err := s.repo.PackagingItem(tx, businessID, branchID, req.PackagingItemID)
+	if strings.TrimSpace(req.PackagingItemID) != "" {
+		return nil, apperrors.BadRequest("recipe packaging components must use component_product_id from Product Master; packaging_item_id is no longer supported for new recipe lines", nil)
+	}
+	component, err := s.resolveRecipeComponentProduct(tx, businessID, branchID, req.ComponentProductID, req.ComponentVariantID, req.UnitID, "packaging")
 	if err != nil {
-		return nil, notFound(err, "packaging item not found")
+		return nil, err
 	}
-	if item.UnitID != req.UnitID {
-		return nil, apperrors.BadRequest("unit conversion is not available yet; packaging unit must match packaging item unit", nil)
+	return &RecipePackaging{ID: utils.NewUUID(), BusinessID: businessID, BranchID: branchID, RecipeID: recipeID, ComponentProductID: &component.ProductID, ComponentVariantID: component.VariantID, PackagingNameSnapshot: component.Name, QuantityRequired: req.QuantityRequired, UnitID: req.UnitID, UnitCostSnapshot: roundMoney(component.UnitCost), TotalCost: roundMoney(req.QuantityRequired * component.UnitCost), IsOptional: req.IsOptional, SortOrder: req.SortOrder}, nil
+}
+
+func (s *Service) resolveRecipeComponentProduct(tx *gorm.DB, businessID, branchID, productID, variantID, unitID, componentRole string) (recipeComponent, error) {
+	if err := validateUUID(productID, "component_product_id"); err != nil {
+		return recipeComponent{}, err
 	}
-	return &RecipePackaging{ID: utils.NewUUID(), BusinessID: businessID, BranchID: branchID, RecipeID: recipeID, PackagingItemID: item.ID, PackagingNameSnapshot: item.PackagingName, QuantityRequired: req.QuantityRequired, UnitID: req.UnitID, UnitCostSnapshot: roundMoney(item.CostPerUnit), TotalCost: roundMoney(req.QuantityRequired * item.CostPerUnit), IsOptional: req.IsOptional, SortOrder: req.SortOrder}, nil
+	product, err := s.repo.Product(tx, businessID, branchID, productID)
+	if err != nil {
+		return recipeComponent{}, notFound(err, "component product not found")
+	}
+	if !validRecipeComponentProductType(product.ProductType, componentRole) {
+		return recipeComponent{}, apperrors.BadRequest("component product_type is not valid for this recipe line", map[string]interface{}{"product_type": product.ProductType, "component_role": componentRole})
+	}
+	if product.UnitID != unitID {
+		return recipeComponent{}, apperrors.BadRequest("unit conversion is not available yet; component unit must match product unit", nil)
+	}
+	component := recipeComponent{ProductID: product.ID, Name: product.ProductName}
+	if product.CostPrice != nil {
+		component.UnitCost = *product.CostPrice
+	}
+	if strings.TrimSpace(variantID) == "" {
+		return component, nil
+	}
+	if err := validateUUID(variantID, "component_variant_id"); err != nil {
+		return recipeComponent{}, err
+	}
+	variant, err := s.repo.ProductVariant(tx, businessID, branchID, product.ID, variantID)
+	if err != nil {
+		return recipeComponent{}, notFound(err, "component variant not found")
+	}
+	if variant.Status != "active" {
+		return recipeComponent{}, apperrors.BadRequest("component variant must be active", nil)
+	}
+	component.VariantID = &variant.ID
+	component.Name = product.ProductName + " - " + variant.VariantName
+	if variant.CostPrice != nil {
+		component.UnitCost = *variant.CostPrice
+	}
+	return component, nil
 }
 
 func (s *Service) refreshLineCosts(tx *gorm.DB, businessID, branchID, recipeID string) error {
@@ -776,7 +805,13 @@ func (s *Service) refreshLineCosts(tx *gorm.DB, businessID, branchID, recipeID s
 	}
 	for _, line := range ingredients {
 		name, cost := line.ItemNameSnapshot, line.UnitCostSnapshot
-		if line.InventoryItemID != nil {
+		if line.ComponentProductID != nil {
+			component, err := s.resolveRecipeComponentProduct(tx, businessID, branchID, *line.ComponentProductID, deref(line.ComponentVariantID), line.UnitID, "ingredient")
+			if err != nil {
+				continue
+			}
+			name, cost = component.Name, component.UnitCost
+		} else if line.InventoryItemID != nil {
 			item, err := s.repo.InventoryItem(tx, businessID, branchID, *line.InventoryItemID)
 			if err != nil {
 				continue
@@ -799,12 +834,22 @@ func (s *Service) refreshLineCosts(tx *gorm.DB, businessID, branchID, recipeID s
 		return err
 	}
 	for _, line := range packaging {
-		item, err := s.repo.PackagingItem(tx, businessID, branchID, line.PackagingItemID)
-		if err != nil {
-			continue
+		name, cost := line.PackagingNameSnapshot, line.UnitCostSnapshot
+		if line.ComponentProductID != nil {
+			component, err := s.resolveRecipeComponentProduct(tx, businessID, branchID, *line.ComponentProductID, deref(line.ComponentVariantID), line.UnitID, "packaging")
+			if err != nil {
+				continue
+			}
+			name, cost = component.Name, component.UnitCost
+		} else if line.PackagingItemID != nil {
+			item, err := s.repo.PackagingItem(tx, businessID, branchID, *line.PackagingItemID)
+			if err != nil {
+				continue
+			}
+			name, cost = item.PackagingName, item.CostPerUnit
 		}
-		total := roundMoney(line.QuantityRequired * item.CostPerUnit)
-		if err := s.repo.UpdatePackaging(tx, line.ID, recipeID, businessID, branchID, map[string]interface{}{"packaging_name_snapshot": item.PackagingName, "unit_cost_snapshot": item.CostPerUnit, "total_cost": total, "updated_at": time.Now().UTC()}); err != nil {
+		total := roundMoney(line.QuantityRequired * cost)
+		if err := s.repo.UpdatePackaging(tx, line.ID, recipeID, businessID, branchID, map[string]interface{}{"packaging_name_snapshot": name, "unit_cost_snapshot": cost, "total_cost": total, "updated_at": time.Now().UTC()}); err != nil {
 			return err
 		}
 	}
@@ -822,6 +867,13 @@ func (s *Service) recalculateCost(tx *gorm.DB, businessID, branchID, recipeID st
 	packagingCost := sumPackagingCost(packaging)
 	totalCost := roundMoney(ingredientCost + packagingCost)
 	return s.repo.UpdateRecipe(tx, recipeID, businessID, branchID, map[string]interface{}{"estimated_ingredient_cost": ingredientCost, "estimated_packaging_cost": packagingCost, "estimated_total_cost": totalCost, "cost_per_yield_unit": roundQuantity(totalCost / recipe.BatchYieldQuantity), "updated_at": time.Now().UTC()})
+}
+
+type recipeComponent struct {
+	ProductID string
+	VariantID *string
+	Name      string
+	UnitCost  float64
 }
 
 func (s *Service) createVersionSnapshot(tx *gorm.DB, currentUser *utils.AuthContext, recipe *Recipe, note string) (*RecipeVersion, error) {
@@ -893,6 +945,13 @@ func validateUUID(value, field string) error {
 		return apperrors.BadRequest(field+" must be a valid UUID", nil)
 	}
 	return nil
+}
+
+func deref(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func sumIngredientCost(items []RecipeIngredient) float64 {

@@ -72,8 +72,6 @@ type OpeningStockRequest struct {
 	ItemType         string  `json:"item_type" binding:"required"`
 	ProductID        string  `json:"product_id"`
 	ProductVariantID string  `json:"product_variant_id"`
-	IngredientID     string  `json:"ingredient_id"`
-	PackagingItemID  string  `json:"packaging_item_id"`
 	StockLocationID  string  `json:"stock_location_id"`
 	UnitID           string  `json:"unit_id" binding:"required"`
 	Quantity         float64 `json:"quantity"`

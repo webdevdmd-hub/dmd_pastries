@@ -120,6 +120,8 @@ type ProductionBatchResponse struct {
 
 type ProductionIngredientResponse struct {
 	ID                 string    `json:"id"`
+	ComponentProductID *string   `json:"component_product_id"`
+	ComponentVariantID *string   `json:"component_variant_id"`
 	InventoryItemID    string    `json:"inventory_item_id"`
 	RecipeIngredientID string    `json:"recipe_ingredient_id"`
 	ItemNameSnapshot   string    `json:"item_name_snapshot"`
@@ -137,7 +139,10 @@ type ProductionIngredientResponse struct {
 
 type ProductionPackagingResponse struct {
 	ID                    string    `json:"id"`
-	PackagingItemID       string    `json:"packaging_item_id"`
+	ComponentProductID    *string   `json:"component_product_id"`
+	ComponentVariantID    *string   `json:"component_variant_id"`
+	InventoryItemID       *string   `json:"inventory_item_id"`
+	PackagingItemID       *string   `json:"packaging_item_id"`
 	RecipePackagingID     string    `json:"recipe_packaging_id"`
 	PackagingNameSnapshot string    `json:"packaging_name_snapshot"`
 	PlannedQuantity       float64   `json:"planned_quantity"`

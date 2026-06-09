@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Copy, Database, LoaderCircle, MoreHorizontal, Plus, ShieldAlert } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import type { JSX, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -122,6 +123,7 @@ import type {
   Unit,
   UnitCategory,
 } from "@/types/master-data";
+import { PRODUCT_TYPE_LABELS, PRODUCT_TYPES, type ProductType } from "@/types/product";
 import type { RecordStatus } from "@/types/settings";
 
 type MasterDataPageClientProps = {
@@ -190,6 +192,7 @@ const categoryCopyLabels: Record<
 };
 
 const productCategoryDefaultValues: ProductCategorySchema = {
+  allowedProductTypes: ["finished_product"],
   parentCategoryId: "",
   categoryName: "",
   categoryCode: "",
@@ -260,12 +263,20 @@ function isCopyableCategoryCollection(
   );
 }
 
+function parseProductTypeFilter(value: string | null): ProductType | undefined {
+  return PRODUCT_TYPES.includes(value as ProductType) ? (value as ProductType) : undefined;
+}
+
 function toProductCategoryForm(category: ProductCategory | null): ProductCategorySchema {
   if (!category) {
     return productCategoryDefaultValues;
   }
 
   return {
+    allowedProductTypes:
+      category.allowedProductTypes.length > 0
+        ? category.allowedProductTypes
+        : productCategoryDefaultValues.allowedProductTypes,
     parentCategoryId: category.parentCategoryId ?? "",
     categoryName: category.categoryName,
     categoryCode: category.categoryCode,
@@ -286,6 +297,7 @@ function toProductCategoryPayload(values: ProductCategorySchema): CreateProductC
   const shouldPreserveLegacyImageUrl = imageUrl.trim().length > 0 && explicitIconKey === null;
 
   return {
+    allowedProductTypes: values.allowedProductTypes,
     parentCategoryId:
       values.parentCategoryId && values.parentCategoryId.trim().length > 0
         ? values.parentCategoryId.trim()
@@ -434,6 +446,44 @@ function ProductCategoryDialog({
                   <FormControl>
                     <Input placeholder="Fresh bakery cakes and celebration cakes" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="allowedProductTypes"
+              render={({ field }) => (
+                <FormItem className="md:col-span-2">
+                  <FormLabel>Allowed product types</FormLabel>
+                  <div className="grid gap-2 rounded-2xl border border-border bg-muted/30 p-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {PRODUCT_TYPES.map((productType) => {
+                      const checked = field.value.includes(productType);
+
+                      return (
+                        <label
+                          key={productType}
+                          className="flex items-center gap-2 rounded-xl bg-background px-3 py-2 text-sm"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(nextChecked) => {
+                              if (nextChecked === true) {
+                                field.onChange([...field.value, productType]);
+                                return;
+                              }
+
+                              field.onChange(field.value.filter((item) => item !== productType));
+                            }}
+                          />
+                          {PRODUCT_TYPE_LABELS[productType]}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Product forms only show categories compatible with the selected product type.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
@@ -978,6 +1028,7 @@ function ProductCategoriesTable({
         <TableRow>
           <TableHead>Name</TableHead>
           <TableHead>Code</TableHead>
+          <TableHead>Allowed Types</TableHead>
           <TableHead>Description</TableHead>
           <TableHead>Sort</TableHead>
           <TableHead>Status</TableHead>
@@ -999,6 +1050,19 @@ function ProductCategoriesTable({
                 </div>
               </TableCell>
               <TableCell>{category.categoryCode}</TableCell>
+              <TableCell>
+                {category.allowedProductTypes.length > 0 ? (
+                  <div className="flex max-w-xs flex-wrap gap-1">
+                    {category.allowedProductTypes.map((productType) => (
+                      <Badge key={productType} variant="outline">
+                        {PRODUCT_TYPE_LABELS[productType]}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground">All product types</span>
+                )}
+              </TableCell>
               <TableCell>{category.description}</TableCell>
               <TableCell>{category.sortOrder}</TableCell>
               <TableCell>
@@ -1696,6 +1760,7 @@ function CategoryCopyDialog({
 }
 
 export function MasterDataPageClient({ collection }: MasterDataPageClientProps): JSX.Element {
+  const searchParams = useSearchParams();
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
   const canView = hasAnyPermission([PERMISSIONS.masterDataView]);
@@ -1748,8 +1813,13 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
   const updateUnitMutation = useUpdateUnit();
   const updateUnitStatusMutation = useUpdateUnitStatus();
   const deleteUnitMutation = useDeleteUnit();
+  const productTypeFilter =
+    collection === "product-categories"
+      ? parseProductTypeFilter(searchParams.get("product_type"))
+      : undefined;
   const productCategoriesQuery = useProductCategories(
     canView && collection === "product-categories",
+    { productType: productTypeFilter ?? "all" },
   );
   const createProductCategoryMutation = useCreateProductCategory();
   const updateProductCategoryMutation = useUpdateProductCategory();

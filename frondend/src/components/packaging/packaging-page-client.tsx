@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -13,6 +14,7 @@ import { PackagingSummaryCards } from "@/components/packaging/packaging-summary-
 import { PackagingTable } from "@/components/packaging/packaging-table";
 import { PackagingTableSkeleton } from "@/components/packaging/packaging-table-skeleton";
 import { PackagingToolbar } from "@/components/packaging/packaging-toolbar";
+import { LegacyProductMasterNotice } from "@/components/shared/legacy-product-master-notice";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,6 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PERMISSIONS } from "@/constants/permissions";
+import { ROUTES } from "@/constants/routes";
 import {
   useCreatePackaging,
   useDeletePackaging,
@@ -90,11 +93,6 @@ export function PackagingPageClient(): JSX.Element {
   if (!canView) {
     return <AccessDeniedCard />;
   }
-
-  const openCreate = (): void => {
-    setEditingItem(null);
-    setFormOpen(true);
-  };
 
   const handleCreate = async (payload: CreatePackagingPayload): Promise<void> => {
     try {
@@ -163,13 +161,17 @@ export function PackagingPageClient(): JSX.Element {
         description="Manage packaging items like boxes, cups, trays, labels, and their usage in products and orders."
         actions={
           canManage ? (
-            <Button onClick={openCreate} type="button">
-              <Plus className="h-4 w-4" />
-              Add Packaging
+            <Button asChild type="button">
+              <Link href={ROUTES.productsPackaging}>
+                Open Product Master
+                <ArrowRight className="h-4 w-4" />
+              </Link>
             </Button>
           ) : undefined
         }
       />
+
+      <LegacyProductMasterNotice kind="packaging" />
 
       <PackagingSummaryCards items={items} />
 
@@ -196,7 +198,7 @@ export function PackagingPageClient(): JSX.Element {
       ) : null}
 
       {!packagingQuery.isLoading && !packagingQuery.error && items.length === 0 ? (
-        <PackagingEmptyState canManage={canManage} onCreate={openCreate} />
+        <PackagingEmptyState canManage={false} onCreate={() => undefined} />
       ) : null}
 
       {!packagingQuery.isLoading && !packagingQuery.error && items.length > 0 ? (

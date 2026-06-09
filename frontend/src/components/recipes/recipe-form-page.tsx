@@ -242,8 +242,7 @@ export function RecipeFormPage({ recipeId }: RecipeFormPageProps): JSX.Element {
   };
 
   const data = referenceQuery.data ?? {
-    inventoryItems: [],
-    packagingItems: [],
+    componentProducts: [],
     products: [],
     units: [],
   };
@@ -253,6 +252,10 @@ export function RecipeFormPage({ recipeId }: RecipeFormPageProps): JSX.Element {
   const selectedVariantId = form.watch("productVariantId") ?? "";
   const selectedProduct = data.products.find((product) => product.id === selectedProductId) ?? null;
   const selectedProductVariants = useMemo(() => selectedProduct?.variants ?? [], [selectedProduct]);
+  const packagingComponentProducts = useMemo(
+    () => data.componentProducts.filter((product) => product.productType === "packaging"),
+    [data.componentProducts],
+  );
   const isSaving = createMutation.isPending || updateMutation.isPending || statusMutation.isPending;
   const productOptions = useMemo<SearchableComboboxOption[]>(
     () =>
@@ -561,8 +564,8 @@ export function RecipeFormPage({ recipeId }: RecipeFormPageProps): JSX.Element {
 
             <RecipeIngredientsSection
               canManage={canManage}
+              componentProducts={data.componentProducts}
               draftLines={draftIngredients}
-              inventoryItems={data.inventoryItems}
               onDraftLinesChange={setDraftIngredients}
               recipeId={recipeId}
               units={data.units}
@@ -593,9 +596,9 @@ export function RecipeFormPage({ recipeId }: RecipeFormPageProps): JSX.Element {
             />
             <RecipePackagingSection
               canManage={canManage}
+              componentProducts={packagingComponentProducts}
               draftLines={draftPackaging}
               onDraftLinesChange={setDraftPackaging}
-              packagingItems={data.packagingItems}
               recipeId={recipeId}
               units={data.units}
             />

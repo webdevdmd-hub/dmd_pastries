@@ -29,11 +29,13 @@ import { useAdjustStock, useLowStock } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 import type { InventoryItem, LowStockFilters, StockAdjustmentPayload } from "@/types/inventory";
+import { PRODUCT_TYPE_LABELS, PRODUCT_TYPES } from "@/types/product";
 
 const defaultFilters: LowStockFilters = {
   search: "",
   branchId: "",
   itemType: "all",
+  productType: "all",
 };
 
 export function LowStockPageClient(): JSX.Element {
@@ -95,7 +97,7 @@ export function LowStockPageClient(): JSX.Element {
         title="Low Stock Alerts"
         description="Items where available quantity is at or below reorder level."
       />
-      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/70 p-4 shadow-soft md:grid-cols-4">
+      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/70 p-4 shadow-soft md:grid-cols-5">
         <Input
           aria-label="Search low stock"
           onChange={(event) => setFilters({ ...filters, search: event.target.value })}
@@ -133,8 +135,27 @@ export function LowStockPageClient(): JSX.Element {
             <SelectItem value="all">All types</SelectItem>
             <SelectItem value="product">Products</SelectItem>
             <SelectItem value="product_variant">Variants</SelectItem>
-            <SelectItem value="ingredient">Ingredients</SelectItem>
-            <SelectItem value="packaging">Packaging</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          onValueChange={(productType) =>
+            setFilters({
+              ...filters,
+              productType: productType as LowStockFilters["productType"],
+            })
+          }
+          value={filters.productType}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All product types</SelectItem>
+            {PRODUCT_TYPES.map((productType) => (
+              <SelectItem key={productType} value={productType}>
+                {PRODUCT_TYPE_LABELS[productType]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Button

@@ -29,7 +29,6 @@ import type {
   PurchaseInvoice,
   PurchaseItemLineDraft,
   PurchasingBranchOption,
-  PurchasingIngredientOption,
   PurchasingProductOption,
   PurchasingSupplierOption,
   PurchasingTaxRateOption,
@@ -51,6 +50,7 @@ function emptyLine(): PurchaseItemLineDraft {
     lineId: crypto.randomUUID(),
     packagingItemId: null,
     productId: null,
+    productVariantId: null,
     quantity: 1,
     taxRateId: null,
     unitCost: 0,
@@ -61,7 +61,6 @@ function emptyLine(): PurchaseItemLineDraft {
 export function PurchaseInvoiceFormDialog({
   branches,
   invoice,
-  ingredients,
   isSubmitting,
   onClose,
   onCreate,
@@ -74,7 +73,6 @@ export function PurchaseInvoiceFormDialog({
 }: {
   branches: PurchasingBranchOption[];
   invoice: PurchaseInvoice | null;
-  ingredients: PurchasingIngredientOption[];
   isSubmitting: boolean;
   onClose: () => void;
   onCreate: (payload: CreatePurchaseInvoicePayload) => Promise<void>;
@@ -120,11 +118,12 @@ export function PurchaseInvoiceFormDialog({
             discountAmount: item.discountAmount,
             expiryDate: item.expiryDate,
             ingredientId: item.ingredientId,
-            itemType: item.itemType,
+            itemType: "product",
             itemNameSnapshot: item.itemNameSnapshot,
             lineId: item.id || crypto.randomUUID(),
             packagingItemId: item.packagingItemId,
             productId: item.productId,
+            productVariantId: item.productVariantId,
             quantity: item.quantity,
             taxRateId: item.taxRateId,
             unitCost: item.unitCost,
@@ -217,7 +216,6 @@ export function PurchaseInvoiceFormDialog({
         </div>
         <PurchasingItemLineEditor
           allowBatchFields
-          ingredients={ingredients}
           lines={lines}
           onLinesChange={setLines}
           products={products}

@@ -27,6 +27,7 @@ type catalogProductCreate struct {
 	Barcode                string
 	Description            string
 	ProductType            string
+	ItemStructure          string
 	SalePrice              float64
 	CostPrice              *float64
 	IsPOSVisible           bool
@@ -231,7 +232,7 @@ func (r *Repository) UpsertProduction(tx *gorm.DB, production *BakeryOrderProduc
 func (r *Repository) Packaging(businessID, orderID string) ([]BakeryOrderPackagingResponse, error) {
 	var rows []BakeryOrderPackagingResponse
 	err := r.db.Table("bakery_order_packaging bop").
-		Select("bop.id, bop.bakery_order_id, bop.packaging_item_id, bop.packaging_name_snapshot, bop.quantity_required, bop.unit_id, u.symbol AS unit_symbol, bop.created_at, bop.updated_at").
+		Select("bop.id, bop.bakery_order_id, bop.packaging_item_id, bop.component_product_id, bop.component_variant_id, bop.packaging_name_snapshot, bop.quantity_required, bop.unit_id, u.symbol AS unit_symbol, bop.created_at, bop.updated_at").
 		Joins("JOIN units u ON u.id = bop.unit_id").
 		Where("bop.business_id = ? AND bop.bakery_order_id = ?", businessID, orderID).
 		Order("bop.created_at ASC").
@@ -285,7 +286,7 @@ func (r *Repository) Customer(tx *gorm.DB, businessID, branchID, customerID stri
 
 func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string) (*productRow, error) {
 	var row productRow
-	err := tx.Table("products").Select("id, product_name, unit_id, tax_rate_id, sale_price, status, is_pos_visible").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", productID, businessID, branchID).Take(&row).Error
+	err := tx.Table("products").Select("id, product_name, product_type, unit_id, tax_rate_id, sale_price, status, is_pos_visible, is_stock_tracked").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", productID, businessID, branchID).Take(&row).Error
 	return &row, err
 }
 
@@ -322,8 +323,11 @@ func (r *Repository) ValidateUnit(tx *gorm.DB, businessID, unitID string) error 
 	return exists(tx.Table("units").Where("id = ? AND (business_id IS NULL OR business_id = ?) AND status = ? AND deleted_at IS NULL", unitID, businessID, "active"))
 }
 
-func (r *Repository) ValidateProductCategory(tx *gorm.DB, businessID, branchID, categoryID string) error {
-	return exists(tx.Table("product_categories").Where("id = ? AND business_id = ? AND branch_id = ? AND status = ? AND deleted_at IS NULL", categoryID, businessID, branchID, "active"))
+func (r *Repository) ValidateProductCategory(tx *gorm.DB, businessID, branchID, categoryID, productType string) error {
+	query := tx.Table("product_categories pc").
+		Joins("JOIN product_category_allowed_types pcat ON pcat.product_category_id = pc.id AND pcat.product_type = ?", productType).
+		Where("pc.id = ? AND pc.business_id = ? AND pc.branch_id = ? AND pc.status = ? AND pc.deleted_at IS NULL", categoryID, businessID, branchID, "active")
+	return exists(query)
 }
 
 func (r *Repository) CreateCatalogProduct(tx *gorm.DB, product *catalogProductCreate) error {

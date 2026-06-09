@@ -10,15 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ingredientLineSchema } from "@/lib/validators/recipes.schema";
+import { PRODUCT_TYPE_LABELS } from "@/types/product";
 import type {
   RecipeIngredientLine,
   RecipeIngredientPayload,
-  RecipeInventoryItemOption,
+  RecipeProductOption,
   RecipeUnitOption,
 } from "@/types/recipes";
 
 type RecipeIngredientLineEditorProps = {
-  inventoryItems: RecipeInventoryItemOption[];
+  componentProducts: RecipeProductOption[];
   line: RecipeIngredientLine | null;
   onCancel: () => void;
   onSubmit: (payload: RecipeIngredientPayload) => Promise<void>;
@@ -27,31 +28,48 @@ type RecipeIngredientLineEditorProps = {
 };
 
 export function RecipeIngredientLineEditor({
-  inventoryItems,
+  componentProducts,
   line,
   onCancel,
   onSubmit,
   submitting,
   units,
 }: RecipeIngredientLineEditorProps): JSX.Element {
-  const [inventoryItemId, setInventoryItemId] = useState(line?.inventoryItemId ?? "");
+  const [componentProductId, setComponentProductId] = useState(line?.componentProductId ?? "");
+  const [componentVariantId, setComponentVariantId] = useState(line?.componentVariantId ?? "");
   const [quantityRequired, setQuantityRequired] = useState(String(line?.quantityRequired ?? 1));
   const [unitId, setUnitId] = useState(line?.unitId ?? "");
   const [wastagePercentage, setWastagePercentage] = useState(String(line?.wastagePercentage ?? 0));
   const [notes, setNotes] = useState(line?.notes ?? "");
   const [sortOrder, setSortOrder] = useState(String(line?.sortOrder ?? 0));
-  const selectedItem = inventoryItems.find((item) => item.id === inventoryItemId);
-  const inventoryItemOptions = useMemo<SearchableComboboxOption[]>(
+  const selectedProduct = componentProducts.find((item) => item.id === componentProductId);
+  const selectedVariants = useMemo(() => selectedProduct?.variants ?? [], [selectedProduct]);
+  const componentOptions = useMemo<SearchableComboboxOption[]>(
     () =>
-      inventoryItems.map((item) => ({
+      componentProducts.map((item) => ({
         value: item.id,
-        label: item.itemName,
-        description: `${item.currentQuantity.toLocaleString(undefined, {
-          maximumFractionDigits: 3,
-        })} ${item.unitSymbol} available`,
-        keywords: [item.itemName, item.unitName, item.unitSymbol],
+        label: item.productName,
+        description: `${PRODUCT_TYPE_LABELS[item.productType]} · ${item.isStockTracked ? "Stock tracked" : "Not stock tracked"} · ${item.unitSymbol || item.unitName}`,
+        keywords: [
+          item.productName,
+          item.productCode,
+          PRODUCT_TYPE_LABELS[item.productType],
+          item.unitName,
+          item.unitSymbol,
+          ...item.variants.flatMap((variant) => [variant.variantName, variant.sku ?? ""]),
+        ],
       })),
-    [inventoryItems],
+    [componentProducts],
+  );
+  const variantOptions = useMemo<SearchableComboboxOption[]>(
+    () =>
+      selectedVariants.map((variant) => ({
+        value: variant.id,
+        label: variant.variantName,
+        description: `AED ${variant.salePrice.toFixed(2)}${variant.sku ? ` · ${variant.sku}` : ""}`,
+        keywords: [variant.variantName, variant.sku ?? "", String(variant.salePrice)],
+      })),
+    [selectedVariants],
   );
   const unitOptions = useMemo<SearchableComboboxOption[]>(
     () =>
@@ -65,14 +83,15 @@ export function RecipeIngredientLineEditor({
   );
 
   useEffect(() => {
-    if (selectedItem && unitId.length === 0) {
-      setUnitId(selectedItem.unitId);
+    if (selectedProduct && unitId.length === 0) {
+      setUnitId(selectedProduct.unitId);
     }
-  }, [selectedItem, unitId.length]);
+  }, [selectedProduct, unitId.length]);
 
   const submit = async (): Promise<void> => {
     const parsed = ingredientLineSchema.safeParse({
-      inventoryItemId,
+      componentProductId,
+      componentVariantId,
       notes,
       quantityRequired,
       sortOrder,
@@ -92,15 +111,28 @@ export function RecipeIngredientLineEditor({
     <div className="grid gap-4 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4">
       <div className="grid gap-4 lg:grid-cols-2">
         <label className="grid gap-2">
-          <Label>Ingredient</Label>
+          <Label>Component product</Label>
           <SearchableCombobox
-            emptyMessage="No matching ingredients found."
-            onValueChange={setInventoryItemId}
-            options={inventoryItemOptions}
-            placeholder="Select ingredient"
-            searchPlaceholder="Search ingredient..."
-            value={inventoryItemId}
+            emptyMessage="No matching Product Master components found."
+            onValueChange={(value) => {
+              setComponentProductId(value);
+              setComponentVariantId("");
+              const nextProduct = componentProducts.find((item) => item.id === value);
+              if (nextProduct) {
+                setUnitId(nextProduct.unitId);
+              }
+            }}
+            options={componentOptions}
+            placeholder="Select component product"
+            searchPlaceholder="Search product, type, variant..."
+            value={componentProductId}
           />
+          {!line?.componentProductId && line?.inventoryItemId ? (
+            <span className="text-xs text-brand-mocha">
+              Legacy ingredient: {line.itemNameSnapshot}. Select a Product Master component before
+              saving changes.
+            </span>
+          ) : null}
         </label>
         <label className="grid gap-2">
           <Label>Unit</Label>
@@ -114,6 +146,19 @@ export function RecipeIngredientLineEditor({
           />
         </label>
       </div>
+      {selectedVariants.length > 0 ? (
+        <label className="grid gap-2">
+          <Label>Component variant</Label>
+          <SearchableCombobox
+            emptyMessage="No matching variants found."
+            onValueChange={setComponentVariantId}
+            options={variantOptions}
+            placeholder="Parent product component"
+            searchPlaceholder="Search variant, SKU..."
+            value={componentVariantId}
+          />
+        </label>
+      ) : null}
       <div className="grid gap-4 md:grid-cols-4">
         <label className="grid gap-2">
           <Label htmlFor="ingredient-qty">Quantity</Label>

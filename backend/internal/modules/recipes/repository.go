@@ -142,7 +142,10 @@ func (r *Repository) NextRecipeCode(tx *gorm.DB, businessID, branchID string) (s
 
 func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string) (*ProductInfo, error) {
 	var p ProductInfo
-	err := tx.Table("products").Select("id, product_name, product_type, unit_id, sale_price, cost_price").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", productID, businessID, branchID).Take(&p).Error
+	err := tx.Table("products").
+		Select("id, product_name, product_type, unit_id, sale_price, cost_price, is_stock_tracked, status").
+		Where("id = ? AND business_id = ? AND branch_id = ? AND status = ? AND deleted_at IS NULL", productID, businessID, branchID, "active").
+		Take(&p).Error
 	return &p, err
 }
 
@@ -333,7 +336,7 @@ func (r *Repository) ToIngredientResponses(items []RecipeIngredient) []RecipeIng
 	responses := make([]RecipeIngredientResponse, 0, len(items))
 	for _, item := range items {
 		responses = append(responses, RecipeIngredientResponse{
-			ID: item.ID, IngredientID: item.IngredientID, InventoryItemID: item.InventoryItemID, ItemNameSnapshot: item.ItemNameSnapshot,
+			ID: item.ID, ComponentProductID: item.ComponentProductID, ComponentVariantID: item.ComponentVariantID, IngredientID: item.IngredientID, InventoryItemID: item.InventoryItemID, ItemNameSnapshot: item.ItemNameSnapshot,
 			QuantityRequired: roundQuantity(item.QuantityRequired), UnitID: item.UnitID, UnitSymbol: r.UnitSymbol(item.UnitID),
 			UnitCostSnapshot: roundMoney(item.UnitCostSnapshot), TotalCost: roundMoney(item.TotalCost), WastagePercentage: roundQuantity(item.WastagePercentage),
 			SortOrder: item.SortOrder, Notes: item.Notes, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
@@ -346,7 +349,7 @@ func (r *Repository) ToPackagingResponses(items []RecipePackaging) []RecipePacka
 	responses := make([]RecipePackagingResponse, 0, len(items))
 	for _, item := range items {
 		responses = append(responses, RecipePackagingResponse{
-			ID: item.ID, PackagingItemID: item.PackagingItemID, PackagingNameSnapshot: item.PackagingNameSnapshot,
+			ID: item.ID, ComponentProductID: item.ComponentProductID, ComponentVariantID: item.ComponentVariantID, PackagingItemID: item.PackagingItemID, PackagingNameSnapshot: item.PackagingNameSnapshot,
 			QuantityRequired: roundQuantity(item.QuantityRequired), UnitID: item.UnitID, UnitSymbol: r.UnitSymbol(item.UnitID),
 			UnitCostSnapshot: roundMoney(item.UnitCostSnapshot), TotalCost: roundMoney(item.TotalCost), IsOptional: item.IsOptional,
 			SortOrder: item.SortOrder, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
@@ -403,12 +406,14 @@ func roundMoney(value float64) float64    { return math.Round(value*100) / 100 }
 func roundQuantity(value float64) float64 { return math.Round(value*10000) / 10000 }
 
 type ProductInfo struct {
-	ID          string
-	ProductName string
-	ProductType string
-	UnitID      string
-	SalePrice   float64
-	CostPrice   *float64
+	ID             string
+	ProductName    string
+	ProductType    string
+	UnitID         string
+	SalePrice      float64
+	CostPrice      *float64
+	IsStockTracked bool
+	Status         string
 }
 
 type ProductVariantInfo struct {

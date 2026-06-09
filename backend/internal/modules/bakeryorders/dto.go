@@ -127,9 +127,11 @@ type UpdateProductionStatusRequest struct {
 }
 
 type AddPackagingRequest struct {
-	PackagingItemID  string  `json:"packaging_item_id"`
-	QuantityRequired float64 `json:"quantity_required"`
-	UnitID           string  `json:"unit_id"`
+	ComponentProductID string  `json:"component_product_id"`
+	ComponentVariantID string  `json:"component_variant_id"`
+	PackagingItemID    string  `json:"packaging_item_id"`
+	QuantityRequired   float64 `json:"quantity_required"`
+	UnitID             string  `json:"unit_id"`
 }
 
 type PaginationResponse struct {
@@ -242,7 +244,9 @@ type BakeryOrderProductionResponse struct {
 type BakeryOrderPackagingResponse struct {
 	ID                    string    `json:"id"`
 	BakeryOrderID         string    `json:"bakery_order_id"`
-	PackagingItemID       string    `json:"packaging_item_id"`
+	PackagingItemID       *string   `json:"packaging_item_id"`
+	ComponentProductID    *string   `json:"component_product_id"`
+	ComponentVariantID    *string   `json:"component_variant_id"`
 	PackagingNameSnapshot string    `json:"packaging_name_snapshot"`
 	QuantityRequired      float64   `json:"quantity_required"`
 	UnitID                string    `json:"unit_id"`
@@ -261,13 +265,15 @@ type SummaryResponse struct {
 }
 
 type productRow struct {
-	ID           string
-	ProductName  string
-	UnitID       string
-	TaxRateID    *string
-	SalePrice    float64
-	Status       string
-	IsPOSVisible bool
+	ID             string
+	ProductName    string
+	ProductType    string
+	UnitID         string
+	TaxRateID      *string
+	SalePrice      float64
+	Status         string
+	IsPOSVisible   bool
+	IsStockTracked bool
 }
 
 type productVariantRow struct {

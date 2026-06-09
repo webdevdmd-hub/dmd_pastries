@@ -1,4 +1,6 @@
 import { apiRequest } from "@/lib/api/client";
+import type { ItemStructure, ProductType } from "@/types/product";
+import { ITEM_STRUCTURES, PRODUCT_TYPES } from "@/types/product";
 import type {
   AddSupplierPaymentPayload,
   ConvertPurchaseInvoiceToReceiptPayload,
@@ -44,10 +46,9 @@ import type {
 } from "@/types/purchasing";
 
 type BackendLinePayload = {
-  item_type: PurchaseItemType;
+  item_type: "product";
   product_id?: string | null;
-  ingredient_id?: string | null;
-  packaging_item_id?: string | null;
+  product_variant_id?: string | null;
   quantity?: number;
   quantity_ordered?: number;
   quantity_received?: number;
@@ -215,6 +216,14 @@ function isItemType(value: unknown): value is PurchaseItemType {
   return value === "product" || value === "ingredient" || value === "packaging";
 }
 
+function isProductType(value: unknown): value is ProductType {
+  return PRODUCT_TYPES.includes(value as ProductType);
+}
+
+function isItemStructure(value: unknown): value is ItemStructure {
+  return ITEM_STRUCTURES.includes(value as ItemStructure);
+}
+
 function isOrderStatus(value: unknown): value is PurchaseOrderStatus {
   return (
     value === "draft" ||
@@ -258,6 +267,7 @@ function parseOrderItem(value: unknown): PurchaseOrderItem {
     id: stringValue(value.id),
     itemType: isItemType(value.item_type) ? value.item_type : "product",
     productId: optionalString(value.product_id),
+    productVariantId: optionalString(value.product_variant_id),
     ingredientId: optionalString(value.ingredient_id),
     packagingItemId: optionalString(value.packaging_item_id),
     itemNameSnapshot: stringValue(value.item_name_snapshot, "Purchase item"),
@@ -283,6 +293,7 @@ function parseInvoiceItem(value: unknown): PurchaseInvoiceItem {
     id: stringValue(value.id),
     itemType: isItemType(value.item_type) ? value.item_type : "product",
     productId: optionalString(value.product_id),
+    productVariantId: optionalString(value.product_variant_id),
     ingredientId: optionalString(value.ingredient_id),
     packagingItemId: optionalString(value.packaging_item_id),
     itemNameSnapshot: stringValue(value.item_name_snapshot, "Purchase item"),
@@ -309,6 +320,7 @@ function parseReceiptItem(value: unknown): PurchaseReceiptItem {
     id: stringValue(value.id),
     itemType: isItemType(value.item_type) ? value.item_type : "product",
     productId: optionalString(value.product_id),
+    productVariantId: optionalString(value.product_variant_id),
     ingredientId: optionalString(value.ingredient_id),
     packagingItemId: optionalString(value.packaging_item_id),
     inventoryItemId: optionalString(value.inventory_item_id),
@@ -418,6 +430,7 @@ function parsePurchaseReturnItem(value: unknown): PurchaseReturnItem {
     lineTotal: numberValue(value.line_total),
     packagingItemId: optionalString(value.packaging_item_id),
     productId: optionalString(value.product_id),
+    productVariantId: optionalString(value.product_variant_id),
     purchaseReceiptItemId: stringValue(value.purchase_receipt_item_id),
     quantity: numberValue(value.quantity),
     reason: optionalString(value.reason),
@@ -444,6 +457,7 @@ function parseReturnablePurchaseReceiptItem(value: unknown): ReturnablePurchaseR
     itemType: isItemType(value.item_type) ? value.item_type : "product",
     packagingItemId: optionalString(value.packaging_item_id),
     productId: optionalString(value.product_id),
+    productVariantId: optionalString(value.product_variant_id),
     purchaseReceiptItemId: stringValue(value.purchase_receipt_item_id, stringValue(value.id)),
     receivedQuantity: numberValue(value.received_quantity, numberValue(value.quantity_received)),
     returnableQuantity: numberValue(
@@ -744,10 +758,32 @@ function parseProduct(value: unknown): PurchasingProductOption {
     throw new Error("Backend product payload is invalid.");
   }
 
+  const productType = isProductType(value.product_type) ? value.product_type : "finished_product";
+  const itemStructure = isItemStructure(value.item_structure) ? value.item_structure : "single";
+  const unit = isObject(value.unit) ? value.unit : {};
+  const variants = Array.isArray(value.variants) ? value.variants : [];
+
   return {
     id: stringValue(value.id),
     productName: stringValue(value.product_name, "Product"),
-    productCode: stringValue(value.product_code),
+    productCode: stringValue(value.product_code, stringValue(value.sku)),
+    barcode: optionalString(value.barcode),
+    costPrice: typeof value.cost_price === "number" ? value.cost_price : null,
+    isStockTracked: value.is_stock_tracked === true,
+    itemStructure,
+    productType,
+    sku: optionalString(value.sku),
+    unitId: stringValue(value.unit_id, stringValue(unit.id)),
+    unitName: stringValue(value.unit_name, stringValue(unit.unit_name, "Unit")),
+    unitSymbol: stringValue(value.unit_symbol, stringValue(unit.symbol)),
+    variants: variants.filter(isObject).map((variant) => ({
+      barcode: optionalString(variant.barcode),
+      costPrice: typeof variant.cost_price === "number" ? variant.cost_price : null,
+      id: stringValue(variant.id),
+      sku: optionalString(variant.sku),
+      status: variant.status === "inactive" ? "inactive" : "active",
+      variantName: stringValue(variant.variant_name, "Variant"),
+    })),
   };
 }
 
@@ -811,10 +847,9 @@ function linePayload(
   quantityKey: "quantity" | "quantity_ordered" | "quantity_received",
 ): BackendLinePayload {
   const payload: BackendLinePayload = {
-    item_type: line.itemType,
+    item_type: "product",
     product_id: line.productId,
-    ingredient_id: line.ingredientId,
-    packaging_item_id: line.packagingItemId,
+    product_variant_id: line.productVariantId,
     [quantityKey]: line.quantity,
     unit_id: line.unitId,
     unit_cost: line.unitCost,
@@ -1436,10 +1471,23 @@ export async function lookupSuppliers(search = ""): Promise<PurchasingSupplierOp
 }
 
 export async function getProducts(): Promise<PurchasingProductOption[]> {
-  const response = await apiRequest<PurchasingProductOption[]>("/api/v1/products?limit=100", {
-    authMode: "appwrite",
-    parse: (data) => parseList(data, parseProduct),
-  });
+  const response = await apiRequest<PurchasingProductOption[]>(
+    "/api/v1/products?status=active&limit=100",
+    {
+      authMode: "appwrite",
+      parse: (data) =>
+        parseList(data, parseProduct).filter((product) =>
+          [
+            "ingredient",
+            "packaging",
+            "raw_material",
+            "semi_finished",
+            "consumable",
+            "equipment",
+          ].includes(product.productType),
+        ),
+    },
+  );
 
   return response.data;
 }

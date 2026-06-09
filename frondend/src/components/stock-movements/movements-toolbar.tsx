@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Branch } from "@/types/branch";
+import { PRODUCT_TYPE_LABELS, PRODUCT_TYPES } from "@/types/product";
 import type { StockMovementFilters } from "@/types/stock-movements";
 
 type MovementsToolbarProps = {
@@ -34,7 +35,7 @@ export function MovementsToolbar({
   };
 
   return (
-    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/70 p-4 shadow-soft lg:grid-cols-4 xl:grid-cols-8">
+    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/70 p-4 shadow-soft lg:grid-cols-4 xl:grid-cols-9">
       <Input
         aria-label="Search stock movements"
         onChange={(event) => updateFilters({ search: event.target.value })}
@@ -67,8 +68,24 @@ export function MovementsToolbar({
           <SelectItem value="all">All item types</SelectItem>
           <SelectItem value="product">Products</SelectItem>
           <SelectItem value="product_variant">Variants</SelectItem>
-          <SelectItem value="ingredient">Ingredients</SelectItem>
-          <SelectItem value="packaging">Packaging</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select
+        onValueChange={(productType) =>
+          updateFilters({ productType: productType as StockMovementFilters["productType"] })
+        }
+        value={filters.productType}
+      >
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All product types</SelectItem>
+          {PRODUCT_TYPES.map((productType) => (
+            <SelectItem key={productType} value={productType}>
+              {PRODUCT_TYPE_LABELS[productType]}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
       <Select
@@ -130,6 +147,7 @@ export function MovementsToolbar({
             search: "",
             branchId: resetBranchId,
             itemType: "all",
+            productType: "all",
             movementType: "all",
             direction: "all",
             dateFrom: "",

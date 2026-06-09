@@ -480,7 +480,10 @@ func (r *Repository) PaymentMethod(tx *gorm.DB, businessID, methodID string) (*P
 
 func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string) (*ProductInfo, error) {
 	var product ProductInfo
-	err := tx.Table("products").Select("id, product_name, unit_id, is_expiry_tracked").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", productID, businessID, branchID).Take(&product).Error
+	err := tx.Table("products").
+		Select("id, product_name, unit_id, product_type, is_stock_tracked, is_expiry_tracked").
+		Where("id = ? AND business_id = ? AND branch_id = ? AND status = ? AND deleted_at IS NULL", productID, businessID, branchID, "active").
+		Take(&product).Error
 	return &product, err
 }
 
@@ -718,6 +721,8 @@ type ProductInfo struct {
 	ID              string
 	ProductName     string
 	UnitID          string
+	ProductType     string
+	IsStockTracked  bool
 	IsExpiryTracked bool
 }
 

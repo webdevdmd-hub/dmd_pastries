@@ -92,25 +92,34 @@ type SalesListQuery struct {
 }
 
 type POSProductQuery struct {
-	Search      string
-	CategoryID  string
-	ProductType string
-	Page        int
-	Limit       int
+	Search        string
+	CategoryID    string
+	ProductType   string
+	ItemStructure string
+	Page          int
+	Limit         int
 }
 
 type POSPaymentMethodResponse struct {
 	ID                        string  `json:"id"`
+	BusinessID                string  `json:"business_id"`
 	MethodName                string  `json:"method_name"`
 	MethodType                string  `json:"method_type"`
+	IsDefault                 bool    `json:"is_default"`
 	Status                    string  `json:"status"`
 	ShowInPOS                 bool    `json:"show_in_pos"`
+	ShowInBakeryOrders        bool    `json:"show_in_bakery_orders"`
+	ShowInPurchasing          bool    `json:"show_in_purchasing"`
+	ShowInExpenses            bool    `json:"show_in_expenses"`
+	ShowInDashboardCollection bool    `json:"show_in_dashboard_collection"`
 	AllowSplitPayment         bool    `json:"allow_split_payment"`
 	RequiresReference         bool    `json:"requires_reference"`
 	DefaultPaymentAccountID   string  `json:"default_payment_account_id"`
 	DefaultPaymentAccountName string  `json:"default_payment_account_name"`
 	BranchID                  *string `json:"branch_id"`
 	BranchName                string  `json:"branch_name"`
+	CreatedAt                 string  `json:"created_at"`
+	UpdatedAt                 string  `json:"updated_at"`
 }
 
 type POSReferenceDataResponse struct {
@@ -219,6 +228,7 @@ type POSProductResponse struct {
 	Unit           UnitInfo             `json:"unit"`
 	TaxRate        *TaxRateInfo         `json:"tax_rate"`
 	ProductType    string               `json:"product_type"`
+	ItemStructure  string               `json:"item_structure"`
 	SalePrice      float64              `json:"sale_price"`
 	ImageFileID    string               `json:"image_file_id"`
 	Variants       []POSVariantResponse `json:"variants"`

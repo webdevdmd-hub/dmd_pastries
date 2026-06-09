@@ -2,15 +2,25 @@ import { z } from "zod";
 
 const uuidSchema = z.string().min(1, "Required.");
 const optionalTextSchema = z.string().optional();
+const inventoryItemTypeFilterSchema = z.enum(["all", "product", "product_variant"]);
+const inventoryProductTypeFilterSchema = z.enum([
+  "all",
+  "finished_product",
+  "ingredient",
+  "packaging",
+  "raw_material",
+  "semi_finished",
+  "consumable",
+  "equipment",
+  "service",
+]);
 
 export const openingStockSchema = z
   .object({
     branchId: uuidSchema,
-    itemType: z.enum(["product", "product_variant", "ingredient", "packaging"]),
+    itemType: z.enum(["product", "product_variant"]),
     productId: z.string().optional(),
     productVariantId: z.string().optional(),
-    ingredientId: z.string().optional(),
-    packagingItemId: z.string().optional(),
     unitId: uuidSchema,
     stockLocationId: z.string().optional(),
     quantity: z.coerce.number().min(0, "Quantity cannot be negative."),
@@ -44,22 +54,6 @@ export const openingStockSchema = z
           path: ["productVariantId"],
         });
       }
-    }
-
-    if (value.itemType === "ingredient" && !value.ingredientId) {
-      context.addIssue({
-        code: "custom",
-        message: "Ingredient is required.",
-        path: ["ingredientId"],
-      });
-    }
-
-    if (value.itemType === "packaging" && !value.packagingItemId) {
-      context.addIssue({
-        code: "custom",
-        message: "Packaging item is required.",
-        path: ["packagingItemId"],
-      });
     }
 
     if (value.isExpiryTracked && value.expiryDate && Number.isNaN(Date.parse(value.expiryDate))) {
@@ -123,7 +117,8 @@ export const updateExpiryBatchSchema = z.object({
 export const inventoryFiltersSchema = z.object({
   search: z.string(),
   branchId: z.string(),
-  itemType: z.enum(["all", "product", "product_variant", "ingredient", "packaging"]),
+  itemType: inventoryItemTypeFilterSchema,
+  productType: inventoryProductTypeFilterSchema,
   status: z.enum(["all", "active", "inactive"]),
   lowStockOnly: z.boolean(),
   expiryTrackedOnly: z.boolean(),
@@ -132,7 +127,8 @@ export const inventoryFiltersSchema = z.object({
 export const stockMovementFiltersSchema = z.object({
   search: z.string(),
   branchId: z.string(),
-  itemType: z.enum(["all", "product", "product_variant", "ingredient", "packaging"]),
+  itemType: inventoryItemTypeFilterSchema,
+  productType: inventoryProductTypeFilterSchema,
   movementType: z.enum([
     "all",
     "opening_stock",

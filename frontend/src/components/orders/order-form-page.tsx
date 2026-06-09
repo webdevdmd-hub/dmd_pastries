@@ -77,6 +77,7 @@ export function OrderFormPage({ orderId }: { orderId: string | null }): JSX.Elem
       limit: 100,
       page: 1,
       productType: "all",
+      itemStructure: "all",
       search: "",
       sortBy: "product_name",
       sortOrder: "asc",

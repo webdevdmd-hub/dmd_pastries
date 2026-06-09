@@ -46,21 +46,30 @@ func (r *Repository) ListPOSPaymentMethods(businessID, branchID string) ([]POSPa
 	err := r.db.Table("payment_methods pm").
 		Select(`
 			pm.id,
+			pm.business_id,
 			pm.method_name,
 			pm.method_type,
+			pm.is_default,
 			pm.status,
 			pm.show_in_pos,
+			pm.show_in_bakery_orders,
+			pm.show_in_purchasing,
+			pm.show_in_expenses,
+			pm.show_in_dashboard_collection,
 			pm.allow_split_payment,
 			pm.requires_reference,
-			pa.id AS default_payment_account_id,
+			pa.id::text AS default_payment_account_id,
 			pa.account_name AS default_payment_account_name,
 			pa.branch_id,
-			COALESCE(account_branch.branch_name, checkout_branch.branch_name, '') AS branch_name
+			COALESCE(account_branch.branch_name, checkout_branch.branch_name, '') AS branch_name,
+			pm.created_at::text AS created_at,
+			pm.updated_at::text AS updated_at
 		`).
-		Joins("JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = pm.business_id AND pa.status = ? AND pa.deleted_at IS NULL", "active").
+		Joins("LEFT JOIN payment_method_account_mappings pmam ON pmam.payment_method_id = pm.id AND pmam.business_id = pm.business_id AND pmam.branch_id = ? AND pmam.status = ? AND pmam.deleted_at IS NULL", branchID, "active").
+		Joins("JOIN payment_accounts pa ON pa.id = COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AND pa.business_id = pm.business_id AND pa.status = ? AND pa.deleted_at IS NULL", "active").
 		Joins("LEFT JOIN branches account_branch ON account_branch.id = pa.branch_id AND account_branch.business_id = pm.business_id AND account_branch.deleted_at IS NULL").
 		Joins("LEFT JOIN branches checkout_branch ON checkout_branch.id = ? AND checkout_branch.business_id = pm.business_id AND checkout_branch.deleted_at IS NULL", branchID).
-		Where("pm.business_id = ? AND pm.status = ? AND pm.show_in_pos = ? AND pm.default_payment_account_id IS NOT NULL AND pm.deleted_at IS NULL", businessID, "active", true).
+		Where("pm.business_id = ? AND pm.status = ? AND pm.show_in_pos = ? AND COALESCE(pmam.payment_account_id, pm.default_payment_account_id) IS NOT NULL AND pm.deleted_at IS NULL", businessID, "active", true).
 		Where("(pa.branch_id IS NULL OR pa.branch_id = ?)", branchID).
 		Order("pm.is_default DESC, pm.method_name ASC").
 		Scan(&rows).Error
@@ -647,6 +656,7 @@ type ProductRow struct {
 	SKU            string
 	Barcode        string
 	ProductType    string
+	ItemStructure  string
 	SalePrice      float64
 	ImageFileID    string
 	IsStockTracked bool
@@ -772,6 +782,9 @@ func applyPOSProductFilters(db *gorm.DB, query POSProductQuery) *gorm.DB {
 	}
 	if query.ProductType != "" {
 		db = db.Where("p.product_type = ?", query.ProductType)
+	}
+	if query.ItemStructure != "" {
+		db = db.Where("p.item_structure = ?", query.ItemStructure)
 	}
 	return db
 }

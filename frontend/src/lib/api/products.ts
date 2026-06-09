@@ -3,6 +3,7 @@ import type { Unit } from "@/types/master-data";
 import type {
   CreateProductPayload,
   CreateProductVariantPayload,
+  ItemStructure,
   Product,
   ProductListFilters,
   ProductListResponse,
@@ -15,6 +16,7 @@ import type {
   UpdateProductVariantPayload,
   UpdateProductVariantStatusPayload,
 } from "@/types/product";
+import { ITEM_STRUCTURES, PRODUCT_TYPES } from "@/types/product";
 import type { TaxRate } from "@/types/settings";
 
 type BackendListResponse = {
@@ -27,6 +29,7 @@ type BackendListResponse = {
 };
 
 type BackendProductCategoryReference = {
+  allowed_product_types?: unknown;
   id?: unknown;
   category_name?: unknown;
   name?: unknown;
@@ -83,6 +86,7 @@ type BackendProduct = {
   tax_rate_id?: unknown;
   tax_rate_name?: unknown;
   product_type?: unknown;
+  item_structure?: unknown;
   sale_price?: unknown;
   cost_price?: unknown;
   compare_at_price?: unknown;
@@ -121,6 +125,7 @@ type BackendProductPayload = {
   unit_id?: string;
   tax_rate_id?: string | null;
   product_type?: ProductType;
+  item_structure?: ItemStructure;
   sale_price?: number;
   cost_price?: number | null;
   compare_at_price?: number | null;
@@ -221,13 +226,19 @@ function isRecordStatus(value: unknown): value is "active" | "inactive" {
 }
 
 function isProductType(value: unknown): value is ProductType {
-  return (
-    value === "ready_to_sell" ||
-    value === "made_to_order" ||
-    value === "manufactured" ||
-    value === "retail" ||
-    value === "service"
-  );
+  return PRODUCT_TYPES.includes(value as ProductType);
+}
+
+function isItemStructure(value: unknown): value is ItemStructure {
+  return ITEM_STRUCTURES.includes(value as ItemStructure);
+}
+
+function parseAllowedProductTypes(value: unknown): ProductType[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isProductType);
 }
 
 type VariantFallbacks = {
@@ -296,6 +307,10 @@ function parseProduct(value: unknown): Product {
     throw new Error("Product type is invalid.");
   }
 
+  if (!isItemStructure(product.item_structure)) {
+    throw new Error("Product item structure is invalid.");
+  }
+
   if (!isProductStatus(product.status)) {
     throw new Error("Product status is invalid.");
   }
@@ -332,6 +347,7 @@ function parseProduct(value: unknown): Product {
       nestedString(product.tax_rate, ["tax_name", "name"]) ??
       null,
     productType: product.product_type,
+    itemStructure: product.item_structure,
     salePrice: requiredNumber(product.sale_price, "Sale price"),
     costPrice: nullableNumber(product.cost_price),
     compareAtPrice: nullableNumber(product.compare_at_price),
@@ -424,7 +440,11 @@ function parseReferenceList<TItem>(value: unknown, parser: (item: unknown) => TI
   return [];
 }
 
-function parseProductCategoryReference(value: unknown): { id: string; categoryName: string } {
+function parseProductCategoryReference(value: unknown): {
+  allowedProductTypes: ProductType[];
+  categoryName: string;
+  id: string;
+} {
   if (!isObject(value)) {
     throw new Error("Product category reference payload is invalid.");
   }
@@ -433,6 +453,7 @@ function parseProductCategoryReference(value: unknown): { id: string; categoryNa
   const id = requiredString(category.id, "Product category ID");
 
   return {
+    allowedProductTypes: parseAllowedProductTypes(category.allowed_product_types),
     id,
     categoryName:
       optionalString(category.category_name) ?? optionalString(category.name) ?? "Unnamed category",
@@ -497,14 +518,15 @@ function parseTaxRateReference(value: unknown): TaxRate {
   };
 }
 
-async function getProductCategoryReferences(): Promise<{ id: string; categoryName: string }[]> {
-  const response = await apiRequest<{ id: string; categoryName: string }[]>(
-    "/api/v1/master-data/product-categories",
-    {
-      authMode: "appwrite",
-      parse: (data) => parseReferenceList(data, parseProductCategoryReference),
-    },
-  );
+async function getProductCategoryReferences(): Promise<
+  { allowedProductTypes: ProductType[]; categoryName: string; id: string }[]
+> {
+  const response = await apiRequest<
+    { allowedProductTypes: ProductType[]; categoryName: string; id: string }[]
+  >("/api/v1/master-data/product-categories", {
+    authMode: "appwrite",
+    parse: (data) => parseReferenceList(data, parseProductCategoryReference),
+  });
 
   return response.data.filter((category) => category.id.length > 0);
 }
@@ -536,6 +558,7 @@ function toBackendProductPayload(
     ...(payload.unitId !== undefined ? { unit_id: payload.unitId } : {}),
     ...(payload.taxRateId !== undefined ? { tax_rate_id: payload.taxRateId } : {}),
     ...(payload.productType !== undefined ? { product_type: payload.productType } : {}),
+    ...(payload.itemStructure !== undefined ? { item_structure: payload.itemStructure } : {}),
     ...(payload.salePrice !== undefined ? { sale_price: payload.salePrice } : {}),
     ...(payload.costPrice !== undefined ? { cost_price: payload.costPrice } : {}),
     ...(payload.sku !== undefined ? { sku: payload.sku } : {}),
@@ -581,6 +604,9 @@ function buildProductsPath(filters: ProductListFilters): string {
   }
   if (filters.productType !== "all") {
     params.set("product_type", filters.productType);
+  }
+  if (filters.itemStructure !== "all") {
+    params.set("item_structure", filters.itemStructure);
   }
   if (filters.status !== "all") {
     params.set("status", filters.status);

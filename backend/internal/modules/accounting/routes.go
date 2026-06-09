@@ -29,6 +29,7 @@ func RegisterRoutes(
 	group.PATCH("/settings", manage, handler.UpdateAccountingSettings)
 
 	group.GET("/payment-accounts", view, handler.ListPaymentAccounts)
+	group.POST("/payment-accounts/seed-defaults", manage, handler.SeedDefaultPaymentAccounts)
 	group.POST("/payment-accounts", manage, handler.CreatePaymentAccount)
 	group.GET("/payment-accounts/:id", view, handler.GetPaymentAccount)
 	group.PATCH("/payment-accounts/:id", manage, handler.UpdatePaymentAccount)

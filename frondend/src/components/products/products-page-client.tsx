@@ -1,9 +1,9 @@
 "use client";
 
 import { Archive, Box, Eye, PackageCheck, PlusCircle, ShieldAlert } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ProductsAccessDeniedCard } from "@/components/products/access-denied-card";
@@ -57,11 +57,13 @@ import type {
   UpdateProductPayload,
   UpdateProductVariantPayload,
 } from "@/types/product";
+import { ITEM_STRUCTURES, PRODUCT_TYPES } from "@/types/product";
 
 const initialFilters: ProductListFilters = {
   search: "",
   categoryId: "all",
   productType: "all",
+  itemStructure: "all",
   status: "all",
   isPosVisible: "all",
   page: 1,
@@ -70,11 +72,46 @@ const initialFilters: ProductListFilters = {
   sortOrder: "desc",
 };
 
+type ProductSearchParams = {
+  get: (name: string) => string | null;
+};
+
+function getProductTypeFilter(value: string | null): ProductListFilters["productType"] {
+  return PRODUCT_TYPES.includes(value as (typeof PRODUCT_TYPES)[number])
+    ? (value as ProductListFilters["productType"])
+    : "all";
+}
+
+function getItemStructureFilter(value: string | null): ProductListFilters["itemStructure"] {
+  return ITEM_STRUCTURES.includes(value as (typeof ITEM_STRUCTURES)[number])
+    ? (value as ProductListFilters["itemStructure"])
+    : "all";
+}
+
+function getProductStatusFilter(value: string | null): ProductListFilters["status"] {
+  return value === "active" || value === "inactive" || value === "archived" ? value : "all";
+}
+
+function getProductFiltersFromSearchParams(searchParams: ProductSearchParams): ProductListFilters {
+  return {
+    ...initialFilters,
+    itemStructure: getItemStructureFilter(searchParams.get("item_structure")),
+    productType: getProductTypeFilter(searchParams.get("product_type")),
+    search: searchParams.get("search") ?? "",
+    status: getProductStatusFilter(searchParams.get("status")),
+  };
+}
+
 export function ProductsPageClient(): JSX.Element {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { logout } = useAuth();
   const { hasAnyPermission } = usePermission();
-  const [filters, setFilters] = useState<ProductListFilters>(initialFilters);
+  const searchParamFilters = useMemo(
+    () => getProductFiltersFromSearchParams(searchParams),
+    [searchParams],
+  );
+  const [filters, setFilters] = useState<ProductListFilters>(searchParamFilters);
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [variantOpen, setVariantOpen] = useState(false);
@@ -118,6 +155,33 @@ export function ProductsPageClient(): JSX.Element {
     };
   }, [list, productsQuery.data?.total]);
   const totalPages = Math.max(1, Math.ceil((productsQuery.data?.total ?? 0) / filters.limit));
+
+  useEffect(() => {
+    setFilters((current) => {
+      if (
+        current.itemStructure === searchParamFilters.itemStructure &&
+        current.productType === searchParamFilters.productType &&
+        current.search === searchParamFilters.search &&
+        current.status === searchParamFilters.status
+      ) {
+        return current;
+      }
+
+      return {
+        ...current,
+        itemStructure: searchParamFilters.itemStructure,
+        page: 1,
+        productType: searchParamFilters.productType,
+        search: searchParamFilters.search,
+        status: searchParamFilters.status,
+      };
+    });
+  }, [
+    searchParamFilters.itemStructure,
+    searchParamFilters.productType,
+    searchParamFilters.search,
+    searchParamFilters.status,
+  ]);
 
   if (!canViewProducts) {
     return <ProductsAccessDeniedCard />;

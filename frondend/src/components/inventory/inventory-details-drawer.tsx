@@ -22,6 +22,7 @@ import type {
   InventoryItem,
   StockMovement,
 } from "@/types/inventory";
+import { PRODUCT_TYPE_LABELS } from "@/types/product";
 
 type InventoryDetailsDrawerProps = {
   batches: ExpiryBatch[];
@@ -39,6 +40,14 @@ type InventoryDetailsDrawerProps = {
 
 function formatQuantity(value: number, unit: string): string {
   return `${new Intl.NumberFormat("en-AE", { maximumFractionDigits: 3 }).format(value)} ${unit}`;
+}
+
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    maximumFractionDigits: 2,
+    style: "currency",
+  }).format(value);
 }
 
 export function InventoryDetailsDrawer({
@@ -88,6 +97,31 @@ export function InventoryDetailsDrawer({
                 <div className="mt-2 flex flex-wrap gap-2">
                   <InventoryStatusBadge status={item.status} />
                   <StockLevelBadge item={item} />
+                </div>
+              </div>
+              <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">
+                  Item Identity
+                </p>
+                <div className="mt-2 space-y-1 text-sm text-brand-espresso">
+                  <p className="font-bold">
+                    {item.productType ? PRODUCT_TYPE_LABELS[item.productType] : "Legacy item"}
+                  </p>
+                  {item.variantName ? <p>Variant: {item.variantName}</p> : null}
+                  <p className="text-brand-mocha">{item.itemCode || item.id.slice(0, 8)}</p>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">
+                  Inventory Value
+                </p>
+                <div className="mt-2 space-y-1 text-sm text-brand-espresso">
+                  <p>
+                    Avg cost: <span className="font-bold">{formatMoney(item.averageCost)}</span>
+                  </p>
+                  <p>
+                    Value: <span className="font-bold">{formatMoney(item.inventoryValue)}</span>
+                  </p>
                 </div>
               </div>
             </div>

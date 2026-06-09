@@ -7,6 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ProductionWastage } from "@/types/manufacturing";
+import { PRODUCT_TYPE_LABELS } from "@/types/product";
 
 function formatDate(value: string): string {
   return value
@@ -21,6 +22,19 @@ function formatMoney(value: number): string {
     currency: "AED",
     style: "currency",
   }).format(value);
+}
+
+function wastageName(item: ProductionWastage): string {
+  return item.componentProductName ?? item.itemName;
+}
+
+function wastageMeta(item: ProductionWastage): string {
+  const parts = [
+    item.componentProductType ? PRODUCT_TYPE_LABELS[item.componentProductType] : "Legacy item",
+    item.componentVariantName,
+  ].filter((part): part is string => Boolean(part));
+
+  return parts.join(" / ");
 }
 
 export function BatchWastageSection({
@@ -52,7 +66,8 @@ export function BatchWastageSection({
               key={item.id}
             >
               <div>
-                <p className="font-semibold text-brand-espresso">{item.itemName}</p>
+                <p className="font-semibold text-brand-espresso">{wastageName(item)}</p>
+                <p className="text-xs text-brand-mocha">{wastageMeta(item)}</p>
                 <p className="text-sm text-brand-mocha">
                   {item.quantity} {item.unitName} / {item.wastageType} / {item.reason}
                 </p>

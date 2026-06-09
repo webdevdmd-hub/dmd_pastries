@@ -400,6 +400,8 @@ function parsePaymentMethod(value: unknown): PaymentMethod {
     showInDashboardCollection: optionalBoolean(method.show_in_dashboard_collection, true),
     defaultPaymentAccountId: optionalNullableString(method.default_payment_account_id),
     defaultPaymentAccountName: optionalString(method.default_payment_account_name),
+    branchId: null,
+    branchName: null,
     status: method.status,
     createdAt: requiredString(method.created_at, "Payment method created date is missing."),
     updatedAt: requiredString(method.updated_at, "Payment method updated date is missing."),

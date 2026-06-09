@@ -800,20 +800,29 @@ func (r *Repository) WastageReport(filter *shared.ResolvedFilter) (*WastageRepor
 func (r *Repository) PackagingStock(filter *shared.ResolvedFilter) ([]PackagingStockReportItem, error) {
 	items := []PackagingStockReportItem{}
 	query := `
-		SELECT pi.id AS packaging_item_id, pi.packaging_name, pc.category_name, b.branch_name,
+		SELECT p.id AS packaging_item_id,
+			CASE WHEN ii.item_type = 'product_variant' THEN CONCAT(p.product_name, ' - ', pv.variant_name) ELSE p.product_name END AS packaging_name,
+			p.id AS product_id,
+			pv.id AS product_variant_id,
+			CASE WHEN ii.item_type = 'product_variant' THEN CONCAT(p.product_name, ' - ', pv.variant_name) ELSE p.product_name END AS product_name,
+			COALESCE(NULLIF(pv.sku, ''), p.product_code, '') AS product_code,
+			pc.category_name,
+			b.branch_name,
 			ii.current_quantity, ii.available_quantity, ii.reorder_level,
-			u.symbol AS unit_symbol, pi.cost_per_unit,
-			(ii.current_quantity * pi.cost_per_unit) AS stock_value,
+			u.symbol AS unit_symbol,
+			COALESCE(pv.cost_price, p.cost_price, ii.average_unit_cost, 0) AS cost_per_unit,
+			COALESCE(ii.inventory_value, ii.current_quantity * COALESCE(pv.cost_price, p.cost_price, ii.average_unit_cost, 0)) AS stock_value,
 			(ii.available_quantity <= ii.reorder_level) AS is_low_stock
 		FROM inventory_items ii
-		JOIN packaging_items pi ON pi.id = ii.packaging_item_id
-		LEFT JOIN packaging_categories pc ON pc.id = pi.packaging_category_id
+		JOIN products p ON p.id = ii.product_id AND p.product_type = 'packaging' AND p.deleted_at IS NULL
+		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id AND pv.deleted_at IS NULL
+		LEFT JOIN product_categories pc ON pc.id = p.category_id
 		JOIN branches b ON b.id = ii.branch_id
 		JOIN units u ON u.id = ii.unit_id
-		WHERE ii.business_id = ? AND ii.item_type = 'packaging' AND ii.deleted_at IS NULL`
+		WHERE ii.business_id = ? AND ii.item_type IN ('product', 'product_variant') AND ii.deleted_at IS NULL`
 	args := []interface{}{filter.BusinessID}
 	query, args = addInventoryItemFilters(query, args, filter)
-	query += " ORDER BY pi.packaging_name ASC"
+	query += " ORDER BY packaging_name ASC"
 	if err := r.db.Raw(query, args...).Scan(&items).Error; err != nil {
 		return nil, err
 	}

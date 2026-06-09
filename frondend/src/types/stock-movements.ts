@@ -1,4 +1,8 @@
-import type { InventoryItemType } from "@/types/inventory";
+import type {
+  InventoryItemType,
+  InventoryItemTypeFilter,
+  InventoryProductTypeFilter,
+} from "@/types/inventory";
 
 export type MovementType =
   | "opening_stock"
@@ -85,7 +89,8 @@ export type ReversalPayload = {
 export type StockMovementFilters = {
   search: string;
   branchId: string;
-  itemType: InventoryItemType | "all";
+  itemType: InventoryItemTypeFilter;
+  productType: InventoryProductTypeFilter;
   movementType: MovementType | "all";
   direction: MovementDirection | "all";
   dateFrom: string;
@@ -95,5 +100,5 @@ export type StockMovementFilters = {
 
 export type StockMovementSummaryParams = Pick<
   StockMovementFilters,
-  "branchId" | "itemType" | "movementType" | "direction" | "dateFrom" | "dateTo"
+  "branchId" | "itemType" | "productType" | "movementType" | "direction" | "dateFrom" | "dateTo"
 >;

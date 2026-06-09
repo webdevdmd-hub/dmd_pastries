@@ -29,6 +29,16 @@ func (s *Service) ListProducts(currentUser *utils.AuthContext, query ProductList
 		return nil, err
 	}
 	normalizeListQuery(&query)
+	if query.ProductType != "" {
+		if err := validateProductType(query.ProductType); err != nil {
+			return nil, err
+		}
+	}
+	if query.ItemStructure != "" {
+		if err := validateItemStructure(query.ItemStructure); err != nil {
+			return nil, err
+		}
+	}
 	products, total, err := s.repo.List(currentUser.BusinessID, branchID, query)
 	if err != nil {
 		return nil, apperrors.Internal("failed to list products")
@@ -87,7 +97,8 @@ func (s *Service) CreateProduct(currentUser *utils.AuthContext, req CreateProduc
 		SKU:                    strings.TrimSpace(req.SKU),
 		Barcode:                strings.TrimSpace(req.Barcode),
 		Description:            strings.TrimSpace(req.Description),
-		ProductType:            req.ProductType,
+		ProductType:            strings.TrimSpace(req.ProductType),
+		ItemStructure:          normalizeItemStructure(req.ItemStructure),
 		SalePrice:              req.SalePrice,
 		CostPrice:              req.CostPrice,
 		CompareAtPrice:         req.CompareAtPrice,
@@ -151,7 +162,7 @@ func (s *Service) UpdateProduct(currentUser *utils.AuthContext, id string, req U
 		}
 		return nil, apperrors.Internal("failed to load product")
 	}
-	if err := s.validateUpdate(currentUser.BusinessID, branchID, product.ID, req); err != nil {
+	if err := s.validateUpdate(currentUser.BusinessID, branchID, product, req); err != nil {
 		return nil, err
 	}
 
@@ -172,7 +183,10 @@ func (s *Service) UpdateProduct(currentUser *utils.AuthContext, id string, req U
 		updates["description"] = strings.TrimSpace(req.Description)
 	}
 	if req.ProductType != "" {
-		updates["product_type"] = req.ProductType
+		updates["product_type"] = strings.TrimSpace(req.ProductType)
+	}
+	if req.ItemStructure != "" {
+		updates["item_structure"] = normalizeItemStructure(req.ItemStructure)
 	}
 	if req.SalePrice != nil {
 		updates["sale_price"] = *req.SalePrice
@@ -331,7 +345,11 @@ func (s *Service) validateCreate(businessID, branchID string, req CreateProductR
 	if strings.TrimSpace(req.ProductName) == "" {
 		return apperrors.BadRequest("product_name is required", nil)
 	}
-	if err := validateProductType(req.ProductType); err != nil {
+	productType := strings.TrimSpace(req.ProductType)
+	if err := validateProductType(productType); err != nil {
+		return err
+	}
+	if err := validateItemStructure(req.ItemStructure); err != nil {
 		return err
 	}
 	if err := validatePrices(req.SalePrice, req.CostPrice, req.CompareAtPrice); err != nil {
@@ -340,7 +358,7 @@ func (s *Service) validateCreate(businessID, branchID string, req CreateProductR
 	if err := validatePreparationTime(req.PreparationTimeMinutes); err != nil {
 		return err
 	}
-	if err := s.validateReferences(businessID, branchID, req.CategoryID, req.UnitID, cleanStringPointer(req.TaxRateID)); err != nil {
+	if err := s.validateReferences(businessID, branchID, req.CategoryID, productType, req.UnitID, cleanStringPointer(req.TaxRateID)); err != nil {
 		return err
 	}
 	if err := s.validateUniqueCodes(businessID, branchID, "", strings.TrimSpace(req.SKU), strings.TrimSpace(req.Barcode)); err != nil {
@@ -349,9 +367,17 @@ func (s *Service) validateCreate(businessID, branchID string, req CreateProductR
 	return nil
 }
 
-func (s *Service) validateUpdate(businessID, branchID, productID string, req UpdateProductRequest) error {
+func (s *Service) validateUpdate(businessID, branchID string, product *Product, req UpdateProductRequest) error {
+	productID := product.ID
+	productType := product.ProductType
 	if req.ProductType != "" {
 		if err := validateProductType(req.ProductType); err != nil {
+			return err
+		}
+		productType = strings.TrimSpace(req.ProductType)
+	}
+	if req.ItemStructure != "" {
+		if err := validateItemStructure(req.ItemStructure); err != nil {
 			return err
 		}
 	}
@@ -370,8 +396,12 @@ func (s *Service) validateUpdate(businessID, branchID, productID string, req Upd
 	if err := validatePreparationTime(req.PreparationTimeMinutes); err != nil {
 		return err
 	}
-	if req.CategoryID != "" || req.UnitID != "" || req.TaxRateID != nil {
-		if err := s.validateReferences(businessID, branchID, req.CategoryID, req.UnitID, cleanStringPointer(req.TaxRateID)); err != nil {
+	categoryID := product.CategoryID
+	if req.CategoryID != "" {
+		categoryID = req.CategoryID
+	}
+	if req.CategoryID != "" || req.ProductType != "" || req.UnitID != "" || req.TaxRateID != nil {
+		if err := s.validateReferences(businessID, branchID, categoryID, productType, req.UnitID, cleanStringPointer(req.TaxRateID)); err != nil {
 			return err
 		}
 	}
@@ -381,11 +411,18 @@ func (s *Service) validateUpdate(businessID, branchID, productID string, req Upd
 	return nil
 }
 
-func (s *Service) validateReferences(businessID, branchID, categoryID, unitID string, taxRateID *string) error {
+func (s *Service) validateReferences(businessID, branchID, categoryID, productType, unitID string, taxRateID *string) error {
 	if categoryID != "" {
 		var count int64
-		if err := s.db.Table("product_categories").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", categoryID, businessID, branchID).Count(&count).Error; err != nil || count == 0 {
+		if err := s.db.Table("product_categories").Where("id = ? AND business_id = ? AND branch_id = ? AND status = ? AND deleted_at IS NULL", categoryID, businessID, branchID, "active").Count(&count).Error; err != nil || count == 0 {
 			return apperrors.BadRequest("invalid category_id", nil)
+		}
+		count = 0
+		if err := s.db.Table("product_category_allowed_types").Where("business_id = ? AND branch_id = ? AND product_category_id = ? AND product_type = ?", businessID, branchID, categoryID, productType).Count(&count).Error; err != nil {
+			return apperrors.Internal("failed to validate product category type")
+		}
+		if count == 0 {
+			return apperrors.BadRequest("product category is not allowed for selected product_type", nil)
 		}
 	}
 	if unitID != "" {
@@ -504,12 +541,29 @@ func normalizeListQuery(query *ProductListQuery) {
 }
 
 func validateProductType(value string) error {
-	switch value {
-	case "ready_to_sell", "made_to_order", "manufactured", "retail", "service":
+	switch strings.TrimSpace(value) {
+	case "finished_product", "ingredient", "packaging", "raw_material", "semi_finished", "consumable", "equipment", "service":
 		return nil
 	default:
 		return apperrors.BadRequest("invalid product_type", nil)
 	}
+}
+
+func validateItemStructure(value string) error {
+	switch normalizeItemStructure(value) {
+	case "single", "variant", "recipe_based", "custom":
+		return nil
+	default:
+		return apperrors.BadRequest("invalid item_structure", nil)
+	}
+}
+
+func normalizeItemStructure(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "single"
+	}
+	return trimmed
 }
 
 func validProductStatus(value string) bool {
@@ -575,6 +629,7 @@ func toProductResponse(product Product, category ProductCategoryInfo, unit Produ
 		Unit:                   unit,
 		TaxRate:                taxRate,
 		ProductType:            product.ProductType,
+		ItemStructure:          normalizeItemStructure(product.ItemStructure),
 		SalePrice:              product.SalePrice,
 		CostPrice:              product.CostPrice,
 		CompareAtPrice:         product.CompareAtPrice,

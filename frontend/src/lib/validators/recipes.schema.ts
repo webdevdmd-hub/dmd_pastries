@@ -20,7 +20,8 @@ export const yieldSchema = z.object({
 });
 
 export const ingredientLineSchema = z.object({
-  inventoryItemId: z.string().min(1, "Inventory item is required."),
+  componentProductId: z.string().min(1, "Component product is required."),
+  componentVariantId: nullableText,
   quantityRequired: z.coerce.number().positive("Quantity must be greater than 0."),
   unitId: z.string().min(1, "Unit is required."),
   wastagePercentage: z.coerce.number().min(0, "Wastage cannot be negative."),
@@ -29,7 +30,8 @@ export const ingredientLineSchema = z.object({
 });
 
 export const packagingLineSchema = z.object({
-  packagingItemId: z.string().min(1, "Packaging item is required."),
+  componentProductId: z.string().min(1, "Packaging product is required."),
+  componentVariantId: nullableText,
   quantityRequired: z.coerce.number().positive("Quantity must be greater than 0."),
   unitId: z.string().min(1, "Unit is required."),
   isOptional: z.boolean(),

@@ -642,8 +642,6 @@ func (s *Service) CreateOpeningStock(currentUser *utils.AuthContext, req Opening
 				BranchID:          req.BranchID,
 				ProductID:         nullableString(req.ProductID),
 				ProductVariantID:  nullableString(req.ProductVariantID),
-				IngredientID:      nullableString(req.IngredientID),
-				PackagingItemID:   nullableString(req.PackagingItemID),
 				ItemType:          req.ItemType,
 				CurrentQuantity:   0,
 				ReservedQuantity:  0,
@@ -1231,7 +1229,7 @@ func (s *Service) DeductOnSale(saleID string) error {
 }
 
 func (s *Service) validateOpeningStock(businessID string, req OpeningStockRequest) error {
-	if !validItemType(req.ItemType) {
+	if !validOpeningStockItemType(req.ItemType) {
 		return apperrors.BadRequest("invalid item_type", nil)
 	}
 	if req.Quantity < 0 {
@@ -1272,7 +1270,7 @@ func (s *Service) validateOpeningStock(businessID string, req OpeningStockReques
 		if err := validateUUID(req.ProductID, "product_id"); err != nil {
 			return err
 		}
-		if err := s.repo.ValidateProduct(businessID, req.ProductID); err != nil {
+		if err := s.repo.ValidateStockTrackedProduct(businessID, req.BranchID, req.ProductID); err != nil {
 			return mapNotFound(err, "product not found")
 		}
 	case "product_variant":
@@ -1284,17 +1282,6 @@ func (s *Service) validateOpeningStock(businessID string, req OpeningStockReques
 		}
 		if err := s.repo.ValidateProductVariant(businessID, req.BranchID, req.ProductID, req.ProductVariantID); err != nil {
 			return mapNotFound(err, "product variant not found")
-		}
-	case "ingredient":
-		if err := validateUUID(req.IngredientID, "ingredient_id"); err != nil {
-			return err
-		}
-		if err := s.repo.ValidateIngredient(businessID, req.IngredientID); err != nil {
-			return mapNotFound(err, "ingredient not found")
-		}
-	case "packaging":
-		if err := validateUUID(req.PackagingItemID, "packaging_item_id"); err != nil {
-			return err
 		}
 	}
 	if req.ExpiryDate != "" && !req.IsExpiryTracked {
@@ -1550,6 +1537,10 @@ func validItemType(value string) bool {
 	return value == "product" || value == "product_variant" || value == "ingredient" || value == "packaging"
 }
 
+func validOpeningStockItemType(value string) bool {
+	return value == "product" || value == "product_variant"
+}
+
 func validStockLocationType(value string) bool {
 	switch value {
 	case "kitchen", "store_room", "front_desk", "display_counter", "warehouse", "production_area", "pickup_area", "other":
@@ -1746,14 +1737,10 @@ func nullableString(value string) *string {
 }
 
 func itemIDForRequest(req OpeningStockRequest) *string {
-	switch req.ItemType {
-	case "product", "product_variant":
+	if req.ItemType == "product" || req.ItemType == "product_variant" {
 		return nullableString(req.ProductID)
-	case "ingredient":
-		return nullableString(req.IngredientID)
-	default:
-		return nullableString(req.PackagingItemID)
 	}
+	return nil
 }
 
 func variantIDForRequest(req OpeningStockRequest) *string {

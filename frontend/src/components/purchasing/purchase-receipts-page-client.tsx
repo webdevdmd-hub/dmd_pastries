@@ -34,7 +34,6 @@ import {
   usePostPurchaseReceipt,
   usePurchaseReceipts,
   usePurchasingBranches,
-  usePurchasingIngredients,
   usePurchasingProducts,
   usePurchasingSuppliers,
   usePurchasingTaxRates,
@@ -91,7 +90,6 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const branchesQuery = usePurchasingBranches(canView);
   const productsQuery = usePurchasingProducts(canView);
-  const ingredientsQuery = usePurchasingIngredients(canView);
   const unitsQuery = usePurchasingUnits(canView);
   const taxRatesQuery = usePurchasingTaxRates(canView);
   const stockLocationsQuery = useStockLocations(canView && canReturn);
@@ -220,7 +218,6 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
 
       <PurchaseReceiveDialog
         branches={branchesQuery.data ?? []}
-        ingredients={ingredientsQuery.data ?? []}
         isSubmitting={receiveMutation.isPending}
         onClose={() => setReceiveOpen(false)}
         onReceive={handleReceive}

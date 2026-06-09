@@ -71,6 +71,7 @@ function toOrderProducts(products: POSProduct[], fallbackUnitId: string): Produc
     taxRateId: product.taxRateId,
     taxRateName: product.taxRateName,
     productType: product.productType,
+    itemStructure: product.itemStructure,
     salePrice: product.salePrice,
     costPrice: null,
     compareAtPrice: null,

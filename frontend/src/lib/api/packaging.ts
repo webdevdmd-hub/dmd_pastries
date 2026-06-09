@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/api/client";
+import { getProductCategories } from "@/lib/api/master-data";
 import type {
   CreatePackagingPayload,
   CreatePackagingUsagePayload,
@@ -149,19 +150,6 @@ function parseUsageRule(value: unknown): PackagingUsageRule {
     quantityRequired: numberValue(value.quantity_required),
     isDefault: booleanValue(value.is_default),
     createdAt: stringValue(value.created_at),
-  };
-}
-
-function parseCategory(value: unknown): PackagingCategory {
-  if (!isObject(value)) {
-    throw new Error("Backend packaging category payload is invalid.");
-  }
-
-  return {
-    id: stringValue(value.id),
-    categoryName: stringValue(value.category_name, "Packaging category"),
-    description: stringValue(value.description),
-    status: isPackagingStatus(value.status) ? value.status : "active",
   };
 }
 
@@ -366,15 +354,14 @@ export async function deletePackagingUsage(productId: string, ruleId: string): P
 }
 
 export async function getPackagingCategories(): Promise<PackagingCategory[]> {
-  const response = await apiRequest<PackagingCategory[]>(
-    "/api/v1/master-data/packaging-categories",
-    {
-      authMode: "appwrite",
-      parse: (data) => parseList(data, parseCategory),
-    },
-  );
+  const categories = await getProductCategories({ productType: "packaging" });
 
-  return response.data;
+  return categories.map((category) => ({
+    categoryName: category.categoryName,
+    description: category.description,
+    id: category.id,
+    status: category.status,
+  }));
 }
 
 export async function lookupSuppliers(search = ""): Promise<PackagingSupplierOption[]> {

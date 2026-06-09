@@ -27,11 +27,13 @@ import { useInventoryMovements } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 import type { StockMovementFilters } from "@/types/inventory";
+import { PRODUCT_TYPE_LABELS, PRODUCT_TYPES } from "@/types/product";
 
 const defaultFilters: StockMovementFilters = {
   search: "",
   branchId: "",
   itemType: "all",
+  productType: "all",
   movementType: "all",
   dateFrom: "",
   dateTo: "",
@@ -84,7 +86,7 @@ export function InventoryMovementsPageClient(): JSX.Element {
         description="Review every stock change including opening stock, adjustments, sales, purchases, wastage, and transfers."
       />
 
-      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/70 p-4 shadow-soft lg:grid-cols-6">
+      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/70 p-4 shadow-soft lg:grid-cols-7">
         <Input
           aria-label="Search stock movements"
           onChange={(event) => updateFilters({ search: event.target.value })}
@@ -119,8 +121,24 @@ export function InventoryMovementsPageClient(): JSX.Element {
             <SelectItem value="all">All types</SelectItem>
             <SelectItem value="product">Products</SelectItem>
             <SelectItem value="product_variant">Variants</SelectItem>
-            <SelectItem value="ingredient">Ingredients</SelectItem>
-            <SelectItem value="packaging">Packaging</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          onValueChange={(productType) =>
+            updateFilters({ productType: productType as StockMovementFilters["productType"] })
+          }
+          value={filters.productType}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All product types</SelectItem>
+            {PRODUCT_TYPES.map((productType) => (
+              <SelectItem key={productType} value={productType}>
+                {PRODUCT_TYPE_LABELS[productType]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Input

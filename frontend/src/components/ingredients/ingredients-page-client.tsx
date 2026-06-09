@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -13,6 +14,7 @@ import { IngredientsSummaryCards } from "@/components/ingredients/ingredients-su
 import { IngredientsTable } from "@/components/ingredients/ingredients-table";
 import { IngredientsTableSkeleton } from "@/components/ingredients/ingredients-table-skeleton";
 import { IngredientsToolbar } from "@/components/ingredients/ingredients-toolbar";
+import { LegacyProductMasterNotice } from "@/components/shared/legacy-product-master-notice";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,6 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PERMISSIONS } from "@/constants/permissions";
+import { ROUTES } from "@/constants/routes";
 import {
   useCreateIngredient,
   useDeleteIngredient,
@@ -89,11 +92,6 @@ export function IngredientsPageClient(): JSX.Element {
   if (!canView) {
     return <AccessDeniedCard />;
   }
-
-  const openCreate = (): void => {
-    setEditingItem(null);
-    setFormOpen(true);
-  };
 
   const handleCreate = async (payload: CreateIngredientPayload): Promise<void> => {
     try {
@@ -160,13 +158,17 @@ export function IngredientsPageClient(): JSX.Element {
         description="Manage raw materials used by recipes, manufacturing, purchasing, and inventory."
         actions={
           canManage ? (
-            <Button onClick={openCreate} type="button">
-              <Plus className="h-4 w-4" />
-              Add Ingredient
+            <Button asChild type="button">
+              <Link href={ROUTES.productsIngredients}>
+                Open Product Master
+                <ArrowRight className="h-4 w-4" />
+              </Link>
             </Button>
           ) : undefined
         }
       />
+
+      <LegacyProductMasterNotice kind="ingredient" />
 
       <IngredientsSummaryCards items={items} />
 
@@ -193,7 +195,7 @@ export function IngredientsPageClient(): JSX.Element {
       ) : null}
 
       {!ingredientsQuery.isLoading && !ingredientsQuery.error && items.length === 0 ? (
-        <IngredientsEmptyState canManage={canManage} onCreate={openCreate} />
+        <IngredientsEmptyState canManage={false} onCreate={() => undefined} />
       ) : null}
 
       {!ingredientsQuery.isLoading && !ingredientsQuery.error && items.length > 0 ? (

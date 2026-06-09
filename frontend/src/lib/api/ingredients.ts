@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/api/client";
+import { getProductCategories } from "@/lib/api/master-data";
 import type {
   CreateIngredientPayload,
   Ingredient,
@@ -108,19 +109,6 @@ function parseIngredient(value: unknown): Ingredient {
     createdByUserName: stringValue(value.created_by_user_name, "User"),
     createdAt: stringValue(value.created_at),
     updatedAt: stringValue(value.updated_at),
-  };
-}
-
-function parseCategory(value: unknown): IngredientCategory {
-  if (!isObject(value)) {
-    throw new Error("Backend ingredient category payload is invalid.");
-  }
-
-  return {
-    id: stringValue(value.id),
-    categoryName: stringValue(value.category_name, "Ingredient category"),
-    description: stringValue(value.description),
-    status: isIngredientStatus(value.status) ? value.status : "active",
   };
 }
 
@@ -282,15 +270,14 @@ export async function lookupIngredients(params: IngredientLookupParams): Promise
 }
 
 export async function getIngredientCategories(): Promise<IngredientCategory[]> {
-  const response = await apiRequest<IngredientCategory[]>(
-    "/api/v1/master-data/ingredient-categories",
-    {
-      authMode: "appwrite",
-      parse: (data) => parseList(data, parseCategory),
-    },
-  );
+  const categories = await getProductCategories({ productType: "ingredient" });
 
-  return response.data;
+  return categories.map((category) => ({
+    categoryName: category.categoryName,
+    description: category.description,
+    id: category.id,
+    status: category.status,
+  }));
 }
 
 export async function lookupIngredientSuppliers(search = ""): Promise<IngredientSupplierOption[]> {

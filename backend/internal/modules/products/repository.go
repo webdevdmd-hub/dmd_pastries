@@ -343,6 +343,9 @@ func applyProductFilters(db *gorm.DB, query ProductListQuery) *gorm.DB {
 	if query.ProductType != "" {
 		db = db.Where("product_type = ?", query.ProductType)
 	}
+	if query.ItemStructure != "" {
+		db = db.Where("item_structure = ?", query.ItemStructure)
+	}
 	if query.Status != "" {
 		db = db.Where("status = ?", query.Status)
 	}
