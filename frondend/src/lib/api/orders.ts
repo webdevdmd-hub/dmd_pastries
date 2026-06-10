@@ -17,6 +17,7 @@ import type {
   ConvertOrderItemToProductPayload,
   ConvertOrderItemToVariantPayload,
   CreateOrderItemPayload,
+  CreateOrderItemProductionPayload,
   CreateOrderPayload,
   OrderItemSource,
   OrderPaymentStatus,
@@ -109,6 +110,13 @@ type BackendProductionPayload = {
 
 type BackendProductionStatusPayload = {
   production_status: string;
+};
+
+type BackendCreateProductionFromItemPayload = {
+  notes?: string;
+  planned_quantity?: number;
+  production_date?: string;
+  recipe_id?: string;
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -688,6 +696,42 @@ export async function assignOrderProduction(
       authMode: "appwrite",
       method: "POST",
       body: { production_batch_id: payload.batchId },
+      parse: parseOrder,
+    },
+  );
+
+  return response.data;
+}
+
+export async function createOrderItemProduction(
+  orderId: string,
+  itemId: string,
+  payload: CreateOrderItemProductionPayload,
+): Promise<BakeryOrder> {
+  const body: BackendCreateProductionFromItemPayload = {};
+  const recipeId = requestString(payload.recipeId);
+  const productionDate = requestString(payload.productionDate);
+  const notes = requestString(payload.notes);
+
+  if (recipeId.length > 0) {
+    body.recipe_id = recipeId;
+  }
+  if (payload.plannedQuantity !== null && payload.plannedQuantity > 0) {
+    body.planned_quantity = payload.plannedQuantity;
+  }
+  if (productionDate.length > 0) {
+    body.production_date = productionDate;
+  }
+  if (notes.length > 0) {
+    body.notes = notes;
+  }
+
+  const response = await apiRequest<BakeryOrder, BackendCreateProductionFromItemPayload>(
+    `/api/v1/bakery-orders/${orderId}/items/${itemId}/create-production`,
+    {
+      authMode: "appwrite",
+      method: "POST",
+      body,
       parse: parseOrder,
     },
   );

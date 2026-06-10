@@ -4,7 +4,6 @@ import {
   AccountingJournalLink,
   StockMovementLink,
 } from "@/components/shared/accounting-reference-links";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -42,58 +41,63 @@ export function BatchPackagingSection({
   packaging: ProductionBatchPackaging[];
 }): JSX.Element {
   return (
-    <Card className="bg-white/85">
-      <CardHeader>
-        <CardTitle>Packaging</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Packaging</TableHead>
-              <TableHead>Required</TableHead>
-              <TableHead>Consumed</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead>Cost</TableHead>
-              <TableHead>Stock</TableHead>
-              <TableHead>Journal</TableHead>
+    <section className="overflow-hidden rounded-2xl border border-neutral-300 bg-white">
+      <div className="border-b border-neutral-300 p-5">
+        <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-neutral-950">
+          Packaging Consumed
+        </h2>
+        <p className="mt-1 text-sm text-neutral-500">
+          Backend-generated packaging stock-out rows for this production.
+        </p>
+      </div>
+      <Table>
+        <TableHeader className="bg-neutral-50">
+          <TableRow className="border-neutral-300 hover:bg-neutral-50">
+            <TableHead>Product</TableHead>
+            <TableHead>Required</TableHead>
+            <TableHead>Consumed</TableHead>
+            <TableHead>Cost</TableHead>
+            <TableHead>Stock</TableHead>
+            <TableHead>Journal</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {packaging.map((item) => (
+            <TableRow className="border-neutral-200 hover:bg-neutral-50" key={item.id}>
+              <TableCell>
+                <p className="font-semibold text-neutral-950">{componentName(item)}</p>
+                <p className="text-xs text-neutral-500">{componentMeta(item)}</p>
+              </TableCell>
+              <TableCell className="font-mono">
+                {item.requiredQuantity} {item.unitSymbol || item.unitName}
+              </TableCell>
+              <TableCell className="font-mono">
+                {item.consumedQuantity} {item.unitSymbol || item.unitName}
+              </TableCell>
+              <TableCell>
+                {item.totalCost > 0 ? (
+                  <>
+                    <p className="font-mono">{formatMoney(item.totalCost)}</p>
+                    {item.unitCostSnapshot > 0 ? (
+                      <p className="text-xs text-neutral-500">
+                        Unit {formatMoney(item.unitCostSnapshot)}
+                      </p>
+                    ) : null}
+                  </>
+                ) : (
+                  "-"
+                )}
+              </TableCell>
+              <TableCell>
+                <StockMovementLink id={item.stockMovementId} />
+              </TableCell>
+              <TableCell>
+                <AccountingJournalLink id={item.accountingJournalEntryId} />
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {packaging.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>
-                  <p className="font-semibold text-brand-espresso">{componentName(item)}</p>
-                  <p className="text-xs text-brand-mocha">{componentMeta(item)}</p>
-                </TableCell>
-                <TableCell>{item.requiredQuantity}</TableCell>
-                <TableCell>{item.consumedQuantity}</TableCell>
-                <TableCell>{item.unitSymbol || item.unitName}</TableCell>
-                <TableCell>
-                  {item.totalCost > 0 ? (
-                    <div>
-                      <p>{formatMoney(item.totalCost)}</p>
-                      {item.unitCostSnapshot > 0 ? (
-                        <p className="text-xs text-brand-mocha">
-                          Unit {formatMoney(item.unitCostSnapshot)}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : (
-                    "-"
-                  )}
-                </TableCell>
-                <TableCell>
-                  <StockMovementLink id={item.stockMovementId} />
-                </TableCell>
-                <TableCell>
-                  <AccountingJournalLink id={item.accountingJournalEntryId} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+          ))}
+        </TableBody>
+      </Table>
+    </section>
   );
 }

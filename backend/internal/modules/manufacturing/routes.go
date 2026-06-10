@@ -14,6 +14,10 @@ func RegisterRoutes(
 
 	group.GET("/summary", view, handler.Summary)
 	group.GET("/product/:productId/history", view, handler.ProductHistory)
+	group.GET("/recipes/:id/production-preview", view, handler.ProductionPreview)
+	group.GET("/productions", view, handler.ListProductions)
+	group.POST("/productions", manage, handler.CreateProduction)
+	group.GET("/productions/:id", view, handler.GetProduction)
 	group.GET("/batches", view, handler.ListBatches)
 	group.POST("/batches", manage, handler.CreateBatch)
 	group.GET("/batches/:id", view, handler.GetBatch)

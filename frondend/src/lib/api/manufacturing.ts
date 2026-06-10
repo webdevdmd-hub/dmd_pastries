@@ -4,6 +4,7 @@ import type {
   BatchStatus,
   ConsumePayload,
   CreateBatchPayload,
+  CreateProductionPayload,
   ManufacturingBranchOption,
   ManufacturingInventoryOption,
   ManufacturingProductOption,
@@ -33,6 +34,16 @@ type BackendBatchPayload = {
   planned_quantity?: number;
   production_date?: string;
   notes?: string;
+};
+
+type BackendCreateProductionPayload = {
+  branch_id: string;
+  recipe_id: string;
+  product_id: string;
+  product_variant_id?: string | null;
+  quantity_produced: number;
+  production_date: string;
+  notes?: string | null;
 };
 
 type BackendConsumePayload = {
@@ -384,6 +395,18 @@ function batchPayload(payload: CreateBatchPayload | UpdateBatchPayload): Backend
   return nextPayload;
 }
 
+function productionPayload(payload: CreateProductionPayload): BackendCreateProductionPayload {
+  return {
+    branch_id: payload.branchId,
+    recipe_id: payload.recipeId,
+    product_id: payload.productId,
+    product_variant_id: payload.productVariantId,
+    quantity_produced: payload.quantityProduced,
+    production_date: payload.productionDate,
+    notes: payload.notes,
+  };
+}
+
 function consumePayload(payload: ConsumePayload): BackendConsumePayload {
   return {
     lines: payload.lines.map((line) => ({
@@ -434,6 +457,20 @@ export async function createBatch(payload: CreateBatchPayload): Promise<Producti
       method: "POST",
       authMode: "appwrite",
       body: batchPayload(payload),
+      parse: parseBatch,
+    },
+  );
+
+  return response.data;
+}
+
+export async function createProduction(payload: CreateProductionPayload): Promise<ProductionBatch> {
+  const response = await apiRequest<ProductionBatch, BackendCreateProductionPayload>(
+    "/api/v1/manufacturing/productions",
+    {
+      method: "POST",
+      authMode: "appwrite",
+      body: productionPayload(payload),
       parse: parseBatch,
     },
   );

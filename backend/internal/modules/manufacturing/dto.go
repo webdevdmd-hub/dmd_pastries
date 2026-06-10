@@ -24,6 +24,16 @@ type CreateBatchRequest struct {
 	Notes           string  `json:"notes"`
 }
 
+type CreateProductionRequest struct {
+	BranchID         string  `json:"branch_id" binding:"required"`
+	RecipeID         string  `json:"recipe_id" binding:"required"`
+	QuantityProduced float64 `json:"quantity_produced" binding:"required"`
+	ProductionDate   string  `json:"production_date"`
+	BatchNumber      string  `json:"batch_number"`
+	ExpiryDate       string  `json:"expiry_date"`
+	Notes            string  `json:"notes"`
+}
+
 type UpdateBatchRequest struct {
 	ProductionDate string `json:"production_date"`
 	Notes          string `json:"notes"`
@@ -126,7 +136,9 @@ type ProductionIngredientResponse struct {
 	RecipeIngredientID string    `json:"recipe_ingredient_id"`
 	ItemNameSnapshot   string    `json:"item_name_snapshot"`
 	PlannedQuantity    float64   `json:"planned_quantity"`
+	RequiredQuantity   float64   `json:"required_quantity"`
 	ActualQuantity     float64   `json:"actual_quantity"`
+	ConsumedQuantity   float64   `json:"consumed_quantity"`
 	UnitID             string    `json:"unit_id"`
 	UnitSymbol         string    `json:"unit_symbol"`
 	UnitCostSnapshot   float64   `json:"unit_cost_snapshot"`
@@ -146,7 +158,9 @@ type ProductionPackagingResponse struct {
 	RecipePackagingID     string    `json:"recipe_packaging_id"`
 	PackagingNameSnapshot string    `json:"packaging_name_snapshot"`
 	PlannedQuantity       float64   `json:"planned_quantity"`
+	RequiredQuantity      float64   `json:"required_quantity"`
 	ActualQuantity        float64   `json:"actual_quantity"`
+	ConsumedQuantity      float64   `json:"consumed_quantity"`
 	UnitID                string    `json:"unit_id"`
 	UnitSymbol            string    `json:"unit_symbol"`
 	UnitCostSnapshot      float64   `json:"unit_cost_snapshot"`
@@ -204,6 +218,77 @@ type ManufacturingSummaryResponse struct {
 	TotalProducedQuantity float64 `json:"total_produced_quantity"`
 	TotalProductionCost   float64 `json:"total_production_cost"`
 	TotalWastageQuantity  float64 `json:"total_wastage_quantity"`
+}
+
+type ProductionResponse struct {
+	ProductionID       string                         `json:"production_id"`
+	ProductionNumber   string                         `json:"production_number"`
+	Status             string                         `json:"status"`
+	BranchID           string                         `json:"branch_id"`
+	BranchName         string                         `json:"branch_name"`
+	RecipeID           string                         `json:"recipe_id"`
+	RecipeName         string                         `json:"recipe_name"`
+	ProductID          string                         `json:"product_id"`
+	ProductName        string                         `json:"product_name"`
+	ProductVariantID   *string                        `json:"product_variant_id"`
+	ProductVariantName string                         `json:"product_variant_name"`
+	ProducedQuantity   float64                        `json:"produced_quantity"`
+	ProductionDate     time.Time                      `json:"production_date"`
+	TotalCost          float64                        `json:"total_cost"`
+	CostPerUnit        float64                        `json:"cost_per_unit"`
+	ConsumedComponents []ProductionIngredientResponse `json:"consumed_components"`
+	ConsumedPackaging  []ProductionPackagingResponse  `json:"consumed_packaging"`
+	Outputs            []ProductionOutputResponse     `json:"outputs"`
+	StockMovementIDs   []string                       `json:"stock_movement_ids"`
+	JournalEntryIDs    []string                       `json:"journal_entry_ids"`
+}
+
+type ProductionPreviewResponse struct {
+	RecipeID                 string                      `json:"recipe_id"`
+	RecipeName               string                      `json:"recipe_name"`
+	RecipeYieldQuantity      float64                     `json:"recipe_yield_quantity"`
+	RecipeYieldUnitID        string                      `json:"recipe_yield_unit_id"`
+	RecipeYieldUnit          string                      `json:"recipe_yield_unit"`
+	OutputProductID          string                      `json:"output_product_id"`
+	OutputProductName        string                      `json:"output_product_name"`
+	OutputProductVariantID   *string                     `json:"output_product_variant_id"`
+	OutputProductVariantName string                      `json:"output_product_variant_name"`
+	QuantityProduced         float64                     `json:"quantity_produced"`
+	Components               []ProductionPreviewLineItem `json:"components"`
+	Packaging                []ProductionPreviewLineItem `json:"packaging"`
+	EstimatedComponentCost   float64                     `json:"estimated_component_cost"`
+	EstimatedPackagingCost   float64                     `json:"estimated_packaging_cost"`
+	EstimatedTotalCost       float64                     `json:"estimated_total_cost"`
+	EstimatedCostPerUnit     float64                     `json:"estimated_cost_per_unit"`
+	HasShortage              bool                        `json:"has_shortage"`
+	Shortages                []ProductionPreviewShortage `json:"shortages"`
+	HasZeroCostWarning       bool                        `json:"has_zero_cost_warning"`
+	Warnings                 []string                    `json:"warnings"`
+}
+
+type ProductionPreviewLineItem struct {
+	RecipeLineID       string  `json:"recipe_line_id"`
+	ComponentProductID *string `json:"component_product_id"`
+	ComponentVariantID *string `json:"component_variant_id"`
+	ProductName        string  `json:"product_name"`
+	ProductType        string  `json:"product_type"`
+	RequiredQuantity   float64 `json:"required_quantity"`
+	AvailableQuantity  float64 `json:"available_quantity"`
+	ShortageQuantity   float64 `json:"shortage_quantity"`
+	UnitID             string  `json:"unit_id"`
+	Unit               string  `json:"unit"`
+	EstimatedUnitCost  float64 `json:"estimated_unit_cost"`
+	EstimatedTotalCost float64 `json:"estimated_total_cost"`
+	IsOptional         bool    `json:"is_optional"`
+}
+
+type ProductionPreviewShortage struct {
+	RecipeLineID      string  `json:"recipe_line_id"`
+	ProductName       string  `json:"product_name"`
+	RequiredQuantity  float64 `json:"required_quantity"`
+	AvailableQuantity float64 `json:"available_quantity"`
+	ShortageQuantity  float64 `json:"shortage_quantity"`
+	Unit              string  `json:"unit"`
 }
 
 type ProductHistoryResponse struct {

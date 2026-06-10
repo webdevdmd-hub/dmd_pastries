@@ -4,8 +4,6 @@ import {
   AccountingJournalLink,
   StockMovementLink,
 } from "@/components/shared/accounting-reference-links";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -40,70 +38,64 @@ function componentMeta(ingredient: ProductionBatchIngredient): string {
 }
 
 export function BatchIngredientsSection({
-  canManage,
   ingredients,
-  onConsume,
 }: {
-  canManage: boolean;
   ingredients: ProductionBatchIngredient[];
-  onConsume: () => void;
 }): JSX.Element {
   return (
-    <Card className="bg-white/85">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Ingredients</CardTitle>
-        {canManage ? (
-          <Button onClick={onConsume} type="button" variant="outline">
-            Consume
-          </Button>
-        ) : null}
-      </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Ingredient</TableHead>
-              <TableHead>Required</TableHead>
-              <TableHead>Consumed</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead>Cost</TableHead>
-              <TableHead>Wastage %</TableHead>
-              <TableHead>Stock</TableHead>
-              <TableHead>Journal</TableHead>
+    <section className="overflow-hidden rounded-2xl border border-neutral-300 bg-white">
+      <div className="flex items-center justify-between gap-4 border-b border-neutral-300 p-5">
+        <div>
+          <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-neutral-950">
+            Components Consumed
+          </h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            Backend-generated ingredient and material stock-out rows for this production.
+          </p>
+        </div>
+      </div>
+      <Table>
+        <TableHeader className="bg-neutral-50">
+          <TableRow className="border-neutral-300 hover:bg-neutral-50">
+            <TableHead>Product</TableHead>
+            <TableHead>Required</TableHead>
+            <TableHead>Consumed</TableHead>
+            <TableHead>Cost</TableHead>
+            <TableHead>Stock</TableHead>
+            <TableHead>Journal</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {ingredients.map((ingredient) => (
+            <TableRow className="border-neutral-200 hover:bg-neutral-50" key={ingredient.id}>
+              <TableCell>
+                <p className="font-semibold text-neutral-950">{componentName(ingredient)}</p>
+                <p className="text-xs text-neutral-500">{componentMeta(ingredient)}</p>
+              </TableCell>
+              <TableCell className="font-mono">
+                {ingredient.requiredQuantity} {ingredient.unitSymbol || ingredient.unitName}
+              </TableCell>
+              <TableCell className="font-mono">
+                {ingredient.consumedQuantity} {ingredient.unitSymbol || ingredient.unitName}
+              </TableCell>
+              <TableCell>
+                <p className="font-mono">{formatMoney(ingredient.totalCost)}</p>
+                {ingredient.unitCostSnapshot > 0 ? (
+                  <p className="text-xs text-neutral-500">
+                    Unit {formatMoney(ingredient.unitCostSnapshot)}
+                  </p>
+                ) : null}
+              </TableCell>
+              <TableCell>
+                <StockMovementLink id={ingredient.stockMovementId} />
+              </TableCell>
+              <TableCell>
+                <AccountingJournalLink id={ingredient.accountingJournalEntryId} />
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {ingredients.map((ingredient) => (
-              <TableRow key={ingredient.id}>
-                <TableCell>
-                  <p className="font-semibold text-brand-espresso">{componentName(ingredient)}</p>
-                  <p className="text-xs text-brand-mocha">{componentMeta(ingredient)}</p>
-                </TableCell>
-                <TableCell>{ingredient.requiredQuantity}</TableCell>
-                <TableCell>{ingredient.consumedQuantity}</TableCell>
-                <TableCell>{ingredient.unitSymbol || ingredient.unitName}</TableCell>
-                <TableCell>
-                  <div>
-                    <p>{formatMoney(ingredient.totalCost)}</p>
-                    {ingredient.unitCostSnapshot > 0 ? (
-                      <p className="text-xs text-brand-mocha">
-                        Unit {formatMoney(ingredient.unitCostSnapshot)}
-                      </p>
-                    ) : null}
-                  </div>
-                </TableCell>
-                <TableCell>{ingredient.wastagePercentage}%</TableCell>
-                <TableCell>
-                  <StockMovementLink id={ingredient.stockMovementId} />
-                </TableCell>
-                <TableCell>
-                  <AccountingJournalLink id={ingredient.accountingJournalEntryId} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+          ))}
+        </TableBody>
+      </Table>
+    </section>
   );
 }

@@ -21,10 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useBranchScope } from "@/hooks/use-branch-scope";
-import { useRecipeIngredients } from "@/hooks/use-recipes";
-import { createBatchSchema } from "@/lib/validators/manufacturing.schema";
+import { createBatchSchema, createProductionSchema } from "@/lib/validators/manufacturing.schema";
 import type {
   CreateBatchPayload,
+  CreateProductionPayload,
   ManufacturingBranchOption,
   ManufacturingProductOption,
   ManufacturingRecipeOption,
@@ -38,8 +38,9 @@ export function BatchFormDialog({
   branches,
   isSubmitting,
   onClose,
-  onCreate,
+  onCreatePlanned,
   onProductChange,
+  onProduceNow,
   onUpdate,
   open,
   products,
@@ -49,8 +50,9 @@ export function BatchFormDialog({
   branches: ManufacturingBranchOption[];
   isSubmitting: boolean;
   onClose: () => void;
-  onCreate: (payload: CreateBatchPayload) => Promise<void>;
+  onCreatePlanned: (payload: CreateBatchPayload) => Promise<void>;
   onProductChange: (productId: string) => void;
+  onProduceNow: (payload: CreateProductionPayload) => Promise<void>;
   onUpdate: (id: string, payload: UpdateBatchPayload) => Promise<void>;
   open: boolean;
   products: ManufacturingProductOption[];
@@ -71,10 +73,6 @@ export function BatchFormDialog({
         ? branch.status === "active"
         : branch.id === branchScope.effectiveBranchId),
   );
-  const recipeIngredientsQuery = useRecipeIngredients(
-    recipeId.length > 0 ? recipeId : null,
-    open && recipeId.length > 0,
-  );
 
   useEffect(() => {
     if (!open) return;
@@ -83,7 +81,7 @@ export function BatchFormDialog({
     setProductId(batch?.productId ?? "");
     setRecipeId(batch?.recipeId ?? "");
     setPlannedQuantity(batch?.plannedQuantity ?? 1);
-    setProductionDate(new Date().toISOString().slice(0, 10));
+    setProductionDate(batch?.startTime?.slice(0, 10) ?? new Date().toISOString().slice(0, 10));
     setNotes(batch?.notes ?? "");
     setError(null);
 
@@ -101,7 +99,7 @@ export function BatchFormDialog({
     }
   };
 
-  const submit = async (): Promise<void> => {
+  const submitPlanned = async (): Promise<void> => {
     const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
     const recipeIsKnownInactive =
       selectedRecipe !== undefined &&
@@ -109,17 +107,7 @@ export function BatchFormDialog({
         (selectedRecipe.status !== null && selectedRecipe.status !== "active"));
 
     if (recipeIsKnownInactive) {
-      setError("Only an active recipe can be used to create a production batch.");
-      return;
-    }
-
-    if (recipeIngredientsQuery.isLoading || recipeIngredientsQuery.isFetching) {
-      setError("Recipe BOM is still loading. Please wait a moment.");
-      return;
-    }
-
-    if (recipeIngredientsQuery.data?.length === 0) {
-      setError("Add at least one ingredient line to this recipe before creating a batch.");
+      setError("Only an active recipe can be used to create production.");
       return;
     }
 
@@ -133,15 +121,46 @@ export function BatchFormDialog({
     });
 
     if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Please check the batch form.");
+      setError(result.error.issues[0]?.message ?? "Please check the production form.");
       return;
     }
 
     if (batch) {
       await onUpdate(batch.id, result.data);
-    } else {
-      await onCreate(result.data);
+      return;
     }
+
+    await onCreatePlanned(result.data);
+  };
+
+  const submitProduction = async (): Promise<void> => {
+    const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
+    const recipeIsKnownInactive =
+      selectedRecipe !== undefined &&
+      (selectedRecipe.isActive === false ||
+        (selectedRecipe.status !== null && selectedRecipe.status !== "active"));
+
+    if (recipeIsKnownInactive) {
+      setError("Only an active recipe can be used to create production.");
+      return;
+    }
+
+    const result = createProductionSchema.safeParse({
+      branchId,
+      notes,
+      productId,
+      productVariantId: selectedRecipe?.productVariantId ?? null,
+      productionDate,
+      quantityProduced: plannedQuantity,
+      recipeId,
+    });
+
+    if (!result.success) {
+      setError(result.error.issues[0]?.message ?? "Please check the production form.");
+      return;
+    }
+
+    await onProduceNow(result.data);
   };
 
   const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
@@ -149,129 +168,168 @@ export function BatchFormDialog({
     selectedRecipe !== undefined &&
     (selectedRecipe.isActive === false ||
       (selectedRecipe.status !== null && selectedRecipe.status !== "active"));
-  const selectedRecipeHasNoIngredients = recipeIngredientsQuery.data?.length === 0;
-  const isCreateDisabled =
-    isSubmitting ||
-    recipeIngredientsQuery.isLoading ||
-    recipeIngredientsQuery.isFetching ||
-    selectedRecipeIsKnownInactive ||
-    selectedRecipeHasNoIngredients;
+  const isCreateDisabled = isSubmitting || selectedRecipeIsKnownInactive;
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>{batch ? "Edit production batch" : "Create production batch"}</DialogTitle>
+      <DialogContent className="max-h-[92vh] max-w-4xl overflow-hidden p-0">
+        <DialogHeader className="border-b border-neutral-300 px-8 py-6">
+          <DialogTitle>{batch ? "Edit planned production" : "Create production"}</DialogTitle>
           <DialogDescription>
-            Choose a branch, product, active recipe, and planned production quantity.
+            Save a planned production without stock impact, or produce now to let the backend
+            consume components, create stock, and post accounting in one transaction.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Select
-            value={branchId || "none"}
-            onValueChange={(value) => setBranchId(value === "none" ? "" : value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Branch" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Select branch</SelectItem>
-              {selectableBranches.map((branch) => (
-                <SelectItem key={branch.id} value={branch.id}>
-                  {branch.branchName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={productId || "none"} onValueChange={handleProductChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Product" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Select product</SelectItem>
-              {products.map((product) => (
-                <SelectItem key={product.id} value={product.id}>
-                  {product.productName} / {PRODUCT_TYPE_LABELS[product.productType]} /{" "}
-                  {ITEM_STRUCTURE_LABELS[product.itemStructure]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={recipeId || "none"}
-            onValueChange={(value) => setRecipeId(value === "none" ? "" : value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Recipe" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Select recipe</SelectItem>
-              {recipes.map((recipe) => (
-                <SelectItem key={recipe.id} value={recipe.id}>
-                  {recipe.recipeName} v{recipe.versionNumber}
-                  {recipe.productVariantName ? ` · ${recipe.productVariantName}` : ""}
-                  {recipe.isActive === false ||
-                  (recipe.status !== null && recipe.status !== "active")
-                    ? " (inactive)"
-                    : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            aria-label="Planned quantity"
-            min="0"
-            onChange={(event) => setPlannedQuantity(Number(event.target.value))}
-            placeholder="Planned quantity"
-            type="number"
-            value={plannedQuantity}
-          />
-          <Input
-            aria-label="Production date"
-            onChange={(event) => setProductionDate(event.target.value)}
-            type="date"
-            value={productionDate}
-          />
-        </div>
-        {selectedRecipe ? (
-          <div className="rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/60 p-4 text-sm text-brand-mocha">
-            <p>
-              Output stock:{" "}
-              <span className="font-semibold text-brand-espresso">
-                {selectedRecipe.productVariantName ?? "Parent product"}
-              </span>
-            </p>
-            <p>
-              Recipe yield: {selectedRecipe.batchYieldQuantity} {selectedRecipe.batchYieldUnitName}
-            </p>
-            {recipeIngredientsQuery.isLoading || recipeIngredientsQuery.isFetching ? (
-              <p className="mt-2 font-semibold">Checking recipe BOM...</p>
+
+        <div className="max-h-[calc(92vh-11rem)] overflow-y-auto px-8 py-6">
+          <div className="grid gap-5 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-neutral-950">Branch</label>
+              <Select
+                value={branchId || "none"}
+                onValueChange={(value) => setBranchId(value === "none" ? "" : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Select branch</SelectItem>
+                  {selectableBranches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.branchName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-neutral-950">Production date</label>
+              <Input
+                aria-label="Production date"
+                onChange={(event) => setProductionDate(event.target.value)}
+                type="date"
+                value={productionDate}
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium text-neutral-950">Output product</label>
+              <Select value={productId || "none"} onValueChange={handleProductChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Product" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Select product</SelectItem>
+                  {products.map((product) => (
+                    <SelectItem key={product.id} value={product.id}>
+                      {product.productName} / {PRODUCT_TYPE_LABELS[product.productType]} /{" "}
+                      {ITEM_STRUCTURE_LABELS[product.itemStructure]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium text-neutral-950">Active recipe</label>
+              <Select
+                value={recipeId || "none"}
+                onValueChange={(value) => setRecipeId(value === "none" ? "" : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Recipe" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Select recipe</SelectItem>
+                  {recipes.map((recipe) => (
+                    <SelectItem key={recipe.id} value={recipe.id}>
+                      {recipe.recipeName} v{recipe.versionNumber}
+                      {recipe.productVariantName ? ` / ${recipe.productVariantName}` : ""}
+                      {recipe.isActive === false ||
+                      (recipe.status !== null && recipe.status !== "active")
+                        ? " (inactive)"
+                        : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedRecipe ? (
+              <div className="rounded-2xl border border-neutral-300 bg-neutral-100 p-5 text-sm text-neutral-600 md:col-span-2">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-semibold text-neutral-950">Recipe Details</p>
+                    <p className="mt-3">
+                      Output stock:{" "}
+                      <span className="font-semibold text-neutral-950">
+                        {selectedRecipe.productVariantName ?? "Parent product"}
+                      </span>
+                    </p>
+                    <p>
+                      Recipe yield: {selectedRecipe.batchYieldQuantity}{" "}
+                      {selectedRecipe.batchYieldUnitName}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-neutral-600">
+                    v{selectedRecipe.versionNumber}
+                  </span>
+                </div>
+                {selectedRecipeIsKnownInactive ? (
+                  <p className="mt-3 font-semibold text-red-700">
+                    Activate this recipe before creating production.
+                  </p>
+                ) : null}
+              </div>
             ) : null}
-            {selectedRecipeIsKnownInactive ? (
-              <p className="mt-2 font-semibold text-red-700">
-                Activate this recipe before creating a production batch.
-              </p>
-            ) : null}
-            {selectedRecipeHasNoIngredients ? (
-              <p className="mt-2 font-semibold text-red-700">
-                This recipe has no ingredient BOM lines. Add ingredients in Recipes first.
-              </p>
-            ) : null}
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-neutral-950">Quantity to produce</label>
+              <Input
+                aria-label="Quantity to produce"
+                min="0"
+                onChange={(event) => setPlannedQuantity(Number(event.target.value))}
+                placeholder="Quantity to produce"
+                type="number"
+                value={plannedQuantity}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-neutral-950">Notes</label>
+              <Input
+                aria-label="Notes"
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Optional production notes..."
+                value={notes}
+              />
+            </div>
           </div>
-        ) : null}
-        <Input
-          aria-label="Notes"
-          onChange={(event) => setNotes(event.target.value)}
-          placeholder="Notes"
-          value={notes}
-        />
-        {error ? <p className="text-sm font-semibold text-red-700">{error}</p> : null}
-        <DialogFooter>
+          {error ? <p className="mt-4 text-sm font-semibold text-red-700">{error}</p> : null}
+        </div>
+
+        <DialogFooter className="border-t border-neutral-300 bg-neutral-50 px-8 py-5">
           <Button onClick={onClose} type="button" variant="outline">
             Cancel
           </Button>
-          <Button disabled={isCreateDisabled} onClick={() => void submit()} type="button">
-            {batch ? "Save batch" : "Create batch"}
+          {!batch ? (
+            <Button
+              disabled={isCreateDisabled}
+              onClick={() => void submitPlanned()}
+              type="button"
+              variant="outline"
+            >
+              Save as Planned
+            </Button>
+          ) : null}
+          <Button
+            className="bg-black text-white hover:bg-neutral-800"
+            disabled={isCreateDisabled}
+            onClick={() => void (batch ? submitPlanned() : submitProduction())}
+            type="button"
+          >
+            {batch ? "Save planned production" : "Produce now"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -13,12 +13,12 @@ function formatCurrency(value: number): string {
 }
 
 export function RecipeCostCard({
-  canManage,
+  canRecalculate,
   draftIngredientCount = 0,
   draftPackagingCount = 0,
   recipeId,
 }: {
-  canManage: boolean;
+  canRecalculate: boolean;
   draftIngredientCount?: number;
   draftPackagingCount?: number;
   recipeId: string | null;
@@ -59,6 +59,9 @@ export function RecipeCostCard({
             Exact ingredient, packaging, and yield-unit costs are calculated by the backend after
             saving.
           </p>
+          <Button disabled type="button" variant="outline">
+            Save draft to calculate cost
+          </Button>
         </CardContent>
       </Card>
     );
@@ -68,7 +71,7 @@ export function RecipeCostCard({
     <Card className="bg-white/80">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Cost breakdown</CardTitle>
-        {canManage && recipeId ? (
+        {canRecalculate && recipeId ? (
           <Button
             disabled={recalculateMutation.isPending}
             onClick={() => {
@@ -77,7 +80,7 @@ export function RecipeCostCard({
             type="button"
             variant="outline"
           >
-            Recalculate
+            {recalculateMutation.isPending ? "Recalculating..." : "Recalculate"}
           </Button>
         ) : null}
       </CardHeader>

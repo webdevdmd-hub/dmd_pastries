@@ -1,10 +1,13 @@
 import { z } from "zod";
 
-const optionalNullableString = z
-  .string()
-  .trim()
-  .optional()
-  .transform((value) => (value && value.length > 0 ? value : null));
+const optionalNullableString = z.union([z.string(), z.null(), z.undefined()]).transform((value) => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+});
 
 export const createBatchSchema = z.object({
   branchId: z.string().min(1, "Branch is required."),
@@ -12,6 +15,16 @@ export const createBatchSchema = z.object({
   productionDate: z.string().min(1, "Production date is required."),
   recipeId: z.string().min(1, "Recipe is required."),
   plannedQuantity: z.coerce.number().positive("Planned quantity must be greater than 0."),
+  notes: optionalNullableString,
+});
+
+export const createProductionSchema = z.object({
+  branchId: z.string().min(1, "Branch is required."),
+  productId: z.string().min(1, "Product is required."),
+  productVariantId: optionalNullableString,
+  productionDate: z.string().min(1, "Production date is required."),
+  quantityProduced: z.coerce.number().positive("Produced quantity must be greater than 0."),
+  recipeId: z.string().min(1, "Recipe is required."),
   notes: optionalNullableString,
 });
 
@@ -47,6 +60,7 @@ export const batchFiltersSchema = z.object({
 });
 
 export type CreateBatchFormValues = z.infer<typeof createBatchSchema>;
+export type CreateProductionFormValues = z.infer<typeof createProductionSchema>;
 export type ConsumeFormValues = z.infer<typeof consumeSchema>;
 export type ProduceFormValues = z.infer<typeof produceSchema>;
 export type WastageFormValues = z.infer<typeof wastageSchema>;

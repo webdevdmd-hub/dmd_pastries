@@ -178,7 +178,7 @@ export const appNavigationGroups = [
         ],
       },
       {
-        href: ROUTES.manufacturing,
+        href: ROUTES.manufacturingBatches,
         icon: Soup,
         label: "Manufacturing",
         // TODO: Remove inventory fallback once manufacturing.* permissions are seeded for every tenant.

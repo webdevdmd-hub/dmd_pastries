@@ -9,6 +9,7 @@ import {
   completeBatch,
   consumeBatch,
   createBatch,
+  createProduction,
   deleteBatch,
   getBatchById,
   getBatches,
@@ -31,6 +32,7 @@ import type {
   BatchFilters,
   ConsumePayload,
   CreateBatchPayload,
+  CreateProductionPayload,
   ManufacturingBranchOption,
   ManufacturingInventoryOption,
   ManufacturingProductOption,
@@ -211,6 +213,17 @@ export function useCreateBatch() {
 
   return useMutation<ProductionBatch, Error, CreateBatchPayload>({
     mutationFn: async (payload) => createBatch(payload),
+    onSuccess: async () => {
+      await invalidateManufacturing(queryClient);
+    },
+  });
+}
+
+export function useCreateProduction() {
+  const queryClient = useQueryClient();
+
+  return useMutation<ProductionBatch, Error, CreateProductionPayload>({
+    mutationFn: async (payload) => createProduction(payload),
     onSuccess: async () => {
       await invalidateManufacturing(queryClient);
     },

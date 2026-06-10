@@ -143,7 +143,7 @@ func (r *Repository) RecipePackaging(tx *gorm.DB, businessID, branchID, recipeID
 func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string) (*productInfo, error) {
 	var product productInfo
 	err := tx.Table("products").
-		Select("id, product_name, unit_id, is_stock_tracked, is_expiry_tracked").
+		Select("id, product_name, product_type, unit_id, is_stock_tracked, is_expiry_tracked").
 		Where("id = ? AND business_id = ? AND branch_id = ? AND status = ? AND deleted_at IS NULL", productID, businessID, branchID, "active").
 		Take(&product).Error
 	return &product, err
@@ -160,6 +160,15 @@ func (r *Repository) ProductVariant(tx *gorm.DB, businessID, branchID, productID
 		Where("pv.id = ? AND pv.product_id = ? AND pv.business_id = ? AND p.branch_id = ? AND pv.deleted_at IS NULL", *productVariantID, productID, businessID, branchID).
 		Take(&variant).Error
 	return &variant, err
+}
+
+func (r *Repository) JournalEntryIDsBySource(tx *gorm.DB, businessID, sourceType, sourceID string) ([]string, error) {
+	var ids []string
+	err := tx.Table("journal_entries").
+		Where("business_id = ? AND source_type = ? AND source_id = ? AND status IN ? AND deleted_at IS NULL", businessID, sourceType, sourceID, []string{"posted", "reversed"}).
+		Order("created_at ASC, id ASC").
+		Pluck("id", &ids).Error
+	return ids, err
 }
 
 func (r *Repository) Ingredient(tx *gorm.DB, businessID, branchID, ingredientID string) (*ingredientInfo, error) {
@@ -346,6 +355,7 @@ type recipePackagingInfo struct {
 type productInfo struct {
 	ID              string
 	ProductName     string
+	ProductType     string
 	UnitID          string
 	IsStockTracked  bool
 	IsExpiryTracked bool

@@ -44,6 +44,9 @@ export function RecipePackagingLineEditor({
   const [sortOrder, setSortOrder] = useState(String(line?.sortOrder ?? 0));
   const selectedProduct = componentProducts.find((item) => item.id === componentProductId);
   const selectedVariants = useMemo(() => selectedProduct?.variants ?? [], [selectedProduct]);
+  const selectedProductHasDefaultUnit = (selectedProduct?.unitId ?? "").length > 0;
+  const shouldShowMissingUnitWarning =
+    selectedProduct !== undefined && !selectedProductHasDefaultUnit && unitId.length === 0;
   const packagingOptions = useMemo<SearchableComboboxOption[]>(
     () =>
       componentProducts.map((item) => ({
@@ -143,6 +146,16 @@ export function RecipePackagingLineEditor({
             searchPlaceholder="Search unit..."
             value={unitId}
           />
+          {shouldShowMissingUnitWarning ? (
+            <span className="text-xs text-red-700">
+              This packaging product has no default unit configured. Select a unit before saving.
+            </span>
+          ) : selectedProduct ? (
+            <span className="text-xs text-brand-mocha">
+              Auto-filled from the selected packaging product. Change only if this recipe uses
+              another unit.
+            </span>
+          ) : null}
         </label>
       </div>
       {selectedVariants.length > 0 ? (

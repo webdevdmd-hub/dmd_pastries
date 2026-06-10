@@ -1,18 +1,19 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { BarChart3, Factory, Search, SlidersHorizontal } from "lucide-react";
+import Link from "next/link";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/manufacturing/access-denied-card";
 import { BatchFormDialog } from "@/components/manufacturing/batch-form-dialog";
+import { BatchWastageDialog } from "@/components/manufacturing/batch-wastage-dialog";
 import { BatchesTable } from "@/components/manufacturing/batches-table";
 import { ManufacturingEmptyState } from "@/components/manufacturing/manufacturing-empty-state";
 import { ManufacturingErrorState } from "@/components/manufacturing/manufacturing-error-state";
 import { ManufacturingTableSkeleton } from "@/components/manufacturing/manufacturing-table-skeleton";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
-import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -32,17 +33,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PERMISSIONS } from "@/constants/permissions";
+import { ROUTES } from "@/constants/routes";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import {
+  useAddBatchWastage,
   useBatches,
-  useCancelBatch,
-  useCompleteBatch,
   useCreateBatch,
+  useCreateProduction,
   useDeleteBatch,
   useManufacturingBranches,
+  useManufacturingInventory,
   useManufacturingProducts,
   useManufacturingRecipeByProduct,
-  useStartBatch,
   useUpdateBatch,
 } from "@/hooks/use-manufacturing";
 import { usePermission } from "@/hooks/use-permission";
@@ -50,8 +52,10 @@ import { ApiError, getErrorMessage } from "@/lib/api/client";
 import type {
   BatchFilters,
   CreateBatchPayload,
+  CreateProductionPayload,
   ProductionBatch,
   UpdateBatchPayload,
+  WastagePayload,
 } from "@/types/manufacturing";
 
 const defaultFilters: BatchFilters = {
@@ -63,42 +67,38 @@ const defaultFilters: BatchFilters = {
   status: "all",
 };
 
-type PendingAction = {
-  batch: ProductionBatch;
-  type: "start" | "complete" | "cancel" | "delete";
-} | null;
+function formatMetric(value: number): string {
+  return new Intl.NumberFormat("en-AE", { maximumFractionDigits: 2 }).format(value);
+}
 
 export function BatchesPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
   const { normalizeBranchId } = branchScope;
   const canView = hasAnyPermission([PERMISSIONS.manufacturingView, PERMISSIONS.inventoryView]);
-  const canManage = hasAnyPermission([
-    PERMISSIONS.manufacturingBatchesCreate,
-    PERMISSIONS.manufacturingBatchesEdit,
-    PERMISSIONS.manufacturingBatchesDelete,
-    PERMISSIONS.manufacturingBatchesStart,
-    PERMISSIONS.manufacturingBatchesComplete,
-    PERMISSIONS.manufacturingBatchesCancel,
-  ]);
+  const canCreate = hasAnyPermission([PERMISSIONS.manufacturingBatchesCreate]);
+  const canEdit = hasAnyPermission([PERMISSIONS.manufacturingBatchesEdit]);
+  const canDelete = hasAnyPermission([PERMISSIONS.manufacturingBatchesDelete]);
+  const canRecordWastage = hasAnyPermission([PERMISSIONS.manufacturingBatchesWastage]);
   const [filters, setFilters] = useState<BatchFilters>({
     ...defaultFilters,
     branchId: branchScope.defaultBranchId,
   });
   const [selectedProductId, setSelectedProductId] = useState("");
   const [editingBatch, setEditingBatch] = useState<ProductionBatch | null>(null);
+  const [deleteBatchTarget, setDeleteBatchTarget] = useState<ProductionBatch | null>(null);
+  const [wastageBatch, setWastageBatch] = useState<ProductionBatch | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const batchesQuery = useBatches(filters, canView && branchScope.hasBranchScope);
   const productsQuery = useManufacturingProducts(canView);
   const branchesQuery = useManufacturingBranches(canView);
   const recipesQuery = useManufacturingRecipeByProduct(selectedProductId, canView);
-  const createMutation = useCreateBatch();
-  const updateMutation = useUpdateBatch();
-  const startMutation = useStartBatch();
-  const completeMutation = useCompleteBatch();
-  const cancelMutation = useCancelBatch();
-  const deleteMutation = useDeleteBatch();
+  const inventoryQuery = useManufacturingInventory(canView && canRecordWastage);
+  const createPlannedMutation = useCreateBatch();
+  const createProductionMutation = useCreateProduction();
+  const updateBatchMutation = useUpdateBatch();
+  const deleteBatchMutation = useDeleteBatch();
+  const addWastageMutation = useAddBatchWastage();
   const isPermissionDenied =
     batchesQuery.error instanceof ApiError && batchesQuery.error.status === 403;
 
@@ -133,14 +133,30 @@ export function BatchesPageClient(): JSX.Element {
     setFormOpen(true);
   };
 
+  const openEdit = (batch: ProductionBatch): void => {
+    setEditingBatch(batch);
+    setSelectedProductId(batch.productId);
+    setFormOpen(true);
+  };
+
   const updateFilter = (patch: Partial<BatchFilters>): void => {
     setFilters({ ...filters, ...patch });
   };
 
-  const handleCreate = async (payload: CreateBatchPayload): Promise<void> => {
+  const handleCreatePlanned = async (payload: CreateBatchPayload): Promise<void> => {
     try {
-      await createMutation.mutateAsync(payload);
-      toast.success("Production batch created.");
+      await createPlannedMutation.mutateAsync(payload);
+      toast.success("Planned production saved.");
+      setFormOpen(false);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  const handleProduceNow = async (payload: CreateProductionPayload): Promise<void> => {
+    try {
+      await createProductionMutation.mutateAsync(payload);
+      toast.success("Production completed.");
       setFormOpen(false);
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -149,8 +165,8 @@ export function BatchesPageClient(): JSX.Element {
 
   const handleUpdate = async (id: string, payload: UpdateBatchPayload): Promise<void> => {
     try {
-      await updateMutation.mutateAsync({ id, payload });
-      toast.success("Production batch updated.");
+      await updateBatchMutation.mutateAsync({ id, payload });
+      toast.success("Planned production updated.");
       setEditingBatch(null);
       setFormOpen(false);
     } catch (error) {
@@ -158,107 +174,200 @@ export function BatchesPageClient(): JSX.Element {
     }
   };
 
-  const confirmAction = async (): Promise<void> => {
-    if (!pendingAction) return;
+  const confirmDelete = async (): Promise<void> => {
+    if (!deleteBatchTarget) {
+      return;
+    }
 
     try {
-      if (pendingAction.type === "start") await startMutation.mutateAsync(pendingAction.batch.id);
-      if (pendingAction.type === "complete") {
-        await completeMutation.mutateAsync(pendingAction.batch.id);
-      }
-      if (pendingAction.type === "cancel") await cancelMutation.mutateAsync(pendingAction.batch.id);
-      if (pendingAction.type === "delete") await deleteMutation.mutateAsync(pendingAction.batch.id);
-      toast.success("Batch action completed.");
-      setPendingAction(null);
+      await deleteBatchMutation.mutateAsync(deleteBatchTarget.id);
+      toast.success("Planned production deleted.");
+      setDeleteBatchTarget(null);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  const handleWastage = async (payload: WastagePayload): Promise<void> => {
+    if (!wastageBatch) {
+      return;
+    }
+
+    try {
+      await addWastageMutation.mutateAsync({ id: wastageBatch.id, payload });
+      toast.success("Wastage recorded.");
+      setWastageBatch(null);
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
   };
 
   const batches = batchesQuery.data ?? [];
+  const batchMetrics = {
+    completed: batches.filter((batch) => batch.status === "completed").length,
+    inProgress: batches.filter(
+      (batch) => batch.status === "in_progress" || batch.status === "partially_completed",
+    ).length,
+    planned: batches.reduce((total, batch) => total + batch.plannedQuantity, 0),
+    produced: batches.reduce((total, batch) => total + batch.producedQuantity, 0),
+    total: batches.length,
+    wastage: batches.reduce((total, batch) => total + batch.wastageQuantity, 0),
+  };
+  const metricCards = [
+    { label: "Total Batches", meta: "visible", value: formatMetric(batchMetrics.total) },
+    { label: "In Progress", meta: "active", value: formatMetric(batchMetrics.inProgress) },
+    { label: "Completed", meta: "closed", value: formatMetric(batchMetrics.completed) },
+    {
+      label: "Wastage Recorded",
+      meta: "units",
+      tone: "danger",
+      value: formatMetric(batchMetrics.wastage),
+    },
+    { label: "Planned Output", meta: "units", value: formatMetric(batchMetrics.planned) },
+    { label: "Produced Output", meta: "units", value: formatMetric(batchMetrics.produced) },
+  ];
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <PageHeader
-        title="Production Batches"
-        description="Track production lifecycle, ingredient consumption, outputs, and wastage."
-        actions={
-          canManage ? (
-            <Button onClick={openCreate} type="button">
-              <Plus className="h-4 w-4" />
-              Create Batch
+    <div className="mx-auto flex max-w-7xl flex-col gap-7">
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-neutral-500">
+            Manufacturing
+          </p>
+          <h1 className="mt-2 text-4xl font-semibold tracking-tight text-neutral-950">
+            Production
+          </h1>
+          <p className="mt-2 max-w-2xl text-base text-neutral-600">
+            Choose a recipe and output quantity. Component consumption, packaging consumption,
+            output stock, costing, and accounting are handled automatically by the backend.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Button
+            asChild
+            className="border-neutral-300 bg-white text-neutral-950 hover:bg-neutral-100"
+            variant="outline"
+          >
+            <Link href={ROUTES.reportsManufacturing}>
+              <BarChart3 className="h-4 w-4" />
+              View Reports
+            </Link>
+          </Button>
+          {canCreate ? (
+            <Button
+              className="bg-black text-white hover:bg-neutral-800"
+              onClick={openCreate}
+              type="button"
+            >
+              <Factory className="h-4 w-4" />
+              Create Production
             </Button>
-          ) : undefined
-        }
-      />
+          ) : null}
+        </div>
+      </section>
 
-      <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-white/80 p-4 lg:grid-cols-[1.4fr_repeat(5,minmax(0,1fr))]">
-        <Input
-          aria-label="Search batches"
-          onChange={(event) => updateFilter({ search: event.target.value })}
-          placeholder="Search batch number, product..."
-          value={filters.search}
-        />
-        <Select
-          value={filters.productId}
-          onValueChange={(productId) => updateFilter({ productId })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Product" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All products</SelectItem>
-            {(productsQuery.data ?? []).map((product) => (
-              <SelectItem key={product.id} value={product.id}>
-                {product.productName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={filters.branchId} onValueChange={(branchId) => updateFilter({ branchId })}>
-          <SelectTrigger>
-            <SelectValue placeholder="Branch" />
-          </SelectTrigger>
-          <SelectContent>
-            {branchScope.canAccessAllBranches ? (
-              <SelectItem value="all">All branches</SelectItem>
-            ) : null}
-            {branchOptions.map((branch) => (
-              <SelectItem key={branch.id} value={branch.id}>
-                {branch.branchName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.status}
-          onValueChange={(status) => updateFilter({ status: status as BatchFilters["status"] })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="in_progress">In progress</SelectItem>
-            <SelectItem value="partially_completed">Partially completed</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
-        <Input
-          aria-label="Date from"
-          onChange={(event) => updateFilter({ dateFrom: event.target.value })}
-          type="date"
-          value={filters.dateFrom}
-        />
-        <div className="flex gap-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        {metricCards.map((metric) => (
+          <section
+            className="rounded-2xl border border-neutral-300 bg-white p-5"
+            key={metric.label}
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-neutral-500">
+              {metric.label}
+            </p>
+            <div className="mt-4 flex items-end gap-2">
+              <p
+                className={
+                  metric.tone === "danger"
+                    ? "font-mono text-4xl font-semibold leading-none text-red-600"
+                    : "font-mono text-4xl font-semibold leading-none text-neutral-950"
+                }
+              >
+                {metric.value}
+              </p>
+              <p className="pb-1 text-sm text-neutral-500">{metric.meta}</p>
+            </div>
+          </section>
+        ))}
+      </div>
+
+      <div className="rounded-2xl border border-neutral-300 bg-white p-5">
+        <div className="grid gap-4 lg:grid-cols-[1.5fr_repeat(5,minmax(0,1fr))]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+            <Input
+              aria-label="Search batches"
+              className="pl-10"
+              onChange={(event) => updateFilter({ search: event.target.value })}
+              placeholder="Batch ID or product..."
+              value={filters.search}
+            />
+          </div>
+          <Select
+            value={filters.productId}
+            onValueChange={(productId) => updateFilter({ productId })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Product" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All products</SelectItem>
+              {(productsQuery.data ?? []).map((product) => (
+                <SelectItem key={product.id} value={product.id}>
+                  {product.productName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filters.branchId} onValueChange={(branchId) => updateFilter({ branchId })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Branch" />
+            </SelectTrigger>
+            <SelectContent>
+              {branchScope.canAccessAllBranches ? (
+                <SelectItem value="all">All branches</SelectItem>
+              ) : null}
+              {branchOptions.map((branch) => (
+                <SelectItem key={branch.id} value={branch.id}>
+                  {branch.branchName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={filters.status}
+            onValueChange={(status) => updateFilter({ status: status as BatchFilters["status"] })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="draft">Planned</SelectItem>
+              <SelectItem value="in_progress">In progress</SelectItem>
+              <SelectItem value="partially_completed">Partially completed</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            aria-label="Date from"
+            onChange={(event) => updateFilter({ dateFrom: event.target.value })}
+            type="date"
+            value={filters.dateFrom}
+          />
           <Input
             aria-label="Date to"
             onChange={(event) => updateFilter({ dateTo: event.target.value })}
             type="date"
             value={filters.dateTo}
           />
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <Button className="border-neutral-300" type="button" variant="ghost">
+            <SlidersHorizontal className="h-4 w-4" />
+            Filter options
+          </Button>
           <Button
             onClick={() => setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })}
             type="button"
@@ -286,26 +395,22 @@ export function BatchesPageClient(): JSX.Element {
 
       {!batchesQuery.isLoading && !batchesQuery.error && batches.length === 0 ? (
         <ManufacturingEmptyState
-          actionLabel={canManage ? "Create Batch" : undefined}
-          onAction={canManage ? openCreate : undefined}
+          actionLabel={canCreate ? "Create Production" : undefined}
+          onAction={canCreate ? openCreate : undefined}
         />
       ) : null}
 
       {!batchesQuery.isLoading && !batchesQuery.error && batches.length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden rounded-2xl border-neutral-300 bg-white shadow-none">
           <CardContent className="p-0">
             <BatchesTable
               batches={batches}
-              canManage={canManage}
-              onCancel={(batch) => setPendingAction({ batch, type: "cancel" })}
-              onComplete={(batch) => setPendingAction({ batch, type: "complete" })}
-              onDelete={(batch) => setPendingAction({ batch, type: "delete" })}
-              onEdit={(batch) => {
-                setEditingBatch(batch);
-                setSelectedProductId(batch.productId);
-                setFormOpen(true);
-              }}
-              onStart={(batch) => setPendingAction({ batch, type: "start" })}
+              canDelete={canDelete}
+              canEdit={canEdit}
+              canRecordWastage={canRecordWastage}
+              onDelete={setDeleteBatchTarget}
+              onEdit={openEdit}
+              onWastage={setWastageBatch}
             />
           </CardContent>
         </Card>
@@ -314,46 +419,58 @@ export function BatchesPageClient(): JSX.Element {
       <BatchFormDialog
         batch={editingBatch}
         branches={branchOptions}
-        isSubmitting={createMutation.isPending || updateMutation.isPending}
+        isSubmitting={
+          createPlannedMutation.isPending ||
+          createProductionMutation.isPending ||
+          updateBatchMutation.isPending
+        }
         onClose={() => {
           setEditingBatch(null);
           setFormOpen(false);
         }}
-        onCreate={handleCreate}
+        onCreatePlanned={handleCreatePlanned}
         onProductChange={setSelectedProductId}
+        onProduceNow={handleProduceNow}
         onUpdate={handleUpdate}
         open={formOpen}
         products={productsQuery.data ?? []}
         recipes={recipesQuery.data ?? []}
       />
 
+      <BatchWastageDialog
+        inventory={inventoryQuery.data ?? []}
+        isSubmitting={addWastageMutation.isPending}
+        onClose={() => setWastageBatch(null)}
+        onWastage={handleWastage}
+        open={wastageBatch !== null}
+      />
+
       <Dialog
-        open={pendingAction !== null}
-        onOpenChange={(open) => (!open ? setPendingAction(null) : undefined)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteBatchTarget(null);
+          }
+        }}
+        open={deleteBatchTarget !== null}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm batch action</DialogTitle>
+            <DialogTitle>Delete planned production?</DialogTitle>
             <DialogDescription>
-              Continue with {pendingAction?.type ?? "this action"} for{" "}
-              {pendingAction?.batch.batchNumber ?? "this batch"}?
+              This production has not posted stock or accounting yet. Deleting it cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={() => setPendingAction(null)} type="button" variant="outline">
+            <Button onClick={() => setDeleteBatchTarget(null)} type="button" variant="outline">
               Cancel
             </Button>
             <Button
-              disabled={
-                startMutation.isPending ||
-                completeMutation.isPending ||
-                cancelMutation.isPending ||
-                deleteMutation.isPending
-              }
-              onClick={() => void confirmAction()}
+              className="bg-red-700 text-white hover:bg-red-800"
+              disabled={deleteBatchMutation.isPending}
+              onClick={() => void confirmDelete()}
               type="button"
             >
-              Confirm
+              Delete planned production
             </Button>
           </DialogFooter>
         </DialogContent>

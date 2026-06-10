@@ -22,6 +22,37 @@ func (h *Handler) ListBatches(c *gin.Context) {
 	respond(c, "production batches fetched successfully", result, err)
 }
 
+func (h *Handler) ListProductions(c *gin.Context) {
+	result, err := h.service.ListProductions(utils.MustAuthContext(c), parseBatchListQuery(c))
+	respond(c, "productions fetched successfully", result, err)
+}
+
+func (h *Handler) CreateProduction(c *gin.Context) {
+	var req CreateProductionRequest
+	if !bind(c, &req) {
+		return
+	}
+	result, err := h.service.CreateProduction(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "production created successfully", result, err)
+}
+
+func (h *Handler) GetProduction(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.GetProduction(utils.MustAuthContext(c), c.Param("id"))
+	respond(c, "production fetched successfully", result, err)
+}
+
+func (h *Handler) ProductionPreview(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	quantity, _ := strconv.ParseFloat(c.Query("quantity"), 64)
+	result, err := h.service.ProductionPreview(utils.MustAuthContext(c), c.Param("id"), c.Query("branch_id"), quantity)
+	respond(c, "production preview fetched successfully", result, err)
+}
+
 func (h *Handler) CreateBatch(c *gin.Context) {
 	var req CreateBatchRequest
 	if !bind(c, &req) {

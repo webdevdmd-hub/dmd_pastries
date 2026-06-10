@@ -16,56 +16,55 @@ function batchOutputLabel(batch: ProductionBatch): string {
 
 export function BatchHeader({
   batch,
-  canManage,
-  onCancel,
-  onComplete,
-  onStart,
+  canRecordWastage = false,
+  onRecordWastage,
 }: {
   batch: ProductionBatch;
-  canManage: boolean;
-  onCancel: () => void;
-  onComplete: () => void;
-  onStart: () => void;
+  canRecordWastage?: boolean;
+  onRecordWastage?: () => void;
 }): JSX.Element {
+  const canShowWastageAction =
+    canRecordWastage && batch.status !== "draft" && batch.status !== "cancelled";
+
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="flex flex-col gap-5 border-b border-neutral-300 pb-6 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <Link
-          className="text-sm font-semibold text-brand-mocha hover:text-brand-espresso"
+          className="text-sm font-semibold text-neutral-500 hover:text-neutral-950"
           href={ROUTES.manufacturingBatches}
         >
-          Back to Batches
+          Manufacturing / Production Detail
         </Link>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-4xl text-brand-espresso">{batch.batchNumber}</h1>
+          <h1 className="text-4xl font-semibold tracking-tight text-neutral-950">
+            Production {batch.batchNumber}
+          </h1>
           <BatchStatusBadge status={batch.status} />
         </div>
-        <p className="mt-2 text-sm text-brand-mocha">
-          {batchOutputLabel(batch)} · {batch.recipeName} v{batch.recipeVersionNumber}
-        </p>
-      </div>
-      {canManage ? (
-        <div className="flex flex-wrap gap-2">
-          <Button disabled={batch.status !== "draft"} onClick={onStart} type="button">
-            Start
-          </Button>
-          <Button
-            disabled={batch.status !== "in_progress" && batch.status !== "partially_completed"}
-            onClick={onComplete}
-            type="button"
-            variant="outline"
-          >
-            Complete
-          </Button>
-          <Button
-            disabled={batch.status === "completed" || batch.status === "cancelled"}
-            onClick={onCancel}
-            type="button"
-            variant="outline"
-          >
-            Cancel
-          </Button>
+        <div className="mt-3 grid gap-2 text-sm text-neutral-600">
+          <p>
+            Recipe:{" "}
+            <span className="font-semibold text-neutral-950">
+              {batch.recipeName} v{batch.recipeVersionNumber}
+            </span>
+          </p>
+          <p>
+            Output:{" "}
+            <span className="font-semibold text-neutral-950">{batchOutputLabel(batch)}</span>
+          </p>
+          <p>
+            Branch: <span className="font-semibold text-neutral-950">{batch.branchName}</span>
+          </p>
         </div>
+      </div>
+      {canShowWastageAction ? (
+        <Button
+          className="bg-black text-white hover:bg-neutral-800"
+          onClick={onRecordWastage}
+          type="button"
+        >
+          Record Wastage
+        </Button>
       ) : null}
     </div>
   );

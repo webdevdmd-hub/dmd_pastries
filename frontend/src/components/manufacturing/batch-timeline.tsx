@@ -1,45 +1,51 @@
-import { CheckCircle2, Circle, Factory, PackageCheck, Play } from "lucide-react";
 import type { JSX } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ProductionBatch } from "@/types/manufacturing";
 
 export function BatchTimeline({ batch }: { batch: ProductionBatch }): JSX.Element {
   const steps = [
-    { done: true, icon: Circle, label: "Draft created" },
-    { done: batch.status !== "draft", icon: Play, label: "Started" },
+    { done: true, label: "Planned" },
+    { done: batch.status !== "draft", label: "Production Posted" },
     {
       done: batch.producedQuantity > 0 || batch.status === "completed",
-      icon: Factory,
-      label: "Produced output",
+      label: "Output Produced",
     },
-    { done: batch.status === "completed", icon: PackageCheck, label: "Completed" },
+    { done: batch.status === "completed", label: "Completed" },
   ];
 
   return (
-    <Card className="bg-white/85">
-      <CardHeader>
-        <CardTitle>Batch timeline</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {steps.map((step) => {
-          const Icon = step.done ? CheckCircle2 : step.icon;
-          return (
-            <div className="flex items-center gap-3" key={step.label}>
+    <section className="rounded-2xl border border-neutral-300 bg-white p-6">
+      <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-neutral-950">
+        Production Timeline
+      </h2>
+      <div className="mt-6 space-y-0">
+        {steps.map((step, index) => (
+          <div className="grid grid-cols-[24px_1fr] gap-4" key={step.label}>
+            <div className="flex flex-col items-center">
               <span
                 className={
                   step.done
-                    ? "rounded-full bg-green-50 p-2 text-green-800"
-                    : "rounded-full bg-brand-latte p-2 text-brand-mocha"
+                    ? "h-4 w-4 rounded-full bg-black"
+                    : "h-4 w-4 rounded-full border-2 border-neutral-300 bg-white"
+                }
+              />
+              {index < steps.length - 1 ? <span className="h-12 w-px bg-neutral-300" /> : null}
+            </div>
+            <div className="-mt-1 pb-6">
+              <p
+                className={
+                  step.done ? "font-semibold text-neutral-950" : "font-semibold text-neutral-500"
                 }
               >
-                <Icon className="h-4 w-4" />
-              </span>
-              <span className="text-sm font-semibold text-brand-espresso">{step.label}</span>
+                {step.label}
+              </p>
+              <p className="mt-1 text-sm text-neutral-500">
+                {step.done ? "Completed in workflow" : "Pending"}
+              </p>
             </div>
-          );
-        })}
-      </CardContent>
-    </Card>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

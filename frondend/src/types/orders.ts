@@ -168,6 +168,13 @@ export type AssignOrderProductionPayload = {
   batchId: string;
 };
 
+export type CreateOrderItemProductionPayload = {
+  recipeId: string | null;
+  plannedQuantity: number | null;
+  productionDate: string | null;
+  notes: string | null;
+};
+
 export type UpdateOrderProductionStatusPayload = {
   productionStatus: string;
 };

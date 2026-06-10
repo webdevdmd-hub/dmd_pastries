@@ -21,8 +21,8 @@ import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 
 const actions = [
-  { href: ROUTES.manufacturingBatches, icon: Boxes, label: "Create Production Batch" },
-  { href: ROUTES.manufacturing, icon: Soup, label: "View Manufacturing" },
+  { href: ROUTES.manufacturingBatches, icon: Boxes, label: "Create Production" },
+  { href: ROUTES.manufacturingBatches, icon: Soup, label: "View Manufacturing" },
   { href: ROUTES.recipes, icon: ListChecks, label: "View Recipe List" },
   { href: ROUTES.reportsBakeryOrdersProductionSchedule, icon: Clock, label: "View Schedule" },
 ] as const;

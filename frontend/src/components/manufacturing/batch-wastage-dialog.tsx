@@ -1,7 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -56,6 +56,18 @@ export function BatchWastageDialog({
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    setInventoryItemId("");
+    setWastageType("ingredient");
+    setQuantity(1);
+    setReason("");
+    setError(null);
+  }, [open]);
+
   const submit = async (): Promise<void> => {
     const result = wastageSchema.safeParse({
       inventoryItemId,
@@ -74,55 +86,62 @@ export function BatchWastageDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent className="max-w-xl p-0">
+        <DialogHeader className="border-b border-neutral-300 px-7 py-6">
           <DialogTitle>Add wastage</DialogTitle>
           <DialogDescription>
             Record unusable stock or production waste for audit visibility.
           </DialogDescription>
         </DialogHeader>
-        <Select
-          value={inventoryItemId || "none"}
-          onValueChange={(value) => setInventoryItemId(value === "none" ? "" : value)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Inventory item" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Select item</SelectItem>
-            {inventory.map((item) => (
-              <SelectItem key={item.id} value={item.id}>
-                {inventoryLabel(item)}
-                {inventoryMeta(item) ? ` (${inventoryMeta(item)})` : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input
-          aria-label="Wastage type"
-          onChange={(event) => setWastageType(event.target.value)}
-          placeholder="Wastage type"
-          value={wastageType}
-        />
-        <Input
-          aria-label="Quantity"
-          min="0"
-          onChange={(event) => setQuantity(Number(event.target.value))}
-          type="number"
-          value={quantity}
-        />
-        <Input
-          aria-label="Reason"
-          onChange={(event) => setReason(event.target.value)}
-          placeholder="Reason"
-          value={reason}
-        />
-        {error ? <p className="text-sm font-semibold text-red-700">{error}</p> : null}
-        <DialogFooter>
+        <div className="grid gap-4 px-7 py-6">
+          <Select
+            value={inventoryItemId || "none"}
+            onValueChange={(value) => setInventoryItemId(value === "none" ? "" : value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Inventory item" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Select item</SelectItem>
+              {inventory.map((item) => (
+                <SelectItem key={item.id} value={item.id}>
+                  {inventoryLabel(item)}
+                  {inventoryMeta(item) ? ` (${inventoryMeta(item)})` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            aria-label="Wastage type"
+            onChange={(event) => setWastageType(event.target.value)}
+            placeholder="Wastage type"
+            value={wastageType}
+          />
+          <Input
+            aria-label="Quantity"
+            min="0"
+            onChange={(event) => setQuantity(Number(event.target.value))}
+            type="number"
+            value={quantity}
+          />
+          <Input
+            aria-label="Reason"
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Reason"
+            value={reason}
+          />
+          {error ? <p className="text-sm font-semibold text-red-700">{error}</p> : null}
+        </div>
+        <DialogFooter className="border-t border-neutral-300 bg-neutral-50 px-7 py-5">
           <Button onClick={onClose} type="button" variant="outline">
             Cancel
           </Button>
-          <Button disabled={isSubmitting} onClick={() => void submit()} type="button">
+          <Button
+            className="bg-black text-white hover:bg-neutral-800"
+            disabled={isSubmitting}
+            onClick={() => void submit()}
+            type="button"
+          >
             Add wastage
           </Button>
         </DialogFooter>

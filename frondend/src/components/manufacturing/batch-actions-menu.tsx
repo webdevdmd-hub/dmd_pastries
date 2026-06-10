@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal } from "lucide-react";
+import { Edit, MoreHorizontal, Trash2 } from "lucide-react";
 import type { JSX } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -8,30 +8,33 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ProductionBatch } from "@/types/manufacturing";
 
 export function BatchActionsMenu({
   batch,
-  canManage,
-  onCancel,
-  onComplete,
+  canDelete,
+  canEdit,
+  canRecordWastage,
   onDelete,
   onEdit,
-  onStart,
   onView,
+  onWastage,
 }: {
   batch: ProductionBatch;
-  canManage: boolean;
-  onCancel: (batch: ProductionBatch) => void;
-  onComplete: (batch: ProductionBatch) => void;
+  canDelete: boolean;
+  canEdit: boolean;
+  canRecordWastage: boolean;
   onDelete: (batch: ProductionBatch) => void;
   onEdit: (batch: ProductionBatch) => void;
-  onStart: (batch: ProductionBatch) => void;
   onView: (batch: ProductionBatch) => void;
+  onWastage: (batch: ProductionBatch) => void;
 }): JSX.Element {
+  const isPlanned = batch.status === "draft";
+  const canAddWastage =
+    canRecordWastage && batch.status !== "draft" && batch.status !== "cancelled";
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -46,31 +49,20 @@ export function BatchActionsMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={() => onView(batch)}>View details</DropdownMenuItem>
-        {canManage ? (
-          <>
-            <DropdownMenuItem disabled={batch.status !== "draft"} onSelect={() => onEdit(batch)}>
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={batch.status !== "draft"} onSelect={() => onStart(batch)}>
-              Start
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={batch.status !== "in_progress" && batch.status !== "partially_completed"}
-              onSelect={() => onComplete(batch)}
-            >
-              Complete
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              disabled={batch.status === "completed" || batch.status === "cancelled"}
-              onSelect={() => onCancel(batch)}
-            >
-              Cancel
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-700" onSelect={() => onDelete(batch)}>
-              Delete
-            </DropdownMenuItem>
-          </>
+        {canEdit && isPlanned ? (
+          <DropdownMenuItem onSelect={() => onEdit(batch)}>
+            <Edit className="h-4 w-4" />
+            Edit planned
+          </DropdownMenuItem>
+        ) : null}
+        {canDelete && isPlanned ? (
+          <DropdownMenuItem className="text-red-700" onSelect={() => onDelete(batch)}>
+            <Trash2 className="h-4 w-4" />
+            Delete planned
+          </DropdownMenuItem>
+        ) : null}
+        {canAddWastage ? (
+          <DropdownMenuItem onSelect={() => onWastage(batch)}>Record wastage</DropdownMenuItem>
         ) : null}
       </DropdownMenuContent>
     </DropdownMenu>

@@ -32,89 +32,124 @@ function batchOutputLabel(batch: ProductionBatch): string {
     : batch.productName;
 }
 
+function formatQuantity(value: number, unit: string): string {
+  return `${new Intl.NumberFormat("en-AE", { maximumFractionDigits: 2 }).format(value)} ${unit}`;
+}
+
 export function BatchesTable({
   batches,
-  canManage,
-  onCancel,
-  onComplete,
+  canDelete,
+  canEdit,
+  canRecordWastage,
   onDelete,
   onEdit,
-  onStart,
+  onWastage,
 }: {
   batches: ProductionBatch[];
-  canManage: boolean;
-  onCancel: (batch: ProductionBatch) => void;
-  onComplete: (batch: ProductionBatch) => void;
+  canDelete: boolean;
+  canEdit: boolean;
+  canRecordWastage: boolean;
   onDelete: (batch: ProductionBatch) => void;
   onEdit: (batch: ProductionBatch) => void;
-  onStart: (batch: ProductionBatch) => void;
+  onWastage: (batch: ProductionBatch) => void;
 }): JSX.Element {
   const router = useRouter();
 
   return (
     <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Batch Number</TableHead>
-          <TableHead>Product</TableHead>
-          <TableHead>Recipe</TableHead>
-          <TableHead>Planned Qty</TableHead>
-          <TableHead>Produced Qty</TableHead>
+      <TableHeader className="bg-neutral-100">
+        <TableRow className="border-neutral-300 hover:bg-neutral-100">
+          <TableHead className="h-14 text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
+            Production Number
+          </TableHead>
+          <TableHead className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
+            Output Product
+          </TableHead>
+          <TableHead className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
+            Recipe
+          </TableHead>
+          <TableHead className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
+            Planned
+          </TableHead>
+          <TableHead className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
+            Produced
+          </TableHead>
           <TableHead>Status</TableHead>
-          <TableHead>Start Time</TableHead>
-          <TableHead>End Time</TableHead>
-          <TableHead>Actions</TableHead>
+          <TableHead className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
+            Start Time
+          </TableHead>
+          <TableHead className="text-right text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
+            Actions
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {batches.map((batch) => (
-          <TableRow key={batch.id}>
-            <TableCell>
-              <Link
-                className="font-semibold text-brand-espresso"
-                href={`${ROUTES.manufacturingBatches}/${batch.id}`}
-              >
-                {batch.batchNumber}
-              </Link>
-            </TableCell>
-            <TableCell>
-              <div className="grid gap-1">
-                <span>{batchOutputLabel(batch)}</span>
-                <span className="text-xs text-brand-mocha">
-                  Output: {batch.productVariantName ? "Variant stock" : "Parent product stock"}
-                </span>
-              </div>
-            </TableCell>
-            <TableCell>
-              {batch.recipeName} v{batch.recipeVersionNumber}
-            </TableCell>
-            <TableCell>
-              {batch.plannedQuantity} {batch.batchUnitName}
-            </TableCell>
-            <TableCell>
-              {batch.producedQuantity} {batch.batchUnitName}
-            </TableCell>
-            <TableCell>
-              <BatchStatusBadge status={batch.status} />
-            </TableCell>
-            <TableCell>{formatDateTime(batch.startTime)}</TableCell>
-            <TableCell>{formatDateTime(batch.endTime)}</TableCell>
-            <TableCell>
-              <BatchActionsMenu
-                batch={batch}
-                canManage={canManage}
-                onCancel={onCancel}
-                onComplete={onComplete}
-                onDelete={onDelete}
-                onEdit={onEdit}
-                onStart={onStart}
-                onView={(selectedBatch) =>
-                  router.push(`${ROUTES.manufacturingBatches}/${selectedBatch.id}`)
-                }
-              />
-            </TableCell>
-          </TableRow>
-        ))}
+        {batches.map((batch) => {
+          const progress =
+            batch.plannedQuantity > 0
+              ? Math.min((batch.producedQuantity / batch.plannedQuantity) * 100, 100)
+              : 0;
+
+          return (
+            <TableRow className="border-neutral-200 hover:bg-neutral-50" key={batch.id}>
+              <TableCell>
+                <Link
+                  className="font-mono text-sm font-semibold text-neutral-950 underline-offset-4 hover:underline"
+                  href={`${ROUTES.manufacturingBatches}/${batch.id}`}
+                >
+                  {batch.batchNumber}
+                </Link>
+              </TableCell>
+              <TableCell>
+                <div className="grid gap-1">
+                  <span className="font-semibold text-neutral-950">{batchOutputLabel(batch)}</span>
+                  <span className="text-xs text-neutral-500">
+                    Output: {batch.productVariantName ? "Variant stock" : "Parent product stock"}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell className="text-neutral-700">
+                {batch.recipeName} v{batch.recipeVersionNumber}
+              </TableCell>
+              <TableCell className="font-mono text-neutral-950">
+                {formatQuantity(batch.plannedQuantity, batch.batchUnitName)}
+              </TableCell>
+              <TableCell className="min-w-44">
+                <div className="space-y-2">
+                  <span className="font-mono text-neutral-950">
+                    {formatQuantity(batch.producedQuantity, batch.batchUnitName)}
+                  </span>
+                  <div className="h-1.5 rounded-full bg-neutral-200">
+                    <div
+                      className="h-1.5 rounded-full bg-neutral-950"
+                      style={{ width: `${progress.toFixed(0)}%` }}
+                    />
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell>
+                <BatchStatusBadge status={batch.status} />
+              </TableCell>
+              <TableCell className="text-sm text-neutral-600">
+                {formatDateTime(batch.startTime)}
+              </TableCell>
+              <TableCell className="text-right">
+                <BatchActionsMenu
+                  batch={batch}
+                  canDelete={canDelete}
+                  canEdit={canEdit}
+                  canRecordWastage={canRecordWastage}
+                  onDelete={onDelete}
+                  onEdit={onEdit}
+                  onView={(selectedBatch) =>
+                    router.push(`${ROUTES.manufacturingBatches}/${selectedBatch.id}`)
+                  }
+                  onWastage={onWastage}
+                />
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );

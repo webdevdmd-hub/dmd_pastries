@@ -1,7 +1,8 @@
+import { redirect } from "next/navigation";
 import type { JSX } from "react";
 
-import { ManufacturingPageClient } from "@/components/manufacturing/manufacturing-page-client";
+import { ROUTES } from "@/constants/routes";
 
 export default function ManufacturingPage(): JSX.Element {
-  return <ManufacturingPageClient />;
+  redirect(ROUTES.manufacturingBatches);
 }

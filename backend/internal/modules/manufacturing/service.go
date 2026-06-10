@@ -84,6 +84,148 @@ func (s *Service) CreateBatch(currentUser *utils.AuthContext, req CreateBatchReq
 	return s.GetBatch(currentUser, batchID)
 }
 
+func (s *Service) CreateProduction(currentUser *utils.AuthContext, req CreateProductionRequest, ipAddress, userAgent string) (*ProductionResponse, error) {
+	if req.QuantityProduced <= 0 {
+		return nil, apperrors.BadRequest("quantity_produced must be greater than zero", nil)
+	}
+	if strings.TrimSpace(req.BranchID) == "" || strings.TrimSpace(req.RecipeID) == "" {
+		return nil, apperrors.BadRequest("branch_id and recipe_id are required", nil)
+	}
+	if err := validateUUID(req.BranchID, "branch_id"); err != nil {
+		return nil, err
+	}
+	if err := validateUUID(req.RecipeID, "recipe_id"); err != nil {
+		return nil, err
+	}
+	var productionID string
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		batchReq := CreateBatchRequest{
+			BranchID:        strings.TrimSpace(req.BranchID),
+			RecipeID:        strings.TrimSpace(req.RecipeID),
+			PlannedQuantity: req.QuantityProduced,
+			ProductionDate:  strings.TrimSpace(req.ProductionDate),
+			Notes:           strings.TrimSpace(req.Notes),
+		}
+		batch, ingredients, packaging, err := s.buildBatch(tx, currentUser, batchReq)
+		if err != nil {
+			return err
+		}
+		if err := s.validateProductionHasValuedInputs(tx, currentUser.BusinessID, batch.BranchID, ingredients, packaging); err != nil {
+			return err
+		}
+		number, err := s.repo.NextNumber(tx, currentUser.BusinessID)
+		if err != nil {
+			return err
+		}
+		batch.ProductionBatchNumber = number
+		batch.Status = "planned"
+		if err := s.repo.CreateBatch(tx, batch, ingredients, packaging); err != nil {
+			return err
+		}
+		if err := s.completeBatchTx(tx, currentUser, batch.ID, CompleteBatchRequest{
+			ProducedQuantity: req.QuantityProduced,
+			BatchNumber:      strings.TrimSpace(req.BatchNumber),
+			ExpiryDate:       strings.TrimSpace(req.ExpiryDate),
+			Notes:            strings.TrimSpace(req.Notes),
+		}); err != nil {
+			return err
+		}
+		if err := s.audit(tx, currentUser, "production.one_click_created", batch.ID, "Production created and completed", ipAddress, userAgent); err != nil {
+			return err
+		}
+		productionID = batch.ID
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetProduction(currentUser, productionID)
+}
+
+func (s *Service) ListProductions(currentUser *utils.AuthContext, query BatchListQuery) (*PaginatedBatchResponse, error) {
+	return s.ListBatches(currentUser, query)
+}
+
+func (s *Service) GetProduction(currentUser *utils.AuthContext, id string) (*ProductionResponse, error) {
+	batch, err := s.GetBatch(currentUser, id)
+	if err != nil {
+		return nil, err
+	}
+	return s.productionResponse(currentUser.BusinessID, *batch)
+}
+
+func (s *Service) ProductionPreview(currentUser *utils.AuthContext, recipeID, branchID string, quantity float64) (*ProductionPreviewResponse, error) {
+	if quantity <= 0 {
+		return nil, apperrors.BadRequest("quantity must be greater than zero", nil)
+	}
+	if err := validateUUID(recipeID, "id"); err != nil {
+		return nil, err
+	}
+	if err := validateUUID(branchID, "branch_id"); err != nil {
+		return nil, err
+	}
+	if !currentUser.CanAccessBranch(branchID) {
+		return nil, apperrors.Forbidden("branch access denied")
+	}
+	recipe, err := s.repo.ActiveRecipe(s.db, currentUser.BusinessID, branchID, recipeID)
+	if err != nil {
+		return nil, notFound(err, "active recipe not found")
+	}
+	if recipe.BatchYieldQuantity <= 0 {
+		return nil, apperrors.BadRequest("recipe yield quantity must be greater than zero", nil)
+	}
+	product, err := s.repo.Product(s.db, currentUser.BusinessID, branchID, recipe.ProductID)
+	if err != nil {
+		return nil, notFound(err, "output product not found")
+	}
+	var variantName string
+	if variant, err := s.repo.ProductVariant(s.db, currentUser.BusinessID, branchID, recipe.ProductID, recipe.ProductVariantID); err == nil && variant != nil {
+		variantName = variant.VariantName
+	}
+	ratio := quantity / recipe.BatchYieldQuantity
+	components, componentShortages, componentCost, err := s.previewIngredientLines(currentUser.BusinessID, branchID, recipe.ID, ratio)
+	if err != nil {
+		return nil, err
+	}
+	packaging, packagingShortages, packagingCost, err := s.previewPackagingLines(currentUser.BusinessID, branchID, recipe.ID, ratio)
+	if err != nil {
+		return nil, err
+	}
+	shortages := append(componentShortages, packagingShortages...)
+	total := roundMoney(componentCost + packagingCost)
+	warnings := make([]string, 0, 2)
+	hasZeroCostWarning := productionPreviewHasZeroCost(components, packaging)
+	if hasZeroCostWarning {
+		warnings = append(warnings, "Some components have quantity but zero inventory value. Accounting journal will not be created until stock has value.")
+	}
+	if len(components) == 0 && len(packaging) == 0 {
+		hasZeroCostWarning = true
+		warnings = append(warnings, "This recipe has no components or packaging, so production has no inventory cost to post.")
+	}
+	return &ProductionPreviewResponse{
+		RecipeID:                 recipe.ID,
+		RecipeName:               recipe.RecipeName,
+		RecipeYieldQuantity:      roundQuantity(recipe.BatchYieldQuantity),
+		RecipeYieldUnitID:        recipe.BatchYieldUnitID,
+		RecipeYieldUnit:          s.repo.UnitSymbol(recipe.BatchYieldUnitID),
+		OutputProductID:          recipe.ProductID,
+		OutputProductName:        product.ProductName,
+		OutputProductVariantID:   recipe.ProductVariantID,
+		OutputProductVariantName: variantName,
+		QuantityProduced:         roundQuantity(quantity),
+		Components:               components,
+		Packaging:                packaging,
+		EstimatedComponentCost:   roundMoney(componentCost),
+		EstimatedPackagingCost:   roundMoney(packagingCost),
+		EstimatedTotalCost:       total,
+		EstimatedCostPerUnit:     roundQuantity(total / quantity),
+		HasShortage:              len(shortages) > 0,
+		Shortages:                shortages,
+		HasZeroCostWarning:       hasZeroCostWarning,
+		Warnings:                 warnings,
+	}, nil
+}
+
 func (s *Service) GetBatch(currentUser *utils.AuthContext, id string) (*ProductionBatchResponse, error) {
 	batch, err := s.repo.FindBatch(id, currentUser.BusinessID)
 	if err != nil {
@@ -406,145 +548,9 @@ func (s *Service) CompleteBatch(currentUser *utils.AuthContext, id string, req C
 	if req.WastageQuantity < 0 {
 		return nil, apperrors.BadRequest("wastage_quantity must be non-negative", nil)
 	}
-	var expiryDate *time.Time
-	if strings.TrimSpace(req.ExpiryDate) != "" {
-		parsed, err := parseDate(req.ExpiryDate, "expiry_date")
-		if err != nil {
-			return nil, err
-		}
-		expiryDate = &parsed
-	}
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		batch, err := s.repo.FindBatchForUpdate(tx, id, currentUser.BusinessID)
-		if err != nil {
-			return notFound(err, "production batch not found")
-		}
-		if !currentUser.CanAccessBranch(batch.BranchID) {
-			return apperrors.Forbidden("branch access denied")
-		}
-		if batch.Status != "planned" && batch.Status != "in_progress" {
-			return apperrors.BadRequest("only planned or in_progress batches can be completed", nil)
-		}
-		producedQuantity := req.ProducedQuantity
-		if producedQuantity <= 0 {
-			producedQuantity = batch.ProducedQuantity
-		}
-		if producedQuantity <= 0 {
-			producedQuantity = batch.PlannedQuantity
-		}
-		if producedQuantity <= 0 {
-			return apperrors.BadRequest("produced_quantity must be greater than zero", nil)
-		}
-		wastageQuantity := req.WastageQuantity
-		if wastageQuantity == 0 && batch.WastageQuantity > 0 {
-			wastageQuantity = batch.WastageQuantity
-		}
-		wastageReason := strings.TrimSpace(req.WastageReason)
-		if wastageReason == "" {
-			wastageReason = batch.WastageReason
-		}
-		notes := strings.TrimSpace(req.Notes)
-		if notes == "" {
-			notes = batch.Notes
-		}
-		ingredients, err := s.repo.Ingredients(id, currentUser.BusinessID)
-		if err != nil {
+		if err := s.completeBatchTx(tx, currentUser, id, req); err != nil {
 			return err
-		}
-		packaging, err := s.repo.Packaging(id, currentUser.BusinessID)
-		if err != nil {
-			return err
-		}
-		consumedCost := 0.0
-		for _, line := range ingredients {
-			if line.ActualQuantity <= 0 {
-				return apperrors.BadRequest("all ingredient actual quantities must be greater than zero", map[string]string{"line_id": line.ID})
-			}
-			movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: line.InventoryItemID, MovementType: "production_out", Quantity: line.ActualQuantity, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production ingredient consumed", CreatedByUserID: currentUser.UserID})
-			if err != nil {
-				return err
-			}
-			consumedCost = roundMoney(consumedCost + movement.TotalCost)
-			if line.WastageQuantity > 0 {
-				if _, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: line.InventoryItemID, MovementType: "wastage", Quantity: line.WastageQuantity, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production ingredient wastage", CreatedByUserID: currentUser.UserID}); err != nil {
-					return err
-				}
-			}
-			if err := s.repo.UpdateIngredient(tx, line.ID, id, currentUser.BusinessID, map[string]interface{}{
-				"stock_movement_id":  movement.ID,
-				"unit_cost_snapshot": movement.UnitCostSnapshot,
-				"total_cost":         movement.TotalCost,
-				"updated_at":         time.Now().UTC(),
-			}); err != nil {
-				return err
-			}
-		}
-		for _, line := range packaging {
-			if line.ActualQuantity <= 0 {
-				if line.IsOptional {
-					continue
-				}
-				return apperrors.BadRequest("required packaging actual quantities must be greater than zero", map[string]string{"line_id": line.ID})
-			}
-			inventoryItem, err := s.resolveProductionPackagingInventoryItem(tx, currentUser.BusinessID, batch.BranchID, line)
-			if err != nil {
-				return err
-			}
-			if inventoryItem.UnitID != line.UnitID {
-				return apperrors.BadRequest("unit conversion is not available yet; packaging unit must match inventory unit", nil)
-			}
-			movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: inventoryItem.ID, MovementType: "production_out", Quantity: line.ActualQuantity, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production packaging consumed", CreatedByUserID: currentUser.UserID})
-			if err != nil {
-				return err
-			}
-			consumedCost = roundMoney(consumedCost + movement.TotalCost)
-			if err := s.repo.UpdatePackaging(tx, line.ID, id, currentUser.BusinessID, map[string]interface{}{
-				"stock_movement_id":  movement.ID,
-				"unit_cost_snapshot": movement.UnitCostSnapshot,
-				"total_cost":         movement.TotalCost,
-				"updated_at":         time.Now().UTC(),
-			}); err != nil {
-				return err
-			}
-		}
-		outputItem, err := s.findOrCreateProductInventoryItem(tx, currentUser.BusinessID, batch.BranchID, batch.ProductID, batch.ProductVariantID, batch.YieldUnitID)
-		if err != nil {
-			return err
-		}
-		outputUnitCost := 0.0
-		if producedQuantity > 0 {
-			outputUnitCost = roundMoney(consumedCost / producedQuantity)
-		}
-		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: outputItem.ID, MovementType: "production_in", Quantity: producedQuantity, UnitCost: outputUnitCost, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production finished goods received", CreatedByUserID: currentUser.UserID})
-		if err != nil {
-			return err
-		}
-		output := &ProductionOutput{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, ProductionBatchID: batch.ID, ProductID: batch.ProductID, ProductVariantID: batch.ProductVariantID, InventoryItemID: outputItem.ID, ProducedQuantity: producedQuantity, UnitID: batch.YieldUnitID, BatchNumber: strings.TrimSpace(req.BatchNumber), ExpiryDate: expiryDate, StockMovementID: &movement.ID}
-		if err := s.repo.CreateOutput(tx, output); err != nil {
-			return err
-		}
-		if expiryDate != nil {
-			expiry := &inventory.ExpiryBatch{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BranchID: batch.BranchID, InventoryItemID: outputItem.ID, BatchNumber: strings.TrimSpace(req.BatchNumber), Quantity: producedQuantity, ExpiryDate: *expiryDate, ReceivedDate: time.Now().UTC(), Status: "active"}
-			if err := s.inventoryRepo.CreateExpiryBatch(tx, expiry); err != nil {
-				return err
-			}
-		}
-		if err := s.recalculateBatchCosts(tx, currentUser.BusinessID, id); err != nil {
-			return err
-		}
-		ingredientCost, packagingCost, err := s.costTotals(id, currentUser.BusinessID)
-		if err != nil {
-			return err
-		}
-		now := time.Now().UTC()
-		total := roundMoney(ingredientCost + packagingCost)
-		if err := s.repo.UpdateBatch(tx, id, currentUser.BusinessID, map[string]interface{}{"status": "completed", "produced_quantity": producedQuantity, "completed_at": now, "completed_by_user_id": currentUser.UserID, "ingredient_cost": ingredientCost, "packaging_cost": packagingCost, "total_production_cost": total, "cost_per_unit": roundQuantity(total / producedQuantity), "wastage_quantity": wastageQuantity, "wastage_reason": wastageReason, "notes": notes, "updated_by_user_id": currentUser.UserID, "updated_at": now}); err != nil {
-			return err
-		}
-		if s.accountingService != nil {
-			if _, err := s.accountingService.PostManufacturingBatchJournal(tx, currentUser, id); err != nil {
-				return err
-			}
 		}
 		return s.audit(tx, currentUser, "production_batch.completed", id, "Production batch completed", ipAddress, userAgent)
 	})
@@ -552,6 +558,152 @@ func (s *Service) CompleteBatch(currentUser *utils.AuthContext, id string, req C
 		return nil, err
 	}
 	return s.GetBatch(currentUser, id)
+}
+
+func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, id string, req CompleteBatchRequest) error {
+	var expiryDate *time.Time
+	if strings.TrimSpace(req.ExpiryDate) != "" {
+		parsed, err := parseDate(req.ExpiryDate, "expiry_date")
+		if err != nil {
+			return err
+		}
+		expiryDate = &parsed
+	}
+	batch, err := s.repo.FindBatchForUpdate(tx, id, currentUser.BusinessID)
+	if err != nil {
+		return notFound(err, "production batch not found")
+	}
+	if !currentUser.CanAccessBranch(batch.BranchID) {
+		return apperrors.Forbidden("branch access denied")
+	}
+	if batch.Status != "planned" && batch.Status != "in_progress" {
+		return apperrors.BadRequest("only planned or in_progress batches can be completed", nil)
+	}
+	producedQuantity := req.ProducedQuantity
+	if producedQuantity <= 0 {
+		producedQuantity = batch.ProducedQuantity
+	}
+	if producedQuantity <= 0 {
+		producedQuantity = batch.PlannedQuantity
+	}
+	if producedQuantity <= 0 {
+		return apperrors.BadRequest("produced_quantity must be greater than zero", nil)
+	}
+	wastageQuantity := req.WastageQuantity
+	if wastageQuantity == 0 && batch.WastageQuantity > 0 {
+		wastageQuantity = batch.WastageQuantity
+	}
+	wastageReason := strings.TrimSpace(req.WastageReason)
+	if wastageReason == "" {
+		wastageReason = batch.WastageReason
+	}
+	notes := strings.TrimSpace(req.Notes)
+	if notes == "" {
+		notes = batch.Notes
+	}
+	ingredients, err := s.repo.Ingredients(id, currentUser.BusinessID)
+	if err != nil {
+		return err
+	}
+	packaging, err := s.repo.Packaging(id, currentUser.BusinessID)
+	if err != nil {
+		return err
+	}
+	if err := s.validateProductionHasValuedInputs(tx, currentUser.BusinessID, batch.BranchID, ingredients, packaging); err != nil {
+		return err
+	}
+	consumedCost := 0.0
+	for _, line := range ingredients {
+		if line.ActualQuantity <= 0 {
+			return apperrors.BadRequest("all component actual quantities must be greater than zero", map[string]string{"line_id": line.ID})
+		}
+		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: line.InventoryItemID, MovementType: "production_out", Quantity: line.ActualQuantity, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production component consumed", CreatedByUserID: currentUser.UserID})
+		if err != nil {
+			return err
+		}
+		consumedCost = roundMoney(consumedCost + movement.TotalCost)
+		if line.WastageQuantity > 0 {
+			if _, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: line.InventoryItemID, MovementType: "wastage", Quantity: line.WastageQuantity, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production component wastage", CreatedByUserID: currentUser.UserID}); err != nil {
+				return err
+			}
+		}
+		if err := s.repo.UpdateIngredient(tx, line.ID, id, currentUser.BusinessID, map[string]interface{}{
+			"stock_movement_id":  movement.ID,
+			"unit_cost_snapshot": movement.UnitCostSnapshot,
+			"total_cost":         movement.TotalCost,
+			"updated_at":         time.Now().UTC(),
+		}); err != nil {
+			return err
+		}
+	}
+	for _, line := range packaging {
+		if line.ActualQuantity <= 0 {
+			if line.IsOptional {
+				continue
+			}
+			return apperrors.BadRequest("required packaging actual quantities must be greater than zero", map[string]string{"line_id": line.ID})
+		}
+		inventoryItem, err := s.resolveProductionPackagingInventoryItem(tx, currentUser.BusinessID, batch.BranchID, line)
+		if err != nil {
+			return err
+		}
+		if inventoryItem.UnitID != line.UnitID {
+			return apperrors.BadRequest("unit conversion is not available yet; packaging unit must match inventory unit", nil)
+		}
+		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: inventoryItem.ID, MovementType: "production_out", Quantity: line.ActualQuantity, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production packaging consumed", CreatedByUserID: currentUser.UserID})
+		if err != nil {
+			return err
+		}
+		consumedCost = roundMoney(consumedCost + movement.TotalCost)
+		if err := s.repo.UpdatePackaging(tx, line.ID, id, currentUser.BusinessID, map[string]interface{}{
+			"stock_movement_id":  movement.ID,
+			"unit_cost_snapshot": movement.UnitCostSnapshot,
+			"total_cost":         movement.TotalCost,
+			"updated_at":         time.Now().UTC(),
+		}); err != nil {
+			return err
+		}
+	}
+	outputItem, err := s.findOrCreateProductInventoryItem(tx, currentUser.BusinessID, batch.BranchID, batch.ProductID, batch.ProductVariantID, batch.YieldUnitID)
+	if err != nil {
+		return err
+	}
+	outputUnitCost := 0.0
+	if producedQuantity > 0 {
+		outputUnitCost = roundMoney(consumedCost / producedQuantity)
+	}
+	movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: outputItem.ID, MovementType: "production_in", Quantity: producedQuantity, UnitCost: outputUnitCost, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production finished goods received", CreatedByUserID: currentUser.UserID})
+	if err != nil {
+		return err
+	}
+	output := &ProductionOutput{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, ProductionBatchID: batch.ID, ProductID: batch.ProductID, ProductVariantID: batch.ProductVariantID, InventoryItemID: outputItem.ID, ProducedQuantity: producedQuantity, UnitID: batch.YieldUnitID, BatchNumber: strings.TrimSpace(req.BatchNumber), ExpiryDate: expiryDate, StockMovementID: &movement.ID}
+	if err := s.repo.CreateOutput(tx, output); err != nil {
+		return err
+	}
+	if expiryDate != nil {
+		expiry := &inventory.ExpiryBatch{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BranchID: batch.BranchID, InventoryItemID: outputItem.ID, BatchNumber: strings.TrimSpace(req.BatchNumber), Quantity: producedQuantity, ExpiryDate: *expiryDate, ReceivedDate: time.Now().UTC(), Status: "active"}
+		if err := s.inventoryRepo.CreateExpiryBatch(tx, expiry); err != nil {
+			return err
+		}
+	}
+	if err := s.recalculateBatchCosts(tx, currentUser.BusinessID, id); err != nil {
+		return err
+	}
+	ingredientCost, packagingCost, err := s.costTotals(id, currentUser.BusinessID)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	total := roundMoney(ingredientCost + packagingCost)
+	if err := s.repo.UpdateBatch(tx, id, currentUser.BusinessID, map[string]interface{}{"status": "completed", "produced_quantity": producedQuantity, "completed_at": now, "completed_by_user_id": currentUser.UserID, "ingredient_cost": ingredientCost, "packaging_cost": packagingCost, "total_production_cost": total, "cost_per_unit": roundQuantity(total / producedQuantity), "wastage_quantity": wastageQuantity, "wastage_reason": wastageReason, "notes": notes, "updated_by_user_id": currentUser.UserID, "updated_at": now}); err != nil {
+		return err
+	}
+	if s.accountingService != nil {
+		if _, err := s.accountingService.PostManufacturingBatchJournal(tx, currentUser, id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Service) CancelBatch(currentUser *utils.AuthContext, id string, req CancelBatchRequest, ipAddress, userAgent string) (*ProductionBatchResponse, error) {
@@ -945,7 +1097,7 @@ func (s *Service) batchResponse(businessID string, batch ProductionBatch, includ
 func (s *Service) ingredientResponses(items []ProductionIngredientConsumption) []ProductionIngredientResponse {
 	result := make([]ProductionIngredientResponse, 0, len(items))
 	for _, item := range items {
-		result = append(result, ProductionIngredientResponse{ID: item.ID, ComponentProductID: item.ComponentProductID, ComponentVariantID: item.ComponentVariantID, InventoryItemID: item.InventoryItemID, RecipeIngredientID: item.RecipeIngredientID, ItemNameSnapshot: item.ItemNameSnapshot, PlannedQuantity: roundQuantity(item.PlannedQuantity), ActualQuantity: roundQuantity(item.ActualQuantity), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), UnitCostSnapshot: roundMoney(item.UnitCostSnapshot), TotalCost: roundMoney(item.TotalCost), WastageQuantity: roundQuantity(item.WastageQuantity), StockMovementID: item.StockMovementID, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
+		result = append(result, ProductionIngredientResponse{ID: item.ID, ComponentProductID: item.ComponentProductID, ComponentVariantID: item.ComponentVariantID, InventoryItemID: item.InventoryItemID, RecipeIngredientID: item.RecipeIngredientID, ItemNameSnapshot: item.ItemNameSnapshot, PlannedQuantity: roundQuantity(item.PlannedQuantity), RequiredQuantity: roundQuantity(item.PlannedQuantity), ActualQuantity: roundQuantity(item.ActualQuantity), ConsumedQuantity: roundQuantity(item.ActualQuantity), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), UnitCostSnapshot: roundMoney(item.UnitCostSnapshot), TotalCost: roundMoney(item.TotalCost), WastageQuantity: roundQuantity(item.WastageQuantity), StockMovementID: item.StockMovementID, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
 	}
 	return result
 }
@@ -953,7 +1105,7 @@ func (s *Service) ingredientResponses(items []ProductionIngredientConsumption) [
 func (s *Service) packagingResponses(items []ProductionPackagingConsumption) []ProductionPackagingResponse {
 	result := make([]ProductionPackagingResponse, 0, len(items))
 	for _, item := range items {
-		result = append(result, ProductionPackagingResponse{ID: item.ID, ComponentProductID: item.ComponentProductID, ComponentVariantID: item.ComponentVariantID, InventoryItemID: item.InventoryItemID, PackagingItemID: item.PackagingItemID, RecipePackagingID: item.RecipePackagingID, PackagingNameSnapshot: item.PackagingNameSnapshot, PlannedQuantity: roundQuantity(item.PlannedQuantity), ActualQuantity: roundQuantity(item.ActualQuantity), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), UnitCostSnapshot: roundMoney(item.UnitCostSnapshot), TotalCost: roundMoney(item.TotalCost), IsOptional: item.IsOptional, StockMovementID: item.StockMovementID, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
+		result = append(result, ProductionPackagingResponse{ID: item.ID, ComponentProductID: item.ComponentProductID, ComponentVariantID: item.ComponentVariantID, InventoryItemID: item.InventoryItemID, PackagingItemID: item.PackagingItemID, RecipePackagingID: item.RecipePackagingID, PackagingNameSnapshot: item.PackagingNameSnapshot, PlannedQuantity: roundQuantity(item.PlannedQuantity), RequiredQuantity: roundQuantity(item.PlannedQuantity), ActualQuantity: roundQuantity(item.ActualQuantity), ConsumedQuantity: roundQuantity(item.ActualQuantity), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), UnitCostSnapshot: roundMoney(item.UnitCostSnapshot), TotalCost: roundMoney(item.TotalCost), IsOptional: item.IsOptional, StockMovementID: item.StockMovementID, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
 	}
 	return result
 }
@@ -964,6 +1116,222 @@ func (s *Service) outputResponse(output ProductionOutput) ProductionOutputRespon
 		_ = s.db.Table("product_variants").Select("variant_name").Where("id = ? AND business_id = ?", *output.ProductVariantID, output.BusinessID).Scan(&variantName).Error
 	}
 	return ProductionOutputResponse{ID: output.ID, ProductID: output.ProductID, ProductVariantID: output.ProductVariantID, ProductVariantName: variantName, InventoryItemID: output.InventoryItemID, ProducedQuantity: roundQuantity(output.ProducedQuantity), UnitID: output.UnitID, UnitSymbol: s.repo.UnitSymbol(output.UnitID), BatchNumber: output.BatchNumber, ExpiryDate: output.ExpiryDate, StockMovementID: output.StockMovementID, CreatedAt: output.CreatedAt, UpdatedAt: output.UpdatedAt}
+}
+
+func (s *Service) productionResponse(businessID string, batch ProductionBatchResponse) (*ProductionResponse, error) {
+	journalIDs, err := s.repo.JournalEntryIDsBySource(s.db, businessID, "manufacturing_batch", batch.ID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load production journal references")
+	}
+	outputs := make([]ProductionOutputResponse, 0, 1)
+	if batch.Output != nil {
+		outputs = append(outputs, *batch.Output)
+	}
+	return &ProductionResponse{
+		ProductionID:       batch.ID,
+		ProductionNumber:   batch.ProductionBatchNumber,
+		Status:             batch.Status,
+		BranchID:           batch.BranchID,
+		BranchName:         batch.BranchName,
+		RecipeID:           batch.RecipeID,
+		RecipeName:         batch.RecipeName,
+		ProductID:          batch.ProductID,
+		ProductName:        batch.ProductName,
+		ProductVariantID:   batch.ProductVariantID,
+		ProductVariantName: batch.ProductVariantName,
+		ProducedQuantity:   batch.ProducedQuantity,
+		ProductionDate:     batch.ProductionDate,
+		TotalCost:          batch.TotalProductionCost,
+		CostPerUnit:        batch.CostPerUnit,
+		ConsumedComponents: batch.Ingredients,
+		ConsumedPackaging:  batch.Packaging,
+		Outputs:            outputs,
+		StockMovementIDs:   batch.StockMovementIDs,
+		JournalEntryIDs:    journalIDs,
+	}, nil
+}
+
+func (s *Service) previewIngredientLines(businessID, branchID, recipeID string, ratio float64) ([]ProductionPreviewLineItem, []ProductionPreviewShortage, float64, error) {
+	recipeLines, err := s.repo.RecipeIngredients(s.db, businessID, branchID, recipeID)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	items := make([]ProductionPreviewLineItem, 0, len(recipeLines))
+	shortages := make([]ProductionPreviewShortage, 0)
+	total := 0.0
+	for _, line := range recipeLines {
+		item, productName, productType, err := s.previewInventoryItem(businessID, branchID, line.ComponentProductID, line.ComponentVariantID, line.InventoryItemID, "ingredient", line.IngredientID)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, 0, err
+		}
+		available := 0.0
+		unitCost := line.UnitCostSnapshot
+		if item != nil {
+			available = item.AvailableQuantity
+			unitCost = item.AverageUnitCost
+		}
+		if productName == "" {
+			productName = line.ItemNameSnapshot
+		}
+		required := roundQuantity(line.QuantityRequired * ratio)
+		shortage := roundQuantity(required - available)
+		if shortage < 0 {
+			shortage = 0
+		}
+		lineTotal := roundMoney(required * unitCost)
+		total = roundMoney(total + lineTotal)
+		unit := s.repo.UnitSymbol(line.UnitID)
+		items = append(items, ProductionPreviewLineItem{RecipeLineID: line.ID, ComponentProductID: line.ComponentProductID, ComponentVariantID: line.ComponentVariantID, ProductName: productName, ProductType: productType, RequiredQuantity: required, AvailableQuantity: roundQuantity(available), ShortageQuantity: shortage, UnitID: line.UnitID, Unit: unit, EstimatedUnitCost: roundMoney(unitCost), EstimatedTotalCost: lineTotal})
+		if shortage > 0 {
+			shortages = append(shortages, ProductionPreviewShortage{RecipeLineID: line.ID, ProductName: productName, RequiredQuantity: required, AvailableQuantity: roundQuantity(available), ShortageQuantity: shortage, Unit: unit})
+		}
+	}
+	return items, shortages, total, nil
+}
+
+func (s *Service) previewPackagingLines(businessID, branchID, recipeID string, ratio float64) ([]ProductionPreviewLineItem, []ProductionPreviewShortage, float64, error) {
+	recipeLines, err := s.repo.RecipePackaging(s.db, businessID, branchID, recipeID)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	items := make([]ProductionPreviewLineItem, 0, len(recipeLines))
+	shortages := make([]ProductionPreviewShortage, 0)
+	total := 0.0
+	for _, line := range recipeLines {
+		item, productName, productType, err := s.previewInventoryItem(businessID, branchID, line.ComponentProductID, line.ComponentVariantID, nil, "packaging", line.PackagingItemID)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, 0, err
+		}
+		available := 0.0
+		unitCost := line.UnitCostSnapshot
+		if item != nil {
+			available = item.AvailableQuantity
+			unitCost = item.AverageUnitCost
+		}
+		if productName == "" {
+			productName = line.PackagingNameSnapshot
+		}
+		required := roundQuantity(line.QuantityRequired * ratio)
+		shortage := roundQuantity(required - available)
+		if shortage < 0 || line.IsOptional {
+			shortage = 0
+		}
+		lineTotal := roundMoney(required * unitCost)
+		total = roundMoney(total + lineTotal)
+		unit := s.repo.UnitSymbol(line.UnitID)
+		items = append(items, ProductionPreviewLineItem{RecipeLineID: line.ID, ComponentProductID: line.ComponentProductID, ComponentVariantID: line.ComponentVariantID, ProductName: productName, ProductType: productType, RequiredQuantity: required, AvailableQuantity: roundQuantity(available), ShortageQuantity: shortage, UnitID: line.UnitID, Unit: unit, EstimatedUnitCost: roundMoney(unitCost), EstimatedTotalCost: lineTotal, IsOptional: line.IsOptional})
+		if shortage > 0 {
+			shortages = append(shortages, ProductionPreviewShortage{RecipeLineID: line.ID, ProductName: productName, RequiredQuantity: required, AvailableQuantity: roundQuantity(available), ShortageQuantity: shortage, Unit: unit})
+		}
+	}
+	return items, shortages, total, nil
+}
+
+func (s *Service) previewInventoryItem(businessID, branchID string, componentProductID, componentVariantID, inventoryItemID *string, fallbackType string, fallbackItemID *string) (*inventory.InventoryItem, string, string, error) {
+	if componentProductID != nil {
+		product, err := s.repo.Product(s.db, businessID, branchID, *componentProductID)
+		if err != nil {
+			return nil, "", "", err
+		}
+		itemType := "product"
+		if componentVariantID != nil {
+			itemType = "product_variant"
+		}
+		item, err := s.inventoryRepo.FindExistingItem(s.db, businessID, branchID, itemType, componentProductID, componentVariantID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, product.ProductName, product.ProductType, nil
+		}
+		return item, product.ProductName, product.ProductType, err
+	}
+	if inventoryItemID != nil {
+		item, err := s.inventoryRepo.FindInventoryItem(*inventoryItemID, businessID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, "", fallbackType, nil
+		}
+		return item, "", fallbackType, err
+	}
+	item, err := s.inventoryRepo.FindExistingItem(s.db, businessID, branchID, fallbackType, fallbackItemID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, "", fallbackType, nil
+	}
+	return item, "", fallbackType, err
+}
+
+func (s *Service) validateProductionHasValuedInputs(tx *gorm.DB, businessID, branchID string, ingredients []ProductionIngredientConsumption, packaging []ProductionPackagingConsumption) error {
+	if len(ingredients) == 0 && len(packaging) == 0 {
+		return apperrors.BadRequest("production cannot be posted because the recipe has no components or packaging to consume", nil)
+	}
+	hasRequiredInput := false
+	zeroCostLines := make([]string, 0)
+	stockShortages := make([]map[string]interface{}, 0)
+	for _, line := range ingredients {
+		requiredQuantity := roundQuantity(line.ActualQuantity + line.WastageQuantity)
+		if requiredQuantity <= 0 {
+			continue
+		}
+		hasRequiredInput = true
+		item, err := s.inventoryRepo.FindInventoryItemForUpdate(tx, line.InventoryItemID, businessID)
+		if err != nil {
+			return notFound(err, "component inventory item not found")
+		}
+		if item.BranchID != branchID || item.Status != "active" {
+			return apperrors.BadRequest("component inventory item must be active and belong to the production branch", map[string]interface{}{"line_id": line.ID, "item_name": line.ItemNameSnapshot})
+		}
+		if item.AvailableQuantity < requiredQuantity {
+			stockShortages = append(stockShortages, map[string]interface{}{"line_id": line.ID, "item_name": line.ItemNameSnapshot, "required_quantity": requiredQuantity, "available_quantity": item.AvailableQuantity})
+			continue
+		}
+		if item.AverageUnitCost <= 0 {
+			zeroCostLines = append(zeroCostLines, line.ItemNameSnapshot)
+		}
+	}
+	for _, line := range packaging {
+		if line.ActualQuantity <= 0 {
+			continue
+		}
+		hasRequiredInput = true
+		if line.InventoryItemID == nil {
+			return apperrors.BadRequest("production packaging line must have inventory_item_id", map[string]interface{}{"line_id": line.ID, "item_name": line.PackagingNameSnapshot})
+		}
+		item, err := s.inventoryRepo.FindInventoryItemForUpdate(tx, *line.InventoryItemID, businessID)
+		if err != nil {
+			return notFound(err, "packaging inventory item not found")
+		}
+		if item.BranchID != branchID || item.Status != "active" {
+			return apperrors.BadRequest("packaging inventory item must be active and belong to the production branch", map[string]interface{}{"line_id": line.ID, "item_name": line.PackagingNameSnapshot})
+		}
+		if item.AvailableQuantity < line.ActualQuantity {
+			stockShortages = append(stockShortages, map[string]interface{}{"line_id": line.ID, "item_name": line.PackagingNameSnapshot, "required_quantity": line.ActualQuantity, "available_quantity": item.AvailableQuantity})
+			continue
+		}
+		if item.AverageUnitCost <= 0 {
+			zeroCostLines = append(zeroCostLines, line.PackagingNameSnapshot)
+		}
+	}
+	if !hasRequiredInput {
+		return apperrors.BadRequest("production cannot be posted because the recipe has no required components or packaging to consume", nil)
+	}
+	if len(stockShortages) > 0 {
+		return apperrors.BadRequest("production cannot be posted because required component or packaging stock is not available", map[string]interface{}{"shortages": stockShortages})
+	}
+	if len(zeroCostLines) > 0 {
+		return apperrors.BadRequest("Production cannot be posted because consumed components have zero inventory value. Add opening stock value or purchase stock before manufacturing.", map[string]interface{}{"zero_cost_items": zeroCostLines})
+	}
+	return nil
+}
+
+func productionPreviewHasZeroCost(componentLines, packagingLines []ProductionPreviewLineItem) bool {
+	for _, line := range componentLines {
+		if line.RequiredQuantity > 0 && line.ShortageQuantity == 0 && line.EstimatedUnitCost <= 0 {
+			return true
+		}
+	}
+	for _, line := range packagingLines {
+		if line.RequiredQuantity > 0 && line.ShortageQuantity == 0 && !line.IsOptional && line.EstimatedUnitCost <= 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {

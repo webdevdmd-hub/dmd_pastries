@@ -6,9 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export function ManufacturingEmptyState({
   actionLabel,
-  description = "Create a production batch to start consuming ingredients and producing finished goods.",
+  description = "Create production from an active recipe. The backend will handle component consumption, finished output, costing, and accounting.",
   onAction,
-  title = "No manufacturing batches found.",
+  title = "No production records found.",
 }: {
   actionLabel?: string | undefined;
   description?: string;

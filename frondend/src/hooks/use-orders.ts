@@ -11,6 +11,7 @@ import {
   convertOrderItemToProduct,
   convertOrderItemToVariant,
   createOrder,
+  createOrderItemProduction,
   deleteOrder,
   deleteOrderItem,
   getOrderById,
@@ -36,6 +37,7 @@ import type {
   ConvertOrderItemToProductPayload,
   ConvertOrderItemToVariantPayload,
   CreateOrderItemPayload,
+  CreateOrderItemProductionPayload,
   CreateOrderPayload,
   UpdateOrderItemPayload,
   UpdateOrderPayload,
@@ -258,6 +260,22 @@ export function useAssignProduction() {
     { orderId: string; payload: AssignOrderProductionPayload }
   >({
     mutationFn: async ({ orderId, payload }) => assignOrderProduction(orderId, payload),
+    onSuccess: async () => {
+      await invalidateOrders(queryClient);
+    },
+  });
+}
+
+export function useCreateOrderItemProduction() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    BakeryOrder,
+    Error,
+    { itemId: string; orderId: string; payload: CreateOrderItemProductionPayload }
+  >({
+    mutationFn: async ({ itemId, orderId, payload }) =>
+      createOrderItemProduction(orderId, itemId, payload),
     onSuccess: async () => {
       await invalidateOrders(queryClient);
     },

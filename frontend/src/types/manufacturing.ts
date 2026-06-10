@@ -182,6 +182,16 @@ export type CreateBatchPayload = {
 
 export type UpdateBatchPayload = Partial<CreateBatchPayload>;
 
+export type CreateProductionPayload = {
+  branchId: string;
+  productId: string;
+  productVariantId: string | null;
+  productionDate: string;
+  quantityProduced: number;
+  recipeId: string;
+  notes: string | null;
+};
+
 export type UpdateBatchStatusPayload = {
   status: BatchStatus;
 };

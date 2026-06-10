@@ -1,12 +1,12 @@
 "use client";
 
 import { LayoutGrid, List, Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/orders/access-denied-card";
+import { OrderFormPage } from "@/components/orders/order-form-page";
 import { OrdersCardGrid } from "@/components/orders/orders-card-grid";
 import { OrdersEmptyState } from "@/components/orders/orders-empty-state";
 import { OrdersErrorState } from "@/components/orders/orders-error-state";
@@ -26,7 +26,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PERMISSIONS } from "@/constants/permissions";
-import { ROUTES } from "@/constants/routes";
 import {
   useDeleteOrder,
   useOrders,
@@ -59,7 +58,6 @@ function isOrdersViewMode(value: string | null): value is OrdersViewMode {
 }
 
 export function OrdersPageClient(): JSX.Element {
-  const router = useRouter();
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.ordersView, PERMISSIONS.posView]);
   const canManage = hasAnyPermission([
@@ -74,6 +72,7 @@ export function OrdersPageClient(): JSX.Element {
   ]);
   const [filters, setFilters] = useState<BakeryOrderFilters>(defaultFilters);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [viewMode, setViewMode] = useState<OrdersViewMode>("list");
   const ordersQuery = useOrders(filters, canView);
   const summaryQuery = useOrderSummary(canView);
@@ -100,7 +99,7 @@ export function OrdersPageClient(): JSX.Element {
   }
 
   const openCreate = (): void => {
-    router.push(`${ROUTES.orders}/new`);
+    setCreateOpen(true);
   };
 
   const confirmAction = async (): Promise<void> => {
@@ -255,6 +254,28 @@ export function OrdersPageClient(): JSX.Element {
               Confirm
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog onOpenChange={setCreateOpen} open={createOpen}>
+        <DialogContent
+          className="top-3 flex h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-7xl translate-y-0 gap-0 overflow-hidden border-0 bg-transparent p-0 shadow-none sm:top-6 sm:h-[calc(100dvh-3rem)] sm:max-h-[calc(100dvh-3rem)] sm:w-[calc(100vw-3rem)]"
+          showCloseButton={false}
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>Create bakery order</DialogTitle>
+            <DialogDescription>
+              Create a bakery order with customer details, scheduling, items, charges, and
+              packaging.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1">
+            <OrderFormPage
+              onClose={() => setCreateOpen(false)}
+              orderId={null}
+              presentation="modal"
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </div>

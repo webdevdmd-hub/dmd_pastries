@@ -1,13 +1,13 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/recipes/access-denied-card";
 import { RecipeDetailsDrawer } from "@/components/recipes/recipe-details-drawer";
+import { RecipeFormPage } from "@/components/recipes/recipe-form-page";
 import { RecipeVersionDialog } from "@/components/recipes/recipe-version-dialog";
 import { RecipesEmptyState } from "@/components/recipes/recipes-empty-state";
 import { RecipesErrorState } from "@/components/recipes/recipes-error-state";
@@ -27,7 +27,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PERMISSIONS } from "@/constants/permissions";
-import { ROUTES } from "@/constants/routes";
 import { usePermission } from "@/hooks/use-permission";
 import {
   useDeleteRecipe,
@@ -51,7 +50,6 @@ type PendingAction =
   | null;
 
 export function RecipesPageClient(): JSX.Element {
-  const router = useRouter();
   const { hasAnyPermission } = usePermission();
   // TODO: Remove products.* fallback once recipes.* permissions are seeded for every tenant.
   const canView = hasAnyPermission([PERMISSIONS.recipesView, PERMISSIONS.productsView]);
@@ -67,6 +65,7 @@ export function RecipesPageClient(): JSX.Element {
   ]);
   const [filters, setFilters] = useState<RecipeFilters>(defaultFilters);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [drawerRecipe, setDrawerRecipe] = useState<Recipe | null>(null);
   const [versionRecipe, setVersionRecipe] = useState<Recipe | null>(null);
   const recipesQuery = useRecipes(filters, canView);
@@ -114,7 +113,7 @@ export function RecipesPageClient(): JSX.Element {
         description="Define BOM ingredients, packaging, yield, and cost for manufactured products."
         actions={
           canManage ? (
-            <Button onClick={() => router.push(`${ROUTES.recipes}/new`)} type="button">
+            <Button onClick={() => setCreateOpen(true)} type="button">
               <Plus className="h-4 w-4" />
               Create Recipe
             </Button>
@@ -146,10 +145,7 @@ export function RecipesPageClient(): JSX.Element {
       ) : null}
 
       {!recipesQuery.isLoading && !recipesQuery.error && recipes.length === 0 ? (
-        <RecipesEmptyState
-          canManage={canManage}
-          onCreate={() => router.push(`${ROUTES.recipes}/new`)}
-        />
+        <RecipesEmptyState canManage={canManage} onCreate={() => setCreateOpen(true)} />
       ) : null}
 
       {!recipesQuery.isLoading && !recipesQuery.error && recipes.length > 0 ? (
@@ -183,6 +179,30 @@ export function RecipesPageClient(): JSX.Element {
         open={versionRecipe !== null}
         recipeId={versionRecipe?.id ?? null}
       />
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent
+          className="flex h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-7xl gap-0 overflow-hidden border-0 bg-transparent p-0 shadow-none sm:h-[calc(100dvh-3rem)] sm:max-h-[calc(100dvh-3rem)] sm:w-[calc(100vw-3rem)]"
+          showCloseButton={false}
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>Recipe Builder</DialogTitle>
+            <DialogDescription>
+              Define how finished and semi-finished products are made.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1">
+            <RecipeFormPage
+              onClose={() => setCreateOpen(false)}
+              onSaved={() => {
+                void recipesQuery.refetch();
+              }}
+              presentation="dialog"
+              recipeId={null}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={pendingAction !== null}

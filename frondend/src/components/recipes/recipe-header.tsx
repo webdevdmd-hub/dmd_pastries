@@ -16,12 +16,14 @@ function recipeOutputLabel(recipe: Recipe): string {
 }
 
 export function RecipeHeader({
-  canManage,
+  canActivate,
+  canCreateVersion,
   onActivate,
   onCreateVersion,
   recipe,
 }: {
-  canManage: boolean;
+  canActivate: boolean;
+  canCreateVersion: boolean;
   onActivate: () => void;
   onCreateVersion: () => void;
   recipe: Recipe | null;
@@ -48,14 +50,18 @@ export function RecipeHeader({
             : "Define a new product BOM."}
         </p>
       </div>
-      {canManage && recipe ? (
+      {(canActivate || canCreateVersion) && recipe ? (
         <div className="flex flex-wrap gap-3">
-          <Button disabled={recipe.isActive} onClick={onActivate} type="button" variant="outline">
-            Activate
-          </Button>
-          <Button onClick={onCreateVersion} type="button" variant="outline">
-            Create version
-          </Button>
+          {canActivate ? (
+            <Button disabled={recipe.isActive} onClick={onActivate} type="button" variant="outline">
+              Activate
+            </Button>
+          ) : null}
+          {canCreateVersion ? (
+            <Button onClick={onCreateVersion} type="button" variant="outline">
+              Create version
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>

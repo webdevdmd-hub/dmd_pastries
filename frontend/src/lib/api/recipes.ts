@@ -71,6 +71,21 @@ function optionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
+function nestedString(value: unknown, keys: string[]): string | null {
+  if (!isObject(value)) {
+    return null;
+  }
+
+  for (const key of keys) {
+    const item = value[key];
+    if (typeof item === "string" && item.trim().length > 0) {
+      return item;
+    }
+  }
+
+  return null;
+}
+
 function numberValue(value: unknown, fallback = 0): number {
   return typeof value === "number" ? value : fallback;
 }
@@ -178,9 +193,16 @@ function parseIngredientLine(value: unknown): RecipeIngredientLine {
       ),
     ),
     quantityRequired: numberValue(value.quantity_required),
-    unitId: stringValue(value.unit_id),
-    unitName: stringValue(value.unit_name, "Unit"),
-    unitSymbol: stringValue(value.unit_symbol),
+    unitId: optionalString(value.unit_id) ?? nestedString(value.unit, ["id", "unit_id"]) ?? "",
+    unitName:
+      optionalString(value.unit_name) ??
+      nestedString(value.unit, ["unit_name", "name", "symbol"]) ??
+      "Unit",
+    unitSymbol:
+      optionalString(value.unit_symbol) ??
+      optionalString(value.symbol) ??
+      nestedString(value.unit, ["symbol"]) ??
+      "",
     unitCostSnapshot: numberValue(value.unit_cost_snapshot),
     totalCost: numberValue(value.total_cost),
     wastagePercentage: numberValue(value.wastage_percentage),
@@ -207,9 +229,16 @@ function parsePackagingLine(value: unknown): RecipePackagingLine {
       stringValue(value.component_product_name, "Packaging item"),
     ),
     quantityRequired: numberValue(value.quantity_required),
-    unitId: stringValue(value.unit_id),
-    unitName: stringValue(value.unit_name, "Unit"),
-    unitSymbol: stringValue(value.unit_symbol),
+    unitId: optionalString(value.unit_id) ?? nestedString(value.unit, ["id", "unit_id"]) ?? "",
+    unitName:
+      optionalString(value.unit_name) ??
+      nestedString(value.unit, ["unit_name", "name", "symbol"]) ??
+      "Unit",
+    unitSymbol:
+      optionalString(value.unit_symbol) ??
+      optionalString(value.symbol) ??
+      nestedString(value.unit, ["symbol"]) ??
+      "",
     unitCostSnapshot: numberValue(value.unit_cost_snapshot),
     totalCost: numberValue(value.total_cost),
     isOptional: booleanValue(value.is_optional),
@@ -275,9 +304,16 @@ function parseProductOption(value: unknown): RecipeProductOption {
       value.item_structure === "custom"
         ? value.item_structure
         : "single",
-    unitId: stringValue(value.unit_id),
-    unitName: stringValue(value.unit_name, "Unit"),
-    unitSymbol: stringValue(value.unit_symbol),
+    unitId: optionalString(value.unit_id) ?? nestedString(value.unit, ["id", "unit_id"]) ?? "",
+    unitName:
+      optionalString(value.unit_name) ??
+      nestedString(value.unit, ["unit_name", "name", "symbol"]) ??
+      "Unit",
+    unitSymbol:
+      optionalString(value.unit_symbol) ??
+      optionalString(value.symbol) ??
+      nestedString(value.unit, ["symbol"]) ??
+      "",
     isStockTracked: booleanValue(value.is_stock_tracked),
     variants: Array.isArray(value.variants)
       ? value.variants.map(parseProductVariantOption).filter((variant) => variant.id.length > 0)
