@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	_ "time/tzdata"
 
 	"pastries-pos/internal/config"
 	"pastries-pos/internal/database"

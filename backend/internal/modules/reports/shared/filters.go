@@ -133,7 +133,7 @@ func Resolve(currentUser *utils.AuthContext, filter ReportBaseFilter) (*Resolved
 	}
 	location, err := time.LoadLocation(locationName)
 	if err != nil {
-		return nil, apperrors.BadRequest("invalid timezone", nil)
+		return nil, apperrors.BadRequest("invalid timezone", map[string]string{"timezone": locationName})
 	}
 	now := time.Now().In(location)
 	from, to, err := parseDateRange(filter.DateFrom, filter.DateTo, now)

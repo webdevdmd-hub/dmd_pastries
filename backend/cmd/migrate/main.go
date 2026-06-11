@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	_ "time/tzdata"
 
 	"pastries-pos/internal/config"
 	"pastries-pos/internal/database"

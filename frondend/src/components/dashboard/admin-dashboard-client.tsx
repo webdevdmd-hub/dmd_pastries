@@ -58,7 +58,9 @@ function monthFilters(): ReportFilters {
     dateFrom: toDateInputValue(firstDay),
     dateTo: toDateInputValue(lastDay),
     groupBy: "day",
-    timezone: "Asia/Dubai",
+    // Embedded admin dashboard widgets must not fail when the backend host lacks
+    // IANA timezone data. Detailed Reports pages still use browser/business timezone.
+    timezone: "UTC",
   };
 }
 

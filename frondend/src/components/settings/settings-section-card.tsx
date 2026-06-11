@@ -3,6 +3,7 @@
 import {
   Activity,
   Archive,
+  ArrowRight,
   BadgeDollarSign,
   Bell,
   Building2,
@@ -72,7 +73,7 @@ export function SettingsSectionCard({
   const disabledReason = "This section is prepared for the next development phase.";
 
   return (
-    <Card className="overflow-hidden transition-colors hover:border-brand-caramel/60">
+    <Card className="group/card overflow-hidden transition-colors hover:border-brand-caramel/60">
       <CardContent className="flex h-full flex-col gap-5 p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-cappuccino/35 text-brand-caramel">
@@ -99,16 +100,21 @@ export function SettingsSectionCard({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="inline-flex w-full">
+              <span className="inline-flex justify-end">
                 <Button
                   aria-label={`${section.actionLabel} ${section.title}`}
-                  className="w-full"
+                  className="group/action rounded-full"
                   disabled={disabled}
                   onClick={onOpen}
                   type="button"
-                  variant={disabled ? "outline" : "default"}
+                  variant={disabled ? "outline" : "secondary"}
                 >
-                  {canManage ? section.actionLabel : "View"}
+                  <span className="sr-only">{canManage ? section.actionLabel : "View"}</span>
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="transition-transform duration-200 ease-out motion-reduce:transition-none group-hover/card:translate-x-1 group-focus-visible/action:translate-x-1"
+                    data-icon="inline-end"
+                  />
                 </Button>
               </span>
             </TooltipTrigger>
