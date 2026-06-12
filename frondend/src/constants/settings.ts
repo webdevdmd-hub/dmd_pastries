@@ -42,13 +42,12 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   },
   {
     id: "payment-methods",
-    title: "Payment Methods",
-    description:
-      "Control cash, card, bank transfer, split payment, and future online payment options.",
-    iconName: "CreditCard",
+    title: "Payment Methods & Accounts",
+    description: "Choose how customers pay, then link where that money is recorded in accounts.",
+    iconName: "WalletCards",
     permission: PERMISSIONS.settingsView,
     managePermission: PERMISSIONS.settingsPaymentMethodsManage,
-    route: "/settings/payment-methods",
+    route: ROUTES.settingsPaymentSetup,
     status: "available",
     category: "system",
     actionLabel: "Configure",

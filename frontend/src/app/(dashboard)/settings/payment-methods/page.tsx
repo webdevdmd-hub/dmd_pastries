@@ -1,7 +1,7 @@
-import type { JSX } from "react";
+import { redirect } from "next/navigation";
 
-import { SettingsDataPageClient } from "@/components/settings/settings-data-page-client";
+import { ROUTES } from "@/constants/routes";
 
-export default function PaymentMethodsSettingsPage(): JSX.Element {
-  return <SettingsDataPageClient kind="payment-methods" />;
+export default function PaymentMethodsSettingsPage(): never {
+  redirect(`${ROUTES.settingsPaymentSetup}?tab=methods`);
 }

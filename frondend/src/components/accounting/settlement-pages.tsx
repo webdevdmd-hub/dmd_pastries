@@ -396,7 +396,13 @@ function PaymentAccountDialog({
   );
 }
 
-export function PaymentAccountsPageClient(): JSX.Element {
+type PaymentAccountsPageClientProps = {
+  embedded?: boolean;
+};
+
+export function PaymentAccountsPageClient({
+  embedded = false,
+}: PaymentAccountsPageClientProps): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.accountingView]);
   const canManage = hasAnyPermission([PERMISSIONS.accountingAccountsManage]);
@@ -476,18 +482,35 @@ export function PaymentAccountsPageClient(): JSX.Element {
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <PageHeader
-        title="Payment Accounts"
-        description="Manage cash, bank, card clearing, and platform settlement accounts."
-        actions={
-          canManage ? (
+      {embedded ? (
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-brand-espresso">Payment accounts</h2>
+            <p className="text-sm text-brand-mocha">
+              Manage where cash, bank, card, and platform money is held and accounted.
+            </p>
+          </div>
+          {canManage ? (
             <Button onClick={openCreate}>
               <Plus className="h-4 w-4" />
               Create account
             </Button>
-          ) : null
-        }
-      />
+          ) : null}
+        </div>
+      ) : (
+        <PageHeader
+          title="Payment Accounts"
+          description="Manage cash, bank, card clearing, and platform settlement accounts."
+          actions={
+            canManage ? (
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4" />
+                Create account
+              </Button>
+            ) : null
+          }
+        />
+      )}
 
       <Card>
         <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_220px_180px]">

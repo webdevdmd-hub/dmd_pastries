@@ -95,6 +95,7 @@ import type {
 type SettingsDataPageKind = "company" | "tax-rates" | "payment-methods";
 
 type SettingsDataPageClientProps = {
+  embedded?: boolean;
   kind: SettingsDataPageKind;
 };
 
@@ -1223,9 +1224,13 @@ function PaymentMethodDialog({
   );
 }
 
-export function SettingsDataPageClient({ kind }: SettingsDataPageClientProps): JSX.Element {
+export function SettingsDataPageClient({
+  embedded = false,
+  kind,
+}: SettingsDataPageClientProps): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.settingsView]);
+  const canManagePaymentMethods = hasAnyPermission([PERMISSIONS.settingsPaymentMethodsManage]);
   const canManage = hasAnyPermission([
     PERMISSIONS.settingsCompanyUpdate,
     PERMISSIONS.settingsTaxRatesManage,
@@ -1509,18 +1514,35 @@ export function SettingsDataPageClient({ kind }: SettingsDataPageClientProps): J
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <PageHeader
-        title="Payment Methods"
-        description="Manage cash, card, transfer, split payment, and reference rules."
-        actions={
-          canManage ? (
+      {embedded ? (
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-brand-espresso">Payment methods</h2>
+            <p className="text-sm text-brand-mocha">
+              Manage how customers pay and connect each method to a payment account.
+            </p>
+          </div>
+          {canManagePaymentMethods ? (
             <Button onClick={openCreatePaymentMethodDialog}>
               <Plus className="h-4 w-4" />
               Create payment method
             </Button>
-          ) : null
-        }
-      />
+          ) : null}
+        </div>
+      ) : (
+        <PageHeader
+          title="Payment Methods & Accounts"
+          description="Choose how customers pay, then link where that money is recorded."
+          actions={
+            canManagePaymentMethods ? (
+              <Button onClick={openCreatePaymentMethodDialog}>
+                <Plus className="h-4 w-4" />
+                Create payment method
+              </Button>
+            ) : null
+          }
+        />
+      )}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-brand-espresso">
@@ -1535,7 +1557,7 @@ export function SettingsDataPageClient({ kind }: SettingsDataPageClientProps): J
       ) : null}
       {paymentMethodsQuery.data ? (
         <PaymentMethodsTable
-          canManage={canManage}
+          canManage={canManagePaymentMethods}
           methods={paymentMethodsQuery.data}
           onDeactivate={(method) => {
             void handlePaymentMethodDeactivate(method);

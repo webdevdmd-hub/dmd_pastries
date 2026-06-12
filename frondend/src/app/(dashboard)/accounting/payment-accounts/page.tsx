@@ -1,7 +1,7 @@
-import type { JSX } from "react";
+import { redirect } from "next/navigation";
 
-import { PaymentAccountsPageClient } from "@/components/accounting/settlement-pages";
+import { ROUTES } from "@/constants/routes";
 
-export default function PaymentAccountsPage(): JSX.Element {
-  return <PaymentAccountsPageClient />;
+export default function PaymentAccountsPage(): never {
+  redirect(`${ROUTES.settingsPaymentSetup}?tab=accounts`);
 }

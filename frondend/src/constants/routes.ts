@@ -102,5 +102,6 @@ export const ROUTES = {
   manufacturingBatches: "/manufacturing/batches",
   settings: "/settings",
   settingsApiHealth: "/settings/api-health",
+  settingsPaymentSetup: "/settings/payment-setup",
   settingsSalesChannels: "/settings/sales-channels",
 } as const;

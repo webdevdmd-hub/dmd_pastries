@@ -74,10 +74,10 @@ const accountingSections = [
     label: "Cash and settlements",
     items: [
       {
-        description: "Manage cash, bank, card, and platform accounts used by POS and payments.",
-        href: ROUTES.accountingPaymentAccounts,
+        description: "Configure payment methods and the accounts where received money is recorded.",
+        href: `${ROUTES.settingsPaymentSetup}?tab=accounts`,
         icon: CreditCard,
-        label: "Payment Accounts",
+        label: "Payment Setup",
         permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingAccountsManage],
       },
       {
