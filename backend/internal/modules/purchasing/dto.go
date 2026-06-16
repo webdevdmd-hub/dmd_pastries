@@ -52,9 +52,10 @@ type PurchaseReturnListQuery struct {
 }
 
 type ConvertPurchaseOrderToInvoiceRequest struct {
-	InvoiceDate string `json:"invoice_date"`
-	DueDate     string `json:"due_date"`
-	Notes       string `json:"notes"`
+	InvoiceDate        string `json:"invoice_date"`
+	DueDate            string `json:"due_date"`
+	SupplierBillNumber string `json:"supplier_bill_number"`
+	Notes              string `json:"notes"`
 }
 
 type ConvertPurchaseInvoiceToReceiptRequest struct {
@@ -103,27 +104,29 @@ type CancelPurchaseInvoiceRequest struct {
 }
 
 type CreatePurchaseInvoiceRequest struct {
-	BranchID        string                     `json:"branch_id" binding:"required"`
-	SupplierID      string                     `json:"supplier_id" binding:"required"`
-	PurchaseOrderID string                     `json:"purchase_order_id"`
-	InvoiceNumber   string                     `json:"invoice_number" binding:"required"`
-	InvoiceDate     string                     `json:"invoice_date" binding:"required"`
-	DueDate         string                     `json:"due_date"`
-	Items           []PurchaseInvoiceItemInput `json:"items" binding:"required"`
-	Charges         []charges.ChargeInput      `json:"charges"`
-	Notes           string                     `json:"notes"`
+	BranchID           string                     `json:"branch_id" binding:"required"`
+	SupplierID         string                     `json:"supplier_id" binding:"required"`
+	PurchaseOrderID    string                     `json:"purchase_order_id"`
+	InvoiceNumber      string                     `json:"invoice_number" binding:"required"`
+	SupplierBillNumber string                     `json:"supplier_bill_number"`
+	InvoiceDate        string                     `json:"invoice_date" binding:"required"`
+	DueDate            string                     `json:"due_date"`
+	Items              []PurchaseInvoiceItemInput `json:"items" binding:"required"`
+	Charges            []charges.ChargeInput      `json:"charges"`
+	Notes              string                     `json:"notes"`
 }
 
 type UpdatePurchaseInvoiceRequest struct {
-	BranchID        string                     `json:"branch_id"`
-	SupplierID      string                     `json:"supplier_id"`
-	PurchaseOrderID string                     `json:"purchase_order_id"`
-	InvoiceNumber   string                     `json:"invoice_number"`
-	InvoiceDate     string                     `json:"invoice_date"`
-	DueDate         string                     `json:"due_date"`
-	Items           []PurchaseInvoiceItemInput `json:"items"`
-	Charges         []charges.ChargeInput      `json:"charges"`
-	Notes           string                     `json:"notes"`
+	BranchID           string                     `json:"branch_id"`
+	SupplierID         string                     `json:"supplier_id"`
+	PurchaseOrderID    string                     `json:"purchase_order_id"`
+	InvoiceNumber      string                     `json:"invoice_number"`
+	SupplierBillNumber string                     `json:"supplier_bill_number"`
+	InvoiceDate        string                     `json:"invoice_date"`
+	DueDate            string                     `json:"due_date"`
+	Items              []PurchaseInvoiceItemInput `json:"items"`
+	Charges            []charges.ChargeInput      `json:"charges"`
+	Notes              string                     `json:"notes"`
 }
 
 type PurchaseInvoiceItemInput struct {
@@ -268,6 +271,7 @@ type PurchaseInvoiceResponse struct {
 	SupplierName           string                           `json:"supplier_name"`
 	PurchaseOrderID        *string                          `json:"purchase_order_id"`
 	InvoiceNumber          string                           `json:"invoice_number"`
+	SupplierBillNumber     string                           `json:"supplier_bill_number"`
 	InvoiceDate            time.Time                        `json:"invoice_date"`
 	DueDate                *time.Time                       `json:"due_date"`
 	Status                 string                           `json:"status"`

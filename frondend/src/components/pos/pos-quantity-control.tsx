@@ -25,8 +25,9 @@ export function POSQuantityControl({ onChange, quantity }: POSQuantityControlPro
       <Input
         aria-label="Quantity"
         className="h-8 w-14 rounded-md border-[#d4d4d8] text-center font-mono text-sm"
-        min={1}
+        min={0.001}
         onChange={(event) => onChange(Number(event.target.value))}
+        step={0.001}
         type="number"
         value={String(quantity)}
       />

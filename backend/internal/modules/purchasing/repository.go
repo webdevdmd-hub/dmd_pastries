@@ -643,7 +643,7 @@ func applyCommonFilters(db *gorm.DB, table string, query ListQuery) *gorm.DB {
 		case "purchase_orders":
 			db = db.Where("LOWER(purchase_orders.purchase_order_number) LIKE ? OR LOWER(purchase_orders.notes) LIKE ?", like, like)
 		case "purchase_invoices":
-			db = db.Where("LOWER(purchase_invoices.invoice_number) LIKE ? OR LOWER(purchase_invoices.notes) LIKE ?", like, like)
+			db = db.Where("LOWER(purchase_invoices.invoice_number) LIKE ? OR LOWER(purchase_invoices.supplier_bill_number) LIKE ? OR LOWER(purchase_invoices.notes) LIKE ?", like, like, like)
 		case "purchase_receipts":
 			db = db.Where("LOWER(purchase_receipts.receipt_number) LIKE ? OR LOWER(purchase_receipts.notes) LIKE ?", like, like)
 		}

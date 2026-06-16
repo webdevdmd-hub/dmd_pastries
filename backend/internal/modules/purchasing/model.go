@@ -62,6 +62,7 @@ type PurchaseInvoice struct {
 	SupplierID             string         `gorm:"type:uuid;not null;index" json:"supplier_id"`
 	PurchaseOrderID        *string        `gorm:"type:uuid;index" json:"purchase_order_id"`
 	InvoiceNumber          string         `gorm:"size:150;not null" json:"invoice_number"`
+	SupplierBillNumber     string         `gorm:"size:255" json:"supplier_bill_number"`
 	InvoiceDate            time.Time      `gorm:"type:date;not null" json:"invoice_date"`
 	DueDate                *time.Time     `gorm:"type:date" json:"due_date"`
 	Status                 string         `gorm:"size:50;not null;default:draft" json:"status"`

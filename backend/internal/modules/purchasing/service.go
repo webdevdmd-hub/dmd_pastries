@@ -295,26 +295,27 @@ func (s *Service) ConvertOrderToInvoice(currentUser *utils.AuthContext, id strin
 		}
 		invoiceID = utils.NewUUID()
 		invoice := &PurchaseInvoice{
-			ID:              invoiceID,
-			BusinessID:      currentUser.BusinessID,
-			BranchID:        order.BranchID,
-			SupplierID:      order.SupplierID,
-			PurchaseOrderID: &order.ID,
-			InvoiceNumber:   invoiceNumber,
-			InvoiceDate:     invoiceDate,
-			DueDate:         dueDate,
-			Status:          "draft",
-			PaymentStatus:   "unpaid",
-			SubtotalAmount:  order.SubtotalAmount,
-			TaxAmount:       order.TaxAmount,
-			ChargeAmount:    order.ChargeAmount,
-			ChargeTaxAmount: order.ChargeTaxAmount,
-			DiscountAmount:  order.DiscountAmount,
-			TotalAmount:     order.TotalAmount,
-			BalanceAmount:   order.TotalAmount,
-			Notes:           notes,
-			CreatedByUserID: currentUser.UserID,
-			UpdatedByUserID: currentUser.UserID,
+			ID:                 invoiceID,
+			BusinessID:         currentUser.BusinessID,
+			BranchID:           order.BranchID,
+			SupplierID:         order.SupplierID,
+			PurchaseOrderID:    &order.ID,
+			InvoiceNumber:      invoiceNumber,
+			SupplierBillNumber: strings.TrimSpace(req.SupplierBillNumber),
+			InvoiceDate:        invoiceDate,
+			DueDate:            dueDate,
+			Status:             "draft",
+			PaymentStatus:      "unpaid",
+			SubtotalAmount:     order.SubtotalAmount,
+			TaxAmount:          order.TaxAmount,
+			ChargeAmount:       order.ChargeAmount,
+			ChargeTaxAmount:    order.ChargeTaxAmount,
+			DiscountAmount:     order.DiscountAmount,
+			TotalAmount:        order.TotalAmount,
+			BalanceAmount:      order.TotalAmount,
+			Notes:              notes,
+			CreatedByUserID:    currentUser.UserID,
+			UpdatedByUserID:    currentUser.UserID,
 		}
 		items := make([]PurchaseInvoiceItem, 0, len(orderItems))
 		for _, item := range orderItems {
@@ -646,7 +647,7 @@ func (s *Service) UpdateInvoice(currentUser *utils.AuthContext, id string, req U
 		} else if exists {
 			return apperrors.Conflict("invoice_number already exists for this supplier", nil)
 		}
-		updates := map[string]interface{}{"branch_id": invoice.BranchID, "supplier_id": invoice.SupplierID, "purchase_order_id": invoice.PurchaseOrderID, "invoice_number": invoice.InvoiceNumber, "invoice_date": invoice.InvoiceDate, "due_date": invoice.DueDate, "subtotal_amount": invoice.SubtotalAmount, "tax_amount": invoice.TaxAmount, "discount_amount": invoice.DiscountAmount, "total_amount": invoice.TotalAmount, "balance_amount": invoice.BalanceAmount, "notes": invoice.Notes, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
+		updates := map[string]interface{}{"branch_id": invoice.BranchID, "supplier_id": invoice.SupplierID, "purchase_order_id": invoice.PurchaseOrderID, "invoice_number": invoice.InvoiceNumber, "supplier_bill_number": invoice.SupplierBillNumber, "invoice_date": invoice.InvoiceDate, "due_date": invoice.DueDate, "subtotal_amount": invoice.SubtotalAmount, "tax_amount": invoice.TaxAmount, "discount_amount": invoice.DiscountAmount, "total_amount": invoice.TotalAmount, "balance_amount": invoice.BalanceAmount, "notes": invoice.Notes, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
 		if err := s.repo.UpdateInvoice(tx, id, currentUser.BusinessID, updates, items); err != nil {
 			return err
 		}
@@ -1639,7 +1640,7 @@ func (s *Service) buildInvoice(tx *gorm.DB, currentUser *utils.AuthContext, id s
 	}
 	taxAmount := roundMoney(total.Tax + chargeTotals.TaxAmount)
 	totalAmount := roundMoney(total.Total + chargeTotals.Total)
-	return &PurchaseInvoice{ID: invoiceID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, SupplierID: req.SupplierID, PurchaseOrderID: nullableString(req.PurchaseOrderID), InvoiceNumber: strings.TrimSpace(req.InvoiceNumber), InvoiceDate: invoiceDate, DueDate: dueDate, Status: "draft", PaymentStatus: "unpaid", SubtotalAmount: total.Subtotal, TaxAmount: taxAmount, ChargeAmount: chargeTotals.Amount, ChargeTaxAmount: chargeTotals.TaxAmount, DiscountAmount: total.Discount, TotalAmount: totalAmount, BalanceAmount: totalAmount, Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}, items, chargeRows, nil
+	return &PurchaseInvoice{ID: invoiceID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, SupplierID: req.SupplierID, PurchaseOrderID: nullableString(req.PurchaseOrderID), InvoiceNumber: strings.TrimSpace(req.InvoiceNumber), SupplierBillNumber: strings.TrimSpace(req.SupplierBillNumber), InvoiceDate: invoiceDate, DueDate: dueDate, Status: "draft", PaymentStatus: "unpaid", SubtotalAmount: total.Subtotal, TaxAmount: taxAmount, ChargeAmount: chargeTotals.Amount, ChargeTaxAmount: chargeTotals.TaxAmount, DiscountAmount: total.Discount, TotalAmount: totalAmount, BalanceAmount: totalAmount, Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}, items, chargeRows, nil
 }
 
 func (s *Service) buildInvoiceItems(tx *gorm.DB, businessID, branchID, invoiceID string, inputItems []PurchaseInvoiceItemInput) ([]PurchaseInvoiceItem, totals, error) {
@@ -2237,7 +2238,7 @@ func (s *Service) orderResponse(businessID string, order PurchaseOrder, includeI
 
 func (s *Service) invoiceResponse(businessID string, invoice PurchaseInvoice, includeItems bool) PurchaseInvoiceResponse {
 	branchName, supplierName := s.repo.NameLookups(businessID, invoice.BranchID, invoice.SupplierID)
-	response := PurchaseInvoiceResponse{ID: invoice.ID, BusinessID: invoice.BusinessID, BranchID: invoice.BranchID, BranchName: branchName, SupplierID: invoice.SupplierID, SupplierName: supplierName, PurchaseOrderID: invoice.PurchaseOrderID, InvoiceNumber: invoice.InvoiceNumber, InvoiceDate: invoice.InvoiceDate, DueDate: invoice.DueDate, Status: invoice.Status, PaymentStatus: invoice.PaymentStatus, SubtotalAmount: roundMoney(invoice.SubtotalAmount), TaxAmount: roundMoney(invoice.TaxAmount), ChargeAmount: roundMoney(invoice.ChargeAmount), ChargeTaxAmount: roundMoney(invoice.ChargeTaxAmount), DiscountAmount: roundMoney(invoice.DiscountAmount), TotalAmount: roundMoney(invoice.TotalAmount), PaidAmount: roundMoney(invoice.PaidAmount), BalanceAmount: roundMoney(invoice.BalanceAmount), ReturnedAmount: roundMoney(invoice.ReturnedAmount), CreditedAmount: roundMoney(invoice.CreditedAmount), ReturnStatus: invoice.ReturnStatus, JournalEntryID: invoice.JournalEntryID, CancelledByUserID: invoice.CancelledByUserID, CancelledAt: invoice.CancelledAt, CancelReason: invoice.CancelReason, ReversalJournalEntryID: invoice.ReversalJournalEntryID, CancelledReceiptID: invoice.CancelledReceiptID, Notes: invoice.Notes, CreatedAt: invoice.CreatedAt, UpdatedAt: invoice.UpdatedAt}
+	response := PurchaseInvoiceResponse{ID: invoice.ID, BusinessID: invoice.BusinessID, BranchID: invoice.BranchID, BranchName: branchName, SupplierID: invoice.SupplierID, SupplierName: supplierName, PurchaseOrderID: invoice.PurchaseOrderID, InvoiceNumber: invoice.InvoiceNumber, SupplierBillNumber: invoice.SupplierBillNumber, InvoiceDate: invoice.InvoiceDate, DueDate: invoice.DueDate, Status: invoice.Status, PaymentStatus: invoice.PaymentStatus, SubtotalAmount: roundMoney(invoice.SubtotalAmount), TaxAmount: roundMoney(invoice.TaxAmount), ChargeAmount: roundMoney(invoice.ChargeAmount), ChargeTaxAmount: roundMoney(invoice.ChargeTaxAmount), DiscountAmount: roundMoney(invoice.DiscountAmount), TotalAmount: roundMoney(invoice.TotalAmount), PaidAmount: roundMoney(invoice.PaidAmount), BalanceAmount: roundMoney(invoice.BalanceAmount), ReturnedAmount: roundMoney(invoice.ReturnedAmount), CreditedAmount: roundMoney(invoice.CreditedAmount), ReturnStatus: invoice.ReturnStatus, JournalEntryID: invoice.JournalEntryID, CancelledByUserID: invoice.CancelledByUserID, CancelledAt: invoice.CancelledAt, CancelReason: invoice.CancelReason, ReversalJournalEntryID: invoice.ReversalJournalEntryID, CancelledReceiptID: invoice.CancelledReceiptID, Notes: invoice.Notes, CreatedAt: invoice.CreatedAt, UpdatedAt: invoice.UpdatedAt}
 	if includeItems {
 		items, _ := s.repo.InvoiceItems(invoice.ID, businessID)
 		for _, item := range items {
