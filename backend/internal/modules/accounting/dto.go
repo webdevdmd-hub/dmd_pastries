@@ -143,16 +143,17 @@ type UpdateChartAccountStatusRequest struct {
 }
 
 type JournalEntryListQuery struct {
-	Search     string
-	BranchID   string
-	Status     string
-	SourceType string
-	DateFrom   string
-	DateTo     string
-	Page       int
-	Limit      int
-	SortBy     string
-	SortOrder  string
+	Search        string
+	BranchID      string
+	Status        string
+	SourceType    string
+	JournalOrigin string
+	DateFrom      string
+	DateTo        string
+	Page          int
+	Limit         int
+	SortBy        string
+	SortOrder     string
 }
 
 type GeneralLedgerQuery struct {

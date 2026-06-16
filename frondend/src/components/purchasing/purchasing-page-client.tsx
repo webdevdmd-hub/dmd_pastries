@@ -6,7 +6,6 @@ import type { JSX } from "react";
 
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
-import { PurchaseLifecycleBoard } from "@/components/purchasing/purchase-lifecycle-board";
 import { PurchasingSummaryCards } from "@/components/purchasing/purchasing-summary-cards";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,28 +23,28 @@ const documentCards = [
     label: "Purchase Orders",
   },
   {
-    description: "Review draft bills, post payables, then convert to stock receipts.",
+    description: "Review supplier bills, post payables, and record payments made.",
     href: ROUTES.purchasingInvoices,
     icon: ReceiptText,
-    label: "Purchase Invoices / Bills",
+    label: "Bills",
   },
   {
-    description: "Post received stock into inventory after invoice confirmation.",
+    description: "Advanced receiving records for stock already received from suppliers.",
     href: ROUTES.purchasingReceipts,
     icon: PackageCheck,
-    label: "Stock Receipts",
+    label: "Receive Goods",
   },
   {
-    description: "Track money paid out against posted supplier invoices.",
+    description: "Track money paid out against posted supplier bills.",
     href: ROUTES.purchasingPayments,
     icon: WalletCards,
-    label: "Supplier Payments",
+    label: "Payments Made",
   },
   {
     description: "Return damaged or excess stock and track supplier credits.",
     href: ROUTES.purchasingReturns,
     icon: RotateCcwSquare,
-    label: "Purchase Returns / Vendor Credits",
+    label: "Vendor Credits",
   },
 ];
 
@@ -62,7 +61,7 @@ export function PurchasingPageClient(): JSX.Element {
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
         title="Purchasing"
-        description="Run the connected supplier workflow from order to bill, receipt, payment, and vendor credit."
+        description="Open the exact supplier workflow you need: orders, bills, receiving, payments made, or vendor credits."
       />
 
       {summaryQuery.error ? (
@@ -75,8 +74,6 @@ export function PurchasingPageClient(): JSX.Element {
       ) : (
         <PurchasingSummaryCards summary={summaryQuery.data} />
       )}
-
-      <PurchaseLifecycleBoard summary={summaryQuery.data} />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {documentCards.map((action) => {

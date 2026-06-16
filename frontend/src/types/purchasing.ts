@@ -148,6 +148,7 @@ export type PurchaseInvoice = {
   supplierName: string;
   purchaseOrderId: string | null;
   invoiceNumber: string;
+  supplierBillNumber: string | null;
   invoiceDate: string;
   dueDate: string | null;
   status: PurchaseInvoiceStatus;
@@ -159,6 +160,11 @@ export type PurchaseInvoice = {
   paidAmount: number;
   balanceAmount: number;
   notes: string | null;
+  cancelledAt: string | null;
+  cancelledByUserId: string | null;
+  cancelReason: string | null;
+  cancelledReceiptId: string | null;
+  reversalJournalEntryId: string | null;
   createdByUserName: string;
   createdAt: string;
   updatedAt: string;
@@ -387,6 +393,10 @@ export type CreatePurchaseInvoicePayload = {
 
 export type UpdatePurchaseInvoicePayload = Partial<CreatePurchaseInvoicePayload>;
 
+export type CancelPurchaseInvoicePayload = {
+  reason: string;
+};
+
 export type ReceivePurchasePayload = {
   branchId: string;
   supplierId: string;
@@ -395,6 +405,22 @@ export type ReceivePurchasePayload = {
   receivedDate: string;
   items: PurchaseItemLinePayload[];
   notes: string | null;
+};
+
+export type ReceivePurchaseOrderItemPayload = {
+  productId: string;
+  productVariantId: string | null;
+  quantityReceived: number;
+  unitId: string;
+  unitCost: number;
+  batchNumber: string | null;
+  expiryDate: string | null;
+};
+
+export type ReceivePurchaseOrderPayload = {
+  receivedDate: string;
+  notes: string | null;
+  items?: ReceivePurchaseOrderItemPayload[];
 };
 
 export type AddSupplierPaymentPayload = {
@@ -406,6 +432,12 @@ export type AddSupplierPaymentPayload = {
 };
 
 export type ConvertPurchaseOrderToInvoicePayload = {
+  dueDate?: string | null;
+  invoiceDate?: string | null;
+  notes?: string | null;
+};
+
+export type ConvertPurchaseOrderToBillPayload = {
   dueDate?: string | null;
   invoiceDate?: string | null;
   notes?: string | null;

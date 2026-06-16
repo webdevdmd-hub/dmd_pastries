@@ -73,6 +73,8 @@ export function PurchaseSupplierPaymentDialog({
     resolver: zodResolver(supplierPaymentSchema),
   });
   const selectedMethod = methods.find((method) => method.id === form.watch("paymentMethodId"));
+  const paymentAmount = form.watch("amount");
+  const remainingBalance = Math.max(balanceAmount - paymentAmount, 0);
 
   useEffect(() => {
     if (open) {
@@ -124,11 +126,11 @@ export function PurchaseSupplierPaymentDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add supplier payment</DialogTitle>
+          <DialogTitle>Record payment made</DialogTitle>
           <DialogDescription>
             {description ?? (
               <>
-                Record money paid out for {invoiceNumber}. Current balance is AED{" "}
+                Record money paid out for bill {invoiceNumber}. Current balance is AED{" "}
                 {balanceAmount.toFixed(2)}.
               </>
             )}
@@ -141,6 +143,33 @@ export function PurchaseSupplierPaymentDialog({
           }}
         >
           {invoiceSelector ? <div className="grid gap-2">{invoiceSelector}</div> : null}
+
+          <div className="grid gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4 text-sm md:grid-cols-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha">
+                Bill balance
+              </p>
+              <p className="mt-1 font-semibold text-brand-espresso">
+                AED {balanceAmount.toFixed(2)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha">
+                New payment
+              </p>
+              <p className="mt-1 font-semibold text-brand-espresso">
+                AED {paymentAmount.toFixed(2)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha">
+                Remaining
+              </p>
+              <p className="mt-1 font-semibold text-brand-espresso">
+                AED {remainingBalance.toFixed(2)}
+              </p>
+            </div>
+          </div>
 
           <div className="grid gap-2">
             <Label>Payment method</Label>
@@ -225,7 +254,7 @@ export function PurchaseSupplierPaymentDialog({
               Cancel
             </Button>
             <Button disabled={disabled || isSubmitting || balanceAmount <= 0} type="submit">
-              {isSubmitting ? "Adding..." : "Add payment"}
+              {isSubmitting ? "Recording..." : "Record payment"}
             </Button>
           </DialogFooter>
         </form>

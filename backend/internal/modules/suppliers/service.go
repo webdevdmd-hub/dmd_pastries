@@ -1,6 +1,7 @@
 package suppliers
 
 import (
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -356,6 +357,90 @@ func (s *Service) Stats(currentUser *utils.AuthContext, supplierID string) (*Sup
 	return s.repo.Stats(currentUser.BusinessID, supplierID)
 }
 
+func (s *Service) Statement(currentUser *utils.AuthContext, supplierID string, query SupplierStatementQuery) (*SupplierStatementResponse, error) {
+	branchID, err := currentUser.ResolveOperationalBranch("")
+	if err != nil {
+		return nil, err
+	}
+	supplier, err := s.repo.FindByID(supplierID, currentUser.BusinessID, branchID)
+	if err != nil {
+		return nil, mapSupplierNotFound(err, "supplier not found")
+	}
+	dateFrom, err := parseSupplierStatementDate(query.DateFrom, "date_from")
+	if err != nil {
+		return nil, err
+	}
+	dateTo, err := parseSupplierStatementDate(query.DateTo, "date_to")
+	if err != nil {
+		return nil, err
+	}
+	if dateFrom != nil && dateTo != nil && dateFrom.After(*dateTo) {
+		return nil, apperrors.BadRequest("date_from must be before or equal to date_to", nil)
+	}
+	transactionType := strings.TrimSpace(query.TransactionType)
+	if transactionType != "" && transactionType != "all" && !validSupplierStatementTransactionType(transactionType) {
+		return nil, apperrors.BadRequest("invalid transaction_type", nil)
+	}
+	rows, err := s.repo.StatementRows(currentUser.BusinessID, supplier.BranchID, supplier.ID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load supplier statement")
+	}
+	response := &SupplierStatementResponse{
+		SupplierID:   supplier.ID,
+		SupplierCode: supplier.SupplierCode,
+		SupplierName: supplier.SupplierName,
+		DateFrom:     strings.TrimSpace(query.DateFrom),
+		DateTo:       strings.TrimSpace(query.DateTo),
+		Items:        make([]SupplierStatementItemResponse, 0, len(rows)),
+	}
+	balance := 0.0
+	for _, row := range rows {
+		rowDate := dateOnly(row.TransactionDate)
+		if dateFrom != nil && rowDate.Before(*dateFrom) {
+			balance = roundSupplierMoney(balance + row.DebitAmount - row.CreditAmount)
+			response.OpeningBalance = balance
+			continue
+		}
+		if dateTo != nil && rowDate.After(*dateTo) {
+			continue
+		}
+		if transactionType != "" && transactionType != "all" && row.TransactionType != transactionType {
+			balance = roundSupplierMoney(balance + row.DebitAmount - row.CreditAmount)
+			continue
+		}
+		balance = roundSupplierMoney(balance + row.DebitAmount - row.CreditAmount)
+		response.TotalDebit = roundSupplierMoney(response.TotalDebit + row.DebitAmount)
+		response.TotalCredit = roundSupplierMoney(response.TotalCredit + row.CreditAmount)
+		response.Items = append(response.Items, SupplierStatementItemResponse{
+			ID:                row.ID,
+			DocumentID:        row.DocumentID,
+			DocumentNumber:    row.DocumentNumber,
+			TransactionType:   row.TransactionType,
+			TransactionDate:   row.TransactionDate,
+			BranchID:          row.BranchID,
+			BranchName:        row.BranchName,
+			DebitAmount:       roundSupplierMoney(row.DebitAmount),
+			CreditAmount:      roundSupplierMoney(row.CreditAmount),
+			RunningBalance:    balance,
+			Status:            row.Status,
+			PaymentStatus:     row.PaymentStatus,
+			ReferenceNumber:   row.ReferenceNumber,
+			Notes:             row.Notes,
+			PurchaseOrderID:   row.PurchaseOrderID,
+			PurchaseInvoiceID: row.PurchaseInvoiceID,
+			PurchaseReceiptID: row.PurchaseReceiptID,
+			PurchaseReturnID:  row.PurchaseReturnID,
+			PaymentID:         row.PaymentID,
+		})
+	}
+	response.ClosingBalance = balance
+	response.OpeningBalance = roundSupplierMoney(response.OpeningBalance)
+	response.TotalDebit = roundSupplierMoney(response.TotalDebit)
+	response.TotalCredit = roundSupplierMoney(response.TotalCredit)
+	response.ClosingBalance = roundSupplierMoney(response.ClosingBalance)
+	return response, nil
+}
+
 func (s *Service) validateSupplierPayload(name, phone, email, website string) error {
 	if strings.TrimSpace(name) == "" {
 		return apperrors.BadRequest("supplier_name is required", nil)
@@ -451,6 +536,31 @@ func validateContact(name, phone, email string) error {
 		return apperrors.BadRequest("contact_name is required", nil)
 	}
 	return validateSupplierContact(phone, email, "")
+}
+
+func parseSupplierStatementDate(value, field string) (*time.Time, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		return nil, apperrors.BadRequest(field+" must use YYYY-MM-DD format", nil)
+	}
+	parsed = dateOnly(parsed)
+	return &parsed, nil
+}
+
+func dateOnly(value time.Time) time.Time {
+	return time.Date(value.Year(), value.Month(), value.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+func validSupplierStatementTransactionType(value string) bool {
+	return value == "bill" || value == "payment_made" || value == "vendor_credit"
+}
+
+func roundSupplierMoney(value float64) float64 {
+	return math.Round(value*100) / 100
 }
 
 func setString(updates map[string]interface{}, key, value string) {

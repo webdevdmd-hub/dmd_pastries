@@ -593,16 +593,17 @@ func parseJournalEntryListQuery(c *gin.Context) JournalEntryListQuery {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	return JournalEntryListQuery{
-		Search:     c.Query("search"),
-		BranchID:   c.Query("branch_id"),
-		Status:     c.Query("status"),
-		SourceType: c.Query("source_type"),
-		DateFrom:   c.Query("date_from"),
-		DateTo:     c.Query("date_to"),
-		Page:       page,
-		Limit:      limit,
-		SortBy:     c.DefaultQuery("sort_by", "entry_date"),
-		SortOrder:  c.DefaultQuery("sort_order", "desc"),
+		Search:        c.Query("search"),
+		BranchID:      c.Query("branch_id"),
+		Status:        c.Query("status"),
+		SourceType:    c.Query("source_type"),
+		JournalOrigin: c.Query("journal_origin"),
+		DateFrom:      c.Query("date_from"),
+		DateTo:        c.Query("date_to"),
+		Page:          page,
+		Limit:         limit,
+		SortBy:        c.DefaultQuery("sort_by", "entry_date"),
+		SortOrder:     c.DefaultQuery("sort_order", "desc"),
 	}
 }
 

@@ -72,7 +72,7 @@ func (h *Handler) DeleteOrder(c *gin.Context) {
 		return
 	}
 	err := h.service.DeleteOrder(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
-	respond(c, "purchase order deleted successfully", gin.H{"deleted": true}, err)
+	respond(c, "purchase order deleted successfully", gin.H{"deleted": true, "delete_type": "hard_delete"}, err)
 }
 
 func (h *Handler) ConvertOrderToInvoice(c *gin.Context) {
@@ -85,6 +85,18 @@ func (h *Handler) ConvertOrderToInvoice(c *gin.Context) {
 	}
 	result, err := h.service.ConvertOrderToInvoice(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
 	respondCreated(c, "purchase order converted to invoice successfully", result, err)
+}
+
+func (h *Handler) ReceiveOrder(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	var req ReceivePurchaseOrderRequest
+	if !bindOptionalJSON(c, &req) {
+		return
+	}
+	result, err := h.service.ReceiveOrder(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "purchase order received successfully", result, err)
 }
 
 func (h *Handler) GetOrderDocumentChain(c *gin.Context) {
@@ -176,7 +188,11 @@ func (h *Handler) CancelInvoice(c *gin.Context) {
 	if !validParam(c, "id") {
 		return
 	}
-	result, err := h.service.CancelInvoice(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	var req CancelPurchaseInvoiceRequest
+	if !bindOptionalJSON(c, &req) {
+		return
+	}
+	result, err := h.service.CancelInvoice(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
 	respond(c, "purchase invoice cancelled successfully", result, err)
 }
 

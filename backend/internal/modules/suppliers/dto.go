@@ -20,6 +20,12 @@ type SupplierLookupQuery struct {
 	Limit  int
 }
 
+type SupplierStatementQuery struct {
+	DateFrom        string
+	DateTo          string
+	TransactionType string
+}
+
 type CreateSupplierRequest struct {
 	SupplierName string `json:"supplier_name" binding:"required"`
 	Phone        string `json:"phone"`
@@ -138,6 +144,41 @@ type SupplierLookupResponse struct {
 type SupplierListResponse struct {
 	Items      []SupplierResponse `json:"items"`
 	Pagination PaginationResponse `json:"pagination"`
+}
+
+type SupplierStatementResponse struct {
+	SupplierID     string                          `json:"supplier_id"`
+	SupplierCode   string                          `json:"supplier_code"`
+	SupplierName   string                          `json:"supplier_name"`
+	DateFrom       string                          `json:"date_from"`
+	DateTo         string                          `json:"date_to"`
+	OpeningBalance float64                         `json:"opening_balance"`
+	TotalDebit     float64                         `json:"total_debit"`
+	TotalCredit    float64                         `json:"total_credit"`
+	ClosingBalance float64                         `json:"closing_balance"`
+	Items          []SupplierStatementItemResponse `json:"items"`
+}
+
+type SupplierStatementItemResponse struct {
+	ID                string    `json:"id"`
+	DocumentID        string    `json:"document_id"`
+	DocumentNumber    string    `json:"document_number"`
+	TransactionType   string    `json:"transaction_type"`
+	TransactionDate   time.Time `json:"transaction_date"`
+	BranchID          string    `json:"branch_id"`
+	BranchName        string    `json:"branch_name"`
+	DebitAmount       float64   `json:"debit_amount"`
+	CreditAmount      float64   `json:"credit_amount"`
+	RunningBalance    float64   `json:"running_balance"`
+	Status            string    `json:"status"`
+	PaymentStatus     string    `json:"payment_status"`
+	ReferenceNumber   string    `json:"reference_number"`
+	Notes             string    `json:"notes"`
+	PurchaseOrderID   *string   `json:"purchase_order_id,omitempty"`
+	PurchaseInvoiceID *string   `json:"purchase_invoice_id,omitempty"`
+	PurchaseReceiptID *string   `json:"purchase_receipt_id,omitempty"`
+	PurchaseReturnID  *string   `json:"purchase_return_id,omitempty"`
+	PaymentID         *string   `json:"payment_id,omitempty"`
 }
 
 type PaginationResponse struct {

@@ -115,6 +115,7 @@ export type JournalEntriesFilters = {
   branchId: string;
   dateFrom: string;
   dateTo: string;
+  journalOrigin: "manual" | "system";
   limit: number;
   page: number;
   search: string;

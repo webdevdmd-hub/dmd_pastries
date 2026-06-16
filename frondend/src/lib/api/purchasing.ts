@@ -3,7 +3,9 @@ import type { ItemStructure, ProductType } from "@/types/product";
 import { ITEM_STRUCTURES, PRODUCT_TYPES } from "@/types/product";
 import type {
   AddSupplierPaymentPayload,
+  CancelPurchaseInvoicePayload,
   ConvertPurchaseInvoiceToReceiptPayload,
+  ConvertPurchaseOrderToBillPayload,
   ConvertPurchaseOrderToInvoicePayload,
   CreatePurchaseInvoicePayload,
   CreatePurchaseOrderPayload,
@@ -33,6 +35,7 @@ import type {
   PurchasingSupplierOption,
   PurchasingTaxRateOption,
   PurchasingUnitOption,
+  ReceivePurchaseOrderPayload,
   ReceivePurchasePayload,
   ReturnablePurchaseReceiptItem,
   ReversePurchaseReturnPayload,
@@ -80,6 +83,10 @@ type BackendPurchaseInvoicePayload = {
   notes?: string | null;
 };
 
+type BackendCancelPurchaseInvoicePayload = {
+  reason: string;
+};
+
 type BackendReceivePayload = {
   branch_id: string;
   supplier_id: string;
@@ -88,6 +95,23 @@ type BackendReceivePayload = {
   received_date: string;
   items: BackendLinePayload[];
   notes: string | null;
+};
+
+type BackendReceivePurchaseOrderItemPayload = {
+  batch_number?: string | null;
+  expiry_date?: string | null;
+  item_type: "product";
+  product_id: string;
+  product_variant_id?: string | null;
+  quantity_received: number;
+  unit_cost: number;
+  unit_id: string;
+};
+
+type BackendReceivePurchaseOrderPayload = {
+  items?: BackendReceivePurchaseOrderItemPayload[];
+  notes: string | null;
+  received_date: string;
 };
 
 type BackendSupplierPaymentPayload = {
@@ -99,6 +123,12 @@ type BackendSupplierPaymentPayload = {
 };
 
 type BackendConvertPurchaseOrderToInvoicePayload = {
+  due_date?: string | null;
+  invoice_date?: string | null;
+  notes?: string | null;
+};
+
+type BackendConvertPurchaseOrderToBillPayload = {
   due_date?: string | null;
   invoice_date?: string | null;
   notes?: string | null;
@@ -375,6 +405,7 @@ function parseInvoice(value: unknown): PurchaseInvoice {
     supplierName: stringValue(value.supplier_name, "Supplier"),
     purchaseOrderId: optionalString(value.purchase_order_id),
     invoiceNumber: stringValue(value.invoice_number, "Invoice"),
+    supplierBillNumber: optionalString(value.supplier_bill_number),
     invoiceDate: stringValue(value.invoice_date),
     dueDate: optionalString(value.due_date),
     status: isInvoiceStatus(value.status) ? value.status : "draft",
@@ -386,6 +417,11 @@ function parseInvoice(value: unknown): PurchaseInvoice {
     paidAmount: numberValue(value.paid_amount),
     balanceAmount: numberValue(value.balance_amount),
     notes: optionalString(value.notes),
+    cancelledAt: optionalString(value.cancelled_at),
+    cancelledByUserId: optionalString(value.cancelled_by_user_id),
+    cancelReason: optionalString(value.cancel_reason),
+    cancelledReceiptId: optionalString(value.cancelled_receipt_id),
+    reversalJournalEntryId: optionalString(value.reversal_journal_entry_id),
     createdByUserName: stringValue(value.created_by_user_name, "User"),
     createdAt: stringValue(value.created_at),
     updatedAt: stringValue(value.updated_at),
@@ -608,17 +644,23 @@ function parseDocumentChainInvoice(value: unknown): PurchaseInvoice {
     balanceAmount: 0,
     branchId: "",
     branchName: "",
+    cancelledAt: optionalString(value.cancelled_at),
+    cancelledByUserId: optionalString(value.cancelled_by_user_id),
+    cancelReason: optionalString(value.cancel_reason),
+    cancelledReceiptId: optionalString(value.cancelled_receipt_id),
     createdAt: "",
     createdByUserName: "User",
     discountAmount: 0,
     dueDate: null,
     invoiceDate: stringValue(value.date, stringValue(value.invoice_date)),
     invoiceNumber: stringValue(value.document_number, stringValue(value.invoice_number, "Invoice")),
+    supplierBillNumber: optionalString(value.supplier_bill_number),
     items: [],
     notes: null,
     paidAmount: 0,
     paymentStatus: isPaymentStatus(value.payment_status) ? value.payment_status : "unpaid",
     purchaseOrderId: optionalString(value.purchase_order_id),
+    reversalJournalEntryId: optionalString(value.reversal_journal_entry_id),
     status: isInvoiceStatus(value.status) ? value.status : "draft",
     subtotalAmount: 0,
     supplierId: "",
@@ -920,6 +962,30 @@ function receivePayload(payload: ReceivePurchasePayload): BackendReceivePayload 
   };
 }
 
+function receivePurchaseOrderPayload(
+  payload: ReceivePurchaseOrderPayload,
+): BackendReceivePurchaseOrderPayload {
+  const nextPayload: BackendReceivePurchaseOrderPayload = {
+    notes: payload.notes,
+    received_date: payload.receivedDate,
+  };
+
+  if (payload.items !== undefined) {
+    nextPayload.items = payload.items.map((item) => ({
+      batch_number: item.batchNumber,
+      expiry_date: item.expiryDate,
+      item_type: "product",
+      product_id: item.productId,
+      product_variant_id: item.productVariantId,
+      quantity_received: item.quantityReceived,
+      unit_cost: item.unitCost,
+      unit_id: item.unitId,
+    }));
+  }
+
+  return nextPayload;
+}
+
 function supplierPaymentPayload(payload: AddSupplierPaymentPayload): BackendSupplierPaymentPayload {
   return {
     amount: payload.amount,
@@ -934,6 +1000,18 @@ function convertOrderToInvoicePayload(
   payload: ConvertPurchaseOrderToInvoicePayload = {},
 ): BackendConvertPurchaseOrderToInvoicePayload {
   const nextPayload: BackendConvertPurchaseOrderToInvoicePayload = {};
+
+  if (payload.invoiceDate !== undefined) nextPayload.invoice_date = payload.invoiceDate;
+  if (payload.dueDate !== undefined) nextPayload.due_date = payload.dueDate;
+  if (payload.notes !== undefined) nextPayload.notes = payload.notes;
+
+  return nextPayload;
+}
+
+function convertOrderToBillPayload(
+  payload: ConvertPurchaseOrderToBillPayload,
+): BackendConvertPurchaseOrderToBillPayload {
+  const nextPayload: BackendConvertPurchaseOrderToBillPayload = {};
 
   if (payload.invoiceDate !== undefined) nextPayload.invoice_date = payload.invoiceDate;
   if (payload.dueDate !== undefined) nextPayload.due_date = payload.dueDate;
@@ -1090,6 +1168,23 @@ export async function convertPurchaseOrderToInvoice(
   return response.data;
 }
 
+export async function convertPurchaseOrderToBill(
+  id: string,
+  payload: ConvertPurchaseOrderToBillPayload,
+): Promise<PurchaseInvoice> {
+  const response = await apiRequest<PurchaseInvoice, BackendConvertPurchaseOrderToBillPayload>(
+    `/api/v1/purchasing/orders/${id}/convert-to-bill`,
+    {
+      authMode: "appwrite",
+      body: convertOrderToBillPayload(payload),
+      method: "POST",
+      parse: parseInvoice,
+    },
+  );
+
+  return response.data;
+}
+
 export async function getPurchaseOrderDocumentChain(id: string): Promise<PurchaseDocumentChain> {
   const response = await apiRequest<PurchaseDocumentChain>(
     `/api/v1/purchasing/orders/${id}/document-chain`,
@@ -1188,12 +1283,19 @@ export async function postPurchaseInvoice(id: string): Promise<PurchaseInvoice> 
   return response.data;
 }
 
-export async function cancelPurchaseInvoice(id: string): Promise<PurchaseInvoice> {
-  const response = await apiRequest<PurchaseInvoice>(`/api/v1/purchasing/invoices/${id}/cancel`, {
-    method: "POST",
-    authMode: "appwrite",
-    parse: parseInvoice,
-  });
+export async function cancelPurchaseInvoice(
+  id: string,
+  payload: CancelPurchaseInvoicePayload,
+): Promise<PurchaseInvoice> {
+  const response = await apiRequest<PurchaseInvoice, BackendCancelPurchaseInvoicePayload>(
+    `/api/v1/purchasing/invoices/${id}/cancel`,
+    {
+      method: "POST",
+      authMode: "appwrite",
+      body: { reason: payload.reason },
+      parse: parseInvoice,
+    },
+  );
 
   return response.data;
 }
@@ -1207,6 +1309,23 @@ export async function convertPurchaseInvoiceToReceipt(
     {
       authMode: "appwrite",
       body: convertInvoiceToReceiptPayload(payload),
+      method: "POST",
+      parse: parseReceipt,
+    },
+  );
+
+  return response.data;
+}
+
+export async function receivePurchaseOrder(
+  id: string,
+  payload: ReceivePurchaseOrderPayload,
+): Promise<PurchaseReceipt> {
+  const response = await apiRequest<PurchaseReceipt, BackendReceivePurchaseOrderPayload>(
+    `/api/v1/purchasing/orders/${id}/receive`,
+    {
+      authMode: "appwrite",
+      body: receivePurchaseOrderPayload(payload),
       method: "POST",
       parse: parseReceipt,
     },

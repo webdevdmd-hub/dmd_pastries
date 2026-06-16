@@ -77,7 +77,9 @@ export function PurchaseReceiptDetailsPageClient({
     return (
       <PurchaseErrorState
         description={
-          receiptQuery.error ? getErrorMessage(receiptQuery.error) : "Purchase receipt not found."
+          receiptQuery.error
+            ? getErrorMessage(receiptQuery.error)
+            : "Receive goods record not found."
         }
         onRetry={() => {
           void receiptQuery.refetch();
@@ -92,7 +94,7 @@ export function PurchaseReceiptDetailsPageClient({
   const handlePost = async (): Promise<void> => {
     try {
       await postMutation.mutateAsync(receipt.id);
-      toast.success("Receipt posted and stock updated.");
+      toast.success("Receive goods posted and stock updated.");
       await receiptQuery.refetch();
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -106,7 +108,7 @@ export function PurchaseReceiptDetailsPageClient({
           className="text-sm font-semibold text-brand-mocha hover:text-brand-espresso"
           href={ROUTES.purchasingReceipts}
         >
-          Back to Purchase Receipts
+          Back to Receive Goods
         </Link>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <h1 className="font-display text-4xl text-brand-espresso">{receipt.receiptNumber}</h1>
@@ -117,7 +119,7 @@ export function PurchaseReceiptDetailsPageClient({
               onClick={() => void handlePost()}
               type="button"
             >
-              Post Receipt
+              Post Receive Goods
             </Button>
           ) : null}
           {canReturn && receipt.status === "posted" ? (
@@ -141,7 +143,7 @@ export function PurchaseReceiptDetailsPageClient({
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Linked Invoice</p>
+            <p className="text-sm text-brand-mocha">Linked Bill</p>
             <p className="text-lg font-semibold text-brand-espresso">
               {receipt.purchaseInvoiceId ?? "Not linked"}
             </p>
@@ -156,7 +158,7 @@ export function PurchaseReceiptDetailsPageClient({
           </CardContent>
         </Card>
       </div>
-      <PurchasingItemLines lines={receipt.items} title="Receipt items" />
+      <PurchasingItemLines lines={receipt.items} title="Received items" />
       {receipt.purchaseOrderId ? (
         <PurchaseDocumentChain
           chain={chainQuery.data}
@@ -169,7 +171,7 @@ export function PurchaseReceiptDetailsPageClient({
       ) : null}
       <Card className="bg-white/85">
         <CardHeader>
-          <CardTitle>Purchase returns / vendor credits</CardTitle>
+          <CardTitle>Vendor credits</CardTitle>
         </CardHeader>
         <CardContent>
           {receiptReturnsQuery.isLoading ? (

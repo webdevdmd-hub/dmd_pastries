@@ -49,6 +49,17 @@ type RecentDocument = {
   status: JSX.Element;
 };
 
+type StatementRow = {
+  credit: number;
+  date: string | null;
+  debit: number;
+  documentNumber: string;
+  key: string;
+  runningBalance: number;
+  status: JSX.Element;
+  type: string;
+};
+
 function invoiceDocuments(invoices: PurchaseInvoice[]): RecentDocument[] {
   return invoices.map((invoice) => ({
     amount: invoice.totalAmount,
@@ -95,7 +106,7 @@ function paymentDocuments(payments: SupplierPayment[]): RecentDocument[] {
     href: `${ROUTES.purchasingInvoices}/${payment.purchaseInvoiceId}`,
     icon: <WalletCards className="h-4 w-4" />,
     key: `payment-${payment.id}`,
-    label: "Payment",
+    label: "Payment Made",
     number: payment.invoiceNumber,
     status: (
       <PurchasePaymentStatusBadge
@@ -103,6 +114,67 @@ function paymentDocuments(payments: SupplierPayment[]): RecentDocument[] {
       />
     ),
   }));
+}
+
+function buildVendorStatement({
+  invoices,
+  payments,
+  returns,
+}: {
+  invoices: PurchaseInvoice[];
+  payments: SupplierPayment[];
+  returns: PurchaseReturn[];
+}): StatementRow[] {
+  const rows = [
+    ...invoices.map((invoice) => ({
+      credit: 0,
+      date: invoice.invoiceDate,
+      debit: invoice.totalAmount,
+      documentNumber: invoice.supplierBillNumber ?? invoice.invoiceNumber,
+      key: `statement-bill-${invoice.id}`,
+      status: <PurchaseInvoiceStatusBadge status={invoice.status} />,
+      type: "Bill",
+    })),
+    ...payments.map((payment) => ({
+      credit: payment.amount,
+      date: payment.paidAt,
+      debit: 0,
+      documentNumber: payment.invoiceNumber,
+      key: `statement-payment-${payment.id}`,
+      status: (
+        <PurchasePaymentStatusBadge
+          status={payment.paymentStatus === "completed" ? "paid" : "unpaid"}
+        />
+      ),
+      type: "Payment Made",
+    })),
+    ...returns
+      .filter((purchaseReturn) => purchaseReturn.status !== "cancelled")
+      .map((purchaseReturn) => ({
+        credit: purchaseReturn.returnTotal,
+        date: purchaseReturn.returnDate,
+        debit: 0,
+        documentNumber: purchaseReturn.returnNumber,
+        key: `statement-vendor-credit-${purchaseReturn.id}`,
+        status: <PurchaseReturnStatusBadge status={purchaseReturn.status} />,
+        type: "Vendor Credit",
+      })),
+  ].sort((first, second) => {
+    const firstDate = first.date ? new Date(first.date).getTime() : 0;
+    const secondDate = second.date ? new Date(second.date).getTime() : 0;
+    return firstDate - secondDate;
+  });
+
+  let runningBalance = 0;
+
+  return rows.map((row) => {
+    runningBalance += row.debit - row.credit;
+
+    return {
+      ...row,
+      runningBalance,
+    };
+  });
 }
 
 function itemKey(item: PurchaseInvoiceItem): string {
@@ -236,6 +308,7 @@ export function SupplierPurchasingHistory({
       return secondDate - firstDate;
     })
     .slice(0, 8);
+  const statementRows = buildVendorStatement({ invoices, payments, returns });
 
   return (
     <Card className="overflow-hidden border-brand-cappuccino bg-white/90">
@@ -317,7 +390,7 @@ export function SupplierPurchasingHistory({
               ) : (
                 <p className="rounded-xl border border-dashed border-brand-cappuccino bg-brand-latte/25 p-4 text-sm text-brand-mocha">
                   No item-level bill lines are available in the loaded supplier records yet. Open a
-                  purchase invoice to view its full item table.
+                  bill to view its full item table.
                 </p>
               )}
             </div>
@@ -369,6 +442,60 @@ export function SupplierPurchasingHistory({
             </div>
           </section>
         </div>
+
+        <section
+          className="overflow-hidden rounded-2xl border border-brand-cappuccino bg-white"
+          id="statement"
+        >
+          <div className="border-b border-brand-cappuccino p-4">
+            <h3 className="font-semibold text-brand-espresso">Vendor statement</h3>
+            <p className="mt-1 text-sm text-brand-mocha">
+              Running supplier balance from bills, payments made, and vendor credits.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[48rem] text-sm">
+              <thead className="bg-brand-latte/50 text-left text-xs uppercase tracking-[0.18em] text-brand-mocha">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Date</th>
+                  <th className="px-4 py-3 font-semibold">Type</th>
+                  <th className="px-4 py-3 font-semibold">Document</th>
+                  <th className="px-4 py-3 text-right font-semibold">Debit</th>
+                  <th className="px-4 py-3 text-right font-semibold">Credit</th>
+                  <th className="px-4 py-3 text-right font-semibold">Balance</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-brand-cappuccino">
+                {statementRows.length > 0 ? (
+                  statementRows.map((row) => (
+                    <tr className="bg-white" key={row.key}>
+                      <td className="px-4 py-3 text-brand-mocha">{formatDate(row.date)}</td>
+                      <td className="px-4 py-3 font-semibold text-brand-espresso">{row.type}</td>
+                      <td className="px-4 py-3 text-brand-mocha">{row.documentNumber}</td>
+                      <td className="px-4 py-3 text-right text-brand-espresso">
+                        {row.debit > 0 ? formatCurrency(row.debit) : "-"}
+                      </td>
+                      <td className="px-4 py-3 text-right text-brand-espresso">
+                        {row.credit > 0 ? formatCurrency(row.credit) : "-"}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-brand-espresso">
+                        {formatCurrency(row.runningBalance)}
+                      </td>
+                      <td className="px-4 py-3">{row.status}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td className="px-4 py-6 text-center text-brand-mocha" colSpan={7}>
+                      No statement activity is available for this supplier yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </CardContent>
     </Card>
   );

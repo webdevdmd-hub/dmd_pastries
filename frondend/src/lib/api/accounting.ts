@@ -1402,6 +1402,7 @@ export async function getJournalEntries(
       branch_id: filters.branchId,
       date_from: filters.dateFrom,
       date_to: filters.dateTo,
+      journal_origin: filters.journalOrigin,
       limit: filters.limit,
       page: filters.page,
       search: filters.search,

@@ -26,6 +26,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useBranchScope } from "@/hooks/use-branch-scope";
@@ -104,6 +106,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
   const [receivingInvoice, setReceivingInvoice] = useState<PurchaseInvoice | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [cancelReason, setCancelReason] = useState("");
   const [loadingInvoiceDetailId, setLoadingInvoiceDetailId] = useState<string | null>(null);
   const invoicesQuery = usePurchaseInvoices(filters, canView && branchScope.hasBranchScope);
   const suppliersQuery = usePurchasingSuppliers("", canView);
@@ -153,7 +156,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
   const handleCreate = async (payload: CreatePurchaseInvoicePayload): Promise<void> => {
     try {
       await createMutation.mutateAsync(payload);
-      toast.success("Purchase invoice created.");
+      toast.success("Bill created.");
       setFormOpen(false);
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -163,7 +166,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
   const handleUpdate = async (id: string, payload: UpdatePurchaseInvoicePayload): Promise<void> => {
     try {
       await updateMutation.mutateAsync({ id, payload });
-      toast.success("Purchase invoice updated.");
+      toast.success("Bill updated.");
       setEditingInvoice(null);
       setFormOpen(false);
     } catch (error) {
@@ -218,7 +221,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
           receivedDate: new Date().toISOString().slice(0, 10),
         },
       });
-      toast.success("Purchase invoice converted to draft receipt.");
+      toast.success("Bill converted to draft receive goods record.");
       router.push(`${ROUTES.purchasingReceipts}/${receipt.id}`);
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -231,12 +234,21 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
     try {
       if (pendingAction.type === "post") {
         await postMutation.mutateAsync(pendingAction.invoice.id);
-        toast.success("Purchase invoice posted.");
+        toast.success("Bill posted.");
       } else {
-        await cancelMutation.mutateAsync(pendingAction.invoice.id);
-        toast.success("Purchase invoice cancelled.");
+        const reason = cancelReason.trim();
+        if (!reason) {
+          toast.error("Enter a cancellation reason before cancelling the bill.");
+          return;
+        }
+        await cancelMutation.mutateAsync({
+          id: pendingAction.invoice.id,
+          payload: { reason },
+        });
+        toast.success("Bill cancelled.");
       }
       setPendingAction(null);
+      setCancelReason("");
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -247,13 +259,13 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
-        title="Purchase Invoices"
-        description="Record supplier invoices, posting status, and payable balances."
+        title="Bills"
+        description="Review supplier bills, posting status, and payable balances."
         actions={
           canManage ? (
             <Button onClick={openCreate} type="button">
               <Plus className="h-4 w-4" />
-              Create Invoice
+              Create Bill
             </Button>
           ) : undefined
         }
@@ -274,7 +286,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
 
       {!invoicesQuery.isLoading && invoicesQuery.error ? (
         isPermissionDenied ? (
-          <AccessDeniedCard message="The backend denied access to purchase invoices." />
+          <AccessDeniedCard message="The backend denied access to bills." />
         ) : (
           <PurchaseErrorState
             description={getErrorMessage(invoicesQuery.error)}
@@ -287,9 +299,9 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
 
       {!invoicesQuery.isLoading && !invoicesQuery.error && invoices.length === 0 ? (
         <PurchaseEmptyState
-          actionLabel={canManage ? "Create Invoice" : undefined}
+          actionLabel={canManage ? "Create Bill" : undefined}
           onAction={canManage ? openCreate : undefined}
-          title="No purchase invoices found."
+          title="No bills found."
         />
       ) : null}
 
@@ -301,7 +313,10 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
               canManage={canManage}
               invoices={invoices}
               loadingInvoiceId={loadingInvoiceDetailId}
-              onCancel={(invoice) => setPendingAction({ invoice, type: "cancel" })}
+              onCancel={(invoice) => {
+                setCancelReason("");
+                setPendingAction({ invoice, type: "cancel" });
+              }}
               onConvertToReceipt={(invoice) => void handleConvertToReceipt(invoice)}
               onEdit={(invoice) => void handleEditInvoice(invoice)}
               onPost={(invoice) => setPendingAction({ invoice, type: "post" })}
@@ -345,29 +360,56 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
 
       <Dialog
         open={pendingAction !== null}
-        onOpenChange={(open) => (!open ? setPendingAction(null) : undefined)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingAction(null);
+            setCancelReason("");
+          }
+        }}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {pendingAction?.type === "post" ? "Post invoice" : "Cancel invoice"}
+              {pendingAction?.type === "post" ? "Post bill" : "Cancel Bill"}
             </DialogTitle>
             <DialogDescription>
               {pendingAction?.type === "post"
-                ? "Posting confirms the supplier invoice and payable total."
-                : "Cancelling this invoice depends on backend purchasing rules."}
+                ? "Posting confirms the supplier bill and payable total."
+                : "Cancelling this posted bill will reverse supplier payable, VAT, and inventory if the stock is still available. This action keeps an audit trail and cannot be undone."}
             </DialogDescription>
           </DialogHeader>
+          {pendingAction?.type === "cancel" ? (
+            <div className="space-y-2">
+              <Label htmlFor="bill-cancel-reason">Cancellation reason</Label>
+              <Textarea
+                id="bill-cancel-reason"
+                onChange={(event) => setCancelReason(event.target.value)}
+                placeholder="Wrong supplier bill entered"
+                value={cancelReason}
+              />
+            </div>
+          ) : null}
           <DialogFooter>
-            <Button onClick={() => setPendingAction(null)} type="button" variant="outline">
+            <Button
+              onClick={() => {
+                setPendingAction(null);
+                setCancelReason("");
+              }}
+              type="button"
+              variant="outline"
+            >
               Cancel
             </Button>
             <Button
-              disabled={postMutation.isPending || cancelMutation.isPending}
+              disabled={
+                postMutation.isPending ||
+                cancelMutation.isPending ||
+                (pendingAction?.type === "cancel" && !cancelReason.trim())
+              }
               onClick={() => void confirmAction()}
               type="button"
             >
-              Confirm
+              {pendingAction?.type === "post" ? "Post bill" : "Cancel Bill"}
             </Button>
           </DialogFooter>
         </DialogContent>

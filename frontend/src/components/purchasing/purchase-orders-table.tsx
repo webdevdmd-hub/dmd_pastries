@@ -29,37 +29,43 @@ function formatDate(value: string | null): string {
 
 function nextStepForOrder(order: PurchaseOrder): string {
   if (order.status === "draft") {
-    return "Mark ordered or convert to invoice";
+    return "Mark as issued";
   }
 
   if (order.status === "ordered") {
-    return "Convert to invoice";
+    return "Receive goods";
   }
 
   if (order.status === "partially_received") {
-    return "Receive remaining stock";
+    return "Receive remaining goods";
   }
 
   if (order.status === "received") {
-    return "Completed";
+    return "Convert to bill";
   }
 
   return "No action";
 }
 
 export function PurchaseOrdersTable({
-  canConvertToInvoice,
-  canManage,
-  onConvertToInvoice,
+  canDelete,
+  canEdit,
+  canConvertToBill,
+  canReceiveOrder,
+  canUpdateStatus,
+  onConvertToBill,
   onDelete,
   onEdit,
   onReceive,
   onStatusChange,
   orders,
 }: {
-  canConvertToInvoice: boolean;
-  canManage: boolean;
-  onConvertToInvoice: (order: PurchaseOrder) => void;
+  canDelete: boolean;
+  canEdit: boolean;
+  canConvertToBill: boolean;
+  canReceiveOrder: boolean;
+  canUpdateStatus: boolean;
+  onConvertToBill: (order: PurchaseOrder) => void;
   onDelete: (order: PurchaseOrder) => void;
   onEdit: (order: PurchaseOrder) => void;
   onReceive: (order: PurchaseOrder) => void;
@@ -111,9 +117,12 @@ export function PurchaseOrdersTable({
             </TableCell>
             <TableCell>
               <PurchaseOrderActionsMenu
-                canConvertToInvoice={canConvertToInvoice}
-                canManage={canManage}
-                onConvertToInvoice={onConvertToInvoice}
+                canDelete={canDelete}
+                canEdit={canEdit}
+                canConvertToBill={canConvertToBill}
+                canReceiveOrder={canReceiveOrder}
+                canUpdateStatus={canUpdateStatus}
+                onConvertToBill={onConvertToBill}
                 onDelete={onDelete}
                 onEdit={onEdit}
                 onReceive={onReceive}

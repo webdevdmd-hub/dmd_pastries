@@ -1436,6 +1436,66 @@ func (s *Service) PostPurchaseInvoiceJournal(tx *gorm.DB, currentUser *utils.Aut
 	return journalID, nil
 }
 
+func (s *Service) PostPurchaseInvoiceCancellationJournal(tx *gorm.DB, currentUser *utils.AuthContext, invoiceID string) (string, error) {
+	invoice, err := s.repo.FindPurchaseInvoiceForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(invoiceID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load purchase invoice for accounting")
+	}
+	if invoice.ReversalJournalEntryID != nil && *invoice.ReversalJournalEntryID != "" {
+		return *invoice.ReversalJournalEntryID, nil
+	}
+	if invoice.Status != "posted" && invoice.Status != "cancelled" {
+		return "", nil
+	}
+	totalAmount := roundMoney(invoice.TotalAmount)
+	if totalAmount <= 0 {
+		return "", nil
+	}
+	if invoice.JournalEntryID == nil || strings.TrimSpace(*invoice.JournalEntryID) == "" {
+		if invoice.Status != "posted" {
+			return "", apperrors.BadRequest("purchase invoice has no original accounting journal to reverse", nil)
+		}
+		if _, err := s.PostPurchaseInvoiceJournal(tx, currentUser, invoice.ID); err != nil {
+			return "", err
+		}
+	}
+	inventoryAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "inventory_stock", "1200", "Inventory / Stock")
+	if err != nil {
+		return "", err
+	}
+	accountsPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "accounts_payable", "2000", "Accounts Payable")
+	if err != nil {
+		return "", err
+	}
+	taxAmount := roundMoney(invoice.TaxAmount)
+	chargeLines, chargeNetAmount, err := s.buildPurchaseChargeCreditLines(tx, currentUser.BusinessID, "purchase_invoice", invoice.ID, "Purchase invoice cancellation charge")
+	if err != nil {
+		return "", err
+	}
+	netAmount := roundMoney(totalAmount - taxAmount - chargeNetAmount)
+	lines := make([]JournalEntryLineRequest, 0, 3+len(chargeLines))
+	lines = append(lines, JournalEntryLineRequest{AccountID: accountsPayable.ID, DebitAmount: totalAmount, Description: "Supplier payable reversed " + invoice.InvoiceNumber})
+	if netAmount > 0 {
+		lines = append(lines, JournalEntryLineRequest{AccountID: inventoryAccount.ID, CreditAmount: netAmount, Description: "Purchase invoice stock value reversed"})
+	}
+	lines = append(lines, chargeLines...)
+	if taxAmount > 0 {
+		vatReceivable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "vat_receivable", "1300", "VAT Receivable")
+		if err != nil {
+			return "", err
+		}
+		lines = append(lines, JournalEntryLineRequest{AccountID: vatReceivable.ID, CreditAmount: taxAmount, Description: "VAT receivable reversed on purchase invoice cancellation"})
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, time.Now().UTC(), &invoice.BranchID, "purchase_invoice_cancel", invoice.ID, invoice.InvoiceNumber, "Purchase invoice cancellation "+invoice.InvoiceNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdatePurchaseInvoiceReversalJournalID(tx, currentUser.BusinessID, invoice.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update purchase invoice reversal journal")
+	}
+	return journalID, nil
+}
+
 func (s *Service) PostPurchaseInvoicePaymentJournal(tx *gorm.DB, currentUser *utils.AuthContext, paymentID string) (string, error) {
 	payment, err := s.repo.FindPurchaseInvoicePaymentForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(paymentID))
 	if err != nil {
@@ -1977,6 +2037,7 @@ func (s *Service) backfillOneJournal(currentUser *utils.AuthContext, target, id 
 func (s *Service) ListJournalEntries(currentUser *utils.AuthContext, query JournalEntryListQuery) (*PaginatedResponse[JournalEntryResponse], error) {
 	query.Page, query.Limit = normalizePagination(query.Page, query.Limit)
 	query.Search = strings.TrimSpace(query.Search)
+	query.JournalOrigin = strings.ToLower(strings.TrimSpace(query.JournalOrigin))
 	if err := validateJournalEntryFilters(query); err != nil {
 		return nil, err
 	}
@@ -2842,6 +2903,9 @@ func (s *Service) validatePlatformSettlementFilters(currentUser *utils.AuthConte
 func validateJournalEntryFilters(query JournalEntryListQuery) error {
 	if query.Status != "" && !validJournalEntryStatus(query.Status) {
 		return apperrors.BadRequest("invalid status", nil)
+	}
+	if query.JournalOrigin != "" && query.JournalOrigin != "manual" && query.JournalOrigin != "system" {
+		return apperrors.BadRequest("journal_origin must be manual or system", nil)
 	}
 	if query.DateFrom != "" {
 		if _, err := time.Parse("2006-01-02", query.DateFrom); err != nil {

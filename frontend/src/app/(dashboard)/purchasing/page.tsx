@@ -1,7 +1,7 @@
-import type { JSX } from "react";
+import { redirect } from "next/navigation";
 
-import { PurchasingPageClient } from "@/components/purchasing/purchasing-page-client";
+import { ROUTES } from "@/constants/routes";
 
-export default function PurchasingPage(): JSX.Element {
-  return <PurchasingPageClient />;
+export default function PurchasingPage(): never {
+  redirect(ROUTES.purchasingOrders);
 }

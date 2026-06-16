@@ -156,13 +156,13 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
-        title="Purchase Receipts"
-        description="Receive stock from suppliers and trace inventory stock-in movements."
+        title="Receive Goods"
+        description="Receive supplier goods and trace inventory stock-in movements."
         actions={
           canManage ? (
             <Button onClick={() => setReceiveOpen(true)} type="button">
               <Plus className="h-4 w-4" />
-              Receive Stock
+              Receive Goods
             </Button>
           ) : undefined
         }
@@ -182,7 +182,7 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
 
       {!receiptsQuery.isLoading && receiptsQuery.error ? (
         isPermissionDenied ? (
-          <AccessDeniedCard message="The backend denied access to purchase receipts." />
+          <AccessDeniedCard message="The backend denied access to receive goods records." />
         ) : (
           <PurchaseErrorState
             description={getErrorMessage(receiptsQuery.error)}
@@ -195,9 +195,9 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
 
       {!receiptsQuery.isLoading && !receiptsQuery.error && receipts.length === 0 ? (
         <PurchaseEmptyState
-          actionLabel={canManage ? "Receive Stock" : undefined}
+          actionLabel={canManage ? "Receive Goods" : undefined}
           onAction={canManage ? () => setReceiveOpen(true) : undefined}
-          title="No purchase receipts found."
+          title="No receive goods records found."
         />
       ) : null}
 
@@ -242,12 +242,12 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {pendingAction?.type === "post" ? "Post receipt" : "Cancel receipt"}
+              {pendingAction?.type === "post" ? "Post receive goods" : "Cancel receive goods"}
             </DialogTitle>
             <DialogDescription>
               {pendingAction?.type === "post"
-                ? "Posting confirms the stock receipt in purchasing workflows."
-                : "Cancelling a posted receipt may create reversal stock movements."}
+                ? "Posting confirms received goods and updates inventory."
+                : "Cancelling posted receive goods may create reversal stock movements."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

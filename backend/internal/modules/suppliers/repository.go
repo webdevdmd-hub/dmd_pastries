@@ -15,6 +15,27 @@ type Repository struct {
 	db *gorm.DB
 }
 
+type supplierStatementRow struct {
+	ID                string
+	DocumentID        string
+	DocumentNumber    string
+	TransactionType   string
+	TransactionDate   time.Time
+	BranchID          string
+	BranchName        string
+	DebitAmount       float64
+	CreditAmount      float64
+	Status            string
+	PaymentStatus     string
+	ReferenceNumber   string
+	Notes             string
+	PurchaseOrderID   *string
+	PurchaseInvoiceID *string
+	PurchaseReceiptID *string
+	PurchaseReturnID  *string
+	PaymentID         *string
+}
+
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
@@ -185,6 +206,97 @@ func (r *Repository) DeleteNote(tx *gorm.DB, businessID, branchID, supplierID, n
 
 func (r *Repository) Stats(businessID, supplierID string) (*SupplierStatsResponse, error) {
 	return &SupplierStatsResponse{SupplierID: supplierID, TotalPurchaseOrders: 0, TotalPurchaseAmount: 0, LastPurchaseDate: nil, OutstandingPayables: 0}, nil
+}
+
+func (r *Repository) StatementRows(businessID, branchID, supplierID string) ([]supplierStatementRow, error) {
+	var rows []supplierStatementRow
+	err := r.db.Raw(`
+		SELECT *
+		FROM (
+			SELECT
+				pi.id AS id,
+				pi.id AS document_id,
+				pi.invoice_number AS document_number,
+				'bill' AS transaction_type,
+				pi.invoice_date AS transaction_date,
+				pi.branch_id AS branch_id,
+				b.branch_name AS branch_name,
+				pi.total_amount AS debit_amount,
+				0::numeric AS credit_amount,
+				pi.status AS status,
+				pi.payment_status AS payment_status,
+				'' AS reference_number,
+				pi.notes AS notes,
+				pi.purchase_order_id AS purchase_order_id,
+				pi.id AS purchase_invoice_id,
+				NULL::uuid AS purchase_receipt_id,
+				NULL::uuid AS purchase_return_id,
+				NULL::uuid AS payment_id,
+				pi.created_at AS created_at
+			FROM purchase_invoices pi
+			JOIN branches b ON b.id = pi.branch_id AND b.business_id = pi.business_id
+			WHERE pi.business_id = ? AND pi.branch_id = ? AND pi.supplier_id = ?
+				AND pi.status = 'posted' AND pi.deleted_at IS NULL
+
+			UNION ALL
+
+			SELECT
+				pip.id AS id,
+				pip.id AS document_id,
+				COALESCE(NULLIF(pip.reference_number, ''), pip.id::text) AS document_number,
+				'payment_made' AS transaction_type,
+				pip.paid_at::date AS transaction_date,
+				pip.branch_id AS branch_id,
+				b.branch_name AS branch_name,
+				0::numeric AS debit_amount,
+				pip.amount AS credit_amount,
+				pip.payment_status AS status,
+				pip.payment_status AS payment_status,
+				pip.reference_number AS reference_number,
+				pip.notes AS notes,
+				pi.purchase_order_id AS purchase_order_id,
+				pip.purchase_invoice_id AS purchase_invoice_id,
+				NULL::uuid AS purchase_receipt_id,
+				NULL::uuid AS purchase_return_id,
+				pip.id AS payment_id,
+				pip.created_at AS created_at
+			FROM purchase_invoice_payments pip
+			JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id AND pi.business_id = pip.business_id
+			JOIN branches b ON b.id = pip.branch_id AND b.business_id = pip.business_id
+			WHERE pip.business_id = ? AND pip.branch_id = ? AND pip.supplier_id = ?
+				AND pip.payment_status = 'completed' AND pip.deleted_at IS NULL
+				AND pi.deleted_at IS NULL
+
+			UNION ALL
+
+			SELECT
+				pr.id AS id,
+				pr.id AS document_id,
+				pr.return_number AS document_number,
+				'vendor_credit' AS transaction_type,
+				pr.return_date AS transaction_date,
+				pr.branch_id AS branch_id,
+				b.branch_name AS branch_name,
+				0::numeric AS debit_amount,
+				pr.return_total AS credit_amount,
+				pr.status AS status,
+				'' AS payment_status,
+				pr.supplier_reference_number AS reference_number,
+				pr.reason AS notes,
+				pr.purchase_order_id AS purchase_order_id,
+				pr.purchase_invoice_id AS purchase_invoice_id,
+				pr.purchase_receipt_id AS purchase_receipt_id,
+				pr.id AS purchase_return_id,
+				NULL::uuid AS payment_id,
+				pr.created_at AS created_at
+			FROM purchase_returns pr
+			JOIN branches b ON b.id = pr.branch_id AND b.business_id = pr.business_id
+			WHERE pr.business_id = ? AND pr.branch_id = ? AND pr.supplier_id = ?
+				AND pr.status = 'posted' AND pr.deleted_at IS NULL
+		) statement
+		ORDER BY transaction_date ASC, created_at ASC, document_number ASC
+	`, businessID, branchID, supplierID, businessID, branchID, supplierID, businessID, branchID, supplierID).Scan(&rows).Error
+	return rows, err
 }
 
 func applySupplierFilters(db *gorm.DB, query SupplierListQuery) *gorm.DB {

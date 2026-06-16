@@ -23,6 +23,7 @@ func RegisterRoutes(
 	group.POST("/:id/notes", manage, handler.AddNote)
 	group.DELETE("/:id/notes/:noteId", manage, handler.DeleteNote)
 	group.GET("/:id/stats", view, handler.Stats)
+	group.GET("/:id/statement", view, handler.Statement)
 	group.GET("/:id", view, handler.GetSupplier)
 	group.PATCH("/:id", manage, handler.UpdateSupplier)
 	group.PATCH("/:id/status", manage, handler.UpdateSupplierStatus)

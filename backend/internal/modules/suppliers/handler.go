@@ -218,6 +218,22 @@ func (h *Handler) Stats(c *gin.Context) {
 	response.Success(c, 200, "supplier stats fetched successfully", result)
 }
 
+func (h *Handler) Statement(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	result, err := h.service.Statement(utils.MustAuthContext(c), c.Param("id"), SupplierStatementQuery{
+		DateFrom:        c.Query("date_from"),
+		DateTo:          c.Query("date_to"),
+		TransactionType: c.Query("transaction_type"),
+	})
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "supplier statement fetched successfully", result)
+}
+
 func parseSupplierListQuery(c *gin.Context) SupplierListQuery {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))

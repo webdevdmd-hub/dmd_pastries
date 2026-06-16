@@ -38,7 +38,7 @@ export function PurchaseInvoicePaymentsSection({
   const handleAddPayment = async (payload: AddSupplierPaymentPayload): Promise<void> => {
     try {
       await addPaymentMutation.mutateAsync({ invoiceId: invoice.id, payload });
-      toast.success("Supplier payment recorded.");
+      toast.success("Payment made recorded.");
       setDialogOpen(false);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
@@ -49,9 +49,9 @@ export function PurchaseInvoicePaymentsSection({
     <Card className="bg-white/85">
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <CardTitle>Supplier Payments</CardTitle>
+          <CardTitle>Payments Made</CardTitle>
           <p className="mt-1 text-sm text-brand-mocha">
-            Money paid out for this supplier invoice. Balance:{" "}
+            Money paid out for this bill. Balance:{" "}
             <span className="font-semibold text-brand-espresso">
               {formatCurrency(invoice.balanceAmount)}
             </span>
@@ -70,17 +70,17 @@ export function PurchaseInvoicePaymentsSection({
       <CardContent>
         {invoice.status !== "posted" ? (
           <p className="rounded-2xl border border-dashed border-brand-cappuccino bg-brand-latte/50 p-4 text-sm text-brand-mocha">
-            Post the supplier invoice before recording payments.
+            Post the bill before recording payments.
           </p>
         ) : null}
         {invoice.status === "posted" && invoice.balanceAmount <= 0 ? (
           <p className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-            This supplier invoice is fully paid.
+            This bill is fully paid.
           </p>
         ) : null}
         {paymentsQuery.isLoading ? (
           <p className="rounded-2xl border border-brand-cappuccino/60 p-4 text-sm text-brand-mocha">
-            Loading supplier payments...
+            Loading payments made...
           </p>
         ) : null}
         {paymentsQuery.error ? (
@@ -100,7 +100,7 @@ export function PurchaseInvoicePaymentsSection({
         !paymentsQuery.error &&
         (paymentsQuery.data ?? []).length === 0 ? (
           <p className="rounded-2xl border border-dashed border-brand-cappuccino p-4 text-sm text-brand-mocha">
-            No supplier payments recorded yet.
+            No payments made yet.
           </p>
         ) : null}
       </CardContent>

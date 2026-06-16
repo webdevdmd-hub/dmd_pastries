@@ -1554,7 +1554,7 @@ func movementDirection(movementType string) (string, error) {
 	switch movementType {
 	case "opening_stock", "purchase_in", "adjustment_in", "return_in", "transfer_in", "production_in":
 		return "in", nil
-	case "sale_out", "adjustment_out", "wastage", "transfer_out", "production_out", "purchase_return_out":
+	case "sale_out", "adjustment_out", "wastage", "transfer_out", "production_out", "purchase_return_out", "purchase_bill_cancel_out":
 		return "out", nil
 	case "transfer":
 		return "transfer", nil

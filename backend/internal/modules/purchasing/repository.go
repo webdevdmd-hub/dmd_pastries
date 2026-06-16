@@ -40,6 +40,69 @@ func (r *Repository) UpdateOrder(tx *gorm.DB, id, businessID string, updates map
 	return nil
 }
 
+func (r *Repository) PurchaseOrderHistoryCount(tx *gorm.DB, businessID, orderID string) (int64, error) {
+	var count int64
+	if err := tx.Model(&PurchaseInvoice{}).
+		Where("business_id = ? AND purchase_order_id = ? AND deleted_at IS NULL", businessID, orderID).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	total := count
+	if err := tx.Model(&PurchaseReceipt{}).
+		Where("business_id = ? AND purchase_order_id = ? AND deleted_at IS NULL", businessID, orderID).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	total += count
+	if err := tx.Model(&PurchaseReturn{}).
+		Where("business_id = ? AND purchase_order_id = ? AND deleted_at IS NULL", businessID, orderID).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	total += count
+	if err := tx.Table("purchase_invoice_payments pip").
+		Joins("JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id AND pi.business_id = pip.business_id AND pi.deleted_at IS NULL").
+		Where("pip.business_id = ? AND pi.purchase_order_id = ? AND pip.deleted_at IS NULL", businessID, orderID).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	total += count
+	if err := tx.Table("stock_movements sm").
+		Where(`
+			sm.business_id = ?
+			AND (
+				sm.reference_id = ?
+				OR EXISTS (
+					SELECT 1
+					FROM purchase_receipts pr
+					WHERE pr.id = sm.reference_id
+						AND pr.business_id = sm.business_id
+						AND pr.purchase_order_id = ?
+						AND pr.deleted_at IS NULL
+				)
+			)
+		`, businessID, orderID, orderID).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	total += count
+	return total, nil
+}
+
+func (r *Repository) HardDeleteOrder(tx *gorm.DB, businessID, orderID string) error {
+	if err := tx.Exec("DELETE FROM document_charges WHERE business_id = ? AND document_type = ? AND document_id = ?", businessID, "purchase_order", orderID).Error; err != nil {
+		return err
+	}
+	if err := tx.Unscoped().
+		Where("purchase_order_id = ? AND business_id = ?", orderID, businessID).
+		Delete(&PurchaseOrderItem{}).Error; err != nil {
+		return err
+	}
+	return updateOne(tx.Unscoped().
+		Where("id = ? AND business_id = ?", orderID, businessID).
+		Delete(&PurchaseOrder{}))
+}
+
 func (r *Repository) FindOrder(id, businessID string) (*PurchaseOrder, error) {
 	var order PurchaseOrder
 	err := r.db.Where("id = ? AND business_id = ? AND deleted_at IS NULL", id, businessID).First(&order).Error
@@ -285,6 +348,15 @@ func (r *Repository) ActiveReceiptCountForInvoice(tx *gorm.DB, businessID, invoi
 	return count, err
 }
 
+func (r *Repository) ReceiptsForInvoiceForUpdate(tx *gorm.DB, businessID, invoiceID string) ([]PurchaseReceipt, error) {
+	var receipts []PurchaseReceipt
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("business_id = ? AND purchase_invoice_id = ? AND status <> ? AND deleted_at IS NULL", businessID, invoiceID, "cancelled").
+		Order("received_date ASC, created_at ASC").
+		Find(&receipts).Error
+	return receipts, err
+}
+
 func (r *Repository) ReceiptsForOrder(businessID, orderID string) ([]PurchaseReceipt, error) {
 	var receipts []PurchaseReceipt
 	err := r.db.Where("business_id = ? AND purchase_order_id = ? AND deleted_at IS NULL", businessID, orderID).
@@ -402,6 +474,14 @@ func (r *Repository) PurchaseReturnsForInvoice(businessID, invoiceID string) ([]
 		Order("return_date ASC, created_at ASC").
 		Find(&rows).Error
 	return rows, err
+}
+
+func (r *Repository) PostedPurchaseReturnCountForInvoice(tx *gorm.DB, businessID, invoiceID string) (int64, error) {
+	var count int64
+	err := tx.Model(&PurchaseReturn{}).
+		Where("business_id = ? AND purchase_invoice_id = ? AND status = ? AND deleted_at IS NULL", businessID, invoiceID, "posted").
+		Count(&count).Error
+	return count, err
 }
 
 func (r *Repository) PurchaseReturnsForOrder(businessID, orderID string) ([]PurchaseReturn, error) {

@@ -137,18 +137,19 @@ type expenseAccountingRow struct {
 }
 
 type purchaseInvoiceAccountingRow struct {
-	ID              string
-	BusinessID      string
-	BranchID        string
-	InvoiceNumber   string
-	InvoiceDate     time.Time
-	Status          string
-	SubtotalAmount  float64
-	TaxAmount       float64
-	ChargeAmount    float64
-	ChargeTaxAmount float64
-	TotalAmount     float64
-	JournalEntryID  *string
+	ID                     string
+	BusinessID             string
+	BranchID               string
+	InvoiceNumber          string
+	InvoiceDate            time.Time
+	Status                 string
+	SubtotalAmount         float64
+	TaxAmount              float64
+	ChargeAmount           float64
+	ChargeTaxAmount        float64
+	TotalAmount            float64
+	JournalEntryID         *string
+	ReversalJournalEntryID *string
 }
 
 type purchaseInvoiceItemAccountingRow struct {
@@ -496,10 +497,17 @@ func (r *Repository) UpsertAccountMapping(tx *gorm.DB, mapping *AccountMapping) 
 
 func (r *Repository) FindPostedJournalBySource(tx *gorm.DB, businessID, sourceType, sourceID string) (*JournalEntry, error) {
 	var entry JournalEntry
-	err := tx.Where("business_id = ? AND source_type = ? AND source_id = ? AND status IN ? AND deleted_at IS NULL", businessID, sourceType, sourceID, []string{"posted", "reversed"}).
+	result := tx.Where("business_id = ? AND source_type = ? AND source_id = ? AND status IN ? AND deleted_at IS NULL", businessID, sourceType, sourceID, []string{"posted", "reversed"}).
 		Order("created_at ASC").
-		First(&entry).Error
-	return &entry, err
+		Limit(1).
+		Find(&entry)
+	if result.Error != nil {
+		return &entry, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return &entry, gorm.ErrRecordNotFound
+	}
+	return &entry, nil
 }
 
 func (r *Repository) FindPOSSaleForAccounting(tx *gorm.DB, businessID, saleID string) (*posSaleAccountingRow, error) {
@@ -589,7 +597,7 @@ func (r *Repository) UpdatePOSSaleVoidJournalID(tx *gorm.DB, businessID, saleID,
 func (r *Repository) FindPurchaseInvoiceForAccounting(tx *gorm.DB, businessID, invoiceID string) (*purchaseInvoiceAccountingRow, error) {
 	var row purchaseInvoiceAccountingRow
 	err := tx.Table("purchase_invoices").
-		Select("id, business_id, branch_id, invoice_number, invoice_date, status, subtotal_amount, tax_amount, charge_amount, charge_tax_amount, total_amount, journal_entry_id").
+		Select("id, business_id, branch_id, invoice_number, invoice_date, status, subtotal_amount, tax_amount, charge_amount, charge_tax_amount, total_amount, journal_entry_id, reversal_journal_entry_id").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, invoiceID).
 		Take(&row).Error
 	return &row, err
@@ -609,6 +617,19 @@ func (r *Repository) UpdatePurchaseInvoiceJournalID(tx *gorm.DB, businessID, inv
 	result := tx.Table("purchase_invoices").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, invoiceID).
 		Update("journal_entry_id", journalEntryID)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) UpdatePurchaseInvoiceReversalJournalID(tx *gorm.DB, businessID, invoiceID, journalEntryID string) error {
+	result := tx.Table("purchase_invoices").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, invoiceID).
+		Update("reversal_journal_entry_id", journalEntryID)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -1077,7 +1098,7 @@ func (r *Repository) ListPaymentMethodReadinessIssues(tx *gorm.DB, businessID st
 func (r *Repository) CountValueMovementsMissingCost(tx *gorm.DB, businessID string, req BackfillJournalsRequest) (int64, error) {
 	query := tx.Table("stock_movements").
 		Where("business_id = ?", businessID).
-		Where("movement_type IN ?", []string{"opening_stock", "adjustment_in", "adjustment_out", "wastage", "purchase_in", "sale_out", "production_in", "production_out", "purchase_return_out", "return_in"}).
+		Where("movement_type IN ?", []string{"opening_stock", "adjustment_in", "adjustment_out", "wastage", "purchase_in", "sale_out", "production_in", "production_out", "purchase_return_out", "purchase_bill_cancel_out", "return_in"}).
 		Where("COALESCE(total_cost, 0) <= 0")
 	if strings.TrimSpace(req.BranchID) != "" {
 		query = query.Where("branch_id = ?", strings.TrimSpace(req.BranchID))
@@ -2172,7 +2193,14 @@ func applyJournalEntryFilters(db *gorm.DB, query JournalEntryListQuery) *gorm.DB
 	if query.Status != "" {
 		db = db.Where("status = ?", query.Status)
 	}
-	if query.SourceType != "" {
+	switch query.JournalOrigin {
+	case "manual":
+		db = db.Where("source_type = ?", "manual")
+	case "system":
+		db = db.Where("COALESCE(source_type, '') <> ?", "manual")
+	case "":
+	}
+	if query.JournalOrigin == "" && query.SourceType != "" {
 		db = db.Where("source_type = ?", query.SourceType)
 	}
 	if query.DateFrom != "" {

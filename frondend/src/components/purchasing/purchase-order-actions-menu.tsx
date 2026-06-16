@@ -14,9 +14,12 @@ import {
 import type { PurchaseOrder, PurchaseOrderStatus } from "@/types/purchasing";
 
 export function PurchaseOrderActionsMenu({
-  canConvertToInvoice,
-  canManage,
-  onConvertToInvoice,
+  canDelete,
+  canEdit,
+  canConvertToBill,
+  canReceiveOrder,
+  canUpdateStatus,
+  onConvertToBill,
   onDelete,
   onEdit,
   onReceive,
@@ -24,9 +27,12 @@ export function PurchaseOrderActionsMenu({
   onView,
   order,
 }: {
-  canConvertToInvoice: boolean;
-  canManage: boolean;
-  onConvertToInvoice: (order: PurchaseOrder) => void;
+  canDelete: boolean;
+  canEdit: boolean;
+  canConvertToBill: boolean;
+  canReceiveOrder: boolean;
+  canUpdateStatus: boolean;
+  onConvertToBill: (order: PurchaseOrder) => void;
   onDelete: (order: PurchaseOrder) => void;
   onEdit: (order: PurchaseOrder) => void;
   onReceive: (order: PurchaseOrder) => void;
@@ -35,7 +41,11 @@ export function PurchaseOrderActionsMenu({
   order: PurchaseOrder;
 }): JSX.Element {
   const canReceive = order.status === "ordered" || order.status === "partially_received";
-  const isConversionEligible = order.status === "draft" || order.status === "ordered";
+  const canHardDelete =
+    canDelete && order.status !== "received" && order.status !== "partially_received";
+  const isConversionEligible = order.status === "received";
+  const showWriteActions =
+    canEdit || canUpdateStatus || canConvertToBill || canReceiveOrder || canHardDelete;
 
   return (
     <DropdownMenu>
@@ -51,36 +61,46 @@ export function PurchaseOrderActionsMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={() => onView(order)}>View details</DropdownMenuItem>
-        {canManage ? (
+        {showWriteActions ? (
           <>
-            <DropdownMenuItem disabled={order.status !== "draft"} onSelect={() => onEdit(order)}>
-              Edit
-            </DropdownMenuItem>
+            {canEdit ? (
+              <DropdownMenuItem disabled={order.status !== "draft"} onSelect={() => onEdit(order)}>
+                Edit
+              </DropdownMenuItem>
+            ) : null}
+            {canUpdateStatus ? (
+              <DropdownMenuItem
+                disabled={order.status !== "draft"}
+                onSelect={() => onStatusChange(order, "ordered")}
+              >
+                Mark as issued
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem
-              disabled={order.status !== "draft"}
-              onSelect={() => onStatusChange(order, "ordered")}
+              disabled={!canConvertToBill || !isConversionEligible}
+              onSelect={() => onConvertToBill(order)}
             >
-              Mark ordered
+              Convert to bill
             </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={!canConvertToInvoice || !isConversionEligible}
-              onSelect={() => onConvertToInvoice(order)}
-            >
-              Convert to invoice
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={!canReceive} onSelect={() => onReceive(order)}>
-              Receive
-            </DropdownMenuItem>
+            {canReceiveOrder ? (
+              <DropdownMenuItem disabled={!canReceive} onSelect={() => onReceive(order)}>
+                Receive goods
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              disabled={order.status === "received" || order.status === "cancelled"}
-              onSelect={() => onStatusChange(order, "cancelled")}
-            >
-              Cancel
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-700" onSelect={() => onDelete(order)}>
-              Delete
-            </DropdownMenuItem>
+            {canUpdateStatus ? (
+              <DropdownMenuItem
+                disabled={order.status === "received" || order.status === "cancelled"}
+                onSelect={() => onStatusChange(order, "cancelled")}
+              >
+                Cancel
+              </DropdownMenuItem>
+            ) : null}
+            {canHardDelete ? (
+              <DropdownMenuItem className="text-red-700" onSelect={() => onDelete(order)}>
+                Delete
+              </DropdownMenuItem>
+            ) : null}
           </>
         ) : null}
       </DropdownMenuContent>

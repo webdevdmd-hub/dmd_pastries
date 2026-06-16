@@ -101,7 +101,7 @@ function PaymentCard({ payment }: { payment: SupplierPayment }): JSX.Element {
     <ChainCard
       description={`${formatDate(payment.paidAt)} - ${payment.paymentMethodName}`}
       icon={<ReceiptText className="h-4 w-4" />}
-      stage="Payment"
+      stage="Payment made"
       title={payment.invoiceNumber}
     >
       <Badge variant="secondary">{formatCurrency(payment.amount)}</Badge>
@@ -132,7 +132,7 @@ export function PurchaseDocumentChain({
       <PurchaseErrorState
         description={getErrorMessage(error)}
         onRetry={onRetry}
-        title="Unable to load document chain"
+        title="Unable to load purchase timeline"
       />
     );
   }
@@ -146,12 +146,12 @@ export function PurchaseDocumentChain({
     invoices.length > 0 || receipts.length > 0 || purchaseReturns.length > 0 || payments.length > 0;
   const nextStep =
     invoices.length === 0
-      ? "Convert this purchase order to a draft purchase invoice."
+      ? "Convert this purchase order to a draft bill."
       : receipts.length === 0
-        ? "Post the invoice, then convert it to a draft receipt."
+        ? "Post the bill, then receive goods if stock has not been received."
         : payments.length === 0
-          ? "Record supplier payment when the invoice is ready to pay."
-          : "This purchase trail has linked downstream documents.";
+          ? "Record payment made when the bill is ready to pay."
+          : "This purchase timeline has linked downstream documents.";
 
   return (
     <Card className="overflow-hidden border-brand-cappuccino bg-white/90 shadow-sm">
@@ -159,11 +159,9 @@ export function PurchaseDocumentChain({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-brand-mocha">
-              Purchase trail
+              Purchase timeline
             </p>
-            <CardTitle className="mt-1 text-xl text-brand-espresso">
-              Purchase document chain
-            </CardTitle>
+            <CardTitle className="mt-1 text-xl text-brand-espresso">Purchase Timeline</CardTitle>
             <p className="mt-2 text-sm text-brand-mocha">{nextStep}</p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-brand-cappuccino bg-brand-latte px-3 py-2 text-xs font-semibold text-brand-mocha">
@@ -197,7 +195,7 @@ export function PurchaseDocumentChain({
                   icon={<FileCheck2 className="h-4 w-4" />}
                   key={invoice.id}
                   stage="Bill"
-                  title={invoice.invoiceNumber}
+                  title={invoice.supplierBillNumber ?? invoice.invoiceNumber}
                 >
                   <PurchaseInvoiceStatusBadge status={invoice.status} />
                   <PurchasePaymentStatusBadge status={invoice.paymentStatus} />
@@ -205,11 +203,11 @@ export function PurchaseDocumentChain({
               ))
             ) : (
               <ChainCard
-                description="Convert this PO to create a draft invoice."
+                description="Convert this PO to create a draft bill."
                 icon={<FileCheck2 className="h-4 w-4" />}
                 isEmpty
                 stage="Bill"
-                title="No invoice yet"
+                title="No bill yet"
               />
             )}
           </div>
@@ -226,7 +224,7 @@ export function PurchaseDocumentChain({
                   href={`${ROUTES.purchasingReceipts}/${receipt.id}`}
                   icon={<PackageCheck className="h-4 w-4" />}
                   key={receipt.id}
-                  stage="Receipt"
+                  stage="Receive goods"
                   title={receipt.receiptNumber}
                 >
                   <PurchaseReceiptStatusBadge status={receipt.status} />
@@ -234,11 +232,11 @@ export function PurchaseDocumentChain({
               ))
             ) : (
               <ChainCard
-                description="Post an invoice, then convert it to a draft receipt."
+                description="Receive goods from the PO or from a posted bill when required."
                 icon={<PackageCheck className="h-4 w-4" />}
                 isEmpty
-                stage="Receipt"
-                title="No receipt yet"
+                stage="Receive goods"
+                title="No receive record yet"
               />
             )}
           </div>
@@ -296,11 +294,11 @@ export function PurchaseDocumentChain({
               payments.map((payment) => <PaymentCard key={payment.id} payment={payment} />)
             ) : (
               <ChainCard
-                description="Supplier payments appear here after invoice payment."
+                description="Payments made appear here after bill payment."
                 icon={<ReceiptText className="h-4 w-4" />}
                 isEmpty
-                stage="Payment"
-                title="No supplier payment yet"
+                stage="Payment made"
+                title="No payment made yet"
               />
             )}
           </div>
@@ -308,8 +306,8 @@ export function PurchaseDocumentChain({
 
         {!hasNextSteps ? (
           <p className="mt-4 text-sm text-brand-mocha">
-            Use the conversion actions to carry supplier, item, quantity, tax, and note details
-            forward without re-entering them.
+            Use the guided actions to carry supplier, item, quantity, tax, and note details forward
+            without re-entering them.
           </p>
         ) : null}
       </CardContent>

@@ -149,8 +149,8 @@ export function PurchaseReturnsPageClient(): JSX.Element {
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
-        title="Purchase Returns / Vendor Credits"
-        description="Review returned supplier stock, open vendor credits, and posted purchase return history."
+        title="Vendor Credits"
+        description="Review returned supplier stock, open vendor credits, and posted credit history."
       />
 
       <PurchasingToolbar
@@ -167,7 +167,7 @@ export function PurchaseReturnsPageClient(): JSX.Element {
 
       {!returnsQuery.isLoading && returnsQuery.error ? (
         isPermissionDenied ? (
-          <AccessDeniedCard message="The backend denied access to purchase returns." />
+          <AccessDeniedCard message="The backend denied access to vendor credits." />
         ) : (
           <PurchaseErrorState
             description={getErrorMessage(returnsQuery.error)}
@@ -180,7 +180,7 @@ export function PurchaseReturnsPageClient(): JSX.Element {
 
       {!returnsQuery.isLoading && !returnsQuery.error && purchaseReturns.length === 0 ? (
         <PurchaseEmptyState
-          title="No purchase returns found."
+          title="No vendor credits found."
           description="Open a posted purchase receipt and use Return items to create a vendor credit."
         />
       ) : null}

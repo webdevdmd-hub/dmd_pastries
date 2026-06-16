@@ -118,6 +118,7 @@ export const PERMISSIONS = {
   purchasingInvoicesCreate: "purchasing.invoices.create",
   purchasingInvoicesEdit: "purchasing.invoices.edit",
   purchasingInvoicesPost: "purchasing.invoices.post",
+  purchasingManage: "purchasing.manage",
   purchasingOrdersCreate: "purchasing.orders.create",
   purchasingOrdersDelete: "purchasing.orders.delete",
   purchasingOrdersEdit: "purchasing.orders.edit",

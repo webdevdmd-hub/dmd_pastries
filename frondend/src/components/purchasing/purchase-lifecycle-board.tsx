@@ -61,27 +61,27 @@ function buildStages(summary?: PurchasingSummary): LifecycleStage[] {
       description: "Convert eligible POs into draft supplier bills without re-entering items.",
       href: ROUTES.purchasingInvoices,
       icon: FileInput,
-      label: "Purchase Invoice / Bill",
+      label: "Bill",
       metric: `${String(data.totalInvoices)} bills`,
       step: "02",
       tone: data.unpaidInvoiceAmount > 0 ? "warning" : "neutral",
     },
     {
-      action: "Receive stock",
-      description: "Convert posted bills into draft receipts; inventory updates only when posted.",
+      action: "Receive goods",
+      description: "Receive goods from purchase orders and post stock into inventory.",
       href: ROUTES.purchasingReceipts,
       icon: PackageCheck,
-      label: "Receive Stock",
+      label: "Receive Goods",
       metric: formatCurrency(data.receivedThisMonth),
       step: "03",
       tone: "active",
     },
     {
-      action: "Pay suppliers",
-      description: "Record outgoing supplier payments against posted invoices and balances.",
+      action: "Record payments",
+      description: "Record outgoing payments made against posted bills and balances.",
       href: ROUTES.purchasingPayments,
       icon: WalletCards,
-      label: "Supplier Payment",
+      label: "Payment Made",
       metric: formatCurrency(data.unpaidInvoiceAmount),
       step: "04",
       tone: data.unpaidInvoiceAmount > 0 ? "warning" : "neutral",
@@ -91,7 +91,7 @@ function buildStages(summary?: PurchasingSummary): LifecycleStage[] {
       description: "Return received items and create supplier credits linked to receipt/invoice.",
       href: ROUTES.purchasingReturns,
       icon: RotateCcwSquare,
-      label: "Purchase Return",
+      label: "Vendor Credit",
       metric: "Credit notes",
       step: "05",
       tone: "neutral",
@@ -190,13 +190,13 @@ export function PurchaseLifecycleBoard({
           <div className="flex items-start gap-3">
             <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-700" />
             <p className="text-sm text-brand-mocha">
-              Bill to receipt stays draft until stock is posted into inventory.
+              Receive goods creates inventory only when the receiving record is posted.
             </p>
           </div>
           <div className="flex items-start gap-3">
             <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-700" />
             <p className="text-sm text-brand-mocha">
-              Payments and vendor credits stay linked in the document chain.
+              Payments made and vendor credits stay linked in the purchase timeline.
             </p>
           </div>
         </div>

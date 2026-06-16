@@ -56,34 +56,39 @@ type PurchaseOrderItem struct {
 func (PurchaseOrderItem) TableName() string { return "purchase_order_items" }
 
 type PurchaseInvoice struct {
-	ID              string         `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID      string         `gorm:"type:uuid;not null;index" json:"business_id"`
-	BranchID        string         `gorm:"type:uuid;not null;index" json:"branch_id"`
-	SupplierID      string         `gorm:"type:uuid;not null;index" json:"supplier_id"`
-	PurchaseOrderID *string        `gorm:"type:uuid;index" json:"purchase_order_id"`
-	InvoiceNumber   string         `gorm:"size:150;not null" json:"invoice_number"`
-	InvoiceDate     time.Time      `gorm:"type:date;not null" json:"invoice_date"`
-	DueDate         *time.Time     `gorm:"type:date" json:"due_date"`
-	Status          string         `gorm:"size:50;not null;default:draft" json:"status"`
-	PaymentStatus   string         `gorm:"size:50;not null;default:unpaid" json:"payment_status"`
-	SubtotalAmount  float64        `gorm:"not null;default:0" json:"subtotal_amount"`
-	TaxAmount       float64        `gorm:"not null;default:0" json:"tax_amount"`
-	DiscountAmount  float64        `gorm:"not null;default:0" json:"discount_amount"`
-	ChargeAmount    float64        `gorm:"not null;default:0" json:"charge_amount"`
-	ChargeTaxAmount float64        `gorm:"not null;default:0" json:"charge_tax_amount"`
-	TotalAmount     float64        `gorm:"not null;default:0" json:"total_amount"`
-	PaidAmount      float64        `gorm:"not null;default:0" json:"paid_amount"`
-	BalanceAmount   float64        `gorm:"not null;default:0" json:"balance_amount"`
-	ReturnedAmount  float64        `gorm:"not null;default:0" json:"returned_amount"`
-	CreditedAmount  float64        `gorm:"not null;default:0" json:"credited_amount"`
-	ReturnStatus    string         `gorm:"size:50;not null;default:none" json:"return_status"`
-	JournalEntryID  *string        `gorm:"type:uuid;index" json:"journal_entry_id"`
-	Notes           string         `json:"notes"`
-	CreatedByUserID string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
-	UpdatedByUserID string         `gorm:"type:uuid;index" json:"updated_by_user_id"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
-	DeletedAt       gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	ID                     string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID             string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID               string         `gorm:"type:uuid;not null;index" json:"branch_id"`
+	SupplierID             string         `gorm:"type:uuid;not null;index" json:"supplier_id"`
+	PurchaseOrderID        *string        `gorm:"type:uuid;index" json:"purchase_order_id"`
+	InvoiceNumber          string         `gorm:"size:150;not null" json:"invoice_number"`
+	InvoiceDate            time.Time      `gorm:"type:date;not null" json:"invoice_date"`
+	DueDate                *time.Time     `gorm:"type:date" json:"due_date"`
+	Status                 string         `gorm:"size:50;not null;default:draft" json:"status"`
+	PaymentStatus          string         `gorm:"size:50;not null;default:unpaid" json:"payment_status"`
+	SubtotalAmount         float64        `gorm:"not null;default:0" json:"subtotal_amount"`
+	TaxAmount              float64        `gorm:"not null;default:0" json:"tax_amount"`
+	DiscountAmount         float64        `gorm:"not null;default:0" json:"discount_amount"`
+	ChargeAmount           float64        `gorm:"not null;default:0" json:"charge_amount"`
+	ChargeTaxAmount        float64        `gorm:"not null;default:0" json:"charge_tax_amount"`
+	TotalAmount            float64        `gorm:"not null;default:0" json:"total_amount"`
+	PaidAmount             float64        `gorm:"not null;default:0" json:"paid_amount"`
+	BalanceAmount          float64        `gorm:"not null;default:0" json:"balance_amount"`
+	ReturnedAmount         float64        `gorm:"not null;default:0" json:"returned_amount"`
+	CreditedAmount         float64        `gorm:"not null;default:0" json:"credited_amount"`
+	ReturnStatus           string         `gorm:"size:50;not null;default:none" json:"return_status"`
+	JournalEntryID         *string        `gorm:"type:uuid;index" json:"journal_entry_id"`
+	CancelledByUserID      *string        `gorm:"type:uuid;index" json:"cancelled_by_user_id"`
+	CancelledAt            *time.Time     `json:"cancelled_at"`
+	CancelReason           string         `json:"cancel_reason"`
+	ReversalJournalEntryID *string        `gorm:"type:uuid;index" json:"reversal_journal_entry_id"`
+	CancelledReceiptID     *string        `gorm:"type:uuid;index" json:"cancelled_receipt_id"`
+	Notes                  string         `json:"notes"`
+	CreatedByUserID        string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
+	UpdatedByUserID        string         `gorm:"type:uuid;index" json:"updated_by_user_id"`
+	CreatedAt              time.Time      `json:"created_at"`
+	UpdatedAt              time.Time      `json:"updated_at"`
+	DeletedAt              gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 func (PurchaseInvoice) TableName() string { return "purchase_invoices" }

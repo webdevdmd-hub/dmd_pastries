@@ -1,6 +1,6 @@
 import { ApiError } from "@/lib/api/client";
 
-type DeletableCatalogEntity = "ingredient" | "packaging item" | "product";
+type DeletableCatalogEntity = "ingredient" | "packaging item" | "product" | "purchase order";
 
 function getReason(error: ApiError): string | null {
   const reason = error.errorDetails?.reason;
@@ -26,6 +26,10 @@ export function isHistoryDeleteConflict(error: unknown): error is ApiError {
 export function getHistoryDeleteConflictMessage(entity: DeletableCatalogEntity): string {
   if (entity === "product") {
     return "This product has stock/sales history and cannot be deleted. Please deactivate or archive it instead.";
+  }
+
+  if (entity === "purchase order") {
+    return "This purchase order already has receiving, bill, payment, vendor credit, or stock history, so it cannot be hard deleted. Keep it in history or cancel it if the workflow should be stopped.";
   }
 
   return `This ${entity} has inventory or usage history and cannot be deleted. Please deactivate it instead.`;

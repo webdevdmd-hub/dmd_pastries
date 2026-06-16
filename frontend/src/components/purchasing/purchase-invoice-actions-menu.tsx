@@ -81,13 +81,12 @@ export function PurchaseInvoiceActionsMenu({
             >
               Convert to receipt
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              disabled={invoice.status === "cancelled"}
-              onSelect={() => onCancel(invoice)}
-            >
-              Cancel
-            </DropdownMenuItem>
+            {invoice.status === "posted" ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => onCancel(invoice)}>Cancel Bill</DropdownMenuItem>
+              </>
+            ) : null}
           </>
         ) : null}
       </DropdownMenuContent>

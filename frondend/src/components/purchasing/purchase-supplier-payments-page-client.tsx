@@ -187,13 +187,13 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
 
   const handleManualPayment = async (payload: AddSupplierPaymentPayload): Promise<void> => {
     if (!selectedInvoice) {
-      toast.error("Select a posted supplier invoice before recording payment.");
+      toast.error("Select a posted bill before recording payment.");
       return;
     }
 
     try {
       await addPaymentMutation.mutateAsync({ invoiceId: selectedInvoice.id, payload });
-      toast.success("Supplier payment recorded.");
+      toast.success("Payment made recorded.");
       closeManualDialog();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
@@ -203,13 +203,13 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
-        title="Supplier Payments"
-        description="Track money paid out to suppliers against posted purchase invoices."
+        title="Payments Made"
+        description="Track money paid out to suppliers against posted bills."
         actions={
           canManage ? (
             <Button onClick={() => setManualDialogOpen(true)} type="button">
               <Plus className="h-4 w-4" />
-              Record Payment
+              Record Payment Made
             </Button>
           ) : undefined
         }
@@ -312,7 +312,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
 
       {!paymentsQuery.isLoading && paymentsQuery.error ? (
         isPermissionDenied ? (
-          <AccessDeniedCard message="The backend denied access to supplier payments." />
+          <AccessDeniedCard message="The backend denied access to payments made." />
         ) : (
           <PurchaseErrorState
             description={getErrorMessage(paymentsQuery.error)}
@@ -326,7 +326,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
       {!paymentsQuery.isLoading &&
       !paymentsQuery.error &&
       (paymentsQuery.data ?? []).length === 0 ? (
-        <PurchaseEmptyState title="No supplier payments found." />
+        <PurchaseEmptyState title="No payments made found." />
       ) : null}
 
       {!paymentsQuery.isLoading && !paymentsQuery.error && (paymentsQuery.data ?? []).length > 0 ? (
@@ -342,37 +342,40 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
         description={
           selectedInvoice ? (
             <>
-              Record money paid out for {selectedInvoice.invoiceNumber}. Current balance is{" "}
-              {formatCurrency(selectedInvoice.balanceAmount)}.
+              Record money paid out for{" "}
+              {selectedInvoice.supplierBillNumber ?? selectedInvoice.invoiceNumber}. Current balance
+              is {formatCurrency(selectedInvoice.balanceAmount)}.
             </>
           ) : (
-            "Select a posted supplier invoice with an open balance, then record the outgoing payment."
+            "Select a posted bill with an open balance, then record the outgoing payment."
           )
         }
         disabled={!selectedInvoice}
-        invoiceNumber={selectedInvoice?.invoiceNumber ?? "selected invoice"}
+        invoiceNumber={
+          selectedInvoice?.supplierBillNumber ?? selectedInvoice?.invoiceNumber ?? "selected bill"
+        }
         invoiceSelector={
           <>
-            <Label>Purchase invoice</Label>
+            <Label>Bill</Label>
             <SearchableCombobox
-              emptyMessage="No posted supplier invoices with an open balance found."
+              emptyMessage="No posted bills with an open balance found."
               errorMessage={
                 payableInvoicesQuery.error ? getErrorMessage(payableInvoicesQuery.error) : null
               }
-              groupLabel="Open supplier invoices"
+              groupLabel="Open bills"
               isLoading={payableInvoicesQuery.isLoading}
-              loadingMessage="Loading posted invoices..."
+              loadingMessage="Loading posted bills..."
               onRetry={() => {
                 void payableInvoicesQuery.refetch();
               }}
               onValueChange={setSelectedInvoiceId}
               options={invoiceOptions}
-              placeholder="Select purchase invoice"
-              searchPlaceholder="Search invoice, supplier, branch..."
+              placeholder="Select bill"
+              searchPlaceholder="Search bill, supplier, branch..."
               value={selectedInvoiceId}
             />
             <p className="text-xs text-brand-mocha">
-              Only posted invoices with remaining balance are available for manual supplier payment.
+              Only posted bills with remaining balance are available for manual payment made.
             </p>
           </>
         }

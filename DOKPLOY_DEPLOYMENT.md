@@ -71,7 +71,7 @@ Dokploy service settings:
 
 ```txt
 Service name: DMD_Pastries_frontend
-Root directory: frondend
+Root directory: frontend
 Build type: Dockerfile
 Dockerfile path: Dockerfile
 Container port: 3000
@@ -79,9 +79,9 @@ Public domain: https://app.<your-domain>
 ```
 
 Copy values from:
-
+nd
 ```txt
-frondend/.env.production.example
+frontend/.env.production.example
 ```
 
 Set the same `NEXT_PUBLIC_*` values in Dokploy runtime environment and Docker build arguments. These values are baked into the Next.js production build:

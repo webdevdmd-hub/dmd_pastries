@@ -3,12 +3,15 @@ import {
   ChartNoAxesCombined,
   Croissant,
   FileMinus2,
+  FileText,
   Landmark,
   LayoutDashboard,
   ListChecks,
   NotebookTabs,
+  PackageCheck,
   PackageSearch,
   ReceiptText,
+  RotateCcwSquare,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -16,6 +19,7 @@ import {
   Truck,
   UserRound,
   Users,
+  WalletCards,
 } from "lucide-react";
 
 import { PERMISSIONS } from "@/constants/permissions";
@@ -136,15 +140,57 @@ export const appNavigationGroups = [
         ],
       },
       {
-        href: ROUTES.purchasing,
+        href: ROUTES.purchasingOrders,
         icon: ShoppingCart,
-        label: "Purchasing",
+        label: "Purchase Orders",
         // TODO: Remove inventory fallback once purchasing.* permissions are seeded for every tenant.
         permissionAny: [
           PERMISSIONS.purchasingView,
           PERMISSIONS.purchasingOrdersCreate,
+          PERMISSIONS.purchasingOrdersEdit,
+          PERMISSIONS.purchasingOrdersStatusUpdate,
+          PERMISSIONS.inventoryView,
+        ],
+      },
+      {
+        href: ROUTES.purchasingInvoices,
+        icon: FileText,
+        label: "Bills",
+        permissionAny: [
+          PERMISSIONS.purchasingView,
           PERMISSIONS.purchasingInvoicesCreate,
+          PERMISSIONS.purchasingInvoicesEdit,
+          PERMISSIONS.purchasingInvoicesPost,
+          PERMISSIONS.inventoryView,
+        ],
+      },
+      {
+        href: ROUTES.purchasingReceipts,
+        icon: PackageCheck,
+        label: "Receive Goods",
+        permissionAny: [
+          PERMISSIONS.purchasingView,
           PERMISSIONS.purchasingReceiptsCreate,
+          PERMISSIONS.purchasingReceiptsPost,
+          PERMISSIONS.purchasingReceiveStock,
+          PERMISSIONS.inventoryView,
+        ],
+      },
+      {
+        href: ROUTES.purchasingPayments,
+        icon: WalletCards,
+        label: "Payments Made",
+        permissionAny: [PERMISSIONS.purchasingView, PERMISSIONS.inventoryView],
+      },
+      {
+        href: ROUTES.purchasingReturns,
+        icon: RotateCcwSquare,
+        label: "Vendor Credits",
+        permissionAny: [
+          PERMISSIONS.purchasingView,
+          PERMISSIONS.purchasingReturnsView,
+          PERMISSIONS.purchasingReturnsCreate,
+          PERMISSIONS.purchasingReturnsManage,
           PERMISSIONS.inventoryView,
         ],
       },

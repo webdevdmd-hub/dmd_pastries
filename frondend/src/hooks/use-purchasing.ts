@@ -10,6 +10,7 @@ import {
   cancelPurchaseReceipt,
   cancelPurchaseReturn,
   convertPurchaseInvoiceToReceipt,
+  convertPurchaseOrderToBill,
   convertPurchaseOrderToInvoice,
   createPurchaseInvoice,
   createPurchaseOrder,
@@ -39,6 +40,7 @@ import {
   postPurchaseReceipt,
   postPurchaseReturn,
   receivePurchase,
+  receivePurchaseOrder,
   reversePurchaseReturn,
   updatePurchaseInvoice,
   updatePurchaseOrder,
@@ -47,7 +49,9 @@ import {
 } from "@/lib/api/purchasing";
 import type {
   AddSupplierPaymentPayload,
+  CancelPurchaseInvoicePayload,
   ConvertPurchaseInvoiceToReceiptPayload,
+  ConvertPurchaseOrderToBillPayload,
   ConvertPurchaseOrderToInvoicePayload,
   CreatePurchaseInvoicePayload,
   CreatePurchaseOrderPayload,
@@ -66,6 +70,7 @@ import type {
   PurchasingSupplierOption,
   PurchasingTaxRateOption,
   PurchasingUnitOption,
+  ReceivePurchaseOrderPayload,
   ReceivePurchasePayload,
   ReturnablePurchaseReceiptItem,
   ReversePurchaseReturnPayload,
@@ -394,6 +399,21 @@ export function useConvertPurchaseOrderToInvoice() {
   });
 }
 
+export function useConvertPurchaseOrderToBill() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    PurchaseInvoice,
+    Error,
+    { id: string; payload: ConvertPurchaseOrderToBillPayload }
+  >({
+    mutationFn: async ({ id, payload }) => convertPurchaseOrderToBill(id, payload),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+    },
+  });
+}
+
 export function useCreatePurchaseInvoice() {
   const queryClient = useQueryClient();
 
@@ -432,12 +452,17 @@ export function usePostPurchaseInvoice() {
 export function useCancelPurchaseInvoice() {
   const queryClient = useQueryClient();
 
-  return useMutation<PurchaseInvoice, Error, string>({
-    mutationFn: async (id) => cancelPurchaseInvoice(id),
-    onSuccess: async () => {
-      await invalidatePurchasing(queryClient);
+  return useMutation<PurchaseInvoice, Error, { id: string; payload: CancelPurchaseInvoicePayload }>(
+    {
+      mutationFn: async ({ id, payload }) => cancelPurchaseInvoice(id, payload),
+      onSuccess: async () => {
+        await invalidatePurchasing(queryClient);
+        await queryClient.invalidateQueries({ queryKey: ["inventory"] });
+        await queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+        await queryClient.invalidateQueries({ queryKey: ["accounting"] });
+      },
     },
-  });
+  );
 }
 
 export function useConvertPurchaseInvoiceToReceipt() {
@@ -475,6 +500,19 @@ export function useReceivePurchase() {
 
   return useMutation<PurchaseReceipt, Error, ReceivePurchasePayload>({
     mutationFn: async (payload) => receivePurchase(payload),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+      await queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      await queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+    },
+  });
+}
+
+export function useReceivePurchaseOrder() {
+  const queryClient = useQueryClient();
+
+  return useMutation<PurchaseReceipt, Error, { id: string; payload: ReceivePurchaseOrderPayload }>({
+    mutationFn: async ({ id, payload }) => receivePurchaseOrder(id, payload),
     onSuccess: async () => {
       await invalidatePurchasing(queryClient);
       await queryClient.invalidateQueries({ queryKey: ["inventory"] });

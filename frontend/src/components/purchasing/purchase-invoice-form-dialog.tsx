@@ -147,7 +147,7 @@ export function PurchaseInvoiceFormDialog({
     });
 
     if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Please check the invoice form.");
+      setError(result.error.issues[0]?.message ?? "Please check the bill form.");
       return;
     }
 
@@ -162,9 +162,9 @@ export function PurchaseInvoiceFormDialog({
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
       <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{invoice ? "Edit purchase invoice" : "Create purchase invoice"}</DialogTitle>
+          <DialogTitle>{invoice ? "Edit bill" : "Create bill"}</DialogTitle>
           <DialogDescription>
-            Record supplier invoice totals. Backend posting remains the final authority.
+            Record supplier bill totals. Backend posting remains the final authority.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">
@@ -196,13 +196,13 @@ export function PurchaseInvoiceFormDialog({
             value={purchaseOrderId}
           />
           <Input
-            aria-label="Invoice number"
+            aria-label="Bill number"
             onChange={(event) => setInvoiceNumber(event.target.value)}
-            placeholder="Invoice number"
+            placeholder="Internal bill number"
             value={invoiceNumber}
           />
           <Input
-            aria-label="Invoice date"
+            aria-label="Bill date"
             onChange={(event) => setInvoiceDate(event.target.value)}
             type="date"
             value={invoiceDate}
@@ -234,7 +234,7 @@ export function PurchaseInvoiceFormDialog({
             Cancel
           </Button>
           <Button disabled={isSubmitting} onClick={() => void submit()} type="button">
-            {invoice ? "Save invoice" : "Create invoice"}
+            {invoice ? "Save bill" : "Create bill"}
           </Button>
         </DialogFooter>
       </DialogContent>

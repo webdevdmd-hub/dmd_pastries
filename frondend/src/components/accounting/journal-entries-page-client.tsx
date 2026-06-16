@@ -87,6 +87,7 @@ const defaultFilters: JournalEntriesFilters = {
   branchId: "",
   dateFrom: "",
   dateTo: "",
+  journalOrigin: "manual",
   limit: 25,
   page: 1,
   search: "",
@@ -101,6 +102,8 @@ type PendingAction =
   | { entry: JournalEntry; type: "reverse" }
   | { entry: JournalEntry; type: "delete" }
   | null;
+
+type JournalFormMode = "create" | "edit";
 
 type LineFormState = {
   accountId: string;
@@ -656,7 +659,7 @@ function JournalEntryDetailsPanel({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {canManage && entry.status === "draft" ? (
+          {canManage && entry.sourceType === "manual" && entry.status === "draft" ? (
             <>
               <Button onClick={() => onEdit(entry)} type="button" variant="outline">
                 <Pencil className="h-4 w-4" />
@@ -668,7 +671,7 @@ function JournalEntryDetailsPanel({
               </Button>
             </>
           ) : null}
-          {canManage && entry.status === "posted" ? (
+          {canManage && entry.sourceType === "manual" && entry.status === "posted" ? (
             <Button onClick={() => onReverse(entry)} type="button" variant="outline">
               <RotateCcw className="h-4 w-4" />
               Reverse
@@ -836,10 +839,16 @@ export function JournalEntriesPageClient(): JSX.Element {
     search: urlSearch,
   }));
   const [formOpen, setFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<JournalFormMode>("create");
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const entriesQuery = useJournalEntries(filters, canView);
-  const entryQuery = useJournalEntry(selectedEntryId, selectedEntryId !== null);
+  const detailEntryQuery = useJournalEntry(selectedEntryId, selectedEntryId !== null);
+  const formEntryQuery = useJournalEntry(
+    editingEntryId,
+    formOpen && formMode === "edit" && editingEntryId !== null,
+  );
   const branchesQuery = useBranches(canView && canLoadBranches);
   const accountsQuery = useChartAccounts(
     {
@@ -866,7 +875,13 @@ export function JournalEntriesPageClient(): JSX.Element {
   const activeBranches = (branchesQuery.data ?? []).filter((branch) => branch.status === "active");
   const selectedSummaryEntry =
     entries.find((entry) => entry.id === selectedEntryId) ?? entries[0] ?? null;
-  const selectedEntry = entryQuery.data ?? selectedSummaryEntry;
+  const selectedEntry = detailEntryQuery.data ?? selectedSummaryEntry;
+  const formEntry = formMode === "edit" ? (formEntryQuery.data ?? null) : null;
+  const isManualView = filters.journalOrigin === "manual";
+  const journalViewLabel = isManualView ? "Manual Journals" : "System Generated";
+  const journalViewDescription = isManualView
+    ? "Draft, posted, and reversed manual vouchers."
+    : "Read-only journals posted automatically from source documents.";
 
   useEffect(() => {
     setFilters((current) =>
@@ -895,6 +910,19 @@ export function JournalEntriesPageClient(): JSX.Element {
     }));
   };
 
+  const openCreateForm = (): void => {
+    setFormMode("create");
+    setEditingEntryId(null);
+    setFormOpen(true);
+  };
+
+  const openEditForm = (entry: JournalEntry): void => {
+    setFormMode("edit");
+    setEditingEntryId(entry.id);
+    setSelectedEntryId(entry.id);
+    setFormOpen(true);
+  };
+
   if (!canView) {
     return (
       <AccountingAccessDeniedCard message="You need `accounting.view` to view Journal Entries." />
@@ -903,9 +931,11 @@ export function JournalEntriesPageClient(): JSX.Element {
 
   const handleCreate = async (payload: CreateJournalEntryPayload): Promise<void> => {
     try {
-      await createMutation.mutateAsync(payload);
+      const createdEntry = await createMutation.mutateAsync(payload);
       toast.success("Journal entry draft created.");
       setFormOpen(false);
+      setEditingEntryId(null);
+      setSelectedEntryId(createdEntry.id);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
     }
@@ -916,7 +946,8 @@ export function JournalEntriesPageClient(): JSX.Element {
       await updateMutation.mutateAsync({ id, payload });
       toast.success("Journal entry draft updated.");
       setFormOpen(false);
-      setSelectedEntryId(null);
+      setEditingEntryId(null);
+      setSelectedEntryId(id);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
     }
@@ -951,20 +982,18 @@ export function JournalEntriesPageClient(): JSX.Element {
     <div className="mx-auto flex max-w-[1600px] flex-col gap-5">
       <PageHeader
         actions={
-          canManage ? (
-            <Button
-              onClick={() => {
-                setSelectedEntryId(null);
-                setFormOpen(true);
-              }}
-              type="button"
-            >
+          canManage && isManualView ? (
+            <Button onClick={openCreateForm} type="button">
               <FilePlus2 className="h-4 w-4" />
-              Create Journal Entry
+              Create Manual Journal
             </Button>
           ) : undefined
         }
-        description="Create and manage balanced debit/credit manual accounting vouchers."
+        description={
+          isManualView
+            ? "Create and manage balanced debit/credit manual accounting vouchers."
+            : "Review backend-posted accounting journals from sales, purchasing, expenses, inventory, and manufacturing."
+        }
         title="Journal Entries"
       />
 
@@ -975,21 +1004,16 @@ export function JournalEntriesPageClient(): JSX.Element {
               <div className="flex items-center justify-between gap-3 border-b border-brand-cappuccino/70 px-4 py-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold text-brand-espresso">All Manual Journals</h2>
+                    <h2 className="text-lg font-bold text-brand-espresso">{journalViewLabel}</h2>
                     <Badge variant="outline">{totalEntries}</Badge>
                   </div>
-                  <p className="text-xs text-brand-mocha">
-                    Draft, posted, reversed, and source vouchers.
-                  </p>
+                  <p className="text-xs text-brand-mocha">{journalViewDescription}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {canManage ? (
+                  {canManage && isManualView ? (
                     <Button
-                      aria-label="Create journal entry"
-                      onClick={() => {
-                        setSelectedEntryId(null);
-                        setFormOpen(true);
-                      }}
+                      aria-label="Create manual journal"
+                      onClick={openCreateForm}
                       size="icon"
                       type="button"
                     >
@@ -1020,6 +1044,34 @@ export function JournalEntriesPageClient(): JSX.Element {
               </div>
 
               <div className="grid gap-3 border-b border-brand-cappuccino/70 bg-brand-latte/25 p-4">
+                <div className="grid grid-cols-2 rounded-2xl border border-brand-cappuccino/70 bg-white p-1">
+                  <Button
+                    className="rounded-xl"
+                    onClick={() =>
+                      updateFilters({
+                        journalOrigin: "manual",
+                        sourceType: "",
+                      })
+                    }
+                    type="button"
+                    variant={isManualView ? "default" : "ghost"}
+                  >
+                    Manual
+                  </Button>
+                  <Button
+                    className="rounded-xl"
+                    onClick={() =>
+                      updateFilters({
+                        journalOrigin: "system",
+                        sourceType: "",
+                      })
+                    }
+                    type="button"
+                    variant={!isManualView ? "default" : "ghost"}
+                  >
+                    System Generated
+                  </Button>
+                </div>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mocha" />
                   <Input
@@ -1047,21 +1099,9 @@ export function JournalEntriesPageClient(): JSX.Element {
                       <SelectItem value="reversed">Reversed</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select
-                    onValueChange={(sourceType) =>
-                      updateFilters({ sourceType: sourceType === "all" ? "" : sourceType })
-                    }
-                    value={filters.sourceType || "all"}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Source" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All sources</SelectItem>
-                      <SelectItem value="manual">Manual</SelectItem>
-                      <SelectItem value="expense">Expense</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center rounded-2xl border border-brand-cappuccino/70 bg-white px-3 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha">
+                    {isManualView ? "Manual source" : "System sources"}
+                  </div>
                 </div>
                 <Select
                   onValueChange={(branchId) =>
@@ -1132,7 +1172,9 @@ export function JournalEntriesPageClient(): JSX.Element {
                     </div>
                     <p className="font-semibold text-brand-espresso">No journal entries found.</p>
                     <p className="text-sm text-brand-mocha">
-                      Create a balanced voucher or adjust filters.
+                      {isManualView
+                        ? "Create a balanced voucher or adjust filters."
+                        : "No system-generated journals match these filters."}
                     </p>
                   </div>
                 ) : null}
@@ -1159,7 +1201,10 @@ export function JournalEntriesPageClient(): JSX.Element {
                                 {displayText(entry.entryNumber, "Draft journal")}
                               </p>
                               <p className="mt-1 text-xs text-brand-mocha">
-                                {formatDate(entry.entryDate)}
+                                {formatDate(entry.entryDate)} ·{" "}
+                                {entry.sourceType === "manual"
+                                  ? "Manual"
+                                  : sourceLabel(entry.sourceType)}
                               </p>
                             </div>
                             <Badge variant={statusBadgeVariant(entry.status)}>
@@ -1212,12 +1257,9 @@ export function JournalEntriesPageClient(): JSX.Element {
             <JournalEntryDetailsPanel
               canManage={canManage}
               entry={selectedEntry}
-              isLoading={selectedEntryId !== null && entryQuery.isLoading}
+              isLoading={selectedEntryId !== null && detailEntryQuery.isLoading}
               onDelete={(entry) => setPendingAction({ entry, type: "delete" })}
-              onEdit={(entry) => {
-                setSelectedEntryId(entry.id);
-                setFormOpen(true);
-              }}
+              onEdit={openEditForm}
               onPost={(entry) => setPendingAction({ entry, type: "post" })}
               onReverse={(entry) => setPendingAction({ entry, type: "reverse" })}
             />
@@ -1228,12 +1270,12 @@ export function JournalEntriesPageClient(): JSX.Element {
       <JournalEntryFormDialog
         accounts={accountsQuery.data?.items ?? []}
         branches={activeBranches}
-        entry={selectedEntryId !== null && formOpen ? selectedEntry : null}
-        isLoadingEntry={selectedEntryId !== null && formOpen && entryQuery.isLoading}
+        entry={formEntry}
+        isLoadingEntry={formOpen && formMode === "edit" && formEntryQuery.isLoading}
         isSubmitting={createMutation.isPending || updateMutation.isPending}
         onClose={() => {
           setFormOpen(false);
-          setSelectedEntryId(null);
+          setEditingEntryId(null);
         }}
         onCreate={handleCreate}
         onUpdate={handleUpdate}

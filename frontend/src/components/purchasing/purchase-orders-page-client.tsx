@@ -9,9 +9,10 @@ import { toast } from "sonner";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseEmptyState } from "@/components/purchasing/purchase-empty-state";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
+import { PurchaseOrderConvertToBillDialog } from "@/components/purchasing/purchase-order-convert-to-bill-dialog";
 import { PurchaseOrderFormDialog } from "@/components/purchasing/purchase-order-form-dialog";
+import { PurchaseOrderReceiveGoodsDialog } from "@/components/purchasing/purchase-order-receive-goods-dialog";
 import { PurchaseOrdersTable } from "@/components/purchasing/purchase-orders-table";
-import { PurchaseReceiveDialog } from "@/components/purchasing/purchase-receive-dialog";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
 import { PurchasingToolbar } from "@/components/purchasing/purchasing-toolbar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
@@ -31,7 +32,7 @@ import { ROUTES } from "@/constants/routes";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { usePermission } from "@/hooks/use-permission";
 import {
-  useConvertPurchaseOrderToInvoice,
+  useConvertPurchaseOrderToBill,
   useCreatePurchaseOrder,
   useDeletePurchaseOrder,
   usePurchaseOrders,
@@ -40,17 +41,22 @@ import {
   usePurchasingSuppliers,
   usePurchasingTaxRates,
   usePurchasingUnits,
-  useReceivePurchase,
+  useReceivePurchaseOrder,
   useUpdatePurchaseOrder,
   useUpdatePurchaseOrderStatus,
 } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import {
+  getHistoryDeleteConflictMessage,
+  isHistoryDeleteConflict,
+} from "@/lib/api/delete-conflicts";
 import type {
+  ConvertPurchaseOrderToBillPayload,
   CreatePurchaseOrderPayload,
   PurchaseOrder,
   PurchaseOrderStatus,
   PurchasingFilters,
-  ReceivePurchasePayload,
+  ReceivePurchaseOrderPayload,
   UpdatePurchaseOrderPayload,
 } from "@/types/purchasing";
 
@@ -82,19 +88,33 @@ export function PurchaseOrdersPageClient(): JSX.Element {
   const branchScope = useBranchScope();
   const { normalizeBranchId } = branchScope;
   const canView = hasAnyPermission([PERMISSIONS.purchasingView, PERMISSIONS.inventoryView]);
-  const canManage = hasAnyPermission([
+  const canCreate = hasAnyPermission([
     PERMISSIONS.purchasingOrdersCreate,
-    PERMISSIONS.purchasingOrdersEdit,
-    PERMISSIONS.purchasingOrdersDelete,
-    PERMISSIONS.purchasingOrdersStatusUpdate,
-    PERMISSIONS.purchasingReceiveStock,
+    PERMISSIONS.purchasingManage,
   ]);
-  const canConvertToInvoice = hasAnyPermission([PERMISSIONS.purchasingInvoicesCreate]);
+  const canEdit = hasAnyPermission([
+    PERMISSIONS.purchasingOrdersEdit,
+    PERMISSIONS.purchasingManage,
+  ]);
+  const canDelete = hasAnyPermission([
+    PERMISSIONS.purchasingOrdersDelete,
+    PERMISSIONS.purchasingManage,
+  ]);
+  const canUpdateStatus = hasAnyPermission([
+    PERMISSIONS.purchasingOrdersStatusUpdate,
+    PERMISSIONS.purchasingManage,
+  ]);
+  const canReceiveOrder = hasAnyPermission([
+    PERMISSIONS.purchasingReceiveStock,
+    PERMISSIONS.purchasingManage,
+  ]);
+  const canConvertToBill = hasAnyPermission([PERMISSIONS.purchasingInvoicesCreate]);
   const [filters, setFilters] = useState<PurchasingFilters>({
     ...defaultFilters,
     branchId: branchScope.defaultBranchId,
   });
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
+  const [convertingOrder, setConvertingOrder] = useState<PurchaseOrder | null>(null);
   const [receivingOrder, setReceivingOrder] = useState<PurchaseOrder | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
@@ -108,8 +128,8 @@ export function PurchaseOrdersPageClient(): JSX.Element {
   const updateMutation = useUpdatePurchaseOrder();
   const statusMutation = useUpdatePurchaseOrderStatus();
   const deleteMutation = useDeletePurchaseOrder();
-  const receiveMutation = useReceivePurchase();
-  const convertMutation = useConvertPurchaseOrderToInvoice();
+  const receiveMutation = useReceivePurchaseOrder();
+  const convertMutation = useConvertPurchaseOrderToBill();
   const isPermissionDenied =
     ordersQuery.error instanceof ApiError && ordersQuery.error.status === 403;
 
@@ -164,26 +184,28 @@ export function PurchaseOrdersPageClient(): JSX.Element {
     }
   };
 
-  const handleReceive = async (payload: ReceivePurchasePayload): Promise<void> => {
+  const handleReceive = async (payload: ReceivePurchaseOrderPayload): Promise<void> => {
+    if (!receivingOrder) return;
+
     try {
-      await receiveMutation.mutateAsync(payload);
-      toast.success("Stock received and inventory updated successfully.");
+      await receiveMutation.mutateAsync({ id: receivingOrder.id, payload });
+      toast.success("Goods received against purchase order.");
       setReceivingOrder(null);
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
   };
 
-  const handleConvertToInvoice = async (order: PurchaseOrder): Promise<void> => {
+  const handleConvertToBill = async (payload: ConvertPurchaseOrderToBillPayload): Promise<void> => {
+    if (!convertingOrder) return;
+
     try {
       const invoice = await convertMutation.mutateAsync({
-        id: order.id,
-        payload: {
-          invoiceDate: new Date().toISOString().slice(0, 10),
-          notes: `Created from ${order.purchaseOrderNumber}`,
-        },
+        id: convertingOrder.id,
+        payload,
       });
-      toast.success("Purchase order converted to draft invoice.");
+      toast.success("Purchase order converted to draft bill.");
+      setConvertingOrder(null);
       router.push(`${ROUTES.purchasingInvoices}/${invoice.id}`);
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -191,22 +213,27 @@ export function PurchaseOrdersPageClient(): JSX.Element {
   };
 
   const confirmAction = async (): Promise<void> => {
-    if (!pendingAction) return;
+    const action = pendingAction;
+    if (!action) return;
 
     try {
-      if (pendingAction.type === "status") {
+      if (action.type === "status") {
         await statusMutation.mutateAsync({
-          id: pendingAction.order.id,
-          payload: { status: pendingAction.status },
+          id: action.order.id,
+          payload: { status: action.status },
         });
         toast.success("Purchase order status updated.");
       } else {
-        await deleteMutation.mutateAsync(pendingAction.order.id);
+        await deleteMutation.mutateAsync(action.order.id);
         toast.success("Purchase order deleted.");
       }
       setPendingAction(null);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(
+        action.type === "delete" && isHistoryDeleteConflict(error)
+          ? getHistoryDeleteConflictMessage("purchase order")
+          : getErrorMessage(error),
+      );
     }
   };
 
@@ -218,7 +245,7 @@ export function PurchaseOrdersPageClient(): JSX.Element {
         title="Purchase Orders"
         description="Create and track supplier purchase orders before stock is received."
         actions={
-          canManage ? (
+          canCreate ? (
             <Button onClick={openCreate} type="button">
               <Plus className="h-4 w-4" />
               Create Purchase Order
@@ -254,8 +281,8 @@ export function PurchaseOrdersPageClient(): JSX.Element {
 
       {!ordersQuery.isLoading && !ordersQuery.error && orders.length === 0 ? (
         <PurchaseEmptyState
-          actionLabel={canManage ? "Create Purchase Order" : undefined}
-          onAction={canManage ? openCreate : undefined}
+          actionLabel={canCreate ? "Create Purchase Order" : undefined}
+          onAction={canCreate ? openCreate : undefined}
         />
       ) : null}
 
@@ -263,9 +290,12 @@ export function PurchaseOrdersPageClient(): JSX.Element {
         <Card>
           <CardContent className="p-0">
             <PurchaseOrdersTable
-              canConvertToInvoice={canConvertToInvoice}
-              canManage={canManage}
-              onConvertToInvoice={(order) => void handleConvertToInvoice(order)}
+              canDelete={canDelete}
+              canEdit={canEdit}
+              canConvertToBill={canConvertToBill}
+              canReceiveOrder={canReceiveOrder}
+              canUpdateStatus={canUpdateStatus}
+              onConvertToBill={setConvertingOrder}
               onDelete={(order) => setPendingAction({ order, type: "delete" })}
               onEdit={(order) => {
                 setEditingOrder(order);
@@ -298,17 +328,20 @@ export function PurchaseOrdersPageClient(): JSX.Element {
         units={unitsQuery.data ?? []}
       />
 
-      <PurchaseReceiveDialog
-        branches={branchesQuery.data ?? []}
+      <PurchaseOrderReceiveGoodsDialog
         isSubmitting={receiveMutation.isPending}
         onClose={() => setReceivingOrder(null)}
         onReceive={handleReceive}
         open={receivingOrder !== null}
         order={receivingOrder}
-        products={productsQuery.data ?? []}
-        suppliers={suppliersQuery.data ?? []}
-        taxRates={taxRatesQuery.data ?? []}
-        units={unitsQuery.data ?? []}
+      />
+
+      <PurchaseOrderConvertToBillDialog
+        isSubmitting={convertMutation.isPending}
+        onClose={() => setConvertingOrder(null)}
+        onConvert={handleConvertToBill}
+        open={convertingOrder !== null}
+        order={convertingOrder}
       />
 
       <Dialog
@@ -324,7 +357,7 @@ export function PurchaseOrdersPageClient(): JSX.Element {
             </DialogTitle>
             <DialogDescription>
               {pendingAction?.type === "delete"
-                ? "This removes the draft order if the backend allows it."
+                ? "This permanently removes the purchase order, its item lines, and document charges only when it has no linked receiving, bill, payment, vendor credit, or stock history. This cannot be undone."
                 : `Update ${pendingAction?.order.purchaseOrderNumber ?? "order"} to ${pendingAction?.status ?? "status"}?`}
             </DialogDescription>
           </DialogHeader>
@@ -333,11 +366,16 @@ export function PurchaseOrdersPageClient(): JSX.Element {
               Cancel
             </Button>
             <Button
+              className={
+                pendingAction?.type === "delete"
+                  ? "bg-red-700 text-white hover:bg-red-800"
+                  : undefined
+              }
               disabled={statusMutation.isPending || deleteMutation.isPending}
               onClick={() => void confirmAction()}
               type="button"
             >
-              Confirm
+              {pendingAction?.type === "delete" ? "Delete purchase order" : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>

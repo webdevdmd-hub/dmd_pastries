@@ -154,63 +154,70 @@ export function PurchaseOrderFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{order ? "Edit purchase order" : "Create purchase order"}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="flex max-h-[96vh] w-[min(96vw,1500px)] max-w-none flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b border-brand-cappuccino/70 px-5 py-4">
+          <DialogTitle className="text-2xl">
+            {order ? "Edit purchase order" : "Create purchase order"}
+          </DialogTitle>
+          <DialogDescription className="text-sm leading-5">
             Draft supplier orders with product lines, tax, discount, and delivery dates.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Select
-            value={branchId || "none"}
-            onValueChange={(value) => setBranchId(value === "none" ? "" : value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Branch" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Select branch</SelectItem>
-              {selectableBranches.map((branch) => (
-                <SelectItem key={branch.id} value={branch.id}>
-                  {branch.branchName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <SupplierLookupSelect
-            onValueChange={setSupplierId}
-            suppliers={suppliers}
-            value={supplierId}
+        <div className="grid min-h-0 gap-3 overflow-y-auto px-5 py-4">
+          <div className="grid gap-3 lg:grid-cols-4">
+            <Select
+              value={branchId || "none"}
+              onValueChange={(value) => setBranchId(value === "none" ? "" : value)}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="Branch" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Select branch</SelectItem>
+                {selectableBranches.map((branch) => (
+                  <SelectItem key={branch.id} value={branch.id}>
+                    {branch.branchName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <SupplierLookupSelect
+              onValueChange={setSupplierId}
+              suppliers={suppliers}
+              value={supplierId}
+            />
+            <Input
+              aria-label="Order date"
+              className="h-10"
+              onChange={(event) => setOrderDate(event.target.value)}
+              type="date"
+              value={orderDate}
+            />
+            <Input
+              aria-label="Expected delivery date"
+              className="h-10"
+              onChange={(event) => setExpectedDeliveryDate(event.target.value)}
+              type="date"
+              value={expectedDeliveryDate}
+            />
+          </div>
+          <PurchasingItemLineEditor
+            lines={lines}
+            onLinesChange={setLines}
+            products={products}
+            taxRates={taxRates}
+            units={units}
           />
           <Input
-            aria-label="Order date"
-            onChange={(event) => setOrderDate(event.target.value)}
-            type="date"
-            value={orderDate}
+            aria-label="Notes"
+            className="h-10"
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder="Notes"
+            value={notes}
           />
-          <Input
-            aria-label="Expected delivery date"
-            onChange={(event) => setExpectedDeliveryDate(event.target.value)}
-            type="date"
-            value={expectedDeliveryDate}
-          />
+          {error ? <p className="text-sm font-semibold text-red-700">{error}</p> : null}
         </div>
-        <PurchasingItemLineEditor
-          lines={lines}
-          onLinesChange={setLines}
-          products={products}
-          taxRates={taxRates}
-          units={units}
-        />
-        <Input
-          aria-label="Notes"
-          onChange={(event) => setNotes(event.target.value)}
-          placeholder="Notes"
-          value={notes}
-        />
-        {error ? <p className="text-sm font-semibold text-red-700">{error}</p> : null}
-        <DialogFooter>
+        <DialogFooter className="border-t border-brand-cappuccino/70 bg-white px-5 py-3">
           <Button onClick={onClose} type="button" variant="outline">
             Cancel
           </Button>
