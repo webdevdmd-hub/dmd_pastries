@@ -29,6 +29,8 @@ type ReceiveGoodsRow = {
 
 type PurchaseOrderReceiveGoodsDialogProps = {
   isSubmitting: boolean;
+  isLoading?: boolean;
+  loadError?: string | null;
   onClose: () => void;
   onReceive: (payload: ReceivePurchaseOrderPayload) => Promise<void>;
   open: boolean;
@@ -58,6 +60,8 @@ function hasRowChanges(order: PurchaseOrder, rows: ReceiveGoodsRow[]): boolean {
 
 export function PurchaseOrderReceiveGoodsDialog({
   isSubmitting,
+  isLoading = false,
+  loadError = null,
   onClose,
   onReceive,
   open,
@@ -69,7 +73,17 @@ export function PurchaseOrderReceiveGoodsDialog({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open || !order) return;
+    if (!open) {
+      setRows([]);
+      setError(null);
+      return;
+    }
+
+    if (!order) {
+      setRows([]);
+      setError(null);
+      return;
+    }
 
     setReceivedDate(today());
     setNotes("");
@@ -106,7 +120,7 @@ export function PurchaseOrderReceiveGoodsDialog({
   };
 
   const submit = async (): Promise<void> => {
-    if (!order) return;
+    if (isLoading || loadError || !order) return;
 
     if (!receivedDate) {
       setError("Received date is required.");
@@ -241,46 +255,54 @@ export function PurchaseOrderReceiveGoodsDialog({
               <span>Expiry</span>
             </div>
             <div className="max-h-[22rem] overflow-y-auto">
-              {order?.items.map((item) => {
-                const row = rows.find((line) => line.purchaseOrderItemId === item.id);
-                const remaining = Math.max(item.quantityOrdered - item.quantityReceived, 0);
+              {isLoading ? (
+                <div className="px-4 py-6 text-sm text-muted-foreground">
+                  Loading purchase order items...
+                </div>
+              ) : loadError ? (
+                <div className="px-4 py-6 text-sm font-medium text-red-700">{loadError}</div>
+              ) : order ? (
+                order.items.map((item) => {
+                  const row = rows.find((line) => line.purchaseOrderItemId === item.id);
+                  const remaining = Math.max(item.quantityOrdered - item.quantityReceived, 0);
 
-                return (
-                  <div
-                    className="grid grid-cols-[1.8fr_0.7fr_0.7fr_0.85fr_1fr_1fr] gap-3 border-b px-4 py-3 text-sm last:border-b-0"
-                    key={item.id}
-                  >
-                    <div>
-                      <p className="font-semibold text-foreground">{item.itemNameSnapshot}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {item.unitSymbol || item.unitName}
-                      </p>
+                  return (
+                    <div
+                      className="grid grid-cols-[1.8fr_0.7fr_0.7fr_0.85fr_1fr_1fr] gap-3 border-b px-4 py-3 text-sm last:border-b-0"
+                      key={item.id}
+                    >
+                      <div>
+                        <p className="font-semibold text-foreground">{item.itemNameSnapshot}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.unitSymbol || item.unitName}
+                        </p>
+                      </div>
+                      <span>{item.quantityOrdered}</span>
+                      <span>{item.quantityReceived}</span>
+                      <Input
+                        min={0}
+                        max={remaining}
+                        onChange={(event) =>
+                          updateRow(item.id, "quantityReceived", event.target.value)
+                        }
+                        step="0.001"
+                        type="number"
+                        value={row?.quantityReceived ?? "0"}
+                      />
+                      <Input
+                        onChange={(event) => updateRow(item.id, "batchNumber", event.target.value)}
+                        placeholder="Optional"
+                        value={row?.batchNumber ?? ""}
+                      />
+                      <Input
+                        onChange={(event) => updateRow(item.id, "expiryDate", event.target.value)}
+                        type="date"
+                        value={row?.expiryDate ?? ""}
+                      />
                     </div>
-                    <span>{item.quantityOrdered}</span>
-                    <span>{item.quantityReceived}</span>
-                    <Input
-                      min={0}
-                      max={remaining}
-                      onChange={(event) =>
-                        updateRow(item.id, "quantityReceived", event.target.value)
-                      }
-                      step="0.001"
-                      type="number"
-                      value={row?.quantityReceived ?? "0"}
-                    />
-                    <Input
-                      onChange={(event) => updateRow(item.id, "batchNumber", event.target.value)}
-                      placeholder="Optional"
-                      value={row?.batchNumber ?? ""}
-                    />
-                    <Input
-                      onChange={(event) => updateRow(item.id, "expiryDate", event.target.value)}
-                      type="date"
-                      value={row?.expiryDate ?? ""}
-                    />
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : null}
             </div>
           </div>
 
@@ -294,7 +316,11 @@ export function PurchaseOrderReceiveGoodsDialog({
           <Button onClick={onClose} type="button" variant="outline">
             Cancel
           </Button>
-          <Button disabled={isSubmitting} onClick={() => void submit()} type="button">
+          <Button
+            disabled={isSubmitting || isLoading || loadError !== null || !order}
+            onClick={() => void submit()}
+            type="button"
+          >
             {isSubmitting ? "Receiving..." : "Receive goods"}
           </Button>
         </DialogFooter>

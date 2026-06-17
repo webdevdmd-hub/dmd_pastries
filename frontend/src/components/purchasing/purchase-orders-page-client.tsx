@@ -35,6 +35,7 @@ import {
   useConvertPurchaseOrderToBill,
   useCreatePurchaseOrder,
   useDeletePurchaseOrder,
+  usePurchaseOrder,
   usePurchaseOrders,
   usePurchasingBranches,
   usePurchasingProducts,
@@ -115,10 +116,14 @@ export function PurchaseOrdersPageClient(): JSX.Element {
   });
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
   const [convertingOrder, setConvertingOrder] = useState<PurchaseOrder | null>(null);
-  const [receivingOrder, setReceivingOrder] = useState<PurchaseOrder | null>(null);
+  const [receivingOrderId, setReceivingOrderId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const ordersQuery = usePurchaseOrders(filters, canView && branchScope.hasBranchScope);
+  const receivingOrderQuery = usePurchaseOrder(
+    receivingOrderId,
+    canView && branchScope.hasBranchScope && receivingOrderId !== null,
+  );
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const branchesQuery = usePurchasingBranches(canView);
   const productsQuery = usePurchasingProducts(canView);
@@ -185,12 +190,12 @@ export function PurchaseOrdersPageClient(): JSX.Element {
   };
 
   const handleReceive = async (payload: ReceivePurchaseOrderPayload): Promise<void> => {
-    if (!receivingOrder) return;
+    if (!receivingOrderId) return;
 
     try {
-      await receiveMutation.mutateAsync({ id: receivingOrder.id, payload });
+      await receiveMutation.mutateAsync({ id: receivingOrderId, payload });
       toast.success("Goods received against purchase order.");
-      setReceivingOrder(null);
+      setReceivingOrderId(null);
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -301,7 +306,7 @@ export function PurchaseOrdersPageClient(): JSX.Element {
                 setEditingOrder(order);
                 setFormOpen(true);
               }}
-              onReceive={setReceivingOrder}
+              onReceive={(order) => setReceivingOrderId(order.id)}
               onStatusChange={(order, status) =>
                 setPendingAction({ order, status, type: "status" })
               }
@@ -330,10 +335,12 @@ export function PurchaseOrdersPageClient(): JSX.Element {
 
       <PurchaseOrderReceiveGoodsDialog
         isSubmitting={receiveMutation.isPending}
-        onClose={() => setReceivingOrder(null)}
+        isLoading={receivingOrderQuery.isLoading}
+        loadError={receivingOrderQuery.error ? getErrorMessage(receivingOrderQuery.error) : null}
+        onClose={() => setReceivingOrderId(null)}
         onReceive={handleReceive}
-        open={receivingOrder !== null}
-        order={receivingOrder}
+        open={receivingOrderId !== null}
+        order={receivingOrderQuery.data ?? null}
       />
 
       <PurchaseOrderConvertToBillDialog
