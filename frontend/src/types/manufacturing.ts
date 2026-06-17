@@ -27,6 +27,7 @@ export type ProductionBatch = {
   batchUnitId: string;
   batchUnitName: string;
   status: BatchStatus;
+  productionDate: string | null;
   startTime: string | null;
   endTime: string | null;
   notes: string | null;
@@ -133,6 +134,8 @@ export type ManufacturingRecipeOption = {
   versionNumber: number;
   batchYieldQuantity: number;
   batchYieldUnitName: string;
+  componentCount: number | null;
+  packagingCount: number | null;
   isActive: boolean | null;
   status: string | null;
 };
@@ -205,6 +208,7 @@ export type ConsumePayload = {
 
 export type ProducePayload = {
   quantityProduced: number;
+  productionDate?: string;
 };
 
 export type WastagePayload = {

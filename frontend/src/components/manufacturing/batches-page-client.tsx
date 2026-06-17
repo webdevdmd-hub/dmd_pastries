@@ -45,6 +45,7 @@ import {
   useManufacturingInventory,
   useManufacturingProducts,
   useManufacturingRecipeByProduct,
+  useProduceBatch,
   useUpdateBatch,
 } from "@/hooks/use-manufacturing";
 import { usePermission } from "@/hooks/use-permission";
@@ -53,6 +54,7 @@ import type {
   BatchFilters,
   CreateBatchPayload,
   CreateProductionPayload,
+  ProducePayload,
   ProductionBatch,
   UpdateBatchPayload,
   WastagePayload,
@@ -71,6 +73,35 @@ function formatMetric(value: number): string {
   return new Intl.NumberFormat("en-AE", { maximumFractionDigits: 2 }).format(value);
 }
 
+function manufacturingErrorMessage(error: unknown): string {
+  const message = getErrorMessage(error);
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes("no ingredients or packaging") ||
+    normalizedMessage.includes("no bom") ||
+    normalizedMessage.includes("bom lines") ||
+    (normalizedMessage.includes("recipe") &&
+      normalizedMessage.includes("ingredient") &&
+      normalizedMessage.includes("packaging"))
+  ) {
+    return "This recipe has no ingredients or packaging. Add BOM lines before producing.";
+  }
+
+  if (
+    (normalizedMessage.includes("zero") ||
+      normalizedMessage.includes("no value") ||
+      normalizedMessage.includes("unit cost") ||
+      normalizedMessage.includes("stock value") ||
+      normalizedMessage.includes("inventory value")) &&
+    (normalizedMessage.includes("cost") || normalizedMessage.includes("value"))
+  ) {
+    return `${message} Add opening stock or receive purchase stock with a value before producing.`;
+  }
+
+  return message;
+}
+
 export function BatchesPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
@@ -78,6 +109,7 @@ export function BatchesPageClient(): JSX.Element {
   const canView = hasAnyPermission([PERMISSIONS.manufacturingView, PERMISSIONS.inventoryView]);
   const canCreate = hasAnyPermission([PERMISSIONS.manufacturingBatchesCreate]);
   const canEdit = hasAnyPermission([PERMISSIONS.manufacturingBatchesEdit]);
+  const canProduce = hasAnyPermission([PERMISSIONS.manufacturingBatchesProduce]);
   const canDelete = hasAnyPermission([PERMISSIONS.manufacturingBatchesDelete]);
   const canRecordWastage = hasAnyPermission([PERMISSIONS.manufacturingBatchesWastage]);
   const [filters, setFilters] = useState<BatchFilters>({
@@ -97,6 +129,7 @@ export function BatchesPageClient(): JSX.Element {
   const createPlannedMutation = useCreateBatch();
   const createProductionMutation = useCreateProduction();
   const updateBatchMutation = useUpdateBatch();
+  const produceBatchMutation = useProduceBatch();
   const deleteBatchMutation = useDeleteBatch();
   const addWastageMutation = useAddBatchWastage();
   const isPermissionDenied =
@@ -149,7 +182,7 @@ export function BatchesPageClient(): JSX.Element {
       toast.success("Planned production saved.");
       setFormOpen(false);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(manufacturingErrorMessage(error));
     }
   };
 
@@ -159,7 +192,7 @@ export function BatchesPageClient(): JSX.Element {
       toast.success("Production completed.");
       setFormOpen(false);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(manufacturingErrorMessage(error));
     }
   };
 
@@ -170,7 +203,38 @@ export function BatchesPageClient(): JSX.Element {
       setEditingBatch(null);
       setFormOpen(false);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(manufacturingErrorMessage(error));
+    }
+  };
+
+  const handleProducePlanned = async (
+    id: string,
+    updatePayload: UpdateBatchPayload,
+    producePayload: ProducePayload,
+  ): Promise<void> => {
+    try {
+      await updateBatchMutation.mutateAsync({ id, payload: updatePayload });
+      await produceBatchMutation.mutateAsync({ id, payload: producePayload });
+      toast.success("Planned production produced.");
+      setEditingBatch(null);
+      setFormOpen(false);
+    } catch (error) {
+      toast.error(manufacturingErrorMessage(error));
+    }
+  };
+
+  const handleProducePlannedFromRow = async (batch: ProductionBatch): Promise<void> => {
+    try {
+      await produceBatchMutation.mutateAsync({
+        id: batch.id,
+        payload: {
+          ...(batch.productionDate ? { productionDate: batch.productionDate.slice(0, 10) } : {}),
+          quantityProduced: batch.plannedQuantity,
+        },
+      });
+      toast.success("Planned production produced.");
+    } catch (error) {
+      toast.error(manufacturingErrorMessage(error));
     }
   };
 
@@ -184,7 +248,7 @@ export function BatchesPageClient(): JSX.Element {
       toast.success("Planned production deleted.");
       setDeleteBatchTarget(null);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(manufacturingErrorMessage(error));
     }
   };
 
@@ -407,9 +471,13 @@ export function BatchesPageClient(): JSX.Element {
               batches={batches}
               canDelete={canDelete}
               canEdit={canEdit}
+              canProduce={canProduce}
               canRecordWastage={canRecordWastage}
               onDelete={setDeleteBatchTarget}
               onEdit={openEdit}
+              onProduce={(batch) => {
+                void handleProducePlannedFromRow(batch);
+              }}
               onWastage={setWastageBatch}
             />
           </CardContent>
@@ -419,9 +487,11 @@ export function BatchesPageClient(): JSX.Element {
       <BatchFormDialog
         batch={editingBatch}
         branches={branchOptions}
+        canProducePlanned={canProduce}
         isSubmitting={
           createPlannedMutation.isPending ||
           createProductionMutation.isPending ||
+          produceBatchMutation.isPending ||
           updateBatchMutation.isPending
         }
         onClose={() => {
@@ -430,6 +500,7 @@ export function BatchesPageClient(): JSX.Element {
         }}
         onCreatePlanned={handleCreatePlanned}
         onProductChange={setSelectedProductId}
+        onProducePlanned={handleProducePlanned}
         onProduceNow={handleProduceNow}
         onUpdate={handleUpdate}
         open={formOpen}

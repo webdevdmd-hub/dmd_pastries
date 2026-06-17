@@ -3,6 +3,7 @@
 import type { JSX } from "react";
 import { useEffect, useState } from "react";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +29,7 @@ import type {
   ManufacturingBranchOption,
   ManufacturingProductOption,
   ManufacturingRecipeOption,
+  ProducePayload,
   ProductionBatch,
   UpdateBatchPayload,
 } from "@/types/manufacturing";
@@ -36,10 +38,12 @@ import { ITEM_STRUCTURE_LABELS, PRODUCT_TYPE_LABELS } from "@/types/product";
 export function BatchFormDialog({
   batch,
   branches,
+  canProducePlanned,
   isSubmitting,
   onClose,
   onCreatePlanned,
   onProductChange,
+  onProducePlanned,
   onProduceNow,
   onUpdate,
   open,
@@ -48,10 +52,16 @@ export function BatchFormDialog({
 }: {
   batch: ProductionBatch | null;
   branches: ManufacturingBranchOption[];
+  canProducePlanned: boolean;
   isSubmitting: boolean;
   onClose: () => void;
   onCreatePlanned: (payload: CreateBatchPayload) => Promise<void>;
   onProductChange: (productId: string) => void;
+  onProducePlanned: (
+    id: string,
+    updatePayload: UpdateBatchPayload,
+    producePayload: ProducePayload,
+  ) => Promise<void>;
   onProduceNow: (payload: CreateProductionPayload) => Promise<void>;
   onUpdate: (id: string, payload: UpdateBatchPayload) => Promise<void>;
   open: boolean;
@@ -81,7 +91,11 @@ export function BatchFormDialog({
     setProductId(batch?.productId ?? "");
     setRecipeId(batch?.recipeId ?? "");
     setPlannedQuantity(batch?.plannedQuantity ?? 1);
-    setProductionDate(batch?.startTime?.slice(0, 10) ?? new Date().toISOString().slice(0, 10));
+    setProductionDate(
+      batch?.productionDate?.slice(0, 10) ??
+        batch?.startTime?.slice(0, 10) ??
+        new Date().toISOString().slice(0, 10),
+    );
     setNotes(batch?.notes ?? "");
     setError(null);
 
@@ -99,14 +113,17 @@ export function BatchFormDialog({
     }
   };
 
+  const recipeIsKnownInactive = (recipe: ManufacturingRecipeOption | undefined): boolean =>
+    recipe !== undefined &&
+    (recipe.isActive === false || (recipe.status !== null && recipe.status !== "active"));
+
+  const recipeHasKnownEmptyBom = (recipe: ManufacturingRecipeOption | undefined): boolean =>
+    recipe?.componentCount === 0 && recipe.packagingCount === 0;
+
   const submitPlanned = async (): Promise<void> => {
     const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
-    const recipeIsKnownInactive =
-      selectedRecipe !== undefined &&
-      (selectedRecipe.isActive === false ||
-        (selectedRecipe.status !== null && selectedRecipe.status !== "active"));
 
-    if (recipeIsKnownInactive) {
+    if (recipeIsKnownInactive(selectedRecipe)) {
       setError("Only an active recipe can be used to create production.");
       return;
     }
@@ -135,13 +152,14 @@ export function BatchFormDialog({
 
   const submitProduction = async (): Promise<void> => {
     const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
-    const recipeIsKnownInactive =
-      selectedRecipe !== undefined &&
-      (selectedRecipe.isActive === false ||
-        (selectedRecipe.status !== null && selectedRecipe.status !== "active"));
 
-    if (recipeIsKnownInactive) {
+    if (recipeIsKnownInactive(selectedRecipe)) {
       setError("Only an active recipe can be used to create production.");
+      return;
+    }
+
+    if (recipeHasKnownEmptyBom(selectedRecipe)) {
+      setError("This recipe has no ingredients or packaging. Add BOM lines before producing.");
       return;
     }
 
@@ -163,11 +181,46 @@ export function BatchFormDialog({
     await onProduceNow(result.data);
   };
 
+  const submitPlannedProduction = async (): Promise<void> => {
+    if (!batch) {
+      return;
+    }
+
+    const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
+
+    if (recipeIsKnownInactive(selectedRecipe)) {
+      setError("Only an active recipe can be used to create production.");
+      return;
+    }
+
+    if (recipeHasKnownEmptyBom(selectedRecipe)) {
+      setError("This recipe has no ingredients or packaging. Add BOM lines before producing.");
+      return;
+    }
+
+    const result = createBatchSchema.safeParse({
+      branchId,
+      notes,
+      plannedQuantity,
+      productId,
+      productionDate,
+      recipeId,
+    });
+
+    if (!result.success) {
+      setError(result.error.issues[0]?.message ?? "Please check the production form.");
+      return;
+    }
+
+    await onProducePlanned(batch.id, result.data, {
+      productionDate: result.data.productionDate,
+      quantityProduced: result.data.plannedQuantity,
+    });
+  };
+
   const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
-  const selectedRecipeIsKnownInactive =
-    selectedRecipe !== undefined &&
-    (selectedRecipe.isActive === false ||
-      (selectedRecipe.status !== null && selectedRecipe.status !== "active"));
+  const selectedRecipeIsKnownInactive = recipeIsKnownInactive(selectedRecipe);
+  const selectedRecipeHasKnownEmptyBom = recipeHasKnownEmptyBom(selectedRecipe);
   const isCreateDisabled = isSubmitting || selectedRecipeIsKnownInactive;
 
   return (
@@ -281,6 +334,14 @@ export function BatchFormDialog({
                     Activate this recipe before creating production.
                   </p>
                 ) : null}
+                {selectedRecipeHasKnownEmptyBom ? (
+                  <Alert className="mt-4 border-amber-300 bg-amber-50 text-amber-950">
+                    <AlertTitle>Missing BOM lines</AlertTitle>
+                    <AlertDescription>
+                      This recipe has no ingredients or packaging. Add BOM lines before producing.
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
               </div>
             ) : null}
 
@@ -322,15 +383,36 @@ export function BatchFormDialog({
             >
               Save as Planned
             </Button>
+          ) : (
+            <Button
+              disabled={isCreateDisabled}
+              onClick={() => void submitPlanned()}
+              type="button"
+              variant="outline"
+            >
+              Save planned production
+            </Button>
+          )}
+          {batch && canProducePlanned ? (
+            <Button
+              className="bg-black text-white hover:bg-neutral-800"
+              disabled={isCreateDisabled}
+              onClick={() => void submitPlannedProduction()}
+              type="button"
+            >
+              Produce planned
+            </Button>
           ) : null}
-          <Button
-            className="bg-black text-white hover:bg-neutral-800"
-            disabled={isCreateDisabled}
-            onClick={() => void (batch ? submitPlanned() : submitProduction())}
-            type="button"
-          >
-            {batch ? "Save planned production" : "Produce now"}
-          </Button>
+          {!batch ? (
+            <Button
+              className="bg-black text-white hover:bg-neutral-800"
+              disabled={isCreateDisabled}
+              onClick={() => void submitProduction()}
+              type="button"
+            >
+              Produce now
+            </Button>
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -55,6 +55,7 @@ type BackendConsumePayload = {
 
 type BackendProducePayload = {
   quantity_produced: number;
+  production_date?: string;
 };
 
 type BackendWastagePayload = {
@@ -104,6 +105,30 @@ function requestString(value: string | null | undefined): string {
 
 function numberValue(value: unknown, fallback = 0): number {
   return typeof value === "number" ? value : fallback;
+}
+
+function optionalNumber(value: unknown): number | null {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function firstOptionalNumber(...values: unknown[]): number | null {
+  for (const value of values) {
+    const parsed = optionalNumber(value);
+    if (parsed !== null) {
+      return parsed;
+    }
+  }
+
+  return null;
 }
 
 function isBatchStatus(value: unknown): value is BatchStatus {
@@ -178,6 +203,7 @@ function parseBatch(value: unknown): ProductionBatch {
     batchUnitId: stringValue(value.yield_unit_id, stringValue(value.batch_unit_id)),
     batchUnitName: stringValue(value.yield_unit_symbol, stringValue(value.batch_unit_name, "Unit")),
     status: isBatchStatus(value.status) ? value.status : "draft",
+    productionDate: optionalString(value.production_date),
     startTime: optionalString(value.started_at) ?? optionalString(value.start_time),
     endTime: optionalString(value.completed_at) ?? optionalString(value.end_time),
     notes: optionalString(value.notes),
@@ -332,6 +358,23 @@ function parseRecipe(value: unknown): ManufacturingRecipeOption {
     versionNumber: numberValue(value.version_number),
     batchYieldQuantity: numberValue(value.batch_yield_quantity),
     batchYieldUnitName: stringValue(value.batch_yield_unit_name, "Unit"),
+    componentCount: firstOptionalNumber(
+      value.component_count,
+      value.components_count,
+      value.ingredient_count,
+      value.ingredients_count,
+      value.ingredient_line_count,
+      value.ingredient_lines_count,
+      value.bom_ingredient_count,
+      value.bom_ingredient_lines_count,
+    ),
+    packagingCount: firstOptionalNumber(
+      value.packaging_count,
+      value.packaging_line_count,
+      value.packaging_lines_count,
+      value.bom_packaging_count,
+      value.bom_packaging_lines_count,
+    ),
     isActive,
     status,
   };
@@ -417,9 +460,15 @@ function consumePayload(payload: ConsumePayload): BackendConsumePayload {
 }
 
 function producePayload(payload: ProducePayload): BackendProducePayload {
-  return {
+  const nextPayload: BackendProducePayload = {
     quantity_produced: payload.quantityProduced,
   };
+
+  if (payload.productionDate !== undefined) {
+    nextPayload.production_date = payload.productionDate;
+  }
+
+  return nextPayload;
 }
 
 function wastagePayload(payload: WastagePayload): BackendWastagePayload {

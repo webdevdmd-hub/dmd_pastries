@@ -6,6 +6,7 @@ import type { JSX } from "react";
 
 import { BatchActionsMenu } from "@/components/manufacturing/batch-actions-menu";
 import { BatchStatusBadge } from "@/components/manufacturing/batch-status-badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -40,17 +41,21 @@ export function BatchesTable({
   batches,
   canDelete,
   canEdit,
+  canProduce,
   canRecordWastage,
   onDelete,
   onEdit,
+  onProduce,
   onWastage,
 }: {
   batches: ProductionBatch[];
   canDelete: boolean;
   canEdit: boolean;
+  canProduce: boolean;
   canRecordWastage: boolean;
   onDelete: (batch: ProductionBatch) => void;
   onEdit: (batch: ProductionBatch) => void;
+  onProduce: (batch: ProductionBatch) => void;
   onWastage: (batch: ProductionBatch) => void;
 }): JSX.Element {
   const router = useRouter();
@@ -134,18 +139,32 @@ export function BatchesTable({
                 {formatDateTime(batch.startTime)}
               </TableCell>
               <TableCell className="text-right">
-                <BatchActionsMenu
-                  batch={batch}
-                  canDelete={canDelete}
-                  canEdit={canEdit}
-                  canRecordWastage={canRecordWastage}
-                  onDelete={onDelete}
-                  onEdit={onEdit}
-                  onView={(selectedBatch) =>
-                    router.push(`${ROUTES.manufacturingBatches}/${selectedBatch.id}`)
-                  }
-                  onWastage={onWastage}
-                />
+                <div className="flex items-center justify-end gap-2">
+                  {canProduce && batch.status === "draft" ? (
+                    <Button
+                      className="h-8 border-neutral-300 px-3 text-xs"
+                      onClick={() => onProduce(batch)}
+                      type="button"
+                      variant="outline"
+                    >
+                      Produce planned
+                    </Button>
+                  ) : null}
+                  <BatchActionsMenu
+                    batch={batch}
+                    canDelete={canDelete}
+                    canEdit={canEdit}
+                    canProduce={canProduce}
+                    canRecordWastage={canRecordWastage}
+                    onDelete={onDelete}
+                    onEdit={onEdit}
+                    onProduce={onProduce}
+                    onView={(selectedBatch) =>
+                      router.push(`${ROUTES.manufacturingBatches}/${selectedBatch.id}`)
+                    }
+                    onWastage={onWastage}
+                  />
+                </div>
               </TableCell>
             </TableRow>
           );

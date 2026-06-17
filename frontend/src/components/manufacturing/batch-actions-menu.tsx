@@ -1,6 +1,6 @@
 "use client";
 
-import { Edit, MoreHorizontal, Trash2 } from "lucide-react";
+import { Edit, MoreHorizontal, Play, Trash2 } from "lucide-react";
 import type { JSX } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -16,18 +16,22 @@ export function BatchActionsMenu({
   batch,
   canDelete,
   canEdit,
+  canProduce,
   canRecordWastage,
   onDelete,
   onEdit,
+  onProduce,
   onView,
   onWastage,
 }: {
   batch: ProductionBatch;
   canDelete: boolean;
   canEdit: boolean;
+  canProduce: boolean;
   canRecordWastage: boolean;
   onDelete: (batch: ProductionBatch) => void;
   onEdit: (batch: ProductionBatch) => void;
+  onProduce: (batch: ProductionBatch) => void;
   onView: (batch: ProductionBatch) => void;
   onWastage: (batch: ProductionBatch) => void;
 }): JSX.Element {
@@ -53,6 +57,12 @@ export function BatchActionsMenu({
           <DropdownMenuItem onSelect={() => onEdit(batch)}>
             <Edit className="h-4 w-4" />
             Edit planned
+          </DropdownMenuItem>
+        ) : null}
+        {canProduce && isPlanned ? (
+          <DropdownMenuItem onSelect={() => onProduce(batch)}>
+            <Play className="h-4 w-4" />
+            Produce planned
           </DropdownMenuItem>
         ) : null}
         {canDelete && isPlanned ? (
