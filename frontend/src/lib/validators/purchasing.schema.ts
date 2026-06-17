@@ -8,8 +8,9 @@ const optionalNullableString = z.union([z.string(), z.null(), z.undefined()]).tr
   return trimmedValue.length > 0 ? trimmedValue : null;
 });
 
-export const purchaseItemLineSchema = z
+const purchaseProductLineSchema = z
   .object({
+    lineType: z.literal("product").optional(),
     itemType: z.literal("product"),
     productId: optionalNullableString,
     productVariantId: optionalNullableString,
@@ -29,12 +30,48 @@ export const purchaseItemLineSchema = z
     }
   });
 
+const purchaseAccountLineSchema = z
+  .object({
+    lineType: z.literal("account"),
+    itemType: z.literal("account"),
+    productId: optionalNullableString,
+    productVariantId: optionalNullableString,
+    ingredientId: optionalNullableString,
+    packagingItemId: optionalNullableString,
+    accountId: optionalNullableString,
+    description: optionalNullableString,
+    itemNameSnapshot: optionalNullableString,
+    quantity: z.coerce.number().positive("Quantity must be greater than 0."),
+    unitId: z.string().optional().default(""),
+    unitCost: z.coerce.number().min(0, "Unit cost cannot be negative."),
+    discountAmount: z.coerce.number().min(0, "Discount cannot be negative."),
+    taxRateId: optionalNullableString,
+  })
+  .superRefine((value, context) => {
+    if (!value.accountId) {
+      context.addIssue({ code: "custom", message: "Account is required.", path: ["accountId"] });
+    }
+
+    if (!value.description) {
+      context.addIssue({
+        code: "custom",
+        message: "Description is required.",
+        path: ["description"],
+      });
+    }
+  });
+
+export const purchaseItemLineSchema = z.union([
+  purchaseProductLineSchema,
+  purchaseAccountLineSchema,
+]);
+
 export const purchaseOrderSchema = z.object({
   branchId: z.string().min(1, "Branch is required."),
   supplierId: z.string().min(1, "Supplier is required."),
   orderDate: z.string().min(1, "Order date is required."),
   expectedDeliveryDate: optionalNullableString,
-  items: z.array(purchaseItemLineSchema).min(1, "At least one item is required."),
+  items: z.array(purchaseProductLineSchema).min(1, "At least one item is required."),
   notes: optionalNullableString,
 });
 
@@ -46,6 +83,7 @@ export const purchaseInvoiceSchema = z.object({
   invoiceDate: z.string().min(1, "Invoice date is required."),
   dueDate: optionalNullableString,
   items: z.array(purchaseItemLineSchema).min(1, "At least one item is required."),
+  billDiscountAmount: z.coerce.number().min(0, "Bill discount cannot be negative.").optional(),
   notes: optionalNullableString,
 });
 
@@ -55,7 +93,7 @@ export const purchaseReceiveSchema = z.object({
   purchaseOrderId: optionalNullableString,
   purchaseInvoiceId: optionalNullableString,
   receivedDate: z.string().min(1, "Received date is required."),
-  items: z.array(purchaseItemLineSchema).min(1, "At least one item is required."),
+  items: z.array(purchaseProductLineSchema).min(1, "At least one item is required."),
   notes: optionalNullableString,
 });
 

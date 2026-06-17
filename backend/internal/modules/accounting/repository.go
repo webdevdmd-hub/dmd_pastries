@@ -145,6 +145,7 @@ type purchaseInvoiceAccountingRow struct {
 	Status                 string
 	SubtotalAmount         float64
 	TaxAmount              float64
+	BillDiscountAmount     float64
 	ChargeAmount           float64
 	ChargeTaxAmount        float64
 	TotalAmount            float64
@@ -153,12 +154,17 @@ type purchaseInvoiceAccountingRow struct {
 }
 
 type purchaseInvoiceItemAccountingRow struct {
-	ID        string
-	ItemType  string
-	Quantity  float64
-	UnitCost  float64
-	TaxAmount float64
-	LineTotal float64
+	ID                  string
+	LineType            string
+	ItemType            string
+	AccountID           *string
+	AccountNameSnapshot string
+	AccountCodeSnapshot string
+	Quantity            float64
+	UnitCost            float64
+	DiscountAmount      float64
+	TaxAmount           float64
+	LineTotal           float64
 }
 
 type purchaseInvoicePaymentAccountingRow struct {
@@ -597,7 +603,7 @@ func (r *Repository) UpdatePOSSaleVoidJournalID(tx *gorm.DB, businessID, saleID,
 func (r *Repository) FindPurchaseInvoiceForAccounting(tx *gorm.DB, businessID, invoiceID string) (*purchaseInvoiceAccountingRow, error) {
 	var row purchaseInvoiceAccountingRow
 	err := tx.Table("purchase_invoices").
-		Select("id, business_id, branch_id, invoice_number, invoice_date, status, subtotal_amount, tax_amount, charge_amount, charge_tax_amount, total_amount, journal_entry_id, reversal_journal_entry_id").
+		Select("id, business_id, branch_id, invoice_number, invoice_date, status, subtotal_amount, tax_amount, bill_discount_amount, charge_amount, charge_tax_amount, total_amount, journal_entry_id, reversal_journal_entry_id").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, invoiceID).
 		Take(&row).Error
 	return &row, err
@@ -606,7 +612,7 @@ func (r *Repository) FindPurchaseInvoiceForAccounting(tx *gorm.DB, businessID, i
 func (r *Repository) ListPurchaseInvoiceItemsForAccounting(tx *gorm.DB, businessID, invoiceID string) ([]purchaseInvoiceItemAccountingRow, error) {
 	var rows []purchaseInvoiceItemAccountingRow
 	err := tx.Table("purchase_invoice_items").
-		Select("id, item_type, quantity, unit_cost, tax_amount, line_total").
+		Select("id, line_type, item_type, account_id, account_name_snapshot, account_code_snapshot, quantity, unit_cost, discount_amount, tax_amount, line_total").
 		Where("business_id = ? AND purchase_invoice_id = ? AND deleted_at IS NULL", businessID, invoiceID).
 		Order("created_at ASC").
 		Scan(&rows).Error

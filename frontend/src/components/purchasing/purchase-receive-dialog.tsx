@@ -78,22 +78,25 @@ function linesFromOrder(order: PurchaseOrder): PurchaseItemLineDraft[] {
 }
 
 function linesFromInvoice(invoice: PurchaseInvoice): PurchaseItemLineDraft[] {
-  return invoice.items.map((item) => ({
-    batchNumber: item.batchNumber,
-    discountAmount: item.discountAmount,
-    expiryDate: item.expiryDate,
-    ingredientId: item.ingredientId,
-    itemType: "product",
-    itemNameSnapshot: item.itemNameSnapshot,
-    lineId: item.id || crypto.randomUUID(),
-    packagingItemId: item.packagingItemId,
-    productId: item.productId,
-    productVariantId: item.productVariantId,
-    quantity: item.quantity,
-    taxRateId: item.taxRateId,
-    unitCost: item.unitCost,
-    unitId: item.unitId,
-  }));
+  return invoice.items
+    .filter((item) => item.lineType !== "account" && item.itemType !== "account")
+    .map((item) => ({
+      batchNumber: item.batchNumber,
+      discountAmount: item.discountAmount,
+      expiryDate: item.expiryDate,
+      ingredientId: item.ingredientId,
+      itemType: "product",
+      itemNameSnapshot: item.itemNameSnapshot,
+      lineId: item.id || crypto.randomUUID(),
+      lineType: "product",
+      packagingItemId: item.packagingItemId,
+      productId: item.productId,
+      productVariantId: item.productVariantId,
+      quantity: item.quantity,
+      taxRateId: item.taxRateId,
+      unitCost: item.unitCost,
+      unitId: item.unitId,
+    }));
 }
 
 export function PurchaseReceiveDialog({

@@ -70,6 +70,7 @@ type PurchaseInvoice struct {
 	SubtotalAmount         float64        `gorm:"not null;default:0" json:"subtotal_amount"`
 	TaxAmount              float64        `gorm:"not null;default:0" json:"tax_amount"`
 	DiscountAmount         float64        `gorm:"not null;default:0" json:"discount_amount"`
+	BillDiscountAmount     float64        `gorm:"not null;default:0" json:"bill_discount_amount"`
 	ChargeAmount           float64        `gorm:"not null;default:0" json:"charge_amount"`
 	ChargeTaxAmount        float64        `gorm:"not null;default:0" json:"charge_tax_amount"`
 	TotalAmount            float64        `gorm:"not null;default:0" json:"total_amount"`
@@ -98,13 +99,18 @@ type PurchaseInvoiceItem struct {
 	ID                string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID        string         `gorm:"type:uuid;not null;index" json:"business_id"`
 	PurchaseInvoiceID string         `gorm:"type:uuid;not null;index" json:"purchase_invoice_id"`
+	LineType          string         `gorm:"size:30;not null;default:product" json:"line_type"`
 	ItemType          string         `gorm:"size:50;not null" json:"item_type"`
 	ProductID         *string        `gorm:"type:uuid;index" json:"product_id"`
 	IngredientID      *string        `gorm:"type:uuid;index" json:"ingredient_id"`
 	PackagingItemID   *string        `gorm:"type:uuid;index" json:"packaging_item_id"`
+	AccountID         *string        `gorm:"type:uuid;index" json:"account_id"`
+	AccountName       string         `gorm:"column:account_name_snapshot;size:255" json:"account_name_snapshot"`
+	AccountCode       string         `gorm:"column:account_code_snapshot;size:100" json:"account_code_snapshot"`
+	Description       string         `json:"description"`
 	ItemNameSnapshot  string         `gorm:"size:255;not null" json:"item_name_snapshot"`
 	Quantity          float64        `gorm:"not null" json:"quantity"`
-	UnitID            string         `gorm:"type:uuid;not null;index" json:"unit_id"`
+	UnitID            *string        `gorm:"type:uuid;index" json:"unit_id"`
 	UnitCost          float64        `gorm:"not null;default:0" json:"unit_cost"`
 	DiscountAmount    float64        `gorm:"not null;default:0" json:"discount_amount"`
 	TaxRateID         *string        `gorm:"type:uuid;index" json:"tax_rate_id"`

@@ -1399,24 +1399,21 @@ func (s *Service) PostPurchaseInvoiceJournal(tx *gorm.DB, currentUser *utils.Aut
 	if totalAmount <= 0 {
 		return "", nil
 	}
-	inventoryAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "inventory_stock", "1200", "Inventory / Stock")
-	if err != nil {
-		return "", err
-	}
 	accountsPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "accounts_payable", "2000", "Accounts Payable")
 	if err != nil {
 		return "", err
 	}
 	taxAmount := roundMoney(invoice.TaxAmount)
-	chargeLines, chargeNetAmount, err := s.buildPurchaseChargeDebitLines(tx, currentUser.BusinessID, "purchase_invoice", invoice.ID, "Purchase invoice charge")
+	chargeLines, _, err := s.buildPurchaseChargeDebitLines(tx, currentUser.BusinessID, "purchase_invoice", invoice.ID, "Purchase invoice charge")
 	if err != nil {
 		return "", err
 	}
-	netAmount := roundMoney(totalAmount - taxAmount - chargeNetAmount)
-	lines := make([]JournalEntryLineRequest, 0, 3+len(chargeLines))
-	if netAmount > 0 {
-		lines = append(lines, JournalEntryLineRequest{AccountID: inventoryAccount.ID, DebitAmount: netAmount, Description: "Purchase invoice stock value"})
+	valueLines, err := s.buildPurchaseInvoiceValueLines(tx, currentUser.BusinessID, invoice, false)
+	if err != nil {
+		return "", err
 	}
+	lines := make([]JournalEntryLineRequest, 0, len(valueLines)+2+len(chargeLines))
+	lines = append(lines, valueLines...)
 	lines = append(lines, chargeLines...)
 	if taxAmount > 0 {
 		vatReceivable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "vat_receivable", "1300", "VAT Receivable")
@@ -1459,25 +1456,22 @@ func (s *Service) PostPurchaseInvoiceCancellationJournal(tx *gorm.DB, currentUse
 			return "", err
 		}
 	}
-	inventoryAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "inventory_stock", "1200", "Inventory / Stock")
-	if err != nil {
-		return "", err
-	}
 	accountsPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "accounts_payable", "2000", "Accounts Payable")
 	if err != nil {
 		return "", err
 	}
 	taxAmount := roundMoney(invoice.TaxAmount)
-	chargeLines, chargeNetAmount, err := s.buildPurchaseChargeCreditLines(tx, currentUser.BusinessID, "purchase_invoice", invoice.ID, "Purchase invoice cancellation charge")
+	chargeLines, _, err := s.buildPurchaseChargeCreditLines(tx, currentUser.BusinessID, "purchase_invoice", invoice.ID, "Purchase invoice cancellation charge")
 	if err != nil {
 		return "", err
 	}
-	netAmount := roundMoney(totalAmount - taxAmount - chargeNetAmount)
-	lines := make([]JournalEntryLineRequest, 0, 3+len(chargeLines))
-	lines = append(lines, JournalEntryLineRequest{AccountID: accountsPayable.ID, DebitAmount: totalAmount, Description: "Supplier payable reversed " + invoice.InvoiceNumber})
-	if netAmount > 0 {
-		lines = append(lines, JournalEntryLineRequest{AccountID: inventoryAccount.ID, CreditAmount: netAmount, Description: "Purchase invoice stock value reversed"})
+	valueLines, err := s.buildPurchaseInvoiceValueLines(tx, currentUser.BusinessID, invoice, true)
+	if err != nil {
+		return "", err
 	}
+	lines := make([]JournalEntryLineRequest, 0, len(valueLines)+2+len(chargeLines))
+	lines = append(lines, JournalEntryLineRequest{AccountID: accountsPayable.ID, DebitAmount: totalAmount, Description: "Supplier payable reversed " + invoice.InvoiceNumber})
+	lines = append(lines, valueLines...)
 	lines = append(lines, chargeLines...)
 	if taxAmount > 0 {
 		vatReceivable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "vat_receivable", "1300", "VAT Receivable")
@@ -1494,6 +1488,95 @@ func (s *Service) PostPurchaseInvoiceCancellationJournal(tx *gorm.DB, currentUse
 		return "", apperrors.Internal("failed to update purchase invoice reversal journal")
 	}
 	return journalID, nil
+}
+
+func (s *Service) buildPurchaseInvoiceValueLines(tx *gorm.DB, businessID string, invoice *purchaseInvoiceAccountingRow, reverse bool) ([]JournalEntryLineRequest, error) {
+	items, err := s.repo.ListPurchaseInvoiceItemsForAccounting(tx, businessID, invoice.ID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load purchase invoice items for accounting")
+	}
+	lineNetTotal := 0.0
+	for _, item := range items {
+		lineNetTotal += roundMoney(item.LineTotal - item.TaxAmount)
+	}
+	lineNetTotal = roundMoney(lineNetTotal)
+	billDiscount := roundMoney(invoice.BillDiscountAmount)
+	if billDiscount > lineNetTotal {
+		billDiscount = lineNetTotal
+	}
+	discountRemaining := billDiscount
+	eligibleRemaining := 0
+	for _, item := range items {
+		if roundMoney(item.LineTotal-item.TaxAmount) > 0 {
+			eligibleRemaining++
+		}
+	}
+
+	var inventoryAccount *ChartAccount
+	lines := make([]JournalEntryLineRequest, 0, len(items))
+	for _, item := range items {
+		lineNet := roundMoney(item.LineTotal - item.TaxAmount)
+		if lineNet <= 0 {
+			continue
+		}
+		allocatedDiscount := 0.0
+		if billDiscount > 0 && lineNetTotal > 0 {
+			if eligibleRemaining == 1 {
+				allocatedDiscount = discountRemaining
+			} else {
+				allocatedDiscount = roundMoney(billDiscount * lineNet / lineNetTotal)
+			}
+			discountRemaining = roundMoney(discountRemaining - allocatedDiscount)
+			eligibleRemaining--
+		}
+		amount := roundMoney(lineNet - allocatedDiscount)
+		if amount <= 0 {
+			continue
+		}
+
+		lineType := normalizedPurchaseInvoiceAccountingLineType(item)
+		accountID := ""
+		description := ""
+		if lineType == "account" {
+			if item.AccountID == nil || strings.TrimSpace(*item.AccountID) == "" {
+				return nil, apperrors.BadRequest("purchase invoice account line is missing account_id", map[string]interface{}{"purchase_invoice_item_id": item.ID})
+			}
+			account, err := s.repo.ValidateActiveAccount(tx, businessID, *item.AccountID)
+			if err != nil {
+				return nil, apperrors.BadRequest("purchase invoice account line account is inactive or missing", map[string]interface{}{"purchase_invoice_item_id": item.ID})
+			}
+			accountID = account.ID
+			description = "Purchase invoice account line"
+			if strings.TrimSpace(item.AccountNameSnapshot) != "" {
+				description += " - " + strings.TrimSpace(item.AccountNameSnapshot)
+			}
+		} else {
+			if inventoryAccount == nil {
+				inventoryAccount, err = s.requiredMappedAccount(tx, businessID, "inventory_stock", "1200", "Inventory / Stock")
+				if err != nil {
+					return nil, err
+				}
+			}
+			accountID = inventoryAccount.ID
+			description = "Purchase invoice stock value"
+		}
+
+		line := JournalEntryLineRequest{AccountID: accountID, Description: description}
+		if reverse {
+			line.CreditAmount = amount
+		} else {
+			line.DebitAmount = amount
+		}
+		lines = append(lines, line)
+	}
+	return lines, nil
+}
+
+func normalizedPurchaseInvoiceAccountingLineType(item purchaseInvoiceItemAccountingRow) string {
+	if strings.TrimSpace(item.LineType) == "account" || strings.TrimSpace(item.ItemType) == "account" || item.AccountID != nil {
+		return "account"
+	}
+	return "product"
 }
 
 func (s *Service) PostPurchaseInvoicePaymentJournal(tx *gorm.DB, currentUser *utils.AuthContext, paymentID string) (string, error) {

@@ -281,6 +281,64 @@ export function PurchaseInvoiceDetailsPageClient({
         </CardContent>
       </Card>
 
+      <Card className="border-brand-cappuccino bg-white/85">
+        <CardHeader>
+          <CardTitle>Bill summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-brand-mocha">Subtotal</span>
+            <span className="font-semibold text-brand-espresso">
+              {formatCurrency(invoice.subtotalAmount)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
+            <span className="text-brand-mocha">Line discounts</span>
+            <span className="font-semibold text-red-700">
+              -{formatCurrency(invoice.discountAmount)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
+            <span className="text-brand-mocha">Bill discount</span>
+            <span className="font-semibold text-red-700">
+              -{formatCurrency(invoice.billDiscountAmount)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
+            <span className="text-brand-mocha">Tax</span>
+            <span className="font-semibold text-brand-espresso">
+              {formatCurrency(invoice.taxAmount)}
+            </span>
+          </div>
+          {invoice.chargeAmount + invoice.chargeTaxAmount > 0 ? (
+            <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
+              <span className="text-brand-mocha">Legacy charges</span>
+              <span className="font-semibold text-brand-espresso">
+                {formatCurrency(invoice.chargeAmount + invoice.chargeTaxAmount)}
+              </span>
+            </div>
+          ) : null}
+          <div className="flex items-center justify-between rounded-lg bg-brand-latte px-3 py-2 text-base">
+            <span className="font-semibold text-brand-mocha">Grand total</span>
+            <span className="text-lg font-bold text-brand-espresso">
+              {formatCurrency(invoice.totalAmount)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-brand-mocha">Paid</span>
+            <span className="font-semibold text-brand-espresso">
+              {formatCurrency(invoice.paidAmount)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-brand-mocha">Balance due</span>
+            <span className="font-semibold text-brand-espresso">
+              {formatCurrency(invoice.balanceAmount)}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
       <PurchasingItemLines lines={invoice.items} title="Bill items" />
       <PurchaseInvoicePaymentsSection canManage={canManage} invoice={invoice} />
       {invoice.purchaseOrderId ? (

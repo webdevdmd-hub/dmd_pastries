@@ -49,13 +49,17 @@ import type {
 } from "@/types/purchasing";
 
 type BackendLinePayload = {
-  item_type: "product";
+  line_type?: "product" | "account";
+  item_type: "product" | "account";
   product_id?: string | null;
   product_variant_id?: string | null;
+  account_id?: string | null;
+  description?: string | null;
+  item_name_snapshot?: string | null;
   quantity?: number;
   quantity_ordered?: number;
   quantity_received?: number;
-  unit_id: string;
+  unit_id?: string | null;
   unit_cost?: number;
   discount_amount?: number;
   tax_rate_id?: string | null;
@@ -80,6 +84,7 @@ type BackendPurchaseInvoicePayload = {
   invoice_date?: string;
   due_date?: string | null;
   items?: BackendLinePayload[];
+  bill_discount_amount?: number;
   notes?: string | null;
 };
 
@@ -243,7 +248,9 @@ function toQueryString(params: Record<string, string | number | null | undefined
 }
 
 function isItemType(value: unknown): value is PurchaseItemType {
-  return value === "product" || value === "ingredient" || value === "packaging";
+  return (
+    value === "product" || value === "ingredient" || value === "packaging" || value === "account"
+  );
 }
 
 function isProductType(value: unknown): value is ProductType {
@@ -321,11 +328,16 @@ function parseInvoiceItem(value: unknown): PurchaseInvoiceItem {
 
   return {
     id: stringValue(value.id),
+    lineType: value.line_type === "account" ? "account" : "product",
     itemType: isItemType(value.item_type) ? value.item_type : "product",
     productId: optionalString(value.product_id),
     productVariantId: optionalString(value.product_variant_id),
     ingredientId: optionalString(value.ingredient_id),
     packagingItemId: optionalString(value.packaging_item_id),
+    accountId: optionalString(value.account_id),
+    accountName: optionalString(value.account_name_snapshot),
+    accountCode: optionalString(value.account_code_snapshot),
+    description: optionalString(value.description),
     itemNameSnapshot: stringValue(value.item_name_snapshot, "Purchase item"),
     quantity: numberValue(value.quantity),
     unitId: stringValue(value.unit_id),
@@ -413,6 +425,9 @@ function parseInvoice(value: unknown): PurchaseInvoice {
     subtotalAmount: numberValue(value.subtotal_amount),
     taxAmount: numberValue(value.tax_amount),
     discountAmount: numberValue(value.discount_amount),
+    billDiscountAmount: numberValue(value.bill_discount_amount),
+    chargeAmount: numberValue(value.charge_amount),
+    chargeTaxAmount: numberValue(value.charge_tax_amount),
     totalAmount: numberValue(value.total_amount),
     paidAmount: numberValue(value.paid_amount),
     balanceAmount: numberValue(value.balance_amount),
@@ -650,7 +665,10 @@ function parseDocumentChainInvoice(value: unknown): PurchaseInvoice {
     cancelledReceiptId: optionalString(value.cancelled_receipt_id),
     createdAt: "",
     createdByUserName: "User",
+    chargeAmount: 0,
+    chargeTaxAmount: 0,
     discountAmount: 0,
+    billDiscountAmount: 0,
     dueDate: null,
     invoiceDate: stringValue(value.date, stringValue(value.invoice_date)),
     invoiceNumber: stringValue(value.document_number, stringValue(value.invoice_number, "Invoice")),
@@ -888,7 +906,23 @@ function linePayload(
   line: PurchaseItemLinePayload,
   quantityKey: "quantity" | "quantity_ordered" | "quantity_received",
 ): BackendLinePayload {
+  if (line.lineType === "account" || line.itemType === "account" || line.accountId) {
+    const payload: BackendLinePayload = {
+      line_type: "account",
+      item_type: "account",
+      account_id: line.accountId ?? null,
+      description: line.description ?? line.itemNameSnapshot ?? null,
+      [quantityKey]: line.quantity,
+      unit_cost: line.unitCost,
+      discount_amount: line.discountAmount,
+      tax_rate_id: line.taxRateId,
+    };
+
+    return payload;
+  }
+
   const payload: BackendLinePayload = {
+    line_type: "product",
     item_type: "product",
     product_id: line.productId,
     product_variant_id: line.productVariantId,
@@ -944,6 +978,9 @@ function invoicePayload(
   if (payload.dueDate !== undefined) nextPayload.due_date = payload.dueDate;
   if (payload.items !== undefined) {
     nextPayload.items = payload.items.map((line) => linePayload(line, "quantity"));
+  }
+  if (payload.billDiscountAmount !== undefined) {
+    nextPayload.bill_discount_amount = payload.billDiscountAmount;
   }
   if (payload.notes !== undefined) nextPayload.notes = payload.notes;
 

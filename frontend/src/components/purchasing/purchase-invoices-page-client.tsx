@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
+import { useChartAccounts } from "@/hooks/use-accounting";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { usePermission } from "@/hooks/use-permission";
 import {
@@ -114,6 +115,34 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
   const productsQuery = usePurchasingProducts(canView);
   const unitsQuery = usePurchasingUnits(canView);
   const taxRatesQuery = usePurchasingTaxRates(canView);
+  const expenseAccountsQuery = useChartAccounts(
+    {
+      accountGroup: "",
+      accountType: "expense",
+      limit: 100,
+      page: 1,
+      parentAccountId: "",
+      search: "",
+      sortBy: "account_code",
+      sortOrder: "asc",
+      status: "active",
+    },
+    canView,
+  );
+  const cogsAccountsQuery = useChartAccounts(
+    {
+      accountGroup: "",
+      accountType: "cogs",
+      limit: 100,
+      page: 1,
+      parentAccountId: "",
+      search: "",
+      sortBy: "account_code",
+      sortOrder: "asc",
+      status: "active",
+    },
+    canView,
+  );
   const createMutation = useCreatePurchaseInvoice();
   const updateMutation = useUpdatePurchaseInvoice();
   const postMutation = usePostPurchaseInvoice();
@@ -327,6 +356,10 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
       ) : null}
 
       <PurchaseInvoiceFormDialog
+        accounts={[
+          ...(expenseAccountsQuery.data?.items ?? []),
+          ...(cogsAccountsQuery.data?.items ?? []),
+        ]}
         branches={branchesQuery.data ?? []}
         invoice={editingInvoice}
         isSubmitting={

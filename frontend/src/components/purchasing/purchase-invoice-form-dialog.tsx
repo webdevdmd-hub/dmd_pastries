@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { purchaseInvoiceSchema } from "@/lib/validators/purchasing.schema";
+import type { ChartAccount } from "@/types/accounting";
 import type {
   CreatePurchaseInvoicePayload,
   PurchaseInvoice,
@@ -47,6 +48,7 @@ function emptyLine(): PurchaseItemLineDraft {
     expiryDate: null,
     ingredientId: null,
     itemType: "product",
+    lineType: "product",
     lineId: crypto.randomUUID(),
     packagingItemId: null,
     productId: null,
@@ -59,6 +61,7 @@ function emptyLine(): PurchaseItemLineDraft {
 }
 
 export function PurchaseInvoiceFormDialog({
+  accounts,
   branches,
   invoice,
   isSubmitting,
@@ -71,6 +74,7 @@ export function PurchaseInvoiceFormDialog({
   taxRates,
   units,
 }: {
+  accounts: ChartAccount[];
   branches: PurchasingBranchOption[];
   invoice: PurchaseInvoice | null;
   isSubmitting: boolean;
@@ -90,6 +94,7 @@ export function PurchaseInvoiceFormDialog({
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(today());
   const [dueDate, setDueDate] = useState("");
+  const [billDiscountAmount, setBillDiscountAmount] = useState(0);
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<PurchaseItemLineDraft[]>([emptyLine()]);
   const [error, setError] = useState<string | null>(null);
@@ -110,17 +115,21 @@ export function PurchaseInvoiceFormDialog({
     setInvoiceNumber(invoice?.invoiceNumber ?? "");
     setInvoiceDate(invoice ? invoice.invoiceDate.slice(0, 10) : today());
     setDueDate(invoice?.dueDate?.slice(0, 10) ?? "");
+    setBillDiscountAmount(invoice?.billDiscountAmount ?? 0);
     setNotes(invoice?.notes ?? "");
     setLines(
       invoice?.items.length
         ? invoice.items.map((item) => ({
+            accountId: item.accountId,
             batchNumber: item.batchNumber,
+            description: item.description,
             discountAmount: item.discountAmount,
             expiryDate: item.expiryDate,
             ingredientId: item.ingredientId,
-            itemType: "product",
+            itemType: item.lineType === "account" ? "account" : "product",
             itemNameSnapshot: item.itemNameSnapshot,
             lineId: item.id || crypto.randomUUID(),
+            lineType: item.lineType,
             packagingItemId: item.packagingItemId,
             productId: item.productId,
             productVariantId: item.productVariantId,
@@ -141,6 +150,7 @@ export function PurchaseInvoiceFormDialog({
       invoiceDate,
       invoiceNumber,
       items: lines,
+      billDiscountAmount,
       notes,
       purchaseOrderId,
       supplierId,
@@ -160,19 +170,19 @@ export function PurchaseInvoiceFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+      <DialogContent className="flex max-h-[92vh] max-w-[min(96vw,1500px)] flex-col gap-3 overflow-hidden p-4">
         <DialogHeader>
           <DialogTitle>{invoice ? "Edit bill" : "Create bill"}</DialogTitle>
           <DialogDescription>
             Record supplier bill totals. Backend posting remains the final authority.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
           <Select
             value={branchId || "none"}
             onValueChange={(value) => setBranchId(value === "none" ? "" : value)}
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-9 text-xs">
               <SelectValue placeholder="Branch" />
             </SelectTrigger>
             <SelectContent>
@@ -191,39 +201,51 @@ export function PurchaseInvoiceFormDialog({
           />
           <Input
             aria-label="Purchase order ID"
+            className="h-9 text-xs"
             onChange={(event) => setPurchaseOrderId(event.target.value)}
             placeholder="Linked PO ID optional"
             value={purchaseOrderId}
           />
           <Input
             aria-label="Bill number"
+            className="h-9 text-xs"
             onChange={(event) => setInvoiceNumber(event.target.value)}
             placeholder="Internal bill number"
             value={invoiceNumber}
           />
           <Input
             aria-label="Bill date"
+            className="h-9 text-xs"
             onChange={(event) => setInvoiceDate(event.target.value)}
             type="date"
             value={invoiceDate}
           />
           <Input
             aria-label="Due date"
+            className="h-9 text-xs"
             onChange={(event) => setDueDate(event.target.value)}
             type="date"
             value={dueDate}
           />
         </div>
         <PurchasingItemLineEditor
+          accounts={accounts}
           allowBatchFields
+          billDiscountAmount={billDiscountAmount}
+          legacyChargeAmount={invoice?.chargeAmount ?? 0}
+          legacyChargeTaxAmount={invoice?.chargeTaxAmount ?? 0}
           lines={lines}
+          onBillDiscountAmountChange={setBillDiscountAmount}
           onLinesChange={setLines}
+          paidAmount={invoice?.paidAmount ?? 0}
           products={products}
+          showAccountRows
           taxRates={taxRates}
           units={units}
         />
         <Input
           aria-label="Notes"
+          className="h-9 text-xs"
           onChange={(event) => setNotes(event.target.value)}
           placeholder="Notes"
           value={notes}

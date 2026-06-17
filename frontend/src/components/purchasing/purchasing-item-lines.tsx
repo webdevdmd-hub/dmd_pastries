@@ -32,6 +32,26 @@ function formatLineTotal(line: Line): string {
   return total === null ? "Stock receipt" : `AED ${total.toFixed(2)}`;
 }
 
+function getLineName(line: Line): string {
+  if ("lineType" in line && line.lineType === "account") {
+    return line.description ?? line.itemNameSnapshot;
+  }
+
+  return line.itemNameSnapshot;
+}
+
+function getLineType(line: Line): string {
+  if ("lineType" in line && line.lineType === "account") return "account";
+
+  return line.itemType;
+}
+
+function getUnitLabel(line: Line): string {
+  if ("lineType" in line && line.lineType === "account") return "-";
+
+  return line.unitSymbol || line.unitName;
+}
+
 export function PurchasingItemLines({
   lines,
   title = "Item lines",
@@ -59,11 +79,11 @@ export function PurchasingItemLines({
             {lines.map((line) => (
               <TableRow key={line.id}>
                 <TableCell className="font-semibold text-brand-espresso">
-                  {line.itemNameSnapshot}
+                  {getLineName(line)}
                 </TableCell>
-                <TableCell className="capitalize">{line.itemType}</TableCell>
+                <TableCell className="capitalize">{getLineType(line)}</TableCell>
                 <TableCell>{getQuantity(line)}</TableCell>
-                <TableCell>{line.unitSymbol || line.unitName}</TableCell>
+                <TableCell>{getUnitLabel(line)}</TableCell>
                 <TableCell>{formatLineTotal(line)}</TableCell>
               </TableRow>
             ))}

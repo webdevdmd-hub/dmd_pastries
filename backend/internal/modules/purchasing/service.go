@@ -323,11 +323,12 @@ func (s *Service) ConvertOrderToInvoice(currentUser *utils.AuthContext, id strin
 				ID:                utils.NewUUID(),
 				BusinessID:        currentUser.BusinessID,
 				PurchaseInvoiceID: invoiceID,
+				LineType:          "product",
 				ItemType:          item.ItemType,
 				ProductID:         item.ProductID,
 				ItemNameSnapshot:  item.ItemNameSnapshot,
 				Quantity:          item.QuantityOrdered,
-				UnitID:            item.UnitID,
+				UnitID:            nullableString(item.UnitID),
 				UnitCost:          item.UnitCost,
 				DiscountAmount:    item.DiscountAmount,
 				TaxRateID:         item.TaxRateID,
@@ -621,15 +622,20 @@ func (s *Service) UpdateInvoice(currentUser *utils.AuthContext, id string, req U
 			return err
 		}
 		createReq := CreatePurchaseInvoiceRequest{
-			BranchID:        branchID,
-			SupplierID:      first(req.SupplierID, existing.SupplierID),
-			PurchaseOrderID: first(req.PurchaseOrderID, deref(existing.PurchaseOrderID)),
-			InvoiceNumber:   first(req.InvoiceNumber, existing.InvoiceNumber),
-			InvoiceDate:     first(req.InvoiceDate, formatDate(existing.InvoiceDate)),
-			DueDate:         first(req.DueDate, optionalDateString(existing.DueDate)),
-			Items:           req.Items,
-			Charges:         req.Charges,
-			Notes:           req.Notes,
+			BranchID:           branchID,
+			SupplierID:         first(req.SupplierID, existing.SupplierID),
+			PurchaseOrderID:    first(req.PurchaseOrderID, deref(existing.PurchaseOrderID)),
+			InvoiceNumber:      first(req.InvoiceNumber, existing.InvoiceNumber),
+			SupplierBillNumber: first(req.SupplierBillNumber, existing.SupplierBillNumber),
+			InvoiceDate:        first(req.InvoiceDate, formatDate(existing.InvoiceDate)),
+			DueDate:            first(req.DueDate, optionalDateString(existing.DueDate)),
+			Items:              req.Items,
+			BillDiscountAmount: existing.BillDiscountAmount,
+			Charges:            req.Charges,
+			Notes:              req.Notes,
+		}
+		if req.BillDiscountAmount != nil {
+			createReq.BillDiscountAmount = *req.BillDiscountAmount
 		}
 		if createReq.Items == nil {
 			oldItems, err := s.repo.InvoiceItems(id, currentUser.BusinessID)
@@ -647,7 +653,7 @@ func (s *Service) UpdateInvoice(currentUser *utils.AuthContext, id string, req U
 		} else if exists {
 			return apperrors.Conflict("invoice_number already exists for this supplier", nil)
 		}
-		updates := map[string]interface{}{"branch_id": invoice.BranchID, "supplier_id": invoice.SupplierID, "purchase_order_id": invoice.PurchaseOrderID, "invoice_number": invoice.InvoiceNumber, "supplier_bill_number": invoice.SupplierBillNumber, "invoice_date": invoice.InvoiceDate, "due_date": invoice.DueDate, "subtotal_amount": invoice.SubtotalAmount, "tax_amount": invoice.TaxAmount, "discount_amount": invoice.DiscountAmount, "total_amount": invoice.TotalAmount, "balance_amount": invoice.BalanceAmount, "notes": invoice.Notes, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
+		updates := map[string]interface{}{"branch_id": invoice.BranchID, "supplier_id": invoice.SupplierID, "purchase_order_id": invoice.PurchaseOrderID, "invoice_number": invoice.InvoiceNumber, "supplier_bill_number": invoice.SupplierBillNumber, "invoice_date": invoice.InvoiceDate, "due_date": invoice.DueDate, "subtotal_amount": invoice.SubtotalAmount, "tax_amount": invoice.TaxAmount, "discount_amount": invoice.DiscountAmount, "bill_discount_amount": invoice.BillDiscountAmount, "charge_amount": invoice.ChargeAmount, "charge_tax_amount": invoice.ChargeTaxAmount, "total_amount": invoice.TotalAmount, "balance_amount": invoice.BalanceAmount, "notes": invoice.Notes, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
 		if err := s.repo.UpdateInvoice(tx, id, currentUser.BusinessID, updates, items); err != nil {
 			return err
 		}
@@ -1638,9 +1644,16 @@ func (s *Service) buildInvoice(tx *gorm.DB, currentUser *utils.AuthContext, id s
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	billDiscount := roundMoney(req.BillDiscountAmount)
+	if billDiscount < 0 {
+		return nil, nil, nil, apperrors.BadRequest("bill_discount_amount must be non-negative", nil)
+	}
+	if billDiscount > roundMoney(total.Subtotal-total.Discount) {
+		return nil, nil, nil, apperrors.BadRequest("bill_discount_amount cannot exceed bill line net amount", nil)
+	}
 	taxAmount := roundMoney(total.Tax + chargeTotals.TaxAmount)
-	totalAmount := roundMoney(total.Total + chargeTotals.Total)
-	return &PurchaseInvoice{ID: invoiceID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, SupplierID: req.SupplierID, PurchaseOrderID: nullableString(req.PurchaseOrderID), InvoiceNumber: strings.TrimSpace(req.InvoiceNumber), SupplierBillNumber: strings.TrimSpace(req.SupplierBillNumber), InvoiceDate: invoiceDate, DueDate: dueDate, Status: "draft", PaymentStatus: "unpaid", SubtotalAmount: total.Subtotal, TaxAmount: taxAmount, ChargeAmount: chargeTotals.Amount, ChargeTaxAmount: chargeTotals.TaxAmount, DiscountAmount: total.Discount, TotalAmount: totalAmount, BalanceAmount: totalAmount, Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}, items, chargeRows, nil
+	totalAmount := roundMoney(total.Total - billDiscount + chargeTotals.Total)
+	return &PurchaseInvoice{ID: invoiceID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, SupplierID: req.SupplierID, PurchaseOrderID: nullableString(req.PurchaseOrderID), InvoiceNumber: strings.TrimSpace(req.InvoiceNumber), SupplierBillNumber: strings.TrimSpace(req.SupplierBillNumber), InvoiceDate: invoiceDate, DueDate: dueDate, Status: "draft", PaymentStatus: "unpaid", SubtotalAmount: total.Subtotal, TaxAmount: taxAmount, ChargeAmount: chargeTotals.Amount, ChargeTaxAmount: chargeTotals.TaxAmount, DiscountAmount: total.Discount, BillDiscountAmount: billDiscount, TotalAmount: totalAmount, BalanceAmount: totalAmount, Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}, items, chargeRows, nil
 }
 
 func (s *Service) buildInvoiceItems(tx *gorm.DB, businessID, branchID, invoiceID string, inputItems []PurchaseInvoiceItemInput) ([]PurchaseInvoiceItem, totals, error) {
@@ -1650,6 +1663,16 @@ func (s *Service) buildInvoiceItems(tx *gorm.DB, businessID, branchID, invoiceID
 	items := make([]PurchaseInvoiceItem, 0, len(inputItems))
 	var total totals
 	for _, input := range inputItems {
+		lineType := normalizedInvoiceLineType(input)
+		if lineType == "account" {
+			item, line, err := s.buildInvoiceAccountLine(tx, businessID, invoiceID, input)
+			if err != nil {
+				return nil, totals{}, err
+			}
+			total.add(line)
+			items = append(items, item)
+			continue
+		}
 		common, line, err := s.prepareLine(tx, businessID, branchID, lineInput{ItemType: input.ItemType, ProductID: input.ProductID, IngredientID: input.IngredientID, PackagingItemID: input.PackagingItemID, Quantity: input.Quantity, UnitID: input.UnitID, UnitCost: input.UnitCost, DiscountAmount: input.DiscountAmount, TaxRateID: input.TaxRateID})
 		if err != nil {
 			return nil, totals{}, err
@@ -1659,9 +1682,49 @@ func (s *Service) buildInvoiceItems(tx *gorm.DB, businessID, branchID, invoiceID
 			return nil, totals{}, err
 		}
 		total.add(line)
-		items = append(items, PurchaseInvoiceItem{ID: utils.NewUUID(), BusinessID: businessID, PurchaseInvoiceID: invoiceID, ItemType: common.ItemType, ProductID: common.ProductID, IngredientID: common.IngredientID, PackagingItemID: common.PackagingItemID, ItemNameSnapshot: common.ItemName, Quantity: input.Quantity, UnitID: input.UnitID, UnitCost: input.UnitCost, DiscountAmount: input.DiscountAmount, TaxRateID: nullableString(input.TaxRateID), TaxAmount: line.Tax, LineTotal: line.Total, ExpiryDate: expiryDate, BatchNumber: strings.TrimSpace(input.BatchNumber)})
+		items = append(items, PurchaseInvoiceItem{ID: utils.NewUUID(), BusinessID: businessID, PurchaseInvoiceID: invoiceID, LineType: "product", ItemType: common.ItemType, ProductID: common.ProductID, IngredientID: common.IngredientID, PackagingItemID: common.PackagingItemID, ItemNameSnapshot: common.ItemName, Quantity: input.Quantity, UnitID: nullableString(input.UnitID), UnitCost: input.UnitCost, DiscountAmount: input.DiscountAmount, TaxRateID: nullableString(input.TaxRateID), TaxAmount: line.Tax, LineTotal: line.Total, ExpiryDate: expiryDate, BatchNumber: strings.TrimSpace(input.BatchNumber)})
 	}
 	return items, total.round(), nil
+}
+
+func (s *Service) buildInvoiceAccountLine(tx *gorm.DB, businessID, invoiceID string, input PurchaseInvoiceItemInput) (PurchaseInvoiceItem, lineTotals, error) {
+	description := strings.TrimSpace(input.Description)
+	if description == "" {
+		description = strings.TrimSpace(input.ItemNameSnapshot)
+	}
+	if description == "" {
+		return PurchaseInvoiceItem{}, lineTotals{}, apperrors.BadRequest("description is required for account lines", nil)
+	}
+	if err := validateUUID(input.AccountID, "account_id"); err != nil {
+		return PurchaseInvoiceItem{}, lineTotals{}, err
+	}
+	account, err := s.purchaseBillAccount(tx, businessID, input.AccountID)
+	if err != nil {
+		return PurchaseInvoiceItem{}, lineTotals{}, err
+	}
+	line, err := s.calculatePurchaseLine(tx, businessID, input.Quantity, input.UnitCost, input.DiscountAmount, input.TaxRateID)
+	if err != nil {
+		return PurchaseInvoiceItem{}, lineTotals{}, err
+	}
+	return PurchaseInvoiceItem{
+		ID:                utils.NewUUID(),
+		BusinessID:        businessID,
+		PurchaseInvoiceID: invoiceID,
+		LineType:          "account",
+		ItemType:          "account",
+		AccountID:         &account.ID,
+		AccountName:       account.AccountName,
+		AccountCode:       account.AccountCode,
+		Description:       description,
+		ItemNameSnapshot:  description,
+		Quantity:          input.Quantity,
+		UnitID:            nullableString(input.UnitID),
+		UnitCost:          input.UnitCost,
+		DiscountAmount:    input.DiscountAmount,
+		TaxRateID:         nullableString(input.TaxRateID),
+		TaxAmount:         line.Tax,
+		LineTotal:         line.Total,
+	}, line, nil
 }
 
 func (s *Service) buildReceipt(tx *gorm.DB, currentUser *utils.AuthContext, req ReceivePurchaseRequest, status string) (*PurchaseReceipt, []PurchaseReceiptItem, []charges.DocumentCharge, error) {
@@ -1962,35 +2025,63 @@ func (s *Service) prepareLine(tx *gorm.DB, businessID, branchID string, input li
 	if err != nil {
 		return preparedItem{}, lineTotals{}, err
 	}
-	if input.Quantity <= 0 {
-		return preparedItem{}, lineTotals{}, apperrors.BadRequest("quantity must be greater than zero", nil)
+	line, err := s.calculatePurchaseLine(tx, businessID, input.Quantity, input.UnitCost, input.DiscountAmount, input.TaxRateID)
+	if err != nil {
+		return preparedItem{}, lineTotals{}, err
 	}
-	if input.UnitCost < 0 || input.DiscountAmount < 0 {
-		return preparedItem{}, lineTotals{}, apperrors.BadRequest("unit_cost and discount_amount must be non-negative", nil)
+	return prepared, line, nil
+}
+
+func (s *Service) calculatePurchaseLine(tx *gorm.DB, businessID string, quantity, unitCost, discountAmount float64, taxRateID string) (lineTotals, error) {
+	if quantity <= 0 {
+		return lineTotals{}, apperrors.BadRequest("quantity must be greater than zero", nil)
 	}
-	subtotal := input.Quantity * input.UnitCost
-	if input.DiscountAmount > subtotal {
-		return preparedItem{}, lineTotals{}, apperrors.BadRequest("discount_amount cannot exceed line subtotal", nil)
+	if unitCost < 0 || discountAmount < 0 {
+		return lineTotals{}, apperrors.BadRequest("unit_cost and discount_amount must be non-negative", nil)
+	}
+	subtotal := quantity * unitCost
+	if discountAmount > subtotal {
+		return lineTotals{}, apperrors.BadRequest("discount_amount cannot exceed line subtotal", nil)
 	}
 	taxAmount := 0.0
-	if strings.TrimSpace(input.TaxRateID) != "" {
-		if err := validateUUID(input.TaxRateID, "tax_rate_id"); err != nil {
-			return preparedItem{}, lineTotals{}, err
+	if strings.TrimSpace(taxRateID) != "" {
+		if err := validateUUID(taxRateID, "tax_rate_id"); err != nil {
+			return lineTotals{}, err
 		}
-		tax, err := s.repo.TaxRate(tx, businessID, input.TaxRateID)
+		tax, err := s.repo.TaxRate(tx, businessID, taxRateID)
 		if err != nil {
-			return preparedItem{}, lineTotals{}, notFound(err, "tax rate not found")
+			return lineTotals{}, notFound(err, "tax rate not found")
 		}
-		taxable := subtotal - input.DiscountAmount
+		taxable := subtotal - discountAmount
 		if tax.IsInclusive {
 			taxAmount = taxable - (taxable / (1 + tax.RatePercentage/100))
 		} else {
 			taxAmount = taxable * tax.RatePercentage / 100
 		}
 	}
-	line := lineTotals{Subtotal: roundMoney(subtotal), Discount: roundMoney(input.DiscountAmount), Tax: roundMoney(taxAmount)}
+	line := lineTotals{Subtotal: roundMoney(subtotal), Discount: roundMoney(discountAmount), Tax: roundMoney(taxAmount)}
 	line.Total = roundMoney(line.Subtotal - line.Discount + line.Tax)
-	return prepared, line, nil
+	return line, nil
+}
+
+func (s *Service) purchaseBillAccount(tx *gorm.DB, businessID, accountID string) (*purchaseBillAccount, error) {
+	var account purchaseBillAccount
+	err := tx.Table("chart_of_accounts").
+		Select("id, account_name, account_code, account_type, status").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, accountID).
+		Take(&account).Error
+	if err != nil {
+		return nil, notFound(err, "account not found")
+	}
+	if account.Status != "active" {
+		return nil, apperrors.BadRequest("account line account must be active", nil)
+	}
+	switch account.AccountType {
+	case "asset", "expense", "cogs":
+		return &account, nil
+	default:
+		return nil, apperrors.BadRequest("account line must use a purchase-safe asset, expense, or cogs account", map[string]interface{}{"account_type": account.AccountType})
+	}
 }
 
 func (s *Service) prepareReceiptItem(tx *gorm.DB, businessID, branchID string, input PurchaseReceiptItemInput) (preparedItem, error) {
@@ -2176,22 +2267,28 @@ func (s *Service) recalculatePurchaseInvoiceTotals(tx *gorm.DB, businessID, invo
 	if err != nil {
 		return err
 	}
-	totalAmount := roundMoney(itemTotals.Total + chargeTotals.Total)
+	billDiscount := roundMoney(invoice.BillDiscountAmount)
+	lineNetAmount := roundMoney(itemTotals.Subtotal - itemTotals.Discount)
+	if billDiscount > lineNetAmount {
+		billDiscount = lineNetAmount
+	}
+	totalAmount := roundMoney(itemTotals.Total - billDiscount + chargeTotals.Total)
 	settledAmount := roundMoney(invoice.PaidAmount + invoice.CreditedAmount)
 	balanceAmount := roundMoney(totalAmount - settledAmount)
 	if balanceAmount < 0 {
 		balanceAmount = 0
 	}
 	return s.repo.UpdateInvoice(tx, invoiceID, businessID, map[string]interface{}{
-		"subtotal_amount":   itemTotals.Subtotal,
-		"discount_amount":   itemTotals.Discount,
-		"tax_amount":        roundMoney(itemTotals.Tax + chargeTotals.TaxAmount),
-		"charge_amount":     chargeTotals.Amount,
-		"charge_tax_amount": chargeTotals.TaxAmount,
-		"total_amount":      totalAmount,
-		"balance_amount":    balanceAmount,
-		"payment_status":    invoicePaymentStatus(totalAmount, settledAmount),
-		"updated_at":        time.Now().UTC(),
+		"subtotal_amount":      itemTotals.Subtotal,
+		"discount_amount":      itemTotals.Discount,
+		"bill_discount_amount": billDiscount,
+		"tax_amount":           roundMoney(itemTotals.Tax + chargeTotals.TaxAmount),
+		"charge_amount":        chargeTotals.Amount,
+		"charge_tax_amount":    chargeTotals.TaxAmount,
+		"total_amount":         totalAmount,
+		"balance_amount":       balanceAmount,
+		"payment_status":       invoicePaymentStatus(totalAmount, settledAmount),
+		"updated_at":           time.Now().UTC(),
 	}, nil)
 }
 
@@ -2238,11 +2335,12 @@ func (s *Service) orderResponse(businessID string, order PurchaseOrder, includeI
 
 func (s *Service) invoiceResponse(businessID string, invoice PurchaseInvoice, includeItems bool) PurchaseInvoiceResponse {
 	branchName, supplierName := s.repo.NameLookups(businessID, invoice.BranchID, invoice.SupplierID)
-	response := PurchaseInvoiceResponse{ID: invoice.ID, BusinessID: invoice.BusinessID, BranchID: invoice.BranchID, BranchName: branchName, SupplierID: invoice.SupplierID, SupplierName: supplierName, PurchaseOrderID: invoice.PurchaseOrderID, InvoiceNumber: invoice.InvoiceNumber, SupplierBillNumber: invoice.SupplierBillNumber, InvoiceDate: invoice.InvoiceDate, DueDate: invoice.DueDate, Status: invoice.Status, PaymentStatus: invoice.PaymentStatus, SubtotalAmount: roundMoney(invoice.SubtotalAmount), TaxAmount: roundMoney(invoice.TaxAmount), ChargeAmount: roundMoney(invoice.ChargeAmount), ChargeTaxAmount: roundMoney(invoice.ChargeTaxAmount), DiscountAmount: roundMoney(invoice.DiscountAmount), TotalAmount: roundMoney(invoice.TotalAmount), PaidAmount: roundMoney(invoice.PaidAmount), BalanceAmount: roundMoney(invoice.BalanceAmount), ReturnedAmount: roundMoney(invoice.ReturnedAmount), CreditedAmount: roundMoney(invoice.CreditedAmount), ReturnStatus: invoice.ReturnStatus, JournalEntryID: invoice.JournalEntryID, CancelledByUserID: invoice.CancelledByUserID, CancelledAt: invoice.CancelledAt, CancelReason: invoice.CancelReason, ReversalJournalEntryID: invoice.ReversalJournalEntryID, CancelledReceiptID: invoice.CancelledReceiptID, Notes: invoice.Notes, CreatedAt: invoice.CreatedAt, UpdatedAt: invoice.UpdatedAt}
+	response := PurchaseInvoiceResponse{ID: invoice.ID, BusinessID: invoice.BusinessID, BranchID: invoice.BranchID, BranchName: branchName, SupplierID: invoice.SupplierID, SupplierName: supplierName, PurchaseOrderID: invoice.PurchaseOrderID, InvoiceNumber: invoice.InvoiceNumber, SupplierBillNumber: invoice.SupplierBillNumber, InvoiceDate: invoice.InvoiceDate, DueDate: invoice.DueDate, Status: invoice.Status, PaymentStatus: invoice.PaymentStatus, SubtotalAmount: roundMoney(invoice.SubtotalAmount), TaxAmount: roundMoney(invoice.TaxAmount), ChargeAmount: roundMoney(invoice.ChargeAmount), ChargeTaxAmount: roundMoney(invoice.ChargeTaxAmount), DiscountAmount: roundMoney(invoice.DiscountAmount), BillDiscountAmount: roundMoney(invoice.BillDiscountAmount), TotalAmount: roundMoney(invoice.TotalAmount), PaidAmount: roundMoney(invoice.PaidAmount), BalanceAmount: roundMoney(invoice.BalanceAmount), ReturnedAmount: roundMoney(invoice.ReturnedAmount), CreditedAmount: roundMoney(invoice.CreditedAmount), ReturnStatus: invoice.ReturnStatus, JournalEntryID: invoice.JournalEntryID, CancelledByUserID: invoice.CancelledByUserID, CancelledAt: invoice.CancelledAt, CancelReason: invoice.CancelReason, ReversalJournalEntryID: invoice.ReversalJournalEntryID, CancelledReceiptID: invoice.CancelledReceiptID, Notes: invoice.Notes, CreatedAt: invoice.CreatedAt, UpdatedAt: invoice.UpdatedAt}
 	if includeItems {
 		items, _ := s.repo.InvoiceItems(invoice.ID, businessID)
 		for _, item := range items {
-			response.Items = append(response.Items, PurchaseInvoiceItemResponse{ID: item.ID, ItemType: item.ItemType, ProductID: item.ProductID, IngredientID: item.IngredientID, PackagingItemID: item.PackagingItemID, ItemNameSnapshot: item.ItemNameSnapshot, Quantity: roundQuantity(item.Quantity), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), UnitCost: roundMoney(item.UnitCost), DiscountAmount: roundMoney(item.DiscountAmount), TaxRateID: item.TaxRateID, TaxAmount: roundMoney(item.TaxAmount), LineTotal: roundMoney(item.LineTotal), ExpiryDate: item.ExpiryDate, BatchNumber: item.BatchNumber})
+			unitID := deref(item.UnitID)
+			response.Items = append(response.Items, PurchaseInvoiceItemResponse{ID: item.ID, LineType: normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID), ItemType: item.ItemType, ProductID: item.ProductID, IngredientID: item.IngredientID, PackagingItemID: item.PackagingItemID, AccountID: item.AccountID, AccountName: item.AccountName, AccountCode: item.AccountCode, Description: item.Description, ItemNameSnapshot: item.ItemNameSnapshot, Quantity: roundQuantity(item.Quantity), UnitID: unitID, UnitSymbol: s.repo.UnitSymbol(unitID), UnitCost: roundMoney(item.UnitCost), DiscountAmount: roundMoney(item.DiscountAmount), TaxRateID: item.TaxRateID, TaxAmount: roundMoney(item.TaxAmount), LineTotal: roundMoney(item.LineTotal), ExpiryDate: item.ExpiryDate, BatchNumber: item.BatchNumber})
 		}
 		response.Charges, _ = charges.ListChargeResponses(s.db, businessID, "purchase_invoice", invoice.ID)
 		payments, _ := s.repo.ListInvoicePayments(businessID, invoice.ID)
@@ -2369,6 +2467,14 @@ func (t totals) round() totals {
 type lineInput struct {
 	ItemType, ProductID, IngredientID, PackagingItemID, UnitID, TaxRateID string
 	Quantity, UnitCost, DiscountAmount                                    float64
+}
+
+type purchaseBillAccount struct {
+	ID          string
+	AccountName string
+	AccountCode string
+	AccountType string
+	Status      string
 }
 
 type preparedItem struct {
@@ -2519,6 +2625,21 @@ func validItemType(value string) bool {
 	return value == "product"
 }
 
+func normalizedInvoiceLineType(input PurchaseInvoiceItemInput) string {
+	lineType := strings.TrimSpace(input.LineType)
+	if lineType == "account" || strings.TrimSpace(input.AccountID) != "" || strings.TrimSpace(input.ItemType) == "account" {
+		return "account"
+	}
+	return "product"
+}
+
+func normalizedStoredLineType(lineType, itemType string, accountID *string) string {
+	if strings.TrimSpace(lineType) == "account" || strings.TrimSpace(itemType) == "account" || accountID != nil {
+		return "account"
+	}
+	return "product"
+}
+
 func normalizedPurchaseItemType(value string, hasProductID bool) string {
 	if hasProductID {
 		return "product"
@@ -2609,7 +2730,8 @@ func notFound(err error, message string) error {
 func invoiceInputsFromItems(items []PurchaseInvoiceItem) []PurchaseInvoiceItemInput {
 	result := make([]PurchaseInvoiceItemInput, 0, len(items))
 	for _, item := range items {
-		result = append(result, PurchaseInvoiceItemInput{ItemType: normalizedPurchaseItemType(item.ItemType, item.ProductID != nil), ProductID: deref(item.ProductID), IngredientID: deref(item.IngredientID), PackagingItemID: deref(item.PackagingItemID), Quantity: item.Quantity, UnitID: item.UnitID, UnitCost: item.UnitCost, DiscountAmount: item.DiscountAmount, TaxRateID: deref(item.TaxRateID), ExpiryDate: optionalDateString(item.ExpiryDate), BatchNumber: item.BatchNumber})
+		lineType := normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID)
+		result = append(result, PurchaseInvoiceItemInput{LineType: lineType, ItemType: item.ItemType, ProductID: deref(item.ProductID), IngredientID: deref(item.IngredientID), PackagingItemID: deref(item.PackagingItemID), AccountID: deref(item.AccountID), Description: first(item.Description, item.ItemNameSnapshot), ItemNameSnapshot: item.ItemNameSnapshot, Quantity: item.Quantity, UnitID: deref(item.UnitID), UnitCost: item.UnitCost, DiscountAmount: item.DiscountAmount, TaxRateID: deref(item.TaxRateID), ExpiryDate: optionalDateString(item.ExpiryDate), BatchNumber: item.BatchNumber})
 	}
 	return result
 }
@@ -2617,7 +2739,10 @@ func invoiceInputsFromItems(items []PurchaseInvoiceItem) []PurchaseInvoiceItemIn
 func receiptInputsFromInvoiceItems(items []PurchaseInvoiceItem) []PurchaseReceiptItemInput {
 	result := make([]PurchaseReceiptItemInput, 0, len(items))
 	for _, item := range items {
-		result = append(result, PurchaseReceiptItemInput{ItemType: normalizedPurchaseItemType(item.ItemType, item.ProductID != nil), ProductID: deref(item.ProductID), IngredientID: deref(item.IngredientID), PackagingItemID: deref(item.PackagingItemID), QuantityReceived: item.Quantity, UnitID: item.UnitID, UnitCost: item.UnitCost, ExpiryDate: optionalDateString(item.ExpiryDate), BatchNumber: item.BatchNumber})
+		if normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID) == "account" {
+			continue
+		}
+		result = append(result, PurchaseReceiptItemInput{ItemType: normalizedPurchaseItemType(item.ItemType, item.ProductID != nil), ProductID: deref(item.ProductID), IngredientID: deref(item.IngredientID), PackagingItemID: deref(item.PackagingItemID), QuantityReceived: item.Quantity, UnitID: deref(item.UnitID), UnitCost: item.UnitCost, ExpiryDate: optionalDateString(item.ExpiryDate), BatchNumber: item.BatchNumber})
 	}
 	return result
 }
@@ -2638,7 +2763,7 @@ func purchaseReturnInputsFromItems(items []PurchaseReturnItem) []PurchaseReturnI
 func matchingInvoiceItem(invoiceItems []PurchaseInvoiceItem, receiptItem PurchaseReceiptItem) (PurchaseInvoiceItem, bool) {
 	for _, item := range invoiceItems {
 		if item.ItemType == receiptItem.ItemType &&
-			item.UnitID == receiptItem.UnitID &&
+			deref(item.UnitID) == receiptItem.UnitID &&
 			equalStringPtr(item.ProductID, receiptItem.ProductID) &&
 			equalStringPtr(item.IngredientID, receiptItem.IngredientID) &&
 			equalStringPtr(item.PackagingItemID, receiptItem.PackagingItemID) {

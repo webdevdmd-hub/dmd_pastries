@@ -112,6 +112,7 @@ type CreatePurchaseInvoiceRequest struct {
 	InvoiceDate        string                     `json:"invoice_date" binding:"required"`
 	DueDate            string                     `json:"due_date"`
 	Items              []PurchaseInvoiceItemInput `json:"items" binding:"required"`
+	BillDiscountAmount float64                    `json:"bill_discount_amount"`
 	Charges            []charges.ChargeInput      `json:"charges"`
 	Notes              string                     `json:"notes"`
 }
@@ -125,22 +126,27 @@ type UpdatePurchaseInvoiceRequest struct {
 	InvoiceDate        string                     `json:"invoice_date"`
 	DueDate            string                     `json:"due_date"`
 	Items              []PurchaseInvoiceItemInput `json:"items"`
+	BillDiscountAmount *float64                   `json:"bill_discount_amount"`
 	Charges            []charges.ChargeInput      `json:"charges"`
 	Notes              string                     `json:"notes"`
 }
 
 type PurchaseInvoiceItemInput struct {
-	ItemType        string  `json:"item_type" binding:"required"`
-	ProductID       string  `json:"product_id"`
-	IngredientID    string  `json:"ingredient_id"`
-	PackagingItemID string  `json:"packaging_item_id"`
-	Quantity        float64 `json:"quantity" binding:"required"`
-	UnitID          string  `json:"unit_id" binding:"required"`
-	UnitCost        float64 `json:"unit_cost"`
-	DiscountAmount  float64 `json:"discount_amount"`
-	TaxRateID       string  `json:"tax_rate_id"`
-	ExpiryDate      string  `json:"expiry_date"`
-	BatchNumber     string  `json:"batch_number"`
+	LineType         string  `json:"line_type"`
+	ItemType         string  `json:"item_type"`
+	ProductID        string  `json:"product_id"`
+	IngredientID     string  `json:"ingredient_id"`
+	PackagingItemID  string  `json:"packaging_item_id"`
+	AccountID        string  `json:"account_id"`
+	Description      string  `json:"description"`
+	ItemNameSnapshot string  `json:"item_name_snapshot"`
+	Quantity         float64 `json:"quantity" binding:"required"`
+	UnitID           string  `json:"unit_id"`
+	UnitCost         float64 `json:"unit_cost"`
+	DiscountAmount   float64 `json:"discount_amount"`
+	TaxRateID        string  `json:"tax_rate_id"`
+	ExpiryDate       string  `json:"expiry_date"`
+	BatchNumber      string  `json:"batch_number"`
 }
 
 type ReceivePurchaseRequest struct {
@@ -279,6 +285,7 @@ type PurchaseInvoiceResponse struct {
 	SubtotalAmount         float64                          `json:"subtotal_amount"`
 	TaxAmount              float64                          `json:"tax_amount"`
 	DiscountAmount         float64                          `json:"discount_amount"`
+	BillDiscountAmount     float64                          `json:"bill_discount_amount"`
 	ChargeAmount           float64                          `json:"charge_amount"`
 	ChargeTaxAmount        float64                          `json:"charge_tax_amount"`
 	TotalAmount            float64                          `json:"total_amount"`
@@ -303,10 +310,15 @@ type PurchaseInvoiceResponse struct {
 
 type PurchaseInvoiceItemResponse struct {
 	ID               string     `json:"id"`
+	LineType         string     `json:"line_type"`
 	ItemType         string     `json:"item_type"`
 	ProductID        *string    `json:"product_id"`
 	IngredientID     *string    `json:"ingredient_id"`
 	PackagingItemID  *string    `json:"packaging_item_id"`
+	AccountID        *string    `json:"account_id"`
+	AccountName      string     `json:"account_name_snapshot"`
+	AccountCode      string     `json:"account_code_snapshot"`
+	Description      string     `json:"description"`
 	ItemNameSnapshot string     `json:"item_name_snapshot"`
 	Quantity         float64    `json:"quantity"`
 	UnitID           string     `json:"unit_id"`

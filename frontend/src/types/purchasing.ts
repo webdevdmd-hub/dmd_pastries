@@ -14,7 +14,9 @@ export type PurchasePaymentStatus = "unpaid" | "partial" | "paid" | "overdue";
 
 export type PurchaseReceiptStatus = "draft" | "posted" | "cancelled";
 
-export type PurchaseItemType = "product" | "ingredient" | "packaging";
+export type PurchaseLineType = "product" | "account";
+
+export type PurchaseItemType = "product" | "ingredient" | "packaging" | "account";
 
 export type SupplierPaymentStatus = "completed" | "pending" | "failed";
 
@@ -42,11 +44,16 @@ export type PurchaseOrderItem = {
 
 export type PurchaseInvoiceItem = {
   id: string;
+  lineType: PurchaseLineType;
   itemType: PurchaseItemType;
   productId: string | null;
   productVariantId: string | null;
   ingredientId: string | null;
   packagingItemId: string | null;
+  accountId: string | null;
+  accountName: string | null;
+  accountCode: string | null;
+  description: string | null;
   itemNameSnapshot: string;
   quantity: number;
   unitId: string;
@@ -156,6 +163,9 @@ export type PurchaseInvoice = {
   subtotalAmount: number;
   taxAmount: number;
   discountAmount: number;
+  billDiscountAmount: number;
+  chargeAmount: number;
+  chargeTaxAmount: number;
   totalAmount: number;
   paidAmount: number;
   balanceAmount: number;
@@ -346,11 +356,15 @@ export type SupplierPayment = {
 };
 
 export type PurchaseItemLinePayload = {
+  lineType?: PurchaseLineType | undefined;
   itemType: PurchaseItemType;
   productId: string | null;
   productVariantId: string | null;
   ingredientId: string | null;
   packagingItemId: string | null;
+  accountId?: string | null;
+  description?: string | null;
+  itemNameSnapshot?: string | null | undefined;
   quantity: number;
   unitId: string;
   unitCost: number;
@@ -388,6 +402,7 @@ export type CreatePurchaseInvoicePayload = {
   invoiceDate: string;
   dueDate: string | null;
   items: PurchaseItemLinePayload[];
+  billDiscountAmount?: number | undefined;
   notes: string | null;
 };
 

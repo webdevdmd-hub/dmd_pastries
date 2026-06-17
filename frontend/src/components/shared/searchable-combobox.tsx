@@ -27,6 +27,7 @@ export type SearchableComboboxOption = {
 type SearchableComboboxProps = {
   clearLabel?: string | undefined;
   className?: string | undefined;
+  contentClassName?: string | undefined;
   disabled?: boolean | undefined;
   emptyMessage?: string | undefined;
   errorMessage?: string | null | undefined;
@@ -37,9 +38,11 @@ type SearchableComboboxProps = {
   onSearchChange?: ((search: string) => void) | undefined;
   onValueChange: (value: string) => void;
   options: SearchableComboboxOption[];
+  optionTextWrap?: boolean | undefined;
   placeholder: string;
   searchPlaceholder?: string | undefined;
   searchValue?: string | undefined;
+  triggerClassName?: string | undefined;
   value: string;
 };
 
@@ -53,6 +56,7 @@ function optionSearchText(option: SearchableComboboxOption): string {
 export function SearchableCombobox({
   clearLabel = "Clear selection",
   className,
+  contentClassName,
   disabled = false,
   emptyMessage = "No results found.",
   errorMessage = null,
@@ -63,9 +67,11 @@ export function SearchableCombobox({
   onSearchChange,
   onValueChange,
   options,
+  optionTextWrap = false,
   placeholder,
   searchPlaceholder = "Search...",
   searchValue,
+  triggerClassName,
   value,
 }: SearchableComboboxProps): JSX.Element {
   const [open, setOpen] = useState(false);
@@ -123,7 +129,10 @@ export function SearchableCombobox({
           <Button
             aria-controls={`${triggerId}-listbox`}
             aria-expanded={open}
-            className="h-11 w-full justify-between overflow-hidden px-3 text-left font-normal"
+            className={cn(
+              "h-11 w-full justify-between overflow-hidden px-3 text-left font-normal",
+              triggerClassName,
+            )}
             disabled={disabled}
             id={triggerId}
             role="combobox"
@@ -154,7 +163,7 @@ export function SearchableCombobox({
           </Button>
         ) : null}
       </div>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+      <PopoverContent className={cn("w-[--radix-popover-trigger-width] p-0", contentClassName)}>
         <Command shouldFilter={false}>
           <CommandInput
             onValueChange={updateSearch}
@@ -186,9 +195,21 @@ export function SearchableCombobox({
                         )}
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">{option.label}</span>
+                        <span
+                          className={cn(
+                            "block font-medium",
+                            optionTextWrap ? "whitespace-normal leading-snug" : "truncate",
+                          )}
+                        >
+                          {option.label}
+                        </span>
                         {option.description ? (
-                          <span className="block truncate text-xs text-brand-mocha">
+                          <span
+                            className={cn(
+                              "block text-xs text-brand-mocha",
+                              optionTextWrap ? "whitespace-normal leading-snug" : "truncate",
+                            )}
+                          >
                             {option.description}
                           </span>
                         ) : null}
