@@ -11,6 +11,7 @@ import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state
 import { PurchaseSupplierPaymentDialog } from "@/components/purchasing/purchase-supplier-payment-dialog";
 import { PurchaseSupplierPaymentsTable } from "@/components/purchasing/purchase-supplier-payments-table";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
+import { SupplierLookupSelect } from "@/components/purchasing/supplier-lookup-select";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import {
@@ -86,6 +87,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
     branchId: branchScope.defaultBranchId,
   });
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
+  const [selectedSupplierId, setSelectedSupplierId] = useState("");
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const paymentsQuery = useSupplierPayments(filters, canView && branchScope.hasBranchScope);
   const suppliersQuery = usePurchasingSuppliers("", canView);
@@ -99,9 +101,13 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
       paymentStatus: "all",
       search: "",
       status: "posted",
-      supplierId: "all",
+      supplierId: selectedSupplierId,
     },
-    canView && canManage && branchScope.hasBranchScope,
+    canView &&
+      canManage &&
+      branchScope.hasBranchScope &&
+      manualDialogOpen &&
+      selectedSupplierId.length > 0,
   );
   const addPaymentMutation = useAddSupplierInvoicePayment();
   const purchasingPaymentMethods = useMemo(
@@ -122,10 +128,12 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   );
   const payableInvoices = useMemo(
     () =>
-      (payableInvoicesQuery.data ?? []).filter(
-        (invoice) => invoice.status === "posted" && invoice.balanceAmount > 0,
-      ),
-    [payableInvoicesQuery.data],
+      selectedSupplierId
+        ? (payableInvoicesQuery.data ?? []).filter(
+            (invoice) => invoice.status === "posted" && invoice.balanceAmount > 0,
+          )
+        : [],
+    [payableInvoicesQuery.data, selectedSupplierId],
   );
   const selectedInvoice = useMemo(
     () => payableInvoices.find((invoice) => invoice.id === selectedInvoiceId) ?? null,
@@ -160,6 +168,10 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   }, [payableInvoices, payableInvoicesQuery.isLoading, selectedInvoiceId]);
 
   useEffect(() => {
+    setSelectedInvoiceId("");
+  }, [filters.branchId, manualDialogOpen, selectedSupplierId]);
+
+  useEffect(() => {
     setFilters((currentFilters) => {
       const branchId = normalizeBranchId(currentFilters.branchId);
       return branchId === currentFilters.branchId
@@ -182,6 +194,12 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
 
   const closeManualDialog = (): void => {
     setManualDialogOpen(false);
+    setSelectedSupplierId("");
+    setSelectedInvoiceId("");
+  };
+
+  const updateSelectedSupplier = (supplierId: string): void => {
+    setSelectedSupplierId(supplierId);
     setSelectedInvoiceId("");
   };
 
@@ -356,9 +374,22 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
         }
         invoiceSelector={
           <>
+            <Label>Supplier</Label>
+            <SupplierLookupSelect
+              onValueChange={updateSelectedSupplier}
+              suppliers={suppliersQuery.data ?? []}
+              value={selectedSupplierId}
+            />
+            <p className="text-xs text-brand-mocha">Select a supplier to view open bills.</p>
+
             <Label>Bill</Label>
             <SearchableCombobox
-              emptyMessage="No posted bills with an open balance found."
+              disabled={!selectedSupplierId}
+              emptyMessage={
+                selectedSupplierId
+                  ? "No posted open bills found for this supplier."
+                  : "Select a supplier to view open bills."
+              }
               errorMessage={
                 payableInvoicesQuery.error ? getErrorMessage(payableInvoicesQuery.error) : null
               }
@@ -371,7 +402,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
               onValueChange={setSelectedInvoiceId}
               options={invoiceOptions}
               placeholder="Select bill"
-              searchPlaceholder="Search bill, supplier, branch..."
+              searchPlaceholder="Search bill or branch..."
               value={selectedInvoiceId}
             />
             <p className="text-xs text-brand-mocha">
