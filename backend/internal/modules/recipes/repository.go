@@ -299,9 +299,15 @@ func (r *Repository) Lookup(businessID, branchID, search string, limit int) ([]R
 	return items, err
 }
 
-func (r *Repository) ActiveByProduct(businessID, branchID, productID string) (*Recipe, error) {
+func (r *Repository) ActiveByProduct(businessID, branchID, productID, productVariantID string) (*Recipe, error) {
 	var recipe Recipe
-	err := r.db.Where("business_id = ? AND branch_id = ? AND product_id = ? AND product_variant_id IS NULL AND is_active = ? AND deleted_at IS NULL", businessID, branchID, productID, true).First(&recipe).Error
+	query := r.db.Where("business_id = ? AND branch_id = ? AND product_id = ? AND is_active = ? AND deleted_at IS NULL", businessID, branchID, productID, true)
+	if strings.TrimSpace(productVariantID) != "" {
+		query = query.Where("product_variant_id = ?", strings.TrimSpace(productVariantID))
+	} else {
+		query = query.Where("product_variant_id IS NULL")
+	}
+	err := query.First(&recipe).Error
 	return &recipe, err
 }
 

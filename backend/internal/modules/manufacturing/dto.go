@@ -53,6 +53,7 @@ type ProduceBatchRequest struct {
 	ProducedQuantityCamel float64 `json:"producedQuantity"`
 	Quantity              float64 `json:"quantity"`
 	ActualQuantity        float64 `json:"actual_quantity"`
+	ProductionDate        string  `json:"production_date"`
 	Notes                 string  `json:"notes"`
 }
 
@@ -66,6 +67,7 @@ type WastageBatchRequest struct {
 
 type CompleteBatchRequest struct {
 	ProducedQuantity float64 `json:"produced_quantity"`
+	ProductionDate   string  `json:"production_date"`
 	BatchNumber      string  `json:"batch_number"`
 	ExpiryDate       string  `json:"expiry_date"`
 	WastageQuantity  float64 `json:"wastage_quantity"`

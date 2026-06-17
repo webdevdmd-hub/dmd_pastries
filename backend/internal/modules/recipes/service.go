@@ -482,7 +482,7 @@ func (s *Service) CreateVersion(currentUser *utils.AuthContext, recipeID string,
 	return nil, apperrors.Internal("failed to load recipe version")
 }
 
-func (s *Service) ActiveByProduct(currentUser *utils.AuthContext, productID string) (*RecipeResponse, error) {
+func (s *Service) ActiveByProduct(currentUser *utils.AuthContext, productID, productVariantID string) (*RecipeResponse, error) {
 	branchID, err := currentUser.ResolveOperationalBranch("")
 	if err != nil {
 		return nil, err
@@ -490,7 +490,12 @@ func (s *Service) ActiveByProduct(currentUser *utils.AuthContext, productID stri
 	if err := validateUUID(productID, "product_id"); err != nil {
 		return nil, err
 	}
-	recipe, err := s.repo.ActiveByProduct(currentUser.BusinessID, branchID, productID)
+	if strings.TrimSpace(productVariantID) != "" {
+		if err := validateUUID(productVariantID, "product_variant_id"); err != nil {
+			return nil, err
+		}
+	}
+	recipe, err := s.repo.ActiveByProduct(currentUser.BusinessID, branchID, productID, strings.TrimSpace(productVariantID))
 	if err != nil {
 		return nil, notFound(err, "active recipe not found")
 	}

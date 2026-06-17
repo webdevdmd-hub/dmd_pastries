@@ -191,7 +191,7 @@ func (h *Handler) ProductRecipe(c *gin.Context) {
 	if !validParam(c, "productId") {
 		return
 	}
-	result, err := h.service.ActiveByProduct(utils.MustAuthContext(c), c.Param("productId"))
+	result, err := h.service.ActiveByProduct(utils.MustAuthContext(c), c.Param("productId"), c.Query("product_variant_id"))
 	respond(c, "product recipe fetched successfully", result, err)
 }
 

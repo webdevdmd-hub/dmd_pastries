@@ -118,12 +118,12 @@ func (s *Service) CreateProduction(currentUser *utils.AuthContext, req CreatePro
 			return err
 		}
 		batch.ProductionBatchNumber = number
-		batch.Status = "planned"
 		if err := s.repo.CreateBatch(tx, batch, ingredients, packaging); err != nil {
 			return err
 		}
 		if err := s.completeBatchTx(tx, currentUser, batch.ID, CompleteBatchRequest{
 			ProducedQuantity: req.QuantityProduced,
+			ProductionDate:   strings.TrimSpace(req.ProductionDate),
 			BatchNumber:      strings.TrimSpace(req.BatchNumber),
 			ExpiryDate:       strings.TrimSpace(req.ExpiryDate),
 			Notes:            strings.TrimSpace(req.Notes),
@@ -413,8 +413,8 @@ func (s *Service) ProduceBatch(currentUser *utils.AuthContext, id string, req Pr
 		if !currentUser.CanAccessBranch(batch.BranchID) {
 			return apperrors.Forbidden("branch access denied")
 		}
-		if batch.Status != "planned" && batch.Status != "in_progress" {
-			return apperrors.BadRequest("only planned or in_progress batches can record production output", nil)
+		if !batchCanProduce(batch.Status) {
+			return apperrors.BadRequest("only draft, planned, or in_progress batches can be produced", nil)
 		}
 		producedQuantity := req.QuantityValue()
 		if producedQuantity <= 0 {
@@ -424,18 +424,14 @@ func (s *Service) ProduceBatch(currentUser *utils.AuthContext, id string, req Pr
 			return apperrors.BadRequest("produced_quantity must be greater than zero", nil)
 		}
 
-		updates := map[string]interface{}{
-			"produced_quantity":  producedQuantity,
-			"updated_by_user_id": currentUser.UserID,
-			"updated_at":         time.Now().UTC(),
-		}
-		if strings.TrimSpace(req.Notes) != "" {
-			updates["notes"] = strings.TrimSpace(req.Notes)
-		}
-		if err := s.repo.UpdateBatch(tx, id, currentUser.BusinessID, updates); err != nil {
+		if err := s.completeBatchTx(tx, currentUser, id, CompleteBatchRequest{
+			ProducedQuantity: producedQuantity,
+			ProductionDate:   strings.TrimSpace(req.ProductionDate),
+			Notes:            strings.TrimSpace(req.Notes),
+		}); err != nil {
 			return err
 		}
-		return s.audit(tx, currentUser, "production_batch.output_recorded", id, "Production output recorded", ipAddress, userAgent)
+		return s.audit(tx, currentUser, "production_batch.produced", id, "Planned production produced", ipAddress, userAgent)
 	})
 	if err != nil {
 		return nil, err
@@ -576,8 +572,8 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	if !currentUser.CanAccessBranch(batch.BranchID) {
 		return apperrors.Forbidden("branch access denied")
 	}
-	if batch.Status != "planned" && batch.Status != "in_progress" {
-		return apperrors.BadRequest("only planned or in_progress batches can be completed", nil)
+	if !batchCanProduce(batch.Status) {
+		return apperrors.BadRequest("only draft, planned, or in_progress batches can be completed", nil)
 	}
 	producedQuantity := req.ProducedQuantity
 	if producedQuantity <= 0 {
@@ -588,6 +584,14 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	}
 	if producedQuantity <= 0 {
 		return apperrors.BadRequest("produced_quantity must be greater than zero", nil)
+	}
+	productionDate := batch.ProductionDate
+	if strings.TrimSpace(req.ProductionDate) != "" {
+		parsed, err := parseDate(req.ProductionDate, "production_date")
+		if err != nil {
+			return err
+		}
+		productionDate = parsed
 	}
 	wastageQuantity := req.WastageQuantity
 	if wastageQuantity == 0 && batch.WastageQuantity > 0 {
@@ -608,6 +612,11 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	packaging, err := s.repo.Packaging(id, currentUser.BusinessID)
 	if err != nil {
 		return err
+	}
+	if output, err := s.repo.Output(id, currentUser.BusinessID); err != nil {
+		return err
+	} else if output != nil {
+		return apperrors.BadRequest("production output already exists for this batch", nil)
 	}
 	if err := s.validateProductionHasValuedInputs(tx, currentUser.BusinessID, batch.BranchID, ingredients, packaging); err != nil {
 		return err
@@ -695,7 +704,7 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	}
 	now := time.Now().UTC()
 	total := roundMoney(ingredientCost + packagingCost)
-	if err := s.repo.UpdateBatch(tx, id, currentUser.BusinessID, map[string]interface{}{"status": "completed", "produced_quantity": producedQuantity, "completed_at": now, "completed_by_user_id": currentUser.UserID, "ingredient_cost": ingredientCost, "packaging_cost": packagingCost, "total_production_cost": total, "cost_per_unit": roundQuantity(total / producedQuantity), "wastage_quantity": wastageQuantity, "wastage_reason": wastageReason, "notes": notes, "updated_by_user_id": currentUser.UserID, "updated_at": now}); err != nil {
+	if err := s.repo.UpdateBatch(tx, id, currentUser.BusinessID, map[string]interface{}{"status": "completed", "production_date": productionDate, "produced_quantity": producedQuantity, "completed_at": now, "completed_by_user_id": currentUser.UserID, "ingredient_cost": ingredientCost, "packaging_cost": packagingCost, "total_production_cost": total, "cost_per_unit": roundQuantity(total / producedQuantity), "wastage_quantity": wastageQuantity, "wastage_reason": wastageReason, "notes": notes, "updated_by_user_id": currentUser.UserID, "updated_at": now}); err != nil {
 		return err
 	}
 	if s.accountingService != nil {
@@ -862,7 +871,7 @@ func (s *Service) buildBatch(tx *gorm.DB, currentUser *utils.AuthContext, req Cr
 	}
 	ingredientCost, packagingCost := sumIngredientCost(ingredients), sumPackagingCost(packaging)
 	total := roundMoney(ingredientCost + packagingCost)
-	batch := &ProductionBatch{ID: batchID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, RecipeID: recipe.ID, ProductID: recipe.ProductID, ProductVariantID: recipe.ProductVariantID, PlannedQuantity: req.PlannedQuantity, ProducedQuantity: 0, YieldUnitID: recipe.BatchYieldUnitID, Status: "planned", ProductionDate: productionDate, IngredientCost: ingredientCost, PackagingCost: packagingCost, TotalProductionCost: total, CostPerUnit: roundQuantity(total / req.PlannedQuantity), Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}
+	batch := &ProductionBatch{ID: batchID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, RecipeID: recipe.ID, ProductID: recipe.ProductID, ProductVariantID: recipe.ProductVariantID, PlannedQuantity: req.PlannedQuantity, ProducedQuantity: 0, YieldUnitID: recipe.BatchYieldUnitID, Status: "draft", ProductionDate: productionDate, IngredientCost: ingredientCost, PackagingCost: packagingCost, TotalProductionCost: total, CostPerUnit: roundQuantity(total / req.PlannedQuantity), Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}
 	return batch, ingredients, packaging, nil
 }
 
@@ -1259,7 +1268,7 @@ func (s *Service) previewInventoryItem(businessID, branchID string, componentPro
 
 func (s *Service) validateProductionHasValuedInputs(tx *gorm.DB, businessID, branchID string, ingredients []ProductionIngredientConsumption, packaging []ProductionPackagingConsumption) error {
 	if len(ingredients) == 0 && len(packaging) == 0 {
-		return apperrors.BadRequest("production cannot be posted because the recipe has no components or packaging to consume", nil)
+		return apperrors.BadRequest("production cannot be posted because the recipe has no components to consume. Add at least one component to the recipe. Packaging is optional.", nil)
 	}
 	hasRequiredInput := false
 	zeroCostLines := make([]string, 0)
@@ -1309,7 +1318,7 @@ func (s *Service) validateProductionHasValuedInputs(tx *gorm.DB, businessID, bra
 		}
 	}
 	if !hasRequiredInput {
-		return apperrors.BadRequest("production cannot be posted because the recipe has no required components or packaging to consume", nil)
+		return apperrors.BadRequest("production cannot be posted because the recipe has no component quantity to consume. Add at least one component with quantity greater than zero. Packaging is optional.", nil)
 	}
 	if len(stockShortages) > 0 {
 		return apperrors.BadRequest("production cannot be posted because required component or packaging stock is not available", map[string]interface{}{"shortages": stockShortages})
@@ -1368,6 +1377,10 @@ func validateListQuery(query BatchListQuery) error {
 }
 
 func batchCanEditConsumption(status string) bool {
+	return status == "draft" || status == "planned" || status == "in_progress"
+}
+
+func batchCanProduce(status string) bool {
 	return status == "draft" || status == "planned" || status == "in_progress"
 }
 
