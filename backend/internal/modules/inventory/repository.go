@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"pastries-pos/internal/shared/utils"
+
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -119,6 +121,64 @@ func (r *Repository) FindDefaultStockLocation(tx *gorm.DB, businessID, branchID 
 	err := tx.Where("business_id = ? AND branch_id = ? AND is_default = true AND status = ? AND deleted_at IS NULL", businessID, branchID, "active").
 		First(&location).Error
 	return &location, err
+}
+
+func (r *Repository) EnsureDefaultStockLocation(tx *gorm.DB, businessID, branchID, createdByUserID string) (*StockLocation, error) {
+	location, err := r.FindDefaultStockLocation(tx, businessID, branchID)
+	if err == nil {
+		return location, nil
+	}
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return nil, err
+	}
+
+	var existingMain StockLocation
+	err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("business_id = ? AND branch_id = ? AND LOWER(location_code) = ? AND deleted_at IS NULL", businessID, branchID, "main").
+		First(&existingMain).Error
+	if err == nil {
+		if err := r.UnsetDefaultStockLocations(tx, businessID, branchID); err != nil {
+			return nil, err
+		}
+		if err := tx.Model(&StockLocation{}).
+			Where("id = ? AND business_id = ? AND deleted_at IS NULL", existingMain.ID, businessID).
+			Updates(map[string]interface{}{
+				"is_default": true,
+				"status":     "active",
+				"updated_at": time.Now().UTC(),
+			}).Error; err != nil {
+			return nil, err
+		}
+		return r.FindDefaultStockLocation(tx, businessID, branchID)
+	}
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return nil, err
+	}
+
+	if err := r.UnsetDefaultStockLocations(tx, businessID, branchID); err != nil {
+		return nil, err
+	}
+
+	location = &StockLocation{
+		ID:              utils.NewUUID(),
+		BusinessID:      businessID,
+		BranchID:        branchID,
+		LocationName:    "Main Stock",
+		LocationCode:    "MAIN",
+		LocationType:    "store_room",
+		IsDefault:       true,
+		Status:          "active",
+		CreatedByUserID: createdByUserID,
+		CreatedAt:       time.Now().UTC(),
+		UpdatedAt:       time.Now().UTC(),
+	}
+	if err := r.CreateStockLocation(tx, location); err != nil {
+		if retryLocation, retryErr := r.FindDefaultStockLocation(tx, businessID, branchID); retryErr == nil {
+			return retryLocation, nil
+		}
+		return nil, err
+	}
+	return location, nil
 }
 
 func (r *Repository) ListStockLocations(businessID string, query StockLocationListQuery) ([]StockLocation, int64, error) {

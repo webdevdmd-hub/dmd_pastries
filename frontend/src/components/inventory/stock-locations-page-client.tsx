@@ -98,6 +98,10 @@ export function StockLocationsPageClient(): JSX.Element {
     () => locations.filter((location) => location.status === "active").length,
     [locations],
   );
+  const defaultLocation = useMemo(
+    () => locations.find((location) => location.isDefault) ?? null,
+    [locations],
+  );
 
   if (!canView) {
     return <AccessDeniedCard message="You need inventory.view to view stock locations." />;
@@ -203,9 +207,12 @@ export function StockLocationsPageClient(): JSX.Element {
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Current branch</p>
+            <p className="text-sm text-brand-mocha">Default location</p>
             <p className="mt-2 text-xl font-bold text-brand-espresso">
-              {branchScope.effectiveBranchName ?? "Active branch"}
+              {defaultLocation?.locationName ?? "Main Stock"}
+            </p>
+            <p className="mt-1 text-xs text-brand-mocha">
+              Normal receiving uses this location automatically.
             </p>
           </CardContent>
         </Card>
@@ -228,7 +235,10 @@ export function StockLocationsPageClient(): JSX.Element {
               {locations.map((location) => (
                 <TableRow key={location.id}>
                   <TableCell>
-                    <div className="font-semibold text-brand-espresso">{location.locationName}</div>
+                    <div className="flex flex-wrap items-center gap-2 font-semibold text-brand-espresso">
+                      <span>{location.locationName}</span>
+                      {location.isDefault ? <Badge>Default</Badge> : null}
+                    </div>
                     <div className="text-sm text-brand-mocha">
                       {location.description ?? "No description"}
                     </div>
@@ -261,6 +271,7 @@ export function StockLocationsPageClient(): JSX.Element {
                               onClick={() => void handleSetDefault(location)}
                             >
                               <Star className="h-4 w-4" />
+                              Set default
                             </Button>
                           ) : null}
                           <Button

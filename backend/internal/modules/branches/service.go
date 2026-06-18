@@ -7,18 +7,24 @@ import (
 	"gorm.io/gorm"
 
 	"pastries-pos/internal/modules/audit"
+	"pastries-pos/internal/modules/inventory"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
 
 type Service struct {
-	db        *gorm.DB
-	repo      *Repository
-	auditRepo *audit.Repository
+	db            *gorm.DB
+	repo          *Repository
+	auditRepo     *audit.Repository
+	inventoryRepo *inventory.Repository
 }
 
-func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository) *Service {
-	return &Service{db: db, repo: repo, auditRepo: auditRepo}
+func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository, inventoryRepo ...*inventory.Repository) *Service {
+	service := &Service{db: db, repo: repo, auditRepo: auditRepo}
+	if len(inventoryRepo) > 0 {
+		service.inventoryRepo = inventoryRepo[0]
+	}
+	return service
 }
 
 func (s *Service) ListBranches(currentUser *utils.AuthContext) ([]BranchResponse, error) {
@@ -108,6 +114,13 @@ func (s *Service) CreateBranch(currentUser *utils.AuthContext, req CreateBranchR
 	if err := s.repo.Create(tx, branch); err != nil {
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to create branch")
+	}
+
+	if s.inventoryRepo != nil {
+		if _, err := s.inventoryRepo.EnsureDefaultStockLocation(tx, currentUser.BusinessID, branch.ID, currentUser.UserID); err != nil {
+			tx.Rollback()
+			return nil, apperrors.Internal("failed to create default stock location")
+		}
 	}
 
 	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{

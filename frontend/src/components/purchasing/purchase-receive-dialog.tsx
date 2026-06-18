@@ -186,7 +186,8 @@ export function PurchaseReceiveDialog({
         <DialogHeader>
           <DialogTitle>Receive stock</DialogTitle>
           <DialogDescription>
-            Confirm supplier stock-in. The backend creates inventory movements after posting.
+            Confirm supplier stock-in. Stock is received into the branch default location unless an
+            advanced workflow overrides it.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">

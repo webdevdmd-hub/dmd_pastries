@@ -125,7 +125,7 @@ func main() {
 	)
 	userHandler := users.NewHandler(userService)
 
-	branchService := branches.NewService(db, branchRepo, auditRepo)
+	branchService := branches.NewService(db, branchRepo, auditRepo, inventoryRepo)
 	branchHandler := branches.NewHandler(branchService)
 	businessService := businesses.NewService(db, businessRepo, branchRepo, roleRepo, auditRepo)
 	businessHandler := businesses.NewHandler(businessService)

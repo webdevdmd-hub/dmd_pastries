@@ -1302,7 +1302,7 @@ func (s *Service) ApplyMovement(tx *gorm.DB, input ApplyStockMovementInput) (*St
 	if err != nil {
 		return nil, mapNotFound(err, "inventory item not found")
 	}
-	stockLocationID, err := s.resolveMovementStockLocation(tx, item, input.StockLocationID)
+	stockLocationID, err := s.resolveMovementStockLocation(tx, item, input.StockLocationID, input.CreatedByUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -1371,7 +1371,7 @@ func (s *Service) ApplyMovement(tx *gorm.DB, input ApplyStockMovementInput) (*St
 	return movement, nil
 }
 
-func (s *Service) resolveMovementStockLocation(tx *gorm.DB, item *InventoryItem, requestedLocationID *string) (*string, error) {
+func (s *Service) resolveMovementStockLocation(tx *gorm.DB, item *InventoryItem, requestedLocationID *string, createdByUserID string) (*string, error) {
 	if requestedLocationID != nil && strings.TrimSpace(*requestedLocationID) != "" {
 		location, err := s.repo.FindStockLocation(strings.TrimSpace(*requestedLocationID), item.BusinessID)
 		if err != nil {
@@ -1383,9 +1383,9 @@ func (s *Service) resolveMovementStockLocation(tx *gorm.DB, item *InventoryItem,
 		locationID := location.ID
 		return &locationID, nil
 	}
-	location, err := s.repo.FindDefaultStockLocation(tx, item.BusinessID, item.BranchID)
+	location, err := s.repo.EnsureDefaultStockLocation(tx, item.BusinessID, item.BranchID, createdByUserID)
 	if err != nil {
-		return nil, mapNotFound(err, "default stock location not found for branch")
+		return nil, apperrors.Internal("failed to create default stock location for branch")
 	}
 	locationID := location.ID
 	return &locationID, nil

@@ -219,7 +219,8 @@ export function PurchaseOrderReceiveGoodsDialog({
           <DialogTitle>Receive goods</DialogTitle>
           <DialogDescription>
             Receive supplier goods against {order?.purchaseOrderNumber ?? "this purchase order"}.
-            Only receiving quantities are sent; supplier and item details stay linked to the PO.
+            Stock is received into the branch default location unless an advanced workflow overrides
+            it.
           </DialogDescription>
         </DialogHeader>
 
