@@ -115,25 +115,11 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
   const productsQuery = usePurchasingProducts(canView);
   const unitsQuery = usePurchasingUnits(canView);
   const taxRatesQuery = usePurchasingTaxRates(canView);
-  const expenseAccountsQuery = useChartAccounts(
+  const purchaseAccountsQuery = useChartAccounts(
     {
       accountGroup: "",
-      accountType: "expense",
-      limit: 100,
-      page: 1,
-      parentAccountId: "",
-      search: "",
-      sortBy: "account_code",
-      sortOrder: "asc",
-      status: "active",
-    },
-    canView,
-  );
-  const cogsAccountsQuery = useChartAccounts(
-    {
-      accountGroup: "",
-      accountType: "cogs",
-      limit: 100,
+      accountType: "all",
+      limit: 500,
       page: 1,
       parentAccountId: "",
       search: "",
@@ -356,10 +342,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
       ) : null}
 
       <PurchaseInvoiceFormDialog
-        accounts={[
-          ...(expenseAccountsQuery.data?.items ?? []),
-          ...(cogsAccountsQuery.data?.items ?? []),
-        ]}
+        accounts={[...(purchaseAccountsQuery.data?.items ?? [])]}
         branches={branchesQuery.data ?? []}
         invoice={editingInvoice}
         isSubmitting={

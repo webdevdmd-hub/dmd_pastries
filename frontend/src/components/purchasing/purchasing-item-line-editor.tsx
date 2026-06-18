@@ -193,7 +193,9 @@ export function PurchasingItemLineEditor({
           (account) =>
             account.status === "active" &&
             account.allowManualPosting &&
-            (account.accountType === "expense" || account.accountType === "cogs"),
+            (account.accountType === "asset" ||
+              account.accountType === "expense" ||
+              account.accountType === "cogs"),
         )
         .map((account) => ({
           description: [account.accountType.toUpperCase(), account.accountGroup]
@@ -295,6 +297,7 @@ export function PurchasingItemLineEditor({
                   <td className="px-1.5 py-2 text-brand-mocha">
                     {showAccountRows ? (
                       <Select
+                        disabled={disableAddRows || isLineLocked}
                         value={accountLine ? "account" : "product"}
                         onValueChange={(lineType) => {
                           onLinesChange(
@@ -332,6 +335,7 @@ export function PurchasingItemLineEditor({
                         <Input
                           aria-label={`Description for account line ${String(index + 1)}`}
                           className="h-8 text-xs"
+                          disabled={isLineLocked}
                           onChange={(event) =>
                             onLinesChange(
                               updateLine(safeLines, line.lineId, {
@@ -481,8 +485,8 @@ export function PurchasingItemLineEditor({
                         }}
                         options={accountOptions}
                         optionTextWrap
-                        placeholder="Select expense account"
-                        searchPlaceholder="Search freight, delivery, customs..."
+                        placeholder="Select account"
+                        searchPlaceholder="Search account code, name, type, group..."
                         triggerClassName="h-8 text-xs"
                         value={line.accountId ?? ""}
                       />
@@ -496,6 +500,7 @@ export function PurchasingItemLineEditor({
                     <Input
                       aria-label={`Quantity for item line ${String(index + 1)}`}
                       className="h-8 text-right text-xs"
+                      disabled={accountLine && isLineLocked}
                       min={lineLock ? String(lineLock.minQuantity) : "0"}
                       onChange={(event) =>
                         onLinesChange(

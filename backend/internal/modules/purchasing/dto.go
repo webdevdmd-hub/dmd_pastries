@@ -85,12 +85,15 @@ type UpdatePurchaseOrderRequest struct {
 
 type PurchaseOrderItemInput struct {
 	ID              string  `json:"id"`
+	LineType        string  `json:"line_type"`
 	ItemType        string  `json:"item_type" binding:"required"`
 	ProductID       string  `json:"product_id"`
 	IngredientID    string  `json:"ingredient_id"`
 	PackagingItemID string  `json:"packaging_item_id"`
+	AccountID       string  `json:"account_id"`
+	Description     string  `json:"description"`
 	QuantityOrdered float64 `json:"quantity_ordered" binding:"required"`
-	UnitID          string  `json:"unit_id" binding:"required"`
+	UnitID          string  `json:"unit_id"`
 	UnitCost        float64 `json:"unit_cost"`
 	DiscountAmount  float64 `json:"discount_amount"`
 	TaxRateID       string  `json:"tax_rate_id"`
@@ -271,10 +274,15 @@ type PurchaseOrderResponse struct {
 
 type PurchaseOrderItemResponse struct {
 	ID               string  `json:"id"`
+	LineType         string  `json:"line_type"`
 	ItemType         string  `json:"item_type"`
 	ProductID        *string `json:"product_id"`
 	IngredientID     *string `json:"ingredient_id"`
 	PackagingItemID  *string `json:"packaging_item_id"`
+	AccountID        *string `json:"account_id"`
+	AccountName      string  `json:"account_name_snapshot"`
+	AccountCode      string  `json:"account_code_snapshot"`
+	Description      string  `json:"description"`
 	ItemNameSnapshot string  `json:"item_name_snapshot"`
 	QuantityOrdered  float64 `json:"quantity_ordered"`
 	QuantityReceived float64 `json:"quantity_received"`

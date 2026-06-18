@@ -24,11 +24,16 @@ export type PurchaseReturnStatus = "draft" | "posted" | "cancelled" | "reversed"
 
 export type PurchaseOrderItem = {
   id: string;
+  lineType: PurchaseLineType;
   itemType: PurchaseItemType;
   productId: string | null;
   productVariantId: string | null;
   ingredientId: string | null;
   packagingItemId: string | null;
+  accountId: string | null;
+  accountName: string | null;
+  accountCode: string | null;
+  description: string | null;
   itemNameSnapshot: string;
   quantityOrdered: number;
   quantityReceived: number;

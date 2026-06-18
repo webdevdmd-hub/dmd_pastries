@@ -37,6 +37,18 @@ import type {
   UpdatePurchaseInvoicePayload,
 } from "@/types/purchasing";
 
+export type PurchaseInvoiceFormInitialValues = {
+  billDiscountAmount?: number;
+  branchId: string;
+  dueDate?: string | null;
+  invoiceDate?: string | null;
+  invoiceNumber?: string;
+  items: PurchaseItemLineDraft[];
+  notes?: string | null;
+  purchaseOrderId?: string | null;
+  supplierId: string;
+};
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -63,6 +75,10 @@ function emptyLine(): PurchaseItemLineDraft {
 export function PurchaseInvoiceFormDialog({
   accounts,
   branches,
+  createButtonLabel = "Create bill",
+  createDescription = "Record supplier bill totals. Backend posting remains the final authority.",
+  createTitle = "Create bill",
+  initialValues,
   invoice,
   isSubmitting,
   onClose,
@@ -76,6 +92,10 @@ export function PurchaseInvoiceFormDialog({
 }: {
   accounts: ChartAccount[];
   branches: PurchasingBranchOption[];
+  createButtonLabel?: string;
+  createDescription?: string;
+  createTitle?: string;
+  initialValues?: PurchaseInvoiceFormInitialValues | null;
   invoice: PurchaseInvoice | null;
   isSubmitting: boolean;
   onClose: () => void;
@@ -109,24 +129,21 @@ export function PurchaseInvoiceFormDialog({
   useEffect(() => {
     if (!open) return;
 
-    setBranchId(invoice?.branchId ?? branchScope.effectiveBranchId ?? "");
-    setSupplierId(invoice?.supplierId ?? "");
-    setPurchaseOrderId(invoice?.purchaseOrderId ?? "");
-    setInvoiceNumber(invoice?.invoiceNumber ?? "");
-    setInvoiceDate(invoice ? invoice.invoiceDate.slice(0, 10) : today());
-    setDueDate(invoice?.dueDate?.slice(0, 10) ?? "");
-    setBillDiscountAmount(invoice?.billDiscountAmount ?? 0);
-    setNotes(invoice?.notes ?? "");
-    setLines(
-      invoice?.items.length
-        ? invoice.items.map((item) => ({
+    const source: PurchaseInvoiceFormInitialValues | null | undefined = invoice
+      ? {
+          billDiscountAmount: invoice.billDiscountAmount,
+          branchId: invoice.branchId,
+          dueDate: invoice.dueDate,
+          invoiceDate: invoice.invoiceDate,
+          invoiceNumber: invoice.invoiceNumber,
+          items: invoice.items.map((item) => ({
             accountId: item.accountId,
             batchNumber: item.batchNumber,
             description: item.description,
             discountAmount: item.discountAmount,
             expiryDate: item.expiryDate,
             ingredientId: item.ingredientId,
-            itemType: item.lineType === "account" ? "account" : "product",
+            itemType: item.lineType === "account" ? ("account" as const) : ("product" as const),
             itemNameSnapshot: item.itemNameSnapshot,
             lineId: item.id || crypto.randomUUID(),
             lineType: item.lineType,
@@ -137,11 +154,28 @@ export function PurchaseInvoiceFormDialog({
             taxRateId: item.taxRateId,
             unitCost: item.unitCost,
             unitId: item.unitId,
-          }))
+          })),
+          notes: invoice.notes,
+          purchaseOrderId: invoice.purchaseOrderId,
+          supplierId: invoice.supplierId,
+        }
+      : initialValues;
+
+    setBranchId(source?.branchId ?? branchScope.effectiveBranchId ?? "");
+    setSupplierId(source?.supplierId ?? "");
+    setPurchaseOrderId(source?.purchaseOrderId ?? "");
+    setInvoiceNumber(source?.invoiceNumber ?? "");
+    setInvoiceDate(source?.invoiceDate ? source.invoiceDate.slice(0, 10) : today());
+    setDueDate(source?.dueDate?.slice(0, 10) ?? "");
+    setBillDiscountAmount(source?.billDiscountAmount ?? 0);
+    setNotes(source?.notes ?? "");
+    setLines(
+      source?.items.length
+        ? source.items.map((item) => ({ ...item, lineId: item.lineId || crypto.randomUUID() }))
         : [emptyLine()],
     );
     setError(null);
-  }, [branchScope.effectiveBranchId, invoice, open]);
+  }, [branchScope.effectiveBranchId, initialValues, invoice, open]);
 
   const submit = async (): Promise<void> => {
     const result = purchaseInvoiceSchema.safeParse({
@@ -172,9 +206,11 @@ export function PurchaseInvoiceFormDialog({
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
       <DialogContent className="flex max-h-[92vh] max-w-[min(96vw,1500px)] flex-col gap-3 overflow-hidden p-4">
         <DialogHeader>
-          <DialogTitle>{invoice ? "Edit bill" : "Create bill"}</DialogTitle>
+          <DialogTitle>{invoice ? "Edit bill" : createTitle}</DialogTitle>
           <DialogDescription>
-            Record supplier bill totals. Backend posting remains the final authority.
+            {invoice
+              ? "Record supplier bill totals. Backend posting remains the final authority."
+              : createDescription}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
@@ -256,7 +292,7 @@ export function PurchaseInvoiceFormDialog({
             Cancel
           </Button>
           <Button disabled={isSubmitting} onClick={() => void submit()} type="button">
-            {invoice ? "Save bill" : "Create bill"}
+            {invoice ? "Save bill" : createButtonLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

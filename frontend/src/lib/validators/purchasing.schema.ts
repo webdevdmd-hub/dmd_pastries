@@ -73,7 +73,7 @@ export const purchaseOrderSchema = z.object({
   supplierId: z.string().min(1, "Supplier is required."),
   orderDate: z.string().min(1, "Order date is required."),
   expectedDeliveryDate: optionalNullableString,
-  items: z.array(purchaseProductLineSchema).min(1, "At least one item is required."),
+  items: z.array(purchaseItemLineSchema).min(1, "At least one item is required."),
   notes: optionalNullableString,
 });
 

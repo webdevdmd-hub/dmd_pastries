@@ -224,15 +224,33 @@ func (s *Service) updatePartiallyReceivedOrder(tx *gorm.DB, currentUser *utils.A
 			if !ok {
 				return apperrors.BadRequest("partially received purchase orders cannot remove existing lines", nil)
 			}
-			if normalizedPurchaseItemType(input.ItemType, input.ProductID != "") != item.ItemType ||
+			storedLineType := normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID)
+			if storedLineType == "account" {
+				if normalizedOrderLineType(input) != "account" ||
+					input.AccountID != deref(item.AccountID) ||
+					strings.TrimSpace(input.Description) != strings.TrimSpace(item.Description) ||
+					roundQuantity(input.QuantityOrdered) != roundQuantity(item.QuantityOrdered) ||
+					roundMoney(input.UnitCost) != roundMoney(item.UnitCost) ||
+					roundMoney(input.DiscountAmount) != roundMoney(item.DiscountAmount) ||
+					input.TaxRateID != deref(item.TaxRateID) {
+					return apperrors.BadRequest("partially received purchase orders can only adjust product ordered quantities", nil)
+				}
+				itemTotals.Subtotal += roundMoney(item.QuantityOrdered * item.UnitCost)
+				itemTotals.Discount += roundMoney(item.DiscountAmount)
+				itemTotals.Tax += roundMoney(item.TaxAmount)
+				itemTotals.Total += roundMoney(item.LineTotal)
+				continue
+			}
+			if normalizedOrderLineType(input) != "product" ||
+				normalizedPurchaseItemType(input.ItemType, input.ProductID != "") != item.ItemType ||
 				input.ProductID != deref(item.ProductID) ||
 				input.IngredientID != deref(item.IngredientID) ||
 				input.PackagingItemID != deref(item.PackagingItemID) ||
-				input.UnitID != item.UnitID ||
+				input.UnitID != deref(item.UnitID) ||
 				roundMoney(input.UnitCost) != roundMoney(item.UnitCost) ||
 				roundMoney(input.DiscountAmount) != roundMoney(item.DiscountAmount) ||
 				input.TaxRateID != deref(item.TaxRateID) {
-				return apperrors.BadRequest("partially received purchase orders can only adjust ordered quantities", nil)
+				return apperrors.BadRequest("partially received purchase orders can only adjust product ordered quantities", nil)
 			}
 			if roundQuantity(input.QuantityOrdered) < roundQuantity(item.QuantityReceived) {
 				return apperrors.BadRequest("quantity_ordered cannot be less than quantity_received", map[string]interface{}{"line_id": item.ID, "quantity_received": item.QuantityReceived})
@@ -354,12 +372,15 @@ func (s *Service) DuplicateOrder(currentUser *utils.AuthContext, id, ipAddress, 
 	inputs := make([]PurchaseOrderItemInput, 0, len(sourceItems))
 	for _, item := range sourceItems {
 		inputs = append(inputs, PurchaseOrderItemInput{
+			LineType:        normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID),
 			ItemType:        item.ItemType,
 			ProductID:       deref(item.ProductID),
 			IngredientID:    deref(item.IngredientID),
 			PackagingItemID: deref(item.PackagingItemID),
+			AccountID:       deref(item.AccountID),
+			Description:     first(item.Description, item.ItemNameSnapshot),
 			QuantityOrdered: item.QuantityOrdered,
-			UnitID:          item.UnitID,
+			UnitID:          deref(item.UnitID),
 			UnitCost:        item.UnitCost,
 			DiscountAmount:  item.DiscountAmount,
 			TaxRateID:       deref(item.TaxRateID),
@@ -502,6 +523,27 @@ func (s *Service) ConvertOrderToInvoice(currentUser *utils.AuthContext, id strin
 		}
 		items := make([]PurchaseInvoiceItem, 0, len(orderItems))
 		for _, item := range orderItems {
+			if normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID) == "account" {
+				items = append(items, PurchaseInvoiceItem{
+					ID:                utils.NewUUID(),
+					BusinessID:        currentUser.BusinessID,
+					PurchaseInvoiceID: invoiceID,
+					LineType:          "account",
+					ItemType:          "account",
+					AccountID:         item.AccountID,
+					AccountName:       item.AccountName,
+					AccountCode:       item.AccountCode,
+					Description:       first(item.Description, item.ItemNameSnapshot),
+					ItemNameSnapshot:  item.ItemNameSnapshot,
+					Quantity:          item.QuantityOrdered,
+					UnitCost:          item.UnitCost,
+					DiscountAmount:    item.DiscountAmount,
+					TaxRateID:         item.TaxRateID,
+					TaxAmount:         item.TaxAmount,
+					LineTotal:         item.LineTotal,
+				})
+				continue
+			}
 			items = append(items, PurchaseInvoiceItem{
 				ID:                utils.NewUUID(),
 				BusinessID:        currentUser.BusinessID,
@@ -511,7 +553,7 @@ func (s *Service) ConvertOrderToInvoice(currentUser *utils.AuthContext, id strin
 				ProductID:         item.ProductID,
 				ItemNameSnapshot:  item.ItemNameSnapshot,
 				Quantity:          item.QuantityOrdered,
-				UnitID:            nullableString(item.UnitID),
+				UnitID:            item.UnitID,
 				UnitCost:          item.UnitCost,
 				DiscountAmount:    item.DiscountAmount,
 				TaxRateID:         item.TaxRateID,
@@ -1348,6 +1390,9 @@ func (s *Service) ReceiveOrder(currentUser *utils.AuthContext, orderID string, r
 		}
 		receiveReq.Items = make([]PurchaseReceiptItemInput, 0, len(orderItems))
 		for _, item := range orderItems {
+			if normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID) == "account" {
+				continue
+			}
 			remaining := roundQuantity(item.QuantityOrdered - item.QuantityReceived)
 			if remaining <= 0 {
 				continue
@@ -1355,7 +1400,7 @@ func (s *Service) ReceiveOrder(currentUser *utils.AuthContext, orderID string, r
 			input := PurchaseReceiptItemInput{
 				ItemType:         normalizedPurchaseItemType(item.ItemType, item.ProductID != nil),
 				QuantityReceived: remaining,
-				UnitID:           item.UnitID,
+				UnitID:           deref(item.UnitID),
 				UnitCost:         item.UnitCost,
 			}
 			if item.ProductID != nil {
@@ -1968,14 +2013,59 @@ func (s *Service) buildOrderItems(tx *gorm.DB, businessID, branchID, orderID str
 	items := make([]PurchaseOrderItem, 0, len(inputItems))
 	var total totals
 	for _, input := range inputItems {
+		if normalizedOrderLineType(input) == "account" {
+			item, line, err := s.buildOrderAccountLine(tx, businessID, orderID, input)
+			if err != nil {
+				return nil, totals{}, err
+			}
+			total.add(line)
+			items = append(items, item)
+			continue
+		}
 		common, line, err := s.prepareLine(tx, businessID, branchID, lineInput{ItemType: input.ItemType, ProductID: input.ProductID, IngredientID: input.IngredientID, PackagingItemID: input.PackagingItemID, Quantity: input.QuantityOrdered, UnitID: input.UnitID, UnitCost: input.UnitCost, DiscountAmount: input.DiscountAmount, TaxRateID: input.TaxRateID})
 		if err != nil {
 			return nil, totals{}, err
 		}
 		total.add(line)
-		items = append(items, PurchaseOrderItem{ID: utils.NewUUID(), BusinessID: businessID, PurchaseOrderID: orderID, ItemType: common.ItemType, ProductID: common.ProductID, IngredientID: common.IngredientID, PackagingItemID: common.PackagingItemID, ItemNameSnapshot: common.ItemName, QuantityOrdered: input.QuantityOrdered, UnitID: input.UnitID, UnitCost: input.UnitCost, DiscountAmount: input.DiscountAmount, TaxRateID: nullableString(input.TaxRateID), TaxAmount: line.Tax, LineTotal: line.Total})
+		items = append(items, PurchaseOrderItem{ID: utils.NewUUID(), BusinessID: businessID, PurchaseOrderID: orderID, LineType: "product", ItemType: common.ItemType, ProductID: common.ProductID, IngredientID: common.IngredientID, PackagingItemID: common.PackagingItemID, ItemNameSnapshot: common.ItemName, QuantityOrdered: input.QuantityOrdered, UnitID: nullableString(input.UnitID), UnitCost: input.UnitCost, DiscountAmount: input.DiscountAmount, TaxRateID: nullableString(input.TaxRateID), TaxAmount: line.Tax, LineTotal: line.Total})
 	}
 	return items, total.round(), nil
+}
+
+func (s *Service) buildOrderAccountLine(tx *gorm.DB, businessID, orderID string, input PurchaseOrderItemInput) (PurchaseOrderItem, lineTotals, error) {
+	description := strings.TrimSpace(input.Description)
+	if description == "" {
+		return PurchaseOrderItem{}, lineTotals{}, apperrors.BadRequest("description is required for account lines", nil)
+	}
+	if err := validateUUID(input.AccountID, "account_id"); err != nil {
+		return PurchaseOrderItem{}, lineTotals{}, err
+	}
+	account, err := s.purchaseBillAccount(tx, businessID, input.AccountID)
+	if err != nil {
+		return PurchaseOrderItem{}, lineTotals{}, err
+	}
+	line, err := s.calculatePurchaseLine(tx, businessID, input.QuantityOrdered, input.UnitCost, input.DiscountAmount, input.TaxRateID)
+	if err != nil {
+		return PurchaseOrderItem{}, lineTotals{}, err
+	}
+	return PurchaseOrderItem{
+		ID:               utils.NewUUID(),
+		BusinessID:       businessID,
+		PurchaseOrderID:  orderID,
+		LineType:         "account",
+		ItemType:         "account",
+		AccountID:        &account.ID,
+		AccountName:      account.AccountName,
+		AccountCode:      account.AccountCode,
+		Description:      description,
+		ItemNameSnapshot: description,
+		QuantityOrdered:  input.QuantityOrdered,
+		UnitCost:         input.UnitCost,
+		DiscountAmount:   input.DiscountAmount,
+		TaxRateID:        nullableString(input.TaxRateID),
+		TaxAmount:        line.Tax,
+		LineTotal:        line.Total,
+	}, line, nil
 }
 
 func (s *Service) buildInvoice(tx *gorm.DB, currentUser *utils.AuthContext, id string, req CreatePurchaseInvoiceRequest) (*PurchaseInvoice, []PurchaseInvoiceItem, []charges.DocumentCharge, error) {
@@ -2575,13 +2665,21 @@ func (s *Service) refreshOrderReceivedStatus(tx *gorm.DB, businessID, orderID st
 	}
 	receivedAny := false
 	receivedAll := true
+	productLineCount := 0
 	for _, item := range items {
+		if normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID) == "account" {
+			continue
+		}
+		productLineCount++
 		if item.QuantityReceived > 0 {
 			receivedAny = true
 		}
 		if item.QuantityReceived < item.QuantityOrdered {
 			receivedAll = false
 		}
+	}
+	if productLineCount == 0 {
+		return s.repo.UpdateOrder(tx, orderID, businessID, map[string]interface{}{"status": "received", "updated_at": time.Now().UTC()}, nil)
 	}
 	status := "ordered"
 	if receivedAny {
@@ -2701,7 +2799,8 @@ func (s *Service) orderResponse(businessID string, order PurchaseOrder, includeI
 	if includeItems {
 		items, _ := s.repo.OrderItems(order.ID, businessID)
 		for _, item := range items {
-			response.Items = append(response.Items, PurchaseOrderItemResponse{ID: item.ID, ItemType: item.ItemType, ProductID: item.ProductID, IngredientID: item.IngredientID, PackagingItemID: item.PackagingItemID, ItemNameSnapshot: item.ItemNameSnapshot, QuantityOrdered: roundQuantity(item.QuantityOrdered), QuantityReceived: roundQuantity(item.QuantityReceived), UnitID: item.UnitID, UnitSymbol: s.repo.UnitSymbol(item.UnitID), UnitCost: roundMoney(item.UnitCost), DiscountAmount: roundMoney(item.DiscountAmount), TaxRateID: item.TaxRateID, TaxAmount: roundMoney(item.TaxAmount), LineTotal: roundMoney(item.LineTotal)})
+			unitID := deref(item.UnitID)
+			response.Items = append(response.Items, PurchaseOrderItemResponse{ID: item.ID, LineType: normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID), ItemType: item.ItemType, ProductID: item.ProductID, IngredientID: item.IngredientID, PackagingItemID: item.PackagingItemID, AccountID: item.AccountID, AccountName: item.AccountName, AccountCode: item.AccountCode, Description: item.Description, ItemNameSnapshot: item.ItemNameSnapshot, QuantityOrdered: roundQuantity(item.QuantityOrdered), QuantityReceived: roundQuantity(item.QuantityReceived), UnitID: unitID, UnitSymbol: s.repo.UnitSymbol(unitID), UnitCost: roundMoney(item.UnitCost), DiscountAmount: roundMoney(item.DiscountAmount), TaxRateID: item.TaxRateID, TaxAmount: roundMoney(item.TaxAmount), LineTotal: roundMoney(item.LineTotal)})
 		}
 		response.Charges, _ = charges.ListChargeResponses(s.db, businessID, "purchase_order", order.ID)
 	}
@@ -3044,6 +3143,14 @@ func normalizedInvoiceLineType(input PurchaseInvoiceItemInput) string {
 	return "product"
 }
 
+func normalizedOrderLineType(input PurchaseOrderItemInput) string {
+	lineType := strings.TrimSpace(input.LineType)
+	if lineType == "account" || strings.TrimSpace(input.AccountID) != "" || strings.TrimSpace(input.ItemType) == "account" {
+		return "account"
+	}
+	return "product"
+}
+
 func normalizedStoredLineType(lineType, itemType string, accountID *string) string {
 	if strings.TrimSpace(lineType) == "account" || strings.TrimSpace(itemType) == "account" || accountID != nil {
 		return "account"
@@ -3124,6 +3231,9 @@ func equalStringPtr(a, b *string) bool {
 
 func validateUnifiedPurchaseItems(items []PurchaseOrderItem) error {
 	for _, item := range items {
+		if normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID) == "account" {
+			continue
+		}
 		if item.ItemType != "product" || item.ProductID == nil || item.IngredientID != nil || item.PackagingItemID != nil {
 			return apperrors.BadRequest("purchase order contains legacy ingredient/packaging items; recreate the document using Product Master products before conversion", map[string]interface{}{"purchase_order_item_id": item.ID})
 		}

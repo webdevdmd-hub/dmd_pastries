@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { purchaseOrderSchema } from "@/lib/validators/purchasing.schema";
+import type { ChartAccount } from "@/types/accounting";
 import type {
   CreatePurchaseOrderPayload,
   PurchaseItemLineDraft,
@@ -59,6 +60,7 @@ function emptyLine(): PurchaseItemLineDraft {
 }
 
 export function PurchaseOrderFormDialog({
+  accounts,
   branches,
   isSubmitting,
   onClose,
@@ -71,6 +73,7 @@ export function PurchaseOrderFormDialog({
   taxRates,
   units,
 }: {
+  accounts: ChartAccount[];
   branches: PurchasingBranchOption[];
   isSubmitting: boolean;
   onClose: () => void;
@@ -121,13 +124,16 @@ export function PurchaseOrderFormDialog({
       order?.items.length
         ? order.items.map((item) => ({
             id: item.id,
+            accountId: item.accountId,
             batchNumber: null,
+            description: item.description,
             discountAmount: item.discountAmount,
             expiryDate: null,
             ingredientId: item.ingredientId,
-            itemType: "product",
+            itemType: item.lineType === "account" ? ("account" as const) : ("product" as const),
             itemNameSnapshot: item.itemNameSnapshot,
             lineId: item.id || crypto.randomUUID(),
+            lineType: item.lineType,
             packagingItemId: item.packagingItemId,
             productId: item.productId,
             productVariantId: item.productVariantId,
@@ -236,11 +242,13 @@ export function PurchaseOrderFormDialog({
             />
           </div>
           <PurchasingItemLineEditor
+            accounts={accounts}
             disableAddRows={isPartialAdjustment}
             lineLocks={lineLocks}
             lines={lines}
             onLinesChange={setLines}
             products={products}
+            showAccountRows
             taxRates={taxRates}
             units={units}
           />

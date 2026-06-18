@@ -47,6 +47,10 @@ function remainingQuantity(order: PurchaseOrder, purchaseOrderItemId: string): n
   return Math.max(item.quantityOrdered - item.quantityReceived, 0);
 }
 
+function receivableItems(order: PurchaseOrder): PurchaseOrder["items"] {
+  return order.items.filter((item) => item.lineType !== "account");
+}
+
 function hasRowChanges(order: PurchaseOrder, rows: ReceiveGoodsRow[]): boolean {
   return rows.some((row) => {
     const remaining = remainingQuantity(order, row.purchaseOrderItemId);
@@ -89,7 +93,7 @@ export function PurchaseOrderReceiveGoodsDialog({
     setNotes("");
     setError(null);
     setRows(
-      order.items.map((item) => ({
+      receivableItems(order).map((item) => ({
         batchNumber: "",
         expiryDate: "",
         purchaseOrderItemId: item.id,
@@ -127,7 +131,7 @@ export function PurchaseOrderReceiveGoodsDialog({
       return;
     }
 
-    const receivableLegacyItem = order.items.find(
+    const receivableLegacyItem = receivableItems(order).find(
       (item) => Math.max(item.quantityOrdered - item.quantityReceived, 0) > 0 && !item.productId,
     );
 
@@ -158,7 +162,7 @@ export function PurchaseOrderReceiveGoodsDialog({
     for (const row of rows) {
       const quantity = Number(row.quantityReceived);
       const remaining = remainingQuantity(order, row.purchaseOrderItemId);
-      const orderItem = order.items.find((item) => item.id === row.purchaseOrderItemId);
+      const orderItem = receivableItems(order).find((item) => item.id === row.purchaseOrderItemId);
 
       if (!Number.isFinite(quantity) || quantity < 0) {
         setError("Receive quantity must be a valid positive number.");
@@ -263,7 +267,7 @@ export function PurchaseOrderReceiveGoodsDialog({
               ) : loadError ? (
                 <div className="px-4 py-6 text-sm font-medium text-red-700">{loadError}</div>
               ) : order ? (
-                order.items.map((item) => {
+                receivableItems(order).map((item) => {
                   const row = rows.find((line) => line.purchaseOrderItemId === item.id);
                   const remaining = Math.max(item.quantityOrdered - item.quantityReceived, 0);
 

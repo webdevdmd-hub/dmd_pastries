@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseDocumentChain } from "@/components/purchasing/purchase-document-chain";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
-import { PurchaseOrderConvertToBillDialog } from "@/components/purchasing/purchase-order-convert-to-bill-dialog";
+import { PurchaseInvoiceFormDialog } from "@/components/purchasing/purchase-invoice-form-dialog";
 import { PurchaseOrderFormDialog } from "@/components/purchasing/purchase-order-form-dialog";
 import { PurchaseOrderReceiveGoodsDialog } from "@/components/purchasing/purchase-order-receive-goods-dialog";
 import { PurchaseOrderStatusBadge } from "@/components/purchasing/purchase-order-status-badge";
@@ -21,9 +21,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
+import { useChartAccounts } from "@/hooks/use-accounting";
 import { usePermission } from "@/hooks/use-permission";
 import {
-  useConvertPurchaseOrderToBill,
+  useCreatePurchaseInvoice,
   useDuplicatePurchaseOrder,
   usePurchaseOrder,
   usePurchaseOrderDocumentChain,
@@ -38,10 +39,12 @@ import {
   useUpdatePurchaseOrderStatus,
 } from "@/hooks/use-purchasing";
 import { getErrorMessage } from "@/lib/api/client";
+import { purchaseOrderToBillInitialValues } from "@/lib/purchasing/purchase-order-bill-draft";
 import { cn } from "@/lib/utils/cn";
 import type {
-  ConvertPurchaseOrderToBillPayload,
+  CreatePurchaseInvoicePayload,
   ReceivePurchaseOrderPayload,
+  UpdatePurchaseInvoicePayload,
   UpdatePurchaseOrderPayload,
 } from "@/types/purchasing";
 
@@ -125,7 +128,21 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const taxRatesQuery = usePurchasingTaxRates(canView);
   const unitsQuery = usePurchasingUnits(canView);
-  const convertMutation = useConvertPurchaseOrderToBill();
+  const purchaseAccountsQuery = useChartAccounts(
+    {
+      accountGroup: "",
+      accountType: "all",
+      limit: 500,
+      page: 1,
+      parentAccountId: "",
+      search: "",
+      sortBy: "account_code",
+      sortOrder: "asc",
+      status: "active",
+    },
+    canView,
+  );
+  const createInvoiceMutation = useCreatePurchaseInvoice();
   const receiveMutation = useReceivePurchaseOrder();
   const updateMutation = useUpdatePurchaseOrder();
   const statusMutation = useUpdatePurchaseOrderStatus();
@@ -165,6 +182,8 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   const receivedDone = order.status === "received" || Boolean(activeBill);
   const billedDone = Boolean(activeBill);
   const paidDone = isPaid;
+  const billInitialValues = purchaseOrderToBillInitialValues(order);
+  const purchaseAccounts = [...(purchaseAccountsQuery.data?.items ?? [])];
 
   const handleMarkIssued = async (): Promise<void> => {
     try {
@@ -218,19 +237,21 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
     }
   };
 
-  const handleConvert = async (payload: ConvertPurchaseOrderToBillPayload): Promise<void> => {
+  const handleCreateBillFromOrder = async (
+    payload: CreatePurchaseInvoicePayload,
+  ): Promise<void> => {
     try {
-      const invoice = await convertMutation.mutateAsync({
-        id: order.id,
-        payload,
-      });
-      toast.success("Purchase order converted to draft bill.");
+      const invoice = await createInvoiceMutation.mutateAsync(payload);
+      toast.success("Draft bill created from purchase order.");
       setConvertOpen(false);
       router.push(`${ROUTES.purchasingInvoices}/${invoice.id}`);
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
   };
+
+  const noopUpdateBill = (_id: string, _payload: UpdatePurchaseInvoicePayload): Promise<void> =>
+    Promise.reject(new Error("This dialog only creates bills from purchase orders."));
 
   const primaryAction = (): JSX.Element | null => {
     if (order.status === "draft" && canIssue) {
@@ -520,14 +541,26 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
         open={receiveOpen}
         order={order}
       />
-      <PurchaseOrderConvertToBillDialog
-        isSubmitting={convertMutation.isPending}
+      <PurchaseInvoiceFormDialog
+        accounts={purchaseAccounts}
+        branches={branchesQuery.data ?? []}
+        createButtonLabel="Create draft bill"
+        createDescription={`Review and edit the bill copied from ${order.purchaseOrderNumber}.`}
+        createTitle="Create Bill from PO"
+        initialValues={billInitialValues}
+        invoice={null}
+        isSubmitting={createInvoiceMutation.isPending}
         onClose={() => setConvertOpen(false)}
-        onConvert={handleConvert}
+        onCreate={handleCreateBillFromOrder}
+        onUpdate={noopUpdateBill}
         open={convertOpen}
-        order={order}
+        products={productsQuery.data ?? []}
+        suppliers={suppliersQuery.data ?? []}
+        taxRates={taxRatesQuery.data ?? []}
+        units={unitsQuery.data ?? []}
       />
       <PurchaseOrderFormDialog
+        accounts={purchaseAccounts}
         branches={branchesQuery.data ?? []}
         isSubmitting={updateMutation.isPending}
         onClose={() => setFormOpen(false)}

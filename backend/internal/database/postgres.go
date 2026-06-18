@@ -132,6 +132,7 @@ func VerifySchema(db *gorm.DB) error {
 		"bakery_order_productions":       {"bakery_order_item_id"},
 		"purchase_invoice_payments":      {"payment_method_type_snapshot", "payment_status", "reference_number", "paid_by_user_id", "paid_at", "deleted_at"},
 		"purchase_invoices":              {"returned_amount", "credited_amount", "return_status"},
+		"purchase_order_items":           {"line_type", "account_id", "account_name_snapshot", "account_code_snapshot", "description"},
 		"purchase_returns":               {"purchase_receipt_id", "purchase_invoice_id", "return_number", "return_date", "status", "applied_credit_amount", "open_credit_amount", "journal_entry_id", "deleted_at"},
 		"purchase_return_items":          {"purchase_return_id", "purchase_receipt_item_id", "inventory_item_id", "quantity", "stock_location_id", "stock_movement_id", "deleted_at"},
 		"payment_methods":                {"show_in_pos", "show_in_bakery_orders", "show_in_purchasing", "show_in_expenses", "show_in_dashboard_collection", "default_payment_account_id"},

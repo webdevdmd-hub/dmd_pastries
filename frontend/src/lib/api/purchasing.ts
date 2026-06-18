@@ -321,11 +321,16 @@ function parseOrderItem(value: unknown): PurchaseOrderItem {
 
   return {
     id: stringValue(value.id),
+    lineType: value.line_type === "account" ? "account" : "product",
     itemType: isItemType(value.item_type) ? value.item_type : "product",
     productId: optionalString(value.product_id),
     productVariantId: optionalString(value.product_variant_id),
     ingredientId: optionalString(value.ingredient_id),
     packagingItemId: optionalString(value.packaging_item_id),
+    accountId: optionalString(value.account_id),
+    accountName: optionalString(value.account_name_snapshot),
+    accountCode: optionalString(value.account_code_snapshot),
+    description: optionalString(value.description),
     itemNameSnapshot: stringValue(value.item_name_snapshot, "Purchase item"),
     quantityOrdered: numberValue(value.quantity_ordered),
     quantityReceived: numberValue(value.quantity_received),
