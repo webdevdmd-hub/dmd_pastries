@@ -28,8 +28,10 @@ type PurchasingItemLineEditorProps = {
   accounts?: ChartAccount[];
   allowBatchFields?: boolean;
   billDiscountAmount?: number;
+  disableAddRows?: boolean;
   legacyChargeAmount?: number;
   legacyChargeTaxAmount?: number;
+  lineLocks?: Record<string, { minQuantity: number; receivedQuantity: number }>;
   lines: PurchaseItemLineDraft[];
   onLinesChange: (lines: PurchaseItemLineDraft[]) => void;
   onBillDiscountAmountChange?: (value: number) => void;
@@ -137,8 +139,10 @@ export function PurchasingItemLineEditor({
   accounts = [],
   allowBatchFields = false,
   billDiscountAmount = 0,
+  disableAddRows = false,
   legacyChargeAmount = 0,
   legacyChargeTaxAmount = 0,
+  lineLocks = {},
   lines,
   onLinesChange,
   onBillDiscountAmountChange,
@@ -267,6 +271,8 @@ export function PurchasingItemLineEditor({
           </thead>
           <tbody>
             {safeLines.map((line, index) => {
+              const lineLock = lineLocks[line.lineId];
+              const isLineLocked = Boolean(lineLock);
               const accountLine = showAccountRows && isAccountLine(line);
               const selectedProduct =
                 products.find((product) => product.id === line.productId) ?? null;
@@ -349,6 +355,7 @@ export function PurchasingItemLineEditor({
                       <div className="space-y-2">
                         <SearchableCombobox
                           emptyMessage="No matching Product Master items found."
+                          disabled={isLineLocked}
                           onValueChange={(productId) => {
                             const selected = products.find((product) => product.id === productId);
                             onLinesChange(
@@ -379,6 +386,7 @@ export function PurchasingItemLineEditor({
                         {selectedProduct && activeVariants.length > 0 ? (
                           <SearchableCombobox
                             emptyMessage="No matching variants found."
+                            disabled={isLineLocked}
                             onValueChange={(productVariantId) => {
                               const selectedVariant = activeVariants.find(
                                 (variant) => variant.id === productVariantId,
@@ -457,6 +465,7 @@ export function PurchasingItemLineEditor({
                       <SearchableCombobox
                         emptyMessage="No active purchase-safe accounts found."
                         contentClassName="w-[min(560px,92vw)]"
+                        disabled={isLineLocked}
                         onValueChange={(accountId) => {
                           const selected = accounts.find((account) => account.id === accountId);
                           onLinesChange(
@@ -487,7 +496,7 @@ export function PurchasingItemLineEditor({
                     <Input
                       aria-label={`Quantity for item line ${String(index + 1)}`}
                       className="h-8 text-right text-xs"
-                      min="0"
+                      min={lineLock ? String(lineLock.minQuantity) : "0"}
                       onChange={(event) =>
                         onLinesChange(
                           updateLine(safeLines, line.lineId, {
@@ -498,6 +507,11 @@ export function PurchasingItemLineEditor({
                       type="number"
                       value={line.quantity}
                     />
+                    {lineLock ? (
+                      <p className="mt-1 text-right text-[11px] leading-4 text-brand-mocha">
+                        Received {formatAmount(lineLock.receivedQuantity)}
+                      </p>
+                    ) : null}
                     {selectedProduct?.isStockTracked ? (
                       <p className="mt-1 text-right text-[11px] leading-4 text-brand-mocha">
                         Stock
@@ -508,6 +522,7 @@ export function PurchasingItemLineEditor({
                     <Input
                       aria-label={`Rate for item line ${String(index + 1)}`}
                       className="h-8 text-right text-xs"
+                      disabled={isLineLocked}
                       min="0"
                       onChange={(event) =>
                         onLinesChange(
@@ -524,6 +539,7 @@ export function PurchasingItemLineEditor({
                     <Input
                       aria-label={`Discount for item line ${String(index + 1)}`}
                       className="h-8 text-right text-xs"
+                      disabled={isLineLocked}
                       min="0"
                       onChange={(event) =>
                         onLinesChange(
@@ -538,6 +554,7 @@ export function PurchasingItemLineEditor({
                   </td>
                   <td className="px-2 py-2">
                     <Select
+                      disabled={isLineLocked}
                       value={line.taxRateId ?? "none"}
                       onValueChange={(taxRateId) =>
                         onLinesChange(
@@ -571,6 +588,7 @@ export function PurchasingItemLineEditor({
                     ) : (
                       <SearchableCombobox
                         emptyMessage="No matching units found."
+                        disabled={isLineLocked}
                         onValueChange={(unitId) =>
                           onLinesChange(updateLine(safeLines, line.lineId, { unitId }))
                         }
@@ -588,7 +606,7 @@ export function PurchasingItemLineEditor({
                   <td className="px-1.5 py-2">
                     <Button
                       aria-label={`Remove item line ${String(index + 1)}`}
-                      disabled={safeLines.length === 1}
+                      disabled={safeLines.length === 1 || isLineLocked}
                       onClick={() =>
                         onLinesChange(safeLines.filter((item) => item.lineId !== line.lineId))
                       }
@@ -610,6 +628,7 @@ export function PurchasingItemLineEditor({
         <div className="flex flex-wrap items-center gap-2">
           <Button
             className="px-0 text-blue-700"
+            disabled={disableAddRows}
             onClick={() => onLinesChange([...safeLines, createLine()])}
             type="button"
             variant="link"
@@ -622,6 +641,7 @@ export function PurchasingItemLineEditor({
               <span className="text-brand-cappuccino">|</span>
               <Button
                 className="px-0 text-blue-700"
+                disabled={disableAddRows}
                 onClick={() => onLinesChange([...safeLines, createAccountLine()])}
                 type="button"
                 variant="link"
@@ -634,6 +654,7 @@ export function PurchasingItemLineEditor({
           <span className="text-brand-cappuccino">|</span>
           <Button
             className="px-0 text-blue-700"
+            disabled={disableAddRows}
             onClick={() => onLinesChange([...safeLines, createLine(), createLine(), createLine()])}
             type="button"
             variant="link"

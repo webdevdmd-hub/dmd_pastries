@@ -48,6 +48,7 @@ function nextStepForOrder(order: PurchaseOrder): string {
 }
 
 export function PurchaseOrdersTable({
+  canCreate,
   canDelete,
   canEdit,
   canConvertToBill,
@@ -55,11 +56,14 @@ export function PurchaseOrdersTable({
   canUpdateStatus,
   onConvertToBill,
   onDelete,
+  onDuplicate,
   onEdit,
+  onReopen,
   onReceive,
   onStatusChange,
   orders,
 }: {
+  canCreate: boolean;
   canDelete: boolean;
   canEdit: boolean;
   canConvertToBill: boolean;
@@ -67,7 +71,9 @@ export function PurchaseOrdersTable({
   canUpdateStatus: boolean;
   onConvertToBill: (order: PurchaseOrder) => void;
   onDelete: (order: PurchaseOrder) => void;
+  onDuplicate: (order: PurchaseOrder) => void;
   onEdit: (order: PurchaseOrder) => void;
+  onReopen: (order: PurchaseOrder) => void;
   onReceive: (order: PurchaseOrder) => void;
   onStatusChange: (order: PurchaseOrder, status: PurchaseOrderStatus) => void;
   orders: PurchaseOrder[];
@@ -117,6 +123,7 @@ export function PurchaseOrdersTable({
             </TableCell>
             <TableCell>
               <PurchaseOrderActionsMenu
+                canCreate={canCreate}
                 canDelete={canDelete}
                 canEdit={canEdit}
                 canConvertToBill={canConvertToBill}
@@ -124,7 +131,9 @@ export function PurchaseOrdersTable({
                 canUpdateStatus={canUpdateStatus}
                 onConvertToBill={onConvertToBill}
                 onDelete={onDelete}
+                onDuplicate={onDuplicate}
                 onEdit={onEdit}
+                onReopen={onReopen}
                 onReceive={onReceive}
                 onStatusChange={onStatusChange}
                 onView={(selectedOrder) =>

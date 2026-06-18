@@ -16,6 +16,7 @@ import {
   createPurchaseOrder,
   createPurchaseReturn,
   deletePurchaseOrder,
+  duplicatePurchaseOrder,
   getBranches,
   getIngredients,
   getProducts,
@@ -41,6 +42,7 @@ import {
   postPurchaseReturn,
   receivePurchase,
   receivePurchaseOrder,
+  reopenPurchaseOrder,
   reversePurchaseReturn,
   updatePurchaseInvoice,
   updatePurchaseOrder,
@@ -378,6 +380,28 @@ export function useDeletePurchaseOrder() {
 
   return useMutation<void, Error, string>({
     mutationFn: async (id) => deletePurchaseOrder(id),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+    },
+  });
+}
+
+export function useReopenPurchaseOrder() {
+  const queryClient = useQueryClient();
+
+  return useMutation<PurchaseOrder, Error, string>({
+    mutationFn: async (id) => reopenPurchaseOrder(id),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+    },
+  });
+}
+
+export function useDuplicatePurchaseOrder() {
+  const queryClient = useQueryClient();
+
+  return useMutation<PurchaseOrder, Error, string>({
+    mutationFn: async (id) => duplicatePurchaseOrder(id),
     onSuccess: async () => {
       await invalidatePurchasing(queryClient);
     },

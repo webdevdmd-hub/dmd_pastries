@@ -91,6 +91,16 @@ export function PurchaseOrderFormDialog({
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<PurchaseItemLineDraft[]>([emptyLine()]);
   const [error, setError] = useState<string | null>(null);
+  const isPartialAdjustment = order?.status === "partially_received";
+  const lineLocks =
+    order?.status === "partially_received"
+      ? Object.fromEntries(
+          order.items.map((item) => [
+            item.id,
+            { minQuantity: item.quantityReceived, receivedQuantity: item.quantityReceived },
+          ]),
+        )
+      : {};
   const selectableBranches = branches.filter(
     (branch) =>
       branch.id === order?.branchId ||
@@ -110,6 +120,7 @@ export function PurchaseOrderFormDialog({
     setLines(
       order?.items.length
         ? order.items.map((item) => ({
+            id: item.id,
             batchNumber: null,
             discountAmount: item.discountAmount,
             expiryDate: null,
@@ -131,6 +142,18 @@ export function PurchaseOrderFormDialog({
   }, [branchScope.effectiveBranchId, open, order]);
 
   const submit = async (): Promise<void> => {
+    if (isPartialAdjustment) {
+      const invalidLine = lines.find((line) => {
+        const lock = lineLocks[line.lineId];
+        return lock ? line.quantity < lock.minQuantity : true;
+      });
+
+      if (invalidLine) {
+        setError("Partially received lines cannot be reduced below the received quantity.");
+        return;
+      }
+    }
+
     const result = purchaseOrderSchema.safeParse({
       branchId,
       expectedDeliveryDate,
@@ -157,15 +180,24 @@ export function PurchaseOrderFormDialog({
       <DialogContent className="flex max-h-[96vh] w-[min(96vw,1500px)] max-w-none flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-brand-cappuccino/70 px-5 py-4">
           <DialogTitle className="text-2xl">
-            {order ? "Edit purchase order" : "Create purchase order"}
+            {isPartialAdjustment
+              ? "Adjust remaining purchase order"
+              : order
+                ? "Edit purchase order"
+                : "Create purchase order"}
           </DialogTitle>
           <DialogDescription className="text-sm leading-5">
-            Draft supplier orders with product lines, tax, discount, and delivery dates.
+            {isPartialAdjustment
+              ? "Adjust unreceived quantities, expected delivery, and notes. Received history stays locked."
+              : order?.status === "ordered"
+                ? "Update this issued purchase order before receiving goods. It remains issued after saving."
+                : "Draft supplier orders with product lines, tax, discount, and delivery dates."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid min-h-0 gap-3 overflow-y-auto px-5 py-4">
           <div className="grid gap-3 lg:grid-cols-4">
             <Select
+              disabled={isPartialAdjustment}
               value={branchId || "none"}
               onValueChange={(value) => setBranchId(value === "none" ? "" : value)}
             >
@@ -182,6 +214,7 @@ export function PurchaseOrderFormDialog({
               </SelectContent>
             </Select>
             <SupplierLookupSelect
+              disabled={isPartialAdjustment}
               onValueChange={setSupplierId}
               suppliers={suppliers}
               value={supplierId}
@@ -189,6 +222,7 @@ export function PurchaseOrderFormDialog({
             <Input
               aria-label="Order date"
               className="h-10"
+              disabled={isPartialAdjustment}
               onChange={(event) => setOrderDate(event.target.value)}
               type="date"
               value={orderDate}
@@ -202,6 +236,8 @@ export function PurchaseOrderFormDialog({
             />
           </div>
           <PurchasingItemLineEditor
+            disableAddRows={isPartialAdjustment}
+            lineLocks={lineLocks}
             lines={lines}
             onLinesChange={setLines}
             products={products}
@@ -222,7 +258,7 @@ export function PurchaseOrderFormDialog({
             Cancel
           </Button>
           <Button disabled={isSubmitting} onClick={() => void submit()} type="button">
-            {order ? "Save order" : "Create order"}
+            {isPartialAdjustment ? "Save adjustment" : order ? "Save order" : "Create order"}
           </Button>
         </DialogFooter>
       </DialogContent>

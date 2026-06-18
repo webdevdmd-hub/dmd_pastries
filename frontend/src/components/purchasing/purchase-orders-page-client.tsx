@@ -35,6 +35,7 @@ import {
   useConvertPurchaseOrderToBill,
   useCreatePurchaseOrder,
   useDeletePurchaseOrder,
+  useDuplicatePurchaseOrder,
   usePurchaseOrder,
   usePurchaseOrders,
   usePurchasingBranches,
@@ -43,6 +44,7 @@ import {
   usePurchasingTaxRates,
   usePurchasingUnits,
   useReceivePurchaseOrder,
+  useReopenPurchaseOrder,
   useUpdatePurchaseOrder,
   useUpdatePurchaseOrderStatus,
 } from "@/hooks/use-purchasing";
@@ -81,6 +83,7 @@ const orderStatuses = [
 type PendingAction =
   | { order: PurchaseOrder; status: PurchaseOrderStatus; type: "status" }
   | { order: PurchaseOrder; type: "delete" }
+  | { order: PurchaseOrder; type: "reopen" }
   | null;
 
 export function PurchaseOrdersPageClient(): JSX.Element {
@@ -115,11 +118,16 @@ export function PurchaseOrdersPageClient(): JSX.Element {
     branchId: branchScope.defaultBranchId,
   });
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [convertingOrder, setConvertingOrder] = useState<PurchaseOrder | null>(null);
   const [receivingOrderId, setReceivingOrderId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const ordersQuery = usePurchaseOrders(filters, canView && branchScope.hasBranchScope);
+  const editingOrderQuery = usePurchaseOrder(
+    editingOrderId,
+    canView && branchScope.hasBranchScope && editingOrderId !== null,
+  );
   const receivingOrderQuery = usePurchaseOrder(
     receivingOrderId,
     canView && branchScope.hasBranchScope && receivingOrderId !== null,
@@ -133,6 +141,8 @@ export function PurchaseOrdersPageClient(): JSX.Element {
   const updateMutation = useUpdatePurchaseOrder();
   const statusMutation = useUpdatePurchaseOrderStatus();
   const deleteMutation = useDeletePurchaseOrder();
+  const reopenMutation = useReopenPurchaseOrder();
+  const duplicateMutation = useDuplicatePurchaseOrder();
   const receiveMutation = useReceivePurchaseOrder();
   const convertMutation = useConvertPurchaseOrderToBill();
   const isPermissionDenied =
@@ -165,6 +175,7 @@ export function PurchaseOrdersPageClient(): JSX.Element {
 
   const openCreate = (): void => {
     setEditingOrder(null);
+    setEditingOrderId(null);
     setFormOpen(true);
   };
 
@@ -183,6 +194,7 @@ export function PurchaseOrdersPageClient(): JSX.Element {
       await updateMutation.mutateAsync({ id, payload });
       toast.success("Purchase order updated.");
       setEditingOrder(null);
+      setEditingOrderId(null);
       setFormOpen(false);
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -228,9 +240,12 @@ export function PurchaseOrdersPageClient(): JSX.Element {
           payload: { status: action.status },
         });
         toast.success("Purchase order status updated.");
-      } else {
+      } else if (action.type === "delete") {
         await deleteMutation.mutateAsync(action.order.id);
         toast.success("Purchase order deleted.");
+      } else {
+        await reopenMutation.mutateAsync(action.order.id);
+        toast.success("Purchase order reopened as draft.");
       }
       setPendingAction(null);
     } catch (error) {
@@ -239,6 +254,16 @@ export function PurchaseOrdersPageClient(): JSX.Element {
           ? getHistoryDeleteConflictMessage("purchase order")
           : getErrorMessage(error),
       );
+    }
+  };
+
+  const handleDuplicate = async (order: PurchaseOrder): Promise<void> => {
+    try {
+      const duplicatedOrder = await duplicateMutation.mutateAsync(order.id);
+      toast.success("Purchase order duplicated as draft.");
+      router.push(`${ROUTES.purchasingOrders}/${duplicatedOrder.id}`);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 
@@ -295,6 +320,7 @@ export function PurchaseOrdersPageClient(): JSX.Element {
         <Card>
           <CardContent className="p-0">
             <PurchaseOrdersTable
+              canCreate={canCreate}
               canDelete={canDelete}
               canEdit={canEdit}
               canConvertToBill={canConvertToBill}
@@ -302,10 +328,13 @@ export function PurchaseOrdersPageClient(): JSX.Element {
               canUpdateStatus={canUpdateStatus}
               onConvertToBill={setConvertingOrder}
               onDelete={(order) => setPendingAction({ order, type: "delete" })}
+              onDuplicate={(order) => void handleDuplicate(order)}
               onEdit={(order) => {
                 setEditingOrder(order);
+                setEditingOrderId(order.id);
                 setFormOpen(true);
               }}
+              onReopen={(order) => setPendingAction({ order, type: "reopen" })}
               onReceive={(order) => setReceivingOrderId(order.id)}
               onStatusChange={(order, status) =>
                 setPendingAction({ order, status, type: "status" })
@@ -321,12 +350,13 @@ export function PurchaseOrdersPageClient(): JSX.Element {
         isSubmitting={createMutation.isPending || updateMutation.isPending}
         onClose={() => {
           setEditingOrder(null);
+          setEditingOrderId(null);
           setFormOpen(false);
         }}
         onCreate={handleCreate}
         onUpdate={handleUpdate}
         open={formOpen}
-        order={editingOrder}
+        order={editingOrderQuery.data ?? editingOrder}
         products={productsQuery.data ?? []}
         suppliers={suppliersQuery.data ?? []}
         taxRates={taxRatesQuery.data ?? []}
@@ -360,12 +390,16 @@ export function PurchaseOrdersPageClient(): JSX.Element {
             <DialogTitle>
               {pendingAction?.type === "delete"
                 ? "Delete purchase order"
-                : "Change purchase order status"}
+                : pendingAction?.type === "reopen"
+                  ? "Reopen purchase order"
+                  : "Change purchase order status"}
             </DialogTitle>
             <DialogDescription>
               {pendingAction?.type === "delete"
                 ? "This permanently removes the purchase order, its item lines, and document charges only when it has no linked receiving, bill, payment, vendor credit, or stock history. This cannot be undone."
-                : `Update ${pendingAction?.order.purchaseOrderNumber ?? "order"} to ${pendingAction?.status ?? "status"}?`}
+                : pendingAction?.type === "reopen"
+                  ? "Reopen this cancelled purchase order as a draft only if it has no linked receipt, bill, payment, return, or stock history."
+                  : `Update ${pendingAction?.order.purchaseOrderNumber ?? "order"} to ${pendingAction?.status ?? "status"}?`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -378,11 +412,17 @@ export function PurchaseOrdersPageClient(): JSX.Element {
                   ? "bg-red-700 text-white hover:bg-red-800"
                   : undefined
               }
-              disabled={statusMutation.isPending || deleteMutation.isPending}
+              disabled={
+                statusMutation.isPending || deleteMutation.isPending || reopenMutation.isPending
+              }
               onClick={() => void confirmAction()}
               type="button"
             >
-              {pendingAction?.type === "delete" ? "Delete purchase order" : "Confirm"}
+              {pendingAction?.type === "delete"
+                ? "Delete purchase order"
+                : pendingAction?.type === "reopen"
+                  ? "Reopen purchase order"
+                  : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>

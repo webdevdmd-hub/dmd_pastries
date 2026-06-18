@@ -67,6 +67,22 @@ func (h *Handler) UpdateOrderStatus(c *gin.Context) {
 	respond(c, "purchase order status updated successfully", result, err)
 }
 
+func (h *Handler) ReopenOrder(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.ReopenOrder(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase order reopened successfully", result, err)
+}
+
+func (h *Handler) DuplicateOrder(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.DuplicateOrder(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "purchase order duplicated successfully", result, err)
+}
+
 func (h *Handler) DeleteOrder(c *gin.Context) {
 	if !validParam(c, "id") {
 		return

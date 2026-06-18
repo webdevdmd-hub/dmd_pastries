@@ -109,6 +109,9 @@ func (s *Service) UpdateOrder(currentUser *utils.AuthContext, id string, req Upd
 		if !currentUser.CanAccessBranch(existing.BranchID) {
 			return apperrors.Forbidden("branch access denied")
 		}
+		if existing.Status == "partially_received" {
+			return s.updatePartiallyReceivedOrder(tx, currentUser, existing, req, ipAddress, userAgent)
+		}
 		if existing.Status == "received" || existing.Status == "cancelled" {
 			return apperrors.BadRequest("received or cancelled purchase orders cannot be edited", nil)
 		}
@@ -180,6 +183,102 @@ func (s *Service) UpdateOrder(currentUser *utils.AuthContext, id string, req Upd
 	return s.GetOrder(currentUser, id)
 }
 
+func (s *Service) updatePartiallyReceivedOrder(tx *gorm.DB, currentUser *utils.AuthContext, existing *PurchaseOrder, req UpdatePurchaseOrderRequest, ipAddress, userAgent string) error {
+	if strings.TrimSpace(req.BranchID) != "" && req.BranchID != existing.BranchID {
+		return apperrors.BadRequest("partially received purchase orders cannot change branch", nil)
+	}
+	if strings.TrimSpace(req.SupplierID) != "" && req.SupplierID != existing.SupplierID {
+		return apperrors.BadRequest("partially received purchase orders cannot change supplier", nil)
+	}
+	if strings.TrimSpace(req.OrderDate) != "" && req.OrderDate != formatDate(existing.OrderDate) {
+		return apperrors.BadRequest("partially received purchase orders cannot change order_date", nil)
+	}
+
+	expectedDate := optionalDateString(existing.ExpectedDeliveryDate)
+	if strings.TrimSpace(req.ExpectedDeliveryDate) != "" {
+		expectedDate = req.ExpectedDeliveryDate
+	}
+	parsedExpected, err := parseOptionalDate(expectedDate, "expected_delivery_date")
+	if err != nil {
+		return err
+	}
+
+	itemTotals := totals{}
+	if req.Items != nil {
+		items, err := s.repo.OrderItemsForUpdate(tx, existing.ID, currentUser.BusinessID)
+		if err != nil {
+			return apperrors.Internal("failed to load purchase order items")
+		}
+		inputsByID := make(map[string]PurchaseOrderItemInput, len(req.Items))
+		for _, input := range req.Items {
+			if strings.TrimSpace(input.ID) == "" {
+				return apperrors.BadRequest("partially received purchase order lines require id", nil)
+			}
+			inputsByID[input.ID] = input
+		}
+		if len(inputsByID) != len(items) {
+			return apperrors.BadRequest("partially received purchase orders cannot add or remove lines", nil)
+		}
+		for _, item := range items {
+			input, ok := inputsByID[item.ID]
+			if !ok {
+				return apperrors.BadRequest("partially received purchase orders cannot remove existing lines", nil)
+			}
+			if normalizedPurchaseItemType(input.ItemType, input.ProductID != "") != item.ItemType ||
+				input.ProductID != deref(item.ProductID) ||
+				input.IngredientID != deref(item.IngredientID) ||
+				input.PackagingItemID != deref(item.PackagingItemID) ||
+				input.UnitID != item.UnitID ||
+				roundMoney(input.UnitCost) != roundMoney(item.UnitCost) ||
+				roundMoney(input.DiscountAmount) != roundMoney(item.DiscountAmount) ||
+				input.TaxRateID != deref(item.TaxRateID) {
+				return apperrors.BadRequest("partially received purchase orders can only adjust ordered quantities", nil)
+			}
+			if roundQuantity(input.QuantityOrdered) < roundQuantity(item.QuantityReceived) {
+				return apperrors.BadRequest("quantity_ordered cannot be less than quantity_received", map[string]interface{}{"line_id": item.ID, "quantity_received": item.QuantityReceived})
+			}
+			line, err := s.calculatePurchaseLine(tx, currentUser.BusinessID, input.QuantityOrdered, item.UnitCost, item.DiscountAmount, deref(item.TaxRateID))
+			if err != nil {
+				return err
+			}
+			itemTotals.add(line)
+			if err := s.repo.UpdateOrderItem(tx, item.ID, currentUser.BusinessID, map[string]interface{}{"quantity_ordered": input.QuantityOrdered, "tax_amount": line.Tax, "line_total": line.Total, "updated_at": time.Now().UTC()}); err != nil {
+				return err
+			}
+		}
+		itemTotals = itemTotals.round()
+	} else {
+		items, err := s.repo.OrderItemsForUpdate(tx, existing.ID, currentUser.BusinessID)
+		if err != nil {
+			return apperrors.Internal("failed to load purchase order items")
+		}
+		for _, item := range items {
+			itemTotals.Subtotal += roundMoney(item.QuantityOrdered * item.UnitCost)
+			itemTotals.Discount += roundMoney(item.DiscountAmount)
+			itemTotals.Tax += roundMoney(item.TaxAmount)
+			itemTotals.Total += roundMoney(item.LineTotal)
+		}
+		itemTotals = itemTotals.round()
+	}
+
+	updates := map[string]interface{}{
+		"expected_delivery_date": parsedExpected,
+		"notes":                  strings.TrimSpace(req.Notes),
+		"updated_by_user_id":     currentUser.UserID,
+		"updated_at":             time.Now().UTC(),
+	}
+	if req.Items != nil {
+		updates["subtotal_amount"] = itemTotals.Subtotal
+		updates["discount_amount"] = itemTotals.Discount
+		updates["tax_amount"] = roundMoney(itemTotals.Tax + existing.ChargeTaxAmount)
+		updates["total_amount"] = roundMoney(itemTotals.Total + existing.ChargeAmount + existing.ChargeTaxAmount)
+	}
+	if err := s.repo.UpdateOrder(tx, existing.ID, currentUser.BusinessID, updates, nil); err != nil {
+		return err
+	}
+	return s.audit(tx, currentUser, "purchase_order.adjusted_remaining", existing.ID, "Partially received purchase order adjusted", ipAddress, userAgent)
+}
+
 func (s *Service) UpdateOrderStatus(currentUser *utils.AuthContext, id string, req UpdateStatusRequest, ipAddress, userAgent string) (*PurchaseOrderResponse, error) {
 	if !validOrderStatus(req.Status) {
 		return nil, apperrors.BadRequest("invalid purchase order status", nil)
@@ -208,6 +307,90 @@ func (s *Service) UpdateOrderStatus(currentUser *utils.AuthContext, id string, r
 		return nil, err
 	}
 	return s.GetOrder(currentUser, id)
+}
+
+func (s *Service) ReopenOrder(currentUser *utils.AuthContext, id, ipAddress, userAgent string) (*PurchaseOrderResponse, error) {
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		order, err := s.repo.FindOrderForUpdate(tx, id, currentUser.BusinessID)
+		if err != nil {
+			return notFound(err, "purchase order not found")
+		}
+		if !currentUser.CanAccessBranch(order.BranchID) {
+			return apperrors.Forbidden("branch access denied")
+		}
+		if order.Status != "cancelled" {
+			return apperrors.BadRequest("only cancelled purchase orders can be reopened", nil)
+		}
+		historyCount, err := s.repo.PurchaseOrderHistoryCount(tx, currentUser.BusinessID, order.ID)
+		if err != nil {
+			return err
+		}
+		if historyCount > 0 {
+			return apperrors.Conflict("purchase order has linked history and cannot be reopened", map[string]interface{}{"reason": "purchase_order_has_history"})
+		}
+		if err := s.repo.UpdateOrder(tx, id, currentUser.BusinessID, map[string]interface{}{"status": "draft", "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}, nil); err != nil {
+			return err
+		}
+		return s.audit(tx, currentUser, "purchase_order.reopened", id, "Purchase order reopened", ipAddress, userAgent)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetOrder(currentUser, id)
+}
+
+func (s *Service) DuplicateOrder(currentUser *utils.AuthContext, id, ipAddress, userAgent string) (*PurchaseOrderResponse, error) {
+	source, err := s.repo.FindOrder(id, currentUser.BusinessID)
+	if err != nil {
+		return nil, notFound(err, "purchase order not found")
+	}
+	if !currentUser.CanAccessBranch(source.BranchID) {
+		return nil, apperrors.Forbidden("branch access denied")
+	}
+	sourceItems, err := s.repo.OrderItems(id, currentUser.BusinessID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load purchase order items")
+	}
+	inputs := make([]PurchaseOrderItemInput, 0, len(sourceItems))
+	for _, item := range sourceItems {
+		inputs = append(inputs, PurchaseOrderItemInput{
+			ItemType:        item.ItemType,
+			ProductID:       deref(item.ProductID),
+			IngredientID:    deref(item.IngredientID),
+			PackagingItemID: deref(item.PackagingItemID),
+			QuantityOrdered: item.QuantityOrdered,
+			UnitID:          item.UnitID,
+			UnitCost:        item.UnitCost,
+			DiscountAmount:  item.DiscountAmount,
+			TaxRateID:       deref(item.TaxRateID),
+		})
+	}
+	var sourceCharges []charges.DocumentCharge
+	if err := s.db.Where("business_id = ? AND document_type = ? AND document_id = ? AND deleted_at IS NULL", currentUser.BusinessID, "purchase_order", id).Find(&sourceCharges).Error; err != nil {
+		return nil, apperrors.Internal("failed to load purchase order charges")
+	}
+	chargeInputs := make([]charges.ChargeInput, 0, len(sourceCharges))
+	for _, charge := range sourceCharges {
+		refundable := charge.IsRefundable
+		chargeInputs = append(chargeInputs, charges.ChargeInput{
+			ChargeType:   charge.ChargeType,
+			ChargeName:   charge.ChargeName,
+			Description:  charge.Description,
+			Amount:       charge.Amount,
+			TaxRateID:    deref(charge.TaxRateID),
+			IsRefundable: &refundable,
+		})
+	}
+	req := CreatePurchaseOrderRequest{
+		BranchID:             source.BranchID,
+		SupplierID:           source.SupplierID,
+		OrderDate:            time.Now().UTC().Format("2006-01-02"),
+		ExpectedDeliveryDate: optionalDateString(source.ExpectedDeliveryDate),
+		Items:                inputs,
+		Charges:              chargeInputs,
+		Notes:                source.Notes,
+	}
+	return s.CreateOrder(currentUser, req, ipAddress, userAgent)
 }
 
 func (s *Service) DeleteOrder(currentUser *utils.AuthContext, id, ipAddress, userAgent string) error {

@@ -8,10 +8,12 @@ import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import type { PurchasingSupplierOption } from "@/types/purchasing";
 
 export function SupplierLookupSelect({
+  disabled = false,
   onValueChange,
   suppliers,
   value,
 }: {
+  disabled?: boolean;
   onValueChange: (supplierId: string) => void;
   suppliers: PurchasingSupplierOption[];
   value: string;
@@ -28,6 +30,7 @@ export function SupplierLookupSelect({
 
   return (
     <SearchableCombobox
+      disabled={disabled}
       emptyMessage="No matching suppliers found."
       onValueChange={onValueChange}
       options={supplierOptions}

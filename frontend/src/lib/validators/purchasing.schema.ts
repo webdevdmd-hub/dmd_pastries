@@ -10,6 +10,7 @@ const optionalNullableString = z.union([z.string(), z.null(), z.undefined()]).tr
 
 const purchaseProductLineSchema = z
   .object({
+    id: z.string().optional(),
     lineType: z.literal("product").optional(),
     itemType: z.literal("product"),
     productId: optionalNullableString,
@@ -32,6 +33,7 @@ const purchaseProductLineSchema = z
 
 const purchaseAccountLineSchema = z
   .object({
+    id: z.string().optional(),
     lineType: z.literal("account"),
     itemType: z.literal("account"),
     productId: optionalNullableString,

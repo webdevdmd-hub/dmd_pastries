@@ -49,6 +49,7 @@ import type {
 } from "@/types/purchasing";
 
 type BackendLinePayload = {
+  id?: string | undefined;
   line_type?: "product" | "account";
   item_type: "product" | "account";
   product_id?: string | null;
@@ -908,6 +909,7 @@ function linePayload(
 ): BackendLinePayload {
   if (line.lineType === "account" || line.itemType === "account" || line.accountId) {
     const payload: BackendLinePayload = {
+      id: line.id,
       line_type: "account",
       item_type: "account",
       account_id: line.accountId ?? null,
@@ -922,6 +924,7 @@ function linePayload(
   }
 
   const payload: BackendLinePayload = {
+    id: line.id,
     line_type: "product",
     item_type: "product",
     product_id: line.productId,
@@ -1176,6 +1179,26 @@ export async function updatePurchaseOrderStatus(
       parse: parseOrder,
     },
   );
+
+  return response.data;
+}
+
+export async function reopenPurchaseOrder(id: string): Promise<PurchaseOrder> {
+  const response = await apiRequest<PurchaseOrder>(`/api/v1/purchasing/orders/${id}/reopen`, {
+    method: "POST",
+    authMode: "appwrite",
+    parse: parseOrder,
+  });
+
+  return response.data;
+}
+
+export async function duplicatePurchaseOrder(id: string): Promise<PurchaseOrder> {
+  const response = await apiRequest<PurchaseOrder>(`/api/v1/purchasing/orders/${id}/duplicate`, {
+    method: "POST",
+    authMode: "appwrite",
+    parse: parseOrder,
+  });
 
   return response.data;
 }

@@ -15,26 +15,32 @@ import type { PurchaseOrder, PurchaseOrderStatus } from "@/types/purchasing";
 
 export function PurchaseOrderActionsMenu({
   canDelete,
+  canCreate,
   canEdit,
   canConvertToBill,
   canReceiveOrder,
   canUpdateStatus,
   onConvertToBill,
   onDelete,
+  onDuplicate,
   onEdit,
+  onReopen,
   onReceive,
   onStatusChange,
   onView,
   order,
 }: {
   canDelete: boolean;
+  canCreate: boolean;
   canEdit: boolean;
   canConvertToBill: boolean;
   canReceiveOrder: boolean;
   canUpdateStatus: boolean;
   onConvertToBill: (order: PurchaseOrder) => void;
   onDelete: (order: PurchaseOrder) => void;
+  onDuplicate: (order: PurchaseOrder) => void;
   onEdit: (order: PurchaseOrder) => void;
+  onReopen: (order: PurchaseOrder) => void;
   onReceive: (order: PurchaseOrder) => void;
   onStatusChange: (order: PurchaseOrder, status: PurchaseOrderStatus) => void;
   onView: (order: PurchaseOrder) => void;
@@ -43,9 +49,18 @@ export function PurchaseOrderActionsMenu({
   const canReceive = order.status === "ordered" || order.status === "partially_received";
   const canHardDelete =
     canDelete && order.status !== "received" && order.status !== "partially_received";
+  const canEditOrder = canEdit && (order.status === "draft" || order.status === "ordered");
+  const canAdjustRemaining = canEdit && order.status === "partially_received";
+  const canReopen = canUpdateStatus && order.status === "cancelled";
   const isConversionEligible = order.status === "received";
   const showWriteActions =
-    canEdit || canUpdateStatus || canConvertToBill || canReceiveOrder || canHardDelete;
+    canEdit ||
+    canUpdateStatus ||
+    canConvertToBill ||
+    canReceiveOrder ||
+    canHardDelete ||
+    canReopen ||
+    canCreate;
 
   return (
     <DropdownMenu>
@@ -63,10 +78,11 @@ export function PurchaseOrderActionsMenu({
         <DropdownMenuItem onSelect={() => onView(order)}>View details</DropdownMenuItem>
         {showWriteActions ? (
           <>
-            {canEdit ? (
-              <DropdownMenuItem disabled={order.status !== "draft"} onSelect={() => onEdit(order)}>
-                Edit
-              </DropdownMenuItem>
+            {canEditOrder ? (
+              <DropdownMenuItem onSelect={() => onEdit(order)}>Edit</DropdownMenuItem>
+            ) : null}
+            {canAdjustRemaining ? (
+              <DropdownMenuItem onSelect={() => onEdit(order)}>Adjust remaining</DropdownMenuItem>
             ) : null}
             {canUpdateStatus ? (
               <DropdownMenuItem
@@ -94,6 +110,14 @@ export function PurchaseOrderActionsMenu({
                 onSelect={() => onStatusChange(order, "cancelled")}
               >
                 Cancel
+              </DropdownMenuItem>
+            ) : null}
+            {canReopen ? (
+              <DropdownMenuItem onSelect={() => onReopen(order)}>Reopen</DropdownMenuItem>
+            ) : null}
+            {canCreate ? (
+              <DropdownMenuItem onSelect={() => onDuplicate(order)}>
+                Duplicate as draft
               </DropdownMenuItem>
             ) : null}
             {canHardDelete ? (

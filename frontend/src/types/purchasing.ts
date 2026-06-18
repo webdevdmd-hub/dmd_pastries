@@ -356,6 +356,7 @@ export type SupplierPayment = {
 };
 
 export type PurchaseItemLinePayload = {
+  id?: string | undefined;
   lineType?: PurchaseLineType | undefined;
   itemType: PurchaseItemType;
   productId: string | null;

@@ -84,6 +84,7 @@ type UpdatePurchaseOrderRequest struct {
 }
 
 type PurchaseOrderItemInput struct {
+	ID              string  `json:"id"`
 	ItemType        string  `json:"item_type" binding:"required"`
 	ProductID       string  `json:"product_id"`
 	IngredientID    string  `json:"ingredient_id"`

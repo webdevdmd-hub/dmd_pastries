@@ -145,6 +145,10 @@ func (r *Repository) UpdateOrderItemReceived(tx *gorm.DB, itemID, businessID str
 		Updates(map[string]interface{}{"quantity_received": quantityReceived, "updated_at": time.Now().UTC()}))
 }
 
+func (r *Repository) UpdateOrderItem(tx *gorm.DB, itemID, businessID string, updates map[string]interface{}) error {
+	return updateOne(tx.Model(&PurchaseOrderItem{}).Where("id = ? AND business_id = ? AND deleted_at IS NULL", itemID, businessID).Updates(updates))
+}
+
 func (r *Repository) CreateInvoice(tx *gorm.DB, invoice *PurchaseInvoice, items []PurchaseInvoiceItem) error {
 	if err := tx.Create(invoice).Error; err != nil {
 		return err

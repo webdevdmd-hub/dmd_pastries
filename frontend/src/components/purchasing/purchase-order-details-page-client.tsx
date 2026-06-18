@@ -11,6 +11,7 @@ import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseDocumentChain } from "@/components/purchasing/purchase-document-chain";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
 import { PurchaseOrderConvertToBillDialog } from "@/components/purchasing/purchase-order-convert-to-bill-dialog";
+import { PurchaseOrderFormDialog } from "@/components/purchasing/purchase-order-form-dialog";
 import { PurchaseOrderReceiveGoodsDialog } from "@/components/purchasing/purchase-order-receive-goods-dialog";
 import { PurchaseOrderStatusBadge } from "@/components/purchasing/purchase-order-status-badge";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
@@ -23,9 +24,17 @@ import { ROUTES } from "@/constants/routes";
 import { usePermission } from "@/hooks/use-permission";
 import {
   useConvertPurchaseOrderToBill,
+  useDuplicatePurchaseOrder,
   usePurchaseOrder,
   usePurchaseOrderDocumentChain,
+  usePurchasingBranches,
+  usePurchasingProducts,
+  usePurchasingSuppliers,
+  usePurchasingTaxRates,
+  usePurchasingUnits,
   useReceivePurchaseOrder,
+  useReopenPurchaseOrder,
+  useUpdatePurchaseOrder,
   useUpdatePurchaseOrderStatus,
 } from "@/hooks/use-purchasing";
 import { getErrorMessage } from "@/lib/api/client";
@@ -33,6 +42,7 @@ import { cn } from "@/lib/utils/cn";
 import type {
   ConvertPurchaseOrderToBillPayload,
   ReceivePurchaseOrderPayload,
+  UpdatePurchaseOrderPayload,
 } from "@/types/purchasing";
 
 function formatCurrency(value: number): string {
@@ -86,17 +96,38 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.purchasingView, PERMISSIONS.inventoryView]);
   const canConvert = hasAnyPermission([PERMISSIONS.purchasingInvoicesCreate]);
+  const canCreate = hasAnyPermission([
+    PERMISSIONS.purchasingOrdersCreate,
+    PERMISSIONS.purchasingManage,
+  ]);
+  const canEdit = hasAnyPermission([
+    PERMISSIONS.purchasingOrdersEdit,
+    PERMISSIONS.purchasingManage,
+  ]);
   const canReceive = hasAnyPermission([
     PERMISSIONS.purchasingReceiptsCreate,
     PERMISSIONS.purchasingReceiveStock,
   ]);
   const canIssue = hasAnyPermission([PERMISSIONS.purchasingOrdersStatusUpdate]);
+  const canReopen = hasAnyPermission([
+    PERMISSIONS.purchasingOrdersStatusUpdate,
+    PERMISSIONS.purchasingManage,
+  ]);
   const [convertOpen, setConvertOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const orderQuery = usePurchaseOrder(orderId, canView);
   const chainQuery = usePurchaseOrderDocumentChain(orderId, canView);
+  const branchesQuery = usePurchasingBranches(canView);
+  const duplicateMutation = useDuplicatePurchaseOrder();
+  const productsQuery = usePurchasingProducts(canView);
+  const reopenMutation = useReopenPurchaseOrder();
+  const suppliersQuery = usePurchasingSuppliers("", canView);
+  const taxRatesQuery = usePurchasingTaxRates(canView);
+  const unitsQuery = usePurchasingUnits(canView);
   const convertMutation = useConvertPurchaseOrderToBill();
   const receiveMutation = useReceivePurchaseOrder();
+  const updateMutation = useUpdatePurchaseOrder();
   const statusMutation = useUpdatePurchaseOrderStatus();
 
   if (!canView) {
@@ -127,6 +158,8 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   const isPaid = activeBill?.paymentStatus === "paid";
   const canReceiveOrder =
     canReceive && (order.status === "ordered" || order.status === "partially_received");
+  const canEditOrder = canEdit && (order.status === "draft" || order.status === "ordered");
+  const canAdjustRemaining = canEdit && order.status === "partially_received";
   const canConvertOrder = canConvert && order.status === "received" && !activeBill;
   const orderedDone = order.status !== "draft" && order.status !== "cancelled";
   const receivedDone = order.status === "received" || Boolean(activeBill);
@@ -147,6 +180,39 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
       await receiveMutation.mutateAsync({ id: order.id, payload });
       toast.success("Goods received against purchase order.");
       setReceiveOpen(false);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  const handleUpdate = async (id: string, payload: UpdatePurchaseOrderPayload): Promise<void> => {
+    try {
+      await updateMutation.mutateAsync({ id, payload });
+      toast.success(
+        order.status === "partially_received"
+          ? "Remaining quantities adjusted."
+          : "Purchase order updated.",
+      );
+      setFormOpen(false);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  const handleReopen = async (): Promise<void> => {
+    try {
+      await reopenMutation.mutateAsync(order.id);
+      toast.success("Purchase order reopened as draft.");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  const handleDuplicate = async (): Promise<void> => {
+    try {
+      const duplicatedOrder = await duplicateMutation.mutateAsync(order.id);
+      toast.success("Purchase order duplicated as draft.");
+      router.push(`${ROUTES.purchasingOrders}/${duplicatedOrder.id}`);
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -245,6 +311,31 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {canEditOrder || canAdjustRemaining ? (
+                <Button onClick={() => setFormOpen(true)} type="button" variant="outline">
+                  {canAdjustRemaining ? "Adjust remaining" : "Edit"}
+                </Button>
+              ) : null}
+              {canReopen && order.status === "cancelled" ? (
+                <Button
+                  disabled={reopenMutation.isPending}
+                  onClick={() => void handleReopen()}
+                  type="button"
+                  variant="outline"
+                >
+                  Reopen
+                </Button>
+              ) : null}
+              {canCreate ? (
+                <Button
+                  disabled={duplicateMutation.isPending}
+                  onClick={() => void handleDuplicate()}
+                  type="button"
+                  variant="outline"
+                >
+                  Duplicate as draft
+                </Button>
+              ) : null}
               <Button
                 onClick={() => toast.info("Print and download support will be connected later.")}
                 type="button"
@@ -435,6 +526,19 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
         onConvert={handleConvert}
         open={convertOpen}
         order={order}
+      />
+      <PurchaseOrderFormDialog
+        branches={branchesQuery.data ?? []}
+        isSubmitting={updateMutation.isPending}
+        onClose={() => setFormOpen(false)}
+        onCreate={() => Promise.resolve()}
+        onUpdate={handleUpdate}
+        open={formOpen}
+        order={order}
+        products={productsQuery.data ?? []}
+        suppliers={suppliersQuery.data ?? []}
+        taxRates={taxRatesQuery.data ?? []}
+        units={unitsQuery.data ?? []}
       />
     </div>
   );
