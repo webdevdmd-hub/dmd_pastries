@@ -1618,6 +1618,59 @@ func (s *Service) PostPurchaseInvoicePaymentJournal(tx *gorm.DB, currentUser *ut
 	return journalID, nil
 }
 
+func (s *Service) PostSupplierPaymentJournal(tx *gorm.DB, currentUser *utils.AuthContext, paymentID string) (string, error) {
+	payment, err := s.repo.FindSupplierPaymentForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(paymentID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load supplier payment for accounting")
+	}
+	if payment.JournalEntryID != nil && *payment.JournalEntryID != "" {
+		return *payment.JournalEntryID, nil
+	}
+	if payment.Status != "completed" {
+		return "", nil
+	}
+	amount := roundMoney(payment.Amount)
+	allocatedAmount := roundMoney(payment.AllocatedAmount)
+	unappliedAmount := roundMoney(payment.UnappliedAmount)
+	if amount <= 0 {
+		return "", nil
+	}
+	if strings.TrimSpace(payment.ChartAccountID) == "" {
+		return "", apperrors.BadRequest("paid-through account is not linked to an active chart account", map[string]interface{}{"payment_account": payment.PaymentAccountName})
+	}
+	if err := validatePaymentAccountBranch(payment.PaymentAccountBranchID, payment.BranchID, payment.PaymentAccountName); err != nil {
+		return "", err
+	}
+	accountsPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "accounts_payable", "2000", "Accounts Payable")
+	if err != nil {
+		return "", err
+	}
+	lines := make([]JournalEntryLineRequest, 0, 3)
+	if allocatedAmount > 0 {
+		lines = append(lines, JournalEntryLineRequest{AccountID: accountsPayable.ID, DebitAmount: allocatedAmount, Description: "Supplier payment applied to bills"})
+	}
+	if unappliedAmount > 0 {
+		supplierAdvance, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "supplier_advance", "1400", "Supplier Advances / Vendor Prepayments")
+		if err != nil {
+			return "", err
+		}
+		lines = append(lines, JournalEntryLineRequest{AccountID: supplierAdvance.ID, DebitAmount: unappliedAmount, Description: "Unapplied supplier advance"})
+	}
+	lines = append(lines, JournalEntryLineRequest{AccountID: payment.ChartAccountID, CreditAmount: amount, Description: "Supplier payment via " + payment.PaymentMethodName})
+	reference := strings.TrimSpace(payment.ReferenceNumber)
+	if reference == "" {
+		reference = payment.ID
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, payment.PaymentDate, &payment.BranchID, "supplier_payment", payment.ID, reference, "Supplier payment "+payment.SupplierName, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdateSupplierPaymentJournalID(tx, currentUser.BusinessID, payment.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update supplier payment accounting journal")
+	}
+	return journalID, nil
+}
+
 func (s *Service) PostPurchaseReceiptJournal(tx *gorm.DB, currentUser *utils.AuthContext, receiptID string) (string, error) {
 	receipt, err := s.repo.FindPurchaseReceiptForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(receiptID))
 	if err != nil {
@@ -2082,8 +2135,10 @@ func (s *Service) backfillOneJournal(currentUser *utils.AuthContext, target, id 
 			journalID, err = s.PostBakeryOrderPaymentJournal(tx, currentUser, id)
 		case "purchase_invoices":
 			journalID, err = s.PostPurchaseInvoiceJournal(tx, currentUser, id)
-		case "supplier_payments":
+		case "purchase_invoice_payments":
 			journalID, err = s.PostPurchaseInvoicePaymentJournal(tx, currentUser, id)
+		case "supplier_payments":
+			journalID, err = s.PostSupplierPaymentJournal(tx, currentUser, id)
 		case "purchase_receipts":
 			journalID, err = s.PostPurchaseReceiptJournal(tx, currentUser, id)
 		case "stock_movements":
@@ -3284,7 +3339,7 @@ func defaultBackfillTargets() []string {
 
 func validBackfillTarget(value string) bool {
 	switch value {
-	case "pos_sales", "bakery_orders", "bakery_order_payments", "purchase_invoices", "supplier_payments", "purchase_receipts", "stock_movements", "manufacturing_batches", "sales_returns", "purchase_returns", "expenses":
+	case "pos_sales", "bakery_orders", "bakery_order_payments", "purchase_invoices", "purchase_invoice_payments", "supplier_payments", "purchase_receipts", "stock_movements", "manufacturing_batches", "sales_returns", "purchase_returns", "expenses":
 		return true
 	default:
 		return false
@@ -3295,6 +3350,7 @@ func backfillRequiredMappingKeys() []string {
 	return []string{
 		"accounts_receivable",
 		"accounts_payable",
+		"supplier_advance",
 		"inventory_stock",
 		"sales_income",
 		"bakery_income",
@@ -3732,7 +3788,7 @@ func validAccountMappingKey(value string) bool {
 	case "accounts_receivable", "accounts_payable", "inventory_stock", "sales_income", "bakery_income",
 		"customer_advance", "vat_receivable", "vat_payable", "cogs", "sales_returns",
 		"purchase_returns", "wip_inventory", "wastage_expense", "opening_balance_equity",
-		"grni", "platform_commission_expense", "delivery_charge_income", "service_charge_income",
+		"grni", "supplier_advance", "platform_commission_expense", "delivery_charge_income", "service_charge_income",
 		"packing_charge_income", "freight_inward", "charge_refund_account":
 		return true
 	default:

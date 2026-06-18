@@ -172,11 +172,29 @@ type ReceivePurchaseOrderRequest struct {
 }
 
 type AddPurchaseInvoicePaymentRequest struct {
-	PaymentMethodID string  `json:"payment_method_id" binding:"required"`
-	Amount          float64 `json:"amount" binding:"required"`
-	ReferenceNumber string  `json:"reference_number"`
-	PaidAt          string  `json:"paid_at"`
-	Notes           string  `json:"notes"`
+	PaymentMethodID      string  `json:"payment_method_id" binding:"required"`
+	PaidThroughAccountID string  `json:"paid_through_account_id"`
+	Amount               float64 `json:"amount" binding:"required"`
+	ReferenceNumber      string  `json:"reference_number"`
+	PaidAt               string  `json:"paid_at"`
+	Notes                string  `json:"notes"`
+}
+
+type CreateSupplierPaymentRequest struct {
+	SupplierID           string                           `json:"supplier_id" binding:"required"`
+	BranchID             string                           `json:"branch_id"`
+	PaymentMethodID      string                           `json:"payment_method_id" binding:"required"`
+	PaidThroughAccountID string                           `json:"paid_through_account_id"`
+	Amount               float64                          `json:"amount" binding:"required"`
+	ReferenceNumber      string                           `json:"reference_number"`
+	PaymentDate          string                           `json:"payment_date"`
+	Notes                string                           `json:"notes"`
+	Allocations          []SupplierPaymentAllocationInput `json:"allocations"`
+}
+
+type SupplierPaymentAllocationInput struct {
+	PurchaseInvoiceID string  `json:"purchase_invoice_id" binding:"required"`
+	Amount            float64 `json:"amount" binding:"required"`
 }
 
 type PurchaseReceiptItemInput struct {
@@ -352,6 +370,43 @@ type PurchaseInvoicePaymentResponse struct {
 	PaidAt            time.Time `json:"paid_at"`
 	Notes             string    `json:"notes"`
 	JournalEntryID    *string   `json:"journal_entry_id"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+type SupplierPaymentResponse struct {
+	ID                     string                              `json:"id"`
+	BusinessID             string                              `json:"business_id"`
+	BranchID               string                              `json:"branch_id"`
+	BranchName             string                              `json:"branch_name"`
+	SupplierID             string                              `json:"supplier_id"`
+	SupplierName           string                              `json:"supplier_name"`
+	PaymentMethodID        string                              `json:"payment_method_id"`
+	PaymentMethodName      string                              `json:"payment_method_name"`
+	PaymentMethodType      string                              `json:"payment_method_type"`
+	PaidThroughAccountID   string                              `json:"paid_through_account_id"`
+	PaidThroughAccountName string                              `json:"paid_through_account_name"`
+	Amount                 float64                             `json:"amount"`
+	AllocatedAmount        float64                             `json:"allocated_amount"`
+	UnappliedAmount        float64                             `json:"unapplied_amount"`
+	ReferenceNumber        string                              `json:"reference_number"`
+	PaymentDate            time.Time                           `json:"payment_date"`
+	Status                 string                              `json:"status"`
+	Notes                  string                              `json:"notes"`
+	JournalEntryID         *string                             `json:"journal_entry_id"`
+	PaidByUserID           string                              `json:"paid_by_user_id"`
+	PaidByUserName         string                              `json:"paid_by_user_name"`
+	Allocations            []SupplierPaymentAllocationResponse `json:"allocations,omitempty"`
+	CreatedAt              time.Time                           `json:"created_at"`
+	UpdatedAt              time.Time                           `json:"updated_at"`
+}
+
+type SupplierPaymentAllocationResponse struct {
+	ID                string    `json:"id"`
+	SupplierPaymentID string    `json:"supplier_payment_id"`
+	PurchaseInvoiceID string    `json:"purchase_invoice_id"`
+	InvoiceNumber     string    `json:"invoice_number"`
+	Amount            float64   `json:"amount"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }

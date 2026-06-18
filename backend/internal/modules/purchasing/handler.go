@@ -160,6 +160,28 @@ func (h *Handler) ListInvoicePayments(c *gin.Context) {
 	respond(c, "purchase invoice payments fetched successfully", result, err)
 }
 
+func (h *Handler) ListSupplierPayments(c *gin.Context) {
+	result, err := h.service.ListSupplierPayments(utils.MustAuthContext(c), parsePaymentListQuery(c))
+	respond(c, "supplier payments fetched successfully", result, err)
+}
+
+func (h *Handler) GetSupplierPayment(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	result, err := h.service.GetSupplierPayment(utils.MustAuthContext(c), c.Param("id"))
+	respond(c, "supplier payment fetched successfully", result, err)
+}
+
+func (h *Handler) CreateSupplierPayment(c *gin.Context) {
+	var req CreateSupplierPaymentRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.CreateSupplierPayment(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "supplier payment created successfully", result, err)
+}
+
 func (h *Handler) ListInvoicePaymentsByInvoice(c *gin.Context) {
 	if !validParam(c, "id") {
 		return

@@ -62,7 +62,15 @@ func (r *Repository) PurchaseOrderHistoryCount(tx *gorm.DB, businessID, orderID 
 	total += count
 	if err := tx.Table("purchase_invoice_payments pip").
 		Joins("JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id AND pi.business_id = pip.business_id AND pi.deleted_at IS NULL").
-		Where("pip.business_id = ? AND pi.purchase_order_id = ? AND pip.deleted_at IS NULL", businessID, orderID).
+		Where("pip.business_id = ? AND pi.purchase_order_id = ? AND pip.deleted_at IS NULL AND pip.supplier_payment_id IS NULL", businessID, orderID).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	total += count
+	if err := tx.Table("supplier_payment_allocations spa").
+		Joins("JOIN supplier_payments sp ON sp.id = spa.supplier_payment_id AND sp.business_id = spa.business_id AND sp.deleted_at IS NULL").
+		Joins("JOIN purchase_invoices pi ON pi.id = spa.purchase_invoice_id AND pi.business_id = spa.business_id AND pi.deleted_at IS NULL").
+		Where("spa.business_id = ? AND pi.purchase_order_id = ? AND spa.deleted_at IS NULL", businessID, orderID).
 		Count(&count).Error; err != nil {
 		return 0, err
 	}
@@ -225,80 +233,267 @@ func (r *Repository) CreateInvoicePayment(tx *gorm.DB, payment *PurchaseInvoiceP
 	return tx.Create(payment).Error
 }
 
-func (r *Repository) ListInvoicePayments(businessID, invoiceID string) ([]PurchaseInvoicePaymentResponse, error) {
-	var rows []PurchaseInvoicePaymentResponse
-	err := r.db.Table("purchase_invoice_payments pip").
-		Select(`pip.id AS payment_id, pip.purchase_invoice_id, pi.invoice_number, pip.supplier_id, s.supplier_name,
-			pip.branch_id, b.branch_name, pip.payment_method_id,
-			pip.payment_method_name_snapshot AS payment_method_name,
-			pip.payment_method_type_snapshot AS payment_method_type,
-			pip.amount, pip.payment_status, pip.reference_number, pip.paid_by_user_id,
-			u.full_name AS paid_by_user_name, pip.paid_at, pip.notes, pip.journal_entry_id,
-			pip.created_at, pip.updated_at`).
-		Joins("JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id").
-		Joins("JOIN suppliers s ON s.id = pip.supplier_id").
-		Joins("JOIN branches b ON b.id = pip.branch_id").
-		Joins("LEFT JOIN users u ON u.id = pip.paid_by_user_id").
-		Where("pip.business_id = ? AND pip.purchase_invoice_id = ? AND pip.deleted_at IS NULL", businessID, invoiceID).
-		Order("pip.paid_at ASC").
-		Scan(&rows).Error
-	return rows, err
+func (r *Repository) CreateSupplierPayment(tx *gorm.DB, payment *SupplierPayment, allocations []SupplierPaymentAllocation) error {
+	if err := tx.Create(payment).Error; err != nil {
+		return err
+	}
+	if len(allocations) > 0 {
+		return tx.Create(&allocations).Error
+	}
+	return nil
 }
 
-func (r *Repository) ListAllInvoicePayments(businessID string, query PaymentListQuery) ([]PurchaseInvoicePaymentResponse, int64, error) {
-	db := r.db.Table("purchase_invoice_payments pip").
-		Joins("JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id").
-		Joins("JOIN suppliers s ON s.id = pip.supplier_id").
-		Joins("JOIN branches b ON b.id = pip.branch_id").
-		Joins("LEFT JOIN users u ON u.id = pip.paid_by_user_id").
-		Where("pip.business_id = ? AND pip.deleted_at IS NULL", businessID)
-	db = applyPaymentFilters(db, query)
+func (r *Repository) FindSupplierPayment(id, businessID string) (*SupplierPayment, error) {
+	var payment SupplierPayment
+	err := r.db.Where("id = ? AND business_id = ? AND deleted_at IS NULL", id, businessID).First(&payment).Error
+	return &payment, err
+}
+
+func (r *Repository) ListSupplierPayments(businessID string, query PaymentListQuery) ([]SupplierPaymentResponse, int64, error) {
+	db := r.db.Table("supplier_payments sp").
+		Joins("JOIN suppliers s ON s.id = sp.supplier_id").
+		Joins("JOIN branches b ON b.id = sp.branch_id").
+		Joins("JOIN payment_accounts pa ON pa.id = sp.paid_through_account_id").
+		Joins("LEFT JOIN users u ON u.id = sp.paid_by_user_id").
+		Where("sp.business_id = ? AND sp.deleted_at IS NULL", businessID)
+	db = applySupplierPaymentFilters(db, query)
 	var total int64
 	if err := db.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	sortBy := safePaymentSort(query.SortBy)
+	sortBy := safeSupplierPaymentSort(query.SortBy)
 	sortOrder := safeOrder(query.SortOrder)
-	var rows []PurchaseInvoicePaymentResponse
-	err := db.Select(`pip.id AS payment_id, pip.purchase_invoice_id, pi.invoice_number, pip.supplier_id, s.supplier_name,
-			pip.branch_id, b.branch_name, pip.payment_method_id,
-			pip.payment_method_name_snapshot AS payment_method_name,
-			pip.payment_method_type_snapshot AS payment_method_type,
-			pip.amount, pip.payment_status, pip.reference_number, pip.paid_by_user_id,
-			u.full_name AS paid_by_user_name, pip.paid_at, pip.notes, pip.journal_entry_id,
-			pip.created_at, pip.updated_at`).
-		Order("pip." + sortBy + " " + sortOrder).
+	var rows []SupplierPaymentResponse
+	err := db.Select(`sp.id, sp.business_id, sp.branch_id, b.branch_name, sp.supplier_id, s.supplier_name,
+			sp.payment_method_id, sp.payment_method_name_snapshot AS payment_method_name,
+			sp.payment_method_type_snapshot AS payment_method_type,
+			sp.paid_through_account_id, pa.account_name AS paid_through_account_name,
+			sp.amount, sp.allocated_amount, sp.unapplied_amount, sp.reference_number,
+			sp.payment_date, sp.status, sp.notes, sp.journal_entry_id,
+			sp.paid_by_user_id, COALESCE(u.full_name, '') AS paid_by_user_name,
+			sp.created_at, sp.updated_at`).
+		Order("sp." + sortBy + " " + sortOrder).
 		Offset((query.Page - 1) * query.Limit).
 		Limit(query.Limit).
 		Scan(&rows).Error
 	return rows, total, err
 }
 
+func (r *Repository) SupplierPaymentAllocations(businessID, supplierPaymentID string) ([]SupplierPaymentAllocationResponse, error) {
+	var rows []SupplierPaymentAllocationResponse
+	err := r.db.Table("supplier_payment_allocations spa").
+		Select(`spa.id, spa.supplier_payment_id, spa.purchase_invoice_id, pi.invoice_number,
+			spa.amount, spa.created_at, spa.updated_at`).
+		Joins("JOIN purchase_invoices pi ON pi.id = spa.purchase_invoice_id AND pi.business_id = spa.business_id").
+		Where("spa.business_id = ? AND spa.supplier_payment_id = ? AND spa.deleted_at IS NULL", businessID, supplierPaymentID).
+		Order("pi.invoice_date ASC, spa.created_at ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) SupplierPaymentResponse(businessID, supplierPaymentID string) (*SupplierPaymentResponse, error) {
+	var row SupplierPaymentResponse
+	err := r.db.Table("supplier_payments sp").
+		Select(`sp.id, sp.business_id, sp.branch_id, b.branch_name, sp.supplier_id, s.supplier_name,
+			sp.payment_method_id, sp.payment_method_name_snapshot AS payment_method_name,
+			sp.payment_method_type_snapshot AS payment_method_type,
+			sp.paid_through_account_id, pa.account_name AS paid_through_account_name,
+			sp.amount, sp.allocated_amount, sp.unapplied_amount, sp.reference_number,
+			sp.payment_date, sp.status, sp.notes, sp.journal_entry_id,
+			sp.paid_by_user_id, COALESCE(u.full_name, '') AS paid_by_user_name,
+			sp.created_at, sp.updated_at`).
+		Joins("JOIN suppliers s ON s.id = sp.supplier_id").
+		Joins("JOIN branches b ON b.id = sp.branch_id").
+		Joins("JOIN payment_accounts pa ON pa.id = sp.paid_through_account_id").
+		Joins("LEFT JOIN users u ON u.id = sp.paid_by_user_id").
+		Where("sp.business_id = ? AND sp.id = ? AND sp.deleted_at IS NULL", businessID, supplierPaymentID).
+		Take(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	allocations, err := r.SupplierPaymentAllocations(businessID, supplierPaymentID)
+	if err != nil {
+		return nil, err
+	}
+	row.Allocations = allocations
+	return &row, nil
+}
+
+func (r *Repository) ListInvoicePayments(businessID, invoiceID string) ([]PurchaseInvoicePaymentResponse, error) {
+	var rows []PurchaseInvoicePaymentResponse
+	err := r.db.Raw(`
+		SELECT *
+		FROM (
+			SELECT
+				sp.id AS payment_id,
+				spa.purchase_invoice_id,
+				pi.invoice_number,
+				sp.supplier_id,
+				s.supplier_name,
+				sp.branch_id,
+				b.branch_name,
+				sp.payment_method_id,
+				sp.payment_method_name_snapshot AS payment_method_name,
+				sp.payment_method_type_snapshot AS payment_method_type,
+				spa.amount,
+				sp.status AS payment_status,
+				sp.reference_number,
+				sp.paid_by_user_id,
+				COALESCE(u.full_name, '') AS paid_by_user_name,
+				sp.payment_date AS paid_at,
+				sp.notes,
+				sp.journal_entry_id,
+				sp.created_at,
+				sp.updated_at
+			FROM supplier_payment_allocations spa
+			JOIN supplier_payments sp ON sp.id = spa.supplier_payment_id AND sp.business_id = spa.business_id
+			JOIN purchase_invoices pi ON pi.id = spa.purchase_invoice_id AND pi.business_id = spa.business_id
+			JOIN suppliers s ON s.id = sp.supplier_id
+			JOIN branches b ON b.id = sp.branch_id
+			LEFT JOIN users u ON u.id = sp.paid_by_user_id
+			WHERE spa.business_id = ? AND spa.purchase_invoice_id = ?
+				AND spa.deleted_at IS NULL AND sp.deleted_at IS NULL
+
+			UNION ALL
+
+			SELECT
+				pip.id AS payment_id,
+				pip.purchase_invoice_id,
+				pi.invoice_number,
+				pip.supplier_id,
+				s.supplier_name,
+				pip.branch_id,
+				b.branch_name,
+				pip.payment_method_id,
+				pip.payment_method_name_snapshot AS payment_method_name,
+				pip.payment_method_type_snapshot AS payment_method_type,
+				pip.amount,
+				pip.payment_status,
+				pip.reference_number,
+				pip.paid_by_user_id,
+				COALESCE(u.full_name, '') AS paid_by_user_name,
+				pip.paid_at,
+				pip.notes,
+				pip.journal_entry_id,
+				pip.created_at,
+				pip.updated_at
+			FROM purchase_invoice_payments pip
+			JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id
+			JOIN suppliers s ON s.id = pip.supplier_id
+			JOIN branches b ON b.id = pip.branch_id
+			LEFT JOIN users u ON u.id = pip.paid_by_user_id
+			WHERE pip.business_id = ? AND pip.purchase_invoice_id = ?
+				AND pip.deleted_at IS NULL AND pip.supplier_payment_id IS NULL
+		) payments
+		ORDER BY paid_at ASC, created_at ASC
+	`, businessID, invoiceID, businessID, invoiceID).Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) ListAllInvoicePayments(businessID string, query PaymentListQuery) ([]PurchaseInvoicePaymentResponse, int64, error) {
+	baseSQL, args := invoicePaymentCompatibilitySQL(businessID, query)
+	var total int64
+	if err := r.db.Raw("SELECT COUNT(*) FROM ("+baseSQL+") payments", args...).Scan(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	sortBy := safePaymentSort(query.SortBy)
+	sortOrder := safeOrder(query.SortOrder)
+	var rows []PurchaseInvoicePaymentResponse
+	args = append(args, query.Limit, (query.Page-1)*query.Limit)
+	err := r.db.Raw("SELECT * FROM ("+baseSQL+") payments ORDER BY "+sortBy+" "+sortOrder+" LIMIT ? OFFSET ?", args...).Scan(&rows).Error
+	return rows, total, err
+}
+
 func (r *Repository) CompletedInvoicePaymentCount(tx *gorm.DB, businessID, invoiceID string) (int64, error) {
 	var count int64
-	err := tx.Model(&PurchaseInvoicePayment{}).
-		Where("business_id = ? AND purchase_invoice_id = ? AND payment_status = ? AND deleted_at IS NULL", businessID, invoiceID, "completed").
-		Count(&count).Error
+	err := tx.Raw(`
+		SELECT COUNT(*)
+		FROM (
+			SELECT spa.id
+			FROM supplier_payment_allocations spa
+			JOIN supplier_payments sp ON sp.id = spa.supplier_payment_id AND sp.business_id = spa.business_id
+			WHERE spa.business_id = ? AND spa.purchase_invoice_id = ?
+				AND sp.status = 'completed'
+				AND spa.deleted_at IS NULL AND sp.deleted_at IS NULL
+			UNION ALL
+			SELECT pip.id
+			FROM purchase_invoice_payments pip
+			WHERE pip.business_id = ? AND pip.purchase_invoice_id = ?
+				AND pip.payment_status = 'completed'
+				AND pip.deleted_at IS NULL AND pip.supplier_payment_id IS NULL
+		) payments
+	`, businessID, invoiceID, businessID, invoiceID).Scan(&count).Error
 	return count, err
 }
 
 func (r *Repository) InvoicePaymentsForOrder(businessID, orderID string) ([]PurchaseInvoicePaymentResponse, error) {
 	var rows []PurchaseInvoicePaymentResponse
-	err := r.db.Table("purchase_invoice_payments pip").
-		Select(`pip.id AS payment_id, pip.purchase_invoice_id, pi.invoice_number, pip.supplier_id, s.supplier_name,
-			pip.branch_id, b.branch_name, pip.payment_method_id,
-			pip.payment_method_name_snapshot AS payment_method_name,
-			pip.payment_method_type_snapshot AS payment_method_type,
-			pip.amount, pip.payment_status, pip.reference_number, pip.paid_by_user_id,
-			u.full_name AS paid_by_user_name, pip.paid_at, pip.notes, pip.journal_entry_id,
-			pip.created_at, pip.updated_at`).
-		Joins("JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id").
-		Joins("JOIN suppliers s ON s.id = pip.supplier_id").
-		Joins("JOIN branches b ON b.id = pip.branch_id").
-		Joins("LEFT JOIN users u ON u.id = pip.paid_by_user_id").
-		Where("pip.business_id = ? AND pi.purchase_order_id = ? AND pip.deleted_at IS NULL", businessID, orderID).
-		Order("pip.paid_at ASC, pip.created_at ASC").
-		Scan(&rows).Error
+	err := r.db.Raw(`
+		SELECT *
+		FROM (
+			SELECT
+				sp.id AS payment_id,
+				spa.purchase_invoice_id,
+				pi.invoice_number,
+				sp.supplier_id,
+				s.supplier_name,
+				sp.branch_id,
+				b.branch_name,
+				sp.payment_method_id,
+				sp.payment_method_name_snapshot AS payment_method_name,
+				sp.payment_method_type_snapshot AS payment_method_type,
+				spa.amount,
+				sp.status AS payment_status,
+				sp.reference_number,
+				sp.paid_by_user_id,
+				COALESCE(u.full_name, '') AS paid_by_user_name,
+				sp.payment_date AS paid_at,
+				sp.notes,
+				sp.journal_entry_id,
+				sp.created_at,
+				sp.updated_at
+			FROM supplier_payment_allocations spa
+			JOIN supplier_payments sp ON sp.id = spa.supplier_payment_id AND sp.business_id = spa.business_id
+			JOIN purchase_invoices pi ON pi.id = spa.purchase_invoice_id AND pi.business_id = spa.business_id AND pi.deleted_at IS NULL
+			JOIN suppliers s ON s.id = sp.supplier_id
+			JOIN branches b ON b.id = sp.branch_id
+			LEFT JOIN users u ON u.id = sp.paid_by_user_id
+			WHERE spa.business_id = ? AND pi.purchase_order_id = ?
+				AND spa.deleted_at IS NULL AND sp.deleted_at IS NULL
+
+			UNION ALL
+
+			SELECT
+				pip.id AS payment_id,
+				pip.purchase_invoice_id,
+				pi.invoice_number,
+				pip.supplier_id,
+				s.supplier_name,
+				pip.branch_id,
+				b.branch_name,
+				pip.payment_method_id,
+				pip.payment_method_name_snapshot AS payment_method_name,
+				pip.payment_method_type_snapshot AS payment_method_type,
+				pip.amount,
+				pip.payment_status,
+				pip.reference_number,
+				pip.paid_by_user_id,
+				COALESCE(u.full_name, '') AS paid_by_user_name,
+				pip.paid_at,
+				pip.notes,
+				pip.journal_entry_id,
+				pip.created_at,
+				pip.updated_at
+			FROM purchase_invoice_payments pip
+			JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id AND pi.business_id = pip.business_id AND pi.deleted_at IS NULL
+			JOIN suppliers s ON s.id = pip.supplier_id
+			JOIN branches b ON b.id = pip.branch_id
+			LEFT JOIN users u ON u.id = pip.paid_by_user_id
+			WHERE pip.business_id = ? AND pi.purchase_order_id = ?
+				AND pip.deleted_at IS NULL AND pip.supplier_payment_id IS NULL
+		) payments
+		ORDER BY paid_at ASC, created_at ASC
+	`, businessID, orderID, businessID, orderID).Scan(&rows).Error
 	return rows, err
 }
 
@@ -556,10 +751,29 @@ func (r *Repository) TaxRate(tx *gorm.DB, businessID, taxRateID string) (*TaxRat
 func (r *Repository) PaymentMethod(tx *gorm.DB, businessID, methodID string) (*PaymentMethodInfo, error) {
 	var method PaymentMethodInfo
 	err := tx.Table("payment_methods").
-		Select("id, method_name, method_type, requires_reference, show_in_purchasing").
+		Select("id, method_name, method_type, requires_reference, show_in_purchasing, default_payment_account_id").
 		Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", methodID, businessID, "active").
 		Take(&method).Error
 	return &method, err
+}
+
+func (r *Repository) PaymentMethodMappedAccount(tx *gorm.DB, businessID, branchID, methodID string) (*PaymentAccountInfo, error) {
+	var account PaymentAccountInfo
+	err := tx.Table("payment_method_account_mappings pmam").
+		Select("pa.id, pa.branch_id, pa.account_name, pa.chart_account_id, pa.status").
+		Joins("JOIN payment_accounts pa ON pa.id = pmam.payment_account_id AND pa.business_id = pmam.business_id AND pa.status = ? AND pa.deleted_at IS NULL", "active").
+		Where("pmam.business_id = ? AND pmam.branch_id = ? AND pmam.payment_method_id = ? AND pmam.status = ? AND pmam.deleted_at IS NULL", businessID, branchID, methodID, "active").
+		Take(&account).Error
+	return &account, err
+}
+
+func (r *Repository) PaymentAccount(tx *gorm.DB, businessID, accountID string) (*PaymentAccountInfo, error) {
+	var account PaymentAccountInfo
+	err := tx.Table("payment_accounts").
+		Select("id, branch_id, account_name, chart_account_id, status").
+		Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", accountID, businessID, "active").
+		Take(&account).Error
+	return &account, err
 }
 
 func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string) (*ProductInfo, error) {
@@ -687,6 +901,152 @@ func applyPaymentFilters(db *gorm.DB, query PaymentListQuery) *gorm.DB {
 	return db
 }
 
+func invoicePaymentCompatibilitySQL(businessID string, query PaymentListQuery) (string, []interface{}) {
+	args := []interface{}{businessID}
+	conditions := []string{"business_id = ?"}
+	if query.BranchID != "" {
+		conditions = append(conditions, "branch_id = ?")
+		args = append(args, query.BranchID)
+	}
+	if query.SupplierID != "" {
+		conditions = append(conditions, "supplier_id = ?")
+		args = append(args, query.SupplierID)
+	}
+	if query.InvoiceID != "" {
+		conditions = append(conditions, "purchase_invoice_id = ?")
+		args = append(args, query.InvoiceID)
+	}
+	if query.PaymentMethodID != "" {
+		conditions = append(conditions, "payment_method_id = ?")
+		args = append(args, query.PaymentMethodID)
+	}
+	if query.PaymentStatus != "" {
+		conditions = append(conditions, "payment_status = ?")
+		args = append(args, query.PaymentStatus)
+	}
+	if query.PaidByUserID != "" {
+		conditions = append(conditions, "paid_by_user_id = ?")
+		args = append(args, query.PaidByUserID)
+	}
+	if query.DateFrom != "" {
+		conditions = append(conditions, "paid_at >= ?")
+		args = append(args, query.DateFrom)
+	}
+	if query.DateTo != "" {
+		conditions = append(conditions, "paid_at <= ?")
+		args = append(args, query.DateTo)
+	}
+	if query.Search != "" {
+		like := "%" + strings.ToLower(query.Search) + "%"
+		conditions = append(conditions, "(LOWER(invoice_number) LIKE ? OR LOWER(supplier_name) LIKE ? OR LOWER(reference_number) LIKE ? OR LOWER(payment_method_name) LIKE ? OR LOWER(notes) LIKE ?)")
+		args = append(args, like, like, like, like, like)
+	}
+	sql := `
+		SELECT *
+		FROM (
+			SELECT
+				sp.id AS payment_id,
+				spa.purchase_invoice_id,
+				pi.invoice_number,
+				sp.supplier_id,
+				s.supplier_name,
+				sp.branch_id,
+				b.branch_name,
+				sp.payment_method_id,
+				sp.payment_method_name_snapshot AS payment_method_name,
+				sp.payment_method_type_snapshot AS payment_method_type,
+				spa.amount,
+				sp.status AS payment_status,
+				sp.reference_number,
+				sp.paid_by_user_id,
+				COALESCE(u.full_name, '') AS paid_by_user_name,
+				sp.payment_date AS paid_at,
+				sp.notes,
+				sp.journal_entry_id,
+				sp.created_at,
+				sp.updated_at,
+				sp.business_id
+			FROM supplier_payment_allocations spa
+			JOIN supplier_payments sp ON sp.id = spa.supplier_payment_id AND sp.business_id = spa.business_id
+			JOIN purchase_invoices pi ON pi.id = spa.purchase_invoice_id AND pi.business_id = spa.business_id
+			JOIN suppliers s ON s.id = sp.supplier_id
+			JOIN branches b ON b.id = sp.branch_id
+			LEFT JOIN users u ON u.id = sp.paid_by_user_id
+			WHERE spa.deleted_at IS NULL AND sp.deleted_at IS NULL
+
+			UNION ALL
+
+			SELECT
+				pip.id AS payment_id,
+				pip.purchase_invoice_id,
+				pi.invoice_number,
+				pip.supplier_id,
+				s.supplier_name,
+				pip.branch_id,
+				b.branch_name,
+				pip.payment_method_id,
+				pip.payment_method_name_snapshot AS payment_method_name,
+				pip.payment_method_type_snapshot AS payment_method_type,
+				pip.amount,
+				pip.payment_status,
+				pip.reference_number,
+				pip.paid_by_user_id,
+				COALESCE(u.full_name, '') AS paid_by_user_name,
+				pip.paid_at,
+				pip.notes,
+				pip.journal_entry_id,
+				pip.created_at,
+				pip.updated_at,
+				pip.business_id
+			FROM purchase_invoice_payments pip
+			JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id
+			JOIN suppliers s ON s.id = pip.supplier_id
+			JOIN branches b ON b.id = pip.branch_id
+			LEFT JOIN users u ON u.id = pip.paid_by_user_id
+			WHERE pip.deleted_at IS NULL AND pip.supplier_payment_id IS NULL
+		) compatibility_payments
+		WHERE ` + strings.Join(conditions, " AND ")
+	return sql, args
+}
+
+func applySupplierPaymentFilters(db *gorm.DB, query PaymentListQuery) *gorm.DB {
+	if query.BranchID != "" {
+		db = db.Where("sp.branch_id = ?", query.BranchID)
+	}
+	if query.SupplierID != "" {
+		db = db.Where("sp.supplier_id = ?", query.SupplierID)
+	}
+	if query.PaymentMethodID != "" {
+		db = db.Where("sp.payment_method_id = ?", query.PaymentMethodID)
+	}
+	if query.PaymentStatus != "" {
+		db = db.Where("sp.status = ?", query.PaymentStatus)
+	}
+	if query.PaidByUserID != "" {
+		db = db.Where("sp.paid_by_user_id = ?", query.PaidByUserID)
+	}
+	if query.DateFrom != "" {
+		db = db.Where("sp.payment_date >= ?", query.DateFrom)
+	}
+	if query.DateTo != "" {
+		db = db.Where("sp.payment_date <= ?", query.DateTo)
+	}
+	if query.Search != "" {
+		like := "%" + strings.ToLower(query.Search) + "%"
+		db = db.Where("LOWER(s.supplier_name) LIKE ? OR LOWER(sp.reference_number) LIKE ? OR LOWER(sp.payment_method_name_snapshot) LIKE ? OR LOWER(sp.notes) LIKE ?", like, like, like, like)
+	}
+	if query.InvoiceID != "" {
+		db = db.Where(`EXISTS (
+			SELECT 1
+			FROM supplier_payment_allocations spa
+			WHERE spa.supplier_payment_id = sp.id
+				AND spa.purchase_invoice_id = ?
+				AND spa.deleted_at IS NULL
+		)`, query.InvoiceID)
+	}
+	return db
+}
+
 func applyReturnFilters(db *gorm.DB, query PurchaseReturnListQuery) *gorm.DB {
 	if query.BranchID != "" {
 		db = db.Where("purchase_returns.branch_id = ?", query.BranchID)
@@ -743,6 +1103,15 @@ func safePaymentSort(value string) string {
 	}
 }
 
+func safeSupplierPaymentSort(value string) string {
+	switch value {
+	case "payment_date", "amount", "allocated_amount", "unapplied_amount", "status", "created_at", "updated_at":
+		return value
+	default:
+		return "payment_date"
+	}
+}
+
 func safeOrder(value string) string {
 	if strings.ToLower(value) == "asc" {
 		return "asc"
@@ -794,11 +1163,20 @@ type TaxRateInfo struct {
 }
 
 type PaymentMethodInfo struct {
-	ID                string
-	MethodName        string
-	MethodType        string
-	RequiresReference bool
-	ShowInPurchasing  bool
+	ID                      string
+	MethodName              string
+	MethodType              string
+	RequiresReference       bool
+	ShowInPurchasing        bool
+	DefaultPaymentAccountID *string
+}
+
+type PaymentAccountInfo struct {
+	ID             string
+	BranchID       *string
+	AccountName    string
+	ChartAccountID string
+	Status         string
 }
 
 type ProductInfo struct {

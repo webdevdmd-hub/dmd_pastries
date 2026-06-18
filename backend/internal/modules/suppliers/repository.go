@@ -241,6 +241,33 @@ func (r *Repository) StatementRows(businessID, branchID, supplierID string) ([]s
 			UNION ALL
 
 			SELECT
+				sp.id AS id,
+				sp.id AS document_id,
+				COALESCE(NULLIF(sp.reference_number, ''), sp.id::text) AS document_number,
+				'payment_made' AS transaction_type,
+				sp.payment_date::date AS transaction_date,
+				sp.branch_id AS branch_id,
+				b.branch_name AS branch_name,
+				0::numeric AS debit_amount,
+				sp.amount AS credit_amount,
+				sp.status AS status,
+				sp.status AS payment_status,
+				sp.reference_number AS reference_number,
+				sp.notes AS notes,
+				NULL::uuid AS purchase_order_id,
+				NULL::uuid AS purchase_invoice_id,
+				NULL::uuid AS purchase_receipt_id,
+				NULL::uuid AS purchase_return_id,
+				sp.id AS payment_id,
+				sp.created_at AS created_at
+			FROM supplier_payments sp
+			JOIN branches b ON b.id = sp.branch_id AND b.business_id = sp.business_id
+			WHERE sp.business_id = ? AND sp.branch_id = ? AND sp.supplier_id = ?
+				AND sp.status = 'completed' AND sp.deleted_at IS NULL
+
+			UNION ALL
+
+			SELECT
 				pip.id AS id,
 				pip.id AS document_id,
 				COALESCE(NULLIF(pip.reference_number, ''), pip.id::text) AS document_number,
@@ -265,7 +292,7 @@ func (r *Repository) StatementRows(businessID, branchID, supplierID string) ([]s
 			JOIN branches b ON b.id = pip.branch_id AND b.business_id = pip.business_id
 			WHERE pip.business_id = ? AND pip.branch_id = ? AND pip.supplier_id = ?
 				AND pip.payment_status = 'completed' AND pip.deleted_at IS NULL
-				AND pi.deleted_at IS NULL
+				AND pip.supplier_payment_id IS NULL AND pi.deleted_at IS NULL
 
 			UNION ALL
 
@@ -295,7 +322,7 @@ func (r *Repository) StatementRows(businessID, branchID, supplierID string) ([]s
 				AND pr.status = 'posted' AND pr.deleted_at IS NULL
 		) statement
 		ORDER BY transaction_date ASC, created_at ASC, document_number ASC
-	`, businessID, branchID, supplierID, businessID, branchID, supplierID, businessID, branchID, supplierID).Scan(&rows).Error
+	`, businessID, branchID, supplierID, businessID, branchID, supplierID, businessID, branchID, supplierID, businessID, branchID, supplierID).Scan(&rows).Error
 	return rows, err
 }
 

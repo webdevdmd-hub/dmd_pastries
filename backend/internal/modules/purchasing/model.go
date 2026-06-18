@@ -148,6 +148,45 @@ type PurchaseInvoicePayment struct {
 
 func (PurchaseInvoicePayment) TableName() string { return "purchase_invoice_payments" }
 
+type SupplierPayment struct {
+	ID                        string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID                string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID                  string         `gorm:"type:uuid;not null;index" json:"branch_id"`
+	SupplierID                string         `gorm:"type:uuid;not null;index" json:"supplier_id"`
+	PaymentMethodID           string         `gorm:"type:uuid;not null;index" json:"payment_method_id"`
+	PaymentMethodNameSnapshot string         `gorm:"size:150;not null" json:"payment_method_name_snapshot"`
+	PaymentMethodTypeSnapshot string         `gorm:"size:50;not null" json:"payment_method_type_snapshot"`
+	PaidThroughAccountID      string         `gorm:"type:uuid;not null;index" json:"paid_through_account_id"`
+	Amount                    float64        `gorm:"not null" json:"amount"`
+	AllocatedAmount           float64        `gorm:"not null;default:0" json:"allocated_amount"`
+	UnappliedAmount           float64        `gorm:"not null;default:0" json:"unapplied_amount"`
+	ReferenceNumber           string         `gorm:"size:255" json:"reference_number"`
+	PaymentDate               time.Time      `gorm:"not null" json:"payment_date"`
+	Status                    string         `gorm:"size:50;not null;default:completed" json:"status"`
+	Notes                     string         `json:"notes"`
+	JournalEntryID            *string        `gorm:"type:uuid;index" json:"journal_entry_id"`
+	PaidByUserID              string         `gorm:"type:uuid;not null;index" json:"paid_by_user_id"`
+	CreatedAt                 time.Time      `json:"created_at"`
+	UpdatedAt                 time.Time      `json:"updated_at"`
+	DeletedAt                 gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (SupplierPayment) TableName() string { return "supplier_payments" }
+
+type SupplierPaymentAllocation struct {
+	ID                string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID        string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID          string         `gorm:"type:uuid;not null;index" json:"branch_id"`
+	SupplierPaymentID string         `gorm:"type:uuid;not null;index" json:"supplier_payment_id"`
+	PurchaseInvoiceID string         `gorm:"type:uuid;not null;index" json:"purchase_invoice_id"`
+	Amount            float64        `gorm:"not null" json:"amount"`
+	CreatedAt         time.Time      `json:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (SupplierPaymentAllocation) TableName() string { return "supplier_payment_allocations" }
+
 type PurchaseReceipt struct {
 	ID                string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID        string         `gorm:"type:uuid;not null;index" json:"business_id"`

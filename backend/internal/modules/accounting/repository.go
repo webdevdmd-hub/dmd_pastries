@@ -184,6 +184,26 @@ type purchaseInvoicePaymentAccountingRow struct {
 	PaidAt                    time.Time
 }
 
+type supplierPaymentAccountingRow struct {
+	ID                     string
+	BusinessID             string
+	BranchID               string
+	SupplierID             string
+	SupplierName           string
+	PaymentMethodName      string
+	Amount                 float64
+	AllocatedAmount        float64
+	UnappliedAmount        float64
+	Status                 string
+	PaidThroughAccountID   string
+	PaymentAccountBranchID *string
+	PaymentAccountName     string
+	ChartAccountID         string
+	JournalEntryID         *string
+	PaymentDate            time.Time
+	ReferenceNumber        string
+}
+
 type purchaseReceiptAccountingRow struct {
 	ID                string
 	BusinessID        string
@@ -685,6 +705,48 @@ func (r *Repository) UpdatePurchaseInvoicePaymentJournalID(tx *gorm.DB, business
 	return nil
 }
 
+func (r *Repository) FindSupplierPaymentForAccounting(tx *gorm.DB, businessID, paymentID string) (*supplierPaymentAccountingRow, error) {
+	var row supplierPaymentAccountingRow
+	err := tx.Table("supplier_payments sp").
+		Select(`
+			sp.id,
+			sp.business_id,
+			sp.branch_id,
+			sp.supplier_id,
+			s.supplier_name,
+			sp.payment_method_name_snapshot AS payment_method_name,
+			sp.amount,
+			sp.allocated_amount,
+			sp.unapplied_amount,
+			sp.status,
+			sp.paid_through_account_id,
+			pa.branch_id AS payment_account_branch_id,
+			pa.account_name AS payment_account_name,
+			pa.chart_account_id::text AS chart_account_id,
+			sp.journal_entry_id,
+			sp.payment_date,
+			sp.reference_number
+		`).
+		Joins("JOIN suppliers s ON s.id = sp.supplier_id AND s.business_id = sp.business_id AND s.deleted_at IS NULL").
+		Joins("JOIN payment_accounts pa ON pa.id = sp.paid_through_account_id AND pa.business_id = sp.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL").
+		Where("sp.business_id = ? AND sp.id = ? AND sp.deleted_at IS NULL", businessID, paymentID).
+		Take(&row).Error
+	return &row, err
+}
+
+func (r *Repository) UpdateSupplierPaymentJournalID(tx *gorm.DB, businessID, paymentID, journalEntryID string) error {
+	result := tx.Table("supplier_payments").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, paymentID).
+		Update("journal_entry_id", journalEntryID)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func (r *Repository) FindPurchaseReceiptForAccounting(tx *gorm.DB, businessID, receiptID string) (*purchaseReceiptAccountingRow, error) {
 	var row purchaseReceiptAccountingRow
 	err := tx.Table("purchase_receipts").
@@ -986,8 +1048,10 @@ func backfillTargetQuery(target string) (table, idColumn, businessColumn, branch
 		return "bakery_order_payments", "id", "business_id", "", "", "paid_at", "", "", "journal_entry_id IS NULL", ""
 	case "purchase_invoices":
 		return "purchase_invoices", "id", "business_id", "branch_id", "deleted_at IS NULL", "invoice_date", "status", "posted", "journal_entry_id IS NULL", ""
+	case "purchase_invoice_payments":
+		return "purchase_invoice_payments", "id", "business_id", "branch_id", "deleted_at IS NULL", "paid_at", "payment_status", "completed", "journal_entry_id IS NULL", "supplier_payment_id IS NULL"
 	case "supplier_payments":
-		return "purchase_invoice_payments", "id", "business_id", "branch_id", "deleted_at IS NULL", "paid_at", "payment_status", "completed", "journal_entry_id IS NULL", ""
+		return "supplier_payments", "id", "business_id", "branch_id", "deleted_at IS NULL", "payment_date", "status", "completed", "journal_entry_id IS NULL", ""
 	case "purchase_receipts":
 		return "purchase_receipts", "id", "business_id", "branch_id", "deleted_at IS NULL", "received_date", "status", "posted", "journal_entry_id IS NULL", "purchase_invoice_id IS NULL"
 	case "stock_movements":

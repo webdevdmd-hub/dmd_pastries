@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { JSX } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +9,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ROUTES } from "@/constants/routes";
 import type { SupplierPayment, SupplierPaymentStatus } from "@/types/purchasing";
 
 function formatCurrency(value: number): string {
@@ -21,7 +19,6 @@ function formatDate(value: string): string {
   if (!value) return "-";
   return new Intl.DateTimeFormat("en-AE", {
     dateStyle: "medium",
-    timeStyle: "short",
   }).format(new Date(value));
 }
 
@@ -49,30 +46,25 @@ export function PurchaseSupplierPaymentsTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Invoice</TableHead>
             {showSupplier ? <TableHead>Supplier</TableHead> : null}
             <TableHead>Branch</TableHead>
+            <TableHead>Payment date</TableHead>
             <TableHead>Method</TableHead>
-            <TableHead>Amount</TableHead>
+            <TableHead>Paid through</TableHead>
+            <TableHead className="text-right">Amount</TableHead>
+            <TableHead className="text-right">Allocated</TableHead>
+            <TableHead className="text-right">Advance</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Reference</TableHead>
             <TableHead>Paid By</TableHead>
-            <TableHead>Paid At</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {payments.map((payment) => (
             <TableRow key={payment.id}>
-              <TableCell className="font-semibold">
-                <Link
-                  className="text-brand-espresso underline-offset-4 hover:underline"
-                  href={`${ROUTES.purchasingInvoices}/${payment.purchaseInvoiceId}`}
-                >
-                  {payment.invoiceNumber}
-                </Link>
-              </TableCell>
               {showSupplier ? <TableCell>{payment.supplierName}</TableCell> : null}
               <TableCell>{payment.branchName}</TableCell>
+              <TableCell>{formatDate(payment.paymentDate)}</TableCell>
               <TableCell>
                 <span className="font-medium text-brand-espresso">{payment.paymentMethodName}</span>
                 {payment.paymentMethodType ? (
@@ -81,11 +73,19 @@ export function PurchaseSupplierPaymentsTable({
                   </span>
                 ) : null}
               </TableCell>
-              <TableCell className="font-semibold">{formatCurrency(payment.amount)}</TableCell>
+              <TableCell>{payment.paidThroughAccountName ?? "-"}</TableCell>
+              <TableCell className="text-right font-semibold tabular-nums">
+                {formatCurrency(payment.amount)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatCurrency(payment.allocatedAmount)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatCurrency(payment.unappliedAmount)}
+              </TableCell>
               <TableCell>{statusBadge(payment.paymentStatus)}</TableCell>
               <TableCell>{payment.referenceNumber ?? "-"}</TableCell>
               <TableCell>{payment.paidByUserName}</TableCell>
-              <TableCell>{formatDate(payment.paidAt)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

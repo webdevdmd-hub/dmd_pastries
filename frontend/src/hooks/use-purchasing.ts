@@ -15,6 +15,7 @@ import {
   createPurchaseInvoice,
   createPurchaseOrder,
   createPurchaseReturn,
+  createSupplierPayment,
   deletePurchaseOrder,
   duplicatePurchaseOrder,
   getBranches,
@@ -33,6 +34,7 @@ import {
   getPurchaseReturns,
   getPurchasingSummary,
   getSupplierInvoicePayments,
+  getSupplierPaymentById,
   getSupplierPayments,
   getTaxRates,
   getUnits,
@@ -58,6 +60,7 @@ import type {
   CreatePurchaseInvoicePayload,
   CreatePurchaseOrderPayload,
   CreatePurchaseReturnPayload,
+  CreateSupplierPaymentPayload,
   PurchaseDocumentChain,
   PurchaseInvoice,
   PurchaseOrder,
@@ -271,6 +274,22 @@ export function useSupplierInvoicePayments(invoiceId: string | null, enabled = t
       return getSupplierInvoicePayments(invoiceId);
     },
     enabled: enabled && invoiceId !== null,
+  });
+}
+
+export function useSupplierPayment(paymentId: string | null, enabled = true) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<SupplierPayment>({
+    queryKey: [purchasingQueryKey, branchQueryKey, "supplier-payment", paymentId],
+    queryFn: async () => {
+      if (!paymentId) {
+        throw new Error("Supplier payment ID is required.");
+      }
+
+      return getSupplierPaymentById(paymentId);
+    },
+    enabled: enabled && paymentId !== null,
   });
 }
 
@@ -515,6 +534,18 @@ export function useAddSupplierInvoicePayment() {
     mutationFn: async ({ invoiceId, payload }) => addSupplierInvoicePayment(invoiceId, payload),
     onSuccess: async () => {
       await invalidatePurchasing(queryClient);
+    },
+  });
+}
+
+export function useCreateSupplierPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation<SupplierPayment, Error, CreateSupplierPaymentPayload>({
+    mutationFn: async (payload) => createSupplierPayment(payload),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+      await queryClient.invalidateQueries({ queryKey: ["accounting"] });
     },
   });
 }

@@ -326,6 +326,16 @@ export type SupplierPaymentFilters = {
   supplierId: string;
 };
 
+export type SupplierPaymentAllocation = {
+  id: string;
+  supplierPaymentId: string;
+  purchaseInvoiceId: string;
+  invoiceNumber: string;
+  amount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type PurchaseReturnFilters = {
   branchId: string;
   dateFrom: string;
@@ -337,7 +347,7 @@ export type PurchaseReturnFilters = {
 
 export type SupplierPayment = {
   id: string;
-  purchaseInvoiceId: string;
+  purchaseInvoiceId: string | null;
   invoiceNumber: string;
   supplierId: string;
   supplierName: string;
@@ -346,13 +356,20 @@ export type SupplierPayment = {
   paymentMethodId: string;
   paymentMethodName: string;
   paymentMethodType: string;
+  paidThroughAccountId: string | null;
+  paidThroughAccountName: string | null;
   amount: number;
+  allocatedAmount: number;
+  unappliedAmount: number;
   paymentStatus: SupplierPaymentStatus;
+  status: SupplierPaymentStatus;
   referenceNumber: string | null;
   paidByUserId: string;
   paidByUserName: string;
   paidAt: string;
+  paymentDate: string;
   notes: string | null;
+  allocations: SupplierPaymentAllocation[];
 };
 
 export type PurchaseItemLinePayload = {
@@ -444,7 +461,23 @@ export type AddSupplierPaymentPayload = {
   notes: string | null;
   paidAt: string | null;
   paymentMethodId: string;
+  paidThroughAccountId?: string | null;
   referenceNumber: string | null;
+};
+
+export type CreateSupplierPaymentPayload = {
+  supplierId: string;
+  branchId: string;
+  paymentMethodId: string;
+  paidThroughAccountId: string | null;
+  amount: number;
+  referenceNumber: string | null;
+  paymentDate: string | null;
+  notes: string | null;
+  allocations: {
+    purchaseInvoiceId: string;
+    amount: number;
+  }[];
 };
 
 export type ConvertPurchaseOrderToInvoicePayload = {

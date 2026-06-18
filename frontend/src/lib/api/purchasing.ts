@@ -10,6 +10,7 @@ import type {
   CreatePurchaseInvoicePayload,
   CreatePurchaseOrderPayload,
   CreatePurchaseReturnPayload,
+  CreateSupplierPaymentPayload,
   PurchaseDocumentChain,
   PurchaseInvoice,
   PurchaseInvoiceItem,
@@ -40,6 +41,7 @@ import type {
   ReturnablePurchaseReceiptItem,
   ReversePurchaseReturnPayload,
   SupplierPayment,
+  SupplierPaymentAllocation,
   SupplierPaymentFilters,
   SupplierPaymentStatus,
   UpdatePurchaseInvoicePayload,
@@ -125,7 +127,23 @@ type BackendSupplierPaymentPayload = {
   notes: string | null;
   paid_at: string | null;
   payment_method_id: string;
+  paid_through_account_id?: string | null;
   reference_number: string | null;
+};
+
+type BackendCreateSupplierPaymentPayload = {
+  allocations: {
+    amount: number;
+    purchase_invoice_id: string;
+  }[];
+  amount: number;
+  branch_id: string;
+  notes: string | null;
+  paid_through_account_id: string | null;
+  payment_date: string | null;
+  payment_method_id: string;
+  reference_number: string | null;
+  supplier_id: string;
 };
 
 type BackendConvertPurchaseOrderToInvoicePayload = {
@@ -566,15 +584,43 @@ function parsePurchaseReturn(value: unknown): PurchaseReturn {
   };
 }
 
+function parseSupplierPaymentAllocation(value: unknown): SupplierPaymentAllocation {
+  if (!isObject(value)) {
+    throw new Error("Backend supplier payment allocation payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.id),
+    supplierPaymentId: stringValue(value.supplier_payment_id),
+    purchaseInvoiceId: stringValue(value.purchase_invoice_id),
+    invoiceNumber: stringValue(value.invoice_number, "Invoice"),
+    amount: numberValue(value.amount),
+    createdAt: stringValue(value.created_at),
+    updatedAt: stringValue(value.updated_at),
+  };
+}
+
 function parseSupplierPayment(value: unknown): SupplierPayment {
   if (!isObject(value)) {
     throw new Error("Backend supplier payment payload is invalid.");
   }
 
+  const statusValue = value.status ?? value.payment_status;
+  const status = isSupplierPaymentStatus(statusValue) ? statusValue : "completed";
+  const paymentDate = stringValue(value.payment_date, stringValue(value.paid_at));
+  const allocations = Array.isArray(value.allocations)
+    ? value.allocations.map(parseSupplierPaymentAllocation)
+    : [];
+  const amount = numberValue(value.amount);
+  const allocatedAmount =
+    value.allocated_amount === undefined ? amount : numberValue(value.allocated_amount);
+  const unappliedAmount =
+    value.unapplied_amount === undefined ? 0 : numberValue(value.unapplied_amount);
+
   return {
     id: stringValue(value.payment_id, stringValue(value.id)),
-    purchaseInvoiceId: stringValue(value.purchase_invoice_id),
-    invoiceNumber: stringValue(value.invoice_number, "Invoice"),
+    purchaseInvoiceId: optionalString(value.purchase_invoice_id),
+    invoiceNumber: stringValue(value.invoice_number, "Supplier payment"),
     supplierId: stringValue(value.supplier_id),
     supplierName: stringValue(value.supplier_name, "Supplier"),
     branchId: stringValue(value.branch_id),
@@ -582,15 +628,20 @@ function parseSupplierPayment(value: unknown): SupplierPayment {
     paymentMethodId: stringValue(value.payment_method_id),
     paymentMethodName: stringValue(value.payment_method_name, "Payment method"),
     paymentMethodType: stringValue(value.payment_method_type),
-    amount: numberValue(value.amount),
-    paymentStatus: isSupplierPaymentStatus(value.payment_status)
-      ? value.payment_status
-      : "completed",
+    paidThroughAccountId: optionalString(value.paid_through_account_id),
+    paidThroughAccountName: optionalString(value.paid_through_account_name),
+    amount,
+    allocatedAmount,
+    unappliedAmount,
+    paymentStatus: status,
+    status,
     referenceNumber: optionalString(value.reference_number),
     paidByUserId: stringValue(value.paid_by_user_id),
     paidByUserName: stringValue(value.paid_by_user_name, "User"),
-    paidAt: stringValue(value.paid_at),
+    paidAt: paymentDate,
+    paymentDate,
     notes: optionalString(value.notes),
+    allocations,
   };
 }
 
@@ -764,9 +815,15 @@ function parseDocumentChainSupplierPayment(value: unknown): SupplierPayment {
     throw new Error("Backend supplier payment chain payload is invalid.");
   }
 
+  const status = isSupplierPaymentStatus(value.status) ? value.status : "completed";
+  const amount = numberValue(value.total_amount, numberValue(value.amount));
+  const paidAt = stringValue(value.date, stringValue(value.paid_at));
+
   return {
     id: stringValue(value.payment_id, stringValue(value.id)),
-    amount: numberValue(value.total_amount, numberValue(value.amount)),
+    allocations: [],
+    allocatedAmount: amount,
+    amount,
     branchId: "",
     branchName: "",
     invoiceNumber: stringValue(
@@ -774,17 +831,22 @@ function parseDocumentChainSupplierPayment(value: unknown): SupplierPayment {
       stringValue(value.invoice_number, "Supplier payment"),
     ),
     notes: null,
-    paidAt: stringValue(value.date, stringValue(value.paid_at)),
+    paidAt,
     paidByUserId: "",
     paidByUserName: "User",
+    paidThroughAccountId: null,
+    paidThroughAccountName: null,
+    paymentDate: paidAt,
     paymentMethodId: "",
     paymentMethodName: "Supplier payment",
     paymentMethodType: "",
-    paymentStatus: isSupplierPaymentStatus(value.status) ? value.status : "completed",
-    purchaseInvoiceId: stringValue(value.purchase_invoice_id),
+    paymentStatus: status,
+    purchaseInvoiceId: optionalString(value.purchase_invoice_id),
     referenceNumber: null,
+    status,
     supplierId: "",
     supplierName: "",
+    unappliedAmount: 0,
   };
 }
 
@@ -1027,12 +1089,37 @@ function receivePurchaseOrderPayload(
 }
 
 function supplierPaymentPayload(payload: AddSupplierPaymentPayload): BackendSupplierPaymentPayload {
-  return {
+  const nextPayload: BackendSupplierPaymentPayload = {
     amount: payload.amount,
     notes: payload.notes,
     paid_at: payload.paidAt,
     payment_method_id: payload.paymentMethodId,
     reference_number: payload.referenceNumber,
+  };
+
+  if (payload.paidThroughAccountId !== undefined) {
+    nextPayload.paid_through_account_id = payload.paidThroughAccountId;
+  }
+
+  return nextPayload;
+}
+
+function createSupplierPaymentPayload(
+  payload: CreateSupplierPaymentPayload,
+): BackendCreateSupplierPaymentPayload {
+  return {
+    allocations: payload.allocations.map((allocation) => ({
+      amount: allocation.amount,
+      purchase_invoice_id: allocation.purchaseInvoiceId,
+    })),
+    amount: payload.amount,
+    branch_id: payload.branchId,
+    notes: payload.notes,
+    paid_through_account_id: payload.paidThroughAccountId,
+    payment_date: payload.paymentDate,
+    payment_method_id: payload.paymentMethodId,
+    reference_number: payload.referenceNumber,
+    supplier_id: payload.supplierId,
   };
 }
 
@@ -1398,7 +1485,7 @@ export async function getSupplierPayments(
   params: SupplierPaymentFilters,
 ): Promise<SupplierPayment[]> {
   const response = await apiRequest<SupplierPayment[]>(
-    `/api/v1/purchasing/payments${toQueryString({
+    `/api/v1/purchasing/supplier-payments${toQueryString({
       branch_id: params.branchId,
       date_from: params.dateFrom,
       date_to: params.dateTo,
@@ -1414,6 +1501,18 @@ export async function getSupplierPayments(
     {
       authMode: "appwrite",
       parse: (data) => parseList(data, parseSupplierPayment),
+    },
+  );
+
+  return response.data;
+}
+
+export async function getSupplierPaymentById(paymentId: string): Promise<SupplierPayment> {
+  const response = await apiRequest<SupplierPayment>(
+    `/api/v1/purchasing/supplier-payments/${paymentId}`,
+    {
+      authMode: "appwrite",
+      parse: parseSupplierPayment,
     },
   );
 
@@ -1441,6 +1540,22 @@ export async function addSupplierInvoicePayment(
     {
       authMode: "appwrite",
       body: supplierPaymentPayload(payload),
+      method: "POST",
+      parse: parseSupplierPayment,
+    },
+  );
+
+  return response.data;
+}
+
+export async function createSupplierPayment(
+  payload: CreateSupplierPaymentPayload,
+): Promise<SupplierPayment> {
+  const response = await apiRequest<SupplierPayment, BackendCreateSupplierPaymentPayload>(
+    "/api/v1/purchasing/supplier-payments",
+    {
+      authMode: "appwrite",
+      body: createSupplierPaymentPayload(payload),
       method: "POST",
       parse: parseSupplierPayment,
     },

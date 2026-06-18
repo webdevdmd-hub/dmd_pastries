@@ -29,7 +29,7 @@ func DefaultChartAccountSeeds() []defaultAccountSeed {
 		{Code: "1200", Name: "Inventory / Stock", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "1210", Name: "Work in Process Inventory", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "1300", Name: "VAT Receivable", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
-		{Code: "1400", Name: "Advance to Supplier", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false},
+		{Code: "1400", Name: "Supplier Advances / Vendor Prepayments", Type: "asset", Group: "current_asset", NormalBalance: "debit", Description: "Unapplied supplier payments and vendor prepayments", IsControlAccount: true, AllowManualPosting: false},
 		{Code: "1500", Name: "Prepaid Expenses", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
 		{Code: "1600", Name: "Security Deposit", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
 		{Code: "1700", Name: "Other Current Assets", Type: "asset", Group: "other_current_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
@@ -138,6 +138,7 @@ func DefaultAccountMappingSeeds() []defaultAccountMappingSeed {
 	return []defaultAccountMappingSeed{
 		{Key: "accounts_receivable", AccountCode: "1100", Description: "Customer unpaid balances"},
 		{Key: "accounts_payable", AccountCode: "2000", Description: "Supplier unpaid balances"},
+		{Key: "supplier_advance", AccountCode: "1400", Description: "Unapplied supplier payments and vendor prepayments"},
 		{Key: "inventory_stock", AccountCode: "1200", Description: "Inventory stock value"},
 		{Key: "sales_income", AccountCode: "4000", Description: "POS sales income"},
 		{Key: "bakery_income", AccountCode: "4010", Description: "Bakery order income"},

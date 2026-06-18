@@ -8,20 +8,14 @@ import { toast } from "sonner";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseEmptyState } from "@/components/purchasing/purchase-empty-state";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
-import { PurchaseSupplierPaymentDialog } from "@/components/purchasing/purchase-supplier-payment-dialog";
+import { PurchaseSupplierPaymentAllocationDialog } from "@/components/purchasing/purchase-supplier-payment-allocation-dialog";
 import { PurchaseSupplierPaymentsTable } from "@/components/purchasing/purchase-supplier-payments-table";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
-import { SupplierLookupSelect } from "@/components/purchasing/supplier-lookup-select";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
-import {
-  SearchableCombobox,
-  type SearchableComboboxOption,
-} from "@/components/shared/searchable-combobox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -34,14 +28,14 @@ import { useBranchScope } from "@/hooks/use-branch-scope";
 import { usePaymentMethods } from "@/hooks/use-payments";
 import { usePermission } from "@/hooks/use-permission";
 import {
-  useAddSupplierInvoicePayment,
+  useCreateSupplierPayment,
   usePurchaseInvoices,
   usePurchasingBranches,
   usePurchasingSuppliers,
   useSupplierPayments,
 } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
-import type { AddSupplierPaymentPayload, SupplierPaymentFilters } from "@/types/purchasing";
+import type { CreateSupplierPaymentPayload, SupplierPaymentFilters } from "@/types/purchasing";
 
 const defaultFilters: SupplierPaymentFilters = {
   branchId: "",
@@ -52,7 +46,7 @@ const defaultFilters: SupplierPaymentFilters = {
   paymentStatus: "all",
   purchaseInvoiceId: "",
   search: "",
-  sortBy: "paid_at",
+  sortBy: "payment_date",
   sortOrder: "desc",
   supplierId: "all",
 };
@@ -62,16 +56,6 @@ const paymentStatuses = [
   { label: "Pending", value: "pending" },
   { label: "Failed", value: "failed" },
 ];
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return "No due date";
-
-  return new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(new Date(value));
-}
 
 export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -87,15 +71,25 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
     branchId: branchScope.defaultBranchId,
   });
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
+  const [selectedPaymentBranchId, setSelectedPaymentBranchId] = useState("");
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const paymentsQuery = useSupplierPayments(filters, canView && branchScope.hasBranchScope);
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const branchesQuery = usePurchasingBranches(canView);
   const methodsQuery = usePaymentMethods(canView);
+  const filterBranchId = branchScope.normalizeBranchId(filters.branchId);
+  const branchOptions = useMemo(
+    () =>
+      (branchesQuery.data ?? []).filter(
+        (branch) => branchScope.canAccessAllBranches || branchScope.isBranchAllowed(branch.id),
+      ),
+    [branchScope, branchesQuery.data],
+  );
+  const manualBranchId =
+    selectedPaymentBranchId || (filterBranchId === "all" ? "" : filterBranchId);
   const payableInvoicesQuery = usePurchaseInvoices(
     {
-      branchId: branchScope.normalizeBranchId(filters.branchId),
+      branchId: manualBranchId,
       dateFrom: "",
       dateTo: "",
       paymentStatus: "all",
@@ -107,9 +101,10 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
       canManage &&
       branchScope.hasBranchScope &&
       manualDialogOpen &&
+      manualBranchId.length > 0 &&
       selectedSupplierId.length > 0,
   );
-  const addPaymentMutation = useAddSupplierInvoicePayment();
+  const createPaymentMutation = useCreateSupplierPayment();
   const purchasingPaymentMethods = useMemo(
     () =>
       (methodsQuery.data ?? []).filter(
@@ -119,13 +114,6 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   );
   const isPermissionDenied =
     paymentsQuery.error instanceof ApiError && paymentsQuery.error.status === 403;
-  const branchOptions = useMemo(
-    () =>
-      (branchesQuery.data ?? []).filter(
-        (branch) => branchScope.canAccessAllBranches || branchScope.isBranchAllowed(branch.id),
-      ),
-    [branchScope, branchesQuery.data],
-  );
   const payableInvoices = useMemo(
     () =>
       selectedSupplierId
@@ -135,41 +123,21 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
         : [],
     [payableInvoicesQuery.data, selectedSupplierId],
   );
-  const selectedInvoice = useMemo(
-    () => payableInvoices.find((invoice) => invoice.id === selectedInvoiceId) ?? null,
-    [payableInvoices, selectedInvoiceId],
-  );
-  const invoiceOptions = useMemo<SearchableComboboxOption[]>(
-    () =>
-      payableInvoices.map((invoice) => ({
-        description: `${invoice.supplierName} · Balance ${formatCurrency(
-          invoice.balanceAmount,
-        )} · Due ${formatDate(invoice.dueDate)}`,
-        keywords: [
-          invoice.invoiceNumber,
-          invoice.supplierName,
-          invoice.branchName,
-          invoice.paymentStatus,
-        ],
-        label: `${invoice.invoiceNumber} · ${invoice.supplierName}`,
-        value: invoice.id,
-      })),
-    [payableInvoices],
-  );
 
   useEffect(() => {
-    if (
-      selectedInvoiceId &&
-      !payableInvoicesQuery.isLoading &&
-      !payableInvoices.some((invoice) => invoice.id === selectedInvoiceId)
-    ) {
-      setSelectedInvoiceId("");
-    }
-  }, [payableInvoices, payableInvoicesQuery.isLoading, selectedInvoiceId]);
+    setSelectedSupplierId("");
+  }, [filters.branchId, manualDialogOpen]);
 
   useEffect(() => {
-    setSelectedInvoiceId("");
-  }, [filters.branchId, manualDialogOpen, selectedSupplierId]);
+    if (!manualDialogOpen) return;
+
+    const nextBranchId =
+      filterBranchId !== "all"
+        ? filterBranchId
+        : (branchOptions.find((branch) => branch.status === "active")?.id ?? "");
+
+    setSelectedPaymentBranchId(nextBranchId);
+  }, [branchOptions, filterBranchId, manualDialogOpen]);
 
   useEffect(() => {
     setFilters((currentFilters) => {
@@ -194,23 +162,18 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
 
   const closeManualDialog = (): void => {
     setManualDialogOpen(false);
+    setSelectedPaymentBranchId("");
     setSelectedSupplierId("");
-    setSelectedInvoiceId("");
   };
 
-  const updateSelectedSupplier = (supplierId: string): void => {
-    setSelectedSupplierId(supplierId);
-    setSelectedInvoiceId("");
-  };
-
-  const handleManualPayment = async (payload: AddSupplierPaymentPayload): Promise<void> => {
-    if (!selectedInvoice) {
-      toast.error("Select a posted bill before recording payment.");
+  const handleManualPayment = async (payload: CreateSupplierPaymentPayload): Promise<void> => {
+    if (!payload.supplierId) {
+      toast.error("Select a supplier before recording payment.");
       return;
     }
 
     try {
-      await addPaymentMutation.mutateAsync({ invoiceId: selectedInvoice.id, payload });
+      await createPaymentMutation.mutateAsync(payload);
       toast.success("Payment made recorded.");
       closeManualDialog();
     } catch (error: unknown) {
@@ -222,7 +185,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
         title="Payments Made"
-        description="Track money paid out to suppliers against posted bills."
+        description="Track money paid out to suppliers, bill allocations, and advances."
         actions={
           canManage ? (
             <Button onClick={() => setManualDialogOpen(true)} type="button">
@@ -237,7 +200,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
         <Input
           aria-label="Search supplier payments"
           onChange={(event) => updateFilters({ search: event.target.value })}
-          placeholder="Search invoice, supplier, reference..."
+          placeholder="Search supplier, reference, method..."
           value={filters.search}
         />
         <Select
@@ -355,66 +318,30 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
         </Card>
       ) : null}
 
-      <PurchaseSupplierPaymentDialog
-        balanceAmount={selectedInvoice?.balanceAmount ?? 0}
-        description={
-          selectedInvoice ? (
-            <>
-              Record money paid out for{" "}
-              {selectedInvoice.supplierBillNumber ?? selectedInvoice.invoiceNumber}. Current balance
-              is {formatCurrency(selectedInvoice.balanceAmount)}.
-            </>
-          ) : (
-            "Select a posted bill with an open balance, then record the outgoing payment."
-          )
+      <PurchaseSupplierPaymentAllocationDialog
+        branchId={manualBranchId}
+        branches={branchOptions.filter((branch) => branch.status === "active")}
+        invoices={payableInvoices}
+        invoicesError={
+          payableInvoicesQuery.error ? getErrorMessage(payableInvoicesQuery.error) : null
         }
-        disabled={!selectedInvoice}
-        invoiceNumber={
-          selectedInvoice?.supplierBillNumber ?? selectedInvoice?.invoiceNumber ?? "selected bill"
-        }
-        invoiceSelector={
-          <>
-            <Label>Supplier</Label>
-            <SupplierLookupSelect
-              onValueChange={updateSelectedSupplier}
-              suppliers={suppliersQuery.data ?? []}
-              value={selectedSupplierId}
-            />
-            <p className="text-xs text-brand-mocha">Select a supplier to view open bills.</p>
-
-            <Label>Bill</Label>
-            <SearchableCombobox
-              disabled={!selectedSupplierId}
-              emptyMessage={
-                selectedSupplierId
-                  ? "No posted open bills found for this supplier."
-                  : "Select a supplier to view open bills."
-              }
-              errorMessage={
-                payableInvoicesQuery.error ? getErrorMessage(payableInvoicesQuery.error) : null
-              }
-              groupLabel="Open bills"
-              isLoading={payableInvoicesQuery.isLoading}
-              loadingMessage="Loading posted bills..."
-              onRetry={() => {
-                void payableInvoicesQuery.refetch();
-              }}
-              onValueChange={setSelectedInvoiceId}
-              options={invoiceOptions}
-              placeholder="Select bill"
-              searchPlaceholder="Search bill or branch..."
-              value={selectedInvoiceId}
-            />
-            <p className="text-xs text-brand-mocha">
-              Only posted bills with remaining balance are available for manual payment made.
-            </p>
-          </>
-        }
-        isSubmitting={addPaymentMutation.isPending}
+        invoicesLoading={payableInvoicesQuery.isLoading}
+        isSubmitting={createPaymentMutation.isPending}
         methods={purchasingPaymentMethods}
+        onBranchChange={(branchId) => {
+          setSelectedPaymentBranchId(branchId);
+          setSelectedSupplierId("");
+        }}
         onClose={closeManualDialog}
+        onRetryInvoices={() => {
+          void payableInvoicesQuery.refetch();
+        }}
         onSubmit={handleManualPayment}
+        onSupplierChange={setSelectedSupplierId}
         open={manualDialogOpen}
+        selectedBranchId={selectedPaymentBranchId}
+        selectedSupplierId={selectedSupplierId}
+        suppliers={suppliersQuery.data ?? []}
       />
     </div>
   );

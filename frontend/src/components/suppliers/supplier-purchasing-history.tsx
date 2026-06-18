@@ -103,7 +103,9 @@ function paymentDocuments(payments: SupplierPayment[]): RecentDocument[] {
   return payments.map((payment) => ({
     amount: payment.amount,
     date: payment.paidAt,
-    href: `${ROUTES.purchasingInvoices}/${payment.purchaseInvoiceId}`,
+    href: payment.purchaseInvoiceId
+      ? `${ROUTES.purchasingInvoices}/${payment.purchaseInvoiceId}`
+      : ROUTES.purchasingPayments,
     icon: <WalletCards className="h-4 w-4" />,
     key: `payment-${payment.id}`,
     label: "Payment Made",
