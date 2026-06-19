@@ -1672,50 +1672,12 @@ func (s *Service) PostSupplierPaymentJournal(tx *gorm.DB, currentUser *utils.Aut
 }
 
 func (s *Service) PostPurchaseReceiptJournal(tx *gorm.DB, currentUser *utils.AuthContext, receiptID string) (string, error) {
-	receipt, err := s.repo.FindPurchaseReceiptForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(receiptID))
-	if err != nil {
-		return "", apperrors.Internal("failed to load purchase receipt for accounting")
-	}
-	if receipt.JournalEntryID != nil && *receipt.JournalEntryID != "" {
-		return *receipt.JournalEntryID, nil
-	}
-	if receipt.Status != "posted" {
-		return "", nil
-	}
-	if receipt.PurchaseInvoiceID != nil && strings.TrimSpace(*receipt.PurchaseInvoiceID) != "" {
-		return "", nil
-	}
-	costTotal, err := s.repo.SumStockMovementCostByReference(tx, currentUser.BusinessID, "purchase_receipt", receipt.ID, "in")
-	if err != nil {
-		return "", apperrors.Internal("failed to calculate purchase receipt inventory value")
-	}
-	costTotal = roundMoney(costTotal)
-	if costTotal <= 0 {
-		return "", nil
-	}
-	inventoryAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "inventory_stock", "1200", "Inventory / Stock")
-	if err != nil {
-		return "", err
-	}
-	grniAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "grni", "2050", "Goods Received Not Invoiced / GRNI")
-	if err != nil {
-		return "", err
-	}
-	lines := []JournalEntryLineRequest{
-		{AccountID: inventoryAccount.ID, DebitAmount: costTotal, Description: "Uninvoiced stock received " + receipt.ReceiptNumber},
-		{AccountID: grniAccount.ID, CreditAmount: costTotal, Description: "GRNI for " + receipt.ReceiptNumber},
-	}
-	journalID, err := s.createPostedSystemJournal(tx, currentUser, receipt.ReceivedDate, &receipt.BranchID, "purchase_receipt_grni", receipt.ID, receipt.ReceiptNumber, "Purchase receipt GRNI "+receipt.ReceiptNumber, lines)
-	if err != nil {
-		return "", err
-	}
-	if err := s.repo.UpdatePurchaseReceiptJournalID(tx, currentUser.BusinessID, receipt.ID, journalID); err != nil {
-		return "", apperrors.Internal("failed to update purchase receipt accounting journal")
-	}
-	if err := s.repo.UpdateStockMovementJournalByReference(tx, currentUser.BusinessID, "purchase_receipt", receipt.ID, "in", journalID); err != nil {
-		return "", apperrors.Internal("failed to link purchase receipt stock movements to accounting journal")
-	}
-	return journalID, nil
+	// Bill-only purchasing policy: GRN/receive goods is operational stock tracking only.
+	// Supplier liability is recognized when the purchase bill is posted.
+	_ = tx
+	_ = currentUser
+	_ = receiptID
+	return "", nil
 }
 
 func (s *Service) PostInventoryMovementJournal(tx *gorm.DB, currentUser *utils.AuthContext, movementID string) (string, error) {
@@ -2139,8 +2101,6 @@ func (s *Service) backfillOneJournal(currentUser *utils.AuthContext, target, id 
 			journalID, err = s.PostPurchaseInvoicePaymentJournal(tx, currentUser, id)
 		case "supplier_payments":
 			journalID, err = s.PostSupplierPaymentJournal(tx, currentUser, id)
-		case "purchase_receipts":
-			journalID, err = s.PostPurchaseReceiptJournal(tx, currentUser, id)
 		case "stock_movements":
 			journalID, err = s.PostInventoryMovementJournal(tx, currentUser, id)
 		case "manufacturing_batches":
@@ -3328,7 +3288,6 @@ func defaultBackfillTargets() []string {
 		"bakery_orders",
 		"purchase_invoices",
 		"supplier_payments",
-		"purchase_receipts",
 		"stock_movements",
 		"manufacturing_batches",
 		"sales_returns",
@@ -3339,7 +3298,7 @@ func defaultBackfillTargets() []string {
 
 func validBackfillTarget(value string) bool {
 	switch value {
-	case "pos_sales", "bakery_orders", "bakery_order_payments", "purchase_invoices", "purchase_invoice_payments", "supplier_payments", "purchase_receipts", "stock_movements", "manufacturing_batches", "sales_returns", "purchase_returns", "expenses":
+	case "pos_sales", "bakery_orders", "bakery_order_payments", "purchase_invoices", "purchase_invoice_payments", "supplier_payments", "stock_movements", "manufacturing_batches", "sales_returns", "purchase_returns", "expenses":
 		return true
 	default:
 		return false

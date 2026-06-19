@@ -1052,8 +1052,6 @@ func backfillTargetQuery(target string) (table, idColumn, businessColumn, branch
 		return "purchase_invoice_payments", "id", "business_id", "branch_id", "deleted_at IS NULL", "paid_at", "payment_status", "completed", "journal_entry_id IS NULL", "supplier_payment_id IS NULL"
 	case "supplier_payments":
 		return "supplier_payments", "id", "business_id", "branch_id", "deleted_at IS NULL", "payment_date", "status", "completed", "journal_entry_id IS NULL", ""
-	case "purchase_receipts":
-		return "purchase_receipts", "id", "business_id", "branch_id", "deleted_at IS NULL", "received_date", "status", "posted", "journal_entry_id IS NULL", "purchase_invoice_id IS NULL"
 	case "stock_movements":
 		return "stock_movements", "id", "business_id", "branch_id", "", "created_at", "", "", "accounting_journal_entry_id IS NULL", "movement_type IN ('opening_stock','adjustment_in','adjustment_out','wastage')"
 	case "manufacturing_batches":

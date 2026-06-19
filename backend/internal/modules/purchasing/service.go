@@ -1442,11 +1442,6 @@ func (s *Service) Receive(currentUser *utils.AuthContext, req ReceivePurchaseReq
 		if err := s.applyReceiptStock(tx, currentUser, receipt); err != nil {
 			return err
 		}
-		if s.accountingService != nil {
-			if _, err := s.accountingService.PostPurchaseReceiptJournal(tx, currentUser, receipt.ID); err != nil {
-				return err
-			}
-		}
 		if err := s.audit(tx, currentUser, "purchase_receipt.created", receipt.ID, "Purchase receipt created", ipAddress, userAgent); err != nil {
 			return err
 		}
@@ -1516,11 +1511,6 @@ func (s *Service) PostReceipt(currentUser *utils.AuthContext, id, ipAddress, use
 		}
 		if err := s.repo.UpdateReceipt(tx, id, currentUser.BusinessID, map[string]interface{}{"status": "posted", "updated_at": time.Now().UTC()}); err != nil {
 			return err
-		}
-		if s.accountingService != nil {
-			if _, err := s.accountingService.PostPurchaseReceiptJournal(tx, currentUser, id); err != nil {
-				return err
-			}
 		}
 		if err := s.audit(tx, currentUser, "purchase_receipt.posted", id, "Purchase receipt posted", ipAddress, userAgent); err != nil {
 			return err
