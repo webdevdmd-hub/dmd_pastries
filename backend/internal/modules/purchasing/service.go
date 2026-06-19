@@ -2532,17 +2532,14 @@ func (s *Service) calculatePurchaseLine(tx *gorm.DB, businessID string, quantity
 func (s *Service) purchaseBillAccount(tx *gorm.DB, businessID, accountID string) (*purchaseBillAccount, error) {
 	var account purchaseBillAccount
 	err := tx.Table("chart_of_accounts").
-		Select("id, account_name, account_code, account_type, status, allow_manual_posting").
+		Select("id, account_name, account_code, account_type, status").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, accountID).
 		Take(&account).Error
 	if err != nil {
 		return nil, notFound(err, "account not found")
 	}
 	if account.Status != "active" {
-		return nil, apperrors.BadRequest("account line account must be active", nil)
-	}
-	if !account.AllowManualPosting {
-		return nil, apperrors.BadRequest("account line must use an active manual-posting chart account", map[string]interface{}{"account_type": account.AccountType})
+		return nil, apperrors.BadRequest("account line must use an active chart account", nil)
 	}
 	return &account, nil
 }
@@ -2964,12 +2961,11 @@ type lineInput struct {
 }
 
 type purchaseBillAccount struct {
-	ID                 string
-	AccountName        string
-	AccountCode        string
-	AccountType        string
-	Status             string
-	AllowManualPosting bool
+	ID          string
+	AccountName string
+	AccountCode string
+	AccountType string
+	Status      string
 }
 
 type preparedItem struct {

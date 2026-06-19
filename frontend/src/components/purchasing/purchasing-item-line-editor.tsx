@@ -189,7 +189,7 @@ export function PurchasingItemLineEditor({
   const accountOptions = useMemo<SearchableComboboxOption[]>(
     () =>
       accounts
-        .filter((account) => account.status === "active" && account.allowManualPosting)
+        .filter((account) => account.status === "active")
         .map((account) => ({
           description: [account.accountType.toUpperCase(), account.accountGroup]
             .filter(Boolean)
@@ -460,7 +460,7 @@ export function PurchasingItemLineEditor({
                   <td className="px-2 py-2">
                     {accountLine ? (
                       <SearchableCombobox
-                        emptyMessage="No active posting accounts found."
+                        emptyMessage="No active chart accounts found."
                         contentClassName="w-[min(560px,92vw)]"
                         disabled={isLineLocked}
                         onValueChange={(accountId) => {
