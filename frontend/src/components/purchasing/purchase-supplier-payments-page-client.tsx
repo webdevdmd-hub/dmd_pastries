@@ -35,7 +35,11 @@ import {
   useSupplierPayments,
 } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
-import type { CreateSupplierPaymentPayload, SupplierPaymentFilters } from "@/types/purchasing";
+import type {
+  CreateSupplierPaymentPayload,
+  PurchaseInvoice,
+  SupplierPaymentFilters,
+} from "@/types/purchasing";
 
 const defaultFilters: SupplierPaymentFilters = {
   branchId: "",
@@ -172,13 +176,18 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
       return;
     }
 
-    try {
-      await createPaymentMutation.mutateAsync(payload);
-      toast.success("Payment made recorded.");
-      closeManualDialog();
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error));
-    }
+    await createPaymentMutation.mutateAsync(payload);
+    toast.success("Payment made recorded.");
+    closeManualDialog();
+  };
+
+  const refreshPayableInvoices = async (): Promise<PurchaseInvoice[]> => {
+    const result = await payableInvoicesQuery.refetch();
+    return selectedSupplierId
+      ? (result.data ?? []).filter(
+          (invoice) => invoice.status === "posted" && invoice.balanceAmount > 0,
+        )
+      : [];
   };
 
   return (
@@ -336,6 +345,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
         onRetryInvoices={() => {
           void payableInvoicesQuery.refetch();
         }}
+        onRefreshInvoices={refreshPayableInvoices}
         onSubmit={handleManualPayment}
         onSupplierChange={setSelectedSupplierId}
         open={manualDialogOpen}

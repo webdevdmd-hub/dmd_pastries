@@ -825,7 +825,11 @@ func (s *Service) AddInvoicePayment(currentUser *utils.AuthContext, invoiceID st
 	}
 	amount := roundMoney(req.Amount)
 	if amount > roundMoney(invoice.BalanceAmount) {
-		return nil, apperrors.BadRequest("payment amount cannot exceed invoice balance", map[string]float64{"balance_amount": roundMoney(invoice.BalanceAmount)})
+		return nil, apperrors.BadRequest("payment amount cannot exceed invoice balance", map[string]interface{}{
+			"purchase_invoice_id": invoice.ID,
+			"balance_amount":      roundMoney(invoice.BalanceAmount),
+			"payment_amount":      amount,
+		})
 	}
 	_, err = s.createSupplierPayment(currentUser, CreateSupplierPaymentRequest{
 		SupplierID:           invoice.SupplierID,
@@ -917,7 +921,11 @@ func (s *Service) createSupplierPayment(currentUser *utils.AuthContext, req Crea
 				return apperrors.BadRequest("purchase invoice is already paid", map[string]string{"purchase_invoice_id": invoice.ID})
 			}
 			if allocationAmount > roundMoney(invoice.BalanceAmount) {
-				return apperrors.BadRequest("allocation amount cannot exceed invoice balance", map[string]interface{}{"purchase_invoice_id": invoice.ID, "balance_amount": roundMoney(invoice.BalanceAmount)})
+				return apperrors.BadRequest("allocation amount cannot exceed invoice balance", map[string]interface{}{
+					"purchase_invoice_id": invoice.ID,
+					"balance_amount":      roundMoney(invoice.BalanceAmount),
+					"allocation_amount":   allocationAmount,
+				})
 			}
 			allocatedAmount = roundMoney(allocatedAmount + allocationAmount)
 			if allocatedAmount > amount {

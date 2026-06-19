@@ -3,6 +3,7 @@
 import { AlertCircle, Loader2 } from "lucide-react";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { SupplierLookupSelect } from "@/components/purchasing/supplier-lookup-select";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { ApiError, getErrorMessage } from "@/lib/api/client";
 import type {
   CreateSupplierPaymentPayload,
   PurchaseInvoice,
@@ -51,6 +53,7 @@ type SupplierPaymentAllocationDialogProps = {
   onClose: () => void;
   onBranchChange: (branchId: string) => void;
   onRetryInvoices: () => void;
+  onRefreshInvoices: () => Promise<PurchaseInvoice[]>;
   onSubmit: (payload: CreateSupplierPaymentPayload) => Promise<void>;
   onSupplierChange: (supplierId: string) => void;
   open: boolean;
@@ -96,6 +99,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
   onClose,
   onBranchChange,
   onRetryInvoices,
+  onRefreshInvoices,
   onSubmit,
   onSupplierChange,
   open,
@@ -110,6 +114,8 @@ export function PurchaseSupplierPaymentAllocationDialog({
   const [notes, setNotes] = useState("");
   const [allocations, setAllocations] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  const [validatingBalances, setValidatingBalances] = useState(false);
 
   const selectedMethod = methods.find((method) => method.id === paymentMethodId) ?? null;
   const amountValue = roundMoney(parseAmount(amount));
@@ -148,10 +154,17 @@ export function PurchaseSupplierPaymentAllocationDialog({
   useEffect(() => {
     setAllocations({});
     setSubmitError(null);
+    setRowErrors({});
   }, [selectedSupplierId]);
 
   const updateAllocation = (invoiceId: string, nextAmount: string): void => {
     setSubmitError(null);
+    setRowErrors((current) => {
+      if (!(invoiceId in current)) return current;
+      const { [invoiceId]: _removed, ...next } = current;
+      void _removed;
+      return next;
+    });
     setAllocations((current) => ({ ...current, [invoiceId]: nextAmount }));
   };
 
@@ -168,6 +181,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
 
   const submit = async (): Promise<void> => {
     setSubmitError(null);
+    setRowErrors({});
 
     if (!selectedSupplierId) {
       setSubmitError("Select a supplier before saving payment.");
@@ -209,22 +223,78 @@ export function PurchaseSupplierPaymentAllocationDialog({
       return;
     }
 
-    await onSubmit({
-      allocations: allocationEntries
-        .filter((entry) => entry.amount > 0)
-        .map((entry) => ({
+    const payableEntries = allocationEntries.filter((entry) => entry.amount > 0);
+
+    setValidatingBalances(true);
+    try {
+      if (payableEntries.length > 0) {
+        const latestInvoices = await onRefreshInvoices();
+        const latestById = new Map(latestInvoices.map((invoice) => [invoice.id, invoice]));
+        const nextRowErrors: Record<string, string> = {};
+
+        for (const entry of payableEntries) {
+          const latestInvoice = latestById.get(entry.invoice.id);
+          if (latestInvoice?.status !== "posted" || roundMoney(latestInvoice.balanceAmount) <= 0) {
+            nextRowErrors[entry.invoice.id] = "This bill is no longer open for payment.";
+            continue;
+          }
+
+          const latestBalance = roundMoney(latestInvoice.balanceAmount);
+          if (entry.amount > latestBalance) {
+            nextRowErrors[entry.invoice.id] =
+              `Bill balance changed. Maximum payable is ${formatCurrency(latestBalance)}.`;
+          }
+        }
+
+        if (Object.keys(nextRowErrors).length > 0) {
+          setRowErrors(nextRowErrors);
+          setSubmitError("Review bill allocation amounts before saving.");
+          return;
+        }
+      }
+
+      await onSubmit({
+        allocations: payableEntries.map((entry) => ({
           amount: entry.amount,
           purchaseInvoiceId: entry.invoice.id,
         })),
-      amount: amountValue,
-      branchId,
-      notes: notes.trim() ? notes.trim() : null,
-      paidThroughAccountId: selectedMethod.defaultPaymentAccountId,
-      paymentDate: paymentDate || null,
-      paymentMethodId,
-      referenceNumber: referenceNumber.trim() ? referenceNumber.trim() : null,
-      supplierId: selectedSupplierId,
-    });
+        amount: amountValue,
+        branchId,
+        notes: notes.trim() ? notes.trim() : null,
+        paidThroughAccountId: selectedMethod.defaultPaymentAccountId,
+        paymentDate: paymentDate || null,
+        paymentMethodId,
+        referenceNumber: referenceNumber.trim() ? referenceNumber.trim() : null,
+        supplierId: selectedSupplierId,
+      });
+    } catch (error: unknown) {
+      if (error instanceof ApiError && error.message.includes("allocation amount cannot exceed")) {
+        const purchaseInvoiceId =
+          typeof error.errorDetails?.purchase_invoice_id === "string"
+            ? error.errorDetails.purchase_invoice_id
+            : "";
+        const balanceAmount =
+          typeof error.errorDetails?.balance_amount === "number"
+            ? error.errorDetails.balance_amount
+            : null;
+
+        if (purchaseInvoiceId && balanceAmount !== null) {
+          setRowErrors({
+            [purchaseInvoiceId]: `Bill balance changed. Maximum payable is ${formatCurrency(
+              roundMoney(balanceAmount),
+            )}.`,
+          });
+          setSubmitError("Review bill allocation amounts before saving.");
+          return;
+        }
+      }
+
+      const message = getErrorMessage(error);
+      setSubmitError(message);
+      toast.error(message);
+    } finally {
+      setValidatingBalances(false);
+    }
   };
 
   return (
@@ -429,7 +499,11 @@ export function PurchaseSupplierPaymentAllocationDialog({
                     <TableBody>
                       {invoices.map((invoice) => {
                         const rowAmount = roundMoney(parseAmount(allocations[invoice.id] ?? "0"));
-                        const rowError = rowAmount > roundMoney(invoice.balanceAmount);
+                        const rowError =
+                          rowErrors[invoice.id] ??
+                          (rowAmount > roundMoney(invoice.balanceAmount)
+                            ? "Payment cannot exceed amount due."
+                            : "");
 
                         return (
                           <TableRow key={invoice.id}>
@@ -460,9 +534,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
                                 value={allocations[invoice.id] ?? "0"}
                               />
                               {rowError ? (
-                                <p className="mt-1 text-xs text-red-700">
-                                  Payment cannot exceed amount due.
-                                </p>
+                                <p className="mt-1 text-xs text-red-700">{rowError}</p>
                               ) : null}
                             </TableCell>
                             <TableCell className="text-right">
@@ -485,7 +557,11 @@ export function PurchaseSupplierPaymentAllocationDialog({
                 <div className="grid gap-3 p-3 md:hidden">
                   {invoices.map((invoice) => {
                     const rowAmount = roundMoney(parseAmount(allocations[invoice.id] ?? "0"));
-                    const rowError = rowAmount > roundMoney(invoice.balanceAmount);
+                    const rowError =
+                      rowErrors[invoice.id] ??
+                      (rowAmount > roundMoney(invoice.balanceAmount)
+                        ? "Payment cannot exceed amount due."
+                        : "");
 
                     return (
                       <div
@@ -531,11 +607,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
                             type="number"
                             value={allocations[invoice.id] ?? "0"}
                           />
-                          {rowError ? (
-                            <p className="text-xs text-red-700">
-                              Payment cannot exceed amount due.
-                            </p>
-                          ) : null}
+                          {rowError ? <p className="text-xs text-red-700">{rowError}</p> : null}
                         </div>
                       </div>
                     );
@@ -602,11 +674,13 @@ export function PurchaseSupplierPaymentAllocationDialog({
             Cancel
           </Button>
           <Button
-            disabled={isSubmitting || selectedMethodMissingAccount}
+            disabled={
+              isSubmitting || invoicesLoading || validatingBalances || selectedMethodMissingAccount
+            }
             onClick={() => void submit()}
             type="button"
           >
-            {isSubmitting ? "Saving..." : "Save as Paid"}
+            {isSubmitting || validatingBalances ? "Saving..." : "Save as Paid"}
           </Button>
         </DialogFooter>
       </DialogContent>
