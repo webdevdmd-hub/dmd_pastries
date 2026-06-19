@@ -41,8 +41,8 @@ type PurchaseOrderItem struct {
 	IngredientID     *string        `gorm:"type:uuid;index" json:"ingredient_id"`
 	PackagingItemID  *string        `gorm:"type:uuid;index" json:"packaging_item_id"`
 	AccountID        *string        `gorm:"type:uuid;index" json:"account_id"`
-	AccountName      string         `gorm:"size:255" json:"account_name_snapshot"`
-	AccountCode      string         `gorm:"size:100" json:"account_code_snapshot"`
+	AccountName      string         `gorm:"column:account_name_snapshot;size:255" json:"account_name_snapshot"`
+	AccountCode      string         `gorm:"column:account_code_snapshot;size:100" json:"account_code_snapshot"`
 	Description      string         `json:"description"`
 	ItemNameSnapshot string         `gorm:"size:255;not null" json:"item_name_snapshot"`
 	QuantityOrdered  float64        `gorm:"not null" json:"quantity_ordered"`
