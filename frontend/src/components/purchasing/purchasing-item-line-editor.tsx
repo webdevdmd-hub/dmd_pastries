@@ -2,7 +2,7 @@
 
 import { FileText, GripVertical, Package, Plus, Trash2 } from "lucide-react";
 import type { JSX } from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
@@ -135,6 +135,13 @@ function withSnapshotOption(
   ];
 }
 
+function optionSearchText(option: SearchableComboboxOption): string {
+  return [option.label, option.description, ...(option.keywords ?? [])]
+    .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+    .join(" ")
+    .toLowerCase();
+}
+
 export function PurchasingItemLineEditor({
   accounts = [],
   allowBatchFields = false,
@@ -152,6 +159,7 @@ export function PurchasingItemLineEditor({
   taxRates,
   units,
 }: PurchasingItemLineEditorProps): JSX.Element {
+  const [accountSearch, setAccountSearch] = useState("");
   const safeLines = useMemo(() => (lines.length > 0 ? lines : [createLine()]), [lines]);
   const productOptions = useMemo<SearchableComboboxOption[]>(
     () =>
@@ -228,6 +236,18 @@ export function PurchasingItemLineEditor({
     safeLines,
     taxRates,
   ]);
+  const accountGroupLabel = useMemo(() => {
+    const search = accountSearch.trim().toLowerCase();
+
+    if (search.length === 0) {
+      return `Chart accounts (${String(accountOptions.length)})`;
+    }
+
+    const matchingAccounts = accountOptions.filter((option) =>
+      optionSearchText(option).includes(search),
+    ).length;
+    return `Matching accounts (${String(matchingAccounts)})`;
+  }, [accountOptions, accountSearch]);
 
   return (
     <section className="flex min-h-0 w-full flex-1 flex-col rounded-xl border border-brand-cappuccino/70 bg-white shadow-sm">
@@ -463,6 +483,10 @@ export function PurchasingItemLineEditor({
                         emptyMessage="No active chart accounts found."
                         contentClassName="w-[min(560px,92vw)]"
                         disabled={isLineLocked}
+                        filterOptionsLocally
+                        groupLabel={accountGroupLabel}
+                        listClassName="max-h-[28rem]"
+                        onSearchChange={setAccountSearch}
                         onValueChange={(accountId) => {
                           const selected = accounts.find((account) => account.id === accountId);
                           onLinesChange(
@@ -480,6 +504,7 @@ export function PurchasingItemLineEditor({
                         optionTextWrap
                         placeholder="Select account"
                         searchPlaceholder="Search account code, name, type, group..."
+                        searchValue={accountSearch}
                         triggerClassName="h-8 text-xs"
                         value={line.accountId ?? ""}
                       />

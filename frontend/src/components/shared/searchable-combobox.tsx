@@ -31,8 +31,10 @@ type SearchableComboboxProps = {
   disabled?: boolean | undefined;
   emptyMessage?: string | undefined;
   errorMessage?: string | null | undefined;
+  filterOptionsLocally?: boolean | undefined;
   groupLabel?: string | undefined;
   isLoading?: boolean | undefined;
+  listClassName?: string | undefined;
   loadingMessage?: string | undefined;
   onRetry?: (() => void) | undefined;
   onSearchChange?: ((search: string) => void) | undefined;
@@ -60,8 +62,10 @@ export function SearchableCombobox({
   disabled = false,
   emptyMessage = "No results found.",
   errorMessage = null,
+  filterOptionsLocally = false,
   groupLabel,
   isLoading = false,
+  listClassName,
   loadingMessage = "Searching...",
   onRetry,
   onSearchChange,
@@ -81,12 +85,12 @@ export function SearchableCombobox({
   const activeSearch = searchValue ?? internalSearch;
   const normalizedSearch = activeSearch.trim().toLowerCase();
   const visibleOptions = useMemo(() => {
-    if (onSearchChange || normalizedSearch.length === 0) {
+    if (normalizedSearch.length === 0 || (onSearchChange && !filterOptionsLocally)) {
       return options;
     }
 
     return options.filter((option) => optionSearchText(option).includes(normalizedSearch));
-  }, [normalizedSearch, onSearchChange, options]);
+  }, [filterOptionsLocally, normalizedSearch, onSearchChange, options]);
 
   const updateSearch = (nextSearch: string): void => {
     if (searchValue === undefined) {
@@ -170,7 +174,7 @@ export function SearchableCombobox({
             placeholder={searchPlaceholder}
             value={activeSearch}
           />
-          <CommandList id={`${triggerId}-listbox`}>
+          <CommandList className={listClassName} id={`${triggerId}-listbox`}>
             {stateContent}
             {!stateContent ? (
               <>
