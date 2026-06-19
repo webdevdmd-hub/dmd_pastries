@@ -129,6 +129,8 @@ export function PurchaseReceiveDialog({
   const [supplierId, setSupplierId] = useState("");
   const [purchaseOrderId, setPurchaseOrderId] = useState("");
   const [purchaseInvoiceId, setPurchaseInvoiceId] = useState("");
+  const linkedPurchaseOrderLabel = order?.purchaseOrderNumber ?? invoice?.purchaseOrderNumber ?? "";
+  const linkedPurchaseInvoiceLabel = invoice?.invoiceNumber ?? "";
   const [receivedDate, setReceivedDate] = useState(today());
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<PurchaseItemLineDraft[]>([emptyLine()]);
@@ -212,18 +214,20 @@ export function PurchaseReceiveDialog({
             suppliers={suppliers}
             value={supplierId}
           />
-          <Input
-            aria-label="Purchase order ID"
-            onChange={(event) => setPurchaseOrderId(event.target.value)}
-            placeholder="Linked PO ID optional"
-            value={purchaseOrderId}
-          />
-          <Input
-            aria-label="Purchase invoice ID"
-            onChange={(event) => setPurchaseInvoiceId(event.target.value)}
-            placeholder="Linked invoice ID optional"
-            value={purchaseInvoiceId}
-          />
+          {purchaseOrderId ? (
+            <div className="flex h-10 items-center rounded-md border border-input bg-brand-latte/40 px-3 text-sm text-brand-espresso">
+              <span className="mr-2 text-brand-mocha">Linked PO</span>
+              <span className="font-semibold">
+                {linkedPurchaseOrderLabel || "Linked purchase order"}
+              </span>
+            </div>
+          ) : null}
+          {purchaseInvoiceId ? (
+            <div className="flex h-10 items-center rounded-md border border-input bg-brand-latte/40 px-3 text-sm text-brand-espresso">
+              <span className="mr-2 text-brand-mocha">Linked Bill</span>
+              <span className="font-semibold">{linkedPurchaseInvoiceLabel || "Linked bill"}</span>
+            </div>
+          ) : null}
           <Input
             aria-label="Received date"
             onChange={(event) => setReceivedDate(event.target.value)}

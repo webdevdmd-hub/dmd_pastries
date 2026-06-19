@@ -46,6 +46,7 @@ export type PurchaseInvoiceFormInitialValues = {
   items: PurchaseItemLineDraft[];
   notes?: string | null;
   purchaseOrderId?: string | null;
+  purchaseOrderNumber?: string | null;
   supplierId: string;
 };
 
@@ -111,6 +112,7 @@ export function PurchaseInvoiceFormDialog({
   const [branchId, setBranchId] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [purchaseOrderId, setPurchaseOrderId] = useState("");
+  const [purchaseOrderNumber, setPurchaseOrderNumber] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(today());
   const [dueDate, setDueDate] = useState("");
@@ -157,6 +159,7 @@ export function PurchaseInvoiceFormDialog({
           })),
           notes: invoice.notes,
           purchaseOrderId: invoice.purchaseOrderId,
+          purchaseOrderNumber: invoice.purchaseOrderNumber,
           supplierId: invoice.supplierId,
         }
       : initialValues;
@@ -164,6 +167,7 @@ export function PurchaseInvoiceFormDialog({
     setBranchId(source?.branchId ?? branchScope.effectiveBranchId ?? "");
     setSupplierId(source?.supplierId ?? "");
     setPurchaseOrderId(source?.purchaseOrderId ?? "");
+    setPurchaseOrderNumber(source?.purchaseOrderNumber ?? "");
     setInvoiceNumber(source?.invoiceNumber ?? "");
     setInvoiceDate(source?.invoiceDate ? source.invoiceDate.slice(0, 10) : today());
     setDueDate(source?.dueDate?.slice(0, 10) ?? "");
@@ -176,6 +180,9 @@ export function PurchaseInvoiceFormDialog({
     );
     setError(null);
   }, [branchScope.effectiveBranchId, initialValues, invoice, open]);
+
+  const linkedPurchaseOrderLabel =
+    purchaseOrderNumber || (purchaseOrderId ? "Linked purchase order" : "");
 
   const submit = async (): Promise<void> => {
     const result = purchaseInvoiceSchema.safeParse({
@@ -235,13 +242,12 @@ export function PurchaseInvoiceFormDialog({
             suppliers={suppliers}
             value={supplierId}
           />
-          <Input
-            aria-label="Purchase order ID"
-            className="h-9 text-xs"
-            onChange={(event) => setPurchaseOrderId(event.target.value)}
-            placeholder="Linked PO ID optional"
-            value={purchaseOrderId}
-          />
+          {purchaseOrderId ? (
+            <div className="flex h-9 items-center rounded-md border border-input bg-brand-latte/40 px-3 text-xs text-brand-espresso">
+              <span className="mr-2 text-brand-mocha">Linked PO</span>
+              <span className="font-semibold">{linkedPurchaseOrderLabel}</span>
+            </div>
+          ) : null}
           <Input
             aria-label="Bill number"
             className="h-9 text-xs"

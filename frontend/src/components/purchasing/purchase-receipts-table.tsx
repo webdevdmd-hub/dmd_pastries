@@ -35,6 +35,16 @@ function nextStepForReceipt(receipt: PurchaseReceipt): string {
   return "No action";
 }
 
+function linkedPurchaseOrderLabel(receipt: PurchaseReceipt): string {
+  return receipt.purchaseOrderNumber ?? (receipt.purchaseOrderId ? "Linked PO" : "Not linked");
+}
+
+function linkedPurchaseInvoiceLabel(receipt: PurchaseReceipt): string {
+  return (
+    receipt.purchaseInvoiceNumber ?? (receipt.purchaseInvoiceId ? "Linked bill" : "Not linked")
+  );
+}
+
 export function PurchaseReceiptsTable({
   canManage,
   canReturn,
@@ -82,8 +92,8 @@ export function PurchaseReceiptsTable({
             <TableCell>{receipt.supplierName}</TableCell>
             <TableCell>{receipt.branchName}</TableCell>
             <TableCell>{formatDate(receipt.receivedDate)}</TableCell>
-            <TableCell>{receipt.purchaseOrderId ?? "Not linked"}</TableCell>
-            <TableCell>{receipt.purchaseInvoiceId ?? "Not linked"}</TableCell>
+            <TableCell>{linkedPurchaseOrderLabel(receipt)}</TableCell>
+            <TableCell>{linkedPurchaseInvoiceLabel(receipt)}</TableCell>
             <TableCell>
               <PurchaseReceiptStatusBadge status={receipt.status} />
             </TableCell>

@@ -2807,9 +2807,31 @@ func (s *Service) orderResponse(businessID string, order PurchaseOrder, includeI
 	return response
 }
 
+func (s *Service) purchaseOrderNumber(businessID string, orderID *string) string {
+	if orderID == nil || *orderID == "" {
+		return ""
+	}
+	order, err := s.repo.FindOrder(*orderID, businessID)
+	if err != nil {
+		return ""
+	}
+	return order.PurchaseOrderNumber
+}
+
+func (s *Service) purchaseInvoiceNumber(businessID string, invoiceID *string) string {
+	if invoiceID == nil || *invoiceID == "" {
+		return ""
+	}
+	invoice, err := s.repo.FindInvoice(*invoiceID, businessID)
+	if err != nil {
+		return ""
+	}
+	return invoice.InvoiceNumber
+}
+
 func (s *Service) invoiceResponse(businessID string, invoice PurchaseInvoice, includeItems bool) PurchaseInvoiceResponse {
 	branchName, supplierName := s.repo.NameLookups(businessID, invoice.BranchID, invoice.SupplierID)
-	response := PurchaseInvoiceResponse{ID: invoice.ID, BusinessID: invoice.BusinessID, BranchID: invoice.BranchID, BranchName: branchName, SupplierID: invoice.SupplierID, SupplierName: supplierName, PurchaseOrderID: invoice.PurchaseOrderID, InvoiceNumber: invoice.InvoiceNumber, SupplierBillNumber: invoice.SupplierBillNumber, InvoiceDate: invoice.InvoiceDate, DueDate: invoice.DueDate, Status: invoice.Status, PaymentStatus: invoice.PaymentStatus, SubtotalAmount: roundMoney(invoice.SubtotalAmount), TaxAmount: roundMoney(invoice.TaxAmount), ChargeAmount: roundMoney(invoice.ChargeAmount), ChargeTaxAmount: roundMoney(invoice.ChargeTaxAmount), DiscountAmount: roundMoney(invoice.DiscountAmount), BillDiscountAmount: roundMoney(invoice.BillDiscountAmount), TotalAmount: roundMoney(invoice.TotalAmount), PaidAmount: roundMoney(invoice.PaidAmount), BalanceAmount: roundMoney(invoice.BalanceAmount), ReturnedAmount: roundMoney(invoice.ReturnedAmount), CreditedAmount: roundMoney(invoice.CreditedAmount), ReturnStatus: invoice.ReturnStatus, JournalEntryID: invoice.JournalEntryID, CancelledByUserID: invoice.CancelledByUserID, CancelledAt: invoice.CancelledAt, CancelReason: invoice.CancelReason, ReversalJournalEntryID: invoice.ReversalJournalEntryID, CancelledReceiptID: invoice.CancelledReceiptID, Notes: invoice.Notes, CreatedAt: invoice.CreatedAt, UpdatedAt: invoice.UpdatedAt}
+	response := PurchaseInvoiceResponse{ID: invoice.ID, BusinessID: invoice.BusinessID, BranchID: invoice.BranchID, BranchName: branchName, SupplierID: invoice.SupplierID, SupplierName: supplierName, PurchaseOrderID: invoice.PurchaseOrderID, PurchaseOrderNumber: s.purchaseOrderNumber(businessID, invoice.PurchaseOrderID), InvoiceNumber: invoice.InvoiceNumber, SupplierBillNumber: invoice.SupplierBillNumber, InvoiceDate: invoice.InvoiceDate, DueDate: invoice.DueDate, Status: invoice.Status, PaymentStatus: invoice.PaymentStatus, SubtotalAmount: roundMoney(invoice.SubtotalAmount), TaxAmount: roundMoney(invoice.TaxAmount), ChargeAmount: roundMoney(invoice.ChargeAmount), ChargeTaxAmount: roundMoney(invoice.ChargeTaxAmount), DiscountAmount: roundMoney(invoice.DiscountAmount), BillDiscountAmount: roundMoney(invoice.BillDiscountAmount), TotalAmount: roundMoney(invoice.TotalAmount), PaidAmount: roundMoney(invoice.PaidAmount), BalanceAmount: roundMoney(invoice.BalanceAmount), ReturnedAmount: roundMoney(invoice.ReturnedAmount), CreditedAmount: roundMoney(invoice.CreditedAmount), ReturnStatus: invoice.ReturnStatus, JournalEntryID: invoice.JournalEntryID, CancelledByUserID: invoice.CancelledByUserID, CancelledAt: invoice.CancelledAt, CancelReason: invoice.CancelReason, ReversalJournalEntryID: invoice.ReversalJournalEntryID, CancelledReceiptID: invoice.CancelledReceiptID, Notes: invoice.Notes, CreatedAt: invoice.CreatedAt, UpdatedAt: invoice.UpdatedAt}
 	if includeItems {
 		items, _ := s.repo.InvoiceItems(invoice.ID, businessID)
 		for _, item := range items {
@@ -2909,7 +2931,7 @@ func (s *Service) purchaseReturnDocumentNumbers(businessID, invoiceID, receiptID
 
 func (s *Service) receiptResponse(businessID string, receipt PurchaseReceipt, includeItems bool) PurchaseReceiptResponse {
 	branchName, supplierName := s.repo.NameLookups(businessID, receipt.BranchID, receipt.SupplierID)
-	response := PurchaseReceiptResponse{ID: receipt.ID, BusinessID: receipt.BusinessID, BranchID: receipt.BranchID, BranchName: branchName, SupplierID: receipt.SupplierID, SupplierName: supplierName, PurchaseOrderID: receipt.PurchaseOrderID, PurchaseInvoiceID: receipt.PurchaseInvoiceID, ReceiptNumber: receipt.ReceiptNumber, ReceivedDate: receipt.ReceivedDate, Status: receipt.Status, ChargeAmount: roundMoney(receipt.ChargeAmount), ChargeTaxAmount: roundMoney(receipt.ChargeTaxAmount), JournalEntryID: receipt.JournalEntryID, ReceivedByUserID: receipt.ReceivedByUserID, Notes: receipt.Notes, CreatedAt: receipt.CreatedAt, UpdatedAt: receipt.UpdatedAt}
+	response := PurchaseReceiptResponse{ID: receipt.ID, BusinessID: receipt.BusinessID, BranchID: receipt.BranchID, BranchName: branchName, SupplierID: receipt.SupplierID, SupplierName: supplierName, PurchaseOrderID: receipt.PurchaseOrderID, PurchaseOrderNumber: s.purchaseOrderNumber(businessID, receipt.PurchaseOrderID), PurchaseInvoiceID: receipt.PurchaseInvoiceID, PurchaseInvoiceNumber: s.purchaseInvoiceNumber(businessID, receipt.PurchaseInvoiceID), ReceiptNumber: receipt.ReceiptNumber, ReceivedDate: receipt.ReceivedDate, Status: receipt.Status, ChargeAmount: roundMoney(receipt.ChargeAmount), ChargeTaxAmount: roundMoney(receipt.ChargeTaxAmount), JournalEntryID: receipt.JournalEntryID, ReceivedByUserID: receipt.ReceivedByUserID, Notes: receipt.Notes, CreatedAt: receipt.CreatedAt, UpdatedAt: receipt.UpdatedAt}
 	if includeItems {
 		items, _ := s.repo.ReceiptItems(receipt.ID, businessID)
 		for _, item := range items {

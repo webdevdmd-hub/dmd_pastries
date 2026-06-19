@@ -303,6 +303,7 @@ type PurchaseInvoiceResponse struct {
 	SupplierID             string                           `json:"supplier_id"`
 	SupplierName           string                           `json:"supplier_name"`
 	PurchaseOrderID        *string                          `json:"purchase_order_id"`
+	PurchaseOrderNumber    string                           `json:"purchase_order_number"`
 	InvoiceNumber          string                           `json:"invoice_number"`
 	SupplierBillNumber     string                           `json:"supplier_bill_number"`
 	InvoiceDate            time.Time                        `json:"invoice_date"`
@@ -443,26 +444,28 @@ type PurchaseDocumentChainItem struct {
 }
 
 type PurchaseReceiptResponse struct {
-	ID                string                        `json:"id"`
-	BusinessID        string                        `json:"business_id"`
-	BranchID          string                        `json:"branch_id"`
-	BranchName        string                        `json:"branch_name"`
-	SupplierID        string                        `json:"supplier_id"`
-	SupplierName      string                        `json:"supplier_name"`
-	PurchaseOrderID   *string                       `json:"purchase_order_id"`
-	PurchaseInvoiceID *string                       `json:"purchase_invoice_id"`
-	ReceiptNumber     string                        `json:"receipt_number"`
-	ReceivedDate      time.Time                     `json:"received_date"`
-	Status            string                        `json:"status"`
-	ChargeAmount      float64                       `json:"charge_amount"`
-	ChargeTaxAmount   float64                       `json:"charge_tax_amount"`
-	JournalEntryID    *string                       `json:"journal_entry_id"`
-	ReceivedByUserID  string                        `json:"received_by_user_id"`
-	Notes             string                        `json:"notes"`
-	Items             []PurchaseReceiptItemResponse `json:"items,omitempty"`
-	Charges           []charges.ChargeResponse      `json:"charges,omitempty"`
-	CreatedAt         time.Time                     `json:"created_at"`
-	UpdatedAt         time.Time                     `json:"updated_at"`
+	ID                    string                        `json:"id"`
+	BusinessID            string                        `json:"business_id"`
+	BranchID              string                        `json:"branch_id"`
+	BranchName            string                        `json:"branch_name"`
+	SupplierID            string                        `json:"supplier_id"`
+	SupplierName          string                        `json:"supplier_name"`
+	PurchaseOrderID       *string                       `json:"purchase_order_id"`
+	PurchaseOrderNumber   string                        `json:"purchase_order_number"`
+	PurchaseInvoiceID     *string                       `json:"purchase_invoice_id"`
+	PurchaseInvoiceNumber string                        `json:"purchase_invoice_number"`
+	ReceiptNumber         string                        `json:"receipt_number"`
+	ReceivedDate          time.Time                     `json:"received_date"`
+	Status                string                        `json:"status"`
+	ChargeAmount          float64                       `json:"charge_amount"`
+	ChargeTaxAmount       float64                       `json:"charge_tax_amount"`
+	JournalEntryID        *string                       `json:"journal_entry_id"`
+	ReceivedByUserID      string                        `json:"received_by_user_id"`
+	Notes                 string                        `json:"notes"`
+	Items                 []PurchaseReceiptItemResponse `json:"items,omitempty"`
+	Charges               []charges.ChargeResponse      `json:"charges,omitempty"`
+	CreatedAt             time.Time                     `json:"created_at"`
+	UpdatedAt             time.Time                     `json:"updated_at"`
 }
 
 type PurchaseReceiptItemResponse struct {

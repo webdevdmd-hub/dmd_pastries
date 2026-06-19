@@ -26,6 +26,7 @@ import {
   usePurchaseReceiptReturns,
 } from "@/hooks/use-purchasing";
 import { getErrorMessage } from "@/lib/api/client";
+import type { PurchaseReceipt } from "@/types/purchasing";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
@@ -35,6 +36,16 @@ function formatDate(value: string | null): string {
   return value
     ? new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(new Date(value))
     : "Not set";
+}
+
+function linkedPurchaseOrderLabel(receipt: PurchaseReceipt): string {
+  return receipt.purchaseOrderNumber ?? (receipt.purchaseOrderId ? "Linked PO" : "Not linked");
+}
+
+function linkedPurchaseInvoiceLabel(receipt: PurchaseReceipt): string {
+  return (
+    receipt.purchaseInvoiceNumber ?? (receipt.purchaseInvoiceId ? "Linked bill" : "Not linked")
+  );
 }
 
 export function PurchaseReceiptDetailsPageClient({
@@ -137,7 +148,7 @@ export function PurchaseReceiptDetailsPageClient({
           <CardContent className="p-5">
             <p className="text-sm text-brand-mocha">Linked PO</p>
             <p className="text-lg font-semibold text-brand-espresso">
-              {receipt.purchaseOrderId ?? "Not linked"}
+              {linkedPurchaseOrderLabel(receipt)}
             </p>
           </CardContent>
         </Card>
@@ -145,7 +156,7 @@ export function PurchaseReceiptDetailsPageClient({
           <CardContent className="p-5">
             <p className="text-sm text-brand-mocha">Linked Bill</p>
             <p className="text-lg font-semibold text-brand-espresso">
-              {receipt.purchaseInvoiceId ?? "Not linked"}
+              {linkedPurchaseInvoiceLabel(receipt)}
             </p>
           </CardContent>
         </Card>

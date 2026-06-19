@@ -159,6 +159,7 @@ export type PurchaseInvoice = {
   supplierId: string;
   supplierName: string;
   purchaseOrderId: string | null;
+  purchaseOrderNumber: string | null;
   invoiceNumber: string;
   supplierBillNumber: string | null;
   invoiceDate: string;
@@ -193,7 +194,9 @@ export type PurchaseReceipt = {
   supplierId: string;
   supplierName: string;
   purchaseOrderId: string | null;
+  purchaseOrderNumber: string | null;
   purchaseInvoiceId: string | null;
+  purchaseInvoiceNumber: string | null;
   receiptNumber: string;
   receivedDate: string;
   status: PurchaseReceiptStatus;

@@ -57,6 +57,7 @@ export function purchaseOrderToBillInitialValues(
     items: order.items.map(purchaseOrderItemToBillLine),
     notes: `Created from ${order.purchaseOrderNumber}`,
     purchaseOrderId: order.id,
+    purchaseOrderNumber: order.purchaseOrderNumber,
     supplierId: order.supplierId,
   };
 }
