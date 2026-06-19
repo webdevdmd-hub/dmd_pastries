@@ -214,10 +214,17 @@ func (r *Repository) InvoiceItems(invoiceID, businessID string) ([]PurchaseInvoi
 }
 
 func (r *Repository) ActiveInvoiceCountForOrder(tx *gorm.DB, businessID, orderID string) (int64, error) {
+	return r.ActiveInvoiceCountForOrderExcluding(tx, businessID, orderID, "")
+}
+
+func (r *Repository) ActiveInvoiceCountForOrderExcluding(tx *gorm.DB, businessID, orderID, excludeInvoiceID string) (int64, error) {
 	var count int64
-	err := tx.Model(&PurchaseInvoice{}).
-		Where("business_id = ? AND purchase_order_id = ? AND status <> ? AND deleted_at IS NULL", businessID, orderID, "cancelled").
-		Count(&count).Error
+	query := tx.Model(&PurchaseInvoice{}).
+		Where("business_id = ? AND purchase_order_id = ? AND status <> ? AND deleted_at IS NULL", businessID, orderID, "cancelled")
+	if strings.TrimSpace(excludeInvoiceID) != "" {
+		query = query.Where("id <> ?", excludeInvoiceID)
+	}
+	err := query.Count(&count).Error
 	return count, err
 }
 

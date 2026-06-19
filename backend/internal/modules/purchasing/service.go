@@ -464,7 +464,7 @@ func (s *Service) ConvertOrderToInvoice(currentUser *utils.AuthContext, id strin
 			return err
 		}
 		if existingInvoices > 0 {
-			return apperrors.Conflict("purchase order already has a purchase invoice", nil)
+			return apperrors.Conflict("purchase order already has a purchase bill", nil)
 		}
 		orderItems, err := s.repo.OrderItemsForUpdate(tx, order.ID, currentUser.BusinessID)
 		if err != nil {
@@ -2096,6 +2096,13 @@ func (s *Service) buildInvoice(tx *gorm.DB, currentUser *utils.AuthContext, id s
 		if order.BranchID != req.BranchID {
 			return nil, nil, nil, apperrors.BadRequest("purchase order branch does not match invoice branch", nil)
 		}
+		existingInvoices, err := s.repo.ActiveInvoiceCountForOrderExcluding(tx, currentUser.BusinessID, order.ID, id)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if existingInvoices > 0 {
+			return nil, nil, nil, apperrors.Conflict("purchase order already has a purchase bill", nil)
+		}
 	}
 	invoiceID := id
 	if invoiceID == "" {
@@ -2205,6 +2212,7 @@ func (s *Service) buildReceipt(tx *gorm.DB, currentUser *utils.AuthContext, req 
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	var orderItems []PurchaseOrderItem
 	if req.PurchaseOrderID != "" {
 		order, err := s.repo.FindOrderForUpdate(tx, req.PurchaseOrderID, currentUser.BusinessID)
 		if err != nil {
@@ -2215,6 +2223,10 @@ func (s *Service) buildReceipt(tx *gorm.DB, currentUser *utils.AuthContext, req 
 		}
 		if order.BranchID != req.BranchID {
 			return nil, nil, nil, apperrors.BadRequest("purchase order branch does not match receipt branch", nil)
+		}
+		orderItems, err = s.repo.OrderItemsForUpdate(tx, order.ID, currentUser.BusinessID)
+		if err != nil {
+			return nil, nil, nil, err
 		}
 	}
 	if req.PurchaseInvoiceID != "" {
@@ -2241,10 +2253,17 @@ func (s *Service) buildReceipt(tx *gorm.DB, currentUser *utils.AuthContext, req 
 		receipt.Status = status
 	}
 	items := make([]PurchaseReceiptItem, 0, len(req.Items))
+	requestedPOItems := make([]preparedItem, 0, len(req.Items))
 	for _, input := range req.Items {
 		prepared, err := s.prepareReceiptItem(tx, currentUser.BusinessID, req.BranchID, input)
 		if err != nil {
 			return nil, nil, nil, err
+		}
+		if req.PurchaseOrderID != "" {
+			requestedPOItems = append(requestedPOItems, prepared)
+			if err := validatePOReceiptQuantities(orderItems, requestedPOItems); err != nil {
+				return nil, nil, nil, err
+			}
 		}
 		if err := s.validateReceiptProduct(tx, currentUser.BusinessID, req.BranchID, prepared); err != nil {
 			return nil, nil, nil, err
@@ -2634,6 +2653,42 @@ func (s *Service) applyPOReceiveQuantity(tx *gorm.DB, businessID, orderID string
 		}
 	}
 	return apperrors.BadRequest("received item does not exist on purchase order", nil)
+}
+
+func validatePOReceiptQuantities(orderItems []PurchaseOrderItem, requestedItems []preparedItem) error {
+	remainingAny := false
+	virtualItems := make([]PurchaseOrderItem, 0, len(orderItems))
+	for _, item := range orderItems {
+		if normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID) == "account" {
+			continue
+		}
+		if roundQuantity(item.QuantityOrdered-item.QuantityReceived) > 0 {
+			remainingAny = true
+		}
+		virtualItems = append(virtualItems, item)
+	}
+	if !remainingAny {
+		return apperrors.BadRequest("purchase order has no remaining items to receive", nil)
+	}
+	for _, requested := range requestedItems {
+		matched := false
+		for index := range virtualItems {
+			if !requested.matchesOrderItem(virtualItems[index]) {
+				continue
+			}
+			matched = true
+			nextReceived := roundQuantity(virtualItems[index].QuantityReceived + requested.Quantity)
+			if nextReceived > roundQuantity(virtualItems[index].QuantityOrdered) {
+				return apperrors.BadRequest("quantity_received exceeds quantity_ordered", nil)
+			}
+			virtualItems[index].QuantityReceived = nextReceived
+			break
+		}
+		if !matched {
+			return apperrors.BadRequest("received item does not exist on purchase order", nil)
+		}
+	}
+	return nil
 }
 
 func (s *Service) reversePOReceiveQuantity(tx *gorm.DB, businessID, orderID string, item preparedItem) error {

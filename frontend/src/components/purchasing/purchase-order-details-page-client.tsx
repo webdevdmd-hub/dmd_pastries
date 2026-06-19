@@ -43,6 +43,7 @@ import { purchaseOrderToBillInitialValues } from "@/lib/purchasing/purchase-orde
 import { cn } from "@/lib/utils/cn";
 import type {
   CreatePurchaseInvoicePayload,
+  PurchaseOrder,
   ReceivePurchaseOrderPayload,
   UpdatePurchaseInvoicePayload,
   UpdatePurchaseOrderPayload,
@@ -91,6 +92,15 @@ function WorkflowStep({
         {description}
       </p>
     </div>
+  );
+}
+
+function hasRemainingReceivableProducts(order: PurchaseOrder): boolean {
+  return order.items.some(
+    (item) =>
+      item.lineType !== "account" &&
+      item.itemType !== "account" &&
+      item.quantityOrdered - item.quantityReceived > 0,
   );
 }
 
@@ -174,7 +184,9 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   );
   const isPaid = activeBill?.paymentStatus === "paid";
   const canReceiveOrder =
-    canReceive && (order.status === "ordered" || order.status === "partially_received");
+    canReceive &&
+    (order.status === "ordered" || order.status === "partially_received") &&
+    hasRemainingReceivableProducts(order);
   const canEditOrder = canEdit && (order.status === "draft" || order.status === "ordered");
   const canAdjustRemaining = canEdit && order.status === "partially_received";
   const canConvertOrder = canConvert && order.status === "received" && !activeBill;

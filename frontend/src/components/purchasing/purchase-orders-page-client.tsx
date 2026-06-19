@@ -38,6 +38,7 @@ import {
   useDeletePurchaseOrder,
   useDuplicatePurchaseOrder,
   usePurchaseOrder,
+  usePurchaseOrderDocumentChain,
   usePurchaseOrders,
   usePurchasingBranches,
   usePurchasingProducts,
@@ -139,6 +140,10 @@ export function PurchaseOrdersPageClient(): JSX.Element {
     convertingOrderId,
     canView && branchScope.hasBranchScope && convertingOrderId !== null,
   );
+  const convertingOrderChainQuery = usePurchaseOrderDocumentChain(
+    convertingOrderId,
+    canView && branchScope.hasBranchScope && convertingOrderId !== null,
+  );
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const branchesQuery = usePurchasingBranches(canView);
   const productsQuery = usePurchasingProducts(canView);
@@ -192,6 +197,23 @@ export function PurchaseOrdersPageClient(): JSX.Element {
     toast.error(getErrorMessage(convertingOrderQuery.error));
     setConvertingOrderId(null);
   }, [convertingOrderQuery.error]);
+
+  useEffect(() => {
+    if (!convertingOrderChainQuery.error) return;
+
+    toast.error(getErrorMessage(convertingOrderChainQuery.error));
+    setConvertingOrderId(null);
+  }, [convertingOrderChainQuery.error]);
+
+  useEffect(() => {
+    const activeBill = convertingOrderChainQuery.data?.purchaseInvoices.find(
+      (invoice) => invoice.status !== "cancelled",
+    );
+    if (!activeBill) return;
+
+    toast.error("This purchase order already has a bill.");
+    setConvertingOrderId(null);
+  }, [convertingOrderChainQuery.data]);
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -297,6 +319,11 @@ export function PurchaseOrdersPageClient(): JSX.Element {
 
   const orders = ordersQuery.data ?? [];
   const convertingOrder = convertingOrderQuery.data ?? null;
+  const convertingOrderHasActiveBill = Boolean(
+    convertingOrderChainQuery.data?.purchaseInvoices.some(
+      (invoice) => invoice.status !== "cancelled",
+    ),
+  );
   const billInitialValues = convertingOrder
     ? purchaseOrderToBillInitialValues(convertingOrder)
     : null;
@@ -419,11 +446,15 @@ export function PurchaseOrdersPageClient(): JSX.Element {
         createTitle="Create Bill from PO"
         initialValues={billInitialValues}
         invoice={null}
-        isSubmitting={createInvoiceMutation.isPending || convertingOrderQuery.isLoading}
+        isSubmitting={
+          createInvoiceMutation.isPending ||
+          convertingOrderQuery.isLoading ||
+          convertingOrderChainQuery.isLoading
+        }
         onClose={() => setConvertingOrderId(null)}
         onCreate={handleCreateBillFromOrder}
         onUpdate={noopUpdateBill}
-        open={convertingOrderId !== null}
+        open={convertingOrderId !== null && !convertingOrderHasActiveBill}
         products={productsQuery.data ?? []}
         suppliers={suppliersQuery.data ?? []}
         taxRates={taxRatesQuery.data ?? []}
