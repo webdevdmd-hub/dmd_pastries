@@ -218,14 +218,16 @@ export function PurchaseReceiveDialog({
             <div className="flex h-10 items-center rounded-md border border-input bg-brand-latte/40 px-3 text-sm text-brand-espresso">
               <span className="mr-2 text-brand-mocha">Linked PO</span>
               <span className="font-semibold">
-                {linkedPurchaseOrderLabel || "Linked purchase order"}
+                {linkedPurchaseOrderLabel || "PO number unavailable"}
               </span>
             </div>
           ) : null}
           {purchaseInvoiceId ? (
             <div className="flex h-10 items-center rounded-md border border-input bg-brand-latte/40 px-3 text-sm text-brand-espresso">
               <span className="mr-2 text-brand-mocha">Linked Bill</span>
-              <span className="font-semibold">{linkedPurchaseInvoiceLabel || "Linked bill"}</span>
+              <span className="font-semibold">
+                {linkedPurchaseInvoiceLabel || "Bill number unavailable"}
+              </span>
             </div>
           ) : null}
           <Input

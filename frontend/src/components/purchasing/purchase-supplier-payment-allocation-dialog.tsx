@@ -437,7 +437,10 @@ export function PurchaseSupplierPaymentAllocationDialog({
                             <TableCell className="font-medium text-brand-espresso">
                               {invoiceLabel(invoice)}
                             </TableCell>
-                            <TableCell>{invoice.purchaseOrderNumber ?? "-"}</TableCell>
+                            <TableCell>
+                              {invoice.purchaseOrderNumber ??
+                                (invoice.purchaseOrderId ? "PO number unavailable" : "-")}
+                            </TableCell>
                             <TableCell className="text-right tabular-nums">
                               {formatCurrency(invoice.totalAmount)}
                             </TableCell>

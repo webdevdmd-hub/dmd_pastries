@@ -193,23 +193,25 @@ type SupplierPaymentAllocation struct {
 func (SupplierPaymentAllocation) TableName() string { return "supplier_payment_allocations" }
 
 type PurchaseReceipt struct {
-	ID                string         `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID        string         `gorm:"type:uuid;not null;index" json:"business_id"`
-	BranchID          string         `gorm:"type:uuid;not null;index" json:"branch_id"`
-	SupplierID        string         `gorm:"type:uuid;not null;index" json:"supplier_id"`
-	PurchaseOrderID   *string        `gorm:"type:uuid;index" json:"purchase_order_id"`
-	PurchaseInvoiceID *string        `gorm:"type:uuid;index" json:"purchase_invoice_id"`
-	ReceiptNumber     string         `gorm:"size:100;not null" json:"receipt_number"`
-	ReceivedDate      time.Time      `gorm:"type:date;not null" json:"received_date"`
-	Status            string         `gorm:"size:50;not null;default:posted" json:"status"`
-	ChargeAmount      float64        `gorm:"not null;default:0" json:"charge_amount"`
-	ChargeTaxAmount   float64        `gorm:"not null;default:0" json:"charge_tax_amount"`
-	JournalEntryID    *string        `gorm:"type:uuid;index" json:"journal_entry_id"`
-	ReceivedByUserID  string         `gorm:"type:uuid;not null;index" json:"received_by_user_id"`
-	Notes             string         `json:"notes"`
-	CreatedAt         time.Time      `json:"created_at"`
-	UpdatedAt         time.Time      `json:"updated_at"`
-	DeletedAt         gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	ID                    string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID            string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID              string         `gorm:"type:uuid;not null;index" json:"branch_id"`
+	SupplierID            string         `gorm:"type:uuid;not null;index" json:"supplier_id"`
+	PurchaseOrderID       *string        `gorm:"type:uuid;index" json:"purchase_order_id"`
+	PurchaseInvoiceID     *string        `gorm:"type:uuid;index" json:"purchase_invoice_id"`
+	PurchaseOrderNumber   string         `gorm:"->;column:purchase_order_number" json:"purchase_order_number"`
+	PurchaseInvoiceNumber string         `gorm:"->;column:purchase_invoice_number" json:"purchase_invoice_number"`
+	ReceiptNumber         string         `gorm:"size:100;not null" json:"receipt_number"`
+	ReceivedDate          time.Time      `gorm:"type:date;not null" json:"received_date"`
+	Status                string         `gorm:"size:50;not null;default:posted" json:"status"`
+	ChargeAmount          float64        `gorm:"not null;default:0" json:"charge_amount"`
+	ChargeTaxAmount       float64        `gorm:"not null;default:0" json:"charge_tax_amount"`
+	JournalEntryID        *string        `gorm:"type:uuid;index" json:"journal_entry_id"`
+	ReceivedByUserID      string         `gorm:"type:uuid;not null;index" json:"received_by_user_id"`
+	Notes                 string         `json:"notes"`
+	CreatedAt             time.Time      `json:"created_at"`
+	UpdatedAt             time.Time      `json:"updated_at"`
+	DeletedAt             gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 func (PurchaseReceipt) TableName() string { return "purchase_receipts" }

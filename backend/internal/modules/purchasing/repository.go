@@ -516,7 +516,12 @@ func (r *Repository) CreateReceipt(tx *gorm.DB, receipt *PurchaseReceipt, items 
 
 func (r *Repository) FindReceipt(id, businessID string) (*PurchaseReceipt, error) {
 	var receipt PurchaseReceipt
-	err := r.db.Where("id = ? AND business_id = ? AND deleted_at IS NULL", id, businessID).First(&receipt).Error
+	err := r.db.Model(&PurchaseReceipt{}).
+		Select("purchase_receipts.*, po.purchase_order_number AS purchase_order_number, pi.invoice_number AS purchase_invoice_number").
+		Joins("LEFT JOIN purchase_orders po ON po.id = purchase_receipts.purchase_order_id AND po.business_id = purchase_receipts.business_id").
+		Joins("LEFT JOIN purchase_invoices pi ON pi.id = purchase_receipts.purchase_invoice_id AND pi.business_id = purchase_receipts.business_id").
+		Where("purchase_receipts.id = ? AND purchase_receipts.business_id = ? AND purchase_receipts.deleted_at IS NULL", id, businessID).
+		First(&receipt).Error
 	return &receipt, err
 }
 
@@ -534,7 +539,10 @@ func (r *Repository) ListReceipts(businessID string, query ListQuery) ([]Purchas
 		return nil, 0, err
 	}
 	var rows []PurchaseReceipt
-	err := db.Order(fmt.Sprintf("purchase_receipts.%s %s", safeSort(query.SortBy), safeOrder(query.SortOrder))).
+	err := db.Select("purchase_receipts.*, po.purchase_order_number AS purchase_order_number, pi.invoice_number AS purchase_invoice_number").
+		Joins("LEFT JOIN purchase_orders po ON po.id = purchase_receipts.purchase_order_id AND po.business_id = purchase_receipts.business_id").
+		Joins("LEFT JOIN purchase_invoices pi ON pi.id = purchase_receipts.purchase_invoice_id AND pi.business_id = purchase_receipts.business_id").
+		Order(fmt.Sprintf("purchase_receipts.%s %s", safeSort(query.SortBy), safeOrder(query.SortOrder))).
 		Offset((query.Page - 1) * query.Limit).Limit(query.Limit).Find(&rows).Error
 	return rows, total, err
 }

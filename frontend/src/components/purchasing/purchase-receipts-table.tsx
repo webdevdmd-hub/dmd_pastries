@@ -36,12 +36,16 @@ function nextStepForReceipt(receipt: PurchaseReceipt): string {
 }
 
 function linkedPurchaseOrderLabel(receipt: PurchaseReceipt): string {
-  return receipt.purchaseOrderNumber ?? (receipt.purchaseOrderId ? "Linked PO" : "Not linked");
+  return (
+    receipt.purchaseOrderNumber ??
+    (receipt.purchaseOrderId ? "PO number unavailable" : "Not linked")
+  );
 }
 
 function linkedPurchaseInvoiceLabel(receipt: PurchaseReceipt): string {
   return (
-    receipt.purchaseInvoiceNumber ?? (receipt.purchaseInvoiceId ? "Linked bill" : "Not linked")
+    receipt.purchaseInvoiceNumber ??
+    (receipt.purchaseInvoiceId ? "Bill number unavailable" : "Not linked")
   );
 }
 

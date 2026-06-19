@@ -129,3 +129,12 @@
  ✓ Compiled in 168ms (566 modules)
  ✓ Compiled in 158ms (566 modules)
  ✓ Compiled in 156ms (566 modules)
+ ✓ Compiled in 190ms (566 modules)
+ ✓ Compiled in 163ms (566 modules)
+ ✓ Compiled in 136ms (566 modules)
+ ✓ Compiled in 491ms (566 modules)
+ ✓ Compiled in 579ms (566 modules)
+ ✓ Compiled in 195ms (566 modules)
+ ○ Compiling /purchasing/receipts ...
+ ✓ Compiled /purchasing/receipts in 976ms (1256 modules)
+ GET /purchasing/receipts 200 in 1284ms

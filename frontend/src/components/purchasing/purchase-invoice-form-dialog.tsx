@@ -182,7 +182,7 @@ export function PurchaseInvoiceFormDialog({
   }, [branchScope.effectiveBranchId, initialValues, invoice, open]);
 
   const linkedPurchaseOrderLabel =
-    purchaseOrderNumber || (purchaseOrderId ? "Linked purchase order" : "");
+    purchaseOrderNumber || (purchaseOrderId ? "PO number unavailable" : "");
 
   const submit = async (): Promise<void> => {
     const result = purchaseInvoiceSchema.safeParse({
