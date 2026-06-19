@@ -95,6 +95,9 @@ export function PurchaseOrderFormDialog({
   const [lines, setLines] = useState<PurchaseItemLineDraft[]>([emptyLine()]);
   const [error, setError] = useState<string | null>(null);
   const isPartialAdjustment = order?.status === "partially_received";
+  const hasAccountRows = lines.some(
+    (line) => line.lineType === "account" || line.itemType === "account" || Boolean(line.accountId),
+  );
   const lineLocks =
     order?.status === "partially_received"
       ? Object.fromEntries(
@@ -248,7 +251,7 @@ export function PurchaseOrderFormDialog({
             lines={lines}
             onLinesChange={setLines}
             products={products}
-            showAccountRows
+            showAccountRows={hasAccountRows}
             taxRates={taxRates}
             units={units}
           />
