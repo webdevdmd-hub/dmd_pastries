@@ -193,6 +193,26 @@ func (h *Handler) CreateSupplierPayment(c *gin.Context) {
 	respondCreated(c, "supplier payment created successfully", result, err)
 }
 
+func (h *Handler) UpdateSupplierPayment(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	var req UpdateSupplierPaymentRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.UpdateSupplierPayment(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	respond(c, "supplier payment updated successfully", result, err)
+}
+
+func (h *Handler) DeleteSupplierPayment(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	err := h.service.DeleteSupplierPayment(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	respond(c, "supplier payment deleted successfully", gin.H{"id": c.Param("id")}, err)
+}
+
 func (h *Handler) ListInvoicePaymentsByInvoice(c *gin.Context) {
 	if !validParam(c, "id") {
 		return

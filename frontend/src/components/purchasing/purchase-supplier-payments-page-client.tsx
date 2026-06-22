@@ -29,15 +29,19 @@ import { usePaymentMethods } from "@/hooks/use-payments";
 import { usePermission } from "@/hooks/use-permission";
 import {
   useCreateSupplierPayment,
+  useDeleteSupplierPayment,
   usePurchaseInvoices,
   usePurchasingBranches,
   usePurchasingSuppliers,
+  useSupplierPayment,
   useSupplierPayments,
+  useUpdateSupplierPayment,
 } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import type {
   CreateSupplierPaymentPayload,
   PurchaseInvoice,
+  SupplierPayment,
   SupplierPaymentFilters,
 } from "@/types/purchasing";
 
@@ -57,9 +61,37 @@ const defaultFilters: SupplierPaymentFilters = {
 
 const paymentStatuses = [
   { label: "Completed", value: "completed" },
-  { label: "Pending", value: "pending" },
-  { label: "Failed", value: "failed" },
+  { label: "Voided", value: "voided" },
 ];
+
+function paymentAllocationMap(payment: SupplierPayment | null | undefined): Map<string, number> {
+  return new Map(
+    (payment?.allocations ?? []).map((allocation) => [
+      allocation.purchaseInvoiceId,
+      allocation.amount,
+    ]),
+  );
+}
+
+function mergeEditableInvoices(
+  invoices: PurchaseInvoice[],
+  payment: SupplierPayment | null | undefined,
+): PurchaseInvoice[] {
+  const allocationMap = paymentAllocationMap(payment);
+
+  return invoices
+    .map((invoice) => {
+      const existingAllocation = allocationMap.get(invoice.id) ?? 0;
+      return {
+        ...invoice,
+        balanceAmount: invoice.balanceAmount + existingAllocation,
+      };
+    })
+    .filter(
+      (invoice) =>
+        invoice.status === "posted" && (invoice.balanceAmount > 0 || allocationMap.has(invoice.id)),
+    );
+}
 
 export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -75,12 +107,17 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
     branchId: branchScope.defaultBranchId,
   });
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [selectedPaymentBranchId, setSelectedPaymentBranchId] = useState("");
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
   const paymentsQuery = useSupplierPayments(filters, canView && branchScope.hasBranchScope);
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const branchesQuery = usePurchasingBranches(canView);
   const methodsQuery = usePaymentMethods(canView);
+  const editingPaymentQuery = useSupplierPayment(
+    editingPaymentId,
+    canView && canManage && editingPaymentId !== null,
+  );
   const filterBranchId = branchScope.normalizeBranchId(filters.branchId);
   const branchOptions = useMemo(
     () =>
@@ -109,6 +146,8 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
       selectedSupplierId.length > 0,
   );
   const createPaymentMutation = useCreateSupplierPayment();
+  const updatePaymentMutation = useUpdateSupplierPayment();
+  const deletePaymentMutation = useDeleteSupplierPayment();
   const purchasingPaymentMethods = useMemo(
     () =>
       (methodsQuery.data ?? []).filter(
@@ -118,19 +157,21 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   );
   const isPermissionDenied =
     paymentsQuery.error instanceof ApiError && paymentsQuery.error.status === 403;
-  const payableInvoices = useMemo(
-    () =>
-      selectedSupplierId
-        ? (payableInvoicesQuery.data ?? []).filter(
-            (invoice) => invoice.status === "posted" && invoice.balanceAmount > 0,
-          )
-        : [],
-    [payableInvoicesQuery.data, selectedSupplierId],
-  );
+  const payableInvoices = useMemo(() => {
+    if (!selectedSupplierId) return [];
+
+    return editingPaymentId
+      ? mergeEditableInvoices(payableInvoicesQuery.data ?? [], editingPaymentQuery.data)
+      : (payableInvoicesQuery.data ?? []).filter(
+          (invoice) => invoice.status === "posted" && invoice.balanceAmount > 0,
+        );
+  }, [editingPaymentId, editingPaymentQuery.data, payableInvoicesQuery.data, selectedSupplierId]);
 
   useEffect(() => {
-    setSelectedSupplierId("");
-  }, [filters.branchId, manualDialogOpen]);
+    if (!editingPaymentId) {
+      setSelectedSupplierId("");
+    }
+  }, [editingPaymentId, filters.branchId, manualDialogOpen]);
 
   useEffect(() => {
     if (!manualDialogOpen) return;
@@ -166,6 +207,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
 
   const closeManualDialog = (): void => {
     setManualDialogOpen(false);
+    setEditingPaymentId(null);
     setSelectedPaymentBranchId("");
     setSelectedSupplierId("");
   };
@@ -176,18 +218,46 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
       return;
     }
 
-    await createPaymentMutation.mutateAsync(payload);
-    toast.success("Payment made recorded.");
+    if (editingPaymentId) {
+      await updatePaymentMutation.mutateAsync({ paymentId: editingPaymentId, payload });
+      toast.success("Payment made updated.");
+    } else {
+      await createPaymentMutation.mutateAsync(payload);
+      toast.success("Payment made recorded.");
+    }
     closeManualDialog();
   };
 
   const refreshPayableInvoices = async (): Promise<PurchaseInvoice[]> => {
     const result = await payableInvoicesQuery.refetch();
-    return selectedSupplierId
-      ? (result.data ?? []).filter(
+    if (!selectedSupplierId) return [];
+
+    return editingPaymentId
+      ? mergeEditableInvoices(result.data ?? [], editingPaymentQuery.data)
+      : (result.data ?? []).filter(
           (invoice) => invoice.status === "posted" && invoice.balanceAmount > 0,
-        )
-      : [];
+        );
+  };
+
+  const openEditPayment = (payment: SupplierPayment): void => {
+    setEditingPaymentId(payment.id);
+    setSelectedPaymentBranchId(payment.branchId);
+    setSelectedSupplierId(payment.supplierId);
+    setManualDialogOpen(true);
+  };
+
+  const deletePayment = async (payment: SupplierPayment): Promise<void> => {
+    const confirmed = window.confirm(
+      "This will permanently delete the supplier payment and remove its effect from supplier outstanding, bill balances, supplier advance, and accounting records. This cannot be undone.",
+    );
+    if (!confirmed) return;
+
+    try {
+      await deletePaymentMutation.mutateAsync(payment.id);
+      toast.success("Payment made deleted.");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
   };
 
   return (
@@ -322,7 +392,13 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
       {!paymentsQuery.isLoading && !paymentsQuery.error && (paymentsQuery.data ?? []).length > 0 ? (
         <Card>
           <CardContent className="p-0">
-            <PurchaseSupplierPaymentsTable payments={paymentsQuery.data ?? []} />
+            <PurchaseSupplierPaymentsTable
+              onDelete={(payment) => {
+                void deletePayment(payment);
+              }}
+              onEdit={openEditPayment}
+              payments={paymentsQuery.data ?? []}
+            />
           </CardContent>
         </Card>
       ) : null}
@@ -335,7 +411,13 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
           payableInvoicesQuery.error ? getErrorMessage(payableInvoicesQuery.error) : null
         }
         invoicesLoading={payableInvoicesQuery.isLoading}
-        isSubmitting={createPaymentMutation.isPending}
+        initialPayment={editingPaymentQuery.data ?? null}
+        isSubmitting={
+          createPaymentMutation.isPending ||
+          updatePaymentMutation.isPending ||
+          (editingPaymentId !== null && editingPaymentQuery.isLoading)
+        }
+        mode={editingPaymentId ? "edit" : "create"}
         methods={purchasingPaymentMethods}
         onBranchChange={(branchId) => {
           setSelectedPaymentBranchId(branchId);

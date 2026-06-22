@@ -73,8 +73,11 @@ export function PurchaseSupplierPaymentDialog({
     resolver: zodResolver(supplierPaymentSchema),
   });
   const selectedMethod = methods.find((method) => method.id === form.watch("paymentMethodId"));
-  const paymentAmount = form.watch("amount");
-  const remainingBalance = Math.max(balanceAmount - paymentAmount, 0);
+  const watchedPaymentAmount = form.watch("amount");
+  const paymentAmount =
+    typeof watchedPaymentAmount === "number" ? watchedPaymentAmount : Number(watchedPaymentAmount);
+  const safePaymentAmount = Number.isFinite(paymentAmount) ? paymentAmount : 0;
+  const remainingBalance = Math.max(balanceAmount - safePaymentAmount, 0);
 
   useEffect(() => {
     if (open) {
@@ -158,7 +161,7 @@ export function PurchaseSupplierPaymentDialog({
                 New payment
               </p>
               <p className="mt-1 font-semibold text-brand-espresso">
-                AED {paymentAmount.toFixed(2)}
+                AED {safePaymentAmount.toFixed(2)}
               </p>
             </div>
             <div>
@@ -206,7 +209,7 @@ export function PurchaseSupplierPaymentDialog({
                 step="0.01"
                 type="number"
                 disabled={disabled}
-                {...form.register("amount")}
+                {...form.register("amount", { valueAsNumber: true })}
               />
               <p className="text-xs text-red-700">{form.formState.errors.amount?.message}</p>
             </div>

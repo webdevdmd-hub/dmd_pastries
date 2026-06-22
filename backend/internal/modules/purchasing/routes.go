@@ -34,6 +34,8 @@ func RegisterRoutes(
 	group.GET("/supplier-payments", view, handler.ListSupplierPayments)
 	group.POST("/supplier-payments", manage, handler.CreateSupplierPayment)
 	group.GET("/supplier-payments/:id", view, handler.GetSupplierPayment)
+	group.PATCH("/supplier-payments/:id", manage, handler.UpdateSupplierPayment)
+	group.DELETE("/supplier-payments/:id", manage, handler.DeleteSupplierPayment)
 	group.GET("/invoices/:id", view, handler.GetInvoice)
 	group.PATCH("/invoices/:id", manage, handler.UpdateInvoice)
 	group.POST("/invoices/:id/post", manage, handler.PostInvoice)

@@ -206,6 +206,8 @@ type CreateSupplierPaymentRequest struct {
 	Allocations          []SupplierPaymentAllocationInput `json:"allocations"`
 }
 
+type UpdateSupplierPaymentRequest = CreateSupplierPaymentRequest
+
 type SupplierPaymentAllocationInput struct {
 	PurchaseInvoiceID string  `json:"purchase_invoice_id" binding:"required"`
 	Amount            float64 `json:"amount" binding:"required"`
@@ -447,7 +449,7 @@ type SupplierPaymentResponse struct {
 	JournalEntryID         *string                             `json:"journal_entry_id"`
 	PaidByUserID           string                              `json:"paid_by_user_id"`
 	PaidByUserName         string                              `json:"paid_by_user_name"`
-	Allocations            []SupplierPaymentAllocationResponse `json:"allocations,omitempty"`
+	Allocations            []SupplierPaymentAllocationResponse `json:"allocations,omitempty" gorm:"-"`
 	CreatedAt              time.Time                           `json:"created_at"`
 	UpdatedAt              time.Time                           `json:"updated_at"`
 }

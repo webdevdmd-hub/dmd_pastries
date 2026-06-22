@@ -39,6 +39,7 @@ import type {
   PurchaseInvoice,
   PurchasingBranchOption,
   PurchasingSupplierOption,
+  SupplierPayment,
 } from "@/types/purchasing";
 import type { PaymentMethod } from "@/types/settings";
 
@@ -49,6 +50,8 @@ type SupplierPaymentAllocationDialogProps = {
   invoicesError: string | null;
   invoicesLoading: boolean;
   isSubmitting: boolean;
+  initialPayment?: SupplierPayment | null;
+  mode?: "create" | "edit";
   methods: PaymentMethod[];
   onClose: () => void;
   onBranchChange: (branchId: string) => void;
@@ -95,6 +98,8 @@ export function PurchaseSupplierPaymentAllocationDialog({
   invoicesError,
   invoicesLoading,
   isSubmitting,
+  initialPayment = null,
+  mode = "create",
   methods,
   onClose,
   onBranchChange,
@@ -118,6 +123,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
   const [validatingBalances, setValidatingBalances] = useState(false);
 
   const selectedMethod = methods.find((method) => method.id === paymentMethodId) ?? null;
+  const isEditing = mode === "edit";
   const amountValue = roundMoney(parseAmount(amount));
   const allocationEntries = useMemo(
     () =>
@@ -142,14 +148,26 @@ export function PurchaseSupplierPaymentAllocationDialog({
   useEffect(() => {
     if (!open) return;
 
-    setPaymentMethodId("");
-    setAmount("0");
-    setPaymentDate(todayInputValue());
-    setReferenceNumber("");
-    setNotes("");
-    setAllocations({});
+    setPaymentMethodId(initialPayment?.paymentMethodId ?? "");
+    setAmount(initialPayment ? String(initialPayment.amount) : "0");
+    setPaymentDate(
+      initialPayment?.paymentDate ? initialPayment.paymentDate.slice(0, 10) : todayInputValue(),
+    );
+    setReferenceNumber(initialPayment?.referenceNumber ?? "");
+    setNotes(initialPayment?.notes ?? "");
+    setAllocations(
+      initialPayment
+        ? Object.fromEntries(
+            initialPayment.allocations.map((allocation) => [
+              allocation.purchaseInvoiceId,
+              String(roundMoney(allocation.amount)),
+            ]),
+          )
+        : {},
+    );
     setSubmitError(null);
-  }, [open]);
+    setRowErrors({});
+  }, [initialPayment, open]);
 
   useEffect(() => {
     setAllocations({});
@@ -306,10 +324,13 @@ export function PurchaseSupplierPaymentAllocationDialog({
     >
       <DialogContent className="flex max-h-[92vh] max-w-[1200px] flex-col overflow-hidden p-0 sm:w-[92vw]">
         <DialogHeader className="border-b border-brand-cappuccino/70 px-6 py-5">
-          <DialogTitle>Record Supplier Payment</DialogTitle>
+          <DialogTitle>
+            {isEditing ? "Edit Supplier Payment" : "Record Supplier Payment"}
+          </DialogTitle>
           <DialogDescription>
-            Select a supplier, allocate the payment across open bills, or save the balance as
-            supplier advance.
+            {isEditing
+              ? "Update the supplier payment and recalculate bill balances, supplier advance, and accounting."
+              : "Select a supplier, allocate the payment across open bills, or save the balance as supplier advance."}
           </DialogDescription>
         </DialogHeader>
 
@@ -680,7 +701,11 @@ export function PurchaseSupplierPaymentAllocationDialog({
             onClick={() => void submit()}
             type="button"
           >
-            {isSubmitting || validatingBalances ? "Saving..." : "Save as Paid"}
+            {isSubmitting || validatingBalances
+              ? "Saving..."
+              : isEditing
+                ? "Update Payment"
+                : "Save as Paid"}
           </Button>
         </DialogFooter>
       </DialogContent>

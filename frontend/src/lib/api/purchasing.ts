@@ -51,6 +51,7 @@ import type {
   UpdatePurchaseOrderPayload,
   UpdatePurchaseOrderStatusPayload,
   UpdatePurchaseReturnPayload,
+  UpdateSupplierPaymentPayload,
 } from "@/types/purchasing";
 
 type BackendLinePayload = {
@@ -186,6 +187,22 @@ type BackendPurchaseReturnPayload = {
   supplier_reference_number?: string | null;
 };
 
+const PURCHASABLE_PRODUCT_TYPES: ProductType[] = [
+  "finished_product",
+  "ingredient",
+  "packaging",
+  "raw_material",
+  "semi_finished",
+  "consumable",
+  "equipment",
+];
+
+type PurchasingProductPage = {
+  items: PurchasingProductOption[];
+  page: number;
+  totalPages: number;
+};
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -311,7 +328,7 @@ function isReceiptStatus(value: unknown): value is PurchaseReceiptStatus {
 }
 
 function isSupplierPaymentStatus(value: unknown): value is SupplierPaymentStatus {
-  return value === "completed" || value === "pending" || value === "failed";
+  return value === "completed" || value === "voided";
 }
 
 function isPurchaseReturnStatus(value: unknown): value is PurchaseReturnStatus {
@@ -972,6 +989,33 @@ function parseProduct(value: unknown): PurchasingProductOption {
       status: variant.status === "inactive" ? "inactive" : "active",
       variantName: stringValue(variant.variant_name, "Variant"),
     })),
+  };
+}
+
+function parseProductPage(value: unknown): PurchasingProductPage {
+  const items = parseList(value, parseProduct);
+
+  if (!isObject(value)) {
+    return {
+      items,
+      page: 1,
+      totalPages: 1,
+    };
+  }
+
+  const pagination = isObject(value.pagination) ? value.pagination : {};
+  const page = numberValue(value.page, numberValue(pagination.page, 1));
+  const limit = numberValue(value.limit, numberValue(pagination.limit, items.length || 100));
+  const total = numberValue(value.total, numberValue(pagination.total, items.length));
+  const totalPages = numberValue(
+    value.total_pages,
+    numberValue(pagination.total_pages, limit > 0 ? Math.ceil(total / limit) : 1),
+  );
+
+  return {
+    items,
+    page: Math.max(1, page),
+    totalPages: Math.max(1, totalPages),
   };
 }
 
@@ -1659,6 +1703,37 @@ export async function createSupplierPayment(
   return response.data;
 }
 
+export async function updateSupplierPayment(
+  paymentId: string,
+  payload: UpdateSupplierPaymentPayload,
+): Promise<SupplierPayment> {
+  const response = await apiRequest<SupplierPayment, BackendCreateSupplierPaymentPayload>(
+    `/api/v1/purchasing/supplier-payments/${paymentId}`,
+    {
+      authMode: "appwrite",
+      body: createSupplierPaymentPayload(payload),
+      method: "PATCH",
+      parse: parseSupplierPayment,
+    },
+  );
+
+  return response.data;
+}
+
+export async function deleteSupplierPayment(paymentId: string): Promise<void> {
+  await apiRequest<{ id: string }>(`/api/v1/purchasing/supplier-payments/${paymentId}`, {
+    authMode: "appwrite",
+    method: "DELETE",
+    parse: (data) => {
+      if (!isObject(data)) {
+        throw new Error("Backend supplier payment delete payload is invalid.");
+      }
+
+      return { id: stringValue(data.id) };
+    },
+  });
+}
+
 export async function receivePurchase(payload: ReceivePurchasePayload): Promise<PurchaseReceipt> {
   const response = await apiRequest<PurchaseReceipt, BackendReceivePayload>(
     "/api/v1/purchasing/receive",
@@ -1859,26 +1934,54 @@ export async function lookupSuppliers(search = ""): Promise<PurchasingSupplierOp
   return response.data;
 }
 
-export async function getProducts(): Promise<PurchasingProductOption[]> {
-  const response = await apiRequest<PurchasingProductOption[]>(
-    "/api/v1/products?status=active&limit=100",
+async function getProductPage(page: number): Promise<PurchasingProductPage> {
+  const response = await apiRequest<PurchasingProductPage>(
+    `/api/v1/products${toQueryString({
+      limit: 100,
+      page,
+      sort_by: "product_name",
+      sort_order: "asc",
+      status: "active",
+    })}`,
     {
       authMode: "appwrite",
-      parse: (data) =>
-        parseList(data, parseProduct).filter((product) =>
-          [
-            "ingredient",
-            "packaging",
-            "raw_material",
-            "semi_finished",
-            "consumable",
-            "equipment",
-          ].includes(product.productType),
-        ),
+      parse: parseProductPage,
     },
   );
 
   return response.data;
+}
+
+async function getAllProductPages(): Promise<PurchasingProductOption[]> {
+  const firstPage = await getProductPage(1);
+  const remainingPages =
+    firstPage.totalPages > 1
+      ? await Promise.all(
+          Array.from({ length: firstPage.totalPages - 1 }, async (_, index) =>
+            getProductPage(index + 2),
+          ),
+        )
+      : [];
+
+  return [firstPage, ...remainingPages].flatMap((page) => page.items);
+}
+
+export async function getProducts(): Promise<PurchasingProductOption[]> {
+  const products = await getAllProductPages();
+  const productsById = new Map<string, PurchasingProductOption>();
+
+  products.forEach((product) => {
+    if (PURCHASABLE_PRODUCT_TYPES.includes(product.productType)) {
+      productsById.set(product.id, product);
+    }
+  });
+
+  return Array.from(productsById.values()).sort((first, second) => {
+    const nameComparison = first.productName.localeCompare(second.productName);
+    if (nameComparison !== 0) return nameComparison;
+
+    return first.productCode.localeCompare(second.productCode);
+  });
 }
 
 export async function getIngredients(): Promise<PurchasingIngredientOption[]> {

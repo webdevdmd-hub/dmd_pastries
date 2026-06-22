@@ -18,6 +18,7 @@ import {
   createPurchaseReturn,
   createSupplierPayment,
   deletePurchaseOrder,
+  deleteSupplierPayment,
   duplicatePurchaseOrder,
   getBranches,
   getIngredients,
@@ -51,6 +52,7 @@ import {
   updatePurchaseOrder,
   updatePurchaseOrderStatus,
   updatePurchaseReturn,
+  updateSupplierPayment,
 } from "@/lib/api/purchasing";
 import type {
   AddSupplierPaymentPayload,
@@ -88,6 +90,7 @@ import type {
   UpdatePurchaseOrderPayload,
   UpdatePurchaseOrderStatusPayload,
   UpdatePurchaseReturnPayload,
+  UpdateSupplierPaymentPayload,
 } from "@/types/purchasing";
 
 const purchasingQueryKey = "purchasing";
@@ -564,6 +567,34 @@ export function useCreateSupplierPayment() {
 
   return useMutation<SupplierPayment, Error, CreateSupplierPaymentPayload>({
     mutationFn: async (payload) => createSupplierPayment(payload),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+      await queryClient.invalidateQueries({ queryKey: ["accounting"] });
+    },
+  });
+}
+
+export function useUpdateSupplierPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    SupplierPayment,
+    Error,
+    { paymentId: string; payload: UpdateSupplierPaymentPayload }
+  >({
+    mutationFn: async ({ paymentId, payload }) => updateSupplierPayment(paymentId, payload),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+      await queryClient.invalidateQueries({ queryKey: ["accounting"] });
+    },
+  });
+}
+
+export function useDeleteSupplierPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: async (paymentId) => deleteSupplierPayment(paymentId),
     onSuccess: async () => {
       await invalidatePurchasing(queryClient);
       await queryClient.invalidateQueries({ queryKey: ["accounting"] });

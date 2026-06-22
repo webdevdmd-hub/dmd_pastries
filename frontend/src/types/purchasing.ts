@@ -18,7 +18,7 @@ export type PurchaseLineType = "product" | "account";
 
 export type PurchaseItemType = "product" | "ingredient" | "packaging" | "account";
 
-export type SupplierPaymentStatus = "completed" | "pending" | "failed";
+export type SupplierPaymentStatus = "completed" | "voided";
 
 export type PurchaseReturnStatus = "draft" | "posted" | "cancelled" | "reversed";
 
@@ -529,6 +529,8 @@ export type CreateSupplierPaymentPayload = {
     amount: number;
   }[];
 };
+
+export type UpdateSupplierPaymentPayload = CreateSupplierPaymentPayload;
 
 export type ConvertPurchaseOrderToInvoicePayload = {
   dueDate?: string | null;

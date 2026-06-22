@@ -1263,6 +1263,223 @@ func (s *Service) createSupplierPayment(currentUser *utils.AuthContext, req Crea
 	return paymentID, err
 }
 
+func (s *Service) UpdateSupplierPayment(currentUser *utils.AuthContext, id string, req UpdateSupplierPaymentRequest, ipAddress, userAgent string) (*SupplierPaymentResponse, error) {
+	if err := validateUUID(id, "supplier_payment_id"); err != nil {
+		return nil, err
+	}
+	if err := validateUUID(req.SupplierID, "supplier_id"); err != nil {
+		return nil, err
+	}
+	if err := validateUUID(req.PaymentMethodID, "payment_method_id"); err != nil {
+		return nil, err
+	}
+	if req.PaidThroughAccountID != "" {
+		if err := validateUUID(req.PaidThroughAccountID, "paid_through_account_id"); err != nil {
+			return nil, err
+		}
+	}
+	if req.Amount <= 0 {
+		return nil, apperrors.BadRequest("amount must be greater than zero", nil)
+	}
+	branchID, err := currentUser.ResolveOperationalBranch(req.BranchID)
+	if err != nil {
+		return nil, err
+	}
+	paymentDate, err := parseSupplierPaymentDate(req.PaymentDate, time.Now().UTC(), "payment_date")
+	if err != nil {
+		return nil, err
+	}
+	amount := roundMoney(req.Amount)
+
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		existing, err := s.repo.FindSupplierPaymentForUpdate(tx, id, currentUser.BusinessID)
+		if err != nil {
+			return notFound(err, "supplier payment not found")
+		}
+		if !currentUser.CanAccessBranch(existing.BranchID) {
+			return apperrors.Forbidden("branch access denied")
+		}
+		if existing.Status != "completed" {
+			return apperrors.BadRequest("only completed supplier payments can be edited", nil)
+		}
+		if err := s.rollbackSupplierPaymentImpact(tx, currentUser, existing); err != nil {
+			return err
+		}
+		if err := s.repo.ValidateSupplier(tx, currentUser.BusinessID, branchID, req.SupplierID); err != nil {
+			return notFound(err, "supplier not found")
+		}
+		method, err := s.repo.PaymentMethod(tx, currentUser.BusinessID, req.PaymentMethodID)
+		if err != nil {
+			return notFound(err, "payment method not found")
+		}
+		if !method.ShowInPurchasing {
+			return apperrors.BadRequest("payment method is not enabled for purchasing", nil)
+		}
+		reference := strings.TrimSpace(req.ReferenceNumber)
+		if method.RequiresReference && reference == "" {
+			return apperrors.BadRequest("reference_number is required for this payment method", nil)
+		}
+		paidThroughAccount, err := s.resolveSupplierPaidThroughAccount(tx, currentUser.BusinessID, branchID, method, req.PaidThroughAccountID)
+		if err != nil {
+			return err
+		}
+
+		allocations := make([]SupplierPaymentAllocation, 0, len(req.Allocations))
+		allocatedAmount := 0.0
+		seenInvoices := map[string]struct{}{}
+		for _, allocationReq := range req.Allocations {
+			if err := validateUUID(allocationReq.PurchaseInvoiceID, "purchase_invoice_id"); err != nil {
+				return err
+			}
+			allocationAmount := roundMoney(allocationReq.Amount)
+			if allocationAmount <= 0 {
+				return apperrors.BadRequest("allocation amount must be greater than zero", nil)
+			}
+			if _, exists := seenInvoices[allocationReq.PurchaseInvoiceID]; exists {
+				return apperrors.BadRequest("duplicate invoice allocation is not allowed", map[string]string{"purchase_invoice_id": allocationReq.PurchaseInvoiceID})
+			}
+			seenInvoices[allocationReq.PurchaseInvoiceID] = struct{}{}
+			invoice, err := s.repo.FindInvoiceForUpdate(tx, allocationReq.PurchaseInvoiceID, currentUser.BusinessID)
+			if err != nil {
+				return notFound(err, "purchase invoice not found")
+			}
+			if invoice.BranchID != branchID || invoice.SupplierID != req.SupplierID {
+				return apperrors.BadRequest("allocated invoice must belong to the selected supplier and branch", map[string]string{"purchase_invoice_id": invoice.ID})
+			}
+			if invoice.Status != "posted" {
+				return apperrors.BadRequest("only posted purchase invoices can be paid", map[string]string{"purchase_invoice_id": invoice.ID})
+			}
+			if invoice.BalanceAmount <= 0 || invoice.PaymentStatus == "paid" {
+				return apperrors.BadRequest("purchase invoice is already paid", map[string]string{"purchase_invoice_id": invoice.ID})
+			}
+			if allocationAmount > roundMoney(invoice.BalanceAmount) {
+				return apperrors.BadRequest("allocation amount cannot exceed invoice balance", map[string]interface{}{
+					"purchase_invoice_id": invoice.ID,
+					"balance_amount":      roundMoney(invoice.BalanceAmount),
+					"allocation_amount":   allocationAmount,
+				})
+			}
+			allocatedAmount = roundMoney(allocatedAmount + allocationAmount)
+			if allocatedAmount > amount {
+				return apperrors.BadRequest("total allocated amount cannot exceed payment amount", nil)
+			}
+			paidAmount := roundMoney(invoice.PaidAmount + allocationAmount)
+			settledAmount := roundMoney(paidAmount + invoice.CreditedAmount)
+			balanceAmount := roundMoney(invoice.TotalAmount - settledAmount)
+			if balanceAmount < 0 {
+				balanceAmount = 0
+			}
+			status := invoicePaymentStatus(invoice.TotalAmount, settledAmount)
+			if err := s.repo.UpdateInvoice(tx, invoice.ID, currentUser.BusinessID, map[string]interface{}{"paid_amount": paidAmount, "balance_amount": balanceAmount, "payment_status": status, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}, nil); err != nil {
+				return err
+			}
+			allocations = append(allocations, SupplierPaymentAllocation{
+				ID:                utils.NewUUID(),
+				BusinessID:        currentUser.BusinessID,
+				BranchID:          branchID,
+				SupplierPaymentID: existing.ID,
+				PurchaseInvoiceID: invoice.ID,
+				Amount:            allocationAmount,
+				CreatedAt:         time.Now().UTC(),
+				UpdatedAt:         time.Now().UTC(),
+			})
+		}
+
+		existing.BranchID = branchID
+		existing.SupplierID = req.SupplierID
+		existing.PaymentMethodID = method.ID
+		existing.PaymentMethodNameSnapshot = method.MethodName
+		existing.PaymentMethodTypeSnapshot = method.MethodType
+		existing.PaidThroughAccountID = paidThroughAccount.ID
+		existing.Amount = amount
+		existing.AllocatedAmount = allocatedAmount
+		existing.UnappliedAmount = roundMoney(amount - allocatedAmount)
+		existing.ReferenceNumber = reference
+		existing.PaymentDate = paymentDate
+		existing.Status = "completed"
+		existing.Notes = strings.TrimSpace(req.Notes)
+		existing.JournalEntryID = nil
+		existing.UpdatedAt = time.Now().UTC()
+
+		if err := s.repo.UpdateSupplierPayment(tx, existing, allocations); err != nil {
+			return err
+		}
+		if s.accountingService != nil {
+			if _, err := s.accountingService.PostSupplierPaymentJournal(tx, currentUser, existing.ID); err != nil {
+				return err
+			}
+		}
+		return s.audit(tx, currentUser, "supplier_payment.updated", existing.ID, "Supplier payment updated", ipAddress, userAgent)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetSupplierPayment(currentUser, id)
+}
+
+func (s *Service) DeleteSupplierPayment(currentUser *utils.AuthContext, id string, ipAddress, userAgent string) error {
+	if err := validateUUID(id, "supplier_payment_id"); err != nil {
+		return err
+	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		payment, err := s.repo.FindSupplierPaymentForUpdate(tx, id, currentUser.BusinessID)
+		if err != nil {
+			return notFound(err, "supplier payment not found")
+		}
+		if !currentUser.CanAccessBranch(payment.BranchID) {
+			return apperrors.Forbidden("branch access denied")
+		}
+		if payment.Status != "completed" {
+			return apperrors.BadRequest("only completed supplier payments can be deleted", nil)
+		}
+		if err := s.rollbackSupplierPaymentImpact(tx, currentUser, payment); err != nil {
+			return err
+		}
+		if err := s.repo.HardDeleteSupplierPayment(tx, currentUser.BusinessID, payment.ID); err != nil {
+			return notFound(err, "supplier payment not found")
+		}
+		return s.audit(tx, currentUser, "supplier_payment.deleted", payment.ID, "Supplier payment hard deleted", ipAddress, userAgent)
+	})
+}
+
+func (s *Service) rollbackSupplierPaymentImpact(tx *gorm.DB, currentUser *utils.AuthContext, payment *SupplierPayment) error {
+	allocations, err := s.repo.SupplierPaymentAllocationsForUpdate(tx, currentUser.BusinessID, payment.ID)
+	if err != nil {
+		return apperrors.Internal("failed to load supplier payment allocations")
+	}
+	for _, allocation := range allocations {
+		invoice, err := s.repo.FindInvoiceForUpdate(tx, allocation.PurchaseInvoiceID, currentUser.BusinessID)
+		if err != nil {
+			return notFound(err, "purchase invoice not found")
+		}
+		paidAmount := roundMoney(invoice.PaidAmount - allocation.Amount)
+		if paidAmount < 0 {
+			paidAmount = 0
+		}
+		settledAmount := roundMoney(paidAmount + invoice.CreditedAmount)
+		balanceAmount := roundMoney(invoice.TotalAmount - settledAmount)
+		if balanceAmount < 0 {
+			balanceAmount = 0
+		}
+		if err := s.repo.UpdateInvoice(tx, invoice.ID, currentUser.BusinessID, map[string]interface{}{
+			"paid_amount":        paidAmount,
+			"balance_amount":     balanceAmount,
+			"payment_status":     invoicePaymentStatus(invoice.TotalAmount, settledAmount),
+			"updated_by_user_id": currentUser.UserID,
+			"updated_at":         time.Now().UTC(),
+		}, nil); err != nil {
+			return err
+		}
+	}
+	if err := s.repo.HardDeleteSupplierPaymentAllocations(tx, currentUser.BusinessID, payment.ID); err != nil {
+		return err
+	}
+	if err := s.repo.HardDeleteSupplierPaymentJournal(tx, currentUser.BusinessID, payment.ID); err != nil {
+		return apperrors.Internal("failed to delete supplier payment accounting journal")
+	}
+	return nil
+}
+
 func (s *Service) resolveSupplierPaidThroughAccount(tx *gorm.DB, businessID, branchID string, method *PaymentMethodInfo, requestedAccountID string) (*PaymentAccountInfo, error) {
 	if strings.TrimSpace(requestedAccountID) != "" {
 		account, err := s.repo.PaymentAccount(tx, businessID, strings.TrimSpace(requestedAccountID))

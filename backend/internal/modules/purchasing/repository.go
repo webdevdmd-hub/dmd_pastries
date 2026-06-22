@@ -8,10 +8,66 @@ import (
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"pastries-pos/internal/modules/accounting"
 )
 
 type Repository struct {
 	db *gorm.DB
+}
+
+type supplierPaymentResponseRow struct {
+	ID                     string    `json:"id"`
+	BusinessID             string    `json:"business_id"`
+	BranchID               string    `json:"branch_id"`
+	BranchName             string    `json:"branch_name"`
+	SupplierID             string    `json:"supplier_id"`
+	SupplierName           string    `json:"supplier_name"`
+	PaymentMethodID        string    `json:"payment_method_id"`
+	PaymentMethodName      string    `json:"payment_method_name"`
+	PaymentMethodType      string    `json:"payment_method_type"`
+	PaidThroughAccountID   string    `json:"paid_through_account_id"`
+	PaidThroughAccountName string    `json:"paid_through_account_name"`
+	Amount                 float64   `json:"amount"`
+	AllocatedAmount        float64   `json:"allocated_amount"`
+	UnappliedAmount        float64   `json:"unapplied_amount"`
+	ReferenceNumber        string    `json:"reference_number"`
+	PaymentDate            time.Time `json:"payment_date"`
+	Status                 string    `json:"status"`
+	Notes                  string    `json:"notes"`
+	JournalEntryID         *string   `json:"journal_entry_id"`
+	PaidByUserID           string    `json:"paid_by_user_id"`
+	PaidByUserName         string    `json:"paid_by_user_name"`
+	CreatedAt              time.Time `json:"created_at"`
+	UpdatedAt              time.Time `json:"updated_at"`
+}
+
+func (row supplierPaymentResponseRow) toResponse() SupplierPaymentResponse {
+	return SupplierPaymentResponse{
+		ID:                     row.ID,
+		BusinessID:             row.BusinessID,
+		BranchID:               row.BranchID,
+		BranchName:             row.BranchName,
+		SupplierID:             row.SupplierID,
+		SupplierName:           row.SupplierName,
+		PaymentMethodID:        row.PaymentMethodID,
+		PaymentMethodName:      row.PaymentMethodName,
+		PaymentMethodType:      row.PaymentMethodType,
+		PaidThroughAccountID:   row.PaidThroughAccountID,
+		PaidThroughAccountName: row.PaidThroughAccountName,
+		Amount:                 row.Amount,
+		AllocatedAmount:        row.AllocatedAmount,
+		UnappliedAmount:        row.UnappliedAmount,
+		ReferenceNumber:        row.ReferenceNumber,
+		PaymentDate:            row.PaymentDate,
+		Status:                 row.Status,
+		Notes:                  row.Notes,
+		JournalEntryID:         row.JournalEntryID,
+		PaidByUserID:           row.PaidByUserID,
+		PaidByUserName:         row.PaidByUserName,
+		CreatedAt:              row.CreatedAt,
+		UpdatedAt:              row.UpdatedAt,
+	}
 }
 
 func NewRepository(db *gorm.DB) *Repository {
@@ -512,10 +568,84 @@ func (r *Repository) CreateSupplierPayment(tx *gorm.DB, payment *SupplierPayment
 	return nil
 }
 
+func (r *Repository) UpdateSupplierPayment(tx *gorm.DB, payment *SupplierPayment, allocations []SupplierPaymentAllocation) error {
+	if err := tx.Save(payment).Error; err != nil {
+		return err
+	}
+	if len(allocations) > 0 {
+		return tx.Create(&allocations).Error
+	}
+	return nil
+}
+
 func (r *Repository) FindSupplierPayment(id, businessID string) (*SupplierPayment, error) {
 	var payment SupplierPayment
 	err := r.db.Where("id = ? AND business_id = ? AND deleted_at IS NULL", id, businessID).First(&payment).Error
 	return &payment, err
+}
+
+func (r *Repository) FindSupplierPaymentForUpdate(tx *gorm.DB, id, businessID string) (*SupplierPayment, error) {
+	var payment SupplierPayment
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ? AND business_id = ? AND deleted_at IS NULL", id, businessID).
+		First(&payment).Error
+	return &payment, err
+}
+
+func (r *Repository) SupplierPaymentAllocationsForUpdate(tx *gorm.DB, businessID, supplierPaymentID string) ([]SupplierPaymentAllocation, error) {
+	var allocations []SupplierPaymentAllocation
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("business_id = ? AND supplier_payment_id = ? AND deleted_at IS NULL", businessID, supplierPaymentID).
+		Order("created_at ASC").
+		Find(&allocations).Error
+	return allocations, err
+}
+
+func (r *Repository) HardDeleteSupplierPaymentAllocations(tx *gorm.DB, businessID, supplierPaymentID string) error {
+	return tx.Unscoped().
+		Where("business_id = ? AND supplier_payment_id = ?", businessID, supplierPaymentID).
+		Delete(&SupplierPaymentAllocation{}).Error
+}
+
+func (r *Repository) HardDeleteSupplierPayment(tx *gorm.DB, businessID, supplierPaymentID string) error {
+	if err := tx.Unscoped().
+		Where("business_id = ? AND supplier_payment_id = ?", businessID, supplierPaymentID).
+		Delete(&PurchaseInvoicePayment{}).Error; err != nil {
+		return err
+	}
+	if err := r.HardDeleteSupplierPaymentAllocations(tx, businessID, supplierPaymentID); err != nil {
+		return err
+	}
+	result := tx.Unscoped().
+		Where("business_id = ? AND id = ?", businessID, supplierPaymentID).
+		Delete(&SupplierPayment{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) HardDeleteSupplierPaymentJournal(tx *gorm.DB, businessID, supplierPaymentID string) error {
+	var journalIDs []string
+	if err := tx.Table("journal_entries").
+		Where("business_id = ? AND source_type = ? AND source_id = ? AND deleted_at IS NULL", businessID, "supplier_payment", supplierPaymentID).
+		Pluck("id", &journalIDs).Error; err != nil {
+		return err
+	}
+	if len(journalIDs) == 0 {
+		return nil
+	}
+	if err := tx.Unscoped().
+		Where("business_id = ? AND journal_entry_id IN ?", businessID, journalIDs).
+		Delete(&accounting.JournalEntryLine{}).Error; err != nil {
+		return err
+	}
+	return tx.Unscoped().
+		Where("business_id = ? AND id IN ?", businessID, journalIDs).
+		Delete(&accounting.JournalEntry{}).Error
 }
 
 func (r *Repository) ListSupplierPayments(businessID string, query PaymentListQuery) ([]SupplierPaymentResponse, int64, error) {
@@ -532,7 +662,7 @@ func (r *Repository) ListSupplierPayments(businessID string, query PaymentListQu
 	}
 	sortBy := safeSupplierPaymentSort(query.SortBy)
 	sortOrder := safeOrder(query.SortOrder)
-	var rows []SupplierPaymentResponse
+	var rows []supplierPaymentResponseRow
 	err := db.Select(`sp.id, sp.business_id, sp.branch_id, b.branch_name, sp.supplier_id, s.supplier_name,
 			sp.payment_method_id, sp.payment_method_name_snapshot AS payment_method_name,
 			sp.payment_method_type_snapshot AS payment_method_type,
@@ -545,7 +675,14 @@ func (r *Repository) ListSupplierPayments(businessID string, query PaymentListQu
 		Offset((query.Page - 1) * query.Limit).
 		Limit(query.Limit).
 		Scan(&rows).Error
-	return rows, total, err
+	if err != nil {
+		return nil, total, err
+	}
+	responses := make([]SupplierPaymentResponse, 0, len(rows))
+	for _, row := range rows {
+		responses = append(responses, row.toResponse())
+	}
+	return responses, total, nil
 }
 
 func (r *Repository) SupplierPaymentAllocations(businessID, supplierPaymentID string) ([]SupplierPaymentAllocationResponse, error) {
@@ -561,7 +698,7 @@ func (r *Repository) SupplierPaymentAllocations(businessID, supplierPaymentID st
 }
 
 func (r *Repository) SupplierPaymentResponse(businessID, supplierPaymentID string) (*SupplierPaymentResponse, error) {
-	var row SupplierPaymentResponse
+	var row supplierPaymentResponseRow
 	err := r.db.Table("supplier_payments sp").
 		Select(`sp.id, sp.business_id, sp.branch_id, b.branch_name, sp.supplier_id, s.supplier_name,
 			sp.payment_method_id, sp.payment_method_name_snapshot AS payment_method_name,
@@ -576,16 +713,20 @@ func (r *Repository) SupplierPaymentResponse(businessID, supplierPaymentID strin
 		Joins("JOIN payment_accounts pa ON pa.id = sp.paid_through_account_id").
 		Joins("LEFT JOIN users u ON u.id = sp.paid_by_user_id").
 		Where("sp.business_id = ? AND sp.id = ? AND sp.deleted_at IS NULL", businessID, supplierPaymentID).
-		Take(&row).Error
+		Scan(&row).Error
 	if err != nil {
 		return nil, err
 	}
+	if row.ID == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	response := row.toResponse()
 	allocations, err := r.SupplierPaymentAllocations(businessID, supplierPaymentID)
 	if err != nil {
 		return nil, err
 	}
-	row.Allocations = allocations
-	return &row, nil
+	response.Allocations = allocations
+	return &response, nil
 }
 
 func (r *Repository) ListInvoicePayments(businessID, invoiceID string) ([]PurchaseInvoicePaymentResponse, error) {
