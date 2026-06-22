@@ -1,6 +1,7 @@
 package purchasing
 
 import (
+	"encoding/json"
 	"time"
 
 	"gorm.io/gorm"
@@ -59,6 +60,26 @@ type PurchaseOrderItem struct {
 }
 
 func (PurchaseOrderItem) TableName() string { return "purchase_order_items" }
+
+type PurchaseOrderRevision struct {
+	ID                  string          `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID          string          `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID            string          `gorm:"type:uuid;not null;index" json:"branch_id"`
+	PurchaseOrderID     string          `gorm:"type:uuid;not null;index" json:"purchase_order_id"`
+	RevisionNumber      int             `gorm:"not null" json:"revision_number"`
+	Status              string          `gorm:"size:50;not null;default:applied" json:"status"`
+	PaymentExcessAction string          `gorm:"size:50;not null;default:supplier_advance" json:"payment_excess_action"`
+	Reason              string          `json:"reason"`
+	OriginalSnapshot    json.RawMessage `gorm:"type:jsonb;not null" json:"original_snapshot"`
+	RevisedSnapshot     json.RawMessage `gorm:"type:jsonb;not null" json:"revised_snapshot"`
+	ImpactSummary       json.RawMessage `gorm:"type:jsonb;not null" json:"impact_summary"`
+	CreatedByUserID     string          `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+	DeletedAt           gorm.DeletedAt  `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (PurchaseOrderRevision) TableName() string { return "purchase_order_revisions" }
 
 type PurchaseInvoice struct {
 	ID                     string         `gorm:"type:uuid;primaryKey" json:"id"`

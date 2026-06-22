@@ -25,6 +25,7 @@ import { useChartAccounts } from "@/hooks/use-accounting";
 import { usePermission } from "@/hooks/use-permission";
 import {
   useCreatePurchaseInvoice,
+  useCreatePurchaseOrderRevision,
   useDuplicatePurchaseOrder,
   usePurchaseOrder,
   usePurchaseOrderDocumentChain,
@@ -43,6 +44,7 @@ import { purchaseOrderToBillInitialValues } from "@/lib/purchasing/purchase-orde
 import { cn } from "@/lib/utils/cn";
 import type {
   CreatePurchaseInvoicePayload,
+  CreatePurchaseOrderRevisionPayload,
   PurchaseOrder,
   ReceivePurchaseOrderPayload,
   UpdatePurchaseInvoicePayload,
@@ -153,6 +155,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
     canView,
   );
   const createInvoiceMutation = useCreatePurchaseInvoice();
+  const createRevisionMutation = useCreatePurchaseOrderRevision();
   const receiveMutation = useReceivePurchaseOrder();
   const updateMutation = useUpdatePurchaseOrder();
   const statusMutation = useUpdatePurchaseOrderStatus();
@@ -189,6 +192,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
     hasRemainingReceivableProducts(order);
   const canEditOrder = canEdit && (order.status === "draft" || order.status === "ordered");
   const canAdjustRemaining = canEdit && order.status === "partially_received";
+  const canEditWithCorrection = canEdit && order.status === "received";
   const canConvertOrder = canConvert && order.status === "received" && !activeBill;
   const orderedDone = order.status !== "draft" && order.status !== "cancelled";
   const receivedDone = order.status === "received" || Boolean(activeBill);
@@ -224,6 +228,19 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
           ? "Remaining quantities adjusted."
           : "Purchase order updated.",
       );
+      setFormOpen(false);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  const handleRevise = async (
+    id: string,
+    payload: CreatePurchaseOrderRevisionPayload,
+  ): Promise<void> => {
+    try {
+      const revision = await createRevisionMutation.mutateAsync({ id, payload });
+      toast.success(`Purchase order revision ${String(revision.revisionNumber)} saved.`);
       setFormOpen(false);
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -344,9 +361,13 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {canEditOrder || canAdjustRemaining ? (
+              {canEditOrder || canAdjustRemaining || canEditWithCorrection ? (
                 <Button onClick={() => setFormOpen(true)} type="button" variant="outline">
-                  {canAdjustRemaining ? "Adjust remaining" : "Edit"}
+                  {canEditWithCorrection
+                    ? "Edit with correction"
+                    : canAdjustRemaining
+                      ? "Adjust remaining"
+                      : "Edit"}
                 </Button>
               ) : null}
               {canReopen && order.status === "cancelled" ? (
@@ -574,9 +595,10 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
       <PurchaseOrderFormDialog
         accounts={purchaseAccounts}
         branches={branchesQuery.data ?? []}
-        isSubmitting={updateMutation.isPending}
+        isSubmitting={updateMutation.isPending || createRevisionMutation.isPending}
         onClose={() => setFormOpen(false)}
         onCreate={() => Promise.resolve()}
+        onRevise={handleRevise}
         onUpdate={handleUpdate}
         open={formOpen}
         order={order}

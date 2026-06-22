@@ -18,6 +18,70 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
+func (r *Repository) CreateOrderRevision(tx *gorm.DB, revision *PurchaseOrderRevision) error {
+	return tx.Create(revision).Error
+}
+
+func (r *Repository) NextOrderRevisionNumber(tx *gorm.DB, businessID, orderID string) (int, error) {
+	var maxRevision int
+	err := tx.Model(&PurchaseOrderRevision{}).
+		Where("business_id = ? AND purchase_order_id = ? AND deleted_at IS NULL", businessID, orderID).
+		Select("COALESCE(MAX(revision_number), 0)").
+		Scan(&maxRevision).Error
+	return maxRevision + 1, err
+}
+
+func (r *Repository) PurchaseOrderRevisionImpactCounts(tx *gorm.DB, businessID, orderID string) (PurchaseOrderRevisionImpactResponse, error) {
+	var impact PurchaseOrderRevisionImpactResponse
+	if err := tx.Model(&PurchaseReceipt{}).
+		Where("business_id = ? AND purchase_order_id = ? AND deleted_at IS NULL AND status = ?", businessID, orderID, "posted").
+		Count(&impact.PostedReceiptCount).Error; err != nil {
+		return impact, err
+	}
+	if err := tx.Model(&PurchaseInvoice{}).
+		Where("business_id = ? AND purchase_order_id = ? AND deleted_at IS NULL AND status = ?", businessID, orderID, "posted").
+		Count(&impact.PostedInvoiceCount).Error; err != nil {
+		return impact, err
+	}
+	if err := tx.Model(&PurchaseReturn{}).
+		Where("business_id = ? AND purchase_order_id = ? AND deleted_at IS NULL AND status IN ?", businessID, orderID, []string{"posted", "reversed"}).
+		Count(&impact.VendorCreditCount).Error; err != nil {
+		return impact, err
+	}
+	if err := tx.Table("supplier_payment_allocations spa").
+		Joins("JOIN purchase_invoices pi ON pi.id = spa.purchase_invoice_id AND pi.business_id = spa.business_id AND pi.deleted_at IS NULL").
+		Where("spa.business_id = ? AND pi.purchase_order_id = ? AND spa.deleted_at IS NULL", businessID, orderID).
+		Count(&impact.SupplierPaymentCount).Error; err != nil {
+		return impact, err
+	}
+	if err := tx.Table("stock_movements sm").
+		Where(`
+			sm.business_id = ?
+			AND sm.reference_id IS NOT NULL
+			AND (
+				sm.reference_id = ?
+				OR EXISTS (
+					SELECT 1 FROM purchase_receipts pr
+					WHERE pr.id = sm.reference_id
+						AND pr.business_id = sm.business_id
+						AND pr.purchase_order_id = ?
+						AND pr.deleted_at IS NULL
+				)
+				OR EXISTS (
+					SELECT 1 FROM purchase_returns prt
+					WHERE prt.id = sm.reference_id
+						AND prt.business_id = sm.business_id
+						AND prt.purchase_order_id = ?
+						AND prt.deleted_at IS NULL
+				)
+			)
+		`, businessID, orderID, orderID, orderID).
+		Count(&impact.StockMovementCount).Error; err != nil {
+		return impact, err
+	}
+	impact.HasFinalizedHistory = impact.PostedReceiptCount > 0 || impact.PostedInvoiceCount > 0 || impact.SupplierPaymentCount > 0 || impact.StockMovementCount > 0 || impact.VendorCreditCount > 0
+	return impact, nil
+}
 func (r *Repository) CreateOrder(tx *gorm.DB, order *PurchaseOrder, items []PurchaseOrderItem) error {
 	if err := tx.Create(order).Error; err != nil {
 		return err
@@ -97,7 +161,164 @@ func (r *Repository) PurchaseOrderHistoryCount(tx *gorm.DB, businessID, orderID 
 	return total, nil
 }
 
+func (r *Repository) FinalizedPurchaseOrderHistoryCount(tx *gorm.DB, businessID, orderID string) (int64, error) {
+	var count int64
+	var total int64
+
+	if err := tx.Model(&PurchaseInvoice{}).
+		Where(`business_id = ? AND purchase_order_id = ? AND deleted_at IS NULL AND (
+			status = ?
+			OR journal_entry_id IS NOT NULL
+			OR reversal_journal_entry_id IS NOT NULL
+			OR cancelled_receipt_id IS NOT NULL
+		)`, businessID, orderID, "posted").
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	total += count
+
+	if err := tx.Model(&PurchaseReceipt{}).
+		Where("business_id = ? AND purchase_order_id = ? AND deleted_at IS NULL AND (status = ? OR journal_entry_id IS NOT NULL)", businessID, orderID, "posted").
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	total += count
+
+	if err := tx.Model(&PurchaseReturn{}).
+		Where("business_id = ? AND purchase_order_id = ? AND deleted_at IS NULL AND (status IN ? OR journal_entry_id IS NOT NULL)", businessID, orderID, []string{"posted", "reversed"}).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	total += count
+
+	if err := tx.Table("purchase_invoice_payments pip").
+		Joins("JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id AND pi.business_id = pip.business_id AND pi.deleted_at IS NULL").
+		Where("pip.business_id = ? AND pi.purchase_order_id = ? AND pip.deleted_at IS NULL AND pip.payment_status = ?", businessID, orderID, "completed").
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	total += count
+
+	if err := tx.Table("supplier_payment_allocations spa").
+		Joins("JOIN purchase_invoices pi ON pi.id = spa.purchase_invoice_id AND pi.business_id = spa.business_id AND pi.deleted_at IS NULL").
+		Where("spa.business_id = ? AND pi.purchase_order_id = ? AND spa.deleted_at IS NULL", businessID, orderID).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	total += count
+
+	if err := tx.Table("stock_movements sm").
+		Where(`
+			sm.business_id = ?
+			AND sm.reference_id IS NOT NULL
+			AND (
+				sm.reference_id = ?
+				OR EXISTS (
+					SELECT 1
+					FROM purchase_receipts pr
+					WHERE pr.id = sm.reference_id
+						AND pr.business_id = sm.business_id
+						AND pr.purchase_order_id = ?
+						AND pr.deleted_at IS NULL
+				)
+				OR EXISTS (
+					SELECT 1
+					FROM purchase_returns prt
+					WHERE prt.id = sm.reference_id
+						AND prt.business_id = sm.business_id
+						AND prt.purchase_order_id = ?
+						AND prt.deleted_at IS NULL
+				)
+			)
+		`, businessID, orderID, orderID, orderID).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	total += count
+
+	if err := tx.Table("stock_movements sm").
+		Where(`
+			sm.business_id = ?
+			AND sm.accounting_journal_entry_id IS NOT NULL
+			AND sm.reference_id IS NOT NULL
+			AND (
+				sm.reference_id = ?
+				OR EXISTS (
+					SELECT 1
+					FROM purchase_receipts pr
+					WHERE pr.id = sm.reference_id
+						AND pr.business_id = sm.business_id
+						AND pr.purchase_order_id = ?
+						AND pr.deleted_at IS NULL
+				)
+				OR EXISTS (
+					SELECT 1
+					FROM purchase_returns prt
+					WHERE prt.id = sm.reference_id
+						AND prt.business_id = sm.business_id
+						AND prt.purchase_order_id = ?
+						AND prt.deleted_at IS NULL
+				)
+			)
+		`, businessID, orderID, orderID, orderID).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	total += count
+
+	return total, nil
+}
+
 func (r *Repository) HardDeleteOrder(tx *gorm.DB, businessID, orderID string) error {
+	returnIDs, err := r.purchaseOrderDraftReturnIDs(tx, businessID, orderID)
+	if err != nil {
+		return err
+	}
+	receiptIDs, err := r.purchaseOrderDraftReceiptIDs(tx, businessID, orderID)
+	if err != nil {
+		return err
+	}
+	invoiceIDs, err := r.purchaseOrderDraftInvoiceIDs(tx, businessID, orderID)
+	if err != nil {
+		return err
+	}
+
+	if err := r.hardDeleteDocumentChargesForIDs(tx, businessID, "purchase_return", returnIDs); err != nil {
+		return err
+	}
+	if len(returnIDs) > 0 {
+		if err := tx.Unscoped().Where("purchase_return_id IN ? AND business_id = ?", returnIDs, businessID).Delete(&PurchaseReturnItem{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Where("id IN ? AND business_id = ?", returnIDs, businessID).Delete(&PurchaseReturn{}).Error; err != nil {
+			return err
+		}
+	}
+
+	if err := r.hardDeleteDocumentChargesForIDs(tx, businessID, "purchase_receipt", receiptIDs); err != nil {
+		return err
+	}
+	if len(receiptIDs) > 0 {
+		if err := tx.Unscoped().Where("purchase_receipt_id IN ? AND business_id = ?", receiptIDs, businessID).Delete(&PurchaseReceiptItem{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Where("id IN ? AND business_id = ?", receiptIDs, businessID).Delete(&PurchaseReceipt{}).Error; err != nil {
+			return err
+		}
+	}
+
+	if err := r.hardDeleteDocumentChargesForIDs(tx, businessID, "purchase_invoice", invoiceIDs); err != nil {
+		return err
+	}
+	if len(invoiceIDs) > 0 {
+		if err := tx.Unscoped().Where("purchase_invoice_id IN ? AND business_id = ?", invoiceIDs, businessID).Delete(&PurchaseInvoiceItem{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Where("id IN ? AND business_id = ?", invoiceIDs, businessID).Delete(&PurchaseInvoice{}).Error; err != nil {
+			return err
+		}
+	}
+
 	if err := tx.Exec("DELETE FROM document_charges WHERE business_id = ? AND document_type = ? AND document_id = ?", businessID, "purchase_order", orderID).Error; err != nil {
 		return err
 	}
@@ -111,6 +332,47 @@ func (r *Repository) HardDeleteOrder(tx *gorm.DB, businessID, orderID string) er
 		Delete(&PurchaseOrder{}))
 }
 
+func (r *Repository) purchaseOrderDraftInvoiceIDs(tx *gorm.DB, businessID, orderID string) ([]string, error) {
+	var ids []string
+	err := tx.Model(&PurchaseInvoice{}).
+		Where("business_id = ? AND purchase_order_id = ? AND status IN ? AND deleted_at IS NULL", businessID, orderID, []string{"draft", "cancelled"}).
+		Pluck("id", &ids).Error
+	return ids, err
+}
+
+func (r *Repository) purchaseOrderDraftReceiptIDs(tx *gorm.DB, businessID, orderID string) ([]string, error) {
+	var ids []string
+	err := tx.Model(&PurchaseReceipt{}).
+		Where("business_id = ? AND purchase_order_id = ? AND status IN ? AND deleted_at IS NULL", businessID, orderID, []string{"draft", "cancelled"}).
+		Pluck("id", &ids).Error
+	return ids, err
+}
+
+func (r *Repository) purchaseOrderDraftReturnIDs(tx *gorm.DB, businessID, orderID string) ([]string, error) {
+	var ids []string
+	err := tx.Table("purchase_returns prt").
+		Joins("LEFT JOIN purchase_receipts pr ON pr.id = prt.purchase_receipt_id AND pr.business_id = prt.business_id AND pr.deleted_at IS NULL").
+		Joins("LEFT JOIN purchase_invoices pi ON pi.id = prt.purchase_invoice_id AND pi.business_id = prt.business_id AND pi.deleted_at IS NULL").
+		Where(`
+			prt.business_id = ?
+			AND prt.status IN ?
+			AND prt.deleted_at IS NULL
+			AND (
+				prt.purchase_order_id = ?
+				OR pr.purchase_order_id = ?
+				OR pi.purchase_order_id = ?
+			)
+		`, businessID, []string{"draft", "cancelled"}, orderID, orderID, orderID).
+		Pluck("prt.id", &ids).Error
+	return ids, err
+}
+
+func (r *Repository) hardDeleteDocumentChargesForIDs(tx *gorm.DB, businessID, documentType string, documentIDs []string) error {
+	if len(documentIDs) == 0 {
+		return nil
+	}
+	return tx.Exec("DELETE FROM document_charges WHERE business_id = ? AND document_type = ? AND document_id IN ?", businessID, documentType, documentIDs).Error
+}
 func (r *Repository) FindOrder(id, businessID string) (*PurchaseOrder, error) {
 	var order PurchaseOrder
 	err := r.db.Where("id = ? AND business_id = ? AND deleted_at IS NULL", id, businessID).First(&order).Error

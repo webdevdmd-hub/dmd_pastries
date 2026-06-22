@@ -9,6 +9,7 @@ import type {
   ConvertPurchaseOrderToInvoicePayload,
   CreatePurchaseInvoicePayload,
   CreatePurchaseOrderPayload,
+  CreatePurchaseOrderRevisionPayload,
   CreatePurchaseReturnPayload,
   CreateSupplierPaymentPayload,
   PurchaseDocumentChain,
@@ -19,6 +20,8 @@ import type {
   PurchaseItemType,
   PurchaseOrder,
   PurchaseOrderItem,
+  PurchaseOrderRevision,
+  PurchaseOrderRevisionPaymentExcessAction,
   PurchaseOrderStatus,
   PurchasePaymentStatus,
   PurchaseReceipt,
@@ -77,6 +80,11 @@ type BackendPurchaseOrderPayload = {
   expected_delivery_date?: string | null;
   items?: BackendLinePayload[];
   notes?: string | null;
+};
+
+type BackendPurchaseOrderRevisionPayload = BackendPurchaseOrderPayload & {
+  payment_excess_action?: PurchaseOrderRevisionPaymentExcessAction;
+  reason?: string | null;
 };
 
 type BackendPurchaseInvoicePayload = {
@@ -425,6 +433,52 @@ function parseOrder(value: unknown): PurchaseOrder {
     createdAt: stringValue(value.created_at),
     updatedAt: stringValue(value.updated_at),
     items: Array.isArray(value.items) ? value.items.map(parseOrderItem) : [],
+  };
+}
+
+function parsePurchaseOrderRevision(value: unknown): PurchaseOrderRevision {
+  if (!isObject(value)) {
+    throw new Error("Backend purchase order revision payload is invalid.");
+  }
+
+  const impact = isObject(value.impact) ? value.impact : {};
+  const paymentExcessAction =
+    value.payment_excess_action === "vendor_credit" ||
+    value.payment_excess_action === "refund_receivable"
+      ? value.payment_excess_action
+      : "supplier_advance";
+
+  return {
+    id: stringValue(value.id),
+    purchaseOrderId: stringValue(value.purchase_order_id),
+    purchaseOrderNumber: stringValue(value.purchase_order_number, "PO"),
+    revisionNumber: numberValue(value.revision_number),
+    status:
+      value.status === "previewed" || value.status === "failed" || value.status === "applied"
+        ? value.status
+        : "applied",
+    paymentExcessAction,
+    reason: optionalString(value.reason),
+    impact: {
+      originalTotal: numberValue(impact.original_total),
+      revisedTotal: numberValue(impact.revised_total),
+      differenceAmount: numberValue(impact.difference_amount),
+      extraQuantityToReceive: numberValue(impact.extra_quantity_to_receive),
+      overReceivedQuantity: numberValue(impact.over_received_quantity),
+      hasFinalizedHistory: Boolean(impact.has_finalized_history),
+      postedReceiptCount: numberValue(impact.posted_receipt_count),
+      postedInvoiceCount: numberValue(impact.posted_invoice_count),
+      supplierPaymentCount: numberValue(impact.supplier_payment_count),
+      stockMovementCount: numberValue(impact.stock_movement_count),
+      vendorCreditCount: numberValue(impact.vendor_credit_count),
+      inventoryImpact: stringValue(impact.inventory_impact),
+      billImpact: stringValue(impact.bill_impact),
+      paymentImpact: stringValue(impact.payment_impact),
+      accountingImpact: stringValue(impact.accounting_impact),
+      supplierBalanceImpact: stringValue(impact.supplier_balance_impact),
+    },
+    order: parseOrder(value.order),
+    createdAt: stringValue(value.created_at),
   };
 }
 
@@ -1039,6 +1093,19 @@ function orderPayload(
   return nextPayload;
 }
 
+function orderRevisionPayload(
+  payload: CreatePurchaseOrderRevisionPayload,
+): BackendPurchaseOrderRevisionPayload {
+  const nextPayload: BackendPurchaseOrderRevisionPayload = orderPayload(payload);
+
+  if (payload.paymentExcessAction !== undefined) {
+    nextPayload.payment_excess_action = payload.paymentExcessAction;
+  }
+  if (payload.reason !== undefined) nextPayload.reason = payload.reason;
+
+  return nextPayload;
+}
+
 function invoicePayload(
   payload: CreatePurchaseInvoicePayload | UpdatePurchaseInvoicePayload,
 ): BackendPurchaseInvoicePayload {
@@ -1258,6 +1325,23 @@ export async function updatePurchaseOrder(
       authMode: "appwrite",
       body: orderPayload(payload),
       parse: parseOrder,
+    },
+  );
+
+  return response.data;
+}
+
+export async function createPurchaseOrderRevision(
+  id: string,
+  payload: CreatePurchaseOrderRevisionPayload,
+): Promise<PurchaseOrderRevision> {
+  const response = await apiRequest<PurchaseOrderRevision, BackendPurchaseOrderRevisionPayload>(
+    `/api/v1/purchasing/orders/${id}/revisions`,
+    {
+      method: "POST",
+      authMode: "appwrite",
+      body: orderRevisionPayload(payload),
+      parse: parsePurchaseOrderRevision,
     },
   );
 

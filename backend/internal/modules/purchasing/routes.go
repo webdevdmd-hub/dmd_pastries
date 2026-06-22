@@ -20,6 +20,7 @@ func RegisterRoutes(
 	group.GET("/orders/:id/document-chain", view, handler.GetOrderDocumentChain)
 	group.PATCH("/orders/:id", manage, handler.UpdateOrder)
 	group.PATCH("/orders/:id/status", manage, handler.UpdateOrderStatus)
+	group.POST("/orders/:id/revisions", manage, handler.CreateOrderRevision)
 	group.POST("/orders/:id/reopen", manage, handler.ReopenOrder)
 	group.POST("/orders/:id/duplicate", manage, handler.DuplicateOrder)
 	group.POST("/orders/:id/receive", manage, handler.ReceiveOrder)

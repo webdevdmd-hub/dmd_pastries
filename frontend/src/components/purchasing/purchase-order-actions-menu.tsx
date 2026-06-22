@@ -47,9 +47,9 @@ export function PurchaseOrderActionsMenu({
   order: PurchaseOrder;
 }): JSX.Element {
   const canReceive = order.status === "ordered" || order.status === "partially_received";
-  const canHardDelete =
-    canDelete && order.status !== "received" && order.status !== "partially_received";
+  const canHardDelete = canDelete;
   const canEditOrder = canEdit && (order.status === "draft" || order.status === "ordered");
+  const canEditWithCorrection = canEdit && order.status === "received";
   const canAdjustRemaining = canEdit && order.status === "partially_received";
   const canReopen = canUpdateStatus && order.status === "cancelled";
   const isConversionEligible = order.status === "received";
@@ -80,6 +80,11 @@ export function PurchaseOrderActionsMenu({
           <>
             {canEditOrder ? (
               <DropdownMenuItem onSelect={() => onEdit(order)}>Edit</DropdownMenuItem>
+            ) : null}
+            {canEditWithCorrection ? (
+              <DropdownMenuItem onSelect={() => onEdit(order)}>
+                Edit with correction
+              </DropdownMenuItem>
             ) : null}
             {canAdjustRemaining ? (
               <DropdownMenuItem onSelect={() => onEdit(order)}>Adjust remaining</DropdownMenuItem>

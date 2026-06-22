@@ -14,6 +14,7 @@ import {
   convertPurchaseOrderToInvoice,
   createPurchaseInvoice,
   createPurchaseOrder,
+  createPurchaseOrderRevision,
   createPurchaseReturn,
   createSupplierPayment,
   deletePurchaseOrder,
@@ -59,11 +60,13 @@ import type {
   ConvertPurchaseOrderToInvoicePayload,
   CreatePurchaseInvoicePayload,
   CreatePurchaseOrderPayload,
+  CreatePurchaseOrderRevisionPayload,
   CreatePurchaseReturnPayload,
   CreateSupplierPaymentPayload,
   PurchaseDocumentChain,
   PurchaseInvoice,
   PurchaseOrder,
+  PurchaseOrderRevision,
   PurchaseReceipt,
   PurchaseReturn,
   PurchaseReturnFilters,
@@ -375,6 +378,24 @@ export function useUpdatePurchaseOrder() {
     mutationFn: async ({ id, payload }) => updatePurchaseOrder(id, payload),
     onSuccess: async () => {
       await invalidatePurchasing(queryClient);
+    },
+  });
+}
+
+export function useCreatePurchaseOrderRevision() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    PurchaseOrderRevision,
+    Error,
+    { id: string; payload: CreatePurchaseOrderRevisionPayload }
+  >({
+    mutationFn: async ({ id, payload }) => createPurchaseOrderRevision(id, payload),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+      await queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      await queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+      await queryClient.invalidateQueries({ queryKey: ["accounting"] });
     },
   });
 }

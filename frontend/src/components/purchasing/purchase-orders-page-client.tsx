@@ -35,6 +35,7 @@ import { usePermission } from "@/hooks/use-permission";
 import {
   useCreatePurchaseInvoice,
   useCreatePurchaseOrder,
+  useCreatePurchaseOrderRevision,
   useDeletePurchaseOrder,
   useDuplicatePurchaseOrder,
   usePurchaseOrder,
@@ -51,14 +52,11 @@ import {
   useUpdatePurchaseOrderStatus,
 } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
-import {
-  getHistoryDeleteConflictMessage,
-  isHistoryDeleteConflict,
-} from "@/lib/api/delete-conflicts";
 import { purchaseOrderToBillInitialValues } from "@/lib/purchasing/purchase-order-bill-draft";
 import type {
   CreatePurchaseInvoicePayload,
   CreatePurchaseOrderPayload,
+  CreatePurchaseOrderRevisionPayload,
   PurchaseOrder,
   PurchaseOrderStatus,
   PurchasingFilters,
@@ -164,6 +162,7 @@ export function PurchaseOrdersPageClient(): JSX.Element {
     canView,
   );
   const createOrderMutation = useCreatePurchaseOrder();
+  const createRevisionMutation = useCreatePurchaseOrderRevision();
   const createInvoiceMutation = useCreatePurchaseInvoice();
   const updateMutation = useUpdatePurchaseOrder();
   const statusMutation = useUpdatePurchaseOrderStatus();
@@ -251,6 +250,21 @@ export function PurchaseOrdersPageClient(): JSX.Element {
     }
   };
 
+  const handleRevise = async (
+    id: string,
+    payload: CreatePurchaseOrderRevisionPayload,
+  ): Promise<void> => {
+    try {
+      const revision = await createRevisionMutation.mutateAsync({ id, payload });
+      toast.success(`Purchase order revision ${String(revision.revisionNumber)} saved.`);
+      setEditingOrder(null);
+      setEditingOrderId(null);
+      setFormOpen(false);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
   const handleReceive = async (payload: ReceivePurchaseOrderPayload): Promise<void> => {
     if (!receivingOrderId) return;
 
@@ -299,11 +313,7 @@ export function PurchaseOrdersPageClient(): JSX.Element {
       }
       setPendingAction(null);
     } catch (error) {
-      toast.error(
-        action.type === "delete" && isHistoryDeleteConflict(error)
-          ? getHistoryDeleteConflictMessage("purchase order")
-          : getErrorMessage(error),
-      );
+      toast.error(getErrorMessage(error));
     }
   };
 
@@ -408,13 +418,18 @@ export function PurchaseOrdersPageClient(): JSX.Element {
       <PurchaseOrderFormDialog
         accounts={purchaseAccounts}
         branches={branchesQuery.data ?? []}
-        isSubmitting={createOrderMutation.isPending || updateMutation.isPending}
+        isSubmitting={
+          createOrderMutation.isPending ||
+          updateMutation.isPending ||
+          createRevisionMutation.isPending
+        }
         onClose={() => {
           setEditingOrder(null);
           setEditingOrderId(null);
           setFormOpen(false);
         }}
         onCreate={handleCreate}
+        onRevise={handleRevise}
         onUpdate={handleUpdate}
         open={formOpen}
         order={editingOrderQuery.data ?? editingOrder}
@@ -476,7 +491,7 @@ export function PurchaseOrdersPageClient(): JSX.Element {
             </DialogTitle>
             <DialogDescription>
               {pendingAction?.type === "delete"
-                ? "This permanently removes the purchase order, its item lines, and document charges only when it has no linked receiving, bill, payment, vendor credit, or stock history. This cannot be undone."
+                ? "This will permanently delete the purchase order plus linked draft bills, draft receive-goods records, and draft vendor credits. Posted bills, posted GRNs, stock movements, journals, supplier payments, or posted vendor credits will block deletion."
                 : pendingAction?.type === "reopen"
                   ? "Reopen this cancelled purchase order as a draft only if it has no linked receipt, bill, payment, return, or stock history."
                   : `Update ${pendingAction?.order.purchaseOrderNumber ?? "order"} to ${pendingAction?.status ?? "status"}?`}

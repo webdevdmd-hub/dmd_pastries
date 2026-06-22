@@ -416,6 +416,48 @@ export type CreatePurchaseOrderPayload = {
 
 export type UpdatePurchaseOrderPayload = Partial<CreatePurchaseOrderPayload>;
 
+export type PurchaseOrderRevisionPaymentExcessAction =
+  | "supplier_advance"
+  | "vendor_credit"
+  | "refund_receivable";
+
+export type PurchaseOrderRevisionImpact = {
+  originalTotal: number;
+  revisedTotal: number;
+  differenceAmount: number;
+  extraQuantityToReceive: number;
+  overReceivedQuantity: number;
+  hasFinalizedHistory: boolean;
+  postedReceiptCount: number;
+  postedInvoiceCount: number;
+  supplierPaymentCount: number;
+  stockMovementCount: number;
+  vendorCreditCount: number;
+  inventoryImpact: string;
+  billImpact: string;
+  paymentImpact: string;
+  accountingImpact: string;
+  supplierBalanceImpact: string;
+};
+
+export type CreatePurchaseOrderRevisionPayload = UpdatePurchaseOrderPayload & {
+  paymentExcessAction?: PurchaseOrderRevisionPaymentExcessAction;
+  reason?: string | null;
+};
+
+export type PurchaseOrderRevision = {
+  id: string;
+  purchaseOrderId: string;
+  purchaseOrderNumber: string;
+  revisionNumber: number;
+  status: "previewed" | "applied" | "failed";
+  paymentExcessAction: PurchaseOrderRevisionPaymentExcessAction;
+  reason: string | null;
+  impact: PurchaseOrderRevisionImpact;
+  order: PurchaseOrder;
+  createdAt: string;
+};
+
 export type UpdatePurchaseOrderStatusPayload = {
   status: PurchaseOrderStatus;
 };

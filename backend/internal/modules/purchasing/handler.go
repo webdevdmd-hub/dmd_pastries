@@ -55,6 +55,17 @@ func (h *Handler) UpdateOrder(c *gin.Context) {
 	respond(c, "purchase order updated successfully", result, err)
 }
 
+func (h *Handler) CreateOrderRevision(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	var req CreatePurchaseOrderRevisionRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.CreateOrderRevision(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "purchase order revision applied successfully", result, err)
+}
 func (h *Handler) UpdateOrderStatus(c *gin.Context) {
 	if !validParam(c, "id") {
 		return

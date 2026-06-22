@@ -73,6 +73,17 @@ type CreatePurchaseOrderRequest struct {
 	Notes                string                   `json:"notes"`
 }
 
+type CreatePurchaseOrderRevisionRequest struct {
+	BranchID             string                   `json:"branch_id"`
+	SupplierID           string                   `json:"supplier_id"`
+	OrderDate            string                   `json:"order_date"`
+	ExpectedDeliveryDate string                   `json:"expected_delivery_date"`
+	Items                []PurchaseOrderItemInput `json:"items"`
+	Charges              []charges.ChargeInput    `json:"charges"`
+	PaymentExcessAction  string                   `json:"payment_excess_action"`
+	Reason               string                   `json:"reason"`
+	Notes                string                   `json:"notes"`
+}
 type UpdatePurchaseOrderRequest struct {
 	BranchID             string                   `json:"branch_id"`
 	SupplierID           string                   `json:"supplier_id"`
@@ -272,6 +283,37 @@ type PurchaseOrderResponse struct {
 	UpdatedAt            time.Time                   `json:"updated_at"`
 }
 
+type PurchaseOrderRevisionImpactResponse struct {
+	OriginalTotal          float64 `json:"original_total"`
+	RevisedTotal           float64 `json:"revised_total"`
+	DifferenceAmount       float64 `json:"difference_amount"`
+	ExtraQuantityToReceive float64 `json:"extra_quantity_to_receive"`
+	OverReceivedQuantity   float64 `json:"over_received_quantity"`
+	HasFinalizedHistory    bool    `json:"has_finalized_history"`
+	PostedReceiptCount     int64   `json:"posted_receipt_count"`
+	PostedInvoiceCount     int64   `json:"posted_invoice_count"`
+	SupplierPaymentCount   int64   `json:"supplier_payment_count"`
+	StockMovementCount     int64   `json:"stock_movement_count"`
+	VendorCreditCount      int64   `json:"vendor_credit_count"`
+	InventoryImpact        string  `json:"inventory_impact"`
+	BillImpact             string  `json:"bill_impact"`
+	PaymentImpact          string  `json:"payment_impact"`
+	AccountingImpact       string  `json:"accounting_impact"`
+	SupplierBalanceImpact  string  `json:"supplier_balance_impact"`
+}
+
+type PurchaseOrderRevisionResponse struct {
+	ID                  string                              `json:"id"`
+	PurchaseOrderID     string                              `json:"purchase_order_id"`
+	PurchaseOrderNumber string                              `json:"purchase_order_number"`
+	RevisionNumber      int                                 `json:"revision_number"`
+	Status              string                              `json:"status"`
+	PaymentExcessAction string                              `json:"payment_excess_action"`
+	Reason              string                              `json:"reason"`
+	Impact              PurchaseOrderRevisionImpactResponse `json:"impact"`
+	Order               PurchaseOrderResponse               `json:"order"`
+	CreatedAt           time.Time                           `json:"created_at"`
+}
 type PurchaseOrderItemResponse struct {
 	ID               string  `json:"id"`
 	LineType         string  `json:"line_type"`

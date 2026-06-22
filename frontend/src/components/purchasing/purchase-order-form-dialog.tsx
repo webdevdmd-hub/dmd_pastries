@@ -27,6 +27,7 @@ import { purchaseOrderSchema } from "@/lib/validators/purchasing.schema";
 import type { ChartAccount } from "@/types/accounting";
 import type {
   CreatePurchaseOrderPayload,
+  CreatePurchaseOrderRevisionPayload,
   PurchaseItemLineDraft,
   PurchaseOrder,
   PurchasingBranchOption,
@@ -65,6 +66,7 @@ export function PurchaseOrderFormDialog({
   isSubmitting,
   onClose,
   onCreate,
+  onRevise,
   onUpdate,
   open,
   order,
@@ -78,6 +80,7 @@ export function PurchaseOrderFormDialog({
   isSubmitting: boolean;
   onClose: () => void;
   onCreate: (payload: CreatePurchaseOrderPayload) => Promise<void>;
+  onRevise?: (id: string, payload: CreatePurchaseOrderRevisionPayload) => Promise<void>;
   onUpdate: (id: string, payload: UpdatePurchaseOrderPayload) => Promise<void>;
   open: boolean;
   order: PurchaseOrder | null;
@@ -94,7 +97,10 @@ export function PurchaseOrderFormDialog({
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<PurchaseItemLineDraft[]>([emptyLine()]);
   const [error, setError] = useState<string | null>(null);
+  const [pendingRevisionPayload, setPendingRevisionPayload] =
+    useState<CreatePurchaseOrderRevisionPayload | null>(null);
   const isPartialAdjustment = order?.status === "partially_received";
+  const isCorrectionEdit = order?.status === "received";
   const hasAccountRows = lines.some(
     (line) => line.lineType === "account" || line.itemType === "account" || Boolean(line.accountId),
   );
@@ -149,7 +155,16 @@ export function PurchaseOrderFormDialog({
         : [emptyLine()],
     );
     setError(null);
+    setPendingRevisionPayload(null);
   }, [branchScope.effectiveBranchId, open, order]);
+
+  const estimatedRevisedTotal = lines.reduce((sum, line) => {
+    const subtotal = Math.max(line.quantity * line.unitCost - line.discountAmount, 0);
+    const taxRate = taxRates.find((rate) => rate.id === line.taxRateId);
+    const tax = taxRate ? (subtotal * taxRate.taxPercentage) / 100 : 0;
+    return sum + subtotal + tax;
+  }, 0);
+  const revisionDifference = estimatedRevisedTotal - (order?.totalAmount ?? 0);
 
   const submit = async (): Promise<void> => {
     if (isPartialAdjustment) {
@@ -178,11 +193,29 @@ export function PurchaseOrderFormDialog({
       return;
     }
 
+    if (order && isCorrectionEdit) {
+      if (!onRevise) {
+        setError("Correction edit is not available for this purchase order.");
+        return;
+      }
+      setPendingRevisionPayload({
+        ...result.data,
+        paymentExcessAction: "supplier_advance",
+        reason: "PO correction edit",
+      });
+      return;
+    }
+
     if (order) {
       await onUpdate(order.id, result.data);
     } else {
       await onCreate(result.data);
     }
+  };
+
+  const confirmRevision = async (): Promise<void> => {
+    if (!order || !pendingRevisionPayload || !onRevise) return;
+    await onRevise(order.id, pendingRevisionPayload);
   };
 
   return (
@@ -192,22 +225,52 @@ export function PurchaseOrderFormDialog({
           <DialogTitle className="text-2xl">
             {isPartialAdjustment
               ? "Adjust remaining purchase order"
-              : order
-                ? "Edit purchase order"
-                : "Create purchase order"}
+              : isCorrectionEdit
+                ? "Edit with correction"
+                : order
+                  ? "Edit purchase order"
+                  : "Create purchase order"}
           </DialogTitle>
           <DialogDescription className="text-sm leading-5">
             {isPartialAdjustment
               ? "Adjust unreceived quantities, expected delivery, and notes. Received history stays locked."
-              : order?.status === "ordered"
-                ? "Update this issued purchase order before receiving goods. It remains issued after saving."
-                : "Draft supplier orders with product lines, tax, discount, and delivery dates."}
+              : isCorrectionEdit
+                ? "Review the edited PO, then save a revision. Posted stock, bills, journals, and payments stay unchanged."
+                : order?.status === "ordered"
+                  ? "Update this issued purchase order before receiving goods. It remains issued after saving."
+                  : "Draft supplier orders with product lines, tax, discount, and delivery dates."}
           </DialogDescription>
         </DialogHeader>
+        {pendingRevisionPayload ? (
+          <div className="border-b border-brand-cappuccino/70 bg-amber-50 px-5 py-4 text-sm">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div>
+                <p className="text-brand-mocha">Original PO total</p>
+                <p className="font-semibold tabular-nums">
+                  AED {(order?.totalAmount ?? 0).toFixed(2)}
+                </p>
+              </div>
+              <div>
+                <p className="text-brand-mocha">New estimated total</p>
+                <p className="font-semibold tabular-nums">AED {estimatedRevisedTotal.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-brand-mocha">Difference</p>
+                <p className="font-semibold tabular-nums">
+                  {revisionDifference >= 0 ? "+" : "-"}AED {Math.abs(revisionDifference).toFixed(2)}
+                </p>
+              </div>
+            </div>
+            <p className="mt-3 text-amber-900">
+              Posted GRNs, stock movements, bills, journals, and payments will not be rewritten. The
+              backend will save a PO revision and keep correction impact visible for follow-up.
+            </p>
+          </div>
+        ) : null}
         <div className="grid min-h-0 gap-3 overflow-y-auto px-5 py-4">
           <div className="grid gap-3 lg:grid-cols-4">
             <Select
-              disabled={isPartialAdjustment}
+              disabled={isPartialAdjustment || isCorrectionEdit}
               value={branchId || "none"}
               onValueChange={(value) => setBranchId(value === "none" ? "" : value)}
             >
@@ -224,7 +287,7 @@ export function PurchaseOrderFormDialog({
               </SelectContent>
             </Select>
             <SupplierLookupSelect
-              disabled={isPartialAdjustment}
+              disabled={isPartialAdjustment || isCorrectionEdit}
               onValueChange={setSupplierId}
               suppliers={suppliers}
               value={supplierId}
@@ -232,7 +295,7 @@ export function PurchaseOrderFormDialog({
             <Input
               aria-label="Order date"
               className="h-10"
-              disabled={isPartialAdjustment}
+              disabled={isPartialAdjustment || isCorrectionEdit}
               onChange={(event) => setOrderDate(event.target.value)}
               type="date"
               value={orderDate}
@@ -269,8 +332,32 @@ export function PurchaseOrderFormDialog({
           <Button onClick={onClose} type="button" variant="outline">
             Cancel
           </Button>
-          <Button disabled={isSubmitting} onClick={() => void submit()} type="button">
-            {isPartialAdjustment ? "Save adjustment" : order ? "Save order" : "Create order"}
+          {pendingRevisionPayload ? (
+            <Button
+              disabled={isSubmitting}
+              onClick={() => setPendingRevisionPayload(null)}
+              type="button"
+              variant="outline"
+            >
+              Back to edit
+            </Button>
+          ) : null}
+          <Button
+            disabled={isSubmitting}
+            onClick={() => void (pendingRevisionPayload ? confirmRevision() : submit())}
+            type="button"
+          >
+            {pendingRevisionPayload
+              ? isSubmitting
+                ? "Saving revision..."
+                : "Save revision and apply corrections"
+              : isCorrectionEdit
+                ? "Review impact"
+                : isPartialAdjustment
+                  ? "Save adjustment"
+                  : order
+                    ? "Save order"
+                    : "Create order"}
           </Button>
         </DialogFooter>
       </DialogContent>

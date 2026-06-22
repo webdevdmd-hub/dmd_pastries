@@ -1,6 +1,7 @@
 package purchasing
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -297,6 +298,276 @@ func (s *Service) updatePartiallyReceivedOrder(tx *gorm.DB, currentUser *utils.A
 	return s.audit(tx, currentUser, "purchase_order.adjusted_remaining", existing.ID, "Partially received purchase order adjusted", ipAddress, userAgent)
 }
 
+func (s *Service) CreateOrderRevision(currentUser *utils.AuthContext, id string, req CreatePurchaseOrderRevisionRequest, ipAddress, userAgent string) (*PurchaseOrderRevisionResponse, error) {
+	if err := requireAllOrOverride(currentUser, []string{"purchasing.orders.edit"}, []string{"purchasing.manage"}); err != nil {
+		return nil, err
+	}
+	paymentAction := normalizedPaymentExcessAction(req.PaymentExcessAction)
+	var revisionID string
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		existing, err := s.repo.FindOrderForUpdate(tx, id, currentUser.BusinessID)
+		if err != nil {
+			return notFound(err, "purchase order not found")
+		}
+		if !currentUser.CanAccessBranch(existing.BranchID) {
+			return apperrors.Forbidden("branch access denied")
+		}
+		if existing.Status == "cancelled" {
+			return apperrors.BadRequest("cancelled purchase orders cannot be revised", nil)
+		}
+
+		original := s.orderResponse(currentUser.BusinessID, *existing, true)
+		impact, err := s.purchaseOrderRevisionImpact(tx, currentUser, existing, req)
+		if err != nil {
+			return err
+		}
+		originalJSON, err := json.Marshal(original)
+		if err != nil {
+			return apperrors.Internal("failed to snapshot original purchase order")
+		}
+		revisedJSON, err := json.Marshal(req)
+		if err != nil {
+			return apperrors.Internal("failed to snapshot revised purchase order")
+		}
+		impactJSON, err := json.Marshal(impact)
+		if err != nil {
+			return apperrors.Internal("failed to snapshot purchase order revision impact")
+		}
+		revisionNumber, err := s.repo.NextOrderRevisionNumber(tx, currentUser.BusinessID, existing.ID)
+		if err != nil {
+			return err
+		}
+		revision := &PurchaseOrderRevision{
+			ID:                  utils.NewUUID(),
+			BusinessID:          currentUser.BusinessID,
+			BranchID:            existing.BranchID,
+			PurchaseOrderID:     existing.ID,
+			RevisionNumber:      revisionNumber,
+			Status:              "applied",
+			PaymentExcessAction: paymentAction,
+			Reason:              strings.TrimSpace(req.Reason),
+			OriginalSnapshot:    originalJSON,
+			RevisedSnapshot:     revisedJSON,
+			ImpactSummary:       impactJSON,
+			CreatedByUserID:     currentUser.UserID,
+		}
+		if err := s.repo.CreateOrderRevision(tx, revision); err != nil {
+			return err
+		}
+		revisionID = revision.ID
+
+		updateReq := UpdatePurchaseOrderRequest{
+			BranchID:             req.BranchID,
+			SupplierID:           req.SupplierID,
+			OrderDate:            req.OrderDate,
+			ExpectedDeliveryDate: req.ExpectedDeliveryDate,
+			Items:                req.Items,
+			Charges:              req.Charges,
+			Notes:                req.Notes,
+		}
+		if impact.HasFinalizedHistory {
+			if err := s.updatePartiallyReceivedOrder(tx, currentUser, existing, updateReq, ipAddress, userAgent); err != nil {
+				return err
+			}
+			return s.refreshOrderReceivedStatus(tx, currentUser.BusinessID, existing.ID)
+		}
+		return s.applyDirectOrderRevisionUpdate(tx, currentUser, existing, updateReq, ipAddress, userAgent)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetOrderRevision(currentUser, revisionID)
+}
+
+func (s *Service) GetOrderRevision(currentUser *utils.AuthContext, revisionID string) (*PurchaseOrderRevisionResponse, error) {
+	var revision PurchaseOrderRevision
+	if err := s.db.Where("id = ? AND business_id = ? AND deleted_at IS NULL", revisionID, currentUser.BusinessID).First(&revision).Error; err != nil {
+		return nil, notFound(err, "purchase order revision not found")
+	}
+	order, err := s.repo.FindOrder(revision.PurchaseOrderID, currentUser.BusinessID)
+	if err != nil {
+		return nil, notFound(err, "purchase order not found")
+	}
+	if !currentUser.CanAccessBranch(order.BranchID) {
+		return nil, apperrors.Forbidden("branch access denied")
+	}
+	var impact PurchaseOrderRevisionImpactResponse
+	_ = json.Unmarshal(revision.ImpactSummary, &impact)
+	orderResponse := s.orderResponse(currentUser.BusinessID, *order, true)
+	return &PurchaseOrderRevisionResponse{ID: revision.ID, PurchaseOrderID: revision.PurchaseOrderID, PurchaseOrderNumber: order.PurchaseOrderNumber, RevisionNumber: revision.RevisionNumber, Status: revision.Status, PaymentExcessAction: revision.PaymentExcessAction, Reason: revision.Reason, Impact: impact, Order: orderResponse, CreatedAt: revision.CreatedAt}, nil
+}
+
+func (s *Service) purchaseOrderRevisionImpact(tx *gorm.DB, currentUser *utils.AuthContext, existing *PurchaseOrder, req CreatePurchaseOrderRevisionRequest) (PurchaseOrderRevisionImpactResponse, error) {
+	impact, err := s.repo.PurchaseOrderRevisionImpactCounts(tx, currentUser.BusinessID, existing.ID)
+	if err != nil {
+		return impact, err
+	}
+	impact.OriginalTotal = roundMoney(existing.TotalAmount)
+	if req.Items != nil {
+		branchID := first(req.BranchID, existing.BranchID)
+		built, totals, err := s.buildOrderItems(tx, currentUser.BusinessID, branchID, existing.ID, req.Items)
+		if err != nil {
+			return impact, err
+		}
+		_ = built
+		impact.RevisedTotal = roundMoney(totals.Total + existing.ChargeAmount + existing.ChargeTaxAmount)
+		items, err := s.repo.OrderItemsForUpdate(tx, existing.ID, currentUser.BusinessID)
+		if err != nil {
+			return impact, apperrors.Internal("failed to load purchase order items")
+		}
+		byID := make(map[string]PurchaseOrderItemInput, len(req.Items))
+		for _, input := range req.Items {
+			if strings.TrimSpace(input.ID) != "" {
+				byID[input.ID] = input
+			}
+		}
+		for _, item := range items {
+			input, ok := byID[item.ID]
+			if !ok || normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID) == "account" {
+				continue
+			}
+			delta := roundQuantity(input.QuantityOrdered - item.QuantityOrdered)
+			if delta > 0 {
+				impact.ExtraQuantityToReceive += delta
+			}
+			if input.QuantityOrdered < item.QuantityReceived {
+				impact.OverReceivedQuantity += roundQuantity(item.QuantityReceived - input.QuantityOrdered)
+			}
+		}
+	} else {
+		impact.RevisedTotal = impact.OriginalTotal
+	}
+	impact.ExtraQuantityToReceive = roundQuantity(impact.ExtraQuantityToReceive)
+	impact.OverReceivedQuantity = roundQuantity(impact.OverReceivedQuantity)
+	impact.DifferenceAmount = roundMoney(impact.RevisedTotal - impact.OriginalTotal)
+	impact.InventoryImpact = purchaseOrderInventoryImpactText(impact)
+	impact.BillImpact = purchaseOrderBillImpactText(impact)
+	impact.PaymentImpact = purchaseOrderPaymentImpactText(impact)
+	impact.AccountingImpact = purchaseOrderAccountingImpactText(impact)
+	impact.SupplierBalanceImpact = purchaseOrderSupplierBalanceImpactText(impact)
+	return impact, nil
+}
+
+func (s *Service) applyDirectOrderRevisionUpdate(tx *gorm.DB, currentUser *utils.AuthContext, existing *PurchaseOrder, req UpdatePurchaseOrderRequest, ipAddress, userAgent string) error {
+	branchID := first(req.BranchID, existing.BranchID)
+	var err error
+	branchID, err = currentUser.ResolveOperationalBranch(branchID)
+	if err != nil {
+		return err
+	}
+	supplierID := first(req.SupplierID, existing.SupplierID)
+	orderDate := formatDate(existing.OrderDate)
+	if strings.TrimSpace(req.OrderDate) != "" {
+		orderDate = req.OrderDate
+	}
+	expectedDate := optionalDateString(existing.ExpectedDeliveryDate)
+	if strings.TrimSpace(req.ExpectedDeliveryDate) != "" {
+		expectedDate = req.ExpectedDeliveryDate
+	}
+	var items []PurchaseOrderItem
+	if req.Items != nil {
+		built, totals, err := s.buildOrderItems(tx, currentUser.BusinessID, branchID, existing.ID, req.Items)
+		if err != nil {
+			return err
+		}
+		items = built
+		existing.SubtotalAmount = totals.Subtotal
+		existing.TaxAmount = totals.Tax
+		existing.DiscountAmount = totals.Discount
+		existing.TotalAmount = totals.Total
+	}
+	parsedOrderDate, err := parseDate(orderDate, "order_date")
+	if err != nil {
+		return err
+	}
+	parsedExpected, err := parseOptionalDate(expectedDate, "expected_delivery_date")
+	if err != nil {
+		return err
+	}
+	if err := s.validateHeader(tx, currentUser.BusinessID, branchID, supplierID); err != nil {
+		return err
+	}
+	updates := map[string]interface{}{"branch_id": branchID, "supplier_id": supplierID, "order_date": parsedOrderDate, "expected_delivery_date": parsedExpected, "notes": strings.TrimSpace(req.Notes), "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
+	if req.Items != nil {
+		updates["subtotal_amount"] = existing.SubtotalAmount
+		updates["tax_amount"] = existing.TaxAmount
+		updates["discount_amount"] = existing.DiscountAmount
+		updates["total_amount"] = existing.TotalAmount
+	}
+	if err := s.repo.UpdateOrder(tx, existing.ID, currentUser.BusinessID, updates, items); err != nil {
+		return err
+	}
+	if req.Charges != nil {
+		if _, err := charges.ReplaceCharges(tx, currentUser.BusinessID, branchID, "purchase_order", existing.ID, req.Charges); err != nil {
+			return err
+		}
+	}
+	if req.Items != nil || req.Charges != nil {
+		if err := s.recalculatePurchaseOrderTotals(tx, currentUser.BusinessID, existing.ID); err != nil {
+			return err
+		}
+	}
+	return s.audit(tx, currentUser, "purchase_order.revision_direct_update", existing.ID, "Purchase order revision applied directly", ipAddress, userAgent)
+}
+
+func normalizedPaymentExcessAction(value string) string {
+	switch strings.TrimSpace(value) {
+	case "vendor_credit", "refund_receivable":
+		return strings.TrimSpace(value)
+	default:
+		return "supplier_advance"
+	}
+}
+
+func purchaseOrderInventoryImpactText(impact PurchaseOrderRevisionImpactResponse) string {
+	if impact.OverReceivedQuantity > 0 {
+		return fmt.Sprintf("Over-received quantity %.3f requires a stock return or correction.", impact.OverReceivedQuantity)
+	}
+	if impact.ExtraQuantityToReceive > 0 {
+		return fmt.Sprintf("Extra quantity %.3f can be received through an additional GRN.", impact.ExtraQuantityToReceive)
+	}
+	return "No quantity correction required."
+}
+
+func purchaseOrderBillImpactText(impact PurchaseOrderRevisionImpactResponse) string {
+	if impact.DifferenceAmount > 0 {
+		return fmt.Sprintf("Additional payable amount is %.2f.", impact.DifferenceAmount)
+	}
+	if impact.DifferenceAmount < 0 {
+		return fmt.Sprintf("Vendor credit or bill correction amount is %.2f.", -impact.DifferenceAmount)
+	}
+	return "No bill amount correction required."
+}
+
+func purchaseOrderPaymentImpactText(impact PurchaseOrderRevisionImpactResponse) string {
+	if impact.SupplierPaymentCount == 0 {
+		return "No supplier payment allocation is linked."
+	}
+	if impact.DifferenceAmount < 0 {
+		return fmt.Sprintf("Linked payments may create %.2f excess to handle as supplier advance, vendor credit, or refund receivable.", -impact.DifferenceAmount)
+	}
+	if impact.DifferenceAmount > 0 {
+		return fmt.Sprintf("Linked payments remain unchanged; %.2f becomes additional balance due if billed.", impact.DifferenceAmount)
+	}
+	return "Linked payments remain unchanged."
+}
+
+func purchaseOrderAccountingImpactText(impact PurchaseOrderRevisionImpactResponse) string {
+	if impact.HasFinalizedHistory {
+		return "Posted journals are preserved; accounting differences must be posted through correction documents."
+	}
+	return "No posted accounting impact exists; draft/unposted records can be updated directly."
+}
+
+func purchaseOrderSupplierBalanceImpactText(impact PurchaseOrderRevisionImpactResponse) string {
+	if impact.DifferenceAmount > 0 {
+		return fmt.Sprintf("Supplier outstanding can increase by %.2f after correction posting.", impact.DifferenceAmount)
+	}
+	if impact.DifferenceAmount < 0 {
+		return fmt.Sprintf("Supplier outstanding can decrease by %.2f after credit correction.", -impact.DifferenceAmount)
+	}
+	return "Supplier outstanding is unchanged."
+}
 func (s *Service) UpdateOrderStatus(currentUser *utils.AuthContext, id string, req UpdateStatusRequest, ipAddress, userAgent string) (*PurchaseOrderResponse, error) {
 	if !validOrderStatus(req.Status) {
 		return nil, apperrors.BadRequest("invalid purchase order status", nil)
@@ -426,15 +697,12 @@ func (s *Service) DeleteOrder(currentUser *utils.AuthContext, id, ipAddress, use
 		if !currentUser.CanAccessBranch(order.BranchID) {
 			return apperrors.Forbidden("branch access denied")
 		}
-		if order.Status == "partially_received" || order.Status == "received" {
-			return apperrors.Conflict("purchase order has linked documents and cannot be hard deleted", map[string]interface{}{"reason": "purchase_order_has_history"})
-		}
-		historyCount, err := s.repo.PurchaseOrderHistoryCount(tx, currentUser.BusinessID, order.ID)
+		historyCount, err := s.repo.FinalizedPurchaseOrderHistoryCount(tx, currentUser.BusinessID, order.ID)
 		if err != nil {
 			return err
 		}
 		if historyCount > 0 {
-			return apperrors.Conflict("purchase order has linked documents and cannot be hard deleted", map[string]interface{}{"reason": "purchase_order_has_history"})
+			return apperrors.Conflict("purchase order has finalized transactions and cannot be deleted. Use returns/corrections or duplicate as draft.", map[string]interface{}{"reason": "purchase_order_has_finalized_history"})
 		}
 		if err := s.repo.HardDeleteOrder(tx, currentUser.BusinessID, order.ID); err != nil {
 			return err
