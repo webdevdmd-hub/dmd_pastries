@@ -1,9 +1,12 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { FileText, GripVertical, Package, Plus, Trash2 } from "lucide-react";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
+import { ProductFormDialog } from "@/components/products/product-form-dialog";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import { Button } from "@/components/ui/button";
@@ -15,7 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PERMISSIONS } from "@/constants/permissions";
+import { usePermission } from "@/hooks/use-permission";
+import { useCreateProduct, useProductReferenceData } from "@/hooks/use-products";
+import { getErrorMessage } from "@/lib/api/client";
 import type { ChartAccount } from "@/types/accounting";
+import type { CreateProductPayload, Product } from "@/types/product";
 import { PRODUCT_TYPE_LABELS } from "@/types/product";
 import type {
   PurchaseItemLineDraft,
@@ -28,6 +36,7 @@ type PurchasingItemLineEditorProps = {
   accounts?: ChartAccount[];
   allowBatchFields?: boolean;
   billDiscountAmount?: number;
+  canCreateProducts?: boolean;
   disableAddRows?: boolean;
   legacyChargeAmount?: number;
   legacyChargeTaxAmount?: number;
@@ -35,6 +44,7 @@ type PurchasingItemLineEditorProps = {
   lines: PurchaseItemLineDraft[];
   onLinesChange: (lines: PurchaseItemLineDraft[]) => void;
   onBillDiscountAmountChange?: (value: number) => void;
+  onCreateProductRequest?: (lineId: string) => void;
   paidAmount?: number;
   products: PurchasingProductOption[];
   showAccountRows?: boolean;
@@ -146,6 +156,7 @@ export function PurchasingItemLineEditor({
   accounts = [],
   allowBatchFields = false,
   billDiscountAmount = 0,
+  canCreateProducts = false,
   disableAddRows = false,
   legacyChargeAmount = 0,
   legacyChargeTaxAmount = 0,
@@ -153,14 +164,25 @@ export function PurchasingItemLineEditor({
   lines,
   onLinesChange,
   onBillDiscountAmountChange,
+  onCreateProductRequest,
   paidAmount = 0,
   products,
   showAccountRows = false,
   taxRates,
   units,
 }: PurchasingItemLineEditorProps): JSX.Element {
+  const queryClient = useQueryClient();
+  const { hasAnyPermission } = usePermission();
   const [accountSearch, setAccountSearch] = useState("");
+  const [productCreateLineId, setProductCreateLineId] = useState<string | null>(null);
+  const createProductMutation = useCreateProduct();
   const safeLines = useMemo(() => (lines.length > 0 ? lines : [createLine()]), [lines]);
+  const isPurchaseOrderEditor = showAccountRows && !allowBatchFields && !onBillDiscountAmountChange;
+  const canCreateProductInEditor =
+    !disableAddRows &&
+    (canCreateProducts || isPurchaseOrderEditor) &&
+    hasAnyPermission([PERMISSIONS.productsCreate]);
+  const productReferenceDataQuery = useProductReferenceData(canCreateProductInEditor);
   const productOptions = useMemo<SearchableComboboxOption[]>(
     () =>
       products.map((product) => ({
@@ -248,515 +270,593 @@ export function PurchasingItemLineEditor({
     ).length;
     return `Matching accounts (${String(matchingAccounts)})`;
   }, [accountOptions, accountSearch]);
+  const applyCreatedProductToLine = (product: Product): void => {
+    const targetLineId =
+      productCreateLineId ??
+      safeLines.find((line) => !isAccountLine(line) && !line.productId)?.lineId ??
+      safeLines[0]?.lineId;
+
+    if (!targetLineId) return;
+
+    onLinesChange(
+      updateLine(safeLines, targetLineId, {
+        ingredientId: null,
+        itemNameSnapshot: product.productName,
+        itemType: "product",
+        lineType: "product",
+        packagingItemId: null,
+        productId: product.id,
+        productVariantId: null,
+        unitCost: product.costPrice ?? 0,
+        unitId: product.unitId,
+      }),
+    );
+  };
+  const createProductFromLine = async (payload: CreateProductPayload): Promise<void> => {
+    try {
+      const createdProduct = await createProductMutation.mutateAsync(payload);
+      await queryClient.invalidateQueries({ queryKey: ["purchasing"] });
+
+      if (createdProduct.productType === "service") {
+        toast.error("Service products cannot be selected in purchase order product rows.");
+        setProductCreateLineId(null);
+        return;
+      }
+
+      applyCreatedProductToLine(createdProduct);
+      setProductCreateLineId(null);
+      toast.success("Product created and selected for this purchase order.");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
 
   return (
-    <section className="flex min-h-0 w-full flex-1 flex-col rounded-xl border border-brand-cappuccino/70 bg-white shadow-sm">
-      <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-brand-mocha">Item Rates Are</span>
-          <Select value="tax-exclusive">
-            <SelectTrigger className="h-8 w-36 border-0 border-b border-dashed border-brand-mocha/40 bg-transparent px-0 text-xs font-semibold shadow-none focus:ring-0">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="tax-exclusive">Tax Exclusive</SelectItem>
-            </SelectContent>
-          </Select>
+    <>
+      <section className="flex min-h-0 w-full flex-1 flex-col rounded-xl border border-brand-cappuccino/70 bg-white shadow-sm">
+        <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-brand-mocha">Item Rates Are</span>
+            <Select value="tax-exclusive">
+              <SelectTrigger className="h-8 w-36 border-0 border-b border-dashed border-brand-mocha/40 bg-transparent px-0 text-xs font-semibold shadow-none focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tax-exclusive">Tax Exclusive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-brand-mocha">
+            Add purchase lines exactly as they should move through receiving and billing.
+          </p>
         </div>
-        <p className="text-xs text-brand-mocha">
-          Add purchase lines exactly as they should move through receiving and billing.
-        </p>
-      </div>
 
-      <div className="min-h-0 w-full flex-1 overflow-auto">
-        <table className="w-full min-w-[1180px] table-fixed border-collapse text-xs">
-          <thead>
-            <tr className="border-b border-brand-cappuccino/70 bg-brand-latte/30 text-left text-xs font-semibold text-brand-mocha">
-              <th className="w-[105px] px-1.5 py-2">{showAccountRows ? "Row type" : ""}</th>
-              <th className="w-[260px] px-2 py-2">Item Details</th>
-              <th className="w-[250px] px-2 py-2">Account</th>
-              <th className="w-[78px] px-2 py-2 text-right">Qty</th>
-              <th className="w-[92px] px-2 py-2 text-right">Rate</th>
-              <th className="w-[92px] px-2 py-2 text-right">Discount</th>
-              <th className="w-[132px] px-2 py-2">Tax</th>
-              <th className="w-[120px] px-2 py-2">Unit</th>
-              <th className="w-[92px] px-2 py-2 text-right">Amount</th>
-              <th className="w-[42px] px-1.5 py-2" aria-label="Actions" />
-            </tr>
-          </thead>
-          <tbody>
-            {safeLines.map((line, index) => {
-              const lineLock = lineLocks[line.lineId];
-              const isLineLocked = Boolean(lineLock);
-              const accountLine = showAccountRows && isAccountLine(line);
-              const selectedProduct =
-                products.find((product) => product.id === line.productId) ?? null;
-              const selectedAccount =
-                accounts.find((account) => account.id === line.accountId) ?? null;
-              const activeVariants =
-                selectedProduct?.variants.filter((variant) => variant.status === "active") ?? [];
-              const variantOptions = activeVariants.map((variant) => ({
-                description: [variant.sku, variant.barcode].filter(Boolean).join(" / "),
-                keywords: [variant.variantName, variant.sku ?? "", variant.barcode ?? ""],
-                label: variant.variantName,
-                value: variant.id,
-              }));
-              const isLegacyLine =
-                line.itemType !== "product" || (!line.productId && Boolean(line.itemNameSnapshot));
-              const selectedTaxRate = taxRates.find((rate) => rate.id === line.taxRateId);
+        <div className="min-h-0 w-full flex-1 overflow-auto">
+          <table className="w-full min-w-[1180px] table-fixed border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-brand-cappuccino/70 bg-brand-latte/30 text-left text-xs font-semibold text-brand-mocha">
+                <th className="w-[105px] px-1.5 py-2">{showAccountRows ? "Row type" : ""}</th>
+                <th className="w-[260px] px-2 py-2">Item Details</th>
+                <th className="w-[250px] px-2 py-2">Account</th>
+                <th className="w-[78px] px-2 py-2 text-right">Qty</th>
+                <th className="w-[92px] px-2 py-2 text-right">Rate</th>
+                <th className="w-[92px] px-2 py-2 text-right">Discount</th>
+                <th className="w-[132px] px-2 py-2">Tax</th>
+                <th className="w-[120px] px-2 py-2">Unit</th>
+                <th className="w-[92px] px-2 py-2 text-right">Amount</th>
+                <th className="w-[42px] px-1.5 py-2" aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {safeLines.map((line, index) => {
+                const lineLock = lineLocks[line.lineId];
+                const isLineLocked = Boolean(lineLock);
+                const accountLine = showAccountRows && isAccountLine(line);
+                const selectedProduct =
+                  products.find((product) => product.id === line.productId) ?? null;
+                const selectedAccount =
+                  accounts.find((account) => account.id === line.accountId) ?? null;
+                const activeVariants =
+                  selectedProduct?.variants.filter((variant) => variant.status === "active") ?? [];
+                const variantOptions = activeVariants.map((variant) => ({
+                  description: [variant.sku, variant.barcode].filter(Boolean).join(" / "),
+                  keywords: [variant.variantName, variant.sku ?? "", variant.barcode ?? ""],
+                  label: variant.variantName,
+                  value: variant.id,
+                }));
+                const isLegacyLine =
+                  line.itemType !== "product" ||
+                  (!line.productId && Boolean(line.itemNameSnapshot));
+                const selectedTaxRate = taxRates.find((rate) => rate.id === line.taxRateId);
 
-              return (
-                <tr className="border-b border-brand-cappuccino/70 align-top" key={line.lineId}>
-                  <td className="px-1.5 py-2 text-brand-mocha">
-                    {showAccountRows ? (
-                      <Select
-                        disabled={disableAddRows || isLineLocked}
-                        value={accountLine ? "account" : "product"}
-                        onValueChange={(lineType) => {
-                          onLinesChange(
-                            updateLine(
-                              safeLines,
-                              line.lineId,
-                              lineType === "account"
-                                ? {
-                                    ...createAccountLine(),
-                                    lineId: line.lineId,
-                                  }
-                                : {
-                                    ...createLine(),
-                                    lineId: line.lineId,
-                                  },
-                            ),
-                          );
-                        }}
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="product">Product Row</SelectItem>
-                          <SelectItem value="account">Account Row</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <GripVertical className="mt-2 h-4 w-4" />
-                    )}
-                  </td>
-                  <td className="bg-brand-latte/20 px-2 py-2">
-                    {accountLine ? (
-                      <div className="space-y-2">
-                        <Input
-                          aria-label={`Description for account line ${String(index + 1)}`}
-                          className="h-8 text-xs"
-                          disabled={isLineLocked}
-                          onChange={(event) =>
+                return (
+                  <tr className="border-b border-brand-cappuccino/70 align-top" key={line.lineId}>
+                    <td className="px-1.5 py-2 text-brand-mocha">
+                      {showAccountRows ? (
+                        <Select
+                          disabled={disableAddRows || isLineLocked}
+                          value={accountLine ? "account" : "product"}
+                          onValueChange={(lineType) => {
                             onLinesChange(
-                              updateLine(safeLines, line.lineId, {
-                                description: event.target.value,
-                                itemNameSnapshot: event.target.value,
-                              }),
-                            )
-                          }
-                          placeholder="Description, e.g. Delivery Charge"
-                          value={line.description ?? line.itemNameSnapshot ?? ""}
-                        />
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-brand-mocha">
-                          <span className="inline-flex items-center gap-1 rounded bg-brand-cappuccino/60 px-1.5 py-0.5 font-semibold uppercase tracking-[0.12em] text-brand-espresso">
-                            <FileText className="h-3 w-3" />
-                            Account Row
-                          </span>
-                          {selectedAccount ? <span>{selectedAccount.accountName}</span> : null}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <SearchableCombobox
-                          emptyMessage="No matching Product Master items found."
-                          disabled={isLineLocked}
-                          onValueChange={(productId) => {
-                            const selected = products.find((product) => product.id === productId);
-                            onLinesChange(
-                              updateLine(safeLines, line.lineId, {
-                                ingredientId: null,
-                                itemNameSnapshot:
-                                  productId.length === 0 ? null : (selected?.productName ?? null),
-                                itemType: "product",
-                                lineType: "product",
-                                packagingItemId: null,
-                                productId: productId.length === 0 ? null : productId,
-                                productVariantId: null,
-                                unitCost: selected?.costPrice ?? line.unitCost,
-                                unitId: selected?.unitId ?? line.unitId,
-                              }),
+                              updateLine(
+                                safeLines,
+                                line.lineId,
+                                lineType === "account"
+                                  ? {
+                                      ...createAccountLine(),
+                                      lineId: line.lineId,
+                                    }
+                                  : {
+                                      ...createLine(),
+                                      lineId: line.lineId,
+                                    },
+                              ),
                             );
                           }}
-                          options={withSnapshotOption(
-                            productOptions,
-                            line.productId ?? "",
-                            line.itemNameSnapshot,
-                          )}
-                          placeholder={line.itemNameSnapshot ?? "Select Product Master item"}
-                          searchPlaceholder="Search product, code, SKU, barcode..."
-                          triggerClassName="h-8 text-xs"
-                          value={line.productId ?? ""}
-                        />
-                        {selectedProduct && activeVariants.length > 0 ? (
-                          <SearchableCombobox
-                            emptyMessage="No matching variants found."
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="product">Product Row</SelectItem>
+                            <SelectItem value="account">Account Row</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <GripVertical className="mt-2 h-4 w-4" />
+                      )}
+                    </td>
+                    <td className="bg-brand-latte/20 px-2 py-2">
+                      {accountLine ? (
+                        <div className="space-y-2">
+                          <Input
+                            aria-label={`Description for account line ${String(index + 1)}`}
+                            className="h-8 text-xs"
                             disabled={isLineLocked}
-                            onValueChange={(productVariantId) => {
-                              const selectedVariant = activeVariants.find(
-                                (variant) => variant.id === productVariantId,
-                              );
+                            onChange={(event) =>
                               onLinesChange(
                                 updateLine(safeLines, line.lineId, {
+                                  description: event.target.value,
+                                  itemNameSnapshot: event.target.value,
+                                }),
+                              )
+                            }
+                            placeholder="Description, e.g. Delivery Charge"
+                            value={line.description ?? line.itemNameSnapshot ?? ""}
+                          />
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-brand-mocha">
+                            <span className="inline-flex items-center gap-1 rounded bg-brand-cappuccino/60 px-1.5 py-0.5 font-semibold uppercase tracking-[0.12em] text-brand-espresso">
+                              <FileText className="h-3 w-3" />
+                              Account Row
+                            </span>
+                            {selectedAccount ? <span>{selectedAccount.accountName}</span> : null}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <SearchableCombobox
+                            emptyMessage="No matching Product Master items found."
+                            disabled={isLineLocked}
+                            onValueChange={(productId) => {
+                              const selected = products.find((product) => product.id === productId);
+                              onLinesChange(
+                                updateLine(safeLines, line.lineId, {
+                                  ingredientId: null,
                                   itemNameSnapshot:
-                                    productVariantId.length === 0
-                                      ? selectedProduct.productName
-                                      : `${selectedProduct.productName} / ${selectedVariant?.variantName ?? "Variant"}`,
-                                  productVariantId:
-                                    productVariantId.length === 0 ? null : productVariantId,
-                                  unitCost: selectedVariant?.costPrice ?? line.unitCost,
+                                    productId.length === 0 ? null : (selected?.productName ?? null),
+                                  itemType: "product",
+                                  lineType: "product",
+                                  packagingItemId: null,
+                                  productId: productId.length === 0 ? null : productId,
+                                  productVariantId: null,
+                                  unitCost: selected?.costPrice ?? line.unitCost,
+                                  unitId: selected?.unitId ?? line.unitId,
                                 }),
                               );
                             }}
-                            options={variantOptions}
-                            placeholder="Select variant"
-                            searchPlaceholder="Search variant, SKU, barcode..."
+                            options={withSnapshotOption(
+                              productOptions,
+                              line.productId ?? "",
+                              line.itemNameSnapshot,
+                            )}
+                            placeholder={line.itemNameSnapshot ?? "Select Product Master item"}
+                            searchPlaceholder="Search product, code, SKU, barcode..."
                             triggerClassName="h-8 text-xs"
-                            value={line.productVariantId ?? ""}
+                            value={line.productId ?? ""}
                           />
-                        ) : null}
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-brand-mocha">
-                          <span className="inline-flex items-center gap-1 rounded bg-brand-cappuccino/60 px-1.5 py-0.5 font-semibold uppercase tracking-[0.12em] text-brand-espresso">
-                            <Package className="h-3 w-3" />
-                            {selectedProduct
-                              ? PRODUCT_TYPE_LABELS[selectedProduct.productType]
-                              : "Product"}
-                          </span>
-                          {selectedProduct?.productCode ? (
-                            <span>{selectedProduct.productCode}</span>
+                          {canCreateProductInEditor ? (
+                            <Button
+                              className="h-auto px-0 text-xs text-blue-700"
+                              disabled={isLineLocked}
+                              onClick={() => {
+                                if (onCreateProductRequest) {
+                                  onCreateProductRequest(line.lineId);
+                                  return;
+                                }
+                                setProductCreateLineId(line.lineId);
+                              }}
+                              type="button"
+                              variant="link"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              Create product
+                            </Button>
+                          ) : null}
+                          {selectedProduct && activeVariants.length > 0 ? (
+                            <SearchableCombobox
+                              emptyMessage="No matching variants found."
+                              disabled={isLineLocked}
+                              onValueChange={(productVariantId) => {
+                                const selectedVariant = activeVariants.find(
+                                  (variant) => variant.id === productVariantId,
+                                );
+                                onLinesChange(
+                                  updateLine(safeLines, line.lineId, {
+                                    itemNameSnapshot:
+                                      productVariantId.length === 0
+                                        ? selectedProduct.productName
+                                        : `${selectedProduct.productName} / ${selectedVariant?.variantName ?? "Variant"}`,
+                                    productVariantId:
+                                      productVariantId.length === 0 ? null : productVariantId,
+                                    unitCost: selectedVariant?.costPrice ?? line.unitCost,
+                                  }),
+                                );
+                              }}
+                              options={variantOptions}
+                              placeholder="Select variant"
+                              searchPlaceholder="Search variant, SKU, barcode..."
+                              triggerClassName="h-8 text-xs"
+                              value={line.productVariantId ?? ""}
+                            />
+                          ) : null}
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-brand-mocha">
+                            <span className="inline-flex items-center gap-1 rounded bg-brand-cappuccino/60 px-1.5 py-0.5 font-semibold uppercase tracking-[0.12em] text-brand-espresso">
+                              <Package className="h-3 w-3" />
+                              {selectedProduct
+                                ? PRODUCT_TYPE_LABELS[selectedProduct.productType]
+                                : "Product"}
+                            </span>
+                            {selectedProduct?.productCode ? (
+                              <span>{selectedProduct.productCode}</span>
+                            ) : null}
+                          </div>
+                          {isLegacyLine ? (
+                            <p className="text-xs text-amber-700">
+                              Legacy item saved as {line.itemNameSnapshot ?? "purchase item"}.
+                              Select a Product Master item before saving changes.
+                            </p>
+                          ) : null}
+                          {allowBatchFields ? (
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <Input
+                                aria-label="Batch number"
+                                className="h-8"
+                                onChange={(event) =>
+                                  onLinesChange(
+                                    updateLine(safeLines, line.lineId, {
+                                      batchNumber: event.target.value || null,
+                                    }),
+                                  )
+                                }
+                                placeholder="Batch"
+                                value={line.batchNumber ?? ""}
+                              />
+                              <Input
+                                aria-label="Expiry date"
+                                className="h-8"
+                                onChange={(event) =>
+                                  onLinesChange(
+                                    updateLine(safeLines, line.lineId, {
+                                      expiryDate: event.target.value || null,
+                                    }),
+                                  )
+                                }
+                                type="date"
+                                value={line.expiryDate ?? ""}
+                              />
+                            </div>
                           ) : null}
                         </div>
-                        {isLegacyLine ? (
-                          <p className="text-xs text-amber-700">
-                            Legacy item saved as {line.itemNameSnapshot ?? "purchase item"}. Select
-                            a Product Master item before saving changes.
-                          </p>
-                        ) : null}
-                        {allowBatchFields ? (
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            <Input
-                              aria-label="Batch number"
-                              className="h-8"
-                              onChange={(event) =>
-                                onLinesChange(
-                                  updateLine(safeLines, line.lineId, {
-                                    batchNumber: event.target.value || null,
-                                  }),
-                                )
-                              }
-                              placeholder="Batch"
-                              value={line.batchNumber ?? ""}
-                            />
-                            <Input
-                              aria-label="Expiry date"
-                              className="h-8"
-                              onChange={(event) =>
-                                onLinesChange(
-                                  updateLine(safeLines, line.lineId, {
-                                    expiryDate: event.target.value || null,
-                                  }),
-                                )
-                              }
-                              type="date"
-                              value={line.expiryDate ?? ""}
-                            />
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-2 py-2">
-                    {accountLine ? (
-                      <SearchableCombobox
-                        emptyMessage="No active chart accounts found."
-                        contentClassName="w-[min(560px,92vw)]"
-                        disabled={isLineLocked}
-                        filterOptionsLocally
-                        groupLabel={accountGroupLabel}
-                        listClassName="max-h-[28rem]"
-                        onSearchChange={setAccountSearch}
-                        onValueChange={(accountId) => {
-                          const selected = accounts.find((account) => account.id === accountId);
+                      )}
+                    </td>
+                    <td className="px-2 py-2">
+                      {accountLine ? (
+                        <SearchableCombobox
+                          emptyMessage="No active chart accounts found."
+                          contentClassName="w-[min(560px,92vw)]"
+                          disabled={isLineLocked}
+                          filterOptionsLocally
+                          groupLabel={accountGroupLabel}
+                          listClassName="max-h-[28rem]"
+                          onSearchChange={setAccountSearch}
+                          onValueChange={(accountId) => {
+                            const selected = accounts.find((account) => account.id === accountId);
+                            onLinesChange(
+                              updateLine(safeLines, line.lineId, {
+                                accountId: accountId.length === 0 ? null : accountId,
+                                itemNameSnapshot:
+                                  line.description ??
+                                  selected?.accountName ??
+                                  line.itemNameSnapshot ??
+                                  null,
+                              }),
+                            );
+                          }}
+                          options={accountOptions}
+                          optionTextWrap
+                          placeholder="Select account"
+                          searchPlaceholder="Search account code, name, type, group..."
+                          searchValue={accountSearch}
+                          triggerClassName="h-8 text-xs"
+                          value={line.accountId ?? ""}
+                        />
+                      ) : (
+                        <div className="rounded-md border border-brand-cappuccino/70 bg-white px-2 py-1.5 text-xs font-semibold text-brand-espresso">
+                          Inventory Asset
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-2 py-2">
+                      <Input
+                        aria-label={`Quantity for item line ${String(index + 1)}`}
+                        className="h-8 text-right text-xs"
+                        disabled={accountLine && isLineLocked}
+                        min={lineLock ? String(lineLock.minQuantity) : "0"}
+                        onChange={(event) =>
                           onLinesChange(
                             updateLine(safeLines, line.lineId, {
-                              accountId: accountId.length === 0 ? null : accountId,
-                              itemNameSnapshot:
-                                line.description ??
-                                selected?.accountName ??
-                                line.itemNameSnapshot ??
-                                null,
+                              quantity: Number(event.target.value),
                             }),
-                          );
-                        }}
-                        options={accountOptions}
-                        optionTextWrap
-                        placeholder="Select account"
-                        searchPlaceholder="Search account code, name, type, group..."
-                        searchValue={accountSearch}
-                        triggerClassName="h-8 text-xs"
-                        value={line.accountId ?? ""}
-                      />
-                    ) : (
-                      <div className="rounded-md border border-brand-cappuccino/70 bg-white px-2 py-1.5 text-xs font-semibold text-brand-espresso">
-                        Inventory Asset
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-2 py-2">
-                    <Input
-                      aria-label={`Quantity for item line ${String(index + 1)}`}
-                      className="h-8 text-right text-xs"
-                      disabled={accountLine && isLineLocked}
-                      min={lineLock ? String(lineLock.minQuantity) : "0"}
-                      onChange={(event) =>
-                        onLinesChange(
-                          updateLine(safeLines, line.lineId, {
-                            quantity: Number(event.target.value),
-                          }),
-                        )
-                      }
-                      type="number"
-                      value={line.quantity}
-                    />
-                    {lineLock ? (
-                      <p className="mt-1 text-right text-[11px] leading-4 text-brand-mocha">
-                        Received {formatAmount(lineLock.receivedQuantity)}
-                      </p>
-                    ) : null}
-                    {selectedProduct?.isStockTracked ? (
-                      <p className="mt-1 text-right text-[11px] leading-4 text-brand-mocha">
-                        Stock
-                      </p>
-                    ) : null}
-                  </td>
-                  <td className="px-2 py-2">
-                    <Input
-                      aria-label={`Rate for item line ${String(index + 1)}`}
-                      className="h-8 text-right text-xs"
-                      disabled={isLineLocked}
-                      min="0"
-                      onChange={(event) =>
-                        onLinesChange(
-                          updateLine(safeLines, line.lineId, {
-                            unitCost: Number(event.target.value),
-                          }),
-                        )
-                      }
-                      type="number"
-                      value={line.unitCost}
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <Input
-                      aria-label={`Discount for item line ${String(index + 1)}`}
-                      className="h-8 text-right text-xs"
-                      disabled={isLineLocked}
-                      min="0"
-                      onChange={(event) =>
-                        onLinesChange(
-                          updateLine(safeLines, line.lineId, {
-                            discountAmount: Number(event.target.value),
-                          }),
-                        )
-                      }
-                      type="number"
-                      value={line.discountAmount}
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <Select
-                      disabled={isLineLocked}
-                      value={line.taxRateId ?? "none"}
-                      onValueChange={(taxRateId) =>
-                        onLinesChange(
-                          updateLine(safeLines, line.lineId, {
-                            taxRateId: taxRateId === "none" ? null : taxRateId,
-                          }),
-                        )
-                      }
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Tax rate" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No tax</SelectItem>
-                        {taxRates.map((rate) => (
-                          <SelectItem key={rate.id} value={rate.id}>
-                            {rate.taxName} ({rate.taxPercentage}%)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {selectedTaxRate ? (
-                      <p className="mt-1 text-[11px] text-brand-mocha">
-                        Tax {formatAmount(lineTaxAmount(line, taxRates))}
-                      </p>
-                    ) : null}
-                  </td>
-                  <td className="px-2 py-2">
-                    {accountLine ? (
-                      <span className="text-xs text-brand-mocha">Not required</span>
-                    ) : (
-                      <SearchableCombobox
-                        emptyMessage="No matching units found."
-                        disabled={isLineLocked}
-                        onValueChange={(unitId) =>
-                          onLinesChange(updateLine(safeLines, line.lineId, { unitId }))
+                          )
                         }
-                        options={unitOptions}
-                        placeholder="Select unit"
-                        searchPlaceholder="Search unit..."
-                        triggerClassName="h-8 text-xs"
-                        value={line.unitId}
+                        type="number"
+                        value={line.quantity}
                       />
-                    )}
-                  </td>
-                  <td className="px-2 py-2 text-right font-semibold text-brand-espresso">
-                    {formatAmount(lineNetAmount(line))}
-                  </td>
-                  <td className="px-1.5 py-2">
-                    <Button
-                      aria-label={`Remove item line ${String(index + 1)}`}
-                      disabled={safeLines.length === 1 || isLineLocked}
-                      onClick={() =>
-                        onLinesChange(safeLines.filter((item) => item.lineId !== line.lineId))
-                      }
-                      size="icon"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <Trash2 className="h-4 w-4 text-red-700" />
-                    </Button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="grid gap-3 border-t border-brand-cappuccino/70 px-3 py-3 lg:grid-cols-[1fr_430px]">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            className="px-0 text-blue-700"
-            disabled={disableAddRows}
-            onClick={() => onLinesChange([...safeLines, createLine()])}
-            type="button"
-            variant="link"
-          >
-            <Plus className="h-4 w-4" />
-            Add product row
-          </Button>
-          {showAccountRows ? (
-            <>
-              <span className="text-brand-cappuccino">|</span>
-              <Button
-                className="px-0 text-blue-700"
-                disabled={disableAddRows}
-                onClick={() => onLinesChange([...safeLines, createAccountLine()])}
-                type="button"
-                variant="link"
-              >
-                <Plus className="h-4 w-4" />
-                Add account row
-              </Button>
-            </>
-          ) : null}
-          <span className="text-brand-cappuccino">|</span>
-          <Button
-            className="px-0 text-blue-700"
-            disabled={disableAddRows}
-            onClick={() => onLinesChange([...safeLines, createLine(), createLine(), createLine()])}
-            type="button"
-            variant="link"
-          >
-            <Plus className="h-4 w-4" />
-            Add items in bulk
-          </Button>
+                      {lineLock ? (
+                        <p className="mt-1 text-right text-[11px] leading-4 text-brand-mocha">
+                          Received {formatAmount(lineLock.receivedQuantity)}
+                        </p>
+                      ) : null}
+                      {selectedProduct?.isStockTracked ? (
+                        <p className="mt-1 text-right text-[11px] leading-4 text-brand-mocha">
+                          Stock
+                        </p>
+                      ) : null}
+                    </td>
+                    <td className="px-2 py-2">
+                      <Input
+                        aria-label={`Rate for item line ${String(index + 1)}`}
+                        className="h-8 text-right text-xs"
+                        disabled={isLineLocked}
+                        min="0"
+                        onChange={(event) =>
+                          onLinesChange(
+                            updateLine(safeLines, line.lineId, {
+                              unitCost: Number(event.target.value),
+                            }),
+                          )
+                        }
+                        type="number"
+                        value={line.unitCost}
+                      />
+                    </td>
+                    <td className="px-2 py-2">
+                      <Input
+                        aria-label={`Discount for item line ${String(index + 1)}`}
+                        className="h-8 text-right text-xs"
+                        disabled={isLineLocked}
+                        min="0"
+                        onChange={(event) =>
+                          onLinesChange(
+                            updateLine(safeLines, line.lineId, {
+                              discountAmount: Number(event.target.value),
+                            }),
+                          )
+                        }
+                        type="number"
+                        value={line.discountAmount}
+                      />
+                    </td>
+                    <td className="px-2 py-2">
+                      <Select
+                        disabled={isLineLocked}
+                        value={line.taxRateId ?? "none"}
+                        onValueChange={(taxRateId) =>
+                          onLinesChange(
+                            updateLine(safeLines, line.lineId, {
+                              taxRateId: taxRateId === "none" ? null : taxRateId,
+                            }),
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Tax rate" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No tax</SelectItem>
+                          {taxRates.map((rate) => (
+                            <SelectItem key={rate.id} value={rate.id}>
+                              {rate.taxName} ({rate.taxPercentage}%)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedTaxRate ? (
+                        <p className="mt-1 text-[11px] text-brand-mocha">
+                          Tax {formatAmount(lineTaxAmount(line, taxRates))}
+                        </p>
+                      ) : null}
+                    </td>
+                    <td className="px-2 py-2">
+                      {accountLine ? (
+                        <span className="text-xs text-brand-mocha">Not required</span>
+                      ) : (
+                        <SearchableCombobox
+                          emptyMessage="No matching units found."
+                          disabled={isLineLocked}
+                          onValueChange={(unitId) =>
+                            onLinesChange(updateLine(safeLines, line.lineId, { unitId }))
+                          }
+                          options={unitOptions}
+                          placeholder="Select unit"
+                          searchPlaceholder="Search unit..."
+                          triggerClassName="h-8 text-xs"
+                          value={line.unitId}
+                        />
+                      )}
+                    </td>
+                    <td className="px-2 py-2 text-right font-semibold text-brand-espresso">
+                      {formatAmount(lineNetAmount(line))}
+                    </td>
+                    <td className="px-1.5 py-2">
+                      <Button
+                        aria-label={`Remove item line ${String(index + 1)}`}
+                        disabled={safeLines.length === 1 || isLineLocked}
+                        onClick={() =>
+                          onLinesChange(safeLines.filter((item) => item.lineId !== line.lineId))
+                        }
+                        size="icon"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-700" />
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
 
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-brand-mocha">Subtotal</span>
-            <span className="font-semibold text-brand-espresso">
-              {formatAmount(totals.subtotal)}
-            </span>
+        <div className="grid gap-3 border-t border-brand-cappuccino/70 px-3 py-3 lg:grid-cols-[1fr_430px]">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              className="px-0 text-blue-700"
+              disabled={disableAddRows}
+              onClick={() => onLinesChange([...safeLines, createLine()])}
+              type="button"
+              variant="link"
+            >
+              <Plus className="h-4 w-4" />
+              Add product row
+            </Button>
+            {showAccountRows ? (
+              <>
+                <span className="text-brand-cappuccino">|</span>
+                <Button
+                  className="px-0 text-blue-700"
+                  disabled={disableAddRows}
+                  onClick={() => onLinesChange([...safeLines, createAccountLine()])}
+                  type="button"
+                  variant="link"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add account row
+                </Button>
+              </>
+            ) : null}
+            <span className="text-brand-cappuccino">|</span>
+            <Button
+              className="px-0 text-blue-700"
+              disabled={disableAddRows}
+              onClick={() =>
+                onLinesChange([...safeLines, createLine(), createLine(), createLine()])
+              }
+              type="button"
+              variant="link"
+            >
+              <Plus className="h-4 w-4" />
+              Add items in bulk
+            </Button>
           </div>
-          <div className="flex items-start justify-between gap-6 border-t border-brand-cappuccino/60 pt-2">
-            <div>
-              <span className="text-brand-mocha">Line discounts</span>
-              <p className="text-xs text-blue-700">Applied per line</p>
-            </div>
-            <span className="font-semibold text-red-700">-{formatAmount(totals.discount)}</span>
-          </div>
-          {showAccountRows && onBillDiscountAmountChange ? (
-            <div className="grid grid-cols-[1fr_150px] items-center gap-3 border-t border-brand-cappuccino/60 pt-2">
-              <span className="text-brand-mocha">Bill discount</span>
-              <Input
-                aria-label="Bill discount"
-                className="h-9 text-right text-xs"
-                min="0"
-                onChange={(event) => onBillDiscountAmountChange(Number(event.target.value))}
-                type="number"
-                value={billDiscountAmount}
-              />
-            </div>
-          ) : showAccountRows || billDiscountAmount > 0 ? (
-            <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
-              <span className="text-brand-mocha">Bill discount</span>
-              <span className="font-semibold text-red-700">
-                -{formatAmount(billDiscountAmount)}
-              </span>
-            </div>
-          ) : null}
-          <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
-            <span className="text-brand-mocha">Tax</span>
-            <span className="font-semibold text-brand-espresso">{formatAmount(totals.tax)}</span>
-          </div>
-          {totals.legacyCharges > 0 ? (
-            <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
-              <span className="text-brand-mocha">Legacy charges</span>
+
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-brand-mocha">Subtotal</span>
               <span className="font-semibold text-brand-espresso">
-                {formatAmount(totals.legacyCharges)}
+                {formatAmount(totals.subtotal)}
               </span>
             </div>
-          ) : null}
-          <div className="flex items-center justify-between rounded-lg bg-brand-latte px-3 py-2 text-base">
-            <span className="font-semibold text-brand-mocha">Grand total</span>
-            <span className="text-lg font-bold text-brand-espresso">
-              {formatAmount(totals.total)}
-            </span>
+            <div className="flex items-start justify-between gap-6 border-t border-brand-cappuccino/60 pt-2">
+              <div>
+                <span className="text-brand-mocha">Line discounts</span>
+                <p className="text-xs text-blue-700">Applied per line</p>
+              </div>
+              <span className="font-semibold text-red-700">-{formatAmount(totals.discount)}</span>
+            </div>
+            {showAccountRows && onBillDiscountAmountChange ? (
+              <div className="grid grid-cols-[1fr_150px] items-center gap-3 border-t border-brand-cappuccino/60 pt-2">
+                <span className="text-brand-mocha">Bill discount</span>
+                <Input
+                  aria-label="Bill discount"
+                  className="h-9 text-right text-xs"
+                  min="0"
+                  onChange={(event) => onBillDiscountAmountChange(Number(event.target.value))}
+                  type="number"
+                  value={billDiscountAmount}
+                />
+              </div>
+            ) : showAccountRows || billDiscountAmount > 0 ? (
+              <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
+                <span className="text-brand-mocha">Bill discount</span>
+                <span className="font-semibold text-red-700">
+                  -{formatAmount(billDiscountAmount)}
+                </span>
+              </div>
+            ) : null}
+            <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
+              <span className="text-brand-mocha">Tax</span>
+              <span className="font-semibold text-brand-espresso">{formatAmount(totals.tax)}</span>
+            </div>
+            {totals.legacyCharges > 0 ? (
+              <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
+                <span className="text-brand-mocha">Legacy charges</span>
+                <span className="font-semibold text-brand-espresso">
+                  {formatAmount(totals.legacyCharges)}
+                </span>
+              </div>
+            ) : null}
+            <div className="flex items-center justify-between rounded-lg bg-brand-latte px-3 py-2 text-base">
+              <span className="font-semibold text-brand-mocha">Grand total</span>
+              <span className="text-lg font-bold text-brand-espresso">
+                {formatAmount(totals.total)}
+              </span>
+            </div>
+            {showAccountRows ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-brand-mocha">Paid</span>
+                  <span className="font-semibold text-brand-espresso">
+                    {formatAmount(paidAmount)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-brand-mocha">Balance due</span>
+                  <span className="font-semibold text-brand-espresso">
+                    {formatAmount(totals.balanceDue)}
+                  </span>
+                </div>
+              </>
+            ) : null}
           </div>
-          {showAccountRows ? (
-            <>
-              <div className="flex items-center justify-between">
-                <span className="text-brand-mocha">Paid</span>
-                <span className="font-semibold text-brand-espresso">
-                  {formatAmount(paidAmount)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-brand-mocha">Balance due</span>
-                <span className="font-semibold text-brand-espresso">
-                  {formatAmount(totals.balanceDue)}
-                </span>
-              </div>
-            </>
-          ) : null}
         </div>
-      </div>
-    </section>
+      </section>
+      <ProductFormDialog
+        onClose={() => setProductCreateLineId(null)}
+        onCreate={createProductFromLine}
+        onUpdate={() => Promise.resolve()}
+        open={productCreateLineId !== null}
+        product={null}
+        referenceData={
+          productReferenceDataQuery.data ?? {
+            categories: [],
+            taxRates: [],
+            units: [],
+          }
+        }
+        submitting={createProductMutation.isPending}
+      />
+    </>
   );
 }
