@@ -366,6 +366,8 @@ type PurchaseInvoiceResponse struct {
 	ReturnedAmount         float64                          `json:"returned_amount"`
 	CreditedAmount         float64                          `json:"credited_amount"`
 	ReturnStatus           string                           `json:"return_status"`
+	ReceiveStatus          string                           `json:"receive_status"`
+	CanReceiveStock        bool                             `json:"can_receive_stock"`
 	JournalEntryID         *string                          `json:"journal_entry_id"`
 	CancelledByUserID      *string                          `json:"cancelled_by_user_id"`
 	CancelledAt            *time.Time                       `json:"cancelled_at"`
@@ -381,27 +383,30 @@ type PurchaseInvoiceResponse struct {
 }
 
 type PurchaseInvoiceItemResponse struct {
-	ID               string     `json:"id"`
-	LineType         string     `json:"line_type"`
-	ItemType         string     `json:"item_type"`
-	ProductID        *string    `json:"product_id"`
-	IngredientID     *string    `json:"ingredient_id"`
-	PackagingItemID  *string    `json:"packaging_item_id"`
-	AccountID        *string    `json:"account_id"`
-	AccountName      string     `json:"account_name_snapshot"`
-	AccountCode      string     `json:"account_code_snapshot"`
-	Description      string     `json:"description"`
-	ItemNameSnapshot string     `json:"item_name_snapshot"`
-	Quantity         float64    `json:"quantity"`
-	UnitID           string     `json:"unit_id"`
-	UnitSymbol       string     `json:"unit_symbol"`
-	UnitCost         float64    `json:"unit_cost"`
-	DiscountAmount   float64    `json:"discount_amount"`
-	TaxRateID        *string    `json:"tax_rate_id"`
-	TaxAmount        float64    `json:"tax_amount"`
-	LineTotal        float64    `json:"line_total"`
-	ExpiryDate       *time.Time `json:"expiry_date"`
-	BatchNumber      string     `json:"batch_number"`
+	ID                string     `json:"id"`
+	LineType          string     `json:"line_type"`
+	ItemType          string     `json:"item_type"`
+	ProductID         *string    `json:"product_id"`
+	IngredientID      *string    `json:"ingredient_id"`
+	PackagingItemID   *string    `json:"packaging_item_id"`
+	AccountID         *string    `json:"account_id"`
+	AccountName       string     `json:"account_name_snapshot"`
+	AccountCode       string     `json:"account_code_snapshot"`
+	Description       string     `json:"description"`
+	ItemNameSnapshot  string     `json:"item_name_snapshot"`
+	Quantity          float64    `json:"quantity"`
+	QuantityReceived  float64    `json:"quantity_received"`
+	QuantityRemaining float64    `json:"quantity_remaining"`
+	CanReceive        bool       `json:"can_receive"`
+	UnitID            string     `json:"unit_id"`
+	UnitSymbol        string     `json:"unit_symbol"`
+	UnitCost          float64    `json:"unit_cost"`
+	DiscountAmount    float64    `json:"discount_amount"`
+	TaxRateID         *string    `json:"tax_rate_id"`
+	TaxAmount         float64    `json:"tax_amount"`
+	LineTotal         float64    `json:"line_total"`
+	ExpiryDate        *time.Time `json:"expiry_date"`
+	BatchNumber       string     `json:"batch_number"`
 }
 
 type PurchaseInvoicePaymentResponse struct {

@@ -327,6 +327,12 @@ function isReceiptStatus(value: unknown): value is PurchaseReceiptStatus {
   return value === "draft" || value === "posted" || value === "cancelled";
 }
 
+function isInvoiceReceiveStatus(
+  value: unknown,
+): value is "not_received" | "partially_received" | "received" {
+  return value === "not_received" || value === "partially_received" || value === "received";
+}
+
 function isSupplierPaymentStatus(value: unknown): value is SupplierPaymentStatus {
   return value === "completed" || value === "voided";
 }
@@ -389,6 +395,12 @@ function parseInvoiceItem(value: unknown): PurchaseInvoiceItem {
     description: optionalString(value.description),
     itemNameSnapshot: stringValue(value.item_name_snapshot, "Purchase item"),
     quantity: numberValue(value.quantity),
+    quantityReceived: numberValue(value.quantity_received),
+    quantityRemaining: numberValue(value.quantity_remaining, numberValue(value.quantity)),
+    canReceive:
+      typeof value.can_receive === "boolean"
+        ? value.can_receive
+        : numberValue(value.quantity_remaining, numberValue(value.quantity)) > 0,
     unitId: stringValue(value.unit_id),
     unitName: stringValue(value.unit_name, "Unit"),
     unitSymbol: stringValue(value.unit_symbol),
@@ -527,6 +539,11 @@ function parseInvoice(value: unknown): PurchaseInvoice {
     totalAmount: numberValue(value.total_amount),
     paidAmount: numberValue(value.paid_amount),
     balanceAmount: numberValue(value.balance_amount),
+    receiveStatus: isInvoiceReceiveStatus(value.receive_status) ? value.receive_status : "not_received",
+    canReceiveStock:
+      typeof value.can_receive_stock === "boolean"
+        ? value.can_receive_stock
+        : isInvoiceStatus(value.status) && value.status === "posted",
     notes: optionalString(value.notes),
     cancelledAt: optionalString(value.cancelled_at),
     cancelledByUserId: optionalString(value.cancelled_by_user_id),
@@ -810,6 +827,9 @@ function parseDocumentChainInvoice(value: unknown): PurchaseInvoice {
     paymentStatus: isPaymentStatus(value.payment_status) ? value.payment_status : "unpaid",
     purchaseOrderId: optionalString(value.purchase_order_id),
     purchaseOrderNumber: optionalString(value.purchase_order_number),
+    receiveStatus: isInvoiceReceiveStatus(value.receive_status) ? value.receive_status : "not_received",
+    canReceiveStock:
+      typeof value.can_receive_stock === "boolean" ? value.can_receive_stock : false,
     reversalJournalEntryId: optionalString(value.reversal_journal_entry_id),
     status: isInvoiceStatus(value.status) ? value.status : "draft",
     subtotalAmount: 0,

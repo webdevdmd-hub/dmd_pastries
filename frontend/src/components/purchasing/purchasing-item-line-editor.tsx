@@ -711,7 +711,7 @@ export function PurchasingItemLineEditor({
                     <td className="px-1.5 py-2">
                       <Button
                         aria-label={`Remove item line ${String(index + 1)}`}
-                        disabled={safeLines.length === 1 || isLineLocked}
+                        disabled={disableAddRows || safeLines.length === 1 || isLineLocked}
                         onClick={() =>
                           onLinesChange(safeLines.filter((item) => item.lineId !== line.lineId))
                         }

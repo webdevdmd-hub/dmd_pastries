@@ -86,7 +86,12 @@ function linesFromOrder(order: PurchaseOrder): PurchaseItemLineDraft[] {
 
 function linesFromInvoice(invoice: PurchaseInvoice): PurchaseItemLineDraft[] {
   return invoice.items
-    .filter((item) => item.lineType !== "account" && item.itemType !== "account")
+    .filter(
+      (item) =>
+        item.lineType !== "account" &&
+        item.itemType !== "account" &&
+        (item.canReceive || item.quantityRemaining > 0),
+    )
     .map((item) => ({
       batchNumber: item.batchNumber,
       discountAmount: item.discountAmount,
@@ -99,7 +104,7 @@ function linesFromInvoice(invoice: PurchaseInvoice): PurchaseItemLineDraft[] {
       packagingItemId: item.packagingItemId,
       productId: item.productId,
       productVariantId: item.productVariantId,
-      quantity: item.quantity,
+      quantity: Math.max(item.quantityRemaining, 0),
       taxRateId: item.taxRateId,
       unitCost: item.unitCost,
       unitId: item.unitId,

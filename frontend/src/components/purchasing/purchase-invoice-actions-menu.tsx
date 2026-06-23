@@ -70,13 +70,13 @@ export function PurchaseInvoiceActionsMenu({
               Post
             </DropdownMenuItem>
             <DropdownMenuItem
-              disabled={invoice.status !== "posted"}
+              disabled={invoice.status !== "posted" || !invoice.canReceiveStock}
               onSelect={() => onReceive(invoice)}
             >
               Receive now
             </DropdownMenuItem>
             <DropdownMenuItem
-              disabled={!canConvertToReceipt || invoice.status !== "posted"}
+              disabled={!canConvertToReceipt || invoice.status !== "posted" || !invoice.canReceiveStock}
               onSelect={() => onConvertToReceipt(invoice)}
             >
               Convert to receipt

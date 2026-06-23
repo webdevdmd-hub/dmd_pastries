@@ -61,6 +61,9 @@ export type PurchaseInvoiceItem = {
   description: string | null;
   itemNameSnapshot: string;
   quantity: number;
+  quantityReceived: number;
+  quantityRemaining: number;
+  canReceive: boolean;
   unitId: string;
   unitName: string;
   unitSymbol: string;
@@ -175,6 +178,8 @@ export type PurchaseInvoice = {
   totalAmount: number;
   paidAmount: number;
   balanceAmount: number;
+  receiveStatus: "not_received" | "partially_received" | "received";
+  canReceiveStock: boolean;
   notes: string | null;
   cancelledAt: string | null;
   cancelledByUserId: string | null;

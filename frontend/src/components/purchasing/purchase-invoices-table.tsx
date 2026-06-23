@@ -37,8 +37,12 @@ function nextStepForInvoice(invoice: PurchaseInvoice): string {
     return "No action";
   }
 
+  if (!invoice.canReceiveStock) {
+    return invoice.paymentStatus === "paid" ? "Fully received and paid" : "Fully received";
+  }
+
   if (invoice.paymentStatus === "paid") {
-    return "Review receipt / vendor credit";
+    return "Receive remaining stock";
   }
 
   return invoice.balanceAmount > 0 ? "Receive stock or record payment" : "Receive stock";

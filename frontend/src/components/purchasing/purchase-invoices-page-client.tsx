@@ -48,6 +48,7 @@ import {
   useUpdatePurchaseInvoice,
 } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { getPurchaseInvoiceUpdateErrorMessage } from "@/lib/api/purchase-invoice-conflicts";
 import { getPurchaseInvoiceById } from "@/lib/api/purchasing";
 import type {
   CreatePurchaseInvoicePayload,
@@ -185,7 +186,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
       setEditingInvoice(null);
       setFormOpen(false);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(getPurchaseInvoiceUpdateErrorMessage(error));
     }
   };
 

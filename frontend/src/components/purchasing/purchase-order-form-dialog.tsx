@@ -104,9 +104,9 @@ export function PurchaseOrderFormDialog({
   const hasAccountRows = lines.some(
     (line) => line.lineType === "account" || line.itemType === "account" || Boolean(line.accountId),
   );
-  const showAccountRows = !isPartialAdjustment || hasAccountRows;
+  const showAccountRows = (!isPartialAdjustment && !isCorrectionEdit) || hasAccountRows;
   const lineLocks =
-    order?.status === "partially_received"
+    order?.status === "partially_received" || order?.status === "received"
       ? Object.fromEntries(
           order.items.map((item) => [
             item.id,
@@ -167,14 +167,29 @@ export function PurchaseOrderFormDialog({
   const revisionDifference = estimatedRevisedTotal - (order?.totalAmount ?? 0);
 
   const submit = async (): Promise<void> => {
-    if (isPartialAdjustment) {
+    if (isPartialAdjustment || isCorrectionEdit) {
+      const missingExistingLine = lines.find((line) => !line.id);
+      if (missingExistingLine) {
+        setError(
+          "Correction edits can only update existing purchase order lines. Add new items using a new purchase order or a supported adjustment flow.",
+        );
+        return;
+      }
+
+      const existingIds = new Set(order.items.map((item) => item.id));
+      const submittedIds = new Set(lines.map((line) => line.id).filter(Boolean));
+      if (existingIds.size !== submittedIds.size) {
+        setError("Correction edits cannot add or remove purchase order lines.");
+        return;
+      }
+
       const invalidLine = lines.find((line) => {
         const lock = lineLocks[line.lineId];
         return lock ? line.quantity < lock.minQuantity : true;
       });
 
       if (invalidLine) {
-        setError("Partially received lines cannot be reduced below the received quantity.");
+        setError("Correction quantities cannot be reduced below the already received quantity.");
         return;
       }
     }
@@ -310,7 +325,7 @@ export function PurchaseOrderFormDialog({
           </div>
           <PurchasingItemLineEditor
             accounts={accounts}
-            disableAddRows={isPartialAdjustment}
+            disableAddRows={isPartialAdjustment || isCorrectionEdit}
             lineLocks={lineLocks}
             lines={lines}
             onLinesChange={setLines}

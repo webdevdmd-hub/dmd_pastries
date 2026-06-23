@@ -531,6 +531,15 @@ func (r *Repository) InvoiceItems(invoiceID, businessID string) ([]PurchaseInvoi
 	return items, err
 }
 
+func (r *Repository) InvoiceItemsForUpdate(tx *gorm.DB, invoiceID, businessID string) ([]PurchaseInvoiceItem, error) {
+	var items []PurchaseInvoiceItem
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("purchase_invoice_id = ? AND business_id = ? AND deleted_at IS NULL", invoiceID, businessID).
+		Order("created_at ASC").
+		Find(&items).Error
+	return items, err
+}
+
 func (r *Repository) ActiveInvoiceCountForOrder(tx *gorm.DB, businessID, orderID string) (int64, error) {
 	return r.ActiveInvoiceCountForOrderExcluding(tx, businessID, orderID, "")
 }
@@ -985,6 +994,27 @@ func (r *Repository) ReceiptsForOrder(businessID, orderID string) ([]PurchaseRec
 func (r *Repository) ReceiptItems(receiptID, businessID string) ([]PurchaseReceiptItem, error) {
 	var items []PurchaseReceiptItem
 	err := r.db.Where("purchase_receipt_id = ? AND business_id = ? AND deleted_at IS NULL", receiptID, businessID).Order("created_at ASC").Find(&items).Error
+	return items, err
+}
+
+func (r *Repository) PostedReceiptItemsForInvoice(businessID, invoiceID string) ([]PurchaseReceiptItem, error) {
+	var items []PurchaseReceiptItem
+	err := r.db.Model(&PurchaseReceiptItem{}).
+		Joins("JOIN purchase_receipts pr ON pr.id = purchase_receipt_items.purchase_receipt_id AND pr.business_id = purchase_receipt_items.business_id").
+		Where("purchase_receipt_items.business_id = ? AND pr.purchase_invoice_id = ? AND pr.status = ? AND pr.deleted_at IS NULL AND purchase_receipt_items.deleted_at IS NULL", businessID, invoiceID, "posted").
+		Order("purchase_receipt_items.created_at ASC").
+		Find(&items).Error
+	return items, err
+}
+
+func (r *Repository) PostedReceiptItemsForInvoiceForUpdate(tx *gorm.DB, businessID, invoiceID string) ([]PurchaseReceiptItem, error) {
+	var items []PurchaseReceiptItem
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Model(&PurchaseReceiptItem{}).
+		Joins("JOIN purchase_receipts pr ON pr.id = purchase_receipt_items.purchase_receipt_id AND pr.business_id = purchase_receipt_items.business_id").
+		Where("purchase_receipt_items.business_id = ? AND pr.purchase_invoice_id = ? AND pr.status = ? AND pr.deleted_at IS NULL AND purchase_receipt_items.deleted_at IS NULL", businessID, invoiceID, "posted").
+		Order("purchase_receipt_items.created_at ASC").
+		Find(&items).Error
 	return items, err
 }
 

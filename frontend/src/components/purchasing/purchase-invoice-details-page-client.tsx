@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseDocumentChain } from "@/components/purchasing/purchase-document-chain";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
+import { PurchaseInvoiceFormDialog } from "@/components/purchasing/purchase-invoice-form-dialog";
 import { PurchaseInvoicePaymentsSection } from "@/components/purchasing/purchase-invoice-payments-section";
 import { PurchaseInvoiceStatusBadge } from "@/components/purchasing/purchase-invoice-status-badge";
 import { PurchasePaymentStatusBadge } from "@/components/purchasing/purchase-payment-status-badge";
@@ -29,14 +30,26 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
+import { useChartAccounts } from "@/hooks/use-accounting";
 import { usePermission } from "@/hooks/use-permission";
 import {
   useCancelPurchaseInvoice,
   useConvertPurchaseInvoiceToReceipt,
   usePurchaseInvoice,
   usePurchaseOrderDocumentChain,
+  usePurchasingBranches,
+  usePurchasingProducts,
+  usePurchasingSuppliers,
+  usePurchasingTaxRates,
+  usePurchasingUnits,
+  useUpdatePurchaseInvoice,
 } from "@/hooks/use-purchasing";
 import { getErrorMessage } from "@/lib/api/client";
+import { getPurchaseInvoiceUpdateErrorMessage } from "@/lib/api/purchase-invoice-conflicts";
+import type {
+  CreatePurchaseInvoicePayload,
+  UpdatePurchaseInvoicePayload,
+} from "@/types/purchasing";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
@@ -58,6 +71,7 @@ export function PurchaseInvoiceDetailsPageClient({
     PERMISSIONS.purchasingInvoicesEdit,
     PERMISSIONS.purchasingInvoicesPost,
   ]);
+  const canEdit = hasAnyPermission([PERMISSIONS.purchasingInvoicesEdit]);
   const canCancel = hasAnyPermission([PERMISSIONS.purchasingInvoicesCancel]);
   const canConvert = hasAnyPermission([
     PERMISSIONS.purchasingReceiptsCreate,
@@ -66,6 +80,7 @@ export function PurchaseInvoiceDetailsPageClient({
   const [convertOpen, setConvertOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
   const [receivedDate, setReceivedDate] = useState(today());
   const [conversionNotes, setConversionNotes] = useState("");
   const invoiceQuery = usePurchaseInvoice(invoiceId, canView);
@@ -73,8 +88,28 @@ export function PurchaseInvoiceDetailsPageClient({
     invoiceQuery.data?.purchaseOrderId ?? null,
     canView && Boolean(invoiceQuery.data?.purchaseOrderId),
   );
+  const branchesQuery = usePurchasingBranches(canView);
+  const suppliersQuery = usePurchasingSuppliers("", canView);
+  const productsQuery = usePurchasingProducts(canView);
+  const unitsQuery = usePurchasingUnits(canView);
+  const taxRatesQuery = usePurchasingTaxRates(canView);
+  const purchaseAccountsQuery = useChartAccounts(
+    {
+      accountGroup: "",
+      accountType: "all",
+      limit: 500,
+      page: 1,
+      parentAccountId: "",
+      search: "",
+      sortBy: "account_code",
+      sortOrder: "asc",
+      status: "active",
+    },
+    canView,
+  );
   const convertMutation = useConvertPurchaseInvoiceToReceipt();
   const cancelMutation = useCancelPurchaseInvoice();
+  const updateMutation = useUpdatePurchaseInvoice();
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -96,8 +131,9 @@ export function PurchaseInvoiceDetailsPageClient({
   }
 
   const invoice = invoiceQuery.data;
-  const canConvertInvoice = canConvert && invoice.status === "posted";
+  const canConvertInvoice = canConvert && invoice.status === "posted" && invoice.canReceiveStock;
   const canCancelInvoice = canCancel && invoice.status === "posted";
+  const canEditInvoice = canEdit && invoice.status !== "cancelled";
   const billTitle = invoice.supplierBillNumber ?? invoice.invoiceNumber;
 
   const openConvertDialog = (): void => {
@@ -147,6 +183,26 @@ export function PurchaseInvoiceDetailsPageClient({
     }
   };
 
+  const handleUpdateBill = async (
+    id: string,
+    payload: UpdatePurchaseInvoicePayload,
+  ): Promise<void> => {
+    try {
+      await updateMutation.mutateAsync({ id, payload });
+      toast.success("Bill updated.");
+      setEditOpen(false);
+      await invoiceQuery.refetch();
+      if (invoice.purchaseOrderId) {
+        await chainQuery.refetch();
+      }
+    } catch (error) {
+      toast.error(getPurchaseInvoiceUpdateErrorMessage(error));
+    }
+  };
+
+  const noopCreateBill = (_payload: CreatePurchaseInvoicePayload): Promise<void> =>
+    Promise.reject(new Error("This dialog only edits an existing bill."));
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <div>
@@ -160,6 +216,11 @@ export function PurchaseInvoiceDetailsPageClient({
           <h1 className="font-display text-4xl text-brand-espresso">{billTitle}</h1>
           <PurchaseInvoiceStatusBadge status={invoice.status} />
           <PurchasePaymentStatusBadge status={invoice.paymentStatus} />
+          {canEditInvoice ? (
+            <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
+              Edit
+            </Button>
+          ) : null}
           {canConvertInvoice ? (
             <Button onClick={openConvertDialog} type="button">
               Create receive goods
@@ -359,6 +420,20 @@ export function PurchaseInvoiceDetailsPageClient({
           <p className="text-sm text-brand-mocha">{invoice.notes ?? "No notes recorded."}</p>
         </CardContent>
       </Card>
+      <PurchaseInvoiceFormDialog
+        accounts={[...(purchaseAccountsQuery.data?.items ?? [])]}
+        branches={branchesQuery.data ?? []}
+        invoice={invoice}
+        isSubmitting={updateMutation.isPending}
+        onClose={() => setEditOpen(false)}
+        onCreate={noopCreateBill}
+        onUpdate={handleUpdateBill}
+        open={editOpen}
+        products={productsQuery.data ?? []}
+        suppliers={suppliersQuery.data ?? []}
+        taxRates={taxRatesQuery.data ?? []}
+        units={unitsQuery.data ?? []}
+      />
       <Dialog open={convertOpen} onOpenChange={setConvertOpen}>
         <DialogContent>
           <DialogHeader>

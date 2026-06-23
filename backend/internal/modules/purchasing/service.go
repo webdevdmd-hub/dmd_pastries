@@ -213,17 +213,17 @@ func (s *Service) updatePartiallyReceivedOrder(tx *gorm.DB, currentUser *utils.A
 		inputsByID := make(map[string]PurchaseOrderItemInput, len(req.Items))
 		for _, input := range req.Items {
 			if strings.TrimSpace(input.ID) == "" {
-				return apperrors.BadRequest("partially received purchase order lines require id", nil)
+				return apperrors.BadRequest("correction edits can only update existing purchase order lines. Add new items using a new purchase order or a supported adjustment flow.", map[string]interface{}{"reason": "purchase_order_correction_line_id_required"})
 			}
 			inputsByID[input.ID] = input
 		}
 		if len(inputsByID) != len(items) {
-			return apperrors.BadRequest("partially received purchase orders cannot add or remove lines", nil)
+			return apperrors.BadRequest("correction edits can only update existing purchase order lines. Add new items using a new purchase order or a supported adjustment flow.", map[string]interface{}{"reason": "purchase_order_correction_lines_locked"})
 		}
 		for _, item := range items {
 			input, ok := inputsByID[item.ID]
 			if !ok {
-				return apperrors.BadRequest("partially received purchase orders cannot remove existing lines", nil)
+				return apperrors.BadRequest("correction edits cannot remove existing purchase order lines.", map[string]interface{}{"reason": "purchase_order_correction_line_removed"})
 			}
 			storedLineType := normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID)
 			if storedLineType == "account" {
@@ -234,7 +234,7 @@ func (s *Service) updatePartiallyReceivedOrder(tx *gorm.DB, currentUser *utils.A
 					roundMoney(input.UnitCost) != roundMoney(item.UnitCost) ||
 					roundMoney(input.DiscountAmount) != roundMoney(item.DiscountAmount) ||
 					input.TaxRateID != deref(item.TaxRateID) {
-					return apperrors.BadRequest("partially received purchase orders can only adjust product ordered quantities", nil)
+					return apperrors.BadRequest("correction edits can only adjust existing product ordered quantities.", map[string]interface{}{"reason": "purchase_order_correction_only_quantity_allowed"})
 				}
 				itemTotals.Subtotal += roundMoney(item.QuantityOrdered * item.UnitCost)
 				itemTotals.Discount += roundMoney(item.DiscountAmount)
@@ -251,7 +251,7 @@ func (s *Service) updatePartiallyReceivedOrder(tx *gorm.DB, currentUser *utils.A
 				roundMoney(input.UnitCost) != roundMoney(item.UnitCost) ||
 				roundMoney(input.DiscountAmount) != roundMoney(item.DiscountAmount) ||
 				input.TaxRateID != deref(item.TaxRateID) {
-				return apperrors.BadRequest("partially received purchase orders can only adjust product ordered quantities", nil)
+				return apperrors.BadRequest("correction edits can only adjust existing product ordered quantities.", map[string]interface{}{"reason": "purchase_order_correction_only_quantity_allowed"})
 			}
 			if roundQuantity(input.QuantityOrdered) < roundQuantity(item.QuantityReceived) {
 				return apperrors.BadRequest("quantity_ordered cannot be less than quantity_received", map[string]interface{}{"line_id": item.ID, "quantity_received": item.QuantityReceived})
@@ -1859,9 +1859,13 @@ func (s *Service) ConvertInvoiceToReceipt(currentUser *utils.AuthContext, id str
 			PurchaseOrderID:   deref(invoice.PurchaseOrderID),
 			PurchaseInvoiceID: invoice.ID,
 			ReceivedDate:      defaultDate(req.ReceivedDate),
-			Items:             receiptInputsFromInvoiceItems(invoiceItems),
 			Notes:             notes,
 		}
+		receiveLines, _, canReceive := s.invoiceReceiveState(currentUser.BusinessID, *invoice, invoiceItems)
+		if !canReceive {
+			return apperrors.BadRequest("purchase bill has no remaining items to receive", nil)
+		}
+		receiveReq.Items = receiptInputsFromInvoiceItemsWithReceiveState(invoiceItems, receiveLines)
 		receipt, items, _, err := s.buildReceipt(tx, currentUser, receiveReq, "draft")
 		if err != nil {
 			return err
@@ -2737,6 +2741,8 @@ func (s *Service) buildReceipt(tx *gorm.DB, currentUser *utils.AuthContext, req 
 		return nil, nil, nil, err
 	}
 	var orderItems []PurchaseOrderItem
+	var invoiceItems []PurchaseInvoiceItem
+	var postedInvoiceReceiptItems []PurchaseReceiptItem
 	if req.PurchaseOrderID != "" {
 		order, err := s.repo.FindOrderForUpdate(tx, req.PurchaseOrderID, currentUser.BusinessID)
 		if err != nil {
@@ -2764,6 +2770,16 @@ func (s *Service) buildReceipt(tx *gorm.DB, currentUser *utils.AuthContext, req 
 		if invoice.BranchID != req.BranchID {
 			return nil, nil, nil, apperrors.BadRequest("purchase invoice branch does not match receipt branch", nil)
 		}
+		if req.PurchaseOrderID == "" {
+			invoiceItems, err = s.repo.InvoiceItemsForUpdate(tx, invoice.ID, currentUser.BusinessID)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			postedInvoiceReceiptItems, err = s.repo.PostedReceiptItemsForInvoiceForUpdate(tx, currentUser.BusinessID, invoice.ID)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+		}
 	}
 	if len(req.Items) == 0 {
 		return nil, nil, nil, apperrors.BadRequest("items are required", nil)
@@ -2778,6 +2794,7 @@ func (s *Service) buildReceipt(tx *gorm.DB, currentUser *utils.AuthContext, req 
 	}
 	items := make([]PurchaseReceiptItem, 0, len(req.Items))
 	requestedPOItems := make([]preparedItem, 0, len(req.Items))
+	requestedInvoiceItems := make([]preparedItem, 0, len(req.Items))
 	for _, input := range req.Items {
 		prepared, err := s.prepareReceiptItem(tx, currentUser.BusinessID, req.BranchID, input)
 		if err != nil {
@@ -2786,6 +2803,12 @@ func (s *Service) buildReceipt(tx *gorm.DB, currentUser *utils.AuthContext, req 
 		if req.PurchaseOrderID != "" {
 			requestedPOItems = append(requestedPOItems, prepared)
 			if err := validatePOReceiptQuantities(orderItems, requestedPOItems); err != nil {
+				return nil, nil, nil, err
+			}
+		}
+		if req.PurchaseInvoiceID != "" && req.PurchaseOrderID == "" {
+			requestedInvoiceItems = append(requestedInvoiceItems, prepared)
+			if err := validateInvoiceReceiptQuantities(invoiceItems, postedInvoiceReceiptItems, requestedInvoiceItems); err != nil {
 				return nil, nil, nil, err
 			}
 		}
@@ -3215,6 +3238,50 @@ func validatePOReceiptQuantities(orderItems []PurchaseOrderItem, requestedItems 
 	return nil
 }
 
+func validateInvoiceReceiptQuantities(invoiceItems []PurchaseInvoiceItem, postedReceiptItems []PurchaseReceiptItem, requestedItems []preparedItem) error {
+	remainingByKey := make(map[string]float64)
+	for _, item := range invoiceItems {
+		if normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID) == "account" {
+			continue
+		}
+		key := purchaseInvoiceItemReceiveKey(item)
+		remainingByKey[key] = roundQuantity(remainingByKey[key] + item.Quantity)
+	}
+	for _, item := range postedReceiptItems {
+		key := purchaseReceiptItemReceiveKey(item)
+		remainingByKey[key] = roundQuantity(remainingByKey[key] - item.QuantityReceived)
+	}
+
+	remainingAny := false
+	for _, remaining := range remainingByKey {
+		if roundQuantity(remaining) > 0 {
+			remainingAny = true
+			break
+		}
+	}
+	if !remainingAny {
+		return apperrors.BadRequest("purchase bill has no remaining items to receive", nil)
+	}
+
+	virtualRemaining := make(map[string]float64, len(remainingByKey))
+	for key, remaining := range remainingByKey {
+		virtualRemaining[key] = remaining
+	}
+	for _, requested := range requestedItems {
+		key := preparedReceiveKey(requested)
+		remaining, ok := virtualRemaining[key]
+		if !ok {
+			return apperrors.BadRequest("received item does not exist on purchase bill", nil)
+		}
+		nextRemaining := roundQuantity(remaining - requested.Quantity)
+		if nextRemaining < 0 {
+			return apperrors.BadRequest("quantity_received exceeds remaining bill quantity", map[string]interface{}{"remaining_quantity": roundQuantity(remaining)})
+		}
+		virtualRemaining[key] = nextRemaining
+	}
+	return nil
+}
+
 func (s *Service) reversePOReceiveQuantity(tx *gorm.DB, businessID, orderID string, item preparedItem) error {
 	items, err := s.repo.OrderItemsForUpdate(tx, orderID, businessID)
 	if err != nil {
@@ -3406,11 +3473,15 @@ func (s *Service) purchaseInvoiceNumber(businessID string, invoiceID *string) st
 func (s *Service) invoiceResponse(businessID string, invoice PurchaseInvoice, includeItems bool) PurchaseInvoiceResponse {
 	branchName, supplierName := s.repo.NameLookups(businessID, invoice.BranchID, invoice.SupplierID)
 	response := PurchaseInvoiceResponse{ID: invoice.ID, BusinessID: invoice.BusinessID, BranchID: invoice.BranchID, BranchName: branchName, SupplierID: invoice.SupplierID, SupplierName: supplierName, PurchaseOrderID: invoice.PurchaseOrderID, PurchaseOrderNumber: s.purchaseOrderNumber(businessID, invoice.PurchaseOrderID), InvoiceNumber: invoice.InvoiceNumber, SupplierBillNumber: invoice.SupplierBillNumber, InvoiceDate: invoice.InvoiceDate, DueDate: invoice.DueDate, Status: invoice.Status, PaymentStatus: invoice.PaymentStatus, SubtotalAmount: roundMoney(invoice.SubtotalAmount), TaxAmount: roundMoney(invoice.TaxAmount), ChargeAmount: roundMoney(invoice.ChargeAmount), ChargeTaxAmount: roundMoney(invoice.ChargeTaxAmount), DiscountAmount: roundMoney(invoice.DiscountAmount), BillDiscountAmount: roundMoney(invoice.BillDiscountAmount), TotalAmount: roundMoney(invoice.TotalAmount), PaidAmount: roundMoney(invoice.PaidAmount), BalanceAmount: roundMoney(invoice.BalanceAmount), ReturnedAmount: roundMoney(invoice.ReturnedAmount), CreditedAmount: roundMoney(invoice.CreditedAmount), ReturnStatus: invoice.ReturnStatus, JournalEntryID: invoice.JournalEntryID, CancelledByUserID: invoice.CancelledByUserID, CancelledAt: invoice.CancelledAt, CancelReason: invoice.CancelReason, ReversalJournalEntryID: invoice.ReversalJournalEntryID, CancelledReceiptID: invoice.CancelledReceiptID, Notes: invoice.Notes, CreatedAt: invoice.CreatedAt, UpdatedAt: invoice.UpdatedAt}
+	items, _ := s.repo.InvoiceItems(invoice.ID, businessID)
+	receiveLines, receiveStatus, canReceive := s.invoiceReceiveState(businessID, invoice, items)
+	response.ReceiveStatus = receiveStatus
+	response.CanReceiveStock = canReceive
 	if includeItems {
-		items, _ := s.repo.InvoiceItems(invoice.ID, businessID)
 		for _, item := range items {
 			unitID := deref(item.UnitID)
-			response.Items = append(response.Items, PurchaseInvoiceItemResponse{ID: item.ID, LineType: normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID), ItemType: item.ItemType, ProductID: item.ProductID, IngredientID: item.IngredientID, PackagingItemID: item.PackagingItemID, AccountID: item.AccountID, AccountName: item.AccountName, AccountCode: item.AccountCode, Description: item.Description, ItemNameSnapshot: item.ItemNameSnapshot, Quantity: roundQuantity(item.Quantity), UnitID: unitID, UnitSymbol: s.repo.UnitSymbol(unitID), UnitCost: roundMoney(item.UnitCost), DiscountAmount: roundMoney(item.DiscountAmount), TaxRateID: item.TaxRateID, TaxAmount: roundMoney(item.TaxAmount), LineTotal: roundMoney(item.LineTotal), ExpiryDate: item.ExpiryDate, BatchNumber: item.BatchNumber})
+			receiveLine := receiveLines[item.ID]
+			response.Items = append(response.Items, PurchaseInvoiceItemResponse{ID: item.ID, LineType: normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID), ItemType: item.ItemType, ProductID: item.ProductID, IngredientID: item.IngredientID, PackagingItemID: item.PackagingItemID, AccountID: item.AccountID, AccountName: item.AccountName, AccountCode: item.AccountCode, Description: item.Description, ItemNameSnapshot: item.ItemNameSnapshot, Quantity: roundQuantity(item.Quantity), QuantityReceived: roundQuantity(receiveLine.Received), QuantityRemaining: roundQuantity(receiveLine.Remaining), CanReceive: receiveLine.CanReceive, UnitID: unitID, UnitSymbol: s.repo.UnitSymbol(unitID), UnitCost: roundMoney(item.UnitCost), DiscountAmount: roundMoney(item.DiscountAmount), TaxRateID: item.TaxRateID, TaxAmount: roundMoney(item.TaxAmount), LineTotal: roundMoney(item.LineTotal), ExpiryDate: item.ExpiryDate, BatchNumber: item.BatchNumber})
 		}
 		response.Charges, _ = charges.ListChargeResponses(s.db, businessID, "purchase_invoice", invoice.ID)
 		payments, _ := s.repo.ListInvoicePayments(businessID, invoice.ID)
@@ -3420,6 +3491,95 @@ func (s *Service) invoiceResponse(businessID string, invoice PurchaseInvoice, in
 		response.Payments = payments
 	}
 	return response
+}
+
+type invoiceReceiveLineState struct {
+	Received   float64
+	Remaining  float64
+	CanReceive bool
+}
+
+func (s *Service) invoiceReceiveState(businessID string, invoice PurchaseInvoice, items []PurchaseInvoiceItem) (map[string]invoiceReceiveLineState, string, bool) {
+	result := make(map[string]invoiceReceiveLineState, len(items))
+	if invoice.Status != "posted" {
+		return result, "not_received", false
+	}
+
+	receivedByKey := map[string]float64{}
+	remainingByKey := map[string]float64{}
+	if invoice.PurchaseOrderID != nil && strings.TrimSpace(*invoice.PurchaseOrderID) != "" {
+		orderItems, err := s.repo.OrderItems(*invoice.PurchaseOrderID, businessID)
+		if err == nil {
+			for _, orderItem := range orderItems {
+				if normalizedStoredLineType(orderItem.LineType, orderItem.ItemType, orderItem.AccountID) == "account" {
+					continue
+				}
+				key := purchaseOrderItemReceiveKey(orderItem)
+				receivedByKey[key] = roundQuantity(receivedByKey[key] + orderItem.QuantityReceived)
+				remainingByKey[key] = roundQuantity(remainingByKey[key] + orderItem.QuantityOrdered - orderItem.QuantityReceived)
+			}
+		}
+	} else {
+		receiptItems, err := s.repo.PostedReceiptItemsForInvoice(businessID, invoice.ID)
+		if err == nil {
+			for _, receiptItem := range receiptItems {
+				key := purchaseReceiptItemReceiveKey(receiptItem)
+				receivedByKey[key] = roundQuantity(receivedByKey[key] + receiptItem.QuantityReceived)
+			}
+		}
+		for _, item := range items {
+			if normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID) == "account" {
+				continue
+			}
+			key := purchaseInvoiceItemReceiveKey(item)
+			remainingByKey[key] = roundQuantity(remainingByKey[key] + item.Quantity)
+		}
+		for key, received := range receivedByKey {
+			remainingByKey[key] = roundQuantity(remainingByKey[key] - received)
+		}
+	}
+
+	var totalQuantity float64
+	var totalReceived float64
+	var totalRemaining float64
+	for _, item := range items {
+		if normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID) == "account" {
+			continue
+		}
+		key := purchaseInvoiceItemReceiveKey(item)
+		lineReceived := minPositive(item.Quantity, receivedByKey[key])
+		receivedByKey[key] = roundQuantity(receivedByKey[key] - lineReceived)
+		lineRemaining := minPositive(item.Quantity-lineReceived, remainingByKey[key])
+		remainingByKey[key] = roundQuantity(remainingByKey[key] - lineRemaining)
+		if lineRemaining < 0 {
+			lineRemaining = 0
+		}
+		totalQuantity += item.Quantity
+		totalReceived += lineReceived
+		totalRemaining += lineRemaining
+		result[item.ID] = invoiceReceiveLineState{Received: lineReceived, Remaining: lineRemaining, CanReceive: lineRemaining > 0}
+	}
+
+	totalQuantity = roundQuantity(totalQuantity)
+	totalReceived = roundQuantity(totalReceived)
+	totalRemaining = roundQuantity(totalRemaining)
+	if totalQuantity <= 0 || totalRemaining <= 0 {
+		return result, "received", false
+	}
+	if totalReceived <= 0 {
+		return result, "not_received", true
+	}
+	return result, "partially_received", true
+}
+
+func minPositive(limit, value float64) float64 {
+	if value <= 0 || limit <= 0 {
+		return 0
+	}
+	if value < limit {
+		return roundQuantity(value)
+	}
+	return roundQuantity(limit)
 }
 
 func (s *Service) purchaseReturnResponse(businessID string, purchaseReturn PurchaseReturn, includeItems bool) PurchaseReturnResponse {
@@ -3568,6 +3728,22 @@ func (p preparedItem) matchesOrderItem(item PurchaseOrderItem) bool {
 		return true
 	}
 	return p.ItemType == item.ItemType && equalStringPtr(p.ProductID, item.ProductID) && equalStringPtr(p.IngredientID, item.IngredientID) && equalStringPtr(p.PackagingItemID, item.PackagingItemID)
+}
+
+func preparedReceiveKey(item preparedItem) string {
+	return strings.Join([]string{item.ItemType, deref(item.ProductID), deref(item.IngredientID), deref(item.PackagingItemID), item.UnitID}, "|")
+}
+
+func purchaseInvoiceItemReceiveKey(item PurchaseInvoiceItem) string {
+	return strings.Join([]string{item.ItemType, deref(item.ProductID), deref(item.IngredientID), deref(item.PackagingItemID), deref(item.UnitID)}, "|")
+}
+
+func purchaseOrderItemReceiveKey(item PurchaseOrderItem) string {
+	return strings.Join([]string{item.ItemType, deref(item.ProductID), deref(item.IngredientID), deref(item.PackagingItemID), deref(item.UnitID)}, "|")
+}
+
+func purchaseReceiptItemReceiveKey(item PurchaseReceiptItem) string {
+	return strings.Join([]string{item.ItemType, deref(item.ProductID), deref(item.IngredientID), deref(item.PackagingItemID), item.UnitID}, "|")
 }
 
 func normalizeQuery(query *ListQuery) {
@@ -3860,6 +4036,21 @@ func receiptInputsFromInvoiceItems(items []PurchaseInvoiceItem) []PurchaseReceip
 			continue
 		}
 		result = append(result, PurchaseReceiptItemInput{ItemType: normalizedPurchaseItemType(item.ItemType, item.ProductID != nil), ProductID: deref(item.ProductID), IngredientID: deref(item.IngredientID), PackagingItemID: deref(item.PackagingItemID), QuantityReceived: item.Quantity, UnitID: deref(item.UnitID), UnitCost: item.UnitCost, ExpiryDate: optionalDateString(item.ExpiryDate), BatchNumber: item.BatchNumber})
+	}
+	return result
+}
+
+func receiptInputsFromInvoiceItemsWithReceiveState(items []PurchaseInvoiceItem, receiveLines map[string]invoiceReceiveLineState) []PurchaseReceiptItemInput {
+	result := make([]PurchaseReceiptItemInput, 0, len(items))
+	for _, item := range items {
+		if normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID) == "account" {
+			continue
+		}
+		remaining := roundQuantity(receiveLines[item.ID].Remaining)
+		if remaining <= 0 {
+			continue
+		}
+		result = append(result, PurchaseReceiptItemInput{ItemType: normalizedPurchaseItemType(item.ItemType, item.ProductID != nil), ProductID: deref(item.ProductID), IngredientID: deref(item.IngredientID), PackagingItemID: deref(item.PackagingItemID), QuantityReceived: remaining, UnitID: deref(item.UnitID), UnitCost: item.UnitCost, ExpiryDate: optionalDateString(item.ExpiryDate), BatchNumber: item.BatchNumber})
 	}
 	return result
 }

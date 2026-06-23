@@ -183,6 +183,7 @@ export function PurchaseInvoiceFormDialog({
 
   const linkedPurchaseOrderLabel =
     purchaseOrderNumber || (purchaseOrderId ? "PO number unavailable" : "");
+  const isPostedEdit = invoice?.status === "posted";
 
   const submit = async (): Promise<void> => {
     const result = purchaseInvoiceSchema.safeParse({
@@ -220,6 +221,12 @@ export function PurchaseInvoiceFormDialog({
               : createDescription}
           </DialogDescription>
         </DialogHeader>
+        {isPostedEdit ? (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Editing a posted bill will update payable/accounting records. Bills with payments,
+            vendor credits, or received stock cannot be edited.
+          </div>
+        ) : null}
         <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
           <Select
             value={branchId || "none"}
