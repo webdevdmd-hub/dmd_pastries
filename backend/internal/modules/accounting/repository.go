@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"pastries-pos/internal/shared/utils"
 )
@@ -1807,6 +1808,15 @@ func (r *Repository) ListJournalEntryLines(businessID, entryID string) ([]Journa
 		Where("jel.business_id = ? AND jel.journal_entry_id = ? AND jel.deleted_at IS NULL", businessID, entryID).
 		Order("jel.line_number ASC").
 		Scan(&lines).Error
+	return lines, err
+}
+
+func (r *Repository) ListJournalEntryLinesForUpdate(tx *gorm.DB, businessID, entryID string) ([]JournalEntryLine, error) {
+	var lines []JournalEntryLine
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("business_id = ? AND journal_entry_id = ? AND deleted_at IS NULL", businessID, entryID).
+		Order("line_number ASC").
+		Find(&lines).Error
 	return lines, err
 }
 

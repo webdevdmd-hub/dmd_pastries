@@ -58,7 +58,7 @@ export function PurchaseInvoiceActionsMenu({
         {canManage ? (
           <>
             <DropdownMenuItem
-              disabled={invoice.status !== "draft"}
+              disabled={invoice.status === "cancelled"}
               onSelect={() => onEdit(invoice)}
             >
               Edit

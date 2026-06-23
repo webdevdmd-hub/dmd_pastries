@@ -1399,30 +1399,10 @@ func (s *Service) PostPurchaseInvoiceJournal(tx *gorm.DB, currentUser *utils.Aut
 	if totalAmount <= 0 {
 		return "", nil
 	}
-	accountsPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "accounts_payable", "2000", "Accounts Payable")
+	lines, err := s.buildPurchaseInvoiceJournalLineRequests(tx, currentUser.BusinessID, invoice)
 	if err != nil {
 		return "", err
 	}
-	taxAmount := roundMoney(invoice.TaxAmount)
-	chargeLines, _, err := s.buildPurchaseChargeDebitLines(tx, currentUser.BusinessID, "purchase_invoice", invoice.ID, "Purchase invoice charge")
-	if err != nil {
-		return "", err
-	}
-	valueLines, err := s.buildPurchaseInvoiceValueLines(tx, currentUser.BusinessID, invoice, false)
-	if err != nil {
-		return "", err
-	}
-	lines := make([]JournalEntryLineRequest, 0, len(valueLines)+2+len(chargeLines))
-	lines = append(lines, valueLines...)
-	lines = append(lines, chargeLines...)
-	if taxAmount > 0 {
-		vatReceivable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "vat_receivable", "1300", "VAT Receivable")
-		if err != nil {
-			return "", err
-		}
-		lines = append(lines, JournalEntryLineRequest{AccountID: vatReceivable.ID, DebitAmount: taxAmount, Description: "VAT receivable on purchase invoice"})
-	}
-	lines = append(lines, JournalEntryLineRequest{AccountID: accountsPayable.ID, CreditAmount: totalAmount, Description: "Supplier payable " + invoice.InvoiceNumber})
 	journalID, err := s.createPostedSystemJournal(tx, currentUser, invoice.InvoiceDate, &invoice.BranchID, "purchase_invoice", invoice.ID, invoice.InvoiceNumber, "Purchase invoice "+invoice.InvoiceNumber, lines)
 	if err != nil {
 		return "", err
@@ -1431,6 +1411,129 @@ func (s *Service) PostPurchaseInvoiceJournal(tx *gorm.DB, currentUser *utils.Aut
 		return "", apperrors.Internal("failed to update purchase invoice accounting journal")
 	}
 	return journalID, nil
+}
+
+func (s *Service) RefreshPurchaseInvoiceJournalAfterEdit(tx *gorm.DB, currentUser *utils.AuthContext, invoiceID string) (string, error) {
+	invoice, err := s.repo.FindPurchaseInvoiceForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(invoiceID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load purchase invoice for accounting")
+	}
+	if invoice.Status != "posted" {
+		return "", nil
+	}
+	totalAmount := roundMoney(invoice.TotalAmount)
+	if totalAmount <= 0 {
+		return "", nil
+	}
+	if invoice.JournalEntryID != nil && strings.TrimSpace(*invoice.JournalEntryID) != "" {
+		if err := s.reversePostedJournalInTx(tx, currentUser, strings.TrimSpace(*invoice.JournalEntryID), "purchase_invoice_edit_reverse", "Purchase invoice edit reversal "+invoice.InvoiceNumber); err != nil {
+			return "", err
+		}
+	}
+	lines, err := s.buildPurchaseInvoiceJournalLineRequests(tx, currentUser.BusinessID, invoice)
+	if err != nil {
+		return "", err
+	}
+	editSourceID := utils.NewUUID()
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, invoice.InvoiceDate, &invoice.BranchID, "purchase_invoice_edit", editSourceID, invoice.InvoiceNumber, "Purchase invoice edit "+invoice.InvoiceNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdatePurchaseInvoiceJournalID(tx, currentUser.BusinessID, invoice.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update purchase invoice accounting journal")
+	}
+	return journalID, nil
+}
+
+func (s *Service) buildPurchaseInvoiceJournalLineRequests(tx *gorm.DB, businessID string, invoice *purchaseInvoiceAccountingRow) ([]JournalEntryLineRequest, error) {
+	totalAmount := roundMoney(invoice.TotalAmount)
+	accountsPayable, err := s.requiredMappedAccount(tx, businessID, "accounts_payable", "2000", "Accounts Payable")
+	if err != nil {
+		return nil, err
+	}
+	taxAmount := roundMoney(invoice.TaxAmount)
+	chargeLines, _, err := s.buildPurchaseChargeDebitLines(tx, businessID, "purchase_invoice", invoice.ID, "Purchase invoice charge")
+	if err != nil {
+		return nil, err
+	}
+	valueLines, err := s.buildPurchaseInvoiceValueLines(tx, businessID, invoice, false)
+	if err != nil {
+		return nil, err
+	}
+	lines := make([]JournalEntryLineRequest, 0, len(valueLines)+2+len(chargeLines))
+	lines = append(lines, valueLines...)
+	lines = append(lines, chargeLines...)
+	if taxAmount > 0 {
+		vatReceivable, err := s.requiredMappedAccount(tx, businessID, "vat_receivable", "1300", "VAT Receivable")
+		if err != nil {
+			return nil, err
+		}
+		lines = append(lines, JournalEntryLineRequest{AccountID: vatReceivable.ID, DebitAmount: taxAmount, Description: "VAT receivable on purchase invoice"})
+	}
+	lines = append(lines, JournalEntryLineRequest{AccountID: accountsPayable.ID, CreditAmount: totalAmount, Description: "Supplier payable " + invoice.InvoiceNumber})
+	return lines, nil
+}
+
+func (s *Service) reversePostedJournalInTx(tx *gorm.DB, currentUser *utils.AuthContext, journalEntryID, sourceType, narration string) error {
+	entry, err := s.repo.FindJournalEntryForUpdate(tx, currentUser.BusinessID, strings.TrimSpace(journalEntryID))
+	if err != nil {
+		return apperrors.Internal("failed to load purchase invoice accounting journal")
+	}
+	if entry.Status == "reversed" {
+		return nil
+	}
+	if entry.Status != "posted" {
+		return apperrors.BadRequest("only posted purchase invoice journals can be reversed for bill edit", nil)
+	}
+	lines, err := s.repo.ListJournalEntryLinesForUpdate(tx, currentUser.BusinessID, entry.ID)
+	if err != nil {
+		return apperrors.Internal("failed to load purchase invoice accounting journal lines")
+	}
+	reversalEntryNumber, err := s.repo.NextJournalEntryNumber(tx, currentUser.BusinessID, time.Now().UTC())
+	if err != nil {
+		return apperrors.Internal("failed to generate reversal journal entry number")
+	}
+	reversalID := utils.NewUUID()
+	reversalLines := make([]JournalEntryLine, 0, len(lines))
+	for i, line := range lines {
+		reversalLines = append(reversalLines, JournalEntryLine{
+			ID:             utils.NewUUID(),
+			BusinessID:     currentUser.BusinessID,
+			JournalEntryID: reversalID,
+			AccountID:      line.AccountID,
+			LineNumber:     i + 1,
+			DebitAmount:    roundMoney(line.CreditAmount),
+			CreditAmount:   roundMoney(line.DebitAmount),
+			Description:    "Reversal: " + line.Description,
+		})
+	}
+	now := time.Now().UTC()
+	reversal := &JournalEntry{
+		ID:              reversalID,
+		BusinessID:      currentUser.BusinessID,
+		BranchID:        entry.BranchID,
+		EntryNumber:     reversalEntryNumber,
+		EntryDate:       now,
+		ReferenceNumber: entry.ReferenceNumber,
+		SourceType:      sourceType,
+		SourceID:        &entry.ID,
+		Narration:       strings.TrimSpace(narration),
+		Status:          "posted",
+		TotalDebit:      roundMoney(entry.TotalCredit),
+		TotalCredit:     roundMoney(entry.TotalDebit),
+		PostedAt:        &now,
+		PostedByUserID:  &currentUser.UserID,
+		ReversedEntryID: &entry.ID,
+		CreatedByUserID: currentUser.UserID,
+		UpdatedByUserID: &currentUser.UserID,
+	}
+	if err := s.repo.CreateJournalEntry(tx, reversal, reversalLines); err != nil {
+		return apperrors.Internal("failed to create purchase invoice edit reversal journal")
+	}
+	if err := s.repo.UpdateJournalEntry(tx, currentUser.BusinessID, entry.ID, map[string]interface{}{"status": "reversed", "reversed_at": now, "reversed_by_user_id": currentUser.UserID, "updated_by_user_id": currentUser.UserID, "updated_at": now}); err != nil {
+		return apperrors.Internal("failed to mark purchase invoice journal reversed")
+	}
+	return nil
 }
 
 func (s *Service) PostPurchaseInvoiceCancellationJournal(tx *gorm.DB, currentUser *utils.AuthContext, invoiceID string) (string, error) {

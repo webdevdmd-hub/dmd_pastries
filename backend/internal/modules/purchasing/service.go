@@ -1523,8 +1523,14 @@ func (s *Service) UpdateInvoice(currentUser *utils.AuthContext, id string, req U
 		if !currentUser.CanAccessBranch(existing.BranchID) {
 			return apperrors.Forbidden("branch access denied")
 		}
-		if existing.Status != "draft" {
-			return apperrors.BadRequest("only draft invoices can be edited", nil)
+		if existing.Status != "draft" && existing.Status != "posted" {
+			return apperrors.BadRequest("only draft or safe posted invoices can be edited", nil)
+		}
+		editingPosted := existing.Status == "posted"
+		if editingPosted {
+			if err := s.ensurePostedInvoiceCanBeEdited(tx, currentUser.BusinessID, existing.ID); err != nil {
+				return err
+			}
 		}
 		branchID := first(req.BranchID, existing.BranchID)
 		branchID, err = currentUser.ResolveOperationalBranch(branchID)
@@ -1575,8 +1581,18 @@ func (s *Service) UpdateInvoice(currentUser *utils.AuthContext, id string, req U
 		if err := s.recalculatePurchaseInvoiceTotals(tx, currentUser.BusinessID, id); err != nil {
 			return err
 		}
+		if editingPosted && s.accountingService != nil {
+			if _, err := s.accountingService.RefreshPurchaseInvoiceJournalAfterEdit(tx, currentUser, id); err != nil {
+				return err
+			}
+		}
 		if err := s.audit(tx, currentUser, "purchase_invoice.updated", id, "Purchase invoice updated", ipAddress, userAgent); err != nil {
 			return err
+		}
+		if editingPosted {
+			if err := s.audit(tx, currentUser, "purchase_invoice.posted_bill_edited", id, "Posted purchase invoice edited", ipAddress, userAgent); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -1584,6 +1600,31 @@ func (s *Service) UpdateInvoice(currentUser *utils.AuthContext, id string, req U
 		return nil, err
 	}
 	return s.GetInvoice(currentUser, id)
+}
+
+func (s *Service) ensurePostedInvoiceCanBeEdited(tx *gorm.DB, businessID, invoiceID string) error {
+	payments, err := s.repo.CompletedInvoicePaymentCount(tx, businessID, invoiceID)
+	if err != nil {
+		return err
+	}
+	if payments > 0 {
+		return apperrors.Conflict("posted bill has supplier payments and cannot be edited", map[string]interface{}{"reason": "purchase_invoice_has_payments"})
+	}
+	vendorCredits, err := s.repo.PostedPurchaseReturnCountForInvoice(tx, businessID, invoiceID)
+	if err != nil {
+		return err
+	}
+	if vendorCredits > 0 {
+		return apperrors.Conflict("posted bill has vendor credits and cannot be edited", map[string]interface{}{"reason": "purchase_invoice_has_vendor_credits"})
+	}
+	receipts, err := s.repo.ActiveReceiptCountForInvoice(tx, businessID, invoiceID)
+	if err != nil {
+		return err
+	}
+	if receipts > 0 {
+		return apperrors.Conflict("posted bill has received stock history and cannot be edited", map[string]interface{}{"reason": "purchase_invoice_has_receipts"})
+	}
+	return nil
 }
 
 func (s *Service) PostInvoice(currentUser *utils.AuthContext, id, ipAddress, userAgent string) (*PurchaseInvoiceResponse, error) {
