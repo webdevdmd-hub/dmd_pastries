@@ -20,6 +20,12 @@ import type {
   UpdateRecipeStatusPayload,
 } from "@/types/recipes";
 
+const PRODUCT_LOOKUP_PAGE_LIMIT = 100;
+const RECIPE_OUTPUT_PRODUCT_TYPES: ProductType[] = PRODUCT_TYPES.filter(
+  (productType): productType is ProductType => productType !== "service",
+);
+const RECIPE_COMPONENT_PRODUCT_TYPES: ProductType[] = RECIPE_OUTPUT_PRODUCT_TYPES;
+
 type BackendRecipePayload = {
   product_id?: string;
   product_variant_id?: string | null;
@@ -282,6 +288,8 @@ function parseProductVariantOption(value: unknown): RecipeProductVariantOption {
 
   return {
     id: stringValue(value.id),
+    barcode: optionalString(value.barcode),
+    costPrice: typeof value.cost_price === "number" ? value.cost_price : null,
     variantName: stringValue(value.variant_name, "Variant"),
     sku: optionalString(value.sku),
     salePrice: numberValue(value.sale_price),
@@ -295,9 +303,12 @@ function parseProductOption(value: unknown): RecipeProductOption {
 
   return {
     id: stringValue(value.id),
+    barcode: optionalString(value.barcode),
+    costPrice: typeof value.cost_price === "number" ? value.cost_price : null,
     productCode: stringValue(value.product_code),
     productName: stringValue(value.product_name, "Product"),
     productType: productTypeValue(value.product_type),
+    sku: optionalString(value.sku),
     itemStructure:
       value.item_structure === "variant" ||
       value.item_structure === "recipe_based" ||
@@ -318,6 +329,56 @@ function parseProductOption(value: unknown): RecipeProductOption {
     variants: Array.isArray(value.variants)
       ? value.variants.map(parseProductVariantOption).filter((variant) => variant.id.length > 0)
       : [],
+  };
+}
+
+type ProductOptionPage = {
+  items: RecipeProductOption[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+function parseProductOptionPage(value: unknown): ProductOptionPage {
+  if (Array.isArray(value)) {
+    return {
+      items: value.map(parseProductOption),
+      total: value.length,
+      page: 1,
+      limit: value.length,
+    };
+  }
+
+  if (!isObject(value)) {
+    throw new Error("Backend product option page payload is invalid.");
+  }
+
+  const itemsValue = Array.isArray(value.items) ? value.items : [];
+  const pagination = isObject(value.pagination) ? value.pagination : {};
+  const total =
+    typeof value.total === "number"
+      ? value.total
+      : typeof pagination.total === "number"
+        ? pagination.total
+        : itemsValue.length;
+  const page =
+    typeof value.page === "number"
+      ? value.page
+      : typeof pagination.page === "number"
+        ? pagination.page
+        : 1;
+  const limit =
+    typeof value.limit === "number"
+      ? value.limit
+      : typeof pagination.limit === "number"
+        ? pagination.limit
+        : itemsValue.length || PRODUCT_LOOKUP_PAGE_LIMIT;
+
+  return {
+    items: itemsValue.map(parseProductOption),
+    total,
+    page,
+    limit,
   };
 }
 
@@ -344,6 +405,63 @@ function queryString(params: Record<string, string | number | null | undefined>)
 
   const query = searchParams.toString();
   return query.length > 0 ? `?${query}` : "";
+}
+
+function mergeRecipeProductOptions(products: RecipeProductOption[]): RecipeProductOption[] {
+  const byId = new Map<string, RecipeProductOption>();
+
+  products.forEach((product) => {
+    if (product.id.length > 0) {
+      byId.set(product.id, product);
+    }
+  });
+
+  return Array.from(byId.values()).sort((left, right) => {
+    const nameOrder = left.productName.localeCompare(right.productName, undefined, {
+      sensitivity: "base",
+    });
+
+    return nameOrder !== 0
+      ? nameOrder
+      : left.productCode.localeCompare(right.productCode, undefined, { sensitivity: "base" });
+  });
+}
+
+async function getRecipeProductPages(
+  params: Record<string, string | number | null | undefined>,
+): Promise<RecipeProductOption[]> {
+  const products: RecipeProductOption[] = [];
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const response = await apiRequest<ProductOptionPage>(
+      `/api/v1/products${queryString({
+        ...params,
+        page,
+        limit: PRODUCT_LOOKUP_PAGE_LIMIT,
+        sort_by: "product_name",
+        sort_order: "asc",
+      })}`,
+      {
+        authMode: "appwrite",
+        parse: parseProductOptionPage,
+      },
+    );
+    const pageData = response.data;
+
+    products.push(...pageData.items);
+    totalPages =
+      pageData.limit > 0 ? Math.max(1, Math.ceil(pageData.total / pageData.limit)) : page;
+
+    if (pageData.items.length === 0) {
+      break;
+    }
+
+    page += 1;
+  } while (page <= totalPages);
+
+  return products;
 }
 
 function ingredientPayload(payload: RecipeIngredientPayload): BackendIngredientPayload {
@@ -661,27 +779,34 @@ export async function lookupRecipes(search: string): Promise<Recipe[]> {
 }
 
 export async function getRecipeProducts(): Promise<RecipeProductOption[]> {
-  const response = await apiRequest<RecipeProductOption[]>("/api/v1/products?limit=100", {
-    authMode: "appwrite",
-    parse: (data) => parseList(data, parseProductOption),
-  });
+  const products = await Promise.all(
+    RECIPE_OUTPUT_PRODUCT_TYPES.map((productType) =>
+      getRecipeProductPages({
+        status: "active",
+        product_type: productType,
+      }),
+    ),
+  );
 
-  return response.data.filter(
-    (product) =>
-      product.productType === "finished_product" || product.productType === "semi_finished",
+  return mergeRecipeProductOptions(
+    products.flat().filter((product) => RECIPE_OUTPUT_PRODUCT_TYPES.includes(product.productType)),
   );
 }
 
 export async function getRecipeComponentProducts(): Promise<RecipeProductOption[]> {
-  const response = await apiRequest<RecipeProductOption[]>("/api/v1/products?limit=100", {
-    authMode: "appwrite",
-    parse: (data) => parseList(data, parseProductOption),
-  });
-
-  return response.data.filter((product) =>
-    ["ingredient", "packaging", "raw_material", "semi_finished", "consumable"].includes(
-      product.productType,
+  const products = await Promise.all(
+    RECIPE_COMPONENT_PRODUCT_TYPES.map((productType) =>
+      getRecipeProductPages({
+        status: "active",
+        product_type: productType,
+      }),
     ),
+  );
+
+  return mergeRecipeProductOptions(
+    products
+      .flat()
+      .filter((product) => RECIPE_COMPONENT_PRODUCT_TYPES.includes(product.productType)),
   );
 }
 

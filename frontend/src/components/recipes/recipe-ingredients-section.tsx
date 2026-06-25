@@ -31,6 +31,25 @@ function componentKey(line: {
   return `${line.componentProductId ?? line.inventoryItemId ?? ""}:${line.componentVariantId ?? ""}`;
 }
 
+function draftLineCost(
+  line: RecipeIngredientPayload,
+  product: RecipeProductOption | undefined,
+): {
+  totalCost: number;
+  unitCost: number;
+} {
+  const variant =
+    product?.variants.find((productVariant) => productVariant.id === line.componentVariantId) ??
+    null;
+  const unitCost = variant?.costPrice ?? product?.costPrice ?? 0;
+  const effectiveQuantity = line.quantityRequired * (1 + line.wastagePercentage / 100);
+
+  return {
+    totalCost: effectiveQuantity * unitCost,
+    unitCost,
+  };
+}
+
 export function RecipeIngredientsSection({
   canManage,
   componentProducts,
@@ -64,6 +83,7 @@ export function RecipeIngredientsSection({
       item?.variants.find((productVariant) => productVariant.id === line.componentVariantId) ??
       null;
     const unit = units.find((unitOption) => unitOption.id === line.unitId);
+    const cost = draftLineCost(line, item);
 
     return {
       id: `draft-${String(index)}`,
@@ -77,8 +97,8 @@ export function RecipeIngredientsSection({
       notes: line.notes,
       quantityRequired: line.quantityRequired,
       sortOrder: line.sortOrder,
-      totalCost: 0,
-      unitCostSnapshot: 0,
+      totalCost: cost.totalCost,
+      unitCostSnapshot: cost.unitCost,
       unitId: line.unitId,
       unitName: unit?.unitName ?? item?.unitName ?? "Unit",
       unitSymbol: unit?.unitSymbol ?? item?.unitSymbol ?? "",

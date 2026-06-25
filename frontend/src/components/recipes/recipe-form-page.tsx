@@ -10,7 +10,7 @@ import { toast } from "sonner";
 
 import { ProductFormDialog } from "@/components/products/product-form-dialog";
 import { AccessDeniedCard } from "@/components/recipes/access-denied-card";
-import { RecipeCostCard } from "@/components/recipes/recipe-cost-card";
+import { RecipeCostCard, type RecipeLiveCostPreview } from "@/components/recipes/recipe-cost-card";
 import { RecipeHeader } from "@/components/recipes/recipe-header";
 import { RecipeIngredientsSection } from "@/components/recipes/recipe-ingredients-section";
 import { RecipeInstructionsCard } from "@/components/recipes/recipe-instructions-card";
@@ -48,11 +48,16 @@ import {
   type CreateRecipeInputValues,
   createRecipeSchema,
 } from "@/lib/validators/recipes.schema";
-import type { CreateProductPayload } from "@/types/product";
+import {
+  type CreateProductPayload,
+  ITEM_STRUCTURE_LABELS,
+  PRODUCT_TYPE_LABELS,
+} from "@/types/product";
 import type {
   CreateRecipePayload,
   RecipeIngredientPayload,
   RecipePackagingPayload,
+  RecipeProductOption,
   UpdateRecipePayload,
 } from "@/types/recipes";
 
@@ -128,6 +133,22 @@ function toUpdateRecipePayload(values: CreateRecipeFormValues): UpdateRecipePayl
       values.outputVariantMode === "existing" ? (values.productVariantId ?? null) : null,
     recipeName: values.recipeName,
   };
+}
+
+function componentUnitCost(
+  products: RecipeProductOption[],
+  componentProductId: string,
+  componentVariantId: string | null,
+): number {
+  const product = products.find((item) => item.id === componentProductId);
+  const variant =
+    product?.variants.find((productVariant) => productVariant.id === componentVariantId) ?? null;
+
+  return variant?.costPrice ?? product?.costPrice ?? 0;
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 export function RecipeFormPage({
@@ -284,6 +305,7 @@ export function RecipeFormPage({
   };
   const recipe = recipeQuery.data ?? null;
   const selectedProductId = form.watch("productId");
+  const batchYieldQuantity = form.watch("batchYieldQuantity");
   const outputVariantMode = form.watch("outputVariantMode");
   const selectedVariantId = form.watch("productVariantId") ?? "";
   const selectedProduct = data.products.find((product) => product.id === selectedProductId) ?? null;
@@ -291,7 +313,14 @@ export function RecipeFormPage({
   const ingredientComponentProducts = useMemo(
     () =>
       data.componentProducts.filter((product) =>
-        ["ingredient", "raw_material", "semi_finished", "consumable"].includes(product.productType),
+        [
+          "finished_product",
+          "ingredient",
+          "raw_material",
+          "semi_finished",
+          "consumable",
+          "equipment",
+        ].includes(product.productType),
       ),
     [data.componentProducts],
   );
@@ -300,6 +329,57 @@ export function RecipeFormPage({
     [data.componentProducts],
   );
   const isSaving = createMutation.isPending || updateMutation.isPending || statusMutation.isPending;
+  const liveCostPreview = useMemo<RecipeLiveCostPreview>(() => {
+    const ingredientCost = draftIngredients.reduce((total, line) => {
+      const unitCost = componentUnitCost(
+        data.componentProducts,
+        line.componentProductId,
+        line.componentVariantId,
+      );
+      const effectiveQuantity = line.quantityRequired * (1 + line.wastagePercentage / 100);
+
+      return total + effectiveQuantity * unitCost;
+    }, 0);
+    const packagingCost = draftPackaging.reduce((total, line) => {
+      const unitCost = componentUnitCost(
+        data.componentProducts,
+        line.componentProductId,
+        line.componentVariantId,
+      );
+
+      return total + line.quantityRequired * unitCost;
+    }, 0);
+    const totalCost = ingredientCost + packagingCost;
+    const yieldQuantityValid = Number.isFinite(batchYieldQuantity) && batchYieldQuantity > 0;
+    const hasZeroCostComponents =
+      draftIngredients.some(
+        (line) =>
+          componentUnitCost(
+            data.componentProducts,
+            line.componentProductId,
+            line.componentVariantId,
+          ) <= 0,
+      ) ||
+      draftPackaging.some(
+        (line) =>
+          componentUnitCost(
+            data.componentProducts,
+            line.componentProductId,
+            line.componentVariantId,
+          ) <= 0,
+      );
+
+    return {
+      batchYieldQuantity: yieldQuantityValid ? batchYieldQuantity : 0,
+      costPerYieldUnit: yieldQuantityValid ? roundMoney(totalCost / batchYieldQuantity) : 0,
+      estimatedIngredientCost: roundMoney(ingredientCost),
+      estimatedPackagingCost: roundMoney(packagingCost),
+      estimatedTotalCost: roundMoney(totalCost),
+      hasLines: draftIngredients.length > 0 || draftPackaging.length > 0,
+      hasZeroCostComponents,
+      yieldQuantityValid,
+    };
+  }, [batchYieldQuantity, data.componentProducts, draftIngredients, draftPackaging]);
   const productOptions = useMemo<SearchableComboboxOption[]>(
     () =>
       data.products.map((product) => ({
@@ -311,9 +391,15 @@ export function RecipeFormPage({
             : "Parent product output",
         keywords: [
           product.productName,
+          product.productCode,
+          product.sku ?? "",
+          product.barcode ?? "",
+          PRODUCT_TYPE_LABELS[product.productType],
+          ITEM_STRUCTURE_LABELS[product.itemStructure],
           ...product.variants.flatMap((variant) => [
             variant.variantName,
             variant.sku ?? "",
+            variant.barcode ?? "",
             String(variant.salePrice),
           ]),
         ],
@@ -758,6 +844,7 @@ export function RecipeFormPage({
                 canRecalculate={canRecalculateRecipeCost}
                 draftIngredientCount={draftIngredients.length}
                 draftPackagingCount={draftPackaging.length}
+                livePreview={liveCostPreview}
                 recipeId={recipeId}
               />
               <RecipeYieldCard recipe={recipe} />

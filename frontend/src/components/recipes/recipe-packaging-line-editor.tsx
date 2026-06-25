@@ -56,10 +56,16 @@ export function RecipePackagingLineEditor({
         keywords: [
           item.productName,
           item.productCode,
+          item.sku ?? "",
+          item.barcode ?? "",
           PRODUCT_TYPE_LABELS[item.productType],
           item.unitName,
           item.unitSymbol,
-          ...item.variants.flatMap((variant) => [variant.variantName, variant.sku ?? ""]),
+          ...item.variants.flatMap((variant) => [
+            variant.variantName,
+            variant.sku ?? "",
+            variant.barcode ?? "",
+          ]),
         ],
       })),
     [componentProducts],

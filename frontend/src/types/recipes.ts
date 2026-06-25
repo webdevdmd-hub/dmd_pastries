@@ -144,9 +144,12 @@ export type RecipeFilters = {
 
 export type RecipeProductOption = {
   id: string;
+  barcode: string | null;
+  costPrice: number | null;
   productCode: string;
   productName: string;
   productType: ProductType;
+  sku: string | null;
   itemStructure: ItemStructure;
   unitId: string;
   unitName: string;
@@ -157,6 +160,8 @@ export type RecipeProductOption = {
 
 export type RecipeProductVariantOption = {
   id: string;
+  barcode: string | null;
+  costPrice: number | null;
   variantName: string;
   sku: string | null;
   salePrice: number;

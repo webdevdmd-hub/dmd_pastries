@@ -64,12 +64,8 @@ export function RecipePackagingTable({
             <TableCell>
               {line.quantityRequired} {line.unitSymbol}
             </TableCell>
-            <TableCell>
-              {line.id.startsWith("draft-") ? "After save" : formatCurrency(line.unitCostSnapshot)}
-            </TableCell>
-            <TableCell>
-              {line.id.startsWith("draft-") ? "After save" : formatCurrency(line.totalCost)}
-            </TableCell>
+            <TableCell>{formatCurrency(line.unitCostSnapshot)}</TableCell>
+            <TableCell>{formatCurrency(line.totalCost)}</TableCell>
             <TableCell>
               <Badge variant="outline">{line.isOptional ? "Optional" : "Required"}</Badge>
             </TableCell>
