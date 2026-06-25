@@ -8,7 +8,7 @@ Current backend stage: **Sprint 5.7 dashboard intelligence foundation**
 
 This repository currently contains the backend foundation plus Sprint 2 products, POS billing, payments, held sales, customers, Sprint 3 inventory/purchasing foundations, Sprint 4.1 packaging, Sprint 4.2 recipes/BOM, Sprint 4.3 manufacturing production batches, Sprint 4.4 ingredients catalog, bakery orders, Sprint 5 reports foundation with sales, inventory, manufacturing, bakery orders, and financial/payment reports, and Sprint 5.7 dashboard intelligence APIs. Supplier invoice payment tracking is available inside purchasing. The accounting foundation has started with Chart of Accounts management. Loyalty, online payment gateways, and full journal-entry accounting are not built yet.
 
-Admin maturity contracts from `frondend/docs/backend-contracts.md` are implemented for staff invitations, branch assignment, soft-delete/restore users, and activity logs.
+Admin maturity contracts from `frontend/docs/backend-contracts.md` are implemented for staff invitations, branch assignment, soft-delete/restore users, and activity logs.
 
 Phase 1 adds business profile, onboarding status, business settings, current branch switching, default branch support, and versioned SQL migration files.
 

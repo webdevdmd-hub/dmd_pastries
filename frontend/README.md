@@ -100,7 +100,7 @@ Phase status:
 
 ### Foundation
 
-- Fresh Next.js App Router scaffold inside `frondend`
+- Fresh Next.js App Router scaffold inside `frontend`
 - Strict TypeScript configuration with `noImplicitAny`
 - Tailwind brand tokens and warm bakery theme
 - Personal theme preference support with localStorage-backed Latte and Pistachio Fresh themes
