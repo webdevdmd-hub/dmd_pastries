@@ -78,6 +78,9 @@ function manufacturingErrorMessage(error: unknown): string {
   const normalizedMessage = message.toLowerCase();
 
   if (
+    normalizedMessage.includes("no components to consume") ||
+    normalizedMessage.includes("no component quantity to consume") ||
+    normalizedMessage.includes("recipe has no components") ||
     normalizedMessage.includes("no ingredients or packaging") ||
     normalizedMessage.includes("no bom") ||
     normalizedMessage.includes("bom lines") ||
@@ -85,7 +88,7 @@ function manufacturingErrorMessage(error: unknown): string {
       normalizedMessage.includes("ingredient") &&
       normalizedMessage.includes("packaging"))
   ) {
-    return "This recipe has no ingredients or packaging. Add BOM lines before producing.";
+    return "This recipe has no ingredients/components. Add BOM lines in Recipe Builder before producing.";
   }
 
   if (

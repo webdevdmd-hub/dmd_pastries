@@ -35,6 +35,13 @@ import type {
 } from "@/types/manufacturing";
 import { ITEM_STRUCTURE_LABELS, PRODUCT_TYPE_LABELS } from "@/types/product";
 
+const EMPTY_COMPONENT_RECIPE_MESSAGE =
+  "This recipe has no ingredients/components. Add BOM lines in Recipe Builder before producing.";
+
+function countLabel(value: number | null): string {
+  return value === null ? "Unknown" : value.toLocaleString();
+}
+
 export function BatchFormDialog({
   batch,
   branches,
@@ -117,8 +124,9 @@ export function BatchFormDialog({
     recipe !== undefined &&
     (recipe.isActive === false || (recipe.status !== null && recipe.status !== "active"));
 
-  const recipeHasKnownEmptyBom = (recipe: ManufacturingRecipeOption | undefined): boolean =>
-    recipe?.componentCount === 0 && recipe.packagingCount === 0;
+  const recipeHasKnownMissingComponents = (
+    recipe: ManufacturingRecipeOption | undefined,
+  ): boolean => recipe?.componentCount === 0;
 
   const submitPlanned = async (): Promise<void> => {
     const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
@@ -158,8 +166,8 @@ export function BatchFormDialog({
       return;
     }
 
-    if (recipeHasKnownEmptyBom(selectedRecipe)) {
-      setError("This recipe has no ingredients or packaging. Add BOM lines before producing.");
+    if (recipeHasKnownMissingComponents(selectedRecipe)) {
+      setError(EMPTY_COMPONENT_RECIPE_MESSAGE);
       return;
     }
 
@@ -193,8 +201,8 @@ export function BatchFormDialog({
       return;
     }
 
-    if (recipeHasKnownEmptyBom(selectedRecipe)) {
-      setError("This recipe has no ingredients or packaging. Add BOM lines before producing.");
+    if (recipeHasKnownMissingComponents(selectedRecipe)) {
+      setError(EMPTY_COMPONENT_RECIPE_MESSAGE);
       return;
     }
 
@@ -220,8 +228,9 @@ export function BatchFormDialog({
 
   const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
   const selectedRecipeIsKnownInactive = recipeIsKnownInactive(selectedRecipe);
-  const selectedRecipeHasKnownEmptyBom = recipeHasKnownEmptyBom(selectedRecipe);
+  const selectedRecipeHasKnownMissingComponents = recipeHasKnownMissingComponents(selectedRecipe);
   const isCreateDisabled = isSubmitting || selectedRecipeIsKnownInactive;
+  const isProduceDisabled = isCreateDisabled || selectedRecipeHasKnownMissingComponents;
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
@@ -324,6 +333,20 @@ export function BatchFormDialog({
                       Recipe yield: {selectedRecipe.batchYieldQuantity}{" "}
                       {selectedRecipe.batchYieldUnitName}
                     </p>
+                    <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                      <div className="rounded-xl border border-neutral-300 bg-white px-3 py-2">
+                        <span className="text-neutral-500">Ingredients</span>
+                        <strong className="ml-2 text-neutral-950">
+                          {countLabel(selectedRecipe.componentCount)}
+                        </strong>
+                      </div>
+                      <div className="rounded-xl border border-neutral-300 bg-white px-3 py-2">
+                        <span className="text-neutral-500">Packaging</span>
+                        <strong className="ml-2 text-neutral-950">
+                          {countLabel(selectedRecipe.packagingCount)}
+                        </strong>
+                      </div>
+                    </div>
                   </div>
                   <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-neutral-600">
                     v{selectedRecipe.versionNumber}
@@ -334,12 +357,10 @@ export function BatchFormDialog({
                     Activate this recipe before creating production.
                   </p>
                 ) : null}
-                {selectedRecipeHasKnownEmptyBom ? (
+                {selectedRecipeHasKnownMissingComponents ? (
                   <Alert className="mt-4 border-amber-300 bg-amber-50 text-amber-950">
                     <AlertTitle>Missing BOM lines</AlertTitle>
-                    <AlertDescription>
-                      This recipe has no ingredients or packaging. Add BOM lines before producing.
-                    </AlertDescription>
+                    <AlertDescription>{EMPTY_COMPONENT_RECIPE_MESSAGE}</AlertDescription>
                   </Alert>
                 ) : null}
               </div>
@@ -396,7 +417,7 @@ export function BatchFormDialog({
           {batch && canProducePlanned ? (
             <Button
               className="bg-black text-white hover:bg-neutral-800"
-              disabled={isCreateDisabled}
+              disabled={isProduceDisabled}
               onClick={() => void submitPlannedProduction()}
               type="button"
             >
@@ -406,7 +427,7 @@ export function BatchFormDialog({
           {!batch ? (
             <Button
               className="bg-black text-white hover:bg-neutral-800"
-              disabled={isCreateDisabled}
+              disabled={isProduceDisabled}
               onClick={() => void submitProduction()}
               type="button"
             >
