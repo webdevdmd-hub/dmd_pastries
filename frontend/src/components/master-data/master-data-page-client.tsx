@@ -1,7 +1,15 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Copy, Database, LoaderCircle, MoreHorizontal, Plus, ShieldAlert } from "lucide-react";
+import {
+  Copy,
+  Database,
+  LoaderCircle,
+  MoreHorizontal,
+  Plus,
+  Search,
+  ShieldAlert,
+} from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import type { JSX, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -314,6 +322,12 @@ function toProductCategoryPayload(values: ProductCategorySchema): CreateProductC
   };
 }
 
+function productCategoryIconSearchText(
+  option: (typeof productCategoryIconOptions)[number],
+): string {
+  return [option.label, option.key, ...option.keywords].join(" ").toLowerCase();
+}
+
 function ProductCategoryIconPicker({
   categoryCode,
   categoryName,
@@ -325,6 +339,7 @@ function ProductCategoryIconPicker({
   onChange: (key: ProductCategoryIconKey) => void;
   value: string | undefined;
 }): JSX.Element {
+  const [iconSearch, setIconSearch] = useState("");
   const selectedKey = getProductCategoryIconKeyFromMetadata({
     categoryCode,
     categoryName,
@@ -332,28 +347,66 @@ function ProductCategoryIconPicker({
   });
   const hasLegacyValue =
     typeof value === "string" && value.trim().length > 0 && selectedKey === null;
+  const normalizedSearch = iconSearch.trim().toLowerCase();
+  const filteredOptions = useMemo(
+    () =>
+      normalizedSearch.length === 0
+        ? productCategoryIconOptions
+        : productCategoryIconOptions.filter((option) =>
+            productCategoryIconSearchText(option).includes(normalizedSearch),
+          ),
+    [normalizedSearch],
+  );
+  const countLabel =
+    normalizedSearch.length === 0
+      ? `Icons (${String(productCategoryIconOptions.length)})`
+      : `Matching icons (${String(filteredOptions.length)})`;
 
   return (
     <div className="rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/40 p-3">
-      <div className="grid max-h-72 grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-4">
-        {productCategoryIconOptions.map((option) => {
-          const Icon = option.icon;
-          const isSelected = selectedKey === option.key;
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mocha" />
+          <Input
+            aria-label="Search category icons"
+            className="h-10 pl-9"
+            onChange={(event) => setIconSearch(event.target.value)}
+            placeholder="Search icon name or category type..."
+            value={iconSearch}
+          />
+        </div>
+        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mocha">
+          {countLabel}
+        </span>
+      </div>
+      <div className="max-h-80 overflow-y-auto overscroll-contain pr-1">
+        {filteredOptions.length > 0 ? (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+            {filteredOptions.map((option) => {
+              const Icon = option.icon;
+              const isSelected = selectedKey === option.key;
 
-          return (
-            <Button
-              aria-pressed={isSelected}
-              className="h-20 flex-col gap-2 rounded-xl text-xs"
-              key={option.key}
-              onClick={() => onChange(option.key)}
-              type="button"
-              variant={isSelected ? "default" : "outline"}
-            >
-              <Icon className="h-5 w-5" />
-              <span className="line-clamp-1">{option.label}</span>
-            </Button>
-          );
-        })}
+              return (
+                <Button
+                  aria-pressed={isSelected}
+                  className="h-20 flex-col gap-2 rounded-xl px-2 text-xs"
+                  key={option.key}
+                  onClick={() => onChange(option.key)}
+                  title={option.label}
+                  type="button"
+                  variant={isSelected ? "default" : "outline"}
+                >
+                  <Icon className="h-5 w-5 shrink-0" />
+                  <span className="line-clamp-2 leading-tight">{option.label}</span>
+                </Button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-brand-cappuccino bg-white px-4 py-8 text-center text-sm text-brand-mocha">
+            No matching icons found.
+          </div>
+        )}
       </div>
       {hasLegacyValue ? (
         <p className="mt-2 text-xs text-brand-mocha">
@@ -492,7 +545,7 @@ function ProductCategoryDialog({
               control={form.control}
               name="imageUrl"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="md:col-span-2">
                   <FormLabel>Category icon</FormLabel>
                   <FormControl>
                     <ProductCategoryIconPicker
