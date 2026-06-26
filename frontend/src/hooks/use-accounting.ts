@@ -21,6 +21,7 @@ import {
   getAccountMappings,
   getAccountTransferById,
   getAccountTransfers,
+  getAllChartAccounts,
   getBalanceSheetReport,
   getChartAccountById,
   getChartAccounts,
@@ -103,6 +104,14 @@ export function useChartAccounts(filters: ChartAccountsFilters, enabled = true) 
   return useQuery<ChartAccountsResponse>({
     queryKey: [accountingQueryKey, "chart-of-accounts", filters],
     queryFn: async () => getChartAccounts(filters),
+    enabled,
+  });
+}
+
+export function useAllChartAccounts(filters: ChartAccountsFilters, enabled = true) {
+  return useQuery<ChartAccount[]>({
+    queryKey: [accountingQueryKey, "chart-of-accounts", "all-pages", filters],
+    queryFn: async () => getAllChartAccounts(filters),
     enabled,
   });
 }

@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
-import { useChartAccounts } from "@/hooks/use-accounting";
+import { useAllChartAccounts } from "@/hooks/use-accounting";
 import { usePermission } from "@/hooks/use-permission";
 import {
   useCreatePurchaseInvoice,
@@ -140,11 +140,11 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const taxRatesQuery = usePurchasingTaxRates(canView);
   const unitsQuery = usePurchasingUnits(canView);
-  const purchaseAccountsQuery = useChartAccounts(
+  const purchaseAccountsQuery = useAllChartAccounts(
     {
       accountGroup: "",
       accountType: "all",
-      limit: 500,
+      limit: 100,
       page: 1,
       parentAccountId: "",
       search: "",
@@ -199,7 +199,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   const billedDone = Boolean(activeBill);
   const paidDone = isPaid;
   const billInitialValues = purchaseOrderToBillInitialValues(order);
-  const purchaseAccounts = [...(purchaseAccountsQuery.data?.items ?? [])];
+  const purchaseAccounts = [...(purchaseAccountsQuery.data ?? [])];
 
   const handleMarkIssued = async (): Promise<void> => {
     try {

@@ -73,6 +73,7 @@ type BackendListResponse = {
   page?: unknown;
   pagination?: unknown;
   total?: unknown;
+  total_pages?: unknown;
 };
 
 type BackendJournalEntryPayload = {
@@ -226,6 +227,7 @@ function parseChartAccountsResponse(value: unknown): ChartAccountsResponse {
       limit: value.length || 25,
       page: 1,
       total: value.length,
+      totalPages: 1,
     };
   }
 
@@ -239,12 +241,17 @@ function parseChartAccountsResponse(value: unknown): ChartAccountsResponse {
   const total = numberValue(payload.total, numberValue(pagination.total, items.length));
   const page = numberValue(payload.page, numberValue(pagination.page, 1));
   const limit = numberValue(payload.limit, numberValue(pagination.limit, items.length || 25));
+  const totalPages = numberValue(
+    payload.total_pages,
+    numberValue(pagination.total_pages, limit > 0 ? Math.ceil(total / limit) : 1),
+  );
 
   return {
     items,
     limit,
     page,
     total,
+    totalPages: Math.max(1, totalPages),
   };
 }
 
@@ -1134,6 +1141,43 @@ export async function getChartAccounts(
   );
 
   return response.data;
+}
+
+function sortChartAccounts(accounts: ChartAccount[]): ChartAccount[] {
+  return [...accounts].sort((first, second) => {
+    const codeComparison = first.accountCode.localeCompare(second.accountCode, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+
+    if (codeComparison !== 0) {
+      return codeComparison;
+    }
+
+    return first.accountName.localeCompare(second.accountName, undefined, { sensitivity: "base" });
+  });
+}
+
+export async function getAllChartAccounts(filters: ChartAccountsFilters): Promise<ChartAccount[]> {
+  const pageLimit = 100;
+  const firstPage = await getChartAccounts({ ...filters, limit: pageLimit, page: 1 });
+  const remainingPages =
+    firstPage.totalPages > 1
+      ? await Promise.all(
+          Array.from({ length: firstPage.totalPages - 1 }, async (_, index) =>
+            getChartAccounts({ ...filters, limit: pageLimit, page: index + 2 }),
+          ),
+        )
+      : [];
+  const accountsById = new Map<string, ChartAccount>();
+
+  [firstPage, ...remainingPages].forEach((page) => {
+    page.items.forEach((account) => {
+      accountsById.set(account.id, account);
+    });
+  });
+
+  return sortChartAccounts(Array.from(accountsById.values()));
 }
 
 export async function seedDefaultChartAccounts(): Promise<void> {

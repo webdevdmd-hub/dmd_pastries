@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
-import { useChartAccounts } from "@/hooks/use-accounting";
+import { useAllChartAccounts } from "@/hooks/use-accounting";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { usePermission } from "@/hooks/use-permission";
 import {
@@ -147,11 +147,11 @@ export function PurchaseOrdersPageClient(): JSX.Element {
   const productsQuery = usePurchasingProducts(canView);
   const unitsQuery = usePurchasingUnits(canView);
   const taxRatesQuery = usePurchasingTaxRates(canView);
-  const purchaseAccountsQuery = useChartAccounts(
+  const purchaseAccountsQuery = useAllChartAccounts(
     {
       accountGroup: "",
       accountType: "all",
-      limit: 500,
+      limit: 100,
       page: 1,
       parentAccountId: "",
       search: "",
@@ -337,7 +337,7 @@ export function PurchaseOrdersPageClient(): JSX.Element {
   const billInitialValues = convertingOrder
     ? purchaseOrderToBillInitialValues(convertingOrder)
     : null;
-  const purchaseAccounts = [...(purchaseAccountsQuery.data?.items ?? [])];
+  const purchaseAccounts = [...(purchaseAccountsQuery.data ?? [])];
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">

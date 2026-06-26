@@ -567,7 +567,7 @@ export function PurchasingItemLineEditor({
                           disabled={isLineLocked}
                           filterOptionsLocally
                           groupLabel={accountGroupLabel}
-                          listClassName="max-h-[28rem]"
+                          listClassName="max-h-[28rem] overscroll-contain overflow-y-auto"
                           onSearchChange={setAccountSearch}
                           onValueChange={(accountId) => {
                             const selected = accounts.find((account) => account.id === accountId);

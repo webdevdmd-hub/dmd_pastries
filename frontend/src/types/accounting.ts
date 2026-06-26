@@ -46,6 +46,7 @@ export type ChartAccountsResponse = {
   limit: number;
   page: number;
   total: number;
+  totalPages: number;
 };
 
 export type CreateChartAccountPayload = {

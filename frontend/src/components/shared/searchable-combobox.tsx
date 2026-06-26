@@ -167,14 +167,23 @@ export function SearchableCombobox({
           </Button>
         ) : null}
       </div>
-      <PopoverContent className={cn("w-[--radix-popover-trigger-width] p-0", contentClassName)}>
+      <PopoverContent
+        className={cn("w-[--radix-popover-trigger-width] p-0", contentClassName)}
+        onTouchMove={(event) => event.stopPropagation()}
+        onWheel={(event) => event.stopPropagation()}
+      >
         <Command shouldFilter={false}>
           <CommandInput
             onValueChange={updateSearch}
             placeholder={searchPlaceholder}
             value={activeSearch}
           />
-          <CommandList className={listClassName} id={`${triggerId}-listbox`}>
+          <CommandList
+            className={listClassName}
+            id={`${triggerId}-listbox`}
+            onTouchMove={(event) => event.stopPropagation()}
+            onWheel={(event) => event.stopPropagation()}
+          >
             {stateContent}
             {!stateContent ? (
               <>
