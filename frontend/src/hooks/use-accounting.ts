@@ -48,6 +48,7 @@ import {
   updatePaymentAccount,
   updatePaymentAccountStatus,
 } from "@/lib/api/accounting";
+import { invalidateAccountingSetupData } from "@/lib/query-invalidation";
 import type {
   AccountingBackfillFilters,
   AccountingBackfillPayload,
@@ -97,7 +98,7 @@ import type {
 const accountingQueryKey = "accounting";
 
 function invalidateAccounting(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([queryClient.invalidateQueries({ queryKey: [accountingQueryKey] })]);
+  return invalidateAccountingSetupData(queryClient);
 }
 
 export function useChartAccounts(filters: ChartAccountsFilters, enabled = true) {

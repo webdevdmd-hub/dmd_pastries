@@ -19,6 +19,7 @@ import {
   updatePackaging,
   updatePackagingStatus,
 } from "@/lib/api/packaging";
+import { invalidateComponentCatalogData } from "@/lib/query-invalidation";
 import type {
   CreatePackagingPayload,
   CreatePackagingUsagePayload,
@@ -121,7 +122,7 @@ export function usePackagingUsage(productId: string, enabled = true) {
 }
 
 function invalidatePackaging(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([queryClient.invalidateQueries({ queryKey: [packagingQueryKey] })]);
+  return invalidateComponentCatalogData(queryClient);
 }
 
 export function useCreatePackaging() {

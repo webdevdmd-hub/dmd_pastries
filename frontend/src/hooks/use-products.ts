@@ -21,6 +21,7 @@ import {
   updateProductVariant,
   updateProductVariantStatus,
 } from "@/lib/api/products";
+import { invalidateProductData } from "@/lib/query-invalidation";
 import type {
   CreateProductPayload,
   CreateProductVariantPayload,
@@ -90,7 +91,7 @@ export function useProductPriceSuggestions(
 }
 
 function invalidateProducts(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([queryClient.invalidateQueries({ queryKey: [productsQueryKey] })]);
+  return invalidateProductData(queryClient);
 }
 
 function invalidateVariants(
@@ -98,7 +99,7 @@ function invalidateVariants(
   productId?: string,
 ): Promise<unknown[]> {
   void productId;
-  return Promise.all([queryClient.invalidateQueries({ queryKey: [productsQueryKey] })]);
+  return invalidateProductData(queryClient);
 }
 
 export function useCreateProduct() {

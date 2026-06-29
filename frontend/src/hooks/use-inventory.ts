@@ -31,6 +31,7 @@ import {
   updateStockLocation,
   updateStockLocationStatus,
 } from "@/lib/api/inventory";
+import { invalidateInventoryData } from "@/lib/query-invalidation";
 import type {
   CreateExpiryBatchPayload,
   ExpiryAlertFilters,
@@ -58,7 +59,7 @@ import type {
 const inventoryQueryKey = "inventory";
 
 function invalidateInventory(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([queryClient.invalidateQueries({ queryKey: [inventoryQueryKey] })]);
+  return invalidateInventoryData(queryClient);
 }
 
 export function useInventory(filters: InventoryFilters, enabled = true) {

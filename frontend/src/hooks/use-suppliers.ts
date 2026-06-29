@@ -21,6 +21,7 @@ import {
   updateSupplierContact,
   updateSupplierStatus,
 } from "@/lib/api/suppliers";
+import { invalidateSupplierData } from "@/lib/query-invalidation";
 import type {
   CreateSupplierContactPayload,
   CreateSupplierNotePayload,
@@ -131,7 +132,7 @@ export function useSupplierStats(supplierId: string | null, enabled = true) {
 }
 
 function invalidateSuppliers(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([queryClient.invalidateQueries({ queryKey: [suppliersQueryKey] })]);
+  return invalidateSupplierData(queryClient);
 }
 
 export function useCreateSupplier() {

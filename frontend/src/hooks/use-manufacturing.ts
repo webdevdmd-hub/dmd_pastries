@@ -28,6 +28,7 @@ import {
   updateBatch,
   updateBatchStatus,
 } from "@/lib/api/manufacturing";
+import { invalidateManufacturingData } from "@/lib/query-invalidation";
 import type {
   BatchFilters,
   ConsumePayload,
@@ -201,11 +202,7 @@ export function useManufacturingBranches(enabled = true) {
 function invalidateManufacturing(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [manufacturingQueryKey] }),
-    queryClient.invalidateQueries({ queryKey: ["inventory"] }),
-    queryClient.invalidateQueries({ queryKey: ["stock-movements"] }),
-  ]);
+  return invalidateManufacturingData(queryClient);
 }
 
 export function useCreateBatch() {

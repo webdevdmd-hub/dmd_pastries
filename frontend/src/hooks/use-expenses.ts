@@ -10,6 +10,7 @@ import {
   getExpenses,
   updateExpense,
 } from "@/lib/api/expenses";
+import { invalidateExpenseData } from "@/lib/query-invalidation";
 import type {
   CreateExpensePayload,
   Expense,
@@ -21,10 +22,7 @@ import type {
 const expensesQueryKey = "expenses";
 
 function invalidateExpenses(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [expensesQueryKey] }),
-    queryClient.invalidateQueries({ queryKey: ["accounting"] }),
-  ]);
+  return invalidateExpenseData(queryClient);
 }
 
 export function useExpenses(filters: ExpensesFilters, enabled = true) {

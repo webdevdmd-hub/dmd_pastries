@@ -17,7 +17,7 @@ export function QueryProvider({ children }: QueryProviderProps): JSX.Element {
           queries: {
             retry: 1,
             refetchOnWindowFocus: false,
-            staleTime: 30_000,
+            staleTime: 0,
           },
         },
       }),

@@ -18,6 +18,7 @@ import {
   getSalePayments,
   refundPayment,
 } from "@/lib/api/payments";
+import { invalidatePosTransactionData } from "@/lib/query-invalidation";
 import type {
   AddPaymentPayload,
   CreateReconciliationPayload,
@@ -159,7 +160,7 @@ export function usePaymentMethods(enabled = true) {
 }
 
 function invalidatePaymentData(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([queryClient.invalidateQueries({ queryKey: [paymentsQueryKey] })]);
+  return invalidatePosTransactionData(queryClient);
 }
 
 export function useAddPaymentToSale() {

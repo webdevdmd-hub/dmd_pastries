@@ -14,6 +14,7 @@ import {
   reverseSalesReturn,
   updateSalesReturn,
 } from "@/lib/api/sales-returns";
+import { invalidatePosTransactionData } from "@/lib/query-invalidation";
 import type {
   CreateSalesReturnPayload,
   ReturnableSaleItem,
@@ -27,10 +28,7 @@ const salesReturnsQueryKey = "sales-returns";
 function invalidateSalesReturnData(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [salesReturnsQueryKey] }),
-    queryClient.invalidateQueries({ queryKey: ["payments"] }),
-  ]);
+  return invalidatePosTransactionData(queryClient);
 }
 
 export function useSalesReturns(filters: SalesReturnFilters, enabled = true) {
@@ -156,10 +154,6 @@ export function useReverseSalesReturn() {
     mutationFn: async ({ id, payload }) => reverseSalesReturn(id, payload),
     onSuccess: async () => {
       await invalidateSalesReturnData(queryClient);
-      await queryClient.invalidateQueries({ queryKey: ["refunds"] });
-      await queryClient.invalidateQueries({ queryKey: ["inventory"] });
-      await queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
-      await queryClient.invalidateQueries({ queryKey: ["accounting"] });
     },
   });
 }

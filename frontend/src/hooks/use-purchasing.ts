@@ -54,6 +54,7 @@ import {
   updatePurchaseReturn,
   updateSupplierPayment,
 } from "@/lib/api/purchasing";
+import { invalidatePurchasingData, invalidateReceiveStockData } from "@/lib/query-invalidation";
 import type {
   AddSupplierPaymentPayload,
   CancelPurchaseInvoicePayload,
@@ -360,7 +361,13 @@ export function usePurchasingBranches(enabled = true) {
 }
 
 function invalidatePurchasing(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([queryClient.invalidateQueries({ queryKey: [purchasingQueryKey] })]);
+  return invalidatePurchasingData(queryClient);
+}
+
+function invalidatePurchaseStockImpact(
+  queryClient: ReturnType<typeof useQueryClient>,
+): Promise<unknown[]> {
+  return invalidateReceiveStockData(queryClient);
 }
 
 export function useCreatePurchaseOrder() {
@@ -396,9 +403,6 @@ export function useCreatePurchaseOrderRevision() {
     mutationFn: async ({ id, payload }) => createPurchaseOrderRevision(id, payload),
     onSuccess: async () => {
       await invalidatePurchasing(queryClient);
-      await queryClient.invalidateQueries({ queryKey: ["inventory"] });
-      await queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
-      await queryClient.invalidateQueries({ queryKey: ["accounting"] });
     },
   });
 }
@@ -524,9 +528,6 @@ export function useCancelPurchaseInvoice() {
       mutationFn: async ({ id, payload }) => cancelPurchaseInvoice(id, payload),
       onSuccess: async () => {
         await invalidatePurchasing(queryClient);
-        await queryClient.invalidateQueries({ queryKey: ["inventory"] });
-        await queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
-        await queryClient.invalidateQueries({ queryKey: ["accounting"] });
       },
     },
   );
@@ -569,7 +570,6 @@ export function useCreateSupplierPayment() {
     mutationFn: async (payload) => createSupplierPayment(payload),
     onSuccess: async () => {
       await invalidatePurchasing(queryClient);
-      await queryClient.invalidateQueries({ queryKey: ["accounting"] });
     },
   });
 }
@@ -585,7 +585,6 @@ export function useUpdateSupplierPayment() {
     mutationFn: async ({ paymentId, payload }) => updateSupplierPayment(paymentId, payload),
     onSuccess: async () => {
       await invalidatePurchasing(queryClient);
-      await queryClient.invalidateQueries({ queryKey: ["accounting"] });
     },
   });
 }
@@ -597,7 +596,6 @@ export function useDeleteSupplierPayment() {
     mutationFn: async (paymentId) => deleteSupplierPayment(paymentId),
     onSuccess: async () => {
       await invalidatePurchasing(queryClient);
-      await queryClient.invalidateQueries({ queryKey: ["accounting"] });
     },
   });
 }
@@ -608,9 +606,7 @@ export function useReceivePurchase() {
   return useMutation<PurchaseReceipt, Error, ReceivePurchasePayload>({
     mutationFn: async (payload) => receivePurchase(payload),
     onSuccess: async () => {
-      await invalidatePurchasing(queryClient);
-      await queryClient.invalidateQueries({ queryKey: ["inventory"] });
-      await queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+      await invalidatePurchaseStockImpact(queryClient);
     },
   });
 }
@@ -621,9 +617,7 @@ export function useReceivePurchaseOrder() {
   return useMutation<PurchaseReceipt, Error, { id: string; payload: ReceivePurchaseOrderPayload }>({
     mutationFn: async ({ id, payload }) => receivePurchaseOrder(id, payload),
     onSuccess: async () => {
-      await invalidatePurchasing(queryClient);
-      await queryClient.invalidateQueries({ queryKey: ["inventory"] });
-      await queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+      await invalidatePurchaseStockImpact(queryClient);
     },
   });
 }
@@ -634,9 +628,7 @@ export function usePostPurchaseReceipt() {
   return useMutation<PurchaseReceipt, Error, string>({
     mutationFn: async (id) => postPurchaseReceipt(id),
     onSuccess: async () => {
-      await invalidatePurchasing(queryClient);
-      await queryClient.invalidateQueries({ queryKey: ["inventory"] });
-      await queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+      await invalidatePurchaseStockImpact(queryClient);
     },
   });
 }
@@ -680,10 +672,7 @@ export function usePostPurchaseReturn() {
   return useMutation<PurchaseReturn, Error, string>({
     mutationFn: async (id) => postPurchaseReturn(id),
     onSuccess: async () => {
-      await invalidatePurchasing(queryClient);
-      await queryClient.invalidateQueries({ queryKey: ["inventory"] });
-      await queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
-      await queryClient.invalidateQueries({ queryKey: ["accounting"] });
+      await invalidatePurchaseStockImpact(queryClient);
     },
   });
 }
@@ -712,10 +701,7 @@ export function useReversePurchaseReturn() {
   >({
     mutationFn: async ({ id, payload }) => reversePurchaseReturn(id, payload),
     onSuccess: async () => {
-      await invalidatePurchasing(queryClient);
-      await queryClient.invalidateQueries({ queryKey: ["inventory"] });
-      await queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
-      await queryClient.invalidateQueries({ queryKey: ["accounting"] });
+      await invalidatePurchaseStockImpact(queryClient);
     },
   });
 }

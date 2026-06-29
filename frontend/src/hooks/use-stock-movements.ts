@@ -12,6 +12,7 @@ import {
   getStockMovementSummary,
   reverseStockMovement,
 } from "@/lib/api/stock-movements";
+import { invalidateInventoryData } from "@/lib/query-invalidation";
 import type {
   AuditResult,
   ManualMovementPayload,
@@ -23,15 +24,11 @@ import type {
 } from "@/types/stock-movements";
 
 const stockMovementsQueryKey = "stock-movements";
-const inventoryQueryKey = "inventory";
 
 function invalidateStockMovements(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [stockMovementsQueryKey] }),
-    queryClient.invalidateQueries({ queryKey: [inventoryQueryKey] }),
-  ]);
+  return invalidateInventoryData(queryClient);
 }
 
 export function useStockMovements(filters: StockMovementFilters, enabled = true) {

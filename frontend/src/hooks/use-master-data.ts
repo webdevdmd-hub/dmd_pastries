@@ -34,6 +34,7 @@ import {
   updateUnit,
   updateUnitStatus,
 } from "@/lib/api/master-data";
+import { invalidateMasterDataMutation } from "@/lib/query-invalidation";
 import type {
   CopyCategoriesPayload,
   CopyCategoriesResult,
@@ -99,10 +100,7 @@ export function useUnit(id: string | null, enabled = true) {
 }
 
 function invalidateUnits(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [masterDataQueryKey, "overview"] }),
-    queryClient.invalidateQueries({ queryKey: [masterDataQueryKey, "units"] }),
-  ]);
+  return invalidateMasterDataMutation(queryClient);
 }
 
 export function useCreateUnit() {
@@ -203,10 +201,7 @@ export function useProductCategory(id: string | null, enabled = true) {
 function invalidateProductCategories(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [masterDataQueryKey, "overview"] }),
-    queryClient.invalidateQueries({ queryKey: [masterDataQueryKey] }),
-  ]);
+  return invalidateMasterDataMutation(queryClient);
 }
 
 export function useCreateProductCategory() {
@@ -273,10 +268,7 @@ export function useCopyCategories() {
   return useMutation<CopyCategoriesResult, Error, CopyCategoriesPayload>({
     mutationFn: async (payload) => copyCategories(payload),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: [masterDataQueryKey, "overview"] }),
-        queryClient.invalidateQueries({ queryKey: [masterDataQueryKey] }),
-      ]);
+      await invalidateMasterDataMutation(queryClient);
     },
   });
 }
@@ -319,10 +311,7 @@ function invalidateSimpleCategories(
   collection: ManageableSimpleCategoryCollection,
 ): Promise<unknown[]> {
   void collection;
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [masterDataQueryKey, "overview"] }),
-    queryClient.invalidateQueries({ queryKey: [masterDataQueryKey] }),
-  ]);
+  return invalidateMasterDataMutation(queryClient);
 }
 
 export function useCreateSimpleCategory(collection: ManageableSimpleCategoryCollection) {
@@ -394,10 +383,7 @@ export function useOrderStatuses(enabled = true) {
 function invalidateOrderStatuses(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [masterDataQueryKey, "overview"] }),
-    queryClient.invalidateQueries({ queryKey: [masterDataQueryKey, "order-statuses"] }),
-  ]);
+  return invalidateMasterDataMutation(queryClient);
 }
 
 export function useCreateOrderStatus() {
@@ -458,10 +444,7 @@ export function usePaymentStatuses(enabled = true) {
 function invalidatePaymentStatuses(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [masterDataQueryKey, "overview"] }),
-    queryClient.invalidateQueries({ queryKey: [masterDataQueryKey, "payment-statuses"] }),
-  ]);
+  return invalidateMasterDataMutation(queryClient);
 }
 
 export function useCreatePaymentStatus() {

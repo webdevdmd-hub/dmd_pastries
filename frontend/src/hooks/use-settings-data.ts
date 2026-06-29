@@ -33,6 +33,10 @@ import {
   updateTaxRate,
   updateTaxRateStatus,
 } from "@/lib/api/settings-data";
+import {
+  invalidateAccountingSetupData,
+  invalidateMasterDataMutation,
+} from "@/lib/query-invalidation";
 import type {
   CompanySettings,
   CreatePaymentMethodPayload,
@@ -66,10 +70,7 @@ export function useUpdateCompanySettings() {
   return useMutation<CompanySettings, Error, UpdateCompanySettingsPayload>({
     mutationFn: async (payload) => updateCompanySettings(payload),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: [settingsDataQueryKey, "company"] }),
-        queryClient.invalidateQueries({ queryKey: [settingsDataQueryKey, "overview"] }),
-      ]);
+      await invalidateAccountingSetupData(queryClient);
     },
   });
 }
@@ -105,10 +106,7 @@ export function useTaxRate(id: string | null, enabled = true) {
 }
 
 function invalidateTaxRates(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [settingsDataQueryKey, "overview"] }),
-    queryClient.invalidateQueries({ queryKey: [settingsDataQueryKey, "tax-rates"] }),
-  ]);
+  return invalidateMasterDataMutation(queryClient);
 }
 
 export function useCreateTaxRate() {
@@ -196,10 +194,7 @@ export function usePaymentMethod(id: string | null, enabled = true) {
 function invalidatePaymentMethods(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [settingsDataQueryKey, "overview"] }),
-    queryClient.invalidateQueries({ queryKey: [settingsDataQueryKey, "payment-methods"] }),
-  ]);
+  return invalidateAccountingSetupData(queryClient);
 }
 
 export function useCreatePaymentMethod() {
@@ -271,10 +266,7 @@ export function useDeletePaymentMethod() {
 function invalidateSalesChannels(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [settingsDataQueryKey, "overview"] }),
-    queryClient.invalidateQueries({ queryKey: [settingsDataQueryKey, "sales-channels"] }),
-  ]);
+  return invalidateAccountingSetupData(queryClient);
 }
 
 export function useSalesChannels(enabled = true) {
@@ -383,10 +375,7 @@ export function useDeleteSalesChannel() {
 function invalidateReceiptLayouts(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [settingsDataQueryKey, "overview"] }),
-    queryClient.invalidateQueries({ queryKey: [settingsDataQueryKey, "receipt-layouts"] }),
-  ]);
+  return invalidateAccountingSetupData(queryClient);
 }
 
 export function useReceiptLayouts(enabled = true) {

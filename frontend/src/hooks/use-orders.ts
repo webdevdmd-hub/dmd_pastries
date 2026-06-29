@@ -24,6 +24,7 @@ import {
   updateOrderProductionStatus,
   updateOrderStatus,
 } from "@/lib/api/orders";
+import { invalidateOrderData } from "@/lib/query-invalidation";
 import type {
   AddOrderPackagingPayload,
   AddOrderPaymentPayload,
@@ -116,11 +117,7 @@ export function useOrderPackaging(orderId: string | null, enabled = true) {
 }
 
 function invalidateOrders(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [ordersQueryKey] }),
-    queryClient.invalidateQueries({ queryKey: ["products"] }),
-    queryClient.invalidateQueries({ queryKey: ["pos"] }),
-  ]);
+  return invalidateOrderData(queryClient);
 }
 
 export function useCreateOrder() {

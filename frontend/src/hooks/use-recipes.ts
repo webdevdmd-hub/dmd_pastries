@@ -29,6 +29,7 @@ import {
   updateRecipePackaging,
   updateRecipeStatus,
 } from "@/lib/api/recipes";
+import { invalidateRecipeData } from "@/lib/query-invalidation";
 import type {
   CreateRecipePayload,
   CreateRecipeVersionPayload,
@@ -193,7 +194,7 @@ export function useRecipeReferenceData(enabled = true) {
 }
 
 function invalidateRecipeList(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([queryClient.invalidateQueries({ queryKey: [recipeQueryKey] })]);
+  return invalidateRecipeData(queryClient);
 }
 
 function invalidateRecipeDetail(
@@ -201,7 +202,7 @@ function invalidateRecipeDetail(
   id: string,
 ): Promise<unknown[]> {
   void id;
-  return Promise.all([queryClient.invalidateQueries({ queryKey: [recipeQueryKey] })]);
+  return invalidateRecipeData(queryClient);
 }
 
 export function useCreateRecipe() {

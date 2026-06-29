@@ -25,6 +25,7 @@ import {
   updateCustomerStatus,
   updateCustomerTag,
 } from "@/lib/api/customers";
+import { invalidateCustomerData } from "@/lib/query-invalidation";
 import type {
   AssignCustomerTagPayload,
   CreateCustomerNotePayload,
@@ -147,7 +148,7 @@ export function useCustomerStats(customerId: string | null, enabled = true) {
 }
 
 function invalidateCustomers(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([queryClient.invalidateQueries({ queryKey: [customersQueryKey] })]);
+  return invalidateCustomerData(queryClient);
 }
 
 export function useCreateCustomer() {

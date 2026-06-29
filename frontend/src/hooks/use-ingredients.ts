@@ -16,6 +16,7 @@ import {
   updateIngredient,
   updateIngredientStatus,
 } from "@/lib/api/ingredients";
+import { invalidateComponentCatalogData } from "@/lib/query-invalidation";
 import type {
   CreateIngredientPayload,
   Ingredient,
@@ -103,11 +104,7 @@ export function useIngredientUnits(enabled = true) {
 }
 
 function invalidateIngredients(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [ingredientsQueryKey] }),
-    queryClient.invalidateQueries({ queryKey: ["inventory"] }),
-    queryClient.invalidateQueries({ queryKey: ["recipes"] }),
-  ]);
+  return invalidateComponentCatalogData(queryClient);
 }
 
 export function useCreateIngredient() {

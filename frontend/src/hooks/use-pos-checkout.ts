@@ -11,6 +11,11 @@ import {
   holdSalePOS,
   resumeHeldSale,
 } from "@/lib/api/pos";
+import {
+  invalidatePosTransactionData,
+  invalidateRoot,
+  QUERY_ROOTS,
+} from "@/lib/query-invalidation";
 import type {
   CheckoutPayload,
   CheckoutResponse,
@@ -20,8 +25,13 @@ import type {
 } from "@/types/pos";
 
 export function usePOSCheckout() {
+  const queryClient = useQueryClient();
+
   return useMutation<CheckoutResponse, Error, CheckoutPayload>({
     mutationFn: async (payload) => checkoutPOS(payload),
+    onSuccess: async () => {
+      await invalidatePosTransactionData(queryClient);
+    },
   });
 }
 
@@ -57,7 +67,7 @@ export function useHoldSale() {
   return useMutation<HeldSale, Error, HoldSalePayload>({
     mutationFn: holdSalePOS,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["pos"] });
+      await invalidateRoot(queryClient, QUERY_ROOTS.pos);
     },
   });
 }
@@ -68,7 +78,7 @@ export function useResumeHeldSale() {
   return useMutation<HeldSaleResumeData, Error, string>({
     mutationFn: resumeHeldSale,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["pos"] });
+      await invalidateRoot(queryClient, QUERY_ROOTS.pos);
     },
   });
 }
@@ -79,7 +89,7 @@ export function useCancelHeldSale() {
   return useMutation<HeldSale, Error, string>({
     mutationFn: cancelHeldSale,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["pos"] });
+      await invalidateRoot(queryClient, QUERY_ROOTS.pos);
     },
   });
 }
