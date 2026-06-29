@@ -65,6 +65,21 @@ type AccountingSettingsResponse struct {
 	UpdatedAt                time.Time `json:"updated_at"`
 }
 
+type PurchasingPostingIntegrityIssue struct {
+	CheckKey string                 `json:"check_key"`
+	Severity string                 `json:"severity"`
+	Message  string                 `json:"message"`
+	Count    int64                  `json:"count"`
+	Details  map[string]interface{} `json:"details,omitempty"`
+}
+
+type PurchasingPostingIntegrityResponse struct {
+	Healthy   bool                              `json:"healthy"`
+	Policy    string                            `json:"policy"`
+	Issues    []PurchasingPostingIntegrityIssue `json:"issues"`
+	CheckedAt time.Time                         `json:"checked_at"`
+}
+
 type UpdateAccountingSettingsRequest struct {
 	FinancialYearStartMonth *int `json:"financial_year_start_month"`
 	FinancialYearStartDay   *int `json:"financial_year_start_day"`

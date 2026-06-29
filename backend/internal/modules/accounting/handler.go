@@ -410,6 +410,15 @@ func (h *Handler) GetReconciliationHealth(c *gin.Context) {
 	response.Success(c, 200, "accounting reconciliation health fetched successfully", result)
 }
 
+func (h *Handler) GetPurchasingPostingIntegrity(c *gin.Context) {
+	result, err := h.service.GetPurchasingPostingIntegrity(utils.MustAuthContext(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "purchasing posting integrity fetched successfully", result)
+}
+
 func (h *Handler) GetInventoryReconciliation(c *gin.Context) {
 	result, err := h.service.GetInventoryReconciliation(utils.MustAuthContext(c), parseReconciliationQuery(c), c.ClientIP(), c.Request.UserAgent())
 	if err != nil {

@@ -50,6 +50,7 @@ func RegisterRoutes(
 	group.GET("/reports/balance-sheet", view, handler.GetBalanceSheet)
 
 	group.GET("/reconciliation/health-check", view, handler.GetReconciliationHealth)
+	group.GET("/reconciliation/purchasing-posting", view, handler.GetPurchasingPostingIntegrity)
 	group.GET("/reconciliation/inventory", view, handler.GetInventoryReconciliation)
 	group.GET("/reconciliation/ap", view, handler.GetAPReconciliation)
 	group.GET("/reconciliation/ar", view, handler.GetARReconciliation)

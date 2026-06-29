@@ -324,7 +324,7 @@ export function PurchaseReceiveDialog({
           <DialogTitle>Receive stock</DialogTitle>
           <DialogDescription>
             Confirm supplier stock-in. Stock is received into the branch default location unless an
-            advanced workflow overrides it.
+            advanced workflow overrides it. No accounting journal is posted from this stock receipt.
           </DialogDescription>
         </DialogHeader>
 

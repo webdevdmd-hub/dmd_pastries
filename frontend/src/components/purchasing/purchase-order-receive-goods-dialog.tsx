@@ -224,7 +224,7 @@ export function PurchaseOrderReceiveGoodsDialog({
           <DialogDescription>
             Receive supplier goods against {order?.purchaseOrderNumber ?? "this purchase order"}.
             Stock is received into the branch default location unless an advanced workflow overrides
-            it.
+            it. No accounting journal is posted from this receive-goods record.
           </DialogDescription>
         </DialogHeader>
 

@@ -430,6 +430,72 @@ func (r *Repository) ListAccountMappings(businessID string) ([]AccountMappingRes
 	return rows, err
 }
 
+func (r *Repository) CountUnreversedPurchaseReceiptGRNIJournals(businessID string) (int64, error) {
+	var count int64
+	err := r.db.Table("journal_entries je").
+		Where("je.business_id = ? AND je.source_type = ? AND je.status = ? AND je.deleted_at IS NULL", businessID, "purchase_receipt_grni", "posted").
+		Where(`NOT EXISTS (
+			SELECT 1
+			FROM journal_entries rev
+			WHERE rev.business_id = je.business_id
+			  AND rev.reversed_entry_id = je.id
+			  AND rev.deleted_at IS NULL
+		)`).
+		Count(&count).Error
+	return count, err
+}
+
+func (r *Repository) CountPurchaseReceiptMovementsWithAccountingJournal(businessID string) (int64, error) {
+	var count int64
+	err := r.db.Table("stock_movements sm").
+		Where("sm.business_id = ? AND sm.reference_type = ? AND sm.movement_type = ? AND sm.accounting_journal_entry_id IS NOT NULL", businessID, "purchase_receipt", "purchase_in").
+		Count(&count).Error
+	return count, err
+}
+
+func (r *Repository) CountPostedReceiptItemsMissingStockMovement(businessID string) (int64, error) {
+	var count int64
+	err := r.db.Table("purchase_receipt_items pri").
+		Joins("JOIN purchase_receipts pr ON pr.id = pri.purchase_receipt_id AND pr.business_id = pri.business_id").
+		Where("pri.business_id = ? AND pr.status = ? AND pr.deleted_at IS NULL AND pri.deleted_at IS NULL AND pri.stock_movement_id IS NULL", businessID, "posted").
+		Count(&count).Error
+	return count, err
+}
+
+func (r *Repository) CountDuplicateLinkedReceiptStockMovements(businessID string) (int64, error) {
+	var count int64
+	err := r.db.Table(`(
+		SELECT pri.stock_movement_id
+		FROM purchase_receipt_items pri
+		JOIN purchase_receipts pr ON pr.id = pri.purchase_receipt_id AND pr.business_id = pri.business_id
+		WHERE pri.business_id = ?
+		  AND pr.status = 'posted'
+		  AND pr.deleted_at IS NULL
+		  AND pri.deleted_at IS NULL
+		  AND pri.stock_movement_id IS NOT NULL
+		GROUP BY pri.stock_movement_id
+		HAVING COUNT(*) > 1
+	) duplicate_receipt_movements`, businessID).
+		Count(&count).Error
+	return count, err
+}
+
+func (r *Repository) CountDuplicateActiveReceiptsForInvoice(businessID string) (int64, error) {
+	var count int64
+	err := r.db.Table(`(
+		SELECT purchase_invoice_id
+		FROM purchase_receipts
+		WHERE business_id = ?
+		  AND purchase_invoice_id IS NOT NULL
+		  AND status <> 'cancelled'
+		  AND deleted_at IS NULL
+		GROUP BY purchase_invoice_id
+		HAVING COUNT(*) > 1
+	) duplicate_invoice_receipts`, businessID).
+		Count(&count).Error
+	return count, err
+}
+
 func (r *Repository) FindAccountMapping(tx *gorm.DB, businessID, mappingKey string) (*AccountMapping, error) {
 	var mapping AccountMapping
 	err := tx.Where("business_id = ? AND mapping_key = ? AND deleted_at IS NULL", businessID, mappingKey).First(&mapping).Error

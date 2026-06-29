@@ -246,7 +246,7 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
             </DialogTitle>
             <DialogDescription>
               {pendingAction?.type === "post"
-                ? "Posting confirms received goods and updates inventory."
+                ? "Posting confirms received goods and updates inventory. No accounting journal is posted from receive goods."
                 : "Cancelling posted receive goods may create reversal stock movements."}
             </DialogDescription>
           </DialogHeader>

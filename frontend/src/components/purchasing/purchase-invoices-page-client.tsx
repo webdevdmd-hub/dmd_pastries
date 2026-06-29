@@ -391,7 +391,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
             </DialogTitle>
             <DialogDescription>
               {pendingAction?.type === "post"
-                ? "Posting confirms the supplier bill and payable total."
+                ? "Posting confirms the supplier bill, creates the supplier payable, and posts the purchase accounting journal."
                 : "Cancelling this posted bill will reverse supplier payable, VAT, and inventory if the stock is still available. This action keeps an audit trail and cannot be undone."}
             </DialogDescription>
           </DialogHeader>

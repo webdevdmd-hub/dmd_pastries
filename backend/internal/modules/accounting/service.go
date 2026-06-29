@@ -2177,6 +2177,69 @@ func (s *Service) GetBackfillReadiness(currentUser *utils.AuthContext, query Bac
 	}, nil
 }
 
+func (s *Service) GetPurchasingPostingIntegrity(currentUser *utils.AuthContext, ipAddress, userAgent string) (*PurchasingPostingIntegrityResponse, error) {
+	issues := make([]PurchasingPostingIntegrityIssue, 0)
+	checks := []struct {
+		key     string
+		message string
+		count   func(string) (int64, error)
+		details map[string]interface{}
+	}{
+		{
+			key:     "legacy_purchase_receipt_grni_unreversed",
+			message: "Legacy purchase receipt GRNI journals are still posted. Run the bill-only GRNI reversal migration or repair before trusting liability reports.",
+			count:   s.repo.CountUnreversedPurchaseReceiptGRNIJournals,
+			details: map[string]interface{}{"expected_fix": "migration_000077_bill_only_purchase_receipt_grni_reversal"},
+		},
+		{
+			key:     "purchase_receipt_stock_movement_has_accounting_journal",
+			message: "Purchase receipt stock movements still have accounting journal links. GRN should update stock only under bill-only purchasing accounting.",
+			count:   s.repo.CountPurchaseReceiptMovementsWithAccountingJournal,
+		},
+		{
+			key:     "posted_receipt_item_missing_stock_movement",
+			message: "Posted receipt items without stock movement links were found. Stock quantity may not match received goods history.",
+			count:   s.repo.CountPostedReceiptItemsMissingStockMovement,
+		},
+		{
+			key:     "duplicate_receipt_item_stock_movement_link",
+			message: "Multiple posted receipt items are linked to the same stock movement. Receipt stock history should be one movement per posted receipt item.",
+			count:   s.repo.CountDuplicateLinkedReceiptStockMovements,
+		},
+		{
+			key:     "duplicate_active_receipts_for_purchase_bill",
+			message: "A purchase bill has more than one active stock receipt. This can duplicate received stock for the same bill.",
+			count:   s.repo.CountDuplicateActiveReceiptsForInvoice,
+		},
+	}
+
+	for _, check := range checks {
+		count, err := check.count(currentUser.BusinessID)
+		if err != nil {
+			return nil, apperrors.Internal("failed to check purchasing posting integrity")
+		}
+		if count == 0 {
+			continue
+		}
+		issue := PurchasingPostingIntegrityIssue{
+			CheckKey: check.key,
+			Severity: "error",
+			Message:  check.message,
+			Count:    count,
+			Details:  check.details,
+		}
+		issues = append(issues, issue)
+	}
+
+	_ = s.writeReportAudit(currentUser, "accounting.purchasing_posting_integrity_viewed", "purchasing_posting_integrity", nil, ipAddress, userAgent)
+	return &PurchasingPostingIntegrityResponse{
+		Healthy:   len(issues) == 0,
+		Policy:    "bill_only_purchasing_accounting",
+		Issues:    issues,
+		CheckedAt: time.Now().UTC(),
+	}, nil
+}
+
 func (s *Service) backfillOneJournal(currentUser *utils.AuthContext, target, id string) (bool, error) {
 	var journalID string
 	err := s.withTransaction(func(tx *gorm.DB) error {
