@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,7 @@ import type {
   ProductVariant,
   UpdateProductVariantPayload,
 } from "@/types/product";
+import { COST_UPDATE_POLICY_LABELS, PRICING_TYPE_LABELS } from "@/types/product";
 
 type ProductVariantFormDialogProps = {
   onClose: () => void;
@@ -53,6 +55,12 @@ function toDefaultValues(variant: ProductVariant | null): ProductVariantSchema {
     barcode: variant?.barcode ?? "",
     salePrice: variant?.salePrice ?? 0,
     costPrice: variant?.costPrice ?? null,
+    costUpdatePolicy: variant?.costUpdatePolicy ?? "manual",
+    pricingType: variant?.pricingType ?? "markup",
+    pricingPercent: variant?.pricingPercent ?? 0,
+    minimumSalePrice: variant?.minimumSalePrice ?? null,
+    autoPriceUpdateEnabled: variant?.autoPriceUpdateEnabled ?? false,
+    salePriceLocked: variant?.salePriceLocked ?? false,
     imageFileId: variant?.imageFileId ?? "",
     sortOrder: variant?.sortOrder ?? 0,
     status: variant?.status ?? "active",
@@ -73,6 +81,10 @@ export function ProductVariantFormDialog({
     resolver: zodResolver(productVariantSchema),
     defaultValues: toDefaultValues(variant),
   });
+  const watchedCostPrice = form.watch("costPrice");
+  const watchedMinimumSalePrice = form.watch("minimumSalePrice") ?? null;
+  const watchedPricingPercent = form.watch("pricingPercent");
+  const watchedPricingType = form.watch("pricingType");
 
   useEffect(() => {
     form.reset(toDefaultValues(variant));
@@ -94,6 +106,21 @@ export function ProductVariantFormDialog({
 
     return () => URL.revokeObjectURL(previewUrl);
   }, [previewUrl, selectedImage]);
+
+  const liveSuggestedPrice = useMemo(() => {
+    const cost = watchedCostPrice ?? 0;
+    const percent = watchedPricingPercent;
+    let price = cost;
+    if (watchedPricingType === "margin") {
+      price = percent >= 100 ? 0 : cost / (1 - percent / 100);
+    } else {
+      price = cost * (1 + percent / 100);
+    }
+    if (watchedMinimumSalePrice !== null && price < watchedMinimumSalePrice) {
+      price = watchedMinimumSalePrice;
+    }
+    return Math.round(price * 100) / 100;
+  }, [watchedCostPrice, watchedMinimumSalePrice, watchedPricingPercent, watchedPricingType]);
 
   const onSubmit = async (values: ProductVariantSchema): Promise<void> => {
     let imageFileId = values.imageFileId?.trim() ? values.imageFileId : null;
@@ -117,6 +144,12 @@ export function ProductVariantFormDialog({
       barcode: values.barcode?.trim() ? values.barcode : null,
       salePrice: values.salePrice,
       costPrice: values.costPrice ?? null,
+      costUpdatePolicy: values.costUpdatePolicy,
+      pricingType: values.pricingType,
+      pricingPercent: values.pricingPercent,
+      minimumSalePrice: values.minimumSalePrice ?? null,
+      autoPriceUpdateEnabled: values.autoPriceUpdateEnabled,
+      salePriceLocked: values.salePriceLocked,
       imageUrl: null,
       imageFileId,
       sortOrder: values.sortOrder,
@@ -170,6 +203,87 @@ export function ProductVariantFormDialog({
                 <Label htmlFor="costPrice">Cost price</Label>
                 <Input id="costPrice" type="number" {...form.register("costPrice")} />
                 <FieldError message={form.formState.errors.costPrice?.message} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label>Cost update policy</Label>
+                <Select
+                  onValueChange={(value) =>
+                    form.setValue(
+                      "costUpdatePolicy",
+                      value as ProductVariantSchema["costUpdatePolicy"],
+                    )
+                  }
+                  value={form.watch("costUpdatePolicy")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(COST_UPDATE_POLICY_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label>Pricing type</Label>
+                <Select
+                  onValueChange={(value) =>
+                    form.setValue("pricingType", value as ProductVariantSchema["pricingType"])
+                  }
+                  value={form.watch("pricingType")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(PRICING_TYPE_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="pricingPercent">Pricing percent</Label>
+                <Input id="pricingPercent" type="number" {...form.register("pricingPercent")} />
+                <FieldError message={form.formState.errors.pricingPercent?.message} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="minimumSalePrice">Minimum sale price</Label>
+                <Input id="minimumSalePrice" type="number" {...form.register("minimumSalePrice")} />
+                <FieldError message={form.formState.errors.minimumSalePrice?.message} />
+              </div>
+              <div className="rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/50 p-3 md:col-span-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha">
+                  Suggested selling price
+                </p>
+                <p className="mt-1 text-lg font-semibold text-brand-espresso">
+                  AED {liveSuggestedPrice.toFixed(2)}
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 rounded-xl bg-white/70 p-2 text-sm text-brand-espresso">
+                    <Checkbox
+                      checked={form.watch("autoPriceUpdateEnabled")}
+                      onCheckedChange={(checked) =>
+                        form.setValue("autoPriceUpdateEnabled", checked === true)
+                      }
+                    />
+                    Auto-update POS price
+                  </label>
+                  <label className="flex items-center gap-2 rounded-xl bg-white/70 p-2 text-sm text-brand-espresso">
+                    <Checkbox
+                      checked={form.watch("salePriceLocked")}
+                      onCheckedChange={(checked) =>
+                        form.setValue("salePriceLocked", checked === true)
+                      }
+                    />
+                    Lock sale price
+                  </label>
+                </div>
               </div>
               <div className="flex flex-col gap-1">
                 <Label htmlFor="sku">SKU</Label>

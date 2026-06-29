@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -261,7 +262,7 @@ func (r *Repository) LoadProductResponse(businessID string, product Product) (Pr
 
 	var variants []ProductVariantInfo
 	if err := r.db.Table("product_variants").
-		Select("id, variant_name, sku, barcode, sale_price, cost_price, image_file_id, sort_order, status").
+		Select("id, variant_name, sku, barcode, sale_price, cost_price, cost_update_policy, pricing_type, pricing_percent, minimum_sale_price, suggested_sale_price, auto_price_update_enabled, sale_price_locked, last_purchase_cost, last_purchase_date, last_production_cost, last_production_date, average_inventory_cost, image_file_id, sort_order, status").
 		Where("product_id = ? AND business_id = ? AND deleted_at IS NULL", product.ID, businessID).
 		Order("sort_order ASC, variant_name ASC").
 		Scan(&variants).Error; err != nil {
@@ -273,19 +274,31 @@ func (r *Repository) LoadProductResponse(businessID string, product Product) (Pr
 
 func (r *Repository) FindVariantLookup(businessID, branchID, field, value string) (*ProductVariantInfo, string, error) {
 	var row struct {
-		ID          string
-		ProductID   string
-		VariantName string
-		SKU         string
-		Barcode     string
-		SalePrice   float64
-		CostPrice   *float64
-		ImageFileID string
-		SortOrder   int
-		Status      string
+		ID                     string
+		ProductID              string
+		VariantName            string
+		SKU                    string
+		Barcode                string
+		SalePrice              float64
+		CostPrice              *float64
+		CostUpdatePolicy       string
+		PricingType            string
+		PricingPercent         float64
+		MinimumSalePrice       *float64
+		SuggestedSalePrice     *float64
+		AutoPriceUpdateEnabled bool
+		SalePriceLocked        bool
+		LastPurchaseCost       *float64
+		LastPurchaseDate       *time.Time
+		LastProductionCost     *float64
+		LastProductionDate     *time.Time
+		AverageInventoryCost   *float64
+		ImageFileID            string
+		SortOrder              int
+		Status                 string
 	}
 	if err := r.db.Table("product_variants").
-		Select("id, product_id, variant_name, sku, barcode, sale_price, cost_price, image_file_id, sort_order, status").
+		Select("id, product_id, variant_name, sku, barcode, sale_price, cost_price, cost_update_policy, pricing_type, pricing_percent, minimum_sale_price, suggested_sale_price, auto_price_update_enabled, sale_price_locked, last_purchase_cost, last_purchase_date, last_production_cost, last_production_date, average_inventory_cost, image_file_id, sort_order, status").
 		Where("business_id = ? AND status = ? AND deleted_at IS NULL", businessID, "active").
 		Where("product_id IN (SELECT id FROM products WHERE business_id = ? AND branch_id = ? AND deleted_at IS NULL)", businessID, branchID).
 		Where(field+" = ?", value).
@@ -293,15 +306,27 @@ func (r *Repository) FindVariantLookup(businessID, branchID, field, value string
 		return nil, "", err
 	}
 	return &ProductVariantInfo{
-		ID:          row.ID,
-		VariantName: row.VariantName,
-		SKU:         row.SKU,
-		Barcode:     row.Barcode,
-		SalePrice:   row.SalePrice,
-		CostPrice:   row.CostPrice,
-		ImageFileID: row.ImageFileID,
-		SortOrder:   row.SortOrder,
-		Status:      row.Status,
+		ID:                     row.ID,
+		VariantName:            row.VariantName,
+		SKU:                    row.SKU,
+		Barcode:                row.Barcode,
+		SalePrice:              row.SalePrice,
+		CostPrice:              row.CostPrice,
+		CostUpdatePolicy:       normalizeCostUpdatePolicy(row.CostUpdatePolicy),
+		PricingType:            normalizePricingType(row.PricingType),
+		PricingPercent:         roundQuantity(row.PricingPercent),
+		MinimumSalePrice:       row.MinimumSalePrice,
+		SuggestedSalePrice:     row.SuggestedSalePrice,
+		AutoPriceUpdateEnabled: row.AutoPriceUpdateEnabled,
+		SalePriceLocked:        row.SalePriceLocked,
+		LastPurchaseCost:       row.LastPurchaseCost,
+		LastPurchaseDate:       row.LastPurchaseDate,
+		LastProductionCost:     row.LastProductionCost,
+		LastProductionDate:     row.LastProductionDate,
+		AverageInventoryCost:   row.AverageInventoryCost,
+		ImageFileID:            row.ImageFileID,
+		SortOrder:              row.SortOrder,
+		Status:                 row.Status,
 	}, row.ProductID, nil
 }
 

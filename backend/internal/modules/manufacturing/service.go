@@ -11,6 +11,7 @@ import (
 	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
 	"pastries-pos/internal/modules/inventory"
+	"pastries-pos/internal/modules/products"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
@@ -22,6 +23,7 @@ type Service struct {
 	inventoryService  *inventory.Service
 	auditRepo         *audit.Repository
 	accountingService *accounting.Service
+	pricingService    *products.Service
 }
 
 func NewService(db *gorm.DB, repo *Repository, inventoryRepo *inventory.Repository, inventoryService *inventory.Service, auditRepo *audit.Repository, accountingService ...*accounting.Service) *Service {
@@ -30,6 +32,10 @@ func NewService(db *gorm.DB, repo *Repository, inventoryRepo *inventory.Reposito
 		service.accountingService = accountingService[0]
 	}
 	return service
+}
+
+func (s *Service) SetPricingService(pricingService *products.Service) {
+	s.pricingService = pricingService
 }
 
 func (s *Service) ListBatches(currentUser *utils.AuthContext, query BatchListQuery) (*PaginatedBatchResponse, error) {
@@ -688,6 +694,22 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	output := &ProductionOutput{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, ProductionBatchID: batch.ID, ProductID: batch.ProductID, ProductVariantID: batch.ProductVariantID, InventoryItemID: outputItem.ID, ProducedQuantity: producedQuantity, UnitID: batch.YieldUnitID, BatchNumber: strings.TrimSpace(req.BatchNumber), ExpiryDate: expiryDate, StockMovementID: &movement.ID}
 	if err := s.repo.CreateOutput(tx, output); err != nil {
 		return err
+	}
+	if s.pricingService != nil {
+		if err := s.pricingService.ApplyProductionCostUpdate(tx, products.PricingCostSource{
+			BusinessID:       currentUser.BusinessID,
+			BranchID:         batch.BranchID,
+			ProductID:        batch.ProductID,
+			ProductVariantID: batch.ProductVariantID,
+			InventoryItemID:  outputItem.ID,
+			Cost:             outputUnitCost,
+			SourceType:       "production_batch",
+			SourceID:         &batch.ID,
+			SourceNumber:     batch.ProductionBatchNumber,
+			Reason:           "Production cost updated from actual component consumption",
+		}); err != nil {
+			return err
+		}
 	}
 	if expiryDate != nil {
 		expiry := &inventory.ExpiryBatch{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BranchID: batch.BranchID, InventoryItemID: outputItem.ID, BatchNumber: strings.TrimSpace(req.BatchNumber), Quantity: producedQuantity, ExpiryDate: *expiryDate, ReceivedDate: time.Now().UTC(), Status: "active"}

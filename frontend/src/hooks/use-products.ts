@@ -4,11 +4,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useBranchQueryKey } from "@/hooks/use-branch-scope";
 import {
+  applyProductPriceSuggestion,
+  bulkApplyProductPriceSuggestions,
   createProduct,
   createProductVariant,
   deleteProduct,
   deleteProductVariant,
+  dismissProductPriceSuggestion,
   getProductById,
+  getProductPriceSuggestions,
   getProductReferenceData,
   getProducts,
   getProductVariants,
@@ -23,6 +27,9 @@ import type {
   Product,
   ProductListFilters,
   ProductListResponse,
+  ProductPriceSuggestion,
+  ProductPriceSuggestionListFilters,
+  ProductPriceSuggestionListResponse,
   ProductReferenceData,
   ProductVariant,
   UpdateProductPayload,
@@ -65,6 +72,19 @@ export function useProductReferenceData(enabled = true) {
   return useQuery<ProductReferenceData>({
     queryKey: [productsQueryKey, branchQueryKey, "reference-data"],
     queryFn: async () => getProductReferenceData(),
+    enabled,
+  });
+}
+
+export function useProductPriceSuggestions(
+  filters: ProductPriceSuggestionListFilters = {},
+  enabled = true,
+) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<ProductPriceSuggestionListResponse>({
+    queryKey: [productsQueryKey, branchQueryKey, "price-suggestions", filters],
+    queryFn: async () => getProductPriceSuggestions(filters),
     enabled,
   });
 }
@@ -133,6 +153,46 @@ export function useDeleteProduct() {
 
   return useMutation<void, Error, string>({
     mutationFn: async (id) => deleteProduct(id),
+    onSuccess: async () => {
+      await invalidateProducts(queryClient);
+    },
+  });
+}
+
+export function useApplyProductPriceSuggestion() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    ProductPriceSuggestion,
+    Error,
+    {
+      id: string;
+      salePrice?: number;
+    }
+  >({
+    mutationFn: async ({ id, salePrice }) => applyProductPriceSuggestion(id, salePrice),
+    onSuccess: async () => {
+      await invalidateProducts(queryClient);
+    },
+  });
+}
+
+export function useDismissProductPriceSuggestion() {
+  const queryClient = useQueryClient();
+
+  return useMutation<ProductPriceSuggestion, Error, string>({
+    mutationFn: async (id) => dismissProductPriceSuggestion(id),
+    onSuccess: async () => {
+      await invalidateProducts(queryClient);
+    },
+  });
+}
+
+export function useBulkApplyProductPriceSuggestions() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string[]>({
+    mutationFn: async (ids) => bulkApplyProductPriceSuggestions(ids),
     onSuccess: async () => {
       await invalidateProducts(queryClient);
     },

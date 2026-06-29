@@ -44,17 +44,23 @@ func (s *Service) CreateVariant(currentUser *utils.AuthContext, productID string
 		return nil, err
 	}
 	variant := &ProductVariant{
-		ID:          utils.NewUUID(),
-		BusinessID:  currentUser.BusinessID,
-		ProductID:   productID,
-		VariantName: strings.TrimSpace(req.VariantName),
-		SKU:         strings.TrimSpace(req.SKU),
-		Barcode:     strings.TrimSpace(req.Barcode),
-		SalePrice:   req.SalePrice,
-		CostPrice:   req.CostPrice,
-		ImageFileID: strings.TrimSpace(req.ImageFileID),
-		SortOrder:   req.SortOrder,
-		Status:      "active",
+		ID:                     utils.NewUUID(),
+		BusinessID:             currentUser.BusinessID,
+		ProductID:              productID,
+		VariantName:            strings.TrimSpace(req.VariantName),
+		SKU:                    strings.TrimSpace(req.SKU),
+		Barcode:                strings.TrimSpace(req.Barcode),
+		SalePrice:              req.SalePrice,
+		CostPrice:              req.CostPrice,
+		CostUpdatePolicy:       normalizeCostUpdatePolicy(req.CostUpdatePolicy),
+		PricingType:            normalizePricingType(req.PricingType),
+		PricingPercent:         req.PricingPercent,
+		MinimumSalePrice:       req.MinimumSalePrice,
+		AutoPriceUpdateEnabled: req.AutoPriceUpdateEnabled,
+		SalePriceLocked:        req.SalePriceLocked,
+		ImageFileID:            strings.TrimSpace(req.ImageFileID),
+		SortOrder:              req.SortOrder,
+		Status:                 "active",
 	}
 	tx := s.db.Begin()
 	if tx.Error != nil {
@@ -111,6 +117,24 @@ func (s *Service) UpdateVariant(currentUser *utils.AuthContext, productID, varia
 	}
 	if req.CostPrice != nil {
 		updates["cost_price"] = *req.CostPrice
+	}
+	if req.CostUpdatePolicy != nil {
+		updates["cost_update_policy"] = normalizeCostUpdatePolicy(*req.CostUpdatePolicy)
+	}
+	if req.PricingType != nil {
+		updates["pricing_type"] = normalizePricingType(*req.PricingType)
+	}
+	if req.PricingPercent != nil {
+		updates["pricing_percent"] = *req.PricingPercent
+	}
+	if req.MinimumSalePrice != nil {
+		updates["minimum_sale_price"] = *req.MinimumSalePrice
+	}
+	if req.AutoPriceUpdateEnabled != nil {
+		updates["auto_price_update_enabled"] = *req.AutoPriceUpdateEnabled
+	}
+	if req.SalePriceLocked != nil {
+		updates["sale_price_locked"] = *req.SalePriceLocked
 	}
 	if req.ImageFileID != "" {
 		updates["image_file_id"] = strings.TrimSpace(req.ImageFileID)
@@ -169,6 +193,18 @@ func (s *Service) validateCreate(businessID string, req CreateVariantRequest) er
 	if req.CostPrice != nil && *req.CostPrice < 0 {
 		return apperrors.BadRequest("cost_price must be >= 0", nil)
 	}
+	if !validCostUpdatePolicy(req.CostUpdatePolicy) {
+		return apperrors.BadRequest("invalid cost_update_policy", nil)
+	}
+	if !validPricingType(req.PricingType) {
+		return apperrors.BadRequest("invalid pricing_type", nil)
+	}
+	if req.PricingPercent < 0 {
+		return apperrors.BadRequest("pricing_percent must be >= 0", nil)
+	}
+	if req.MinimumSalePrice != nil && *req.MinimumSalePrice < 0 {
+		return apperrors.BadRequest("minimum_sale_price must be >= 0", nil)
+	}
 	return s.validateUnique(businessID, "", strings.TrimSpace(req.SKU), strings.TrimSpace(req.Barcode))
 }
 
@@ -178,6 +214,18 @@ func (s *Service) validateUpdate(businessID, variantID string, req UpdateVariant
 	}
 	if req.CostPrice != nil && *req.CostPrice < 0 {
 		return apperrors.BadRequest("cost_price must be >= 0", nil)
+	}
+	if req.CostUpdatePolicy != nil && !validCostUpdatePolicy(*req.CostUpdatePolicy) {
+		return apperrors.BadRequest("invalid cost_update_policy", nil)
+	}
+	if req.PricingType != nil && !validPricingType(*req.PricingType) {
+		return apperrors.BadRequest("invalid pricing_type", nil)
+	}
+	if req.PricingPercent != nil && *req.PricingPercent < 0 {
+		return apperrors.BadRequest("pricing_percent must be >= 0", nil)
+	}
+	if req.MinimumSalePrice != nil && *req.MinimumSalePrice < 0 {
+		return apperrors.BadRequest("minimum_sale_price must be >= 0", nil)
 	}
 	return s.validateUnique(businessID, variantID, strings.TrimSpace(req.SKU), strings.TrimSpace(req.Barcode))
 }
@@ -259,20 +307,66 @@ func validVariantStatus(value string) bool {
 	}
 }
 
+func validCostUpdatePolicy(value string) bool {
+	switch normalizeCostUpdatePolicy(value) {
+	case "manual", "latest_purchase", "weighted_average", "recipe_actual":
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeCostUpdatePolicy(value string) string {
+	switch strings.TrimSpace(value) {
+	case "latest_purchase", "weighted_average", "recipe_actual":
+		return strings.TrimSpace(value)
+	default:
+		return "manual"
+	}
+}
+
+func validPricingType(value string) bool {
+	switch normalizePricingType(value) {
+	case "markup", "margin":
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizePricingType(value string) string {
+	if strings.TrimSpace(value) == "margin" {
+		return "margin"
+	}
+	return "markup"
+}
+
 func toVariantResponse(variant ProductVariant) VariantResponse {
 	return VariantResponse{
-		ID:          variant.ID,
-		BusinessID:  variant.BusinessID,
-		ProductID:   variant.ProductID,
-		VariantName: variant.VariantName,
-		SKU:         variant.SKU,
-		Barcode:     variant.Barcode,
-		SalePrice:   variant.SalePrice,
-		CostPrice:   variant.CostPrice,
-		ImageFileID: variant.ImageFileID,
-		SortOrder:   variant.SortOrder,
-		Status:      variant.Status,
-		CreatedAt:   variant.CreatedAt,
-		UpdatedAt:   variant.UpdatedAt,
+		ID:                     variant.ID,
+		BusinessID:             variant.BusinessID,
+		ProductID:              variant.ProductID,
+		VariantName:            variant.VariantName,
+		SKU:                    variant.SKU,
+		Barcode:                variant.Barcode,
+		SalePrice:              variant.SalePrice,
+		CostPrice:              variant.CostPrice,
+		CostUpdatePolicy:       normalizeCostUpdatePolicy(variant.CostUpdatePolicy),
+		PricingType:            normalizePricingType(variant.PricingType),
+		PricingPercent:         variant.PricingPercent,
+		MinimumSalePrice:       variant.MinimumSalePrice,
+		SuggestedSalePrice:     variant.SuggestedSalePrice,
+		AutoPriceUpdateEnabled: variant.AutoPriceUpdateEnabled,
+		SalePriceLocked:        variant.SalePriceLocked,
+		LastPurchaseCost:       variant.LastPurchaseCost,
+		LastPurchaseDate:       variant.LastPurchaseDate,
+		LastProductionCost:     variant.LastProductionCost,
+		LastProductionDate:     variant.LastProductionDate,
+		AverageInventoryCost:   variant.AverageInventoryCost,
+		ImageFileID:            variant.ImageFileID,
+		SortOrder:              variant.SortOrder,
+		Status:                 variant.Status,
+		CreatedAt:              variant.CreatedAt,
+		UpdatedAt:              variant.UpdatedAt,
 	}
 }

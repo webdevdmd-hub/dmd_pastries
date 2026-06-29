@@ -14,6 +14,7 @@ import (
 	"pastries-pos/internal/modules/audit"
 	"pastries-pos/internal/modules/charges"
 	"pastries-pos/internal/modules/inventory"
+	"pastries-pos/internal/modules/products"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
@@ -25,6 +26,7 @@ type Service struct {
 	inventoryService  *inventory.Service
 	auditRepo         *audit.Repository
 	accountingService *accounting.Service
+	pricingService    *products.Service
 }
 
 func NewService(db *gorm.DB, repo *Repository, inventoryRepo *inventory.Repository, inventoryService *inventory.Service, auditRepo *audit.Repository, accountingService ...*accounting.Service) *Service {
@@ -33,6 +35,10 @@ func NewService(db *gorm.DB, repo *Repository, inventoryRepo *inventory.Reposito
 		service.accountingService = accountingService[0]
 	}
 	return service
+}
+
+func (s *Service) SetPricingService(pricingService *products.Service) {
+	s.pricingService = pricingService
 }
 
 func (s *Service) ListOrders(currentUser *utils.AuthContext, query ListQuery) (*PaginatedResponse[PurchaseOrderResponse], error) {
@@ -3018,6 +3024,21 @@ func (s *Service) applyReceiptStock(tx *gorm.DB, currentUser *utils.AuthContext,
 		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: item.InventoryItemID, MovementType: "purchase_in", Quantity: item.QuantityReceived, UnitCost: item.UnitCost, ReferenceType: "purchase_receipt", ReferenceID: &receipt.ID, ReferenceNumber: receipt.ReceiptNumber, Reason: "Purchase received", CreatedByUserID: currentUser.UserID})
 		if err != nil {
 			return err
+		}
+		if s.pricingService != nil && item.ProductID != nil {
+			if err := s.pricingService.ApplyPurchaseCostUpdate(tx, products.PricingCostSource{
+				BusinessID:      currentUser.BusinessID,
+				BranchID:        receipt.BranchID,
+				ProductID:       *item.ProductID,
+				InventoryItemID: item.InventoryItemID,
+				Cost:            item.UnitCost,
+				SourceType:      "purchase_receipt",
+				SourceID:        &receipt.ID,
+				SourceNumber:    receipt.ReceiptNumber,
+				Reason:          "Purchase cost updated from received stock",
+			}); err != nil {
+				return err
+			}
 		}
 		if item.ExpiryDate != nil {
 			batch := &inventory.ExpiryBatch{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BranchID: receipt.BranchID, InventoryItemID: item.InventoryItemID, BatchNumber: strings.TrimSpace(item.BatchNumber), Quantity: item.QuantityReceived, ExpiryDate: *item.ExpiryDate, ReceivedDate: receipt.ReceivedDate, Status: "active"}

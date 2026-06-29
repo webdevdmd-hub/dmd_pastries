@@ -2,6 +2,7 @@ package products
 
 import (
 	"database/sql"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -102,6 +103,12 @@ func (s *Service) CreateProduct(currentUser *utils.AuthContext, req CreateProduc
 		SalePrice:              req.SalePrice,
 		CostPrice:              req.CostPrice,
 		CompareAtPrice:         req.CompareAtPrice,
+		CostUpdatePolicy:       normalizeCostUpdatePolicy(req.CostUpdatePolicy),
+		PricingType:            normalizePricingType(req.PricingType),
+		PricingPercent:         roundQuantity(req.PricingPercent),
+		MinimumSalePrice:       req.MinimumSalePrice,
+		AutoPriceUpdateEnabled: req.AutoPriceUpdateEnabled,
+		SalePriceLocked:        req.SalePriceLocked,
 		ImageFileID:            strings.TrimSpace(req.ImageFileID),
 		IsPOSVisible:           isPOSVisible,
 		IsStockTracked:         req.IsStockTracked,
@@ -196,6 +203,24 @@ func (s *Service) UpdateProduct(currentUser *utils.AuthContext, id string, req U
 	}
 	if req.CompareAtPrice != nil {
 		updates["compare_at_price"] = *req.CompareAtPrice
+	}
+	if req.CostUpdatePolicy != nil {
+		updates["cost_update_policy"] = normalizeCostUpdatePolicy(*req.CostUpdatePolicy)
+	}
+	if req.PricingType != nil {
+		updates["pricing_type"] = normalizePricingType(*req.PricingType)
+	}
+	if req.PricingPercent != nil {
+		updates["pricing_percent"] = roundQuantity(*req.PricingPercent)
+	}
+	if req.MinimumSalePrice != nil {
+		updates["minimum_sale_price"] = *req.MinimumSalePrice
+	}
+	if req.AutoPriceUpdateEnabled != nil {
+		updates["auto_price_update_enabled"] = *req.AutoPriceUpdateEnabled
+	}
+	if req.SalePriceLocked != nil {
+		updates["sale_price_locked"] = *req.SalePriceLocked
 	}
 	if req.SKU != "" {
 		updates["sku"] = strings.TrimSpace(req.SKU)
@@ -355,6 +380,18 @@ func (s *Service) validateCreate(businessID, branchID string, req CreateProductR
 	if err := validatePrices(req.SalePrice, req.CostPrice, req.CompareAtPrice); err != nil {
 		return err
 	}
+	if !validCostUpdatePolicy(req.CostUpdatePolicy) {
+		return apperrors.BadRequest("invalid cost_update_policy", nil)
+	}
+	if !validPricingType(req.PricingType) {
+		return apperrors.BadRequest("invalid pricing_type", nil)
+	}
+	if req.PricingPercent < 0 {
+		return apperrors.BadRequest("pricing_percent must be >= 0", nil)
+	}
+	if req.MinimumSalePrice != nil && *req.MinimumSalePrice < 0 {
+		return apperrors.BadRequest("minimum_sale_price must be >= 0", nil)
+	}
 	if err := validatePreparationTime(req.PreparationTimeMinutes); err != nil {
 		return err
 	}
@@ -389,6 +426,18 @@ func (s *Service) validateUpdate(businessID, branchID string, product *Product, 
 		if err := validatePrices(salePrice, req.CostPrice, req.CompareAtPrice); err != nil {
 			return err
 		}
+	}
+	if req.CostUpdatePolicy != nil && !validCostUpdatePolicy(*req.CostUpdatePolicy) {
+		return apperrors.BadRequest("invalid cost_update_policy", nil)
+	}
+	if req.PricingType != nil && !validPricingType(*req.PricingType) {
+		return apperrors.BadRequest("invalid pricing_type", nil)
+	}
+	if req.PricingPercent != nil && *req.PricingPercent < 0 {
+		return apperrors.BadRequest("pricing_percent must be >= 0", nil)
+	}
+	if req.MinimumSalePrice != nil && *req.MinimumSalePrice < 0 {
+		return apperrors.BadRequest("minimum_sale_price must be >= 0", nil)
 	}
 	if req.Status != "" && !validProductStatus(req.Status) {
 		return apperrors.BadRequest("invalid status", nil)
@@ -588,6 +637,50 @@ func validatePrices(salePrice float64, costPrice, compareAtPrice *float64) error
 	return nil
 }
 
+func validCostUpdatePolicy(value string) bool {
+	switch normalizeCostUpdatePolicy(value) {
+	case "manual", "latest_purchase", "weighted_average", "recipe_actual":
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeCostUpdatePolicy(value string) string {
+	switch strings.TrimSpace(value) {
+	case "latest_purchase", "weighted_average", "recipe_actual":
+		return strings.TrimSpace(value)
+	default:
+		return "manual"
+	}
+}
+
+func validPricingType(value string) bool {
+	switch normalizePricingType(value) {
+	case "markup", "margin":
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizePricingType(value string) string {
+	switch strings.TrimSpace(value) {
+	case "margin":
+		return "margin"
+	default:
+		return "markup"
+	}
+}
+
+func roundMoney(value float64) float64 {
+	return math.Round(value*100) / 100
+}
+
+func roundQuantity(value float64) float64 {
+	return math.Round(value*10000) / 10000
+}
+
 func validatePreparationTime(value *int) error {
 	if value != nil && *value < 0 {
 		return apperrors.BadRequest("preparation_time_minutes must be >= 0", nil)
@@ -633,6 +726,18 @@ func toProductResponse(product Product, category ProductCategoryInfo, unit Produ
 		SalePrice:              product.SalePrice,
 		CostPrice:              product.CostPrice,
 		CompareAtPrice:         product.CompareAtPrice,
+		CostUpdatePolicy:       normalizeCostUpdatePolicy(product.CostUpdatePolicy),
+		PricingType:            normalizePricingType(product.PricingType),
+		PricingPercent:         roundQuantity(product.PricingPercent),
+		MinimumSalePrice:       product.MinimumSalePrice,
+		SuggestedSalePrice:     product.SuggestedSalePrice,
+		AutoPriceUpdateEnabled: product.AutoPriceUpdateEnabled,
+		SalePriceLocked:        product.SalePriceLocked,
+		LastPurchaseCost:       product.LastPurchaseCost,
+		LastPurchaseDate:       product.LastPurchaseDate,
+		LastProductionCost:     product.LastProductionCost,
+		LastProductionDate:     product.LastProductionDate,
+		AverageInventoryCost:   product.AverageInventoryCost,
 		Description:            product.Description,
 		ImageFileID:            product.ImageFileID,
 		IsPOSVisible:           product.IsPOSVisible,

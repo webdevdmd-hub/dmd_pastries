@@ -18,6 +18,7 @@ import { ProductsToolbar } from "@/components/products/products-toolbar";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -26,15 +27,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermission } from "@/hooks/use-permission";
 import {
+  useApplyProductPriceSuggestion,
+  useBulkApplyProductPriceSuggestions,
   useCreateProduct,
   useCreateProductVariant,
   useDeleteProduct,
   useDeleteProductVariant,
+  useDismissProductPriceSuggestion,
+  useProductPriceSuggestions,
   useProductReferenceData,
   useProducts,
   useProductVariants,
@@ -52,6 +58,7 @@ import type {
   CreateProductVariantPayload,
   Product,
   ProductListFilters,
+  ProductPriceSuggestion,
   ProductStatus,
   ProductVariant,
   UpdateProductPayload,
@@ -71,6 +78,13 @@ const initialFilters: ProductListFilters = {
   sortBy: "created_at",
   sortOrder: "desc",
 };
+
+function formatMoney(value: number): string {
+  return `AED ${value.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
 type ProductSearchParams = {
   get: (name: string) => string | null;
@@ -122,6 +136,8 @@ export function ProductsPageClient(): JSX.Element {
     nextStatus?: ProductStatus;
     product: Product;
   } | null>(null);
+  const [selectedSuggestionIds, setSelectedSuggestionIds] = useState<string[]>([]);
+  const [suggestionPrices, setSuggestionPrices] = useState<Record<string, string>>({});
 
   const canViewProducts = hasAnyPermission([PERMISSIONS.productsView]);
   const canCreateProducts = hasAnyPermission([PERMISSIONS.productsCreate]);
@@ -133,6 +149,10 @@ export function ProductsPageClient(): JSX.Element {
     PERMISSIONS.productsVariantsManage,
   ]);
   const productsQuery = useProducts(filters, canViewProducts);
+  const priceSuggestionsQuery = useProductPriceSuggestions(
+    { status: "pending", limit: 8 },
+    canViewProducts,
+  );
   const referenceDataQuery = useProductReferenceData(canViewProducts);
   const variantsQuery = useProductVariants(selectedProduct?.id ?? null, detailsOpen);
   const createProductMutation = useCreateProduct();
@@ -142,6 +162,9 @@ export function ProductsPageClient(): JSX.Element {
   const createVariantMutation = useCreateProductVariant();
   const updateVariantMutation = useUpdateProductVariant();
   const deleteVariantMutation = useDeleteProductVariant();
+  const applySuggestionMutation = useApplyProductPriceSuggestion();
+  const dismissSuggestionMutation = useDismissProductPriceSuggestion();
+  const bulkApplySuggestionMutation = useBulkApplyProductPriceSuggestions();
   const list = useMemo(() => productsQuery.data?.items ?? [], [productsQuery.data?.items]);
   const stats = useMemo(() => {
     const active = list.filter((product) => product.status === "active").length;
@@ -155,6 +178,7 @@ export function ProductsPageClient(): JSX.Element {
     };
   }, [list, productsQuery.data?.total]);
   const totalPages = Math.max(1, Math.ceil((productsQuery.data?.total ?? 0) / filters.limit));
+  const priceSuggestions = priceSuggestionsQuery.data?.items ?? [];
 
   useEffect(() => {
     setFilters((current) => {
@@ -248,6 +272,38 @@ export function ProductsPageClient(): JSX.Element {
     }
   };
 
+  const applyPriceSuggestion = async (suggestion: ProductPriceSuggestion): Promise<void> => {
+    const overrideValue = suggestionPrices[suggestion.id]?.trim();
+    const salePrice = overrideValue ? Number(overrideValue) : suggestion.suggestedSalePrice;
+    try {
+      await applySuggestionMutation.mutateAsync({ id: suggestion.id, salePrice });
+      toast.success("Price suggestion applied.");
+      setSelectedSuggestionIds((current) => current.filter((id) => id !== suggestion.id));
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  const dismissPriceSuggestion = async (suggestion: ProductPriceSuggestion): Promise<void> => {
+    try {
+      await dismissSuggestionMutation.mutateAsync(suggestion.id);
+      toast.success("Price suggestion dismissed.");
+      setSelectedSuggestionIds((current) => current.filter((id) => id !== suggestion.id));
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  const bulkApplySelectedSuggestions = async (): Promise<void> => {
+    try {
+      await bulkApplySuggestionMutation.mutateAsync(selectedSuggestionIds);
+      toast.success("Selected price suggestions applied.");
+      setSelectedSuggestionIds([]);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-5">
       <PageHeader
@@ -290,6 +346,114 @@ export function ProductsPageClient(): JSX.Element {
           </Card>
         ))}
       </div>
+
+      {priceSuggestions.length > 0 ? (
+        <Card className="overflow-hidden">
+          <CardContent className="p-0">
+            <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 bg-brand-latte/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-brand-espresso">Price suggestions</p>
+                <p className="text-xs text-brand-mocha">
+                  Review purchase, recipe, and production cost changes before updating POS prices.
+                </p>
+              </div>
+              <Button
+                disabled={
+                  selectedSuggestionIds.length === 0 || bulkApplySuggestionMutation.isPending
+                }
+                onClick={() => {
+                  void bulkApplySelectedSuggestions();
+                }}
+                size="sm"
+                variant="outline"
+              >
+                Apply selected
+              </Button>
+            </div>
+            <div className="divide-y divide-brand-cappuccino/70">
+              {priceSuggestions.map((suggestion) => {
+                const checked = selectedSuggestionIds.includes(suggestion.id);
+                return (
+                  <div
+                    className="grid gap-3 px-4 py-3 lg:grid-cols-[auto_1.6fr_1fr_1fr_1fr_auto]"
+                    key={suggestion.id}
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(nextChecked) => {
+                        setSelectedSuggestionIds((current) =>
+                          nextChecked === true
+                            ? Array.from(new Set([...current, suggestion.id]))
+                            : current.filter((id) => id !== suggestion.id),
+                        );
+                      }}
+                    />
+                    <div>
+                      <p className="font-semibold text-brand-espresso">
+                        {suggestion.productName}
+                        {suggestion.variantName ? ` / ${suggestion.variantName}` : ""}
+                      </p>
+                      <p className="text-xs text-brand-mocha">
+                        {suggestion.sourceNumber ?? suggestion.sourceType} ·{" "}
+                        {suggestion.pricingType} {suggestion.pricingPercent}%
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-brand-mocha">Cost</p>
+                      <p className="font-medium text-brand-espresso">
+                        {formatMoney(suggestion.currentCost)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-brand-mocha">Current POS price</p>
+                      <p className="font-medium text-brand-espresso">
+                        {formatMoney(suggestion.currentSalePrice)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-brand-mocha">Suggested price</p>
+                      <Input
+                        inputMode="decimal"
+                        onChange={(event) =>
+                          setSuggestionPrices((current) => ({
+                            ...current,
+                            [suggestion.id]: event.target.value,
+                          }))
+                        }
+                        value={
+                          suggestionPrices[suggestion.id] ??
+                          suggestion.suggestedSalePrice.toFixed(2)
+                        }
+                      />
+                    </div>
+                    <div className="flex gap-2 lg:justify-end">
+                      <Button
+                        disabled={applySuggestionMutation.isPending}
+                        onClick={() => {
+                          void applyPriceSuggestion(suggestion);
+                        }}
+                        size="sm"
+                      >
+                        Apply
+                      </Button>
+                      <Button
+                        disabled={dismissSuggestionMutation.isPending}
+                        onClick={() => {
+                          void dismissPriceSuggestion(suggestion);
+                        }}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Dismiss
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <ProductsToolbar
         categories={referenceDataQuery.data?.categories ?? []}

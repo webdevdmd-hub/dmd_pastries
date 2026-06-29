@@ -13,6 +13,12 @@ type CreateProductRequest struct {
 	SalePrice              float64  `json:"sale_price"`
 	CostPrice              *float64 `json:"cost_price"`
 	CompareAtPrice         *float64 `json:"compare_at_price"`
+	CostUpdatePolicy       string   `json:"cost_update_policy"`
+	PricingType            string   `json:"pricing_type"`
+	PricingPercent         float64  `json:"pricing_percent"`
+	MinimumSalePrice       *float64 `json:"minimum_sale_price"`
+	AutoPriceUpdateEnabled bool     `json:"auto_price_update_enabled"`
+	SalePriceLocked        bool     `json:"sale_price_locked"`
 	SKU                    string   `json:"sku"`
 	Barcode                string   `json:"barcode"`
 	Description            string   `json:"description"`
@@ -35,6 +41,12 @@ type UpdateProductRequest struct {
 	SalePrice              *float64 `json:"sale_price"`
 	CostPrice              *float64 `json:"cost_price"`
 	CompareAtPrice         *float64 `json:"compare_at_price"`
+	CostUpdatePolicy       *string  `json:"cost_update_policy"`
+	PricingType            *string  `json:"pricing_type"`
+	PricingPercent         *float64 `json:"pricing_percent"`
+	MinimumSalePrice       *float64 `json:"minimum_sale_price"`
+	AutoPriceUpdateEnabled *bool    `json:"auto_price_update_enabled"`
+	SalePriceLocked        *bool    `json:"sale_price_locked"`
 	SKU                    string   `json:"sku"`
 	Barcode                string   `json:"barcode"`
 	ImageFileID            string   `json:"image_file_id"`
@@ -92,6 +104,18 @@ type ProductResponse struct {
 	SalePrice              float64              `json:"sale_price"`
 	CostPrice              *float64             `json:"cost_price"`
 	CompareAtPrice         *float64             `json:"compare_at_price"`
+	CostUpdatePolicy       string               `json:"cost_update_policy"`
+	PricingType            string               `json:"pricing_type"`
+	PricingPercent         float64              `json:"pricing_percent"`
+	MinimumSalePrice       *float64             `json:"minimum_sale_price"`
+	SuggestedSalePrice     *float64             `json:"suggested_sale_price"`
+	AutoPriceUpdateEnabled bool                 `json:"auto_price_update_enabled"`
+	SalePriceLocked        bool                 `json:"sale_price_locked"`
+	LastPurchaseCost       *float64             `json:"last_purchase_cost"`
+	LastPurchaseDate       *time.Time           `json:"last_purchase_date"`
+	LastProductionCost     *float64             `json:"last_production_cost"`
+	LastProductionDate     *time.Time           `json:"last_production_date"`
+	AverageInventoryCost   *float64             `json:"average_inventory_cost"`
 	Description            string               `json:"description"`
 	ImageFileID            string               `json:"image_file_id"`
 	IsPOSVisible           bool                 `json:"is_pos_visible"`
@@ -126,15 +150,73 @@ type ProductTaxRateInfo struct {
 }
 
 type ProductVariantInfo struct {
-	ID          string   `json:"id"`
-	VariantName string   `json:"variant_name"`
-	SKU         string   `json:"sku"`
-	Barcode     string   `json:"barcode"`
-	SalePrice   float64  `json:"sale_price"`
-	CostPrice   *float64 `json:"cost_price"`
-	ImageFileID string   `json:"image_file_id"`
-	SortOrder   int      `json:"sort_order"`
-	Status      string   `json:"status"`
+	ID                     string     `json:"id"`
+	VariantName            string     `json:"variant_name"`
+	SKU                    string     `json:"sku"`
+	Barcode                string     `json:"barcode"`
+	SalePrice              float64    `json:"sale_price"`
+	CostPrice              *float64   `json:"cost_price"`
+	CostUpdatePolicy       string     `json:"cost_update_policy"`
+	PricingType            string     `json:"pricing_type"`
+	PricingPercent         float64    `json:"pricing_percent"`
+	MinimumSalePrice       *float64   `json:"minimum_sale_price"`
+	SuggestedSalePrice     *float64   `json:"suggested_sale_price"`
+	AutoPriceUpdateEnabled bool       `json:"auto_price_update_enabled"`
+	SalePriceLocked        bool       `json:"sale_price_locked"`
+	LastPurchaseCost       *float64   `json:"last_purchase_cost"`
+	LastPurchaseDate       *time.Time `json:"last_purchase_date"`
+	LastProductionCost     *float64   `json:"last_production_cost"`
+	LastProductionDate     *time.Time `json:"last_production_date"`
+	AverageInventoryCost   *float64   `json:"average_inventory_cost"`
+	ImageFileID            string     `json:"image_file_id"`
+	SortOrder              int        `json:"sort_order"`
+	Status                 string     `json:"status"`
+}
+
+type PriceSuggestionListQuery struct {
+	Status   string
+	BranchID string
+	Page     int
+	Limit    int
+}
+
+type ProductPriceSuggestionResponse struct {
+	ID                 string     `json:"id"`
+	BusinessID         string     `json:"business_id"`
+	BranchID           string     `json:"branch_id"`
+	ProductID          string     `json:"product_id"`
+	ProductName        string     `json:"product_name"`
+	ProductCode        string     `json:"product_code"`
+	ProductVariantID   *string    `json:"product_variant_id"`
+	ProductVariantName string     `json:"product_variant_name"`
+	CurrentCost        float64    `json:"current_cost"`
+	PreviousCost       *float64   `json:"previous_cost"`
+	CurrentSalePrice   float64    `json:"current_sale_price"`
+	SuggestedSalePrice float64    `json:"suggested_sale_price"`
+	PricingType        string     `json:"pricing_type"`
+	PricingPercent     float64    `json:"pricing_percent"`
+	SourceType         string     `json:"source_type"`
+	SourceID           *string    `json:"source_id"`
+	SourceNumber       string     `json:"source_number"`
+	Reason             string     `json:"reason"`
+	Status             string     `json:"status"`
+	AppliedAt          *time.Time `json:"applied_at"`
+	DismissedAt        *time.Time `json:"dismissed_at"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+}
+
+type ProductPriceSuggestionListResponse struct {
+	Items      []ProductPriceSuggestionResponse `json:"items"`
+	Pagination PaginationResponse               `json:"pagination"`
+}
+
+type ApplyPriceSuggestionRequest struct {
+	SalePrice *float64 `json:"sale_price"`
+}
+
+type BulkApplyPriceSuggestionsRequest struct {
+	IDs []string `json:"ids"`
 }
 
 type ProductLookupResponse struct {

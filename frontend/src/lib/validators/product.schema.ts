@@ -4,6 +4,13 @@ import { ITEM_STRUCTURES, PRODUCT_TYPES } from "@/types/product";
 
 const productTypeSchema = z.enum(PRODUCT_TYPES);
 const itemStructureSchema = z.enum(ITEM_STRUCTURES);
+const costUpdatePolicySchema = z.enum([
+  "manual",
+  "latest_purchase",
+  "weighted_average",
+  "recipe_actual",
+]);
+const pricingTypeSchema = z.enum(["markup", "margin"]);
 
 const recordStatusSchema = z.enum(["active", "inactive"]);
 
@@ -18,6 +25,14 @@ export const productSchema = z.object({
   costPrice: z
     .union([z.coerce.number().min(0, "Cost price must be at least 0."), z.null()])
     .optional(),
+  costUpdatePolicy: costUpdatePolicySchema,
+  pricingType: pricingTypeSchema,
+  pricingPercent: z.coerce.number().min(0, "Pricing percent cannot be negative."),
+  minimumSalePrice: z
+    .union([z.coerce.number().min(0, "Minimum sale price must be at least 0."), z.null()])
+    .optional(),
+  autoPriceUpdateEnabled: z.boolean(),
+  salePriceLocked: z.boolean(),
   sku: z.string().trim().optional(),
   barcode: z.string().trim().optional(),
   description: z.string().trim().optional(),
@@ -39,6 +54,14 @@ export const productVariantSchema = z.object({
   costPrice: z
     .union([z.coerce.number().min(0, "Cost price must be at least 0."), z.null()])
     .optional(),
+  costUpdatePolicy: costUpdatePolicySchema,
+  pricingType: pricingTypeSchema,
+  pricingPercent: z.coerce.number().min(0, "Pricing percent cannot be negative."),
+  minimumSalePrice: z
+    .union([z.coerce.number().min(0, "Minimum sale price must be at least 0."), z.null()])
+    .optional(),
+  autoPriceUpdateEnabled: z.boolean(),
+  salePriceLocked: z.boolean(),
   imageFileId: z.string().trim().optional(),
   sortOrder: z.coerce.number().int().min(0, "Sort order cannot be negative."),
   status: recordStatusSchema,

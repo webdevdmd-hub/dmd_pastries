@@ -37,6 +37,20 @@ export const ITEM_STRUCTURE_LABELS: Record<ItemStructure, string> = {
 };
 
 export type ProductStatus = RecordStatus | "archived";
+export type CostUpdatePolicy = "manual" | "latest_purchase" | "weighted_average" | "recipe_actual";
+export type PricingType = "markup" | "margin";
+
+export const COST_UPDATE_POLICY_LABELS: Record<CostUpdatePolicy, string> = {
+  manual: "Manual",
+  latest_purchase: "Latest purchase",
+  weighted_average: "Weighted average",
+  recipe_actual: "Recipe actual",
+};
+
+export const PRICING_TYPE_LABELS: Record<PricingType, string> = {
+  markup: "Markup",
+  margin: "Margin",
+};
 
 export type ProductVariant = {
   id: string;
@@ -46,6 +60,18 @@ export type ProductVariant = {
   barcode: string | null;
   salePrice: number;
   costPrice: number | null;
+  costUpdatePolicy: CostUpdatePolicy;
+  pricingType: PricingType;
+  pricingPercent: number;
+  minimumSalePrice: number | null;
+  suggestedSalePrice: number | null;
+  autoPriceUpdateEnabled: boolean;
+  salePriceLocked: boolean;
+  lastPurchaseCost: number | null;
+  lastPurchaseDate: string | null;
+  lastProductionCost: number | null;
+  lastProductionDate: string | null;
+  averageInventoryCost: number | null;
   imageUrl: string | null;
   imageFileId: string | null;
   sortOrder: number;
@@ -72,6 +98,18 @@ export type Product = {
   salePrice: number;
   costPrice: number | null;
   compareAtPrice: number | null;
+  costUpdatePolicy: CostUpdatePolicy;
+  pricingType: PricingType;
+  pricingPercent: number;
+  minimumSalePrice: number | null;
+  suggestedSalePrice: number | null;
+  autoPriceUpdateEnabled: boolean;
+  salePriceLocked: boolean;
+  lastPurchaseCost: number | null;
+  lastPurchaseDate: string | null;
+  lastProductionCost: number | null;
+  lastProductionDate: string | null;
+  averageInventoryCost: number | null;
   imageUrl: string | null;
   imageFileId: string | null;
   isPosVisible: boolean;
@@ -107,6 +145,12 @@ export type CreateProductPayload = {
   itemStructure: ItemStructure;
   salePrice: number;
   costPrice: number | null;
+  costUpdatePolicy: CostUpdatePolicy;
+  pricingType: PricingType;
+  pricingPercent: number;
+  minimumSalePrice: number | null;
+  autoPriceUpdateEnabled: boolean;
+  salePriceLocked: boolean;
   sku: string | null;
   barcode: string | null;
   description: string | null;
@@ -131,6 +175,12 @@ export type CreateProductVariantPayload = {
   barcode: string | null;
   salePrice: number;
   costPrice: number | null;
+  costUpdatePolicy: CostUpdatePolicy;
+  pricingType: PricingType;
+  pricingPercent: number;
+  minimumSalePrice: number | null;
+  autoPriceUpdateEnabled: boolean;
+  salePriceLocked: boolean;
   imageUrl: string | null;
   imageFileId: string | null;
   sortOrder: number;
@@ -154,4 +204,39 @@ export type ProductReferenceData = {
   categories: { allowedProductTypes: ProductType[]; categoryName: string; id: string }[];
   units: Unit[];
   taxRates: TaxRate[];
+};
+
+export type ProductPriceSuggestionStatus = "pending" | "applied" | "dismissed";
+
+export type ProductPriceSuggestion = {
+  id: string;
+  productId: string;
+  productVariantId: string | null;
+  productName: string;
+  variantName: string | null;
+  currentCost: number;
+  previousCost: number | null;
+  currentSalePrice: number;
+  suggestedSalePrice: number;
+  pricingType: PricingType;
+  pricingPercent: number;
+  sourceType: string;
+  sourceNumber: string | null;
+  reason: string | null;
+  status: ProductPriceSuggestionStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProductPriceSuggestionListFilters = {
+  status?: ProductPriceSuggestionStatus;
+  page?: number;
+  limit?: number;
+};
+
+export type ProductPriceSuggestionListResponse = {
+  items: ProductPriceSuggestion[];
+  total: number;
+  page: number;
+  limit: number;
 };

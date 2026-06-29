@@ -1,12 +1,18 @@
 import { apiRequest } from "@/lib/api/client";
 import type { Unit } from "@/types/master-data";
 import type {
+  CostUpdatePolicy,
   CreateProductPayload,
   CreateProductVariantPayload,
   ItemStructure,
+  PricingType,
   Product,
   ProductListFilters,
   ProductListResponse,
+  ProductPriceSuggestion,
+  ProductPriceSuggestionListFilters,
+  ProductPriceSuggestionListResponse,
+  ProductPriceSuggestionStatus,
   ProductReferenceData,
   ProductStatus,
   ProductType,
@@ -90,6 +96,18 @@ type BackendProduct = {
   sale_price?: unknown;
   cost_price?: unknown;
   compare_at_price?: unknown;
+  cost_update_policy?: unknown;
+  pricing_type?: unknown;
+  pricing_percent?: unknown;
+  minimum_sale_price?: unknown;
+  suggested_sale_price?: unknown;
+  auto_price_update_enabled?: unknown;
+  sale_price_locked?: unknown;
+  last_purchase_cost?: unknown;
+  last_purchase_date?: unknown;
+  last_production_cost?: unknown;
+  last_production_date?: unknown;
+  average_inventory_cost?: unknown;
   image_url?: unknown;
   image_file_id?: unknown;
   is_pos_visible?: unknown;
@@ -111,6 +129,18 @@ type BackendVariant = {
   barcode?: unknown;
   sale_price?: unknown;
   cost_price?: unknown;
+  cost_update_policy?: unknown;
+  pricing_type?: unknown;
+  pricing_percent?: unknown;
+  minimum_sale_price?: unknown;
+  suggested_sale_price?: unknown;
+  auto_price_update_enabled?: unknown;
+  sale_price_locked?: unknown;
+  last_purchase_cost?: unknown;
+  last_purchase_date?: unknown;
+  last_production_cost?: unknown;
+  last_production_date?: unknown;
+  average_inventory_cost?: unknown;
   image_url?: unknown;
   image_file_id?: unknown;
   sort_order?: unknown;
@@ -128,6 +158,12 @@ type BackendProductPayload = {
   item_structure?: ItemStructure;
   sale_price?: number;
   cost_price?: number | null;
+  cost_update_policy?: CostUpdatePolicy;
+  pricing_type?: PricingType;
+  pricing_percent?: number;
+  minimum_sale_price?: number | null;
+  auto_price_update_enabled?: boolean;
+  sale_price_locked?: boolean;
   compare_at_price?: number | null;
   sku?: string | null;
   barcode?: string | null;
@@ -147,10 +183,36 @@ type BackendProductVariantPayload = {
   barcode?: string | null;
   sale_price?: number;
   cost_price?: number | null;
+  cost_update_policy?: CostUpdatePolicy;
+  pricing_type?: PricingType;
+  pricing_percent?: number;
+  minimum_sale_price?: number | null;
+  auto_price_update_enabled?: boolean;
+  sale_price_locked?: boolean;
   image_url?: string | null;
   image_file_id?: string | null;
   sort_order?: number;
   status?: "active" | "inactive";
+};
+
+type BackendPriceSuggestion = {
+  id?: unknown;
+  product_id?: unknown;
+  product_variant_id?: unknown;
+  product_name?: unknown;
+  variant_name?: unknown;
+  current_cost?: unknown;
+  previous_cost?: unknown;
+  current_sale_price?: unknown;
+  suggested_sale_price?: unknown;
+  pricing_type?: unknown;
+  pricing_percent?: unknown;
+  source_type?: unknown;
+  source_number?: unknown;
+  reason?: unknown;
+  status?: unknown;
+  created_at?: unknown;
+  updated_at?: unknown;
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -233,6 +295,23 @@ function isItemStructure(value: unknown): value is ItemStructure {
   return ITEM_STRUCTURES.includes(value as ItemStructure);
 }
 
+function isCostUpdatePolicy(value: unknown): value is CostUpdatePolicy {
+  return (
+    value === "manual" ||
+    value === "latest_purchase" ||
+    value === "weighted_average" ||
+    value === "recipe_actual"
+  );
+}
+
+function isPricingType(value: unknown): value is PricingType {
+  return value === "markup" || value === "margin";
+}
+
+function isPriceSuggestionStatus(value: unknown): value is ProductPriceSuggestionStatus {
+  return value === "pending" || value === "applied" || value === "dismissed";
+}
+
 function parseAllowedProductTypes(value: unknown): ProductType[] {
   if (!Array.isArray(value)) {
     return [];
@@ -269,6 +348,20 @@ function parseVariantWithFallbacks(value: unknown, fallbacks: VariantFallbacks):
     barcode: nullableString(variant.barcode),
     salePrice: requiredNumber(variant.sale_price, "Variant sale price"),
     costPrice: nullableNumber(variant.cost_price),
+    costUpdatePolicy: isCostUpdatePolicy(variant.cost_update_policy)
+      ? variant.cost_update_policy
+      : "manual",
+    pricingType: isPricingType(variant.pricing_type) ? variant.pricing_type : "markup",
+    pricingPercent: optionalNumber(variant.pricing_percent, 0),
+    minimumSalePrice: nullableNumber(variant.minimum_sale_price),
+    suggestedSalePrice: nullableNumber(variant.suggested_sale_price),
+    autoPriceUpdateEnabled: optionalBoolean(variant.auto_price_update_enabled, false),
+    salePriceLocked: optionalBoolean(variant.sale_price_locked, false),
+    lastPurchaseCost: nullableNumber(variant.last_purchase_cost),
+    lastPurchaseDate: nullableString(variant.last_purchase_date),
+    lastProductionCost: nullableNumber(variant.last_production_cost),
+    lastProductionDate: nullableString(variant.last_production_date),
+    averageInventoryCost: nullableNumber(variant.average_inventory_cost),
     imageUrl: nullableString(variant.image_url),
     imageFileId: nullableString(variant.image_file_id) ?? nullableString(variant.image_url),
     sortOrder: requiredNumber(variant.sort_order, "Variant sort order"),
@@ -351,6 +444,20 @@ function parseProduct(value: unknown): Product {
     salePrice: requiredNumber(product.sale_price, "Sale price"),
     costPrice: nullableNumber(product.cost_price),
     compareAtPrice: nullableNumber(product.compare_at_price),
+    costUpdatePolicy: isCostUpdatePolicy(product.cost_update_policy)
+      ? product.cost_update_policy
+      : "manual",
+    pricingType: isPricingType(product.pricing_type) ? product.pricing_type : "markup",
+    pricingPercent: optionalNumber(product.pricing_percent, 0),
+    minimumSalePrice: nullableNumber(product.minimum_sale_price),
+    suggestedSalePrice: nullableNumber(product.suggested_sale_price),
+    autoPriceUpdateEnabled: optionalBoolean(product.auto_price_update_enabled, false),
+    salePriceLocked: optionalBoolean(product.sale_price_locked, false),
+    lastPurchaseCost: nullableNumber(product.last_purchase_cost),
+    lastPurchaseDate: nullableString(product.last_purchase_date),
+    lastProductionCost: nullableNumber(product.last_production_cost),
+    lastProductionDate: nullableString(product.last_production_date),
+    averageInventoryCost: nullableNumber(product.average_inventory_cost),
     imageUrl: nullableString(product.image_url),
     imageFileId: nullableString(product.image_file_id) ?? nullableString(product.image_url),
     isPosVisible: requiredBoolean(product.is_pos_visible, "POS visible"),
@@ -417,6 +524,81 @@ function parseProductsResponse(value: unknown): ProductListResponse {
     total: totalValue,
     page: pageValue,
     limit: limitValue,
+  };
+}
+
+function parsePriceSuggestion(value: unknown): ProductPriceSuggestion {
+  if (!isObject(value)) {
+    throw new Error("Price suggestion payload is invalid.");
+  }
+
+  const suggestion = value as BackendPriceSuggestion;
+  const status = isPriceSuggestionStatus(suggestion.status) ? suggestion.status : "pending";
+  const pricingType = isPricingType(suggestion.pricing_type) ? suggestion.pricing_type : "markup";
+
+  return {
+    id: requiredString(suggestion.id, "Price suggestion ID"),
+    productId: requiredString(suggestion.product_id, "Suggestion product ID"),
+    productVariantId: nullableString(suggestion.product_variant_id),
+    productName: requiredString(suggestion.product_name, "Suggestion product name"),
+    variantName: nullableString(suggestion.variant_name),
+    currentCost: requiredNumber(suggestion.current_cost, "Suggestion current cost"),
+    previousCost: nullableNumber(suggestion.previous_cost),
+    currentSalePrice: requiredNumber(
+      suggestion.current_sale_price,
+      "Suggestion current sale price",
+    ),
+    suggestedSalePrice: requiredNumber(suggestion.suggested_sale_price, "Suggestion sale price"),
+    pricingType,
+    pricingPercent: optionalNumber(suggestion.pricing_percent, 0),
+    sourceType: optionalString(suggestion.source_type) ?? "manual",
+    sourceNumber: nullableString(suggestion.source_number),
+    reason: nullableString(suggestion.reason),
+    status,
+    createdAt: requiredString(suggestion.created_at, "Suggestion created at"),
+    updatedAt: requiredString(suggestion.updated_at, "Suggestion updated at"),
+  };
+}
+
+function parsePriceSuggestionListResponse(value: unknown): ProductPriceSuggestionListResponse {
+  if (Array.isArray(value)) {
+    return {
+      items: value.map(parsePriceSuggestion),
+      total: value.length,
+      page: 1,
+      limit: value.length,
+    };
+  }
+  if (!isObject(value)) {
+    throw new Error("Price suggestions list payload is invalid.");
+  }
+  const payload = value as BackendListResponse;
+  const itemsValue = Array.isArray(payload.items)
+    ? payload.items
+    : Array.isArray(payload.data)
+      ? payload.data
+      : [];
+  const pagination = isObject(payload.pagination) ? payload.pagination : {};
+  return {
+    items: itemsValue.map(parsePriceSuggestion),
+    total:
+      typeof payload.total === "number"
+        ? payload.total
+        : typeof pagination.total === "number"
+          ? pagination.total
+          : itemsValue.length,
+    page:
+      typeof payload.page === "number"
+        ? payload.page
+        : typeof pagination.page === "number"
+          ? pagination.page
+          : 1,
+    limit:
+      typeof payload.limit === "number"
+        ? payload.limit
+        : typeof pagination.limit === "number"
+          ? pagination.limit
+          : itemsValue.length || 20,
   };
 }
 
@@ -561,6 +743,20 @@ function toBackendProductPayload(
     ...(payload.itemStructure !== undefined ? { item_structure: payload.itemStructure } : {}),
     ...(payload.salePrice !== undefined ? { sale_price: payload.salePrice } : {}),
     ...(payload.costPrice !== undefined ? { cost_price: payload.costPrice } : {}),
+    ...(payload.costUpdatePolicy !== undefined
+      ? { cost_update_policy: payload.costUpdatePolicy }
+      : {}),
+    ...(payload.pricingType !== undefined ? { pricing_type: payload.pricingType } : {}),
+    ...(payload.pricingPercent !== undefined ? { pricing_percent: payload.pricingPercent } : {}),
+    ...(payload.minimumSalePrice !== undefined
+      ? { minimum_sale_price: payload.minimumSalePrice }
+      : {}),
+    ...(payload.autoPriceUpdateEnabled !== undefined
+      ? { auto_price_update_enabled: payload.autoPriceUpdateEnabled }
+      : {}),
+    ...(payload.salePriceLocked !== undefined
+      ? { sale_price_locked: payload.salePriceLocked }
+      : {}),
     ...(payload.sku !== undefined ? { sku: payload.sku } : {}),
     ...(payload.barcode !== undefined ? { barcode: payload.barcode } : {}),
     ...(payload.description !== undefined ? { description: payload.description } : {}),
@@ -589,6 +785,20 @@ function toBackendVariantPayload(
     ...(payload.barcode !== undefined ? { barcode: payload.barcode } : {}),
     ...(payload.salePrice !== undefined ? { sale_price: payload.salePrice } : {}),
     ...(payload.costPrice !== undefined ? { cost_price: payload.costPrice } : {}),
+    ...(payload.costUpdatePolicy !== undefined
+      ? { cost_update_policy: payload.costUpdatePolicy }
+      : {}),
+    ...(payload.pricingType !== undefined ? { pricing_type: payload.pricingType } : {}),
+    ...(payload.pricingPercent !== undefined ? { pricing_percent: payload.pricingPercent } : {}),
+    ...(payload.minimumSalePrice !== undefined
+      ? { minimum_sale_price: payload.minimumSalePrice }
+      : {}),
+    ...(payload.autoPriceUpdateEnabled !== undefined
+      ? { auto_price_update_enabled: payload.autoPriceUpdateEnabled }
+      : {}),
+    ...(payload.salePriceLocked !== undefined
+      ? { sale_price_locked: payload.salePriceLocked }
+      : {}),
     ...(payload.imageUrl !== undefined ? { image_url: payload.imageUrl } : {}),
     ...(payload.imageFileId !== undefined ? { image_file_id: payload.imageFileId } : {}),
     ...(payload.sortOrder !== undefined ? { sort_order: payload.sortOrder } : {}),
@@ -629,6 +839,72 @@ export async function getProducts(filters: ProductListFilters): Promise<ProductL
   });
 
   return response.data;
+}
+
+function buildPriceSuggestionsPath(filters: ProductPriceSuggestionListFilters = {}): string {
+  const params = new URLSearchParams();
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+  params.set("page", String(filters.page ?? 1));
+  params.set("limit", String(filters.limit ?? 10));
+  return `/api/v1/products/price-suggestions?${params.toString()}`;
+}
+
+export async function getProductPriceSuggestions(
+  filters: ProductPriceSuggestionListFilters = {},
+): Promise<ProductPriceSuggestionListResponse> {
+  const response = await apiRequest<ProductPriceSuggestionListResponse>(
+    buildPriceSuggestionsPath(filters),
+    {
+      authMode: "appwrite",
+      parse: parsePriceSuggestionListResponse,
+    },
+  );
+
+  return response.data;
+}
+
+export async function applyProductPriceSuggestion(
+  id: string,
+  salePrice?: number,
+): Promise<ProductPriceSuggestion> {
+  const response = await apiRequest<ProductPriceSuggestion, { sale_price?: number }>(
+    `/api/v1/products/price-suggestions/${id}/apply`,
+    {
+      method: "POST",
+      authMode: "appwrite",
+      body: salePrice !== undefined ? { sale_price: salePrice } : {},
+      parse: parsePriceSuggestion,
+    },
+  );
+
+  return response.data;
+}
+
+export async function dismissProductPriceSuggestion(id: string): Promise<ProductPriceSuggestion> {
+  const response = await apiRequest<ProductPriceSuggestion>(
+    `/api/v1/products/price-suggestions/${id}/dismiss`,
+    {
+      method: "POST",
+      authMode: "appwrite",
+      parse: parsePriceSuggestion,
+    },
+  );
+
+  return response.data;
+}
+
+export async function bulkApplyProductPriceSuggestions(ids: string[]): Promise<void> {
+  await apiRequest<void, { suggestion_ids: string[] }>(
+    "/api/v1/products/price-suggestions/bulk-apply",
+    {
+      method: "POST",
+      authMode: "appwrite",
+      body: { suggestion_ids: ids },
+      parse: () => undefined,
+    },
+  );
 }
 
 export async function createProduct(payload: CreateProductPayload): Promise<Product> {

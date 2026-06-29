@@ -10,18 +10,24 @@ import (
 	"gorm.io/gorm"
 
 	"pastries-pos/internal/modules/audit"
+	"pastries-pos/internal/modules/products"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
 
 type Service struct {
-	db        *gorm.DB
-	repo      *Repository
-	auditRepo *audit.Repository
+	db             *gorm.DB
+	repo           *Repository
+	auditRepo      *audit.Repository
+	pricingService *products.Service
 }
 
 func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository) *Service {
 	return &Service{db: db, repo: repo, auditRepo: auditRepo}
+}
+
+func (s *Service) SetPricingService(pricingService *products.Service) {
+	s.pricingService = pricingService
 }
 
 func (s *Service) List(currentUser *utils.AuthContext, query ListQuery) (*ListResponse, error) {
@@ -871,7 +877,27 @@ func (s *Service) recalculateCost(tx *gorm.DB, businessID, branchID, recipeID st
 	ingredientCost := sumIngredientCost(ingredients)
 	packagingCost := sumPackagingCost(packaging)
 	totalCost := roundMoney(ingredientCost + packagingCost)
-	return s.repo.UpdateRecipe(tx, recipeID, businessID, branchID, map[string]interface{}{"estimated_ingredient_cost": ingredientCost, "estimated_packaging_cost": packagingCost, "estimated_total_cost": totalCost, "cost_per_yield_unit": roundQuantity(totalCost / recipe.BatchYieldQuantity), "updated_at": time.Now().UTC()})
+	costPerYieldUnit := 0.0
+	if recipe.BatchYieldQuantity > 0 {
+		costPerYieldUnit = roundQuantity(totalCost / recipe.BatchYieldQuantity)
+	}
+	if err := s.repo.UpdateRecipe(tx, recipeID, businessID, branchID, map[string]interface{}{"estimated_ingredient_cost": ingredientCost, "estimated_packaging_cost": packagingCost, "estimated_total_cost": totalCost, "cost_per_yield_unit": costPerYieldUnit, "updated_at": time.Now().UTC()}); err != nil {
+		return err
+	}
+	if s.pricingService == nil || recipe.ProductID == "" || costPerYieldUnit <= 0 {
+		return nil
+	}
+	return s.pricingService.ApplyRecipeCostUpdate(tx, products.PricingCostSource{
+		BusinessID:       businessID,
+		BranchID:         branchID,
+		ProductID:        recipe.ProductID,
+		ProductVariantID: recipe.ProductVariantID,
+		Cost:             costPerYieldUnit,
+		SourceType:       "recipe_cost",
+		SourceID:         &recipe.ID,
+		SourceNumber:     recipe.RecipeCode,
+		Reason:           "Recipe cost recalculated from BOM",
+	})
 }
 
 type recipeComponent struct {

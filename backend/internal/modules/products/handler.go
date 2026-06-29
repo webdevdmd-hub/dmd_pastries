@@ -125,6 +125,69 @@ func (h *Handler) LookupProduct(c *gin.Context) {
 	response.Success(c, 200, "product lookup fetched successfully", result)
 }
 
+func (h *Handler) ListPriceSuggestions(c *gin.Context) {
+	currentUser := utils.MustAuthContext(c)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	result, err := h.service.ListPriceSuggestions(currentUser, PriceSuggestionListQuery{
+		Status:   c.DefaultQuery("status", "pending"),
+		BranchID: c.Query("branch_id"),
+		Page:     page,
+		Limit:    limit,
+	})
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "product price suggestions fetched successfully", result)
+}
+
+func (h *Handler) ApplyPriceSuggestion(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	var req ApplyPriceSuggestionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	currentUser := utils.MustAuthContext(c)
+	result, err := h.service.ApplyPriceSuggestion(currentUser, c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "product price suggestion applied successfully", result)
+}
+
+func (h *Handler) DismissPriceSuggestion(c *gin.Context) {
+	if !validUUIDParam(c, "id") {
+		return
+	}
+	currentUser := utils.MustAuthContext(c)
+	result, err := h.service.DismissPriceSuggestion(currentUser, c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "product price suggestion dismissed successfully", result)
+}
+
+func (h *Handler) BulkApplyPriceSuggestions(c *gin.Context) {
+	var req BulkApplyPriceSuggestionsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	currentUser := utils.MustAuthContext(c)
+	result, err := h.service.BulkApplyPriceSuggestions(currentUser, req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "product price suggestions applied successfully", result)
+}
+
 func parseListQuery(c *gin.Context) ProductListQuery {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))

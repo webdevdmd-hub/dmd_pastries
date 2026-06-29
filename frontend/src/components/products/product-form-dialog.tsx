@@ -30,9 +30,11 @@ import { getProductImagePreviewUrl, uploadProductImage } from "@/lib/appwrite/st
 import { type ProductSchema, productSchema } from "@/lib/validators/product.schema";
 import type { ProductReferenceData } from "@/types/product";
 import {
+  COST_UPDATE_POLICY_LABELS,
   type CreateProductPayload,
   ITEM_STRUCTURE_LABELS,
   ITEM_STRUCTURES,
+  PRICING_TYPE_LABELS,
   type Product,
   PRODUCT_TYPE_LABELS,
   PRODUCT_TYPES,
@@ -63,6 +65,12 @@ function toDefaultValues(product: Product | null): ProductSchema {
     itemStructure: product?.itemStructure ?? "single",
     salePrice: product?.salePrice ?? 0,
     costPrice: product?.costPrice ?? null,
+    costUpdatePolicy: product?.costUpdatePolicy ?? "manual",
+    pricingType: product?.pricingType ?? "markup",
+    pricingPercent: product?.pricingPercent ?? 0,
+    minimumSalePrice: product?.minimumSalePrice ?? null,
+    autoPriceUpdateEnabled: product?.autoPriceUpdateEnabled ?? false,
+    salePriceLocked: product?.salePriceLocked ?? false,
     sku: product?.sku ?? "",
     barcode: product?.barcode ?? "",
     description: product?.description ?? "",
@@ -93,6 +101,10 @@ export function ProductFormDialog({
   const watchedTaxRateId = form.watch("taxRateId") ?? "";
   const watchedItemStructure = form.watch("itemStructure");
   const watchedProductType = form.watch("productType");
+  const watchedCostPrice = form.watch("costPrice");
+  const watchedMinimumSalePrice = form.watch("minimumSalePrice") ?? null;
+  const watchedPricingPercent = form.watch("pricingPercent");
+  const watchedPricingType = form.watch("pricingType");
 
   const compatibleCategories = useMemo(
     () =>
@@ -133,6 +145,21 @@ export function ProductFormDialog({
     return () => URL.revokeObjectURL(previewUrl);
   }, [previewUrl, selectedImage]);
 
+  const liveSuggestedPrice = useMemo(() => {
+    const cost = watchedCostPrice ?? 0;
+    const percent = watchedPricingPercent;
+    let price = cost;
+    if (watchedPricingType === "margin") {
+      price = percent >= 100 ? 0 : cost / (1 - percent / 100);
+    } else {
+      price = cost * (1 + percent / 100);
+    }
+    if (watchedMinimumSalePrice !== null && price < watchedMinimumSalePrice) {
+      price = watchedMinimumSalePrice;
+    }
+    return Math.round(price * 100) / 100;
+  }, [watchedCostPrice, watchedMinimumSalePrice, watchedPricingPercent, watchedPricingType]);
+
   const onSubmit = async (values: ProductSchema): Promise<void> => {
     let imageFileId = values.imageFileId?.trim() ? values.imageFileId : null;
 
@@ -158,6 +185,12 @@ export function ProductFormDialog({
       itemStructure: values.itemStructure,
       salePrice: values.salePrice,
       costPrice: values.costPrice ?? null,
+      costUpdatePolicy: values.costUpdatePolicy,
+      pricingType: values.pricingType,
+      pricingPercent: values.pricingPercent,
+      minimumSalePrice: values.minimumSalePrice ?? null,
+      autoPriceUpdateEnabled: values.autoPriceUpdateEnabled,
+      salePriceLocked: values.salePriceLocked,
       sku: values.sku?.trim() ? values.sku : null,
       barcode: values.barcode?.trim() ? values.barcode : null,
       description: values.description?.trim() ? values.description : null,
@@ -324,6 +357,60 @@ export function ProductFormDialog({
                   <FieldError message={form.formState.errors.costPrice?.message} />
                 </div>
                 <div className="flex flex-col gap-1">
+                  <Label>Cost update policy</Label>
+                  <Select
+                    onValueChange={(value) =>
+                      form.setValue("costUpdatePolicy", value as ProductSchema["costUpdatePolicy"])
+                    }
+                    value={form.watch("costUpdatePolicy")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(COST_UPDATE_POLICY_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label>Pricing type</Label>
+                  <Select
+                    onValueChange={(value) =>
+                      form.setValue("pricingType", value as ProductSchema["pricingType"])
+                    }
+                    value={form.watch("pricingType")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(PRICING_TYPE_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="pricingPercent">Pricing percent</Label>
+                  <Input id="pricingPercent" type="number" {...form.register("pricingPercent")} />
+                  <FieldError message={form.formState.errors.pricingPercent?.message} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="minimumSalePrice">Minimum sale price</Label>
+                  <Input
+                    id="minimumSalePrice"
+                    type="number"
+                    {...form.register("minimumSalePrice")}
+                  />
+                  <FieldError message={form.formState.errors.minimumSalePrice?.message} />
+                </div>
+                <div className="flex flex-col gap-1">
                   <Label>Tax rate</Label>
                   <Select
                     onValueChange={(value) =>
@@ -344,6 +431,34 @@ export function ProductFormDialog({
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="mt-4 grid gap-3 rounded-2xl border border-brand-cappuccino/70 bg-white/70 p-3 md:grid-cols-[1fr_1fr_auto] md:items-center">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha">
+                    Suggested selling price
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-brand-espresso">
+                    AED {liveSuggestedPrice.toFixed(2)}
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 rounded-xl bg-brand-latte/60 p-2 text-sm text-brand-espresso">
+                  <Checkbox
+                    checked={form.watch("autoPriceUpdateEnabled")}
+                    onCheckedChange={(checked) =>
+                      form.setValue("autoPriceUpdateEnabled", checked === true)
+                    }
+                  />
+                  Auto-update POS price
+                </label>
+                <label className="flex items-center gap-2 rounded-xl bg-brand-latte/60 p-2 text-sm text-brand-espresso">
+                  <Checkbox
+                    checked={form.watch("salePriceLocked")}
+                    onCheckedChange={(checked) =>
+                      form.setValue("salePriceLocked", checked === true)
+                    }
+                  />
+                  Lock sale price
+                </label>
               </div>
             </CardContent>
           </Card>
