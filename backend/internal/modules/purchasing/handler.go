@@ -381,6 +381,18 @@ func (h *Handler) CancelReturn(c *gin.Context) {
 	respond(c, "purchase return cancelled successfully", result, err)
 }
 
+func (h *Handler) ReverseReturn(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	var req ReversePurchaseReturnRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.ReverseReturn(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	respond(c, "purchase return reversed successfully", result, err)
+}
+
 func (h *Handler) Summary(c *gin.Context) {
 	result, err := h.service.Summary(utils.MustAuthContext(c))
 	respond(c, "purchasing summary fetched successfully", result, err)

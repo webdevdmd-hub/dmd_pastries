@@ -58,6 +58,7 @@ func RegisterRoutes(
 	group.PATCH("/returns/:id", manage, handler.UpdateReturn)
 	group.POST("/returns/:id/post", manage, handler.PostReturn)
 	group.POST("/returns/:id/cancel", manage, handler.CancelReturn)
+	group.POST("/returns/:id/reverse", manage, handler.ReverseReturn)
 
 	group.GET("/summary", view, handler.Summary)
 	group.GET("/supplier/:supplierId/history", view, handler.SupplierHistory)

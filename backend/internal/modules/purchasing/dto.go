@@ -242,6 +242,10 @@ type UpdatePurchaseReturnRequest struct {
 	Charges                 []charges.ChargeInput     `json:"charges"`
 }
 
+type ReversePurchaseReturnRequest struct {
+	Reason string `json:"reason" binding:"required"`
+}
+
 type PurchaseReturnItemInput struct {
 	PurchaseReceiptItemID string  `json:"purchase_receipt_item_id" binding:"required"`
 	Quantity              float64 `json:"quantity" binding:"required"`
@@ -541,7 +545,7 @@ type PurchaseReturnResponse struct {
 	SupplierID              string                       `json:"supplier_id"`
 	SupplierName            string                       `json:"supplier_name"`
 	PurchaseOrderID         *string                      `json:"purchase_order_id"`
-	PurchaseInvoiceID       string                       `json:"purchase_invoice_id"`
+	PurchaseInvoiceID       *string                      `json:"purchase_invoice_id"`
 	PurchaseInvoiceNumber   string                       `json:"purchase_invoice_number"`
 	PurchaseReceiptID       string                       `json:"purchase_receipt_id"`
 	PurchaseReceiptNumber   string                       `json:"purchase_receipt_number"`
@@ -559,6 +563,15 @@ type PurchaseReturnResponse struct {
 	AppliedCreditAmount     float64                      `json:"applied_credit_amount"`
 	OpenCreditAmount        float64                      `json:"open_credit_amount"`
 	JournalEntryID          *string                      `json:"journal_entry_id"`
+	ReversalJournalEntryID  *string                      `json:"reversal_journal_entry_id"`
+	OriginalReturnID        *string                      `json:"original_return_id"`
+	OriginalReturnNumber    *string                      `json:"original_return_number"`
+	ReversalReturnID        *string                      `json:"reversal_return_id"`
+	ReversalReturnNumber    *string                      `json:"reversal_return_number"`
+	ReversalReason          string                       `json:"reversal_reason"`
+	ReversedByUserID        *string                      `json:"reversed_by_user_id"`
+	ReversedByUserName      string                       `json:"reversed_by_user_name"`
+	ReversedAt              *time.Time                   `json:"reversed_at"`
 	CreatedByUserID         string                       `json:"created_by_user_id"`
 	PostedByUserID          *string                      `json:"posted_by_user_id"`
 	PostedAt                *time.Time                   `json:"posted_at"`

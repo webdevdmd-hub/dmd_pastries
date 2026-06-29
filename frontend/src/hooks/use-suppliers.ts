@@ -15,6 +15,7 @@ import {
   getSupplierContacts,
   getSupplierNotes,
   getSuppliers,
+  getSupplierStatement,
   getSupplierStats,
   lookupSuppliers,
   updateSupplier,
@@ -30,6 +31,8 @@ import type {
   SupplierContact,
   SupplierFilters,
   SupplierNote,
+  SupplierStatement,
+  SupplierStatementFilters,
   SupplierStats,
   UpdateSupplierContactPayload,
   UpdateSupplierPayload,
@@ -126,6 +129,26 @@ export function useSupplierStats(supplierId: string | null, enabled = true) {
       }
 
       return getSupplierStats(supplierId);
+    },
+    enabled: enabled && supplierId !== null,
+  });
+}
+
+export function useSupplierStatement(
+  supplierId: string | null,
+  filters: SupplierStatementFilters = {},
+  enabled = true,
+) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<SupplierStatement>({
+    queryKey: [suppliersQueryKey, branchQueryKey, "statement", supplierId, filters],
+    queryFn: async () => {
+      if (!supplierId) {
+        throw new Error("Supplier ID is required.");
+      }
+
+      return getSupplierStatement(supplierId, filters);
     },
     enabled: enabled && supplierId !== null,
   });

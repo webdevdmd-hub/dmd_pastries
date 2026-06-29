@@ -219,12 +219,16 @@ export function PurchaseReturnDetailsPageClient({
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-brand-mocha">Linked invoice</p>
-            <Link
-              className="text-lg font-semibold text-brand-espresso hover:text-brand-mocha"
-              href={`${ROUTES.purchasingInvoices}/${purchaseReturn.purchaseInvoiceId}`}
-            >
-              {purchaseReturn.purchaseInvoiceNumber}
-            </Link>
+            {purchaseReturn.purchaseInvoiceId ? (
+              <Link
+                className="text-lg font-semibold text-brand-espresso hover:text-brand-mocha"
+                href={`${ROUTES.purchasingInvoices}/${purchaseReturn.purchaseInvoiceId}`}
+              >
+                {purchaseReturn.purchaseInvoiceNumber ?? "Bill number unavailable"}
+              </Link>
+            ) : (
+              <p className="text-lg font-semibold text-brand-espresso">Not linked</p>
+            )}
           </CardContent>
         </Card>
         <Card>

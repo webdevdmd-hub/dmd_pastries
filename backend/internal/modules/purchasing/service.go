@@ -901,9 +901,8 @@ func (s *Service) GetDocumentChain(currentUser *utils.AuthContext, purchaseOrder
 	}
 	for _, purchaseReturn := range returns {
 		returnID := purchaseReturn.ID
-		invoiceID := purchaseReturn.PurchaseInvoiceID
 		receiptID := purchaseReturn.PurchaseReceiptID
-		response.PurchaseReturns = append(response.PurchaseReturns, PurchaseDocumentChainItem{ID: purchaseReturn.ID, DocumentNumber: purchaseReturn.ReturnNumber, DocumentType: "purchase_return", Status: purchaseReturn.Status, Date: purchaseReturn.ReturnDate, TotalAmount: roundMoney(purchaseReturn.ReturnTotal), PurchaseOrderID: purchaseReturn.PurchaseOrderID, PurchaseInvoiceID: &invoiceID, PurchaseReceiptID: &receiptID, PurchaseReturnID: &returnID, PreviousID: &receiptID})
+		response.PurchaseReturns = append(response.PurchaseReturns, PurchaseDocumentChainItem{ID: purchaseReturn.ID, DocumentNumber: purchaseReturn.ReturnNumber, DocumentType: "purchase_return", Status: purchaseReturn.Status, Date: purchaseReturn.ReturnDate, TotalAmount: roundMoney(purchaseReturn.ReturnTotal), PurchaseOrderID: purchaseReturn.PurchaseOrderID, PurchaseInvoiceID: purchaseReturn.PurchaseInvoiceID, PurchaseReceiptID: &receiptID, PurchaseReturnID: &returnID, PreviousID: &receiptID})
 	}
 	for i, payment := range payments {
 		invoiceID := payment.PurchaseInvoiceID
@@ -2262,9 +2261,13 @@ func (s *Service) PostReturn(currentUser *utils.AuthContext, id, ipAddress, user
 		if purchaseReturn.Status != "draft" {
 			return apperrors.BadRequest("only draft purchase returns can be posted", nil)
 		}
-		invoice, err := s.repo.FindInvoiceForUpdate(tx, purchaseReturn.PurchaseInvoiceID, currentUser.BusinessID)
-		if err != nil {
-			return notFound(err, "purchase invoice not found")
+		var invoice *PurchaseInvoice
+		if purchaseReturn.PurchaseInvoiceID != nil && strings.TrimSpace(*purchaseReturn.PurchaseInvoiceID) != "" {
+			loadedInvoice, err := s.repo.FindInvoiceForUpdate(tx, *purchaseReturn.PurchaseInvoiceID, currentUser.BusinessID)
+			if err != nil {
+				return notFound(err, "purchase invoice not found")
+			}
+			invoice = loadedInvoice
 		}
 		items, err := s.repo.PurchaseReturnItemsForUpdate(tx, purchaseReturn.ID, currentUser.BusinessID)
 		if err != nil {
@@ -2311,19 +2314,14 @@ func (s *Service) PostReturn(currentUser *utils.AuthContext, id, ipAddress, user
 				return err
 			}
 		}
-		appliedCredit := roundMoney(purchaseReturn.ReturnTotal)
-		if appliedCredit > roundMoney(invoice.BalanceAmount) {
-			appliedCredit = roundMoney(invoice.BalanceAmount)
+		appliedCredit := 0.0
+		if invoice != nil {
+			appliedCredit = roundMoney(purchaseReturn.ReturnTotal)
+			if appliedCredit > roundMoney(invoice.BalanceAmount) {
+				appliedCredit = roundMoney(invoice.BalanceAmount)
+			}
 		}
 		openCredit := roundMoney(purchaseReturn.ReturnTotal - appliedCredit)
-		creditedAmount := roundMoney(invoice.CreditedAmount + appliedCredit)
-		returnedAmount := roundMoney(invoice.ReturnedAmount + purchaseReturn.ReturnTotal)
-		balanceAmount := roundMoney(invoice.TotalAmount - invoice.PaidAmount - creditedAmount)
-		if balanceAmount < 0 {
-			balanceAmount = 0
-		}
-		paymentStatus := invoicePaymentStatus(invoice.TotalAmount, roundMoney(invoice.PaidAmount+creditedAmount))
-		returnStatus := purchaseInvoiceReturnStatus(invoice.TotalAmount, returnedAmount)
 		now := time.Now().UTC()
 		returnUpdates := map[string]interface{}{
 			"status":                "posted",
@@ -2336,17 +2334,27 @@ func (s *Service) PostReturn(currentUser *utils.AuthContext, id, ipAddress, user
 		if err := s.repo.UpdatePurchaseReturn(tx, purchaseReturn.ID, currentUser.BusinessID, returnUpdates, nil); err != nil {
 			return err
 		}
-		if err := s.repo.UpdateInvoice(tx, invoice.ID, currentUser.BusinessID, map[string]interface{}{
-			"returned_amount": returnedAmount,
-			"credited_amount": creditedAmount,
-			"balance_amount":  balanceAmount,
-			"payment_status":  paymentStatus,
-			"return_status":   returnStatus,
-			"updated_at":      now,
-		}, nil); err != nil {
-			return err
+		if invoice != nil {
+			creditedAmount := roundMoney(invoice.CreditedAmount + appliedCredit)
+			returnedAmount := roundMoney(invoice.ReturnedAmount + purchaseReturn.ReturnTotal)
+			balanceAmount := roundMoney(invoice.TotalAmount - invoice.PaidAmount - creditedAmount)
+			if balanceAmount < 0 {
+				balanceAmount = 0
+			}
+			paymentStatus := invoicePaymentStatus(invoice.TotalAmount, roundMoney(invoice.PaidAmount+creditedAmount))
+			returnStatus := purchaseInvoiceReturnStatus(invoice.TotalAmount, returnedAmount)
+			if err := s.repo.UpdateInvoice(tx, invoice.ID, currentUser.BusinessID, map[string]interface{}{
+				"returned_amount": returnedAmount,
+				"credited_amount": creditedAmount,
+				"balance_amount":  balanceAmount,
+				"payment_status":  paymentStatus,
+				"return_status":   returnStatus,
+				"updated_at":      now,
+			}, nil); err != nil {
+				return err
+			}
 		}
-		if s.accountingService != nil {
+		if s.accountingService != nil && invoice != nil {
 			if _, err := s.accountingService.PostPurchaseReturnJournal(tx, currentUser, purchaseReturn.ID); err != nil {
 				return err
 			}
@@ -2389,6 +2397,137 @@ func (s *Service) CancelReturn(currentUser *utils.AuthContext, id, ipAddress, us
 	return s.GetReturn(currentUser, id)
 }
 
+func (s *Service) ReverseReturn(currentUser *utils.AuthContext, id string, req ReversePurchaseReturnRequest, ipAddress, userAgent string) (*PurchaseReturnResponse, error) {
+	if err := requireAllOrOverride(currentUser, []string{"purchasing.returns.reverse"}, []string{"purchasing.returns.manage", "purchasing.manage", "inventory.manage"}); err != nil {
+		return nil, err
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		return nil, apperrors.BadRequest("reversal reason is required", nil)
+	}
+
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		purchaseReturn, err := s.repo.FindPurchaseReturnForUpdate(tx, id, currentUser.BusinessID)
+		if err != nil {
+			return notFound(err, "purchase return not found")
+		}
+		if !currentUser.CanAccessBranch(purchaseReturn.BranchID) {
+			return apperrors.Forbidden("branch access denied")
+		}
+		if purchaseReturn.Status != "posted" {
+			return apperrors.BadRequest("only posted vendor credits can be reversed", nil)
+		}
+
+		var invoice *PurchaseInvoice
+		if purchaseReturn.PurchaseInvoiceID != nil && strings.TrimSpace(*purchaseReturn.PurchaseInvoiceID) != "" {
+			loadedInvoice, err := s.repo.FindInvoiceForUpdate(tx, *purchaseReturn.PurchaseInvoiceID, currentUser.BusinessID)
+			if err != nil {
+				return notFound(err, "purchase invoice not found")
+			}
+			invoice = loadedInvoice
+		}
+		items, err := s.repo.PurchaseReturnItemsForUpdate(tx, purchaseReturn.ID, currentUser.BusinessID)
+		if err != nil {
+			return err
+		}
+
+		for _, item := range items {
+			if item.StockMovementID == nil || strings.TrimSpace(*item.StockMovementID) == "" {
+				continue
+			}
+			original, err := s.inventoryRepo.FindStockMovementForUpdate(tx, *item.StockMovementID, currentUser.BusinessID)
+			if err != nil {
+				return notFound(err, "purchase return stock movement not found")
+			}
+			if original.IsReversed {
+				return apperrors.Conflict("purchase return stock movement was already reversed", map[string]interface{}{"reason": "purchase_return_stock_already_reversed", "stock_movement_id": original.ID})
+			}
+			movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{
+				BusinessID:         currentUser.BusinessID,
+				InventoryItemID:    item.InventoryItemID,
+				StockLocationID:    original.StockLocationID,
+				MovementType:       "adjustment_in",
+				Quantity:           item.Quantity,
+				UnitCost:           original.UnitCostSnapshot,
+				ReferenceType:      "purchase_return_reversal",
+				ReferenceID:        &purchaseReturn.ID,
+				ReferenceNumber:    purchaseReturn.ReturnNumber,
+				Reason:             "Reverse vendor credit: " + reason,
+				Notes:              "Reversal of purchase return stock movement " + original.ID,
+				IsReversal:         true,
+				ReversedMovementID: &original.ID,
+				CreatedByUserID:    currentUser.UserID,
+			})
+			if err != nil {
+				return err
+			}
+			if err := s.inventoryRepo.MarkMovementReversed(tx, original.ID, currentUser.BusinessID, movement.ID); err != nil {
+				return err
+			}
+		}
+
+		now := time.Now().UTC()
+
+		reversalJournalID := ""
+		if s.accountingService != nil && purchaseReturn.JournalEntryID != nil && strings.TrimSpace(*purchaseReturn.JournalEntryID) != "" {
+			reversalJournalID, err = s.accountingService.ReversePurchaseReturnJournal(tx, currentUser, *purchaseReturn.JournalEntryID, purchaseReturn.ReturnNumber)
+			if err != nil {
+				return err
+			}
+		}
+
+		returnUpdates := map[string]interface{}{
+			"status":                "reversed",
+			"applied_credit_amount": 0,
+			"open_credit_amount":    0,
+			"reversal_reason":       reason,
+			"reversed_by_user_id":   currentUser.UserID,
+			"reversed_at":           now,
+			"updated_at":            now,
+		}
+		if reversalJournalID != "" {
+			returnUpdates["reversal_journal_entry_id"] = reversalJournalID
+		}
+		if err := s.repo.UpdatePurchaseReturn(tx, purchaseReturn.ID, currentUser.BusinessID, returnUpdates, nil); err != nil {
+			return err
+		}
+		if invoice != nil {
+			creditedAmount := roundMoney(invoice.CreditedAmount - purchaseReturn.AppliedCreditAmount)
+			if creditedAmount < 0 {
+				creditedAmount = 0
+			}
+			returnedAmount := roundMoney(invoice.ReturnedAmount - purchaseReturn.ReturnTotal)
+			if returnedAmount < 0 {
+				returnedAmount = 0
+			}
+			balanceAmount := roundMoney(invoice.TotalAmount - invoice.PaidAmount - creditedAmount)
+			if balanceAmount < 0 {
+				balanceAmount = 0
+			}
+			paymentStatus := invoicePaymentStatus(invoice.TotalAmount, roundMoney(invoice.PaidAmount+creditedAmount))
+			returnStatus := purchaseInvoiceReturnStatus(invoice.TotalAmount, returnedAmount)
+			if err := s.repo.UpdateInvoice(tx, invoice.ID, currentUser.BusinessID, map[string]interface{}{
+				"returned_amount": returnedAmount,
+				"credited_amount": creditedAmount,
+				"balance_amount":  balanceAmount,
+				"payment_status":  paymentStatus,
+				"return_status":   returnStatus,
+				"updated_at":      now,
+			}, nil); err != nil {
+				return err
+			}
+		}
+		if err := s.audit(tx, currentUser, "purchase_return.reversed", purchaseReturn.ID, "Purchase return vendor credit reversed", ipAddress, userAgent); err != nil {
+			return err
+		}
+		return s.audit(tx, currentUser, "purchase_return.stock_reversal", purchaseReturn.ID, "Purchase return stock reversal posted", ipAddress, userAgent)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetReturn(currentUser, id)
+}
+
 func (s *Service) ReceiptReturnableItems(currentUser *utils.AuthContext, receiptID string) ([]PurchaseReturnableItemResponse, error) {
 	receipt, err := s.repo.FindReceipt(receiptID, currentUser.BusinessID)
 	if err != nil {
@@ -2400,12 +2539,19 @@ func (s *Service) ReceiptReturnableItems(currentUser *utils.AuthContext, receipt
 	if receipt.Status != "posted" {
 		return nil, apperrors.BadRequest("only posted purchase receipts have returnable items", nil)
 	}
-	if receipt.PurchaseInvoiceID == nil {
-		return nil, apperrors.BadRequest("purchase receipt must be linked to a posted invoice before return", nil)
-	}
-	invoiceItems, err := s.repo.InvoiceItems(*receipt.PurchaseInvoiceID, currentUser.BusinessID)
-	if err != nil {
-		return nil, apperrors.Internal("failed to load invoice items")
+	var invoiceItems []PurchaseInvoiceItem
+	if receipt.PurchaseInvoiceID != nil && strings.TrimSpace(*receipt.PurchaseInvoiceID) != "" {
+		invoice, err := s.repo.FindInvoice(*receipt.PurchaseInvoiceID, currentUser.BusinessID)
+		if err != nil {
+			return nil, notFound(err, "purchase invoice not found")
+		}
+		if invoice.Status != "posted" {
+			return nil, apperrors.BadRequest("receipt-linked purchase invoice must be posted before invoice credit can be applied", nil)
+		}
+		invoiceItems, err = s.repo.InvoiceItems(*receipt.PurchaseInvoiceID, currentUser.BusinessID)
+		if err != nil {
+			return nil, apperrors.Internal("failed to load invoice items")
+		}
 	}
 	receiptItems, err := s.repo.ReceiptItems(receipt.ID, currentUser.BusinessID)
 	if err != nil {
@@ -2417,11 +2563,10 @@ func (s *Service) ReceiptReturnableItems(currentUser *utils.AuthContext, receipt
 		if err != nil {
 			return nil, apperrors.Internal("failed to calculate returned quantity")
 		}
-		invoiceItem, ok := matchingInvoiceItem(invoiceItems, item)
-		if !ok {
-			return nil, apperrors.BadRequest("receipt item has no matching invoice item", map[string]interface{}{"item": item.ID})
+		response, err := s.returnableItemResponse(currentUser.BusinessID, receipt.BranchID, item, invoiceItems, returnedQty, item.QuantityReceived)
+		if err != nil {
+			return nil, err
 		}
-		response := s.returnableItemResponse(item, invoiceItem, returnedQty, item.QuantityReceived)
 		if response.ReturnableQuantity > 0 {
 			result = append(result, response)
 		}
@@ -2854,18 +2999,19 @@ func (s *Service) buildPurchaseReturn(tx *gorm.DB, currentUser *utils.AuthContex
 	if receipt.Status != "posted" {
 		return nil, nil, nil, apperrors.BadRequest("only posted purchase receipts can be returned", nil)
 	}
-	if receipt.PurchaseInvoiceID == nil {
-		return nil, nil, nil, apperrors.BadRequest("purchase receipt must be linked to a posted invoice before return", nil)
-	}
-	invoice, err := s.repo.FindInvoiceForUpdate(tx, *receipt.PurchaseInvoiceID, currentUser.BusinessID)
-	if err != nil {
-		return nil, nil, nil, notFound(err, "purchase invoice not found")
-	}
-	if invoice.Status != "posted" {
-		return nil, nil, nil, apperrors.BadRequest("only posted purchase invoices can receive vendor credits", nil)
-	}
-	if invoice.BranchID != receipt.BranchID || invoice.SupplierID != receipt.SupplierID {
-		return nil, nil, nil, apperrors.BadRequest("receipt and invoice supplier/branch do not match", nil)
+	var invoice *PurchaseInvoice
+	if receipt.PurchaseInvoiceID != nil && strings.TrimSpace(*receipt.PurchaseInvoiceID) != "" {
+		loadedInvoice, err := s.repo.FindInvoiceForUpdate(tx, *receipt.PurchaseInvoiceID, currentUser.BusinessID)
+		if err != nil {
+			return nil, nil, nil, notFound(err, "purchase invoice not found")
+		}
+		if loadedInvoice.Status != "posted" {
+			return nil, nil, nil, apperrors.BadRequest("receipt-linked purchase invoice must be posted before invoice credit can be applied", nil)
+		}
+		if loadedInvoice.BranchID != receipt.BranchID || loadedInvoice.SupplierID != receipt.SupplierID {
+			return nil, nil, nil, apperrors.BadRequest("receipt and invoice supplier/branch do not match", nil)
+		}
+		invoice = loadedInvoice
 	}
 	parsedReturnDate, err := parseDate(returnDate, "return_date")
 	if err != nil {
@@ -2891,7 +3037,7 @@ func (s *Service) buildPurchaseReturn(tx *gorm.DB, currentUser *utils.AuthContex
 		BranchID:                receipt.BranchID,
 		SupplierID:              receipt.SupplierID,
 		PurchaseOrderID:         receipt.PurchaseOrderID,
-		PurchaseInvoiceID:       invoice.ID,
+		PurchaseInvoiceID:       receipt.PurchaseInvoiceID,
 		PurchaseReceiptID:       receipt.ID,
 		ReturnDate:              parsedReturnDate,
 		SupplierReferenceNumber: strings.TrimSpace(supplierReferenceNumber),
@@ -2915,9 +3061,12 @@ func (s *Service) buildPurchaseReturnItems(tx *gorm.DB, businessID string, recei
 	if err != nil {
 		return nil, totals{}, err
 	}
-	invoiceItems, err := s.repo.InvoiceItems(invoice.ID, businessID)
-	if err != nil {
-		return nil, totals{}, err
+	var invoiceItems []PurchaseInvoiceItem
+	if invoice != nil {
+		invoiceItems, err = s.repo.InvoiceItems(invoice.ID, businessID)
+		if err != nil {
+			return nil, totals{}, err
+		}
 	}
 	receiptItemByID := make(map[string]PurchaseReceiptItem, len(receiptItems))
 	for _, item := range receiptItems {
@@ -2949,10 +3098,6 @@ func (s *Service) buildPurchaseReturnItems(tx *gorm.DB, businessID string, recei
 		if roundQuantity(input.Quantity) > returnable {
 			return nil, totals{}, apperrors.BadRequest("return quantity exceeds returnable quantity", map[string]interface{}{"item": receiptItem.ID, "returnable_quantity": returnable})
 		}
-		invoiceItem, ok := matchingInvoiceItem(invoiceItems, receiptItem)
-		if !ok {
-			return nil, totals{}, apperrors.BadRequest("receipt item has no matching invoice item", map[string]interface{}{"item": receiptItem.ID})
-		}
 		var stockLocationID *string
 		if strings.TrimSpace(input.StockLocationID) != "" {
 			if err := validateUUID(input.StockLocationID, "stock_location_id"); err != nil {
@@ -2967,13 +3112,28 @@ func (s *Service) buildPurchaseReturnItems(tx *gorm.DB, businessID string, recei
 			}
 			stockLocationID = &location.ID
 		}
-		if invoiceItem.Quantity <= 0 {
-			return nil, totals{}, apperrors.BadRequest("invoice item quantity must be greater than zero", nil)
+
+		itemName := s.receiptItemName(tx, businessID, receipt.BranchID, receiptItem)
+		unitCost := receiptItem.UnitCost
+		var taxRateID *string
+		discount := 0.0
+		tax := 0.0
+		if invoice != nil {
+			invoiceItem, ok := matchingInvoiceItem(invoiceItems, receiptItem)
+			if !ok {
+				return nil, totals{}, apperrors.BadRequest("receipt item has no matching invoice item", map[string]interface{}{"item": receiptItem.ID})
+			}
+			if invoiceItem.Quantity <= 0 {
+				return nil, totals{}, apperrors.BadRequest("invoice item quantity must be greater than zero", nil)
+			}
+			ratio := input.Quantity / invoiceItem.Quantity
+			itemName = invoiceItem.ItemNameSnapshot
+			unitCost = invoiceItem.UnitCost
+			discount = roundMoney(invoiceItem.DiscountAmount * ratio)
+			tax = roundMoney(invoiceItem.TaxAmount * ratio)
+			taxRateID = invoiceItem.TaxRateID
 		}
-		ratio := input.Quantity / invoiceItem.Quantity
-		lineSubtotal := roundMoney(invoiceItem.UnitCost * input.Quantity)
-		discount := roundMoney(invoiceItem.DiscountAmount * ratio)
-		tax := roundMoney(invoiceItem.TaxAmount * ratio)
+		lineSubtotal := roundMoney(unitCost * input.Quantity)
 		lineTotal := roundMoney(lineSubtotal - discount + tax)
 		line := lineTotals{Subtotal: lineSubtotal, Discount: discount, Tax: tax, Total: lineTotal}
 		total.add(line)
@@ -2987,12 +3147,12 @@ func (s *Service) buildPurchaseReturnItems(tx *gorm.DB, businessID string, recei
 			IngredientID:          receiptItem.IngredientID,
 			PackagingItemID:       receiptItem.PackagingItemID,
 			InventoryItemID:       receiptItem.InventoryItemID,
-			ItemNameSnapshot:      invoiceItem.ItemNameSnapshot,
+			ItemNameSnapshot:      itemName,
 			Quantity:              input.Quantity,
 			UnitID:                receiptItem.UnitID,
-			UnitCost:              invoiceItem.UnitCost,
+			UnitCost:              unitCost,
 			DiscountAmount:        discount,
-			TaxRateID:             invoiceItem.TaxRateID,
+			TaxRateID:             taxRateID,
 			TaxAmount:             tax,
 			LineSubtotal:          lineSubtotal,
 			LineTotal:             lineTotal,
@@ -3632,6 +3792,14 @@ func (s *Service) purchaseReturnResponse(businessID string, purchaseReturn Purch
 		AppliedCreditAmount:     roundMoney(purchaseReturn.AppliedCreditAmount),
 		OpenCreditAmount:        roundMoney(purchaseReturn.OpenCreditAmount),
 		JournalEntryID:          purchaseReturn.JournalEntryID,
+		ReversalJournalEntryID:  purchaseReturn.ReversalJournalEntryID,
+		OriginalReturnID:        purchaseReturn.OriginalReturnID,
+		OriginalReturnNumber:    s.purchaseReturnNumber(businessID, purchaseReturn.OriginalReturnID),
+		ReversalReturnID:        purchaseReturn.ReversalReturnID,
+		ReversalReturnNumber:    s.purchaseReturnNumber(businessID, purchaseReturn.ReversalReturnID),
+		ReversalReason:          purchaseReturn.ReversalReason,
+		ReversedByUserID:        purchaseReturn.ReversedByUserID,
+		ReversedAt:              purchaseReturn.ReversedAt,
 		CreatedByUserID:         purchaseReturn.CreatedByUserID,
 		PostedByUserID:          purchaseReturn.PostedByUserID,
 		PostedAt:                purchaseReturn.PostedAt,
@@ -3672,16 +3840,28 @@ func (s *Service) purchaseReturnResponse(businessID string, purchaseReturn Purch
 	return response
 }
 
-func (s *Service) purchaseReturnDocumentNumbers(businessID, invoiceID, receiptID string) (string, string) {
+func (s *Service) purchaseReturnDocumentNumbers(businessID string, invoiceID *string, receiptID string) (string, string) {
 	invoiceNumber := ""
 	receiptNumber := ""
-	if invoice, err := s.repo.FindInvoice(invoiceID, businessID); err == nil {
-		invoiceNumber = invoice.InvoiceNumber
+	if invoiceID != nil && strings.TrimSpace(*invoiceID) != "" {
+		if invoice, err := s.repo.FindInvoice(*invoiceID, businessID); err == nil {
+			invoiceNumber = invoice.InvoiceNumber
+		}
 	}
 	if receipt, err := s.repo.FindReceipt(receiptID, businessID); err == nil {
 		receiptNumber = receipt.ReceiptNumber
 	}
 	return invoiceNumber, receiptNumber
+}
+
+func (s *Service) purchaseReturnNumber(businessID string, returnID *string) *string {
+	if returnID == nil || strings.TrimSpace(*returnID) == "" {
+		return nil
+	}
+	if purchaseReturn, err := s.repo.FindPurchaseReturn(strings.TrimSpace(*returnID), businessID); err == nil {
+		return &purchaseReturn.ReturnNumber
+	}
+	return nil
 }
 
 func (s *Service) receiptResponse(businessID string, receipt PurchaseReceipt, includeItems bool) PurchaseReceiptResponse {
@@ -4102,18 +4282,51 @@ func matchingInvoiceItem(invoiceItems []PurchaseInvoiceItem, receiptItem Purchas
 	return PurchaseInvoiceItem{}, false
 }
 
-func (s *Service) returnableItemResponse(receiptItem PurchaseReceiptItem, invoiceItem PurchaseInvoiceItem, returnedQty, receivedQty float64) PurchaseReturnableItemResponse {
+func (s *Service) receiptItemName(tx *gorm.DB, businessID, branchID string, receiptItem PurchaseReceiptItem) string {
+	if receiptItem.ProductID != nil && strings.TrimSpace(*receiptItem.ProductID) != "" {
+		if product, err := s.repo.Product(tx, businessID, branchID, *receiptItem.ProductID); err == nil && strings.TrimSpace(product.ProductName) != "" {
+			return product.ProductName
+		}
+	}
+	if receiptItem.IngredientID != nil && strings.TrimSpace(*receiptItem.IngredientID) != "" {
+		if ingredient, err := s.repo.IngredientItem(tx, businessID, branchID, *receiptItem.IngredientID); err == nil && strings.TrimSpace(ingredient.IngredientName) != "" {
+			return ingredient.IngredientName
+		}
+	}
+	if receiptItem.PackagingItemID != nil && strings.TrimSpace(*receiptItem.PackagingItemID) != "" {
+		if packaging, err := s.repo.PackagingItem(tx, businessID, branchID, *receiptItem.PackagingItemID); err == nil && strings.TrimSpace(packaging.PackagingName) != "" {
+			return packaging.PackagingName
+		}
+	}
+	return "Received item"
+}
+
+func (s *Service) returnableItemResponse(businessID, branchID string, receiptItem PurchaseReceiptItem, invoiceItems []PurchaseInvoiceItem, returnedQty, receivedQty float64) (PurchaseReturnableItemResponse, error) {
 	returnable := roundQuantity(receivedQty - returnedQty)
 	if returnable < 0 {
 		returnable = 0
 	}
-	ratio := 0.0
-	if invoiceItem.Quantity > 0 {
-		ratio = returnable / invoiceItem.Quantity
+	itemName := s.receiptItemName(s.db, businessID, branchID, receiptItem)
+	unitCost := receiptItem.UnitCost
+	var taxRateID *string
+	discount := 0.0
+	tax := 0.0
+	if len(invoiceItems) > 0 {
+		invoiceItem, ok := matchingInvoiceItem(invoiceItems, receiptItem)
+		if !ok {
+			return PurchaseReturnableItemResponse{}, apperrors.BadRequest("receipt item has no matching invoice item", map[string]interface{}{"item": receiptItem.ID})
+		}
+		ratio := 0.0
+		if invoiceItem.Quantity > 0 {
+			ratio = returnable / invoiceItem.Quantity
+		}
+		itemName = invoiceItem.ItemNameSnapshot
+		unitCost = invoiceItem.UnitCost
+		discount = roundMoney(invoiceItem.DiscountAmount * ratio)
+		tax = roundMoney(invoiceItem.TaxAmount * ratio)
+		taxRateID = invoiceItem.TaxRateID
 	}
-	lineSubtotal := roundMoney(invoiceItem.UnitCost * returnable)
-	discount := roundMoney(invoiceItem.DiscountAmount * ratio)
-	tax := roundMoney(invoiceItem.TaxAmount * ratio)
+	lineSubtotal := roundMoney(unitCost * returnable)
 	lineTotal := roundMoney(lineSubtotal - discount + tax)
 	return PurchaseReturnableItemResponse{
 		PurchaseReceiptItemID: receiptItem.ID,
@@ -4122,21 +4335,21 @@ func (s *Service) returnableItemResponse(receiptItem PurchaseReceiptItem, invoic
 		IngredientID:          receiptItem.IngredientID,
 		PackagingItemID:       receiptItem.PackagingItemID,
 		InventoryItemID:       receiptItem.InventoryItemID,
-		ItemNameSnapshot:      invoiceItem.ItemNameSnapshot,
+		ItemNameSnapshot:      itemName,
 		QuantityReceived:      roundQuantity(receivedQty),
 		QuantityReturned:      roundQuantity(returnedQty),
 		ReturnableQuantity:    returnable,
 		UnitID:                receiptItem.UnitID,
 		UnitSymbol:            s.repo.UnitSymbol(receiptItem.UnitID),
-		UnitCost:              roundMoney(invoiceItem.UnitCost),
+		UnitCost:              roundMoney(unitCost),
 		DiscountAmount:        discount,
-		TaxRateID:             invoiceItem.TaxRateID,
+		TaxRateID:             taxRateID,
 		TaxAmount:             tax,
 		LineSubtotal:          lineSubtotal,
 		LineTotal:             lineTotal,
 		ExpiryDate:            receiptItem.ExpiryDate,
 		BatchNumber:           receiptItem.BatchNumber,
-	}
+	}, nil
 }
 
 func (s *Service) resolvePurchaseReturnStockLocation(tx *gorm.DB, businessID string, requestedLocationID *string, originalMovementID *string) (*string, error) {

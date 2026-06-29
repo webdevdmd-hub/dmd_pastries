@@ -1,5 +1,6 @@
 "use client";
 
+import { Plus } from "lucide-react";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -7,6 +8,7 @@ import { toast } from "sonner";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseEmptyState } from "@/components/purchasing/purchase-empty-state";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
+import { PurchaseReturnFromReceiptDialog } from "@/components/purchasing/purchase-return-from-receipt-dialog";
 import { PurchaseReturnsTable } from "@/components/purchasing/purchase-returns-table";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
 import { PurchasingToolbar } from "@/components/purchasing/purchasing-toolbar";
@@ -25,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { useStockLocations } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import {
   useCancelPurchaseReturn,
@@ -64,6 +67,10 @@ export function PurchaseReturnsPageClient(): JSX.Element {
     PERMISSIONS.purchasingReturnsPost,
     PERMISSIONS.purchasingReturnsManage,
   ]);
+  const canCreate = hasAnyPermission([
+    PERMISSIONS.purchasingReturnsCreate,
+    PERMISSIONS.purchasingReturnsManage,
+  ]);
   const canCancel = hasAnyPermission([
     PERMISSIONS.purchasingReturnsCancel,
     PERMISSIONS.purchasingReturnsManage,
@@ -77,10 +84,12 @@ export function PurchaseReturnsPageClient(): JSX.Element {
     branchId: branchScope.defaultBranchId,
   });
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [reversalReturn, setReversalReturn] = useState<PurchaseReturn | null>(null);
   const returnsQuery = usePurchaseReturns(filters, canView && branchScope.hasBranchScope);
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const branchesQuery = usePurchasingBranches(canView);
+  const stockLocationsQuery = useStockLocations(canView && canCreate);
   const postMutation = usePostPurchaseReturn();
   const cancelMutation = useCancelPurchaseReturn();
   const reverseMutation = useReversePurchaseReturn();
@@ -151,7 +160,22 @@ export function PurchaseReturnsPageClient(): JSX.Element {
       <PageHeader
         title="Vendor Credits"
         description="Review returned supplier stock, open vendor credits, and posted credit history."
+        actions={
+          canCreate ? (
+            <Button onClick={() => setCreateDialogOpen(true)} type="button">
+              <Plus className="h-4 w-4" />
+              Create vendor credit
+            </Button>
+          ) : undefined
+        }
       />
+
+      <Card>
+        <CardContent className="p-4 text-sm text-brand-mocha">
+          Vendor credits are created from posted receive-goods records so stock and bill links stay
+          correct.
+        </CardContent>
+      </Card>
 
       <PurchasingToolbar
         allowAllBranches={branchScope.canAccessAllBranches}
@@ -180,8 +204,10 @@ export function PurchaseReturnsPageClient(): JSX.Element {
 
       {!returnsQuery.isLoading && !returnsQuery.error && purchaseReturns.length === 0 ? (
         <PurchaseEmptyState
+          actionLabel={canCreate ? "Create vendor credit" : undefined}
           title="No vendor credits found."
-          description="Open a posted purchase receipt and use Return items to create a vendor credit."
+          description="Create one from a posted receive-goods record with returnable supplier stock."
+          onAction={canCreate ? () => setCreateDialogOpen(true) : undefined}
         />
       ) : null}
 
@@ -230,6 +256,15 @@ export function PurchaseReturnsPageClient(): JSX.Element {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PurchaseReturnFromReceiptDialog
+        branches={branchOptions}
+        defaultBranchId={branchScope.defaultBranchId}
+        onClose={() => setCreateDialogOpen(false)}
+        open={createDialogOpen}
+        stockLocations={stockLocationsQuery.data ?? []}
+        suppliers={suppliersQuery.data ?? []}
+      />
 
       <ReturnReversalDialog
         description="Reversing a posted vendor credit creates a linked correction while preserving payable, stock, and accounting audit history."

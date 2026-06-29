@@ -218,8 +218,8 @@ export type PurchaseReturn = {
   branchName: string;
   supplierId: string;
   supplierName: string;
-  purchaseInvoiceId: string;
-  purchaseInvoiceNumber: string;
+  purchaseInvoiceId: string | null;
+  purchaseInvoiceNumber: string | null;
   purchaseReceiptId: string;
   purchaseReceiptNumber: string;
   returnNumber: string;

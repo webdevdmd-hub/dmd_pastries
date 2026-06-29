@@ -19,6 +19,7 @@ import {
   usePurchaseReturns,
   useSupplierPayments,
 } from "@/hooks/use-purchasing";
+import { useSupplierStatement } from "@/hooks/use-suppliers";
 import { getErrorMessage } from "@/lib/api/client";
 import type {
   PurchaseInvoice,
@@ -27,6 +28,7 @@ import type {
   PurchaseReturn,
   SupplierPayment,
 } from "@/types/purchasing";
+import type { SupplierStatementItem } from "@/types/supplier";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
@@ -49,7 +51,7 @@ type RecentDocument = {
   status: JSX.Element;
 };
 
-type StatementRow = {
+type StatementDisplayRow = {
   credit: number;
   date: string | null;
   debit: number;
@@ -118,65 +120,49 @@ function paymentDocuments(payments: SupplierPayment[]): RecentDocument[] {
   }));
 }
 
-function buildVendorStatement({
-  invoices,
-  payments,
-  returns,
-}: {
-  invoices: PurchaseInvoice[];
-  payments: SupplierPayment[];
-  returns: PurchaseReturn[];
-}): StatementRow[] {
-  const rows = [
-    ...invoices.map((invoice) => ({
-      credit: 0,
-      date: invoice.invoiceDate,
-      debit: invoice.totalAmount,
-      documentNumber: invoice.supplierBillNumber ?? invoice.invoiceNumber,
-      key: `statement-bill-${invoice.id}`,
-      status: <PurchaseInvoiceStatusBadge status={invoice.status} />,
-      type: "Bill",
-    })),
-    ...payments.map((payment) => ({
-      credit: payment.amount,
-      date: payment.paidAt,
-      debit: 0,
-      documentNumber: payment.invoiceNumber,
-      key: `statement-payment-${payment.id}`,
-      status: (
-        <PurchasePaymentStatusBadge
-          status={payment.paymentStatus === "completed" ? "paid" : "unpaid"}
-        />
-      ),
-      type: "Payment Made",
-    })),
-    ...returns
-      .filter((purchaseReturn) => purchaseReturn.status !== "cancelled")
-      .map((purchaseReturn) => ({
-        credit: purchaseReturn.returnTotal,
-        date: purchaseReturn.returnDate,
-        debit: 0,
-        documentNumber: purchaseReturn.returnNumber,
-        key: `statement-vendor-credit-${purchaseReturn.id}`,
-        status: <PurchaseReturnStatusBadge status={purchaseReturn.status} />,
-        type: "Vendor Credit",
-      })),
-  ].sort((first, second) => {
-    const firstDate = first.date ? new Date(first.date).getTime() : 0;
-    const secondDate = second.date ? new Date(second.date).getTime() : 0;
-    return firstDate - secondDate;
-  });
+function statementTypeLabel(item: SupplierStatementItem): string {
+  if (item.transactionType === "payment_made") return "Payment Made";
+  if (item.transactionType === "vendor_credit") return "Vendor Credit";
+  return "Bill";
+}
 
-  let runningBalance = 0;
+function statementStatus(item: SupplierStatementItem): JSX.Element {
+  if (item.transactionType === "payment_made") {
+    return (
+      <PurchasePaymentStatusBadge status={item.paymentStatus === "completed" ? "paid" : "unpaid"} />
+    );
+  }
 
-  return rows.map((row) => {
-    runningBalance += row.debit - row.credit;
+  if (item.transactionType === "vendor_credit") {
+    return (
+      <PurchaseReturnStatusBadge status={item.status === "reversed" ? "reversed" : "posted"} />
+    );
+  }
 
-    return {
-      ...row,
-      runningBalance,
-    };
-  });
+  return (
+    <PurchaseInvoiceStatusBadge status={item.status === "cancelled" ? "cancelled" : "posted"} />
+  );
+}
+
+function statementDisplayRows(items: SupplierStatementItem[]): StatementDisplayRow[] {
+  return items.map((item) => ({
+    credit: item.creditAmount,
+    date: item.transactionDate,
+    debit: item.debitAmount,
+    documentNumber: item.documentNumber,
+    key: `statement-${item.transactionType}-${item.id}`,
+    runningBalance: item.runningBalance,
+    status: statementStatus(item),
+    type: statementTypeLabel(item),
+  }));
+}
+
+function formatStatementBalance(value: number): string {
+  if (value < 0) {
+    return `Supplier credit ${formatCurrency(Math.abs(value))}`;
+  }
+
+  return formatCurrency(value);
 }
 
 function itemKey(item: PurchaseInvoiceItem): string {
@@ -269,12 +255,14 @@ export function SupplierPurchasingHistory({
   const invoicesQuery = usePurchaseInvoices(invoiceFilters, canView);
   const returnsQuery = usePurchaseReturns(returnFilters, canView);
   const paymentsQuery = useSupplierPayments(paymentFilters, canView);
+  const statementQuery = useSupplierStatement(supplierId, {}, canView);
 
   const isLoading =
     ordersQuery.isLoading ||
     invoicesQuery.isLoading ||
     returnsQuery.isLoading ||
-    paymentsQuery.isLoading;
+    paymentsQuery.isLoading ||
+    statementQuery.isLoading;
 
   if (isLoading) {
     return <HistorySkeleton />;
@@ -284,8 +272,14 @@ export function SupplierPurchasingHistory({
   const invoices = invoicesQuery.data ?? [];
   const returns = returnsQuery.data ?? [];
   const payments = paymentsQuery.data ?? [];
+  const statement = statementQuery.data;
   const queryError =
-    ordersQuery.error ?? invoicesQuery.error ?? returnsQuery.error ?? paymentsQuery.error ?? null;
+    ordersQuery.error ??
+    invoicesQuery.error ??
+    returnsQuery.error ??
+    paymentsQuery.error ??
+    statementQuery.error ??
+    null;
 
   const totalPurchased = invoices.reduce((total, invoice) => total + invoice.totalAmount, 0);
   const totalPaid = payments.reduce((total, payment) => total + payment.amount, 0);
@@ -310,7 +304,7 @@ export function SupplierPurchasingHistory({
       return secondDate - firstDate;
     })
     .slice(0, 8);
-  const statementRows = buildVendorStatement({ invoices, payments, returns });
+  const statementRows = statementDisplayRows(statement?.items ?? []);
 
   return (
     <Card className="overflow-hidden border-brand-cappuccino bg-white/90">
@@ -455,6 +449,30 @@ export function SupplierPurchasingHistory({
               Running supplier balance from bills, payments made, and vendor credits.
             </p>
           </div>
+          <div className="grid gap-3 border-b border-brand-cappuccino bg-brand-latte/20 p-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              {
+                label: "Opening balance",
+                value: formatStatementBalance(statement?.openingBalance ?? 0),
+              },
+              { label: "Total debit", value: formatCurrency(statement?.totalDebit ?? 0) },
+              { label: "Total credit", value: formatCurrency(statement?.totalCredit ?? 0) },
+              {
+                label: "Closing balance",
+                value: formatStatementBalance(statement?.closingBalance ?? 0),
+              },
+            ].map((metric) => (
+              <div
+                className="rounded-xl border border-brand-cappuccino bg-white px-3 py-2"
+                key={metric.label}
+              >
+                <p className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-brand-mocha">
+                  {metric.label}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-brand-espresso">{metric.value}</p>
+              </div>
+            ))}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[48rem] text-sm">
               <thead className="bg-brand-latte/50 text-left text-xs uppercase tracking-[0.18em] text-brand-mocha">
@@ -495,6 +513,23 @@ export function SupplierPurchasingHistory({
                   </tr>
                 )}
               </tbody>
+              <tfoot className="border-t border-brand-cappuccino bg-brand-latte/40">
+                <tr>
+                  <td className="px-4 py-3 font-semibold text-brand-espresso" colSpan={3}>
+                    Statement total
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-brand-espresso">
+                    {formatCurrency(statement?.totalDebit ?? 0)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-brand-espresso">
+                    {formatCurrency(statement?.totalCredit ?? 0)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-brand-espresso">
+                    {formatStatementBalance(statement?.closingBalance ?? 0)}
+                  </td>
+                  <td className="px-4 py-3" />
+                </tr>
+              </tfoot>
             </table>
           </div>
         </section>

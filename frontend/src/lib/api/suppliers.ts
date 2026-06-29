@@ -8,6 +8,10 @@ import type {
   SupplierFilters,
   SupplierLookupParams,
   SupplierNote,
+  SupplierStatement,
+  SupplierStatementFilters,
+  SupplierStatementItem,
+  SupplierStatementTransactionType,
   SupplierStats,
   SupplierStatus,
   UpdateSupplierContactPayload,
@@ -61,6 +65,12 @@ function booleanValue(value: unknown, fallback = false): boolean {
 
 function isSupplierStatus(value: unknown): value is SupplierStatus {
   return value === "active" || value === "inactive" || value === "blocked";
+}
+
+function isSupplierStatementTransactionType(
+  value: unknown,
+): value is SupplierStatementTransactionType {
+  return value === "bill" || value === "payment_made" || value === "vendor_credit";
 }
 
 function parseList<TItem>(value: unknown, parser: (item: unknown) => TItem): TItem[] {
@@ -175,6 +185,55 @@ function parseStats(value: unknown): SupplierStats {
     totalPurchaseOrders: numberValue(value.total_purchase_orders),
     totalPurchaseAmount: numberValue(value.total_purchase_amount),
     lastPurchaseDate: optionalString(value.last_purchase_date),
+  };
+}
+
+function parseStatementItem(value: unknown): SupplierStatementItem {
+  if (!isObject(value)) {
+    throw new Error("Backend supplier statement item payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.id),
+    documentId: stringValue(value.document_id),
+    documentNumber: stringValue(value.document_number, "Document"),
+    transactionType: isSupplierStatementTransactionType(value.transaction_type)
+      ? value.transaction_type
+      : "bill",
+    transactionDate: stringValue(value.transaction_date),
+    branchId: stringValue(value.branch_id),
+    branchName: stringValue(value.branch_name, "Branch"),
+    debitAmount: numberValue(value.debit_amount),
+    creditAmount: numberValue(value.credit_amount),
+    runningBalance: numberValue(value.running_balance),
+    status: stringValue(value.status),
+    paymentStatus: stringValue(value.payment_status),
+    referenceNumber: optionalString(value.reference_number),
+    notes: optionalString(value.notes),
+    purchaseOrderId: optionalString(value.purchase_order_id),
+    purchaseInvoiceId: optionalString(value.purchase_invoice_id),
+    purchaseReceiptId: optionalString(value.purchase_receipt_id),
+    purchaseReturnId: optionalString(value.purchase_return_id),
+    paymentId: optionalString(value.payment_id),
+  };
+}
+
+function parseStatement(value: unknown): SupplierStatement {
+  if (!isObject(value)) {
+    throw new Error("Backend supplier statement payload is invalid.");
+  }
+
+  return {
+    supplierId: stringValue(value.supplier_id),
+    supplierCode: stringValue(value.supplier_code, "Supplier"),
+    supplierName: stringValue(value.supplier_name, "Supplier"),
+    dateFrom: optionalString(value.date_from),
+    dateTo: optionalString(value.date_to),
+    openingBalance: numberValue(value.opening_balance),
+    totalDebit: numberValue(value.total_debit),
+    totalCredit: numberValue(value.total_credit),
+    closingBalance: numberValue(value.closing_balance),
+    items: Array.isArray(value.items) ? value.items.map(parseStatementItem) : [],
   };
 }
 
@@ -408,6 +467,25 @@ export async function getSupplierStats(supplierId: string): Promise<SupplierStat
     authMode: "appwrite",
     parse: parseStats,
   });
+
+  return response.data;
+}
+
+export async function getSupplierStatement(
+  supplierId: string,
+  filters: SupplierStatementFilters = {},
+): Promise<SupplierStatement> {
+  const response = await apiRequest<SupplierStatement>(
+    `/api/v1/suppliers/${supplierId}/statement${toQueryString({
+      date_from: filters.dateFrom,
+      date_to: filters.dateTo,
+      transaction_type: filters.transactionType,
+    })}`,
+    {
+      authMode: "appwrite",
+      parse: parseStatement,
+    },
+  );
 
   return response.data;
 }

@@ -55,6 +55,49 @@ export type SupplierStats = {
   lastPurchaseDate: string | null;
 };
 
+export type SupplierStatementTransactionType = "bill" | "payment_made" | "vendor_credit";
+
+export type SupplierStatementItem = {
+  id: string;
+  documentId: string;
+  documentNumber: string;
+  transactionType: SupplierStatementTransactionType;
+  transactionDate: string;
+  branchId: string;
+  branchName: string;
+  debitAmount: number;
+  creditAmount: number;
+  runningBalance: number;
+  status: string;
+  paymentStatus: string;
+  referenceNumber: string | null;
+  notes: string | null;
+  purchaseOrderId: string | null;
+  purchaseInvoiceId: string | null;
+  purchaseReceiptId: string | null;
+  purchaseReturnId: string | null;
+  paymentId: string | null;
+};
+
+export type SupplierStatement = {
+  supplierId: string;
+  supplierCode: string;
+  supplierName: string;
+  dateFrom: string | null;
+  dateTo: string | null;
+  openingBalance: number;
+  totalDebit: number;
+  totalCredit: number;
+  closingBalance: number;
+  items: SupplierStatementItem[];
+};
+
+export type SupplierStatementFilters = {
+  dateFrom?: string;
+  dateTo?: string;
+  transactionType?: SupplierStatementTransactionType | "all";
+};
+
 export type CreateSupplierPayload = {
   supplierName: string;
   phone?: string | null;

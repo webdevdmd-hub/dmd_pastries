@@ -265,7 +265,7 @@ type PurchaseReturn struct {
 	BranchID                string         `gorm:"type:uuid;not null;index" json:"branch_id"`
 	SupplierID              string         `gorm:"type:uuid;not null;index" json:"supplier_id"`
 	PurchaseOrderID         *string        `gorm:"type:uuid;index" json:"purchase_order_id"`
-	PurchaseInvoiceID       string         `gorm:"type:uuid;not null;index" json:"purchase_invoice_id"`
+	PurchaseInvoiceID       *string        `gorm:"type:uuid;index" json:"purchase_invoice_id"`
 	PurchaseReceiptID       string         `gorm:"type:uuid;not null;index" json:"purchase_receipt_id"`
 	ReturnNumber            string         `gorm:"size:100;not null" json:"return_number"`
 	ReturnDate              time.Time      `gorm:"type:date;not null" json:"return_date"`
@@ -281,6 +281,12 @@ type PurchaseReturn struct {
 	AppliedCreditAmount     float64        `gorm:"not null;default:0" json:"applied_credit_amount"`
 	OpenCreditAmount        float64        `gorm:"not null;default:0" json:"open_credit_amount"`
 	JournalEntryID          *string        `gorm:"type:uuid;index" json:"journal_entry_id"`
+	ReversalJournalEntryID  *string        `gorm:"type:uuid;index" json:"reversal_journal_entry_id"`
+	OriginalReturnID        *string        `gorm:"type:uuid;index" json:"original_return_id"`
+	ReversalReturnID        *string        `gorm:"type:uuid;index" json:"reversal_return_id"`
+	ReversalReason          string         `json:"reversal_reason"`
+	ReversedByUserID        *string        `gorm:"type:uuid;index" json:"reversed_by_user_id"`
+	ReversedAt              *time.Time     `json:"reversed_at"`
 	CreatedByUserID         string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
 	PostedByUserID          *string        `gorm:"type:uuid;index" json:"posted_by_user_id"`
 	PostedAt                *time.Time     `json:"posted_at"`

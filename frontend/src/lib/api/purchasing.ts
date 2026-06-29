@@ -539,7 +539,9 @@ function parseInvoice(value: unknown): PurchaseInvoice {
     totalAmount: numberValue(value.total_amount),
     paidAmount: numberValue(value.paid_amount),
     balanceAmount: numberValue(value.balance_amount),
-    receiveStatus: isInvoiceReceiveStatus(value.receive_status) ? value.receive_status : "not_received",
+    receiveStatus: isInvoiceReceiveStatus(value.receive_status)
+      ? value.receive_status
+      : "not_received",
     canReceiveStock:
       typeof value.can_receive_stock === "boolean"
         ? value.can_receive_stock
@@ -655,8 +657,8 @@ function parsePurchaseReturn(value: unknown): PurchaseReturn {
     journalEntryId: optionalString(value.journal_entry_id),
     openCreditAmount: numberValue(value.open_credit_amount),
     postedAt: optionalString(value.posted_at),
-    purchaseInvoiceId: stringValue(value.purchase_invoice_id),
-    purchaseInvoiceNumber: stringValue(value.purchase_invoice_number, "Invoice"),
+    purchaseInvoiceId: optionalString(value.purchase_invoice_id),
+    purchaseInvoiceNumber: optionalString(value.purchase_invoice_number),
     purchaseReceiptId: stringValue(value.purchase_receipt_id),
     purchaseReceiptNumber: stringValue(value.purchase_receipt_number, "Receipt"),
     reason: optionalString(value.reason),
@@ -827,9 +829,10 @@ function parseDocumentChainInvoice(value: unknown): PurchaseInvoice {
     paymentStatus: isPaymentStatus(value.payment_status) ? value.payment_status : "unpaid",
     purchaseOrderId: optionalString(value.purchase_order_id),
     purchaseOrderNumber: optionalString(value.purchase_order_number),
-    receiveStatus: isInvoiceReceiveStatus(value.receive_status) ? value.receive_status : "not_received",
-    canReceiveStock:
-      typeof value.can_receive_stock === "boolean" ? value.can_receive_stock : false,
+    receiveStatus: isInvoiceReceiveStatus(value.receive_status)
+      ? value.receive_status
+      : "not_received",
+    canReceiveStock: typeof value.can_receive_stock === "boolean" ? value.can_receive_stock : false,
     reversalJournalEntryId: optionalString(value.reversal_journal_entry_id),
     status: isInvoiceStatus(value.status) ? value.status : "draft",
     subtotalAmount: 0,
@@ -884,8 +887,8 @@ function parseDocumentChainPurchaseReturn(value: unknown): PurchaseReturn {
     journalEntryId: optionalString(value.journal_entry_id),
     openCreditAmount: numberValue(value.open_credit_amount),
     postedAt: optionalString(value.posted_at),
-    purchaseInvoiceId: stringValue(value.purchase_invoice_id),
-    purchaseInvoiceNumber: stringValue(value.purchase_invoice_number, "Invoice"),
+    purchaseInvoiceId: optionalString(value.purchase_invoice_id),
+    purchaseInvoiceNumber: optionalString(value.purchase_invoice_number),
     purchaseReceiptId: stringValue(value.purchase_receipt_id),
     purchaseReceiptNumber: stringValue(value.purchase_receipt_number, "Receipt"),
     reason: optionalString(value.reason),

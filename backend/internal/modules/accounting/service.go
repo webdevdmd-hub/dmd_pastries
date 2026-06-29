@@ -1426,7 +1426,7 @@ func (s *Service) RefreshPurchaseInvoiceJournalAfterEdit(tx *gorm.DB, currentUse
 		return "", nil
 	}
 	if invoice.JournalEntryID != nil && strings.TrimSpace(*invoice.JournalEntryID) != "" {
-		if err := s.reversePostedJournalInTx(tx, currentUser, strings.TrimSpace(*invoice.JournalEntryID), "purchase_invoice_edit_reverse", "Purchase invoice edit reversal "+invoice.InvoiceNumber); err != nil {
+		if _, err := s.reversePostedJournalInTx(tx, currentUser, strings.TrimSpace(*invoice.JournalEntryID), "purchase_invoice_edit_reverse", "Purchase invoice edit reversal "+invoice.InvoiceNumber); err != nil {
 			return "", err
 		}
 	}
@@ -1474,24 +1474,28 @@ func (s *Service) buildPurchaseInvoiceJournalLineRequests(tx *gorm.DB, businessI
 	return lines, nil
 }
 
-func (s *Service) reversePostedJournalInTx(tx *gorm.DB, currentUser *utils.AuthContext, journalEntryID, sourceType, narration string) error {
+func (s *Service) ReversePurchaseReturnJournal(tx *gorm.DB, currentUser *utils.AuthContext, journalEntryID, returnNumber string) (string, error) {
+	return s.reversePostedJournalInTx(tx, currentUser, journalEntryID, "purchase_return_reversal", "Vendor credit reversal "+strings.TrimSpace(returnNumber))
+}
+
+func (s *Service) reversePostedJournalInTx(tx *gorm.DB, currentUser *utils.AuthContext, journalEntryID, sourceType, narration string) (string, error) {
 	entry, err := s.repo.FindJournalEntryForUpdate(tx, currentUser.BusinessID, strings.TrimSpace(journalEntryID))
 	if err != nil {
-		return apperrors.Internal("failed to load purchase invoice accounting journal")
+		return "", apperrors.Internal("failed to load accounting journal")
 	}
 	if entry.Status == "reversed" {
-		return nil
+		return "", nil
 	}
 	if entry.Status != "posted" {
-		return apperrors.BadRequest("only posted purchase invoice journals can be reversed for bill edit", nil)
+		return "", apperrors.BadRequest("only posted journals can be reversed", nil)
 	}
 	lines, err := s.repo.ListJournalEntryLinesForUpdate(tx, currentUser.BusinessID, entry.ID)
 	if err != nil {
-		return apperrors.Internal("failed to load purchase invoice accounting journal lines")
+		return "", apperrors.Internal("failed to load accounting journal lines")
 	}
 	reversalEntryNumber, err := s.repo.NextJournalEntryNumber(tx, currentUser.BusinessID, time.Now().UTC())
 	if err != nil {
-		return apperrors.Internal("failed to generate reversal journal entry number")
+		return "", apperrors.Internal("failed to generate reversal journal entry number")
 	}
 	reversalID := utils.NewUUID()
 	reversalLines := make([]JournalEntryLine, 0, len(lines))
@@ -1528,12 +1532,12 @@ func (s *Service) reversePostedJournalInTx(tx *gorm.DB, currentUser *utils.AuthC
 		UpdatedByUserID: &currentUser.UserID,
 	}
 	if err := s.repo.CreateJournalEntry(tx, reversal, reversalLines); err != nil {
-		return apperrors.Internal("failed to create purchase invoice edit reversal journal")
+		return "", apperrors.Internal("failed to create reversal journal")
 	}
 	if err := s.repo.UpdateJournalEntry(tx, currentUser.BusinessID, entry.ID, map[string]interface{}{"status": "reversed", "reversed_at": now, "reversed_by_user_id": currentUser.UserID, "updated_by_user_id": currentUser.UserID, "updated_at": now}); err != nil {
-		return apperrors.Internal("failed to mark purchase invoice journal reversed")
+		return "", apperrors.Internal("failed to mark journal reversed")
 	}
-	return nil
+	return reversalID, nil
 }
 
 func (s *Service) PostPurchaseInvoiceCancellationJournal(tx *gorm.DB, currentUser *utils.AuthContext, invoiceID string) (string, error) {
