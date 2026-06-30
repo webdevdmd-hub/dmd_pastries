@@ -116,7 +116,7 @@ func (s *Service) CreateProduction(currentUser *utils.AuthContext, req CreatePro
 		if err != nil {
 			return err
 		}
-		if err := s.validateProductionHasValuedInputs(tx, currentUser.BusinessID, batch.BranchID, ingredients, packaging); err != nil {
+		if err := s.validateProductionHasValuedInputs(tx, currentUser.BusinessID, batch.BranchID, batch.RecipeID, ingredients, packaging); err != nil {
 			return err
 		}
 		number, err := s.repo.NextNumber(tx, currentUser.BusinessID)
@@ -204,9 +204,9 @@ func (s *Service) ProductionPreview(currentUser *utils.AuthContext, recipeID, br
 	if hasZeroCostWarning {
 		warnings = append(warnings, "Some components have quantity but zero inventory value. Accounting journal will not be created until stock has value.")
 	}
-	if len(components) == 0 && len(packaging) == 0 {
+	if len(components) == 0 {
 		hasZeroCostWarning = true
-		warnings = append(warnings, "This recipe has no components or packaging, so production has no inventory cost to post.")
+		warnings = append(warnings, "This recipe has no ingredients/components. Add BOM lines in Recipe Builder before producing.")
 	}
 	return &ProductionPreviewResponse{
 		RecipeID:                 recipe.ID,
@@ -624,7 +624,7 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	} else if output != nil {
 		return apperrors.BadRequest("production output already exists for this batch", nil)
 	}
-	if err := s.validateProductionHasValuedInputs(tx, currentUser.BusinessID, batch.BranchID, ingredients, packaging); err != nil {
+	if err := s.validateProductionHasValuedInputs(tx, currentUser.BusinessID, batch.BranchID, batch.RecipeID, ingredients, packaging); err != nil {
 		return err
 	}
 	consumedCost := 0.0
@@ -906,7 +906,7 @@ func (s *Service) buildIngredientLines(tx *gorm.DB, businessID, batchID, branchI
 	for _, recipeLine := range recipeLines {
 		item, err := s.resolveRecipeIngredientInventoryItem(tx, businessID, branchID, recipeLine)
 		if err != nil {
-			return nil, err
+			return nil, recipeIngredientConsumptionError(err, branchID, recipeLine)
 		}
 		if item.UnitID != recipeLine.UnitID {
 			return nil, apperrors.BadRequest("unit conversion is not available yet; recipe ingredient unit must match inventory unit", nil)
@@ -984,7 +984,7 @@ func (s *Service) buildPackagingLines(tx *gorm.DB, businessID, batchID, branchID
 	for _, recipeLine := range recipeLines {
 		item, err := s.resolveRecipePackagingInventoryItem(tx, businessID, branchID, recipeLine)
 		if err != nil {
-			return nil, err
+			return nil, recipePackagingConsumptionError(err, branchID, recipeLine)
 		}
 		if item.UnitID != recipeLine.UnitID {
 			return nil, apperrors.BadRequest("unit conversion is not available yet; recipe packaging unit must match inventory unit", nil)
@@ -1073,6 +1073,47 @@ func (s *Service) findOrCreateProductInventoryItem(tx *gorm.DB, businessID, bran
 		return nil, err
 	}
 	return item, nil
+}
+
+func recipeIngredientConsumptionError(err error, branchID string, line recipeIngredientInfo) error {
+	details := map[string]interface{}{
+		"reason":               "recipe_component_not_consumable",
+		"recipe_line_id":       line.ID,
+		"component_product_id": line.ComponentProductID,
+		"component_variant_id": line.ComponentVariantID,
+		"ingredient_id":        line.IngredientID,
+		"inventory_item_id":    line.InventoryItemID,
+		"branch_id":            branchID,
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		details["reason"] = "recipe_component_inventory_missing"
+		return apperrors.BadRequest("recipe component inventory item is missing for production", details)
+	}
+	var appErr *apperrors.AppError
+	if errors.As(err, &appErr) {
+		return apperrors.New(appErr.StatusCode, appErr.Message, details)
+	}
+	return err
+}
+
+func recipePackagingConsumptionError(err error, branchID string, line recipePackagingInfo) error {
+	details := map[string]interface{}{
+		"reason":               "recipe_packaging_not_consumable",
+		"recipe_line_id":       line.ID,
+		"component_product_id": line.ComponentProductID,
+		"component_variant_id": line.ComponentVariantID,
+		"packaging_item_id":    line.PackagingItemID,
+		"branch_id":            branchID,
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		details["reason"] = "recipe_packaging_inventory_missing"
+		return apperrors.BadRequest("recipe packaging inventory item is missing for production", details)
+	}
+	var appErr *apperrors.AppError
+	if errors.As(err, &appErr) {
+		return apperrors.New(appErr.StatusCode, appErr.Message, details)
+	}
+	return err
 }
 
 func (s *Service) resolveProductionPackagingInventoryItem(tx *gorm.DB, businessID, branchID string, line ProductionPackagingConsumption) (*inventory.InventoryItem, error) {
@@ -1288,9 +1329,20 @@ func (s *Service) previewInventoryItem(businessID, branchID string, componentPro
 	return item, "", fallbackType, err
 }
 
-func (s *Service) validateProductionHasValuedInputs(tx *gorm.DB, businessID, branchID string, ingredients []ProductionIngredientConsumption, packaging []ProductionPackagingConsumption) error {
-	if len(ingredients) == 0 && len(packaging) == 0 {
-		return apperrors.BadRequest("production cannot be posted because the recipe has no components to consume. Add at least one component to the recipe. Packaging is optional.", nil)
+func (s *Service) validateProductionHasValuedInputs(tx *gorm.DB, businessID, branchID, recipeID string, ingredients []ProductionIngredientConsumption, packaging []ProductionPackagingConsumption) error {
+	componentCount, packagingCount, err := s.repo.RecipeBOMCounts(tx, businessID, branchID, recipeID)
+	if err != nil {
+		return err
+	}
+
+	if len(ingredients) == 0 {
+		reason := "recipe_has_no_components"
+		message := "production cannot be posted because the recipe has no components to consume. Add at least one component to the recipe. Packaging is optional."
+		if componentCount > 0 {
+			reason = "recipe_components_not_consumable"
+			message = "production cannot be posted because the recipe components could not be converted into consumable production lines"
+		}
+		return apperrors.BadRequest(message, map[string]interface{}{"reason": reason, "recipe_id": recipeID, "branch_id": branchID, "component_count": componentCount, "packaging_count": packagingCount})
 	}
 	hasRequiredInput := false
 	zeroCostLines := make([]string, 0)
@@ -1340,7 +1392,7 @@ func (s *Service) validateProductionHasValuedInputs(tx *gorm.DB, businessID, bra
 		}
 	}
 	if !hasRequiredInput {
-		return apperrors.BadRequest("production cannot be posted because the recipe has no component quantity to consume. Add at least one component with quantity greater than zero. Packaging is optional.", nil)
+		return apperrors.BadRequest("production cannot be posted because the recipe has no component quantity to consume. Add at least one component with quantity greater than zero. Packaging is optional.", map[string]interface{}{"reason": "recipe_has_no_component_quantity", "recipe_id": recipeID, "branch_id": branchID, "component_count": componentCount, "packaging_count": packagingCount})
 	}
 	if len(stockShortages) > 0 {
 		return apperrors.BadRequest("production cannot be posted because required component or packaging stock is not available", map[string]interface{}{"shortages": stockShortages})

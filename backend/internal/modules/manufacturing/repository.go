@@ -140,6 +140,24 @@ func (r *Repository) RecipePackaging(tx *gorm.DB, businessID, branchID, recipeID
 	return items, err
 }
 
+func (r *Repository) RecipeBOMCounts(tx *gorm.DB, businessID, branchID, recipeID string) (int64, int64, error) {
+	var componentCount int64
+	if err := tx.Table("recipe_ingredients").
+		Where("recipe_id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", recipeID, businessID, branchID).
+		Count(&componentCount).Error; err != nil {
+		return 0, 0, err
+	}
+
+	var packagingCount int64
+	if err := tx.Table("recipe_packaging").
+		Where("recipe_id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", recipeID, businessID, branchID).
+		Count(&packagingCount).Error; err != nil {
+		return 0, 0, err
+	}
+
+	return componentCount, packagingCount, nil
+}
+
 func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string) (*productInfo, error) {
 	var product productInfo
 	err := tx.Table("products").

@@ -223,6 +223,7 @@ export function BatchesPageClient(): JSX.Element {
       setFormOpen(false);
     } catch (error) {
       toast.error(manufacturingErrorMessage(error));
+      throw error;
     }
   };
 

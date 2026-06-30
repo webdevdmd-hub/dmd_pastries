@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useProductionPreview } from "@/hooks/use-manufacturing";
+import { ApiError } from "@/lib/api/client";
 import { createBatchSchema, createProductionSchema } from "@/lib/validators/manufacturing.schema";
 import type {
   CreateBatchPayload,
@@ -38,7 +39,28 @@ import type {
 import { ITEM_STRUCTURE_LABELS, PRODUCT_TYPE_LABELS } from "@/types/product";
 
 const EMPTY_COMPONENT_RECIPE_MESSAGE =
-  "This recipe has no ingredients or packaging. Add BOM lines before producing.";
+  "This recipe has no ingredients/components. Add BOM lines in Recipe Builder before producing.";
+const PREVIEW_OUT_OF_SYNC_MESSAGE =
+  "Recipe preview and production validation are out of sync. Refresh the recipe or reopen the dialog.";
+
+function quantitiesMatch(left: number, right: number): boolean {
+  return Math.abs(left - right) < 0.0001;
+}
+
+function productionErrorMessage(error: unknown, previewHadLines: boolean): string {
+  if (previewHadLines && error instanceof ApiError) {
+    const reason = error.errorDetails?.reason;
+    if (
+      reason === "recipe_has_no_components" ||
+      reason === "recipe_has_no_component_quantity" ||
+      reason === "recipe_components_not_consumable"
+    ) {
+      return PREVIEW_OUT_OF_SYNC_MESSAGE;
+    }
+  }
+
+  return error instanceof Error ? error.message : "Production could not be posted.";
+}
 
 function countLabel(value: number | null): string {
   return value === null ? "Unknown" : value.toLocaleString();
@@ -208,8 +230,7 @@ export function BatchFormDialog({
 
   const recipeHasKnownMissingComponents = (
     recipe: ManufacturingRecipeOption | undefined,
-  ): boolean =>
-    recipe?.componentCount === 0 && (recipe.packagingCount === 0 || recipe.packagingCount === null);
+  ): boolean => recipe?.componentCount === 0;
 
   const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
   const selectedRecipeIsKnownInactive = recipeIsKnownInactive(selectedRecipe);
@@ -227,14 +248,64 @@ export function BatchFormDialog({
       plannedQuantity > 0,
   );
   const productionPreview = productionPreviewQuery.data;
-  const previewHasNoLines =
-    productionPreview?.components.length === 0 && productionPreview.packaging.length === 0;
+  const previewHasNoComponentLines = productionPreview?.components.length === 0;
+  const previewHadComponentLines = productionPreview !== undefined && !previewHasNoComponentLines;
+  const previewHasShortage = productionPreview?.hasShortage ?? false;
+  const previewHasZeroCostWarning = productionPreview?.hasZeroCostWarning ?? false;
+  const previewMatchesForm =
+    productionPreview?.recipeId === recipeId &&
+    quantitiesMatch(productionPreview.quantityProduced, plannedQuantity);
   const previewBlocksProduction =
     productionPreviewQuery.isLoading ||
+    productionPreviewQuery.isFetching ||
     productionPreviewQuery.isError ||
-    productionPreview?.hasShortage === true ||
-    productionPreview?.hasZeroCostWarning === true ||
-    previewHasNoLines;
+    !previewMatchesForm ||
+    previewHasShortage ||
+    previewHasZeroCostWarning ||
+    previewHasNoComponentLines;
+
+  const validateFreshPreview = async (): Promise<boolean> => {
+    const previewResult = await productionPreviewQuery.refetch();
+
+    if (!previewResult.data) {
+      setError(
+        "Production preview is required before producing. Wait for stock validation to finish.",
+      );
+      return false;
+    }
+
+    if (
+      previewResult.data.recipeId !== recipeId ||
+      !quantitiesMatch(previewResult.data.quantityProduced, plannedQuantity)
+    ) {
+      setError(PREVIEW_OUT_OF_SYNC_MESSAGE);
+      return false;
+    }
+
+    const latestPreviewHasNoComponentLines = previewResult.data.components.length === 0;
+
+    if (latestPreviewHasNoComponentLines) {
+      setError(EMPTY_COMPONENT_RECIPE_MESSAGE);
+      return false;
+    }
+
+    if (previewResult.data.hasShortage) {
+      setError(
+        "Production cannot be posted because required component or packaging stock is not available.",
+      );
+      return false;
+    }
+
+    if (previewResult.data.hasZeroCostWarning) {
+      setError(
+        previewResult.data.warnings[0] ??
+          "Production cannot be posted until the recipe has valued component or packaging stock.",
+      );
+      return false;
+    }
+
+    return true;
+  };
 
   const submitPlanned = async (): Promise<void> => {
     const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
@@ -279,25 +350,12 @@ export function BatchFormDialog({
       return;
     }
 
-    if (!productionPreview) {
-      setError(
-        "Production preview is required before producing. Wait for stock validation to finish.",
-      );
+    if (!previewMatchesForm) {
+      setError(PREVIEW_OUT_OF_SYNC_MESSAGE);
       return;
     }
 
-    if (productionPreview.hasShortage) {
-      setError(
-        "Production cannot be posted because required component or packaging stock is not available.",
-      );
-      return;
-    }
-
-    if (productionPreview.hasZeroCostWarning || previewHasNoLines) {
-      setError(
-        productionPreview.warnings[0] ??
-          "Production cannot be posted until the recipe has valued component or packaging stock.",
-      );
+    if (!(await validateFreshPreview())) {
       return;
     }
 
@@ -316,7 +374,11 @@ export function BatchFormDialog({
       return;
     }
 
-    await onProduceNow(result.data);
+    try {
+      await onProduceNow(result.data);
+    } catch (error) {
+      setError(productionErrorMessage(error, previewHadComponentLines));
+    }
   };
 
   const submitPlannedProduction = async (): Promise<void> => {
@@ -336,25 +398,12 @@ export function BatchFormDialog({
       return;
     }
 
-    if (!productionPreview) {
-      setError(
-        "Production preview is required before producing. Wait for stock validation to finish.",
-      );
+    if (!previewMatchesForm) {
+      setError(PREVIEW_OUT_OF_SYNC_MESSAGE);
       return;
     }
 
-    if (productionPreview.hasShortage) {
-      setError(
-        "Production cannot be posted because required component or packaging stock is not available.",
-      );
-      return;
-    }
-
-    if (productionPreview.hasZeroCostWarning || previewHasNoLines) {
-      setError(
-        productionPreview.warnings[0] ??
-          "Production cannot be posted until the recipe has valued component or packaging stock.",
-      );
+    if (!(await validateFreshPreview())) {
       return;
     }
 
@@ -372,10 +421,14 @@ export function BatchFormDialog({
       return;
     }
 
-    await onProducePlanned(batch.id, result.data, {
-      productionDate: result.data.productionDate,
-      quantityProduced: result.data.plannedQuantity,
-    });
+    try {
+      await onProducePlanned(batch.id, result.data, {
+        productionDate: result.data.productionDate,
+        quantityProduced: result.data.plannedQuantity,
+      });
+    } catch (error) {
+      setError(productionErrorMessage(error, previewHadComponentLines));
+    }
   };
   const isCreateDisabled = isSubmitting || selectedRecipeIsKnownInactive;
   const isProduceDisabled =
@@ -563,7 +616,7 @@ export function BatchFormDialog({
                     <PreviewLinesTable lines={productionPreview.components} title="Components" />
                     <PreviewLinesTable lines={productionPreview.packaging} title="Packaging" />
 
-                    {previewHasNoLines ? (
+                    {previewHasNoComponentLines ? (
                       <Alert className="border-amber-300 bg-amber-50 text-amber-950">
                         <AlertTitle>Missing BOM lines</AlertTitle>
                         <AlertDescription>{EMPTY_COMPONENT_RECIPE_MESSAGE}</AlertDescription>
