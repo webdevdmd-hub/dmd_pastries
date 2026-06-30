@@ -209,8 +209,7 @@ export function BatchFormDialog({
   const recipeHasKnownMissingComponents = (
     recipe: ManufacturingRecipeOption | undefined,
   ): boolean =>
-    recipe?.componentCount === 0 &&
-    (recipe.packagingCount === 0 || recipe.packagingCount === null);
+    recipe?.componentCount === 0 && (recipe.packagingCount === 0 || recipe.packagingCount === null);
 
   const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
   const selectedRecipeIsKnownInactive = recipeIsKnownInactive(selectedRecipe);
@@ -281,12 +280,16 @@ export function BatchFormDialog({
     }
 
     if (!productionPreview) {
-      setError("Production preview is required before producing. Wait for stock validation to finish.");
+      setError(
+        "Production preview is required before producing. Wait for stock validation to finish.",
+      );
       return;
     }
 
     if (productionPreview.hasShortage) {
-      setError("Production cannot be posted because required component or packaging stock is not available.");
+      setError(
+        "Production cannot be posted because required component or packaging stock is not available.",
+      );
       return;
     }
 
@@ -334,12 +337,16 @@ export function BatchFormDialog({
     }
 
     if (!productionPreview) {
-      setError("Production preview is required before producing. Wait for stock validation to finish.");
+      setError(
+        "Production preview is required before producing. Wait for stock validation to finish.",
+      );
       return;
     }
 
     if (productionPreview.hasShortage) {
-      setError("Production cannot be posted because required component or packaging stock is not available.");
+      setError(
+        "Production cannot be posted because required component or packaging stock is not available.",
+      );
       return;
     }
 
