@@ -21,10 +21,15 @@ import type {
 } from "@/types/recipes";
 
 const PRODUCT_LOOKUP_PAGE_LIMIT = 100;
-const RECIPE_OUTPUT_PRODUCT_TYPES: ProductType[] = PRODUCT_TYPES.filter(
-  (productType): productType is ProductType => productType !== "service",
-);
-const RECIPE_COMPONENT_PRODUCT_TYPES: ProductType[] = RECIPE_OUTPUT_PRODUCT_TYPES;
+const RECIPE_OUTPUT_PRODUCT_TYPES: readonly ProductType[] = ["finished_product", "semi_finished"];
+const RECIPE_COMPONENT_PRODUCT_TYPES: readonly ProductType[] = [
+  "ingredient",
+  "raw_material",
+  "semi_finished",
+  "finished_product",
+  "consumable",
+  "packaging",
+];
 
 type BackendRecipePayload = {
   product_id?: string;
@@ -784,12 +789,19 @@ export async function getRecipeProducts(): Promise<RecipeProductOption[]> {
       getRecipeProductPages({
         status: "active",
         product_type: productType,
+        item_structure: "recipe_based",
       }),
     ),
   );
 
   return mergeRecipeProductOptions(
-    products.flat().filter((product) => RECIPE_OUTPUT_PRODUCT_TYPES.includes(product.productType)),
+    products
+      .flat()
+      .filter(
+        (product) =>
+          RECIPE_OUTPUT_PRODUCT_TYPES.includes(product.productType) &&
+          product.itemStructure === "recipe_based",
+      ),
   );
 }
 
