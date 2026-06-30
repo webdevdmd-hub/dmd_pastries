@@ -78,8 +78,28 @@ Container port: 3000
 Public domain: https://app.<your-domain>
 ```
 
+Preferred production mode is the frontend Dockerfile. It builds Next.js with `output: "standalone"` and starts the generated server with:
+
+```txt
+node server.js
+```
+
+If you use a custom Node/Nixpacks-style Dokploy start command instead of the Dockerfile, run:
+
+```txt
+pnpm start
+```
+
+The frontend `start` script runs:
+
+```txt
+node .next/standalone/server.js
+```
+
+Do not run `next start` for this app in production because standalone output is enabled.
+
 Copy values from:
-nd
+
 ```txt
 frontend/.env.production.example
 ```
