@@ -789,19 +789,12 @@ export async function getRecipeProducts(): Promise<RecipeProductOption[]> {
       getRecipeProductPages({
         status: "active",
         product_type: productType,
-        item_structure: "recipe_based",
       }),
     ),
   );
 
   return mergeRecipeProductOptions(
-    products
-      .flat()
-      .filter(
-        (product) =>
-          RECIPE_OUTPUT_PRODUCT_TYPES.includes(product.productType) &&
-          product.itemStructure === "recipe_based",
-      ),
+    products.flat().filter((product) => RECIPE_OUTPUT_PRODUCT_TYPES.includes(product.productType)),
   );
 }
 

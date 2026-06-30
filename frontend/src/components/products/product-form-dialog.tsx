@@ -42,6 +42,8 @@ import {
 } from "@/types/product";
 
 type ProductFormDialogProps = {
+  defaultItemStructure?: ProductSchema["itemStructure"];
+  defaultProductType?: ProductSchema["productType"];
   onClose: () => void;
   onCreate: (payload: CreateProductPayload) => Promise<void>;
   onUpdate: (id: string, payload: UpdateProductPayload) => Promise<void>;
@@ -51,18 +53,29 @@ type ProductFormDialogProps = {
   submitting: boolean;
 };
 
+type ProductFormDefaults = {
+  defaultItemStructure: ProductSchema["itemStructure"] | undefined;
+  defaultProductType: ProductSchema["productType"] | undefined;
+};
+
 function FieldError({ message }: { message: string | undefined }): JSX.Element | null {
   return message ? <p className="text-xs font-medium text-red-700">{message}</p> : null;
 }
 
-function toDefaultValues(product: Product | null): ProductSchema {
+function toDefaultValues(
+  product: Product | null,
+  defaults: ProductFormDefaults = {
+    defaultItemStructure: undefined,
+    defaultProductType: undefined,
+  },
+): ProductSchema {
   return {
     productName: product?.productName ?? "",
     categoryId: product?.categoryId ?? "",
     unitId: product?.unitId ?? "",
     taxRateId: product?.taxRateId ?? "",
-    productType: product?.productType ?? "finished_product",
-    itemStructure: product?.itemStructure ?? "single",
+    productType: product?.productType ?? defaults.defaultProductType ?? "finished_product",
+    itemStructure: product?.itemStructure ?? defaults.defaultItemStructure ?? "single",
     salePrice: product?.salePrice ?? 0,
     costPrice: product?.costPrice ?? null,
     costUpdatePolicy: product?.costUpdatePolicy ?? "manual",
@@ -84,6 +97,8 @@ function toDefaultValues(product: Product | null): ProductSchema {
 }
 
 export function ProductFormDialog({
+  defaultItemStructure,
+  defaultProductType,
   onClose,
   onCreate,
   onUpdate,
@@ -96,7 +111,7 @@ export function ProductFormDialog({
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const form = useForm<ProductSchema>({
     resolver: zodResolver(productSchema),
-    defaultValues: toDefaultValues(product),
+    defaultValues: toDefaultValues(product, { defaultItemStructure, defaultProductType }),
   });
   const watchedTaxRateId = form.watch("taxRateId") ?? "";
   const watchedItemStructure = form.watch("itemStructure");
@@ -117,9 +132,9 @@ export function ProductFormDialog({
   );
 
   useEffect(() => {
-    form.reset(toDefaultValues(product));
+    form.reset(toDefaultValues(product, { defaultItemStructure, defaultProductType }));
     setSelectedImage(null);
-  }, [form, product]);
+  }, [defaultItemStructure, defaultProductType, form, product]);
 
   useEffect(() => {
     const categoryId = form.getValues("categoryId");

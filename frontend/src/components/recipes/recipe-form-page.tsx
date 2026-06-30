@@ -860,6 +860,8 @@ export function RecipeFormPage({
       </form>
 
       <ProductFormDialog
+        defaultItemStructure="recipe_based"
+        defaultProductType="finished_product"
         onClose={() => setProductDialogOpen(false)}
         onCreate={createProductFromRecipe}
         onUpdate={() => Promise.resolve()}
