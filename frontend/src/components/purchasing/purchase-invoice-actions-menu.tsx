@@ -76,7 +76,9 @@ export function PurchaseInvoiceActionsMenu({
               Receive now
             </DropdownMenuItem>
             <DropdownMenuItem
-              disabled={!canConvertToReceipt || invoice.status !== "posted" || !invoice.canReceiveStock}
+              disabled={
+                !canConvertToReceipt || invoice.status !== "posted" || !invoice.canReceiveStock
+              }
               onSelect={() => onConvertToReceipt(invoice)}
             >
               Convert to receipt
