@@ -383,8 +383,8 @@ export function BatchFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent className="max-h-[92vh] max-w-4xl overflow-hidden p-0">
-        <DialogHeader className="border-b border-neutral-300 px-8 py-6">
+      <DialogContent className="flex max-h-[92vh] max-w-4xl flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b border-neutral-300 px-8 py-6">
           <DialogTitle>{batch ? "Edit planned production" : "Create production"}</DialogTitle>
           <DialogDescription>
             Save a planned production without stock impact, or produce now to let the backend
@@ -392,7 +392,7 @@ export function BatchFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[calc(92vh-11rem)] overflow-y-auto px-8 py-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
           <div className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-neutral-950">Branch</label>
@@ -629,7 +629,7 @@ export function BatchFormDialog({
           {error ? <p className="mt-4 text-sm font-semibold text-red-700">{error}</p> : null}
         </div>
 
-        <DialogFooter className="border-t border-neutral-300 bg-neutral-50 px-8 py-5">
+        <DialogFooter className="shrink-0 border-t border-neutral-300 bg-neutral-50 px-8 py-5">
           <Button onClick={onClose} type="button" variant="outline">
             Cancel
           </Button>
