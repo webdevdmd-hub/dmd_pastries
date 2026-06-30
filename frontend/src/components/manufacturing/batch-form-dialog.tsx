@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { useProductionPreview } from "@/hooks/use-manufacturing";
 import { createBatchSchema, createProductionSchema } from "@/lib/validators/manufacturing.schema";
 import type {
   CreateBatchPayload,
@@ -31,15 +32,96 @@ import type {
   ManufacturingRecipeOption,
   ProducePayload,
   ProductionBatch,
+  ProductionPreviewLineItem,
   UpdateBatchPayload,
 } from "@/types/manufacturing";
 import { ITEM_STRUCTURE_LABELS, PRODUCT_TYPE_LABELS } from "@/types/product";
 
 const EMPTY_COMPONENT_RECIPE_MESSAGE =
-  "This recipe has no ingredients/components. Add BOM lines in Recipe Builder before producing.";
+  "This recipe has no ingredients or packaging. Add BOM lines before producing.";
 
 function countLabel(value: number | null): string {
   return value === null ? "Unknown" : value.toLocaleString();
+}
+
+function formatQuantity(value: number, unit = ""): string {
+  const formatted = new Intl.NumberFormat("en-AE", {
+    maximumFractionDigits: 3,
+    minimumFractionDigits: 0,
+  }).format(value);
+
+  return unit ? `${formatted} ${unit}` : formatted;
+}
+
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+    style: "currency",
+  }).format(value);
+}
+
+function PreviewLinesTable({
+  lines,
+  title,
+}: {
+  lines: ProductionPreviewLineItem[];
+  title: string;
+}): JSX.Element | null {
+  if (lines.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-xl border border-neutral-300 bg-white">
+      <div className="border-b border-neutral-200 px-3 py-2">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-neutral-500">{title}</p>
+      </div>
+      <div className="divide-y divide-neutral-200">
+        {lines.map((line) => (
+          <div
+            className="grid gap-2 px-3 py-2 text-xs text-neutral-600 sm:grid-cols-[1.5fr_1fr_1fr_1fr]"
+            key={line.recipeLineId}
+          >
+            <div>
+              <p className="font-semibold text-neutral-950">{line.productName}</p>
+              <p>{line.productType || "Component"}</p>
+            </div>
+            <div>
+              <p className="text-neutral-500">Required</p>
+              <p className="font-semibold text-neutral-950">
+                {formatQuantity(line.requiredQuantity, line.unit)}
+              </p>
+            </div>
+            <div>
+              <p className="text-neutral-500">Available</p>
+              <p
+                className={
+                  line.shortageQuantity > 0
+                    ? "font-semibold text-red-700"
+                    : "font-semibold text-neutral-950"
+                }
+              >
+                {formatQuantity(line.availableQuantity, line.unit)}
+              </p>
+            </div>
+            <div>
+              <p className="text-neutral-500">Cost</p>
+              <p className="font-semibold text-neutral-950">
+                {formatMoney(line.estimatedTotalCost)}
+              </p>
+              {line.shortageQuantity > 0 ? (
+                <p className="mt-1 font-semibold text-red-700">
+                  Short {formatQuantity(line.shortageQuantity, line.unit)}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function BatchFormDialog({
@@ -126,7 +208,34 @@ export function BatchFormDialog({
 
   const recipeHasKnownMissingComponents = (
     recipe: ManufacturingRecipeOption | undefined,
-  ): boolean => recipe?.componentCount === 0;
+  ): boolean =>
+    recipe?.componentCount === 0 &&
+    (recipe.packagingCount === 0 || recipe.packagingCount === null);
+
+  const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
+  const selectedRecipeIsKnownInactive = recipeIsKnownInactive(selectedRecipe);
+  const selectedRecipeHasKnownMissingComponents = recipeHasKnownMissingComponents(selectedRecipe);
+  const productionPreviewQuery = useProductionPreview(
+    {
+      branchId,
+      quantity: plannedQuantity,
+      recipeId,
+    },
+    open &&
+      !selectedRecipeIsKnownInactive &&
+      branchId.trim().length > 0 &&
+      recipeId.trim().length > 0 &&
+      plannedQuantity > 0,
+  );
+  const productionPreview = productionPreviewQuery.data;
+  const previewHasNoLines =
+    productionPreview?.components.length === 0 && productionPreview.packaging.length === 0;
+  const previewBlocksProduction =
+    productionPreviewQuery.isLoading ||
+    productionPreviewQuery.isError ||
+    productionPreview?.hasShortage === true ||
+    productionPreview?.hasZeroCostWarning === true ||
+    previewHasNoLines;
 
   const submitPlanned = async (): Promise<void> => {
     const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
@@ -171,6 +280,24 @@ export function BatchFormDialog({
       return;
     }
 
+    if (!productionPreview) {
+      setError("Production preview is required before producing. Wait for stock validation to finish.");
+      return;
+    }
+
+    if (productionPreview.hasShortage) {
+      setError("Production cannot be posted because required component or packaging stock is not available.");
+      return;
+    }
+
+    if (productionPreview.hasZeroCostWarning || previewHasNoLines) {
+      setError(
+        productionPreview.warnings[0] ??
+          "Production cannot be posted until the recipe has valued component or packaging stock.",
+      );
+      return;
+    }
+
     const result = createProductionSchema.safeParse({
       branchId,
       notes,
@@ -206,6 +333,24 @@ export function BatchFormDialog({
       return;
     }
 
+    if (!productionPreview) {
+      setError("Production preview is required before producing. Wait for stock validation to finish.");
+      return;
+    }
+
+    if (productionPreview.hasShortage) {
+      setError("Production cannot be posted because required component or packaging stock is not available.");
+      return;
+    }
+
+    if (productionPreview.hasZeroCostWarning || previewHasNoLines) {
+      setError(
+        productionPreview.warnings[0] ??
+          "Production cannot be posted until the recipe has valued component or packaging stock.",
+      );
+      return;
+    }
+
     const result = createBatchSchema.safeParse({
       branchId,
       notes,
@@ -225,12 +370,9 @@ export function BatchFormDialog({
       quantityProduced: result.data.plannedQuantity,
     });
   };
-
-  const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
-  const selectedRecipeIsKnownInactive = recipeIsKnownInactive(selectedRecipe);
-  const selectedRecipeHasKnownMissingComponents = recipeHasKnownMissingComponents(selectedRecipe);
   const isCreateDisabled = isSubmitting || selectedRecipeIsKnownInactive;
-  const isProduceDisabled = isCreateDisabled || selectedRecipeHasKnownMissingComponents;
+  const isProduceDisabled =
+    isCreateDisabled || selectedRecipeHasKnownMissingComponents || previewBlocksProduction;
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
@@ -337,13 +479,17 @@ export function BatchFormDialog({
                       <div className="rounded-xl border border-neutral-300 bg-white px-3 py-2">
                         <span className="text-neutral-500">Ingredients</span>
                         <strong className="ml-2 text-neutral-950">
-                          {countLabel(selectedRecipe.componentCount)}
+                          {productionPreview
+                            ? productionPreview.components.length.toLocaleString()
+                            : countLabel(selectedRecipe.componentCount)}
                         </strong>
                       </div>
                       <div className="rounded-xl border border-neutral-300 bg-white px-3 py-2">
                         <span className="text-neutral-500">Packaging</span>
                         <strong className="ml-2 text-neutral-950">
-                          {countLabel(selectedRecipe.packagingCount)}
+                          {productionPreview
+                            ? productionPreview.packaging.length.toLocaleString()
+                            : countLabel(selectedRecipe.packagingCount)}
                         </strong>
                       </div>
                     </div>
@@ -362,6 +508,91 @@ export function BatchFormDialog({
                     <AlertTitle>Missing BOM lines</AlertTitle>
                     <AlertDescription>{EMPTY_COMPONENT_RECIPE_MESSAGE}</AlertDescription>
                   </Alert>
+                ) : null}
+                {productionPreviewQuery.isLoading ? (
+                  <Alert className="mt-4 border-neutral-300 bg-white text-neutral-700">
+                    <AlertTitle>Checking stock availability</AlertTitle>
+                    <AlertDescription>
+                      Required components, packaging, and cost will appear here before production
+                      can be posted.
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
+                {productionPreviewQuery.isError ? (
+                  <Alert className="mt-4 border-red-300 bg-red-50 text-red-950">
+                    <AlertTitle>Cannot validate production stock</AlertTitle>
+                    <AlertDescription>
+                      Production is disabled until the backend preview can confirm required stock,
+                      shortages, and cost.
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
+                {productionPreview ? (
+                  <div className="mt-4 space-y-3">
+                    <div className="grid gap-2 rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm sm:grid-cols-3">
+                      <div>
+                        <p className="text-neutral-500">Estimated total cost</p>
+                        <p className="font-semibold text-neutral-950">
+                          {formatMoney(productionPreview.estimatedTotalCost)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-neutral-500">Cost per unit</p>
+                        <p className="font-semibold text-neutral-950">
+                          {formatMoney(productionPreview.estimatedCostPerUnit)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-neutral-500">Quantity checked</p>
+                        <p className="font-semibold text-neutral-950">
+                          {formatQuantity(
+                            productionPreview.quantityProduced,
+                            productionPreview.recipeYieldUnit,
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <PreviewLinesTable lines={productionPreview.components} title="Components" />
+                    <PreviewLinesTable lines={productionPreview.packaging} title="Packaging" />
+
+                    {previewHasNoLines ? (
+                      <Alert className="border-amber-300 bg-amber-50 text-amber-950">
+                        <AlertTitle>Missing BOM lines</AlertTitle>
+                        <AlertDescription>{EMPTY_COMPONENT_RECIPE_MESSAGE}</AlertDescription>
+                      </Alert>
+                    ) : null}
+
+                    {productionPreview.hasShortage ? (
+                      <Alert className="border-red-300 bg-red-50 text-red-950">
+                        <AlertTitle>Not enough stock to produce</AlertTitle>
+                        <AlertDescription>
+                          Add stock for the shortage items before posting production.
+                          <ul className="mt-2 list-disc space-y-1 pl-5">
+                            {productionPreview.shortages.map((shortage) => (
+                              <li key={shortage.recipeLineId}>
+                                {shortage.productName}: short{" "}
+                                {formatQuantity(shortage.shortageQuantity, shortage.unit)}
+                              </li>
+                            ))}
+                          </ul>
+                        </AlertDescription>
+                      </Alert>
+                    ) : null}
+
+                    {productionPreview.warnings.length > 0 ? (
+                      <Alert className="border-amber-300 bg-amber-50 text-amber-950">
+                        <AlertTitle>Production cost warning</AlertTitle>
+                        <AlertDescription>
+                          <ul className="list-disc space-y-1 pl-5">
+                            {productionPreview.warnings.map((warning) => (
+                              <li key={warning}>{warning}</li>
+                            ))}
+                          </ul>
+                        </AlertDescription>
+                      </Alert>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             ) : null}

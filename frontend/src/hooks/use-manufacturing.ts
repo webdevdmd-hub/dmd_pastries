@@ -23,6 +23,7 @@ import {
   getManufacturingRecipeByProduct,
   getManufacturingSummary,
   getManufacturingUnits,
+  getProductionPreview,
   produceBatch,
   startBatch,
   updateBatch,
@@ -45,6 +46,7 @@ import type {
   ProductionBatchIngredient,
   ProductionBatchPackaging,
   ProductionOutput,
+  ProductionPreview,
   ProductionWastage,
   UpdateBatchPayload,
   UpdateBatchStatusPayload,
@@ -196,6 +198,23 @@ export function useManufacturingBranches(enabled = true) {
     queryKey: [manufacturingQueryKey, "branches"],
     queryFn: async () => getManufacturingBranches(),
     enabled,
+  });
+}
+
+export function useProductionPreview(
+  params: { branchId: string; quantity: number; recipeId: string },
+  enabled = true,
+) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<ProductionPreview>({
+    queryKey: [manufacturingQueryKey, branchQueryKey, "production-preview", params],
+    queryFn: async () => getProductionPreview(params),
+    enabled:
+      enabled &&
+      params.branchId.trim().length > 0 &&
+      params.recipeId.trim().length > 0 &&
+      params.quantity > 0,
   });
 }
 

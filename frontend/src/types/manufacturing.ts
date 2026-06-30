@@ -140,6 +140,54 @@ export type ManufacturingRecipeOption = {
   status: string | null;
 };
 
+export type ProductionPreviewLineItem = {
+  recipeLineId: string;
+  componentProductId: string | null;
+  componentVariantId: string | null;
+  productName: string;
+  productType: string;
+  requiredQuantity: number;
+  availableQuantity: number;
+  shortageQuantity: number;
+  unitId: string;
+  unit: string;
+  estimatedUnitCost: number;
+  estimatedTotalCost: number;
+  isOptional: boolean;
+};
+
+export type ProductionPreviewShortage = {
+  recipeLineId: string;
+  productName: string;
+  requiredQuantity: number;
+  availableQuantity: number;
+  shortageQuantity: number;
+  unit: string;
+};
+
+export type ProductionPreview = {
+  recipeId: string;
+  recipeName: string;
+  recipeYieldQuantity: number;
+  recipeYieldUnitId: string;
+  recipeYieldUnit: string;
+  outputProductId: string;
+  outputProductName: string;
+  outputProductVariantId: string | null;
+  outputProductVariantName: string;
+  quantityProduced: number;
+  components: ProductionPreviewLineItem[];
+  packaging: ProductionPreviewLineItem[];
+  estimatedComponentCost: number;
+  estimatedPackagingCost: number;
+  estimatedTotalCost: number;
+  estimatedCostPerUnit: number;
+  hasShortage: boolean;
+  shortages: ProductionPreviewShortage[];
+  hasZeroCostWarning: boolean;
+  warnings: string[];
+};
+
 export type ManufacturingInventoryOption = {
   id: string;
   productId: string | null;

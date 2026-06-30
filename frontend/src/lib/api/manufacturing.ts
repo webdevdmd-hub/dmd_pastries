@@ -16,6 +16,9 @@ import type {
   ProductionBatchIngredient,
   ProductionBatchPackaging,
   ProductionOutput,
+  ProductionPreview,
+  ProductionPreviewLineItem,
+  ProductionPreviewShortage,
   ProductionWastage,
   UpdateBatchPayload,
   UpdateBatchStatusPayload,
@@ -324,6 +327,74 @@ function parseSummary(value: unknown): ManufacturingSummary {
     inProgressBatches: numberValue(value.in_progress_batches),
     completedBatches: numberValue(value.completed_batches),
     totalProductionOutput: numberValue(value.total_production_output),
+  };
+}
+
+function parsePreviewLineItem(value: unknown): ProductionPreviewLineItem {
+  if (!isObject(value)) {
+    throw new Error("Backend production preview line payload is invalid.");
+  }
+
+  return {
+    recipeLineId: stringValue(value.recipe_line_id),
+    componentProductId: nullableString(value.component_product_id),
+    componentVariantId: nullableString(value.component_variant_id),
+    productName: stringValue(value.product_name, "Component"),
+    productType: stringValue(value.product_type),
+    requiredQuantity: numberValue(value.required_quantity),
+    availableQuantity: numberValue(value.available_quantity),
+    shortageQuantity: numberValue(value.shortage_quantity),
+    unitId: stringValue(value.unit_id),
+    unit: stringValue(value.unit, "Unit"),
+    estimatedUnitCost: numberValue(value.estimated_unit_cost),
+    estimatedTotalCost: numberValue(value.estimated_total_cost),
+    isOptional: value.is_optional === true,
+  };
+}
+
+function parsePreviewShortage(value: unknown): ProductionPreviewShortage {
+  if (!isObject(value)) {
+    throw new Error("Backend production preview shortage payload is invalid.");
+  }
+
+  return {
+    recipeLineId: stringValue(value.recipe_line_id),
+    productName: stringValue(value.product_name, "Component"),
+    requiredQuantity: numberValue(value.required_quantity),
+    availableQuantity: numberValue(value.available_quantity),
+    shortageQuantity: numberValue(value.shortage_quantity),
+    unit: stringValue(value.unit, "Unit"),
+  };
+}
+
+function parseProductionPreview(value: unknown): ProductionPreview {
+  if (!isObject(value)) {
+    throw new Error("Backend production preview payload is invalid.");
+  }
+
+  return {
+    recipeId: stringValue(value.recipe_id),
+    recipeName: stringValue(value.recipe_name, "Recipe"),
+    recipeYieldQuantity: numberValue(value.recipe_yield_quantity),
+    recipeYieldUnitId: stringValue(value.recipe_yield_unit_id),
+    recipeYieldUnit: stringValue(value.recipe_yield_unit, "Unit"),
+    outputProductId: stringValue(value.output_product_id),
+    outputProductName: stringValue(value.output_product_name, "Output product"),
+    outputProductVariantId: nullableString(value.output_product_variant_id),
+    outputProductVariantName: stringValue(value.output_product_variant_name),
+    quantityProduced: numberValue(value.quantity_produced),
+    components: parseList(value.components, parsePreviewLineItem),
+    packaging: parseList(value.packaging, parsePreviewLineItem),
+    estimatedComponentCost: numberValue(value.estimated_component_cost),
+    estimatedPackagingCost: numberValue(value.estimated_packaging_cost),
+    estimatedTotalCost: numberValue(value.estimated_total_cost),
+    estimatedCostPerUnit: numberValue(value.estimated_cost_per_unit),
+    hasShortage: value.has_shortage === true,
+    shortages: parseList(value.shortages, parsePreviewShortage),
+    hasZeroCostWarning: value.has_zero_cost_warning === true,
+    warnings: Array.isArray(value.warnings)
+      ? value.warnings.filter((warning): warning is string => typeof warning === "string")
+      : [],
   };
 }
 
@@ -701,6 +772,29 @@ export async function getManufacturingSummary(): Promise<ManufacturingSummary> {
     authMode: "appwrite",
     parse: parseSummary,
   });
+
+  return response.data;
+}
+
+export async function getProductionPreview({
+  branchId,
+  quantity,
+  recipeId,
+}: {
+  branchId: string;
+  quantity: number;
+  recipeId: string;
+}): Promise<ProductionPreview> {
+  const response = await apiRequest<ProductionPreview>(
+    `/api/v1/manufacturing/recipes/${recipeId}/production-preview${toQueryString({
+      branch_id: branchId,
+      quantity,
+    })}`,
+    {
+      authMode: "appwrite",
+      parse: parseProductionPreview,
+    },
+  );
 
   return response.data;
 }
