@@ -19,8 +19,13 @@ type CachedJwt = {
 };
 
 let cachedJwt: CachedJwt | null = null;
+let jwtRequestPromise: Promise<string> | null = null;
+let jwtRateLimitUntil = 0;
 
 const e2eSessionKey = "pastries-pos:e2e-session";
+const jwtRateLimitCooldownMs = 60_000;
+const jwtRateLimitMessage =
+  "Unable to create an Appwrite JWT for login sync. Rate limit for the current endpoint has been exceeded. Wait 60 seconds, then continue the existing session.";
 
 export class AppwriteSessionAlreadyExistsError extends Error {
   constructor(message = "An Appwrite session is already active in this browser.") {
@@ -30,11 +35,15 @@ export class AppwriteSessionAlreadyExistsError extends Error {
 }
 
 export class AppwriteRateLimitError extends Error {
+  readonly retryAfterMs: number;
+
   constructor(
     message = "Appwrite rate limit has been exceeded. Please wait a moment before trying again.",
+    retryAfterMs = jwtRateLimitCooldownMs,
   ) {
     super(message);
     this.name = "AppwriteRateLimitError";
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
@@ -151,18 +160,37 @@ export async function createAppwriteJwt(): Promise<string> {
     return cachedJwt.jwt;
   }
 
+  const cooldownRemainingMs = getJwtRateLimitRemainingMs();
+  if (cooldownRemainingMs > 0) {
+    throw new AppwriteRateLimitError(jwtRateLimitMessage, cooldownRemainingMs);
+  }
+
+  if (jwtRequestPromise) {
+    return jwtRequestPromise;
+  }
+
+  jwtRequestPromise = createFreshAppwriteJwt();
+
+  try {
+    return await jwtRequestPromise;
+  } finally {
+    jwtRequestPromise = null;
+  }
+}
+
+async function createFreshAppwriteJwt(): Promise<string> {
   try {
     const jwt = await requireAccount().createJWT();
     cachedJwt = {
       jwt: jwt.jwt,
       expiresAt: resolveJwtExpiry(jwt.jwt),
     };
+    jwtRateLimitUntil = 0;
     return jwt.jwt;
   } catch (error) {
     if (isAppwriteRateLimitError(error)) {
-      throw new AppwriteRateLimitError(
-        "Unable to create an Appwrite JWT for login sync. Rate limit for the current endpoint has been exceeded. Please wait a moment before trying again.",
-      );
+      jwtRateLimitUntil = Date.now() + jwtRateLimitCooldownMs;
+      throw new AppwriteRateLimitError(jwtRateLimitMessage, jwtRateLimitCooldownMs);
     }
 
     const message = getAppwriteErrorMessage(error);
@@ -172,6 +200,11 @@ export async function createAppwriteJwt(): Promise<string> {
 
 export function clearCachedAppwriteJwt(): void {
   cachedJwt = null;
+  jwtRequestPromise = null;
+}
+
+export function getJwtRateLimitRemainingMs(): number {
+  return Math.max(0, jwtRateLimitUntil - Date.now());
 }
 
 function resolveJwtExpiry(jwt: string): number {

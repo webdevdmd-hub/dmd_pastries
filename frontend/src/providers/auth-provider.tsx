@@ -1,7 +1,7 @@
 "use client";
 
 import type { JSX, ReactNode } from "react";
-import { createContext, useCallback, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ROUTES } from "@/constants/routes";
 import {
@@ -94,13 +94,46 @@ type AuthProviderProps = {
 export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<SafeUserProfile | null>(null);
+  const profileRefreshPromiseRef = useRef<Promise<SafeUserProfile> | null>(null);
+  const authOperationPromiseRef = useRef<Promise<SafeUserProfile> | null>(null);
 
   const refreshCurrentProfile = useCallback(async (): Promise<SafeUserProfile> => {
-    const profile = await repairAssignedBranchContext(await getCurrentProfile());
-    setUser(profile);
-    setStatus("authenticated");
-    return profile;
+    if (profileRefreshPromiseRef.current) {
+      return profileRefreshPromiseRef.current;
+    }
+
+    const profilePromise = (async () => {
+      const profile = await repairAssignedBranchContext(await getCurrentProfile());
+      setUser(profile);
+      setStatus("authenticated");
+      return profile;
+    })().finally(() => {
+      if (profileRefreshPromiseRef.current === profilePromise) {
+        profileRefreshPromiseRef.current = null;
+      }
+    });
+
+    profileRefreshPromiseRef.current = profilePromise;
+    return profilePromise;
   }, []);
+
+  const runAuthOperation = useCallback(
+    async (operation: () => Promise<SafeUserProfile>): Promise<SafeUserProfile> => {
+      if (authOperationPromiseRef.current) {
+        return authOperationPromiseRef.current;
+      }
+
+      const operationPromise = operation().finally(() => {
+        if (authOperationPromiseRef.current === operationPromise) {
+          authOperationPromiseRef.current = null;
+        }
+      });
+
+      authOperationPromiseRef.current = operationPromise;
+      return operationPromise;
+    },
+    [],
+  );
 
   const restoreSession = useCallback(async (): Promise<void> => {
     setStatus("loading");
@@ -190,39 +223,42 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       user,
       isAuthenticated: status === "authenticated" && user !== null,
       async login(input) {
-        const existingSession = await getCurrentAppwriteSession();
+        return runAuthOperation(async () => {
+          const existingSession = await getCurrentAppwriteSession();
 
-        if (existingSession) {
-          throw new AppwriteSessionAlreadyExistsError();
-        }
+          if (existingSession) {
+            throw new AppwriteSessionAlreadyExistsError();
+          }
 
-        await loginWithAppwrite(input.email, input.password);
-        await loginSync();
-        const profile = await refreshCurrentProfile();
-        return profile;
+          await loginWithAppwrite(input.email, input.password);
+          await loginSync();
+          return refreshCurrentProfile();
+        });
       },
       async continueCurrentSession() {
-        const account = await getCurrentAppwriteAccount();
+        return runAuthOperation(async () => {
+          const account = await getCurrentAppwriteAccount();
 
-        if (!account) {
-          throw new Error("No active Appwrite session was found. Please restart login.");
-        }
+          if (!account) {
+            throw new Error("No active Appwrite session was found. Please restart login.");
+          }
 
-        await loginSync();
-        const profile = await refreshCurrentProfile();
-        return profile;
+          await loginSync();
+          return refreshCurrentProfile();
+        });
       },
       async restartLogin(input) {
-        try {
-          await logoutFromAppwrite();
-        } catch {
-          // Continue with a fresh login attempt even if session cleanup is already done.
-        }
+        return runAuthOperation(async () => {
+          try {
+            await logoutFromAppwrite();
+          } catch {
+            // Continue with a fresh login attempt even if session cleanup is already done.
+          }
 
-        await loginWithAppwrite(input.email, input.password);
-        await loginSync();
-        const profile = await refreshCurrentProfile();
-        return profile;
+          await loginWithAppwrite(input.email, input.password);
+          await loginSync();
+          return refreshCurrentProfile();
+        });
       },
       async refreshProfile() {
         return refreshCurrentProfile();
@@ -289,7 +325,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       },
       restoreSession,
     }),
-    [refreshCurrentProfile, restoreSession, status, user],
+    [refreshCurrentProfile, restoreSession, runAuthOperation, status, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

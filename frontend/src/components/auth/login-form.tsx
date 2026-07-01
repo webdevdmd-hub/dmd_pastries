@@ -5,7 +5,7 @@ import { ArrowRight, LoaderCircle, LockKeyhole, Mail, ShieldCheck } from "lucide
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -34,6 +34,8 @@ export function LoginForm(): JSX.Element {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [sessionConflict, setSessionConflict] = useState(false);
   const [rateLimited, setRateLimited] = useState(false);
+  const [rateLimitUntil, setRateLimitUntil] = useState(0);
+  const [cooldownNow, setCooldownNow] = useState(() => Date.now());
   const [recoveryLoading, setRecoveryLoading] = useState(false);
   const form = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
@@ -42,6 +44,30 @@ export function LoginForm(): JSX.Element {
       password: "",
     },
   });
+  const cooldownRemainingMs = Math.max(0, rateLimitUntil - cooldownNow);
+  const cooldownRemainingSeconds = Math.ceil(cooldownRemainingMs / 1000);
+  const isCooldownActive = cooldownRemainingSeconds > 0;
+
+  useEffect(() => {
+    if (!rateLimited || !isCooldownActive) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setCooldownNow(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [isCooldownActive, rateLimited]);
+
+  function applyRateLimit(error: AppwriteRateLimitError): void {
+    setRateLimited(true);
+    setSubmitError(error.message);
+    setCooldownNow(Date.now());
+    setRateLimitUntil(Date.now() + error.retryAfterMs);
+  }
 
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitError(null);
@@ -59,8 +85,7 @@ export function LoginForm(): JSX.Element {
       }
 
       if (error instanceof AppwriteRateLimitError) {
-        setRateLimited(true);
-        setSubmitError(error.message);
+        applyRateLimit(error);
         return;
       }
 
@@ -88,10 +113,10 @@ export function LoginForm(): JSX.Element {
       router.replace(authenticatedHomeRoute(profile));
     } catch (error) {
       if (error instanceof AppwriteRateLimitError) {
-        setRateLimited(true);
+        applyRateLimit(error);
+      } else {
+        setSubmitError(getErrorMessage(error));
       }
-
-      setSubmitError(getErrorMessage(error));
     } finally {
       setRecoveryLoading(false);
     }
@@ -117,10 +142,10 @@ export function LoginForm(): JSX.Element {
       router.replace(authenticatedHomeRoute(profile));
     } catch (error) {
       if (error instanceof AppwriteRateLimitError) {
-        setRateLimited(true);
+        applyRateLimit(error);
+      } else {
+        setSubmitError(getErrorMessage(error));
       }
-
-      setSubmitError(getErrorMessage(error));
     } finally {
       setRecoveryLoading(false);
     }
@@ -153,7 +178,7 @@ export function LoginForm(): JSX.Element {
                   </p>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Button
-                      disabled={recoveryLoading}
+                      disabled={recoveryLoading || isCooldownActive}
                       onClick={() => {
                         void continueSession();
                       }}
@@ -163,7 +188,7 @@ export function LoginForm(): JSX.Element {
                       Continue with current session
                     </Button>
                     <Button
-                      disabled={recoveryLoading}
+                      disabled={recoveryLoading || isCooldownActive}
                       onClick={() => {
                         void restartSessionLogin();
                       }}
@@ -183,15 +208,17 @@ export function LoginForm(): JSX.Element {
                 <AlertTitle>Too many login sync attempts</AlertTitle>
                 <AlertDescription className="space-y-3">
                   <p>
-                    Appwrite is temporarily blocking JWT/session requests for this browser. Wait a
-                    moment, then continue the existing session instead of creating another login
-                    attempt.
+                    Appwrite is temporarily blocking JWT/session requests for this browser. Wait{" "}
+                    {cooldownRemainingSeconds > 0
+                      ? `${String(cooldownRemainingSeconds)} seconds`
+                      : "60 seconds"}
+                    , then continue the existing session instead of creating another login attempt.
                   </p>
                   {submitError ? (
                     <p className="text-sm text-brand-cappuccino">{submitError}</p>
                   ) : null}
                   <Button
-                    disabled={recoveryLoading}
+                    disabled={recoveryLoading || isCooldownActive}
                     onClick={() => {
                       void continueSession();
                     }}
@@ -199,7 +226,9 @@ export function LoginForm(): JSX.Element {
                     className="border-white/15 bg-white/5 text-brand-latte hover:bg-white/10"
                     variant="outline"
                   >
-                    Continue existing session
+                    {isCooldownActive
+                      ? `Wait ${String(cooldownRemainingSeconds)}s`
+                      : "Continue existing session"}
                   </Button>
                 </AlertDescription>
               </Alert>
@@ -263,7 +292,7 @@ export function LoginForm(): JSX.Element {
 
             <Button
               className="h-13 w-full rounded-2xl bg-brand-latte text-base font-semibold text-brand-espresso shadow-[0_20px_60px_rgba(243,233,215,0.16)] transition hover:-translate-y-0.5 hover:bg-brand-cappuccino hover:shadow-[0_26px_72px_rgba(243,233,215,0.22)]"
-              disabled={form.formState.isSubmitting || recoveryLoading}
+              disabled={form.formState.isSubmitting || recoveryLoading || isCooldownActive}
               type="submit"
             >
               {form.formState.isSubmitting ? (
