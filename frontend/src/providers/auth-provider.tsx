@@ -24,6 +24,7 @@ import {
   sendEmailVerification,
   verifyEmailWithSecret,
 } from "@/lib/appwrite/auth";
+import { authenticatedHomeRoute } from "@/lib/auth/routes";
 import { onSessionExpired } from "@/lib/auth/session-events";
 import type {
   AuthStatus,
@@ -237,7 +238,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
           return {
             ...registered,
             user: profile,
-            redirectTo: ROUTES.dashboard,
+            redirectTo: authenticatedHomeRoute(profile),
             message: registered.message,
           };
         } catch {

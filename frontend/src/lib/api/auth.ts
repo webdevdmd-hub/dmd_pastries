@@ -45,6 +45,7 @@ type BackendPasswordResetCompleteInput = {
 };
 
 type BackendAuthProfile = {
+  account_type?: string;
   user_id?: string;
   appwrite_user_id?: string;
   business_id?: string;
@@ -102,8 +103,12 @@ function parseSafeUserProfile(value: unknown): SafeUserProfile {
   }
 
   const backendValue = value as BackendAuthProfile;
+  const accountType =
+    backendValue.account_type === "platform_admin" ? "platform_admin" : "tenant_user";
 
   const id = typeof backendValue.user_id === "string" ? backendValue.user_id : "";
+  const appwriteUserId =
+    typeof backendValue.appwrite_user_id === "string" ? backendValue.appwrite_user_id : "";
   const businessId = typeof backendValue.business_id === "string" ? backendValue.business_id : "";
   const fullName = typeof backendValue.full_name === "string" ? backendValue.full_name : "";
   const email = typeof value.email === "string" ? value.email : "";
@@ -122,11 +127,40 @@ function parseSafeUserProfile(value: unknown): SafeUserProfile {
   const currentBranchName =
     typeof backendValue.current_branch_name === "string" ? backendValue.current_branch_name : null;
 
+  if (accountType === "platform_admin") {
+    if (!appwriteUserId || !fullName || !email) {
+      throw new Error("Backend platform admin payload is missing required fields.");
+    }
+
+    return {
+      accountType,
+      id: appwriteUserId,
+      businessId: "",
+      fullName,
+      email,
+      businessName: "Platform Administration",
+      phone: typeof value.phone === "string" ? value.phone : null,
+      assignedBranchId: null,
+      assignedBranchName: null,
+      currentBranchId: null,
+      currentBranchName: null,
+      allowedBranchIds: [],
+      canAccessAllBranches: true,
+      roles: ["Super Admin"],
+      permissions: parsePermissionList(backendValue.permissions),
+      subscriptionStatus: null,
+      emailVerified:
+        typeof backendValue.email_verified === "boolean" ? backendValue.email_verified : false,
+      isPlatformAdmin: true,
+    };
+  }
+
   if (!id || !businessId || !fullName || !email) {
     throw new Error("Backend user payload is missing required fields.");
   }
 
   return {
+    accountType,
     id,
     businessId,
     fullName,
@@ -150,6 +184,7 @@ function parseSafeUserProfile(value: unknown): SafeUserProfile {
         : null,
     emailVerified:
       typeof backendValue.email_verified === "boolean" ? backendValue.email_verified : false,
+    isPlatformAdmin: false,
   };
 }
 

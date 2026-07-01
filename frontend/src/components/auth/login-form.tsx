@@ -25,6 +25,7 @@ import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import { AppwriteRateLimitError, AppwriteSessionAlreadyExistsError } from "@/lib/appwrite/auth";
+import { authenticatedHomeRoute } from "@/lib/auth/routes";
 import { type LoginSchema, loginSchema } from "@/validators/auth.schema";
 
 export function LoginForm(): JSX.Element {
@@ -48,9 +49,9 @@ export function LoginForm(): JSX.Element {
     setRateLimited(false);
 
     try {
-      await login(values);
-      toast.success("Welcome back. Redirecting to your dashboard.");
-      router.replace(ROUTES.dashboard);
+      const profile = await login(values);
+      toast.success("Welcome back. Redirecting to your workspace.");
+      router.replace(authenticatedHomeRoute(profile));
     } catch (error) {
       if (error instanceof AppwriteSessionAlreadyExistsError) {
         setSessionConflict(true);
@@ -82,9 +83,9 @@ export function LoginForm(): JSX.Element {
     setRecoveryLoading(true);
 
     try {
-      await continueCurrentSession();
-      toast.success("Session restored. Redirecting to your dashboard.");
-      router.replace(ROUTES.dashboard);
+      const profile = await continueCurrentSession();
+      toast.success("Session restored. Redirecting to your workspace.");
+      router.replace(authenticatedHomeRoute(profile));
     } catch (error) {
       if (error instanceof AppwriteRateLimitError) {
         setRateLimited(true);
@@ -109,11 +110,11 @@ export function LoginForm(): JSX.Element {
 
     try {
       setRecoveryLoading(true);
-      await restartLogin(parsed.data);
+      const profile = await restartLogin(parsed.data);
       setSessionConflict(false);
       setRateLimited(false);
-      toast.success("Welcome back. Redirecting to your dashboard.");
-      router.replace(ROUTES.dashboard);
+      toast.success("Welcome back. Redirecting to your workspace.");
+      router.replace(authenticatedHomeRoute(profile));
     } catch (error) {
       if (error instanceof AppwriteRateLimitError) {
         setRateLimited(true);

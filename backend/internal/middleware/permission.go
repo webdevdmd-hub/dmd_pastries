@@ -63,3 +63,22 @@ func (m *PermissionMiddleware) RequireAnyPermission(required ...string) gin.Hand
 		c.Abort()
 	}
 }
+
+func (m *PermissionMiddleware) RequirePlatformAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		currentUser := utils.MustAuthContext(c)
+		if currentUser == nil {
+			response.Error(c, 401, "unauthenticated user", nil)
+			c.Abort()
+			return
+		}
+
+		if currentUser.IsPlatformAdmin {
+			c.Next()
+			return
+		}
+
+		response.Error(c, 403, "platform super admin access required", nil)
+		c.Abort()
+	}
+}

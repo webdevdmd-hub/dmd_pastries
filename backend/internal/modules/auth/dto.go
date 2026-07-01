@@ -27,6 +27,7 @@ type PasswordResetCompleteRequest struct {
 }
 
 type AuthProfileResponse struct {
+	AccountType          string     `json:"account_type"`
 	UserID               string     `json:"user_id"`
 	AppwriteUserID       string     `json:"appwrite_user_id"`
 	BusinessID           string     `json:"business_id"`
@@ -46,6 +47,16 @@ type AuthProfileResponse struct {
 	Status               string     `json:"status"`
 	EmailVerified        bool       `json:"email_verified"`
 	LastLoginAt          *time.Time `json:"last_login_at"`
+}
+
+type PlatformAdminProfileResponse struct {
+	AccountType      string   `json:"account_type"`
+	AppwriteUserID   string   `json:"appwrite_user_id"`
+	FullName         string   `json:"full_name"`
+	Email            string   `json:"email"`
+	EmailVerified    bool     `json:"email_verified"`
+	Permissions      []string `json:"permissions"`
+	SuperAdminStatus string   `json:"super_admin_status"`
 }
 
 type RegisterOwnerResponse struct {

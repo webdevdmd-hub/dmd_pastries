@@ -35,6 +35,7 @@ import (
 	"pastries-pos/internal/modules/salesreturns"
 	"pastries-pos/internal/modules/settings"
 	"pastries-pos/internal/modules/subscriptions"
+	"pastries-pos/internal/modules/superadmin"
 	"pastries-pos/internal/modules/suppliers"
 	"pastries-pos/internal/modules/systemhealth"
 	"pastries-pos/internal/modules/users"
@@ -182,6 +183,7 @@ func main() {
 	expenseHandler := expenses.NewHandler(expenseService)
 	salesReturnService := salesreturns.NewService(db, salesReturnRepo, inventoryService, auditRepo, accountingService)
 	salesReturnHandler := salesreturns.NewHandler(salesReturnService)
+	superAdminService := superadmin.NewService(db)
 
 	authMiddleware := middleware.NewAuthMiddleware(authService)
 	permissionMiddleware := middleware.NewPermissionMiddleware()
@@ -404,6 +406,12 @@ func main() {
 		systemhealth.NewHandler(router),
 		authMiddleware.RequireAuth(),
 		permit("settings.view", "settings.manage"),
+	)
+	superadmin.RegisterRoutes(
+		router,
+		superadmin.NewHandler(superAdminService),
+		authMiddleware.RequireAuth(),
+		permissionMiddleware.RequirePlatformAdmin(),
 	)
 
 	if err := server.Run(router, cfg.Port); err != nil {

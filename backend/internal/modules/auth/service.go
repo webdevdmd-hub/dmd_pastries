@@ -590,7 +590,7 @@ func allPermissionKeys() []string {
 	return keys
 }
 
-func (s *Service) LoginSync(jwt, ipAddress, userAgent string) (*AuthProfileResponse, error) {
+func (s *Service) LoginSync(jwt, ipAddress, userAgent string) (interface{}, error) {
 	identity, err := s.appwriteClient.VerifyJWT(jwt)
 	if err != nil {
 		return nil, apperrors.Unauthorized("invalid Appwrite token")
@@ -599,11 +599,26 @@ func (s *Service) LoginSync(jwt, ipAddress, userAgent string) (*AuthProfileRespo
 	if err := s.ensureEmailVerification(identity); err != nil {
 		return nil, err
 	}
+	if s.isSuperAdminIdentity(identity) {
+		return s.platformAdminProfile(identity), nil
+	}
 
 	return s.syncProfile(identity, ipAddress, userAgent)
 }
 
-func (s *Service) Me(currentUser *utils.AuthContext) (*AuthProfileResponse, error) {
+func (s *Service) Me(currentUser *utils.AuthContext) (interface{}, error) {
+	if currentUser != nil && currentUser.IsPlatformAdmin {
+		return &PlatformAdminProfileResponse{
+			AccountType:      "platform_admin",
+			AppwriteUserID:   currentUser.AppwriteUserID,
+			FullName:         currentUser.FullName,
+			Email:            currentUser.Email,
+			EmailVerified:    true,
+			Permissions:      []string{"super_admin.access"},
+			SuperAdminStatus: "active",
+		}, nil
+	}
+
 	return s.buildProfileByUserID(currentUser.UserID, currentUser.BusinessID)
 }
 
@@ -630,6 +645,20 @@ func (s *Service) AuthenticateToken(token string) (*utils.AuthContext, error) {
 	if err != nil {
 		return nil, apperrors.Unauthorized("invalid Appwrite token")
 	}
+	if err := s.ensureEmailVerification(identity); err != nil {
+		return nil, err
+	}
+	if s.isSuperAdminIdentity(identity) {
+		return &utils.AuthContext{
+			UserID:               identity.ID,
+			AppwriteUserID:       identity.ID,
+			FullName:             identity.Name,
+			Email:                strings.ToLower(strings.TrimSpace(identity.Email)),
+			IsPlatformAdmin:      true,
+			CanAccessAllBranches: true,
+			Permissions:          []string{"super_admin.access"},
+		}, nil
+	}
 
 	tx := s.db.Begin()
 	if tx.Error != nil {
@@ -642,14 +671,13 @@ func (s *Service) AuthenticateToken(token string) (*utils.AuthContext, error) {
 		return nil, err
 	}
 
+	if err := s.activateInvitedUser(tx, user); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
 	if user.Status != "active" {
 		tx.Rollback()
 		return nil, apperrors.Forbidden("user is inactive")
-	}
-
-	if err := s.ensureEmailVerification(identity); err != nil {
-		tx.Rollback()
-		return nil, err
 	}
 
 	if user.EmailVerified != identity.EmailVerified {
@@ -680,6 +708,8 @@ func (s *Service) AuthenticateToken(token string) (*utils.AuthContext, error) {
 		BusinessID:           user.BusinessID,
 		RoleID:               user.RoleID,
 		RoleName:             user.Role.RoleName,
+		FullName:             user.FullName,
+		Email:                user.Email,
 		CurrentBranchID:      branchScope.CurrentBranchID,
 		AssignedBranchID:     branchScope.AssignedBranchID,
 		AllowedBranchIDs:     branchScope.AllowedBranchIDs,
@@ -700,6 +730,10 @@ func (s *Service) syncProfile(identity *utils.AppwriteIdentity, ipAddress, userA
 		return nil, err
 	}
 
+	if err := s.activateInvitedUser(tx, user); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
 	if user.Status != "active" {
 		tx.Rollback()
 		return nil, apperrors.Forbidden("user is inactive")
@@ -759,6 +793,13 @@ func (s *Service) resolveLocalUserForIdentity(tx *gorm.DB, identity *utils.Appwr
 		return nil, apperrors.Internal("failed to load local user")
 	}
 	if len(matches) == 0 {
+		user, err := s.provisionInvitedUserForIdentity(tx, identity)
+		if err != nil {
+			return nil, err
+		}
+		if user != nil {
+			return user, nil
+		}
 		return nil, apperrors.Unauthorized("authenticated Appwrite user is not registered in this business")
 	}
 	if len(matches) > 1 {
@@ -776,9 +817,97 @@ func (s *Service) resolveLocalUserForIdentity(tx *gorm.DB, identity *utils.Appwr
 	return &user, nil
 }
 
+func (s *Service) activateInvitedUser(tx *gorm.DB, user *users.User) error {
+	if user == nil || user.Status != "invited" {
+		return nil
+	}
+	if err := s.userRepo.UpdateByBusinessIDTx(tx, user.ID, user.BusinessID, map[string]interface{}{"status": "active", "updated_at": time.Now().UTC()}); err != nil {
+		return apperrors.Internal("failed to activate invited user")
+	}
+	user.Status = "active"
+	return nil
+}
+
+func (s *Service) provisionInvitedUserForIdentity(tx *gorm.DB, identity *utils.AppwriteIdentity) (*users.User, error) {
+	email := strings.ToLower(strings.TrimSpace(identity.Email))
+	if email == "" {
+		return nil, nil
+	}
+
+	var invitations []users.UserInvitation
+	if err := tx.
+		Where("LOWER(email) = ? AND status = ?", email, "pending").
+		Order("created_at DESC").
+		Limit(2).
+		Find(&invitations).Error; err != nil {
+		return nil, apperrors.Internal("failed to load pending invitation")
+	}
+	if len(invitations) == 0 {
+		return nil, nil
+	}
+	if len(invitations) > 1 {
+		return nil, apperrors.Unauthorized("multiple pending invitations found for this email; contact support")
+	}
+
+	invite := invitations[0]
+	now := time.Now().UTC()
+	if now.After(invite.ExpiresAt) {
+		if err := tx.Model(&users.UserInvitation{}).Where("id = ?", invite.ID).Updates(map[string]interface{}{"status": "expired", "updated_at": now}).Error; err != nil {
+			return nil, apperrors.Internal("failed to expire invitation")
+		}
+		return nil, apperrors.Unauthorized("invitation has expired")
+	}
+
+	user := &users.User{
+		ID:              utils.NewUUID(),
+		AppwriteUserID:  identity.ID,
+		BusinessID:      invite.BusinessID,
+		BranchID:        invite.BranchID,
+		CurrentBranchID: invite.BranchID,
+		RoleID:          invite.RoleID,
+		FullName:        firstNonEmptyString(strings.TrimSpace(identity.Name), invite.FullName),
+		Email:           email,
+		Phone:           firstNonEmptyString(strings.TrimSpace(identity.Phone), invite.Phone),
+		Status:          "active",
+		EmailVerified:   identity.EmailVerified,
+	}
+	if err := s.userRepo.Create(tx, user); err != nil {
+		return nil, apperrors.Internal("failed to create invited local user")
+	}
+	if user.BranchID != nil {
+		if err := s.userRepo.EnsureBranchAccess(tx, user.BusinessID, user.ID, *user.BranchID); err != nil {
+			return nil, apperrors.Internal("failed to grant branch access")
+		}
+	}
+	if err := tx.Model(&users.UserInvitation{}).Where("id = ?", invite.ID).Updates(map[string]interface{}{
+		"status":      "accepted",
+		"accepted_at": now,
+		"updated_at":  now,
+	}).Error; err != nil {
+		return nil, apperrors.Internal("failed to accept invitation")
+	}
+	if err := tx.Preload("Role").Where("id = ?", user.ID).First(user).Error; err != nil {
+		return nil, apperrors.Internal("failed to load invited local user")
+	}
+
+	return user, nil
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func (s *Service) LogoutSync(currentUser *utils.AuthContext, ipAddress, userAgent string) error {
 	if currentUser == nil {
 		return apperrors.Unauthorized("missing authenticated user")
+	}
+	if currentUser.IsPlatformAdmin {
+		return nil
 	}
 
 	if err := s.auditRepo.CreateActivity(s.db, audit.ActivityInput{
@@ -796,6 +925,37 @@ func (s *Service) LogoutSync(currentUser *utils.AuthContext, ipAddress, userAgen
 	}
 
 	return nil
+}
+
+func (s *Service) isSuperAdminIdentity(identity *utils.AppwriteIdentity) bool {
+	if !s.cfg.SuperAdminEnabled || identity == nil {
+		return false
+	}
+
+	email := strings.ToLower(strings.TrimSpace(identity.Email))
+	if email == "" {
+		return false
+	}
+
+	for _, allowedEmail := range s.cfg.SuperAdminEmails {
+		if email == allowedEmail {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (s *Service) platformAdminProfile(identity *utils.AppwriteIdentity) *PlatformAdminProfileResponse {
+	return &PlatformAdminProfileResponse{
+		AccountType:      "platform_admin",
+		AppwriteUserID:   identity.ID,
+		FullName:         identity.Name,
+		Email:            strings.ToLower(strings.TrimSpace(identity.Email)),
+		EmailVerified:    identity.EmailVerified,
+		Permissions:      []string{"super_admin.access"},
+		SuperAdminStatus: "active",
+	}
 }
 
 func (s *Service) ensureEmailVerification(identity *utils.AppwriteIdentity) error {
@@ -838,6 +998,7 @@ func (s *Service) buildProfileByUserID(userID, businessID string) (*AuthProfileR
 	}
 
 	return &AuthProfileResponse{
+		AccountType:          "tenant_user",
 		UserID:               user.ID,
 		AppwriteUserID:       user.AppwriteUserID,
 		BusinessID:           user.BusinessID,

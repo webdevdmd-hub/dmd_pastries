@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -32,6 +33,8 @@ type Config struct {
 	DefaultTrialDays         int
 	AutoRunMigrations        bool
 	MigrationsPath           string
+	SuperAdminEnabled        bool
+	SuperAdminEmails         []string
 }
 
 func Load() Config {
@@ -49,6 +52,8 @@ func Load() Config {
 	cfg.DefaultTrialDays = getEnvInt("DEFAULT_TRIAL_DAYS", 14)
 	cfg.AutoRunMigrations = getEnvBool("AUTO_RUN_MIGRATIONS", false)
 	cfg.MigrationsPath = getEnv("MIGRATIONS_PATH", "migrations")
+	cfg.SuperAdminEnabled = getEnvBool("SUPER_ADMIN_ENABLED", false)
+	cfg.SuperAdminEmails = getEnvStringList("SUPER_ADMIN_EMAILS")
 	return cfg
 }
 
@@ -140,4 +145,22 @@ func getEnvBool(key string, fallback bool) bool {
 	}
 
 	return parsed
+}
+
+func getEnvStringList(key string) []string {
+	value := os.Getenv(key)
+	if value == "" {
+		return []string{}
+	}
+
+	parts := strings.Split(value, ",")
+	values := make([]string, 0, len(parts))
+	for _, part := range parts {
+		normalized := strings.ToLower(strings.TrimSpace(part))
+		if normalized != "" {
+			values = append(values, normalized)
+		}
+	}
+
+	return values
 }

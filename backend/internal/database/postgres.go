@@ -106,6 +106,7 @@ func VerifySchema(db *gorm.DB) error {
 		"role_permissions",
 		"subscriptions",
 		"audit_logs",
+		"platform_audit_logs",
 	}
 
 	for _, table := range requiredTables {

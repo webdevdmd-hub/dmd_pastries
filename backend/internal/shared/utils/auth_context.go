@@ -10,6 +10,9 @@ type AuthContext struct {
 	BusinessID           string
 	RoleID               string
 	RoleName             string
+	FullName             string
+	Email                string
+	IsPlatformAdmin      bool
 	CurrentBranchID      *string
 	AssignedBranchID     *string
 	AllowedBranchIDs     []string

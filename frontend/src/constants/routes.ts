@@ -11,6 +11,7 @@ export const ROUTES = {
   dashboardCashier: "/dashboard/cashier",
   dashboardProduction: "/dashboard/production",
   dashboardPurchasing: "/dashboard/purchasing",
+  superAdmin: "/super-admin",
   accounting: "/accounting",
   accountingAccountTransfers: "/accounting/account-transfers",
   accountingAccountMappings: "/accounting/account-mappings",

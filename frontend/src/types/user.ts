@@ -1,6 +1,7 @@
 import type { Permission } from "@/types/permission";
 
 export type SafeUserProfile = {
+  accountType: "tenant_user" | "platform_admin";
   id: string;
   businessId: string;
   fullName: string;
@@ -17,6 +18,7 @@ export type SafeUserProfile = {
   permissions: Permission[];
   subscriptionStatus: string | null;
   emailVerified: boolean;
+  isPlatformAdmin: boolean;
 };
 
 export type UserStatus = "active" | "inactive" | "suspended" | "invited";
