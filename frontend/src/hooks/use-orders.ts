@@ -255,11 +255,7 @@ export function useConvertOrderItemToVariant() {
 export function useAddOrderPayment() {
   const queryClient = useQueryClient();
 
-  return useMutation<
-    BakeryOrderPayment,
-    Error,
-    { orderId: string; payload: AddOrderPaymentPayload }
-  >({
+  return useMutation<BakeryOrder, Error, { orderId: string; payload: AddOrderPaymentPayload }>({
     mutationFn: async ({ orderId, payload }) => addOrderPayment(orderId, payload),
     onSuccess: async () => {
       await invalidateOrders(queryClient);

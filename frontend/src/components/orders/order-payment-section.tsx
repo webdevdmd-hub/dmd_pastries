@@ -18,6 +18,18 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
 }
 
+function paymentTypeLabel(paymentType: "deposit" | "balance" | "full"): string {
+  if (paymentType === "deposit") {
+    return "Advance Payment";
+  }
+
+  if (paymentType === "full") {
+    return "Final Payment";
+  }
+
+  return "Balance Payment";
+}
+
 export function OrderPaymentSection({
   canManage,
   order,
@@ -113,9 +125,9 @@ export function OrderPaymentSection({
           >
             <span className="flex items-center gap-2 text-brand-espresso">
               <CreditCard className="h-4 w-4" />
-              {payment.paymentMethodName} - {payment.paymentType}
+              {paymentTypeLabel(payment.paymentType)}: {payment.paymentMethodName} -{" "}
+              {formatCurrency(payment.amount)}
             </span>
-            <span className="font-semibold">{formatCurrency(payment.amount)}</span>
             {payment.journalEntryId ? (
               <Button asChild size="sm" variant="outline">
                 <Link

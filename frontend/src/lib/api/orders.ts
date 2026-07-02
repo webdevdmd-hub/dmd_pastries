@@ -300,6 +300,7 @@ function parseOrder(value: unknown): BakeryOrder {
     createdAt: stringValue(value.created_at),
     updatedAt: stringValue(value.updated_at),
     items: Array.isArray(value.items) ? value.items.map(parseOrderItem) : [],
+    payments: Array.isArray(value.payments) ? value.payments.map(parsePayment) : [],
   };
 }
 
@@ -311,7 +312,10 @@ function parsePayment(value: unknown): BakeryOrderPayment {
   return {
     id: stringValue(value.id),
     paymentMethodId: stringValue(value.payment_method_id),
-    paymentMethodName: stringValue(value.payment_method_name, "Payment method"),
+    paymentMethodName: stringValue(
+      value.payment_method_name_snapshot,
+      stringValue(value.payment_method_name, "Payment method"),
+    ),
     amount: numberValue(value.amount),
     referenceNumber: optionalString(value.reference_number),
     journalEntryId: optionalString(value.journal_entry_id),
@@ -699,8 +703,8 @@ export async function getOrderPayments(orderId: string): Promise<BakeryOrderPaym
 export async function addOrderPayment(
   orderId: string,
   payload: AddOrderPaymentPayload,
-): Promise<BakeryOrderPayment> {
-  const response = await apiRequest<BakeryOrderPayment, BackendOrderPaymentPayload>(
+): Promise<BakeryOrder> {
+  const response = await apiRequest<BakeryOrder, BackendOrderPaymentPayload>(
     `/api/v1/bakery-orders/${orderId}/payments`,
     {
       authMode: "appwrite",
@@ -711,7 +715,7 @@ export async function addOrderPayment(
         payment_type: payload.paymentType,
         reference_number: requestString(payload.referenceNumber),
       },
-      parse: parsePayment,
+      parse: parseOrder,
     },
   );
 

@@ -49,6 +49,7 @@ export type BakeryOrder = {
   createdAt: string;
   updatedAt: string;
   items: BakeryOrderItem[];
+  payments: BakeryOrderPayment[];
 };
 
 export type BakeryOrderItem = {
