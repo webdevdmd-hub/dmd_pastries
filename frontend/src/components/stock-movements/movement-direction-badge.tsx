@@ -16,5 +16,9 @@ export function MovementDirectionBadge({ direction }: MovementDirectionBadgeProp
     return <Badge className="bg-orange-100 text-orange-900 hover:bg-orange-100">Out</Badge>;
   }
 
+  if (direction === "transfer") {
+    return <Badge className="bg-sky-100 text-sky-900 hover:bg-sky-100">Transfer</Badge>;
+  }
+
   return <Badge variant="secondary">Neutral</Badge>;
 }

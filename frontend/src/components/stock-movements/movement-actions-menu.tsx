@@ -25,6 +25,7 @@ function canAttemptReverse(movement: StockMovement): boolean {
   return (
     !movement.isReversal &&
     movement.movementType !== "reversal" &&
+    movement.movementType !== "transfer" &&
     movement.movementType !== "sale_out" &&
     movement.movementType !== "purchase_in"
   );

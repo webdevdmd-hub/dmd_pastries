@@ -53,6 +53,10 @@ function DetailRow({ label, value }: { label: string; value: string }): JSX.Elem
   );
 }
 
+function locationName(value: string | null): string {
+  return value && value.trim().length > 0 ? value : "Unknown location";
+}
+
 export function MovementDetailsDrawer({
   movement,
   onOpenChange,
@@ -89,6 +93,16 @@ export function MovementDetailsDrawer({
               />
               <DetailRow label="Reference type" value={movement.referenceType ?? "Manual"} />
               <DetailRow label="Reference number" value={movement.referenceNumber ?? "None"} />
+              {movement.movementType === "transfer" ? (
+                <>
+                  <DetailRow
+                    label="From location"
+                    value={locationName(movement.fromStockLocationName)}
+                  />
+                  <DetailRow label="To location" value={locationName(movement.toStockLocationName)} />
+                  <DetailRow label="Transfer number" value={movement.referenceNumber ?? "None"} />
+                </>
+              ) : null}
               <DetailRow
                 label="Total cost"
                 value={movement.totalCost > 0 ? formatMoney(movement.totalCost) : "Not costed"}

@@ -11,6 +11,14 @@ import {
 } from "@/components/ui/table";
 import type { InventoryMovementReportRow } from "@/types/inventory-reports";
 
+function movementTypeLabel(value: string): string {
+  if (value === "transfer") {
+    return "Stock Transfer";
+  }
+
+  return value.replaceAll("_", " ");
+}
+
 export function InventoryMovementsTable({
   rows,
 }: {
@@ -39,7 +47,7 @@ export function InventoryMovementsTable({
             <TableCell>{formatDate(row.date)}</TableCell>
             <TableCell className="font-semibold">{row.itemName || "-"}</TableCell>
             <TableCell>{row.branchName || "-"}</TableCell>
-            <TableCell className="capitalize">{row.movementType.replaceAll("_", " ")}</TableCell>
+            <TableCell className="capitalize">{movementTypeLabel(row.movementType)}</TableCell>
             <TableCell className="capitalize">{row.movementDirection || "-"}</TableCell>
             <TableCell>{row.quantity}</TableCell>
             <TableCell>{row.beforeQuantity}</TableCell>

@@ -15,6 +15,7 @@ const labels: Record<MovementType, string> = {
   adjustment_out: "Adjust Out",
   wastage: "Wastage",
   return_in: "Return In",
+  transfer: "Stock Transfer",
   transfer_in: "Transfer In",
   transfer_out: "Transfer Out",
   production_in: "Production In",
@@ -25,7 +26,6 @@ export function MovementTypeBadge({ type }: MovementTypeBadgeProps): JSX.Element
   const isOut =
     type === "sale_out" ||
     type === "adjustment_out" ||
-    type === "transfer_out" ||
     type === "production_out";
   const isDanger = type === "wastage";
 

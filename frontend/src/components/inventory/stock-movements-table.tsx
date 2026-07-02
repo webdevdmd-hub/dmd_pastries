@@ -31,6 +31,26 @@ function formatMoney(value: number): string {
   }).format(value);
 }
 
+function locationName(value: string | null): string {
+  return value && value.trim().length > 0 ? value : "Unknown location";
+}
+
+function TransferDetails({ movement }: { movement: StockMovement }): JSX.Element | null {
+  if (movement.movementType !== "transfer") {
+    return null;
+  }
+
+  return (
+    <div className="mt-2 min-w-44 rounded-lg border border-sky-100 bg-sky-50/70 px-2 py-1 text-xs text-sky-950">
+      <p>From: {locationName(movement.fromStockLocationName)}</p>
+      <p>To: {locationName(movement.toStockLocationName)}</p>
+      <p>
+        {formatQuantity(movement.quantity)} {movement.unitSymbol}
+      </p>
+    </div>
+  );
+}
+
 export function StockMovementsTable({ movements }: StockMovementsTableProps): JSX.Element {
   return (
     <Table>
@@ -59,6 +79,7 @@ export function StockMovementsTable({ movements }: StockMovementsTableProps): JS
             <TableCell>{movement.branchName}</TableCell>
             <TableCell>
               <MovementTypeBadge type={movement.movementType} />
+              <TransferDetails movement={movement} />
             </TableCell>
             <TableCell className="font-bold">{formatQuantity(movement.quantity)}</TableCell>
             <TableCell>{formatQuantity(movement.beforeQuantity)}</TableCell>
@@ -80,7 +101,7 @@ export function StockMovementsTable({ movements }: StockMovementsTableProps): JS
             <TableCell>
               <AccountingJournalLink id={movement.accountingJournalEntryId} />
             </TableCell>
-            <TableCell>{movement.referenceType ?? "Manual"}</TableCell>
+            <TableCell>{movement.referenceNumber ?? movement.referenceType ?? "Manual"}</TableCell>
             <TableCell>{movement.reason ?? "No reason"}</TableCell>
             <TableCell>{movement.createdByUserName}</TableCell>
           </TableRow>

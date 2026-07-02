@@ -106,6 +106,7 @@ export function MovementsToolbar({
           <SelectItem value="adjustment_out">Adjustment Out</SelectItem>
           <SelectItem value="wastage">Wastage</SelectItem>
           <SelectItem value="return_in">Return In</SelectItem>
+          <SelectItem value="transfer">Stock Transfer</SelectItem>
           <SelectItem value="transfer_in">Transfer In</SelectItem>
           <SelectItem value="transfer_out">Transfer Out</SelectItem>
           <SelectItem value="production_in">Production In</SelectItem>
@@ -126,6 +127,7 @@ export function MovementsToolbar({
           <SelectItem value="all">All directions</SelectItem>
           <SelectItem value="in">In</SelectItem>
           <SelectItem value="out">Out</SelectItem>
+          <SelectItem value="transfer">Transfer</SelectItem>
           <SelectItem value="neutral">Neutral</SelectItem>
         </SelectContent>
       </Select>

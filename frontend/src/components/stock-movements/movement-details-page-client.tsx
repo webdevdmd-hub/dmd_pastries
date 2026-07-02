@@ -32,6 +32,10 @@ function formatMoney(value: number): string {
   }).format(value);
 }
 
+function locationName(value: string | null): string {
+  return value && value.trim().length > 0 ? value : "Unknown location";
+}
+
 export function MovementDetailsPageClient({
   movementId,
 }: MovementDetailsPageClientProps): JSX.Element {
@@ -103,6 +107,28 @@ export function MovementDetailsPageClient({
                   {movement.referenceNumber ?? movement.referenceType ?? "Manual"}
                 </p>
               </div>
+              {movement.movementType === "transfer" ? (
+                <>
+                  <div>
+                    <p className="text-sm text-brand-mocha">From location</p>
+                    <p className="font-bold text-brand-espresso">
+                      {locationName(movement.fromStockLocationName)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-brand-mocha">To location</p>
+                    <p className="font-bold text-brand-espresso">
+                      {locationName(movement.toStockLocationName)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-brand-mocha">Transfer number</p>
+                    <p className="font-bold text-brand-espresso">
+                      {movement.referenceNumber ?? "None"}
+                    </p>
+                  </div>
+                </>
+              ) : null}
               <div>
                 <p className="text-sm text-brand-mocha">Total cost</p>
                 <p className="font-bold text-brand-espresso">
@@ -126,6 +152,12 @@ export function MovementDetailsPageClient({
               <div>
                 <p className="text-sm text-brand-mocha">Created by</p>
                 <p className="font-bold text-brand-espresso">{movement.createdByUserName}</p>
+              </div>
+              <div>
+                <p className="text-sm text-brand-mocha">Created at</p>
+                <p className="font-bold text-brand-espresso">
+                  {movement.createdAt ? new Date(movement.createdAt).toLocaleString("en-AE") : "-"}
+                </p>
               </div>
             </div>
             {movement.accountingJournalEntryId ? (

@@ -12,13 +12,14 @@ export type MovementType =
   | "adjustment_out"
   | "wastage"
   | "return_in"
+  | "transfer"
   | "transfer_in"
   | "transfer_out"
   | "production_in"
   | "production_out"
   | "reversal";
 
-export type MovementDirection = "in" | "out" | "neutral";
+export type MovementDirection = "in" | "out" | "neutral" | "transfer";
 
 export type StockMovement = {
   id: string;
@@ -34,6 +35,12 @@ export type StockMovement = {
   beforeQuantity: number;
   afterQuantity: number;
   unitSymbol: string;
+  stockLocationId: string | null;
+  stockLocationName: string | null;
+  fromStockLocationId: string | null;
+  fromStockLocationName: string | null;
+  toStockLocationId: string | null;
+  toStockLocationName: string | null;
   referenceType: string | null;
   referenceId: string | null;
   referenceNumber: string | null;

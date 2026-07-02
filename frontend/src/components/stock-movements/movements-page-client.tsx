@@ -50,6 +50,14 @@ const defaultFilters: StockMovementFilters = {
   createdBy: "",
 };
 
+function movementTypeLabel(value: string): string {
+  if (value === "transfer") {
+    return "Stock transfer";
+  }
+
+  return value.replace(/_/g, " ");
+}
+
 export function MovementsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
@@ -174,7 +182,7 @@ export function MovementsPageClient(): JSX.Element {
                 className="rounded-full border border-brand-cappuccino bg-brand-latte px-3 py-1 text-xs font-semibold text-brand-mocha"
                 key={entry.movementType}
               >
-                {entry.movementType.replace(/_/g, " ")} · {entry.quantity} · {entry.count} moves
+                {movementTypeLabel(entry.movementType)} - {entry.quantity} - {entry.count} moves
               </span>
             ))}
           </CardContent>

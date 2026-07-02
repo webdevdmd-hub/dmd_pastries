@@ -38,9 +38,30 @@ function formatMoney(value: number): string {
 
 function rowClassName(movement: StockMovement): string | undefined {
   if (movement.movementType === "reversal" || movement.isReversal) return "bg-violet-50/60";
+  if (movement.movementType === "transfer") return "bg-sky-50/40";
   if (movement.movementDirection === "in") return "bg-emerald-50/40";
   if (movement.movementDirection === "out") return "bg-orange-50/40";
   return undefined;
+}
+
+function locationName(value: string | null): string {
+  return value && value.trim().length > 0 ? value : "Unknown location";
+}
+
+function TransferDetails({ movement }: { movement: StockMovement }): JSX.Element | null {
+  if (movement.movementType !== "transfer") {
+    return null;
+  }
+
+  return (
+    <div className="mt-2 min-w-44 rounded-lg border border-sky-100 bg-sky-50/70 px-2 py-1 text-xs text-sky-950">
+      <p>From: {locationName(movement.fromStockLocationName)}</p>
+      <p>To: {locationName(movement.toStockLocationName)}</p>
+      <p>
+        {formatQuantity(movement.quantity)} {movement.unitSymbol}
+      </p>
+    </div>
+  );
 }
 
 export function MovementsTable({
@@ -83,6 +104,7 @@ export function MovementsTable({
             <TableCell>{movement.branchName}</TableCell>
             <TableCell>
               <MovementTypeBadge type={movement.movementType} />
+              <TransferDetails movement={movement} />
             </TableCell>
             <TableCell>
               <MovementDirectionBadge direction={movement.movementDirection} />

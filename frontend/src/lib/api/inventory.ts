@@ -155,6 +155,7 @@ function isMovementType(value: unknown): value is MovementType {
     value === "adjustment_out" ||
     value === "wastage" ||
     value === "return_in" ||
+    value === "transfer" ||
     value === "transfer_in" ||
     value === "transfer_out" ||
     value === "production_in" ||
@@ -250,12 +251,13 @@ function parseStockMovement(value: unknown): StockMovement {
     toStockLocationName: nullableString(value.to_stock_location_name),
     referenceType: nullableString(value.reference_type),
     referenceId: nullableString(value.reference_id),
+    referenceNumber: nullableString(value.reference_number),
     reason: nullableString(value.reason),
     unitCostSnapshot: numberValue(value.unit_cost_snapshot),
     totalCost: numberValue(value.total_cost),
     valuationMethod: nullableString(value.valuation_method),
     accountingJournalEntryId: nullableString(value.accounting_journal_entry_id),
-    createdByUserName: stringValue(value.created_by_user_name, "System"),
+    createdByUserName: stringValue(value.created_by_name, stringValue(value.created_by_user_name, "System")),
     createdAt: stringValue(value.created_at),
   };
 }

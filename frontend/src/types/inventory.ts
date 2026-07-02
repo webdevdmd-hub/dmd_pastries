@@ -29,6 +29,7 @@ export type MovementType =
   | "adjustment_out"
   | "wastage"
   | "return_in"
+  | "transfer"
   | "transfer_in"
   | "transfer_out"
   | "production_in"
@@ -91,6 +92,7 @@ export type StockMovement = {
   toStockLocationName: string | null;
   referenceType: string | null;
   referenceId: string | null;
+  referenceNumber: string | null;
   reason: string | null;
   unitCostSnapshot: number;
   totalCost: number;

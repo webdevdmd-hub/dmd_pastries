@@ -139,6 +139,7 @@ export const stockMovementFiltersSchema = z.object({
     "adjustment_out",
     "wastage",
     "return_in",
+    "transfer",
     "transfer_in",
     "transfer_out",
     "production_in",

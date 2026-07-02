@@ -64,6 +64,7 @@ function isMovementType(value: unknown): value is MovementType {
     value === "adjustment_out" ||
     value === "wastage" ||
     value === "return_in" ||
+    value === "transfer" ||
     value === "transfer_in" ||
     value === "transfer_out" ||
     value === "production_in" ||
@@ -73,7 +74,7 @@ function isMovementType(value: unknown): value is MovementType {
 }
 
 function isMovementDirection(value: unknown): value is MovementDirection {
-  return value === "in" || value === "out" || value === "neutral";
+  return value === "in" || value === "out" || value === "neutral" || value === "transfer";
 }
 
 function inferMovementDirection(type: MovementType): MovementDirection {
@@ -82,7 +83,6 @@ function inferMovementDirection(type: MovementType): MovementDirection {
     type === "purchase_in" ||
     type === "adjustment_in" ||
     type === "return_in" ||
-    type === "transfer_in" ||
     type === "production_in"
   ) {
     return "in";
@@ -92,13 +92,12 @@ function inferMovementDirection(type: MovementType): MovementDirection {
     type === "sale_out" ||
     type === "adjustment_out" ||
     type === "wastage" ||
-    type === "transfer_out" ||
     type === "production_out"
   ) {
     return "out";
   }
 
-  return "neutral";
+  return type === "transfer" ? "transfer" : "neutral";
 }
 
 function parseList<TItem>(value: unknown, parser: (item: unknown) => TItem): TItem[] {
@@ -132,6 +131,12 @@ function parseStockMovement(value: unknown): StockMovement {
     beforeQuantity: numberValue(value.before_quantity),
     afterQuantity: numberValue(value.after_quantity),
     unitSymbol: stringValue(value.unit_symbol),
+    stockLocationId: nullableString(value.stock_location_id),
+    stockLocationName: nullableString(value.stock_location_name),
+    fromStockLocationId: nullableString(value.from_stock_location_id),
+    fromStockLocationName: nullableString(value.from_stock_location_name),
+    toStockLocationId: nullableString(value.to_stock_location_id),
+    toStockLocationName: nullableString(value.to_stock_location_name),
     referenceType: nullableString(value.reference_type),
     referenceId: nullableString(value.reference_id),
     referenceNumber: nullableString(value.reference_number),
@@ -143,7 +148,7 @@ function parseStockMovement(value: unknown): StockMovement {
     totalCost: numberValue(value.total_cost),
     valuationMethod: nullableString(value.valuation_method),
     accountingJournalEntryId: nullableString(value.accounting_journal_entry_id),
-    createdByUserName: stringValue(value.created_by_user_name, "System"),
+    createdByUserName: stringValue(value.created_by_name, stringValue(value.created_by_user_name, "System")),
     createdAt: stringValue(value.created_at),
   };
 }
