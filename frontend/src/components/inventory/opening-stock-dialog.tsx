@@ -56,6 +56,13 @@ const STOCK_RELEVANT_PRODUCT_TYPES = new Set([
   "equipment",
 ]);
 
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    style: "currency",
+  }).format(value);
+}
+
 export function OpeningStockDialog({
   branches,
   isSubmitting,
@@ -91,6 +98,7 @@ export function OpeningStockDialog({
       unitId: "",
       stockLocationId: "",
       quantity: 0,
+      unitCost: 0,
       reorderLevel: 0,
       isExpiryTracked: false,
       expiryDate: "",
@@ -99,6 +107,8 @@ export function OpeningStockDialog({
   });
   const itemType = form.watch("itemType");
   const selectedProductId = form.watch("productId") ?? "";
+  const openingQuantity = form.watch("quantity");
+  const openingUnitCost = form.watch("unitCost");
   const expiryTracked = form.watch("isExpiryTracked");
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
@@ -201,6 +211,8 @@ export function OpeningStockDialog({
       })),
     [units],
   );
+  const estimatedOpeningValue =
+    Math.max(openingQuantity || 0, 0) * Math.max(openingUnitCost || 0, 0);
 
   useEffect(() => {
     if (open) {
@@ -214,6 +226,10 @@ export function OpeningStockDialog({
       const selectedVariant = selectedProduct?.variants.find(
         (variant) => variant.id === preselectedItem?.productVariantId,
       );
+      const defaultUnitCost =
+        preselectedItem?.averageCost && preselectedItem.averageCost > 0
+          ? preselectedItem.averageCost
+          : (selectedVariant?.costPrice ?? selectedProduct?.costPrice ?? 0);
 
       form.reset({
         branchId: branchScope.normalizeBranchId(activeBranches[0]?.id ?? ""),
@@ -222,6 +238,7 @@ export function OpeningStockDialog({
         unitId: preselectedItem?.unitId ?? selectedProduct?.unitId ?? "",
         stockLocationId: defaultStockLocation?.id ?? "",
         quantity: 0,
+        unitCost: defaultUnitCost,
         reorderLevel: preselectedItem?.reorderLevel ?? 0,
         isExpiryTracked:
           preselectedItem?.isExpiryTracked ?? selectedProduct?.isExpiryTracked ?? false,
@@ -244,6 +261,7 @@ export function OpeningStockDialog({
     const product = products.find((item) => item.id === productId);
     form.setValue("productId", productId);
     form.setValue("productVariantId", "");
+    form.setValue("unitCost", product?.costPrice ?? 0);
     if (product?.unitId) {
       form.setValue("unitId", product.unitId);
       form.setValue("isExpiryTracked", product.isExpiryTracked);
@@ -255,7 +273,14 @@ export function OpeningStockDialog({
     form.setValue("productId", "");
     form.setValue("productVariantId", "");
     form.setValue("unitId", "");
+    form.setValue("unitCost", 0);
     form.setValue("isExpiryTracked", false);
+  };
+
+  const handleVariantChange = (variantId: string): void => {
+    const variant = activeProductVariants.find((item) => item.id === variantId);
+    form.setValue("productVariantId", variantId);
+    form.setValue("unitCost", variant?.costPrice ?? selectedProduct?.costPrice ?? 0);
   };
 
   const handleSubmit = async (values: OpeningStockSchema): Promise<void> => {
@@ -267,6 +292,7 @@ export function OpeningStockDialog({
       unitId: values.unitId,
       ...(values.stockLocationId ? { stockLocationId: values.stockLocationId } : {}),
       quantity: values.quantity,
+      unitCost: values.unitCost,
       reorderLevel: values.reorderLevel,
       isExpiryTracked: values.isExpiryTracked,
       ...(values.expiryDate ? { expiryDate: values.expiryDate } : {}),
@@ -340,7 +366,7 @@ export function OpeningStockDialog({
                 <SearchableCombobox
                   disabled={!selectedProductId}
                   emptyMessage="No matching variants found."
-                  onValueChange={(value) => form.setValue("productVariantId", value)}
+                  onValueChange={handleVariantChange}
                   options={variantOptions}
                   placeholder={
                     selectedProductId ? "Select product variant" : "Select product first"
@@ -389,6 +415,26 @@ export function OpeningStockDialog({
                 type="number"
                 {...form.register("quantity")}
               />
+              {form.formState.errors.quantity ? (
+                <p className="text-sm text-red-800">{form.formState.errors.quantity.message}</p>
+              ) : null}
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="openingUnitCost">Opening cost</Label>
+              <Input
+                id="openingUnitCost"
+                min="0"
+                step="0.01"
+                type="number"
+                {...form.register("unitCost")}
+              />
+              {form.formState.errors.unitCost ? (
+                <p className="text-sm text-red-800">{form.formState.errors.unitCost.message}</p>
+              ) : (
+                <p className="text-xs text-brand-mocha">
+                  Estimated opening value: {formatMoney(estimatedOpeningValue)}
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <ReorderLevelLabel htmlFor="reorderLevel" />

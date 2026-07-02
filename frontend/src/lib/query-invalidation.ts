@@ -195,6 +195,7 @@ export function invalidateInventoryData(queryClient: QueryClient): Promise<void[
     QUERY_ROOTS.accounting,
     QUERY_ROOTS.reports,
     QUERY_ROOTS.inventoryReports,
+    QUERY_ROOTS.financialReports,
     QUERY_ROOTS.dashboard,
   ]);
 }

@@ -1238,6 +1238,9 @@ func (s *Service) validateOpeningStock(businessID string, req OpeningStockReques
 	if req.Quantity == 0 {
 		return apperrors.BadRequest("quantity must be greater than zero for opening stock movement", nil)
 	}
+	if req.UnitCost <= 0 {
+		return apperrors.BadRequest("unit_cost must be greater than zero for opening stock valuation", nil)
+	}
 	if req.ReorderLevel < 0 {
 		return apperrors.BadRequest("reorder_level must be greater than or equal to zero", nil)
 	}

@@ -127,6 +127,7 @@ export type OpeningStockPayload = {
   unitId: string;
   stockLocationId?: string;
   quantity: number;
+  unitCost: number;
   reorderLevel: number;
   isExpiryTracked: boolean;
   expiryDate?: string;

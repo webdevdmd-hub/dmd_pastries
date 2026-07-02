@@ -37,6 +37,7 @@ type BackendOpeningStockPayload = {
   unit_id: string;
   stock_location_id?: string;
   quantity: number;
+  unit_cost: number;
   reorder_level: number;
   is_expiry_tracked: boolean;
   expiry_date?: string;
@@ -186,6 +187,8 @@ function parseInventoryItem(value: unknown): InventoryItem {
     throw new Error("Backend inventory item payload is invalid.");
   }
 
+  const unit = isObject(value.unit) ? value.unit : {};
+
   return {
     id: stringValue(value.id),
     businessId: stringValue(value.business_id),
@@ -199,18 +202,18 @@ function parseInventoryItem(value: unknown): InventoryItem {
     packagingItemId: nullableString(value.packaging_item_id),
     itemType: isInventoryItemType(value.item_type) ? value.item_type : "product",
     itemName: stringValue(value.item_name, "Inventory item"),
-    itemCode: stringValue(value.item_code),
+    itemCode: stringValue(value.sku, stringValue(value.item_code, stringValue(value.barcode))),
     currentQuantity: numberValue(value.current_quantity),
     reservedQuantity: numberValue(value.reserved_quantity),
     availableQuantity: numberValue(value.available_quantity),
     reorderLevel: numberValue(value.reorder_level),
-    averageCost: numberValue(value.average_cost ?? value.avg_cost),
+    averageCost: numberValue(value.average_unit_cost ?? value.average_cost ?? value.avg_cost),
     inventoryValue: numberValue(
       value.inventory_value ?? value.total_value ?? value.stock_value ?? value.current_value,
     ),
-    unitId: stringValue(value.unit_id),
-    unitName: stringValue(value.unit_name, "Unit"),
-    unitSymbol: stringValue(value.unit_symbol),
+    unitId: stringValue(value.unit_id, stringValue(unit.id)),
+    unitName: stringValue(value.unit_name, stringValue(unit.unit_name, "Unit")),
+    unitSymbol: stringValue(value.unit_symbol, stringValue(unit.symbol)),
     isExpiryTracked: booleanValue(value.is_expiry_tracked),
     lowStock: booleanValue(value.low_stock),
     status: inventoryRecordStatus(value.inventory_status ?? value.status),
@@ -423,6 +426,7 @@ function openingStockPayload(payload: OpeningStockPayload): BackendOpeningStockP
     unit_id: payload.unitId,
     ...(payload.stockLocationId ? { stock_location_id: payload.stockLocationId } : {}),
     quantity: payload.quantity,
+    unit_cost: payload.unitCost,
     reorder_level: payload.reorderLevel,
     is_expiry_tracked: payload.isExpiryTracked,
     ...(payload.expiryDate ? { expiry_date: payload.expiryDate } : {}),
