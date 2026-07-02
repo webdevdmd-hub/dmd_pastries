@@ -395,6 +395,7 @@ function parseProduct(value: unknown): Product {
   }
 
   const product = value as BackendProduct;
+  const taxRateStatus = nestedString(product.tax_rate, ["status"]);
 
   if (!isProductType(product.product_type)) {
     throw new Error("Product type is invalid.");
@@ -439,6 +440,7 @@ function parseProduct(value: unknown): Product {
       nullableString(product.tax_rate_name) ??
       nestedString(product.tax_rate, ["tax_name", "name"]) ??
       null,
+    taxRateStatus: isRecordStatus(taxRateStatus) ? taxRateStatus : null,
     productType: product.product_type,
     itemStructure: product.item_structure,
     salePrice: requiredNumber(product.sale_price, "Sale price"),
@@ -723,12 +725,12 @@ async function getUnitReferences(): Promise<Unit[]> {
 }
 
 async function getTaxRateReferences(): Promise<TaxRate[]> {
-  const response = await apiRequest<TaxRate[]>("/api/v1/settings/tax-rates", {
+  const response = await apiRequest<TaxRate[]>("/api/v1/settings/tax-rates?status=active", {
     authMode: "appwrite",
     parse: (data) => parseReferenceList(data, parseTaxRateReference),
   });
 
-  return response.data.filter((taxRate) => taxRate.id.length > 0);
+  return response.data.filter((taxRate) => taxRate.id.length > 0 && taxRate.status === "active");
 }
 
 function toBackendProductPayload(

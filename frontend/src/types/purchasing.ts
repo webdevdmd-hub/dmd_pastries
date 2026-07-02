@@ -126,6 +126,11 @@ export type ReturnablePurchaseReceiptItem = {
   receivedQuantity: number;
   returnedQuantity: number;
   returnableQuantity: number;
+  discountAmount: number;
+  taxAmount: number;
+  taxRateId: string | null;
+  lineSubtotal: number;
+  lineTotal: number;
   unitId: string;
   unitName: string;
   unitSymbol: string;
@@ -307,6 +312,7 @@ export type PurchasingTaxRateOption = {
   id: string;
   taxName: string;
   taxPercentage: number;
+  status: "active" | "inactive";
 };
 
 export type PurchasingBranchOption = {

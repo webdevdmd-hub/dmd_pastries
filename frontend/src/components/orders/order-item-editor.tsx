@@ -250,7 +250,7 @@ export function OrderItemEditor({
                   itemName: null,
                   productId: selectedMeta?.productId ?? null,
                   productVariantId: null,
-                  taxRateId: product?.taxRateId ?? null,
+                  taxRateId: product?.taxRateStatus === "active" ? product.taxRateId : null,
                   unitId: product?.unitId ?? item.unitId,
                   unitPrice: product?.salePrice ?? item.unitPrice,
                 });

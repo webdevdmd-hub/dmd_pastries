@@ -28,7 +28,11 @@ import {
 } from "@/hooks/use-purchasing";
 import { getErrorMessage } from "@/lib/api/client";
 import type { StockLocation } from "@/types/inventory";
-import type { PurchasingBranchOption, PurchasingSupplierOption } from "@/types/purchasing";
+import type {
+  PurchasingBranchOption,
+  PurchasingSupplierOption,
+  ReturnablePurchaseReceiptItem,
+} from "@/types/purchasing";
 
 type ReturnLineState = {
   purchaseReceiptItemId: string;
@@ -50,6 +54,23 @@ function formatDate(value: string | null): string {
   return value
     ? new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(new Date(value))
     : "Not set";
+}
+
+function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function estimatedLineCredit(item: ReturnablePurchaseReceiptItem, quantity: number): number {
+  if (quantity <= 0) {
+    return 0;
+  }
+
+  const backendLineTotal = item.lineTotal > 0 ? item.lineTotal : 0;
+  if (backendLineTotal > 0 && item.returnableQuantity > 0) {
+    return roundMoney(backendLineTotal * (quantity / item.returnableQuantity));
+  }
+
+  return roundMoney(quantity * item.unitCost);
 }
 
 export function PurchaseReturnFromReceiptDialog({
@@ -189,12 +210,19 @@ export function PurchaseReturnFromReceiptDialog({
   }, [defaultLocationId, open, returnableItemsQuery.data]);
 
   const selectedLines = lines.filter((line) => line.selected && line.quantity > 0);
+  const hasInvalidSelectedQuantity = selectedLines.some((line) => {
+    const item = (returnableItemsQuery.data ?? []).find(
+      (returnableItem) => returnableItem.purchaseReceiptItemId === line.purchaseReceiptItemId,
+    );
+    return !item || line.quantity > item.returnableQuantity;
+  });
   const selectedTotal = selectedLines.reduce((total, line) => {
     const item = (returnableItemsQuery.data ?? []).find(
       (returnableItem) => returnableItem.purchaseReceiptItemId === line.purchaseReceiptItemId,
     );
-    return total + line.quantity * (item?.unitCost ?? 0);
+    return item ? total + estimatedLineCredit(item, line.quantity) : total;
   }, 0);
+  const estimatedCredit = roundMoney(selectedTotal);
 
   const updateLine = (itemId: string, patch: Partial<ReturnLineState>): void => {
     setLines((currentLines) =>
@@ -329,7 +357,7 @@ export function PurchaseReturnFromReceiptDialog({
           <div className="rounded-lg border border-brand-cappuccino bg-brand-latte/60 p-4">
             <p className="text-xs uppercase tracking-[0.22em] text-brand-mocha">Estimated credit</p>
             <p className="mt-2 text-2xl font-semibold text-brand-espresso">
-              {formatCurrency(selectedTotal)}
+              {formatCurrency(estimatedCredit)}
             </p>
           </div>
         </div>
@@ -397,6 +425,7 @@ export function PurchaseReturnFromReceiptDialog({
             }
 
             const disabled = item.returnableQuantity <= 0;
+            const lineCredit = line.selected ? estimatedLineCredit(item, line.quantity) : 0;
 
             return (
               <div
@@ -417,6 +446,11 @@ export function PurchaseReturnFromReceiptDialog({
                   <p className="text-xs text-brand-mocha">
                     {item.itemType} - {item.unitCost ? formatCurrency(item.unitCost) : "No cost"}
                   </p>
+                  {line.selected ? (
+                    <p className="text-xs font-medium text-brand-espresso">
+                      Credit {formatCurrency(lineCredit)}
+                    </p>
+                  ) : null}
                 </div>
                 <p className="text-sm text-brand-mocha">
                   {item.returnableQuantity} {item.unitSymbol}
@@ -466,7 +500,9 @@ export function PurchaseReturnFromReceiptDialog({
               createReturnMutation.isPending ||
               returnableItemsQuery.isLoading ||
               selectedReceipt === null ||
-              selectedLines.length === 0
+              selectedLines.length === 0 ||
+              hasInvalidSelectedQuantity ||
+              estimatedCredit <= 0
             }
             onClick={() => void handleSubmit()}
             type="button"

@@ -633,6 +633,11 @@ function parseReturnablePurchaseReceiptItem(value: unknown): ReturnablePurchaseR
       numberValue(value.remaining_quantity),
     ),
     returnedQuantity: numberValue(value.returned_quantity),
+    discountAmount: numberValue(value.discount_amount),
+    lineSubtotal: numberValue(value.line_subtotal),
+    lineTotal: numberValue(value.line_total),
+    taxAmount: numberValue(value.tax_amount),
+    taxRateId: optionalString(value.tax_rate_id),
     unitCost: numberValue(value.unit_cost),
     unitId: stringValue(value.unit_id),
     unitName: stringValue(value.unit_name, "Unit"),
@@ -1078,7 +1083,8 @@ function parseTaxRate(value: unknown): PurchasingTaxRateOption {
   return {
     id: stringValue(value.id),
     taxName: stringValue(value.tax_name, "Tax"),
-    taxPercentage: numberValue(value.tax_percentage),
+    taxPercentage: numberValue(value.tax_percentage, numberValue(value.rate_percentage)),
+    status: branchStatus(value.status),
   };
 }
 
@@ -2026,12 +2032,15 @@ export async function getUnits(): Promise<PurchasingUnitOption[]> {
 }
 
 export async function getTaxRates(): Promise<PurchasingTaxRateOption[]> {
-  const response = await apiRequest<PurchasingTaxRateOption[]>("/api/v1/settings/tax-rates", {
-    authMode: "appwrite",
-    parse: (data) => parseList(data, parseTaxRate),
-  });
+  const response = await apiRequest<PurchasingTaxRateOption[]>(
+    "/api/v1/settings/tax-rates?status=active",
+    {
+      authMode: "appwrite",
+      parse: (data) => parseList(data, parseTaxRate),
+    },
+  );
 
-  return response.data;
+  return response.data.filter((taxRate) => taxRate.id.length > 0 && taxRate.status === "active");
 }
 
 export async function getBranches(): Promise<PurchasingBranchOption[]> {

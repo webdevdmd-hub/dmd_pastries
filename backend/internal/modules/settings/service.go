@@ -647,8 +647,13 @@ func (s *Service) DeleteSalesChannel(currentUser *utils.AuthContext, id string, 
 	return nil
 }
 
-func (s *Service) ListTaxRates(currentUser *utils.AuthContext) ([]TaxRateResponse, error) {
-	taxRates, err := s.repo.ListTaxRates(currentUser.BusinessID)
+func (s *Service) ListTaxRates(currentUser *utils.AuthContext, status string) ([]TaxRateResponse, error) {
+	status = strings.TrimSpace(strings.ToLower(status))
+	if status != "" && status != "active" && status != "inactive" {
+		return nil, apperrors.BadRequest("invalid tax rate status filter", nil)
+	}
+
+	taxRates, err := s.repo.ListTaxRates(currentUser.BusinessID, status)
 	if err != nil {
 		return nil, apperrors.Internal("failed to list tax rates")
 	}

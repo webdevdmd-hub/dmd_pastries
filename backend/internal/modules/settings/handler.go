@@ -55,7 +55,7 @@ func (h *Handler) GetOverview(c *gin.Context) {
 
 func (h *Handler) ListTaxRates(c *gin.Context) {
 	currentUser := utils.MustAuthContext(c)
-	taxRates, err := h.service.ListTaxRates(currentUser)
+	taxRates, err := h.service.ListTaxRates(currentUser, c.Query("status"))
 	if err != nil {
 		handleError(c, err)
 		return

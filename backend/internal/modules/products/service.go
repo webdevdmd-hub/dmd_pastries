@@ -482,7 +482,7 @@ func (s *Service) validateReferences(businessID, branchID, categoryID, productTy
 	}
 	if taxRateID != nil {
 		var count int64
-		if err := s.db.Table("tax_rates").Where("id = ? AND business_id = ? AND deleted_at IS NULL", *taxRateID, businessID).Count(&count).Error; err != nil || count == 0 {
+		if err := s.db.Table("tax_rates").Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", *taxRateID, businessID, "active").Count(&count).Error; err != nil || count == 0 {
 			return apperrors.BadRequest("invalid tax_rate_id", nil)
 		}
 	}

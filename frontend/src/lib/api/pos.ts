@@ -810,7 +810,9 @@ function parsePOSReferenceData(value: unknown): POSReferenceData {
       ? reference.product_categories.map(parsePOSProductCategory)
       : [],
     units: Array.isArray(reference.units) ? reference.units.map(parsePOSUnit) : [],
-    taxRates: Array.isArray(reference.tax_rates) ? reference.tax_rates.map(parsePOSTaxRate) : [],
+    taxRates: Array.isArray(reference.tax_rates)
+      ? reference.tax_rates.map(parsePOSTaxRate).filter((taxRate) => taxRate.status === "active")
+      : [],
     salesChannels: Array.isArray(reference.sales_channels)
       ? reference.sales_channels.map(parsePOSSalesChannel)
       : [],

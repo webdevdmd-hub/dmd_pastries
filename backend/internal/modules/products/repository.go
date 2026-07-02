@@ -254,7 +254,7 @@ func (r *Repository) LoadProductResponse(businessID string, product Product) (Pr
 	var taxRate *ProductTaxRateInfo
 	if product.TaxRateID != nil {
 		var tax ProductTaxRateInfo
-		if err := r.db.Table("tax_rates").Select("id, tax_name, tax_type, rate_percentage, is_inclusive").Where("id = ? AND business_id = ?", *product.TaxRateID, businessID).Take(&tax).Error; err != nil {
+		if err := r.db.Table("tax_rates").Select("id, tax_name, tax_type, rate_percentage, is_inclusive, status").Where("id = ? AND business_id = ?", *product.TaxRateID, businessID).Take(&tax).Error; err != nil {
 			return ProductResponse{}, err
 		}
 		taxRate = &tax

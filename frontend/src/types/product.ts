@@ -93,6 +93,7 @@ export type Product = {
   unitName: string;
   taxRateId: string | null;
   taxRateName: string | null;
+  taxRateStatus: RecordStatus | null;
   productType: ProductType;
   itemStructure: ItemStructure;
   salePrice: number;

@@ -73,7 +73,7 @@ function toDefaultValues(
     productName: product?.productName ?? "",
     categoryId: product?.categoryId ?? "",
     unitId: product?.unitId ?? "",
-    taxRateId: product?.taxRateId ?? "",
+    taxRateId: product?.taxRateStatus === "active" ? (product.taxRateId ?? "") : "",
     productType: product?.productType ?? defaults.defaultProductType ?? "finished_product",
     itemStructure: product?.itemStructure ?? defaults.defaultItemStructure ?? "single",
     salePrice: product?.salePrice ?? 0,

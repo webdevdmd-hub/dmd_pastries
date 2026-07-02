@@ -111,11 +111,13 @@ func (r *Repository) CreateTaxRate(tx *gorm.DB, taxRate *TaxRate) error {
 	return tx.Create(taxRate).Error
 }
 
-func (r *Repository) ListTaxRates(businessID string) ([]TaxRate, error) {
+func (r *Repository) ListTaxRates(businessID, status string) ([]TaxRate, error) {
 	var taxRates []TaxRate
-	err := r.db.Where("business_id = ? AND deleted_at IS NULL", businessID).
-		Order("is_default DESC, tax_name ASC").
-		Find(&taxRates).Error
+	query := r.db.Where("business_id = ? AND deleted_at IS NULL", businessID)
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	err := query.Order("is_default DESC, tax_name ASC").Find(&taxRates).Error
 	return taxRates, err
 }
 

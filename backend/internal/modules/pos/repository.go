@@ -15,16 +15,43 @@ type Repository struct {
 	db *gorm.DB
 }
 
+const posProductSelect = `
+	p.id,
+	p.business_id,
+	p.branch_id,
+	p.category_id,
+	p.unit_id,
+	tr.id AS tax_rate_id,
+	p.product_name,
+	p.product_code,
+	p.sku,
+	p.barcode,
+	p.product_type,
+	p.item_structure,
+	p.sale_price,
+	p.image_file_id,
+	p.is_stock_tracked,
+	p.status,
+	pc.category_name,
+	pc.category_code,
+	u.unit_name,
+	u.symbol,
+	COALESCE(tr.tax_name, '') AS tax_name,
+	COALESCE(tr.tax_type, '') AS tax_type,
+	COALESCE(tr.rate_percentage, 0) AS rate_percentage,
+	COALESCE(tr.is_inclusive, false) AS is_inclusive
+`
+
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
 func (r *Repository) ListPOSProducts(businessID, branchID string, query POSProductQuery) ([]ProductRow, int64, error) {
 	db := r.db.Table("products p").
-		Select("p.*, pc.category_name, pc.category_code, u.unit_name, u.symbol, tr.tax_name, tr.tax_type, tr.rate_percentage, tr.is_inclusive").
+		Select(posProductSelect).
 		Joins("JOIN product_categories pc ON pc.id = p.category_id AND pc.branch_id = p.branch_id").
 		Joins("JOIN units u ON u.id = p.unit_id").
-		Joins("LEFT JOIN tax_rates tr ON tr.id = p.tax_rate_id").
+		Joins("LEFT JOIN tax_rates tr ON tr.id = p.tax_rate_id AND tr.business_id = p.business_id AND tr.status = ? AND tr.deleted_at IS NULL", "active").
 		Where("p.business_id = ? AND p.branch_id = ? AND p.status = ? AND p.is_pos_visible = ? AND p.deleted_at IS NULL", businessID, branchID, "active", true)
 	db = applyPOSProductFilters(db, query)
 
@@ -159,10 +186,10 @@ func (r *Repository) ListPOSReceiptLayouts(businessID, branchID string) ([]POSRe
 func (r *Repository) FindPOSProductByID(tx *gorm.DB, businessID, branchID, productID string) (*ProductRow, error) {
 	var row ProductRow
 	err := tx.Table("products p").
-		Select("p.*, pc.category_name, pc.category_code, u.unit_name, u.symbol, tr.tax_name, tr.tax_type, tr.rate_percentage, tr.is_inclusive").
+		Select(posProductSelect).
 		Joins("JOIN product_categories pc ON pc.id = p.category_id AND pc.branch_id = p.branch_id").
 		Joins("JOIN units u ON u.id = p.unit_id").
-		Joins("LEFT JOIN tax_rates tr ON tr.id = p.tax_rate_id").
+		Joins("LEFT JOIN tax_rates tr ON tr.id = p.tax_rate_id AND tr.business_id = p.business_id AND tr.status = ? AND tr.deleted_at IS NULL", "active").
 		Where("p.id = ? AND p.business_id = ? AND p.branch_id = ? AND p.status = ? AND p.is_pos_visible = ? AND p.deleted_at IS NULL", productID, businessID, branchID, "active", true).
 		Take(&row).Error
 	if err != nil {
@@ -252,10 +279,10 @@ func (r *Repository) LookupProduct(businessID, branchID, field, value string) (*
 func (r *Repository) findPOSProductByLookup(businessID, branchID, field, value string) (*ProductRow, error) {
 	var row ProductRow
 	err := r.db.Table("products p").
-		Select("p.*, pc.category_name, pc.category_code, u.unit_name, u.symbol, tr.tax_name, tr.tax_type, tr.rate_percentage, tr.is_inclusive").
+		Select(posProductSelect).
 		Joins("JOIN product_categories pc ON pc.id = p.category_id AND pc.branch_id = p.branch_id").
 		Joins("JOIN units u ON u.id = p.unit_id").
-		Joins("LEFT JOIN tax_rates tr ON tr.id = p.tax_rate_id").
+		Joins("LEFT JOIN tax_rates tr ON tr.id = p.tax_rate_id AND tr.business_id = p.business_id AND tr.status = ? AND tr.deleted_at IS NULL", "active").
 		Where("p.business_id = ? AND p.branch_id = ? AND p.status = ? AND p.is_pos_visible = ? AND p.deleted_at IS NULL", businessID, branchID, "active", true).
 		Where("p."+field+" = ?", value).
 		Take(&row).Error

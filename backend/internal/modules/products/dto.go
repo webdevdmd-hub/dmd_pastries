@@ -147,6 +147,7 @@ type ProductTaxRateInfo struct {
 	TaxType        string  `json:"tax_type"`
 	RatePercentage float64 `json:"rate_percentage"`
 	IsInclusive    bool    `json:"is_inclusive"`
+	Status         string  `json:"status"`
 }
 
 type ProductVariantInfo struct {
