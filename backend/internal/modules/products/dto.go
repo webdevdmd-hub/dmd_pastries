@@ -23,6 +23,7 @@ type CreateProductRequest struct {
 	Barcode                string   `json:"barcode"`
 	Description            string   `json:"description"`
 	ImageFileID            string   `json:"image_file_id"`
+	IsSellable             *bool    `json:"is_sellable"`
 	IsPOSVisible           *bool    `json:"is_pos_visible"`
 	IsStockTracked         bool     `json:"is_stock_tracked"`
 	IsExpiryTracked        bool     `json:"is_expiry_tracked"`
@@ -50,6 +51,7 @@ type UpdateProductRequest struct {
 	SKU                    string   `json:"sku"`
 	Barcode                string   `json:"barcode"`
 	ImageFileID            string   `json:"image_file_id"`
+	IsSellable             *bool    `json:"is_sellable"`
 	IsPOSVisible           *bool    `json:"is_pos_visible"`
 	IsStockTracked         *bool    `json:"is_stock_tracked"`
 	IsExpiryTracked        *bool    `json:"is_expiry_tracked"`
@@ -118,6 +120,7 @@ type ProductResponse struct {
 	AverageInventoryCost   *float64             `json:"average_inventory_cost"`
 	Description            string               `json:"description"`
 	ImageFileID            string               `json:"image_file_id"`
+	IsSellable             bool                 `json:"is_sellable"`
 	IsPOSVisible           bool                 `json:"is_pos_visible"`
 	IsStockTracked         bool                 `json:"is_stock_tracked"`
 	IsExpiryTracked        bool                 `json:"is_expiry_tracked"`

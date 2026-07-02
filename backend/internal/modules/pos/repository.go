@@ -30,6 +30,8 @@ const posProductSelect = `
 	p.item_structure,
 	p.sale_price,
 	p.image_file_id,
+	p.is_sellable,
+	p.is_pos_visible,
 	p.is_stock_tracked,
 	p.status,
 	pc.category_name,
@@ -52,7 +54,7 @@ func (r *Repository) ListPOSProducts(businessID, branchID string, query POSProdu
 		Joins("JOIN product_categories pc ON pc.id = p.category_id AND pc.branch_id = p.branch_id").
 		Joins("JOIN units u ON u.id = p.unit_id").
 		Joins("LEFT JOIN tax_rates tr ON tr.id = p.tax_rate_id AND tr.business_id = p.business_id AND tr.status = ? AND tr.deleted_at IS NULL", "active").
-		Where("p.business_id = ? AND p.branch_id = ? AND p.status = ? AND p.is_pos_visible = ? AND p.deleted_at IS NULL", businessID, branchID, "active", true)
+		Where("p.business_id = ? AND p.branch_id = ? AND p.status = ? AND p.is_pos_visible = ? AND p.is_sellable = ? AND p.deleted_at IS NULL", businessID, branchID, "active", true, true)
 	db = applyPOSProductFilters(db, query)
 
 	var total int64
@@ -190,7 +192,7 @@ func (r *Repository) FindPOSProductByID(tx *gorm.DB, businessID, branchID, produ
 		Joins("JOIN product_categories pc ON pc.id = p.category_id AND pc.branch_id = p.branch_id").
 		Joins("JOIN units u ON u.id = p.unit_id").
 		Joins("LEFT JOIN tax_rates tr ON tr.id = p.tax_rate_id AND tr.business_id = p.business_id AND tr.status = ? AND tr.deleted_at IS NULL", "active").
-		Where("p.id = ? AND p.business_id = ? AND p.branch_id = ? AND p.status = ? AND p.is_pos_visible = ? AND p.deleted_at IS NULL", productID, businessID, branchID, "active", true).
+		Where("p.id = ? AND p.business_id = ? AND p.branch_id = ? AND p.status = ? AND p.is_pos_visible = ? AND p.is_sellable = ? AND p.deleted_at IS NULL", productID, businessID, branchID, "active", true, true).
 		Take(&row).Error
 	if err != nil {
 		return nil, err
@@ -202,7 +204,7 @@ func (r *Repository) FindVariantByID(tx *gorm.DB, businessID, branchID, productI
 	var row VariantRow
 	err := tx.Table("product_variants pv").
 		Select("pv.*, COALESCE(ii.current_quantity, 0) AS current_stock_quantity, COALESCE(ii.available_quantity, 0) AS available_stock_quantity").
-		Joins("JOIN products p ON p.id = pv.product_id AND p.business_id = pv.business_id AND p.deleted_at IS NULL").
+		Joins("JOIN products p ON p.id = pv.product_id AND p.business_id = pv.business_id AND p.status = ? AND p.is_pos_visible = ? AND p.is_sellable = ? AND p.deleted_at IS NULL", "active", true, true).
 		Joins("LEFT JOIN inventory_items ii ON ii.business_id = pv.business_id AND ii.branch_id = p.branch_id AND ii.item_type = ? AND ii.product_id = pv.product_id AND ii.product_variant_id = pv.id AND ii.deleted_at IS NULL", "product_variant").
 		Where("pv.id = ? AND pv.product_id = ? AND pv.business_id = ? AND p.branch_id = ? AND pv.status = ? AND pv.deleted_at IS NULL", variantID, productID, businessID, branchID, "active").
 		Take(&row).Error
@@ -216,7 +218,7 @@ func (r *Repository) FindProductInventoryForSale(tx *gorm.DB, businessID, branch
 	var row ProductInventoryStockRow
 	query := tx.Table("products p").
 		Select("p.id AS product_id, p.product_name, p.is_stock_tracked, ii.id AS inventory_item_id, COALESCE(ii.available_quantity, 0) AS available_quantity").
-		Where("p.id = ? AND p.business_id = ? AND p.branch_id = ? AND p.deleted_at IS NULL", productID, businessID, branchID)
+		Where("p.id = ? AND p.business_id = ? AND p.branch_id = ? AND p.status = ? AND p.is_pos_visible = ? AND p.is_sellable = ? AND p.deleted_at IS NULL", productID, businessID, branchID, "active", true, true)
 	if variantID != nil && strings.TrimSpace(*variantID) != "" {
 		query = query.Select("p.id AS product_id, p.product_name, pv.id AS product_variant_id, pv.variant_name, p.is_stock_tracked, ii.id AS inventory_item_id, COALESCE(ii.available_quantity, 0) AS available_quantity").
 			Joins("JOIN product_variants pv ON pv.product_id = p.id AND pv.business_id = p.business_id AND pv.id = ? AND pv.status = ? AND pv.deleted_at IS NULL", *variantID, "active").
@@ -283,7 +285,7 @@ func (r *Repository) findPOSProductByLookup(businessID, branchID, field, value s
 		Joins("JOIN product_categories pc ON pc.id = p.category_id AND pc.branch_id = p.branch_id").
 		Joins("JOIN units u ON u.id = p.unit_id").
 		Joins("LEFT JOIN tax_rates tr ON tr.id = p.tax_rate_id AND tr.business_id = p.business_id AND tr.status = ? AND tr.deleted_at IS NULL", "active").
-		Where("p.business_id = ? AND p.branch_id = ? AND p.status = ? AND p.is_pos_visible = ? AND p.deleted_at IS NULL", businessID, branchID, "active", true).
+		Where("p.business_id = ? AND p.branch_id = ? AND p.status = ? AND p.is_pos_visible = ? AND p.is_sellable = ? AND p.deleted_at IS NULL", businessID, branchID, "active", true, true).
 		Where("p."+field+" = ?", value).
 		Take(&row).Error
 	if err != nil {
@@ -747,6 +749,8 @@ type ProductRow struct {
 	ItemStructure  string
 	SalePrice      float64
 	ImageFileID    string
+	IsSellable     bool
+	IsPOSVisible   bool
 	IsStockTracked bool
 	Status         string
 	CategoryName   string

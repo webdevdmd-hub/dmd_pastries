@@ -38,6 +38,7 @@ export type POSProduct = {
   availableStockQuantity: number | null;
   imageUrl: string | null;
   imageFileId: string | null;
+  isSellable: boolean;
   isPosVisible: boolean;
   variants: POSProductVariant[];
   status: RecordStatus;

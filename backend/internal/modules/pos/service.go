@@ -1412,6 +1412,8 @@ func toPOSProduct(row ProductRow) POSProductResponse {
 		ItemStructure:  defaultItemStructure(row.ItemStructure),
 		SalePrice:      row.SalePrice,
 		ImageFileID:    row.ImageFileID,
+		IsSellable:     row.IsSellable,
+		IsPOSVisible:   row.IsPOSVisible,
 		IsStockTracked: row.IsStockTracked,
 		Status:         row.Status,
 	}

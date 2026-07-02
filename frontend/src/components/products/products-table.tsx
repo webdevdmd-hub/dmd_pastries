@@ -72,6 +72,20 @@ function ProductCapabilityBadges({ product }: { product: Product }): JSX.Element
         )}
         POS {product.isPosVisible ? "Visible" : "Hidden"}
       </Badge>
+      <Badge
+        className={
+          product.isSellable
+            ? "border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-50"
+            : "border-brand-cappuccino bg-brand-latte text-brand-mocha hover:bg-brand-latte"
+        }
+      >
+        {product.isSellable ? (
+          <CheckCircle2 className="h-3.5 w-3.5" />
+        ) : (
+          <EyeOff className="h-3.5 w-3.5" />
+        )}
+        {product.isSellable ? "Sellable" : "Not sellable"}
+      </Badge>
       {product.isStockTracked ? <Badge variant="outline">Stock</Badge> : null}
       {product.isExpiryTracked ? <Badge variant="outline">Expiry</Badge> : null}
       {product.isCustomOrderAvailable ? <Badge variant="outline">Custom</Badge> : null}

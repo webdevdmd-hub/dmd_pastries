@@ -110,6 +110,7 @@ type BackendProduct = {
   average_inventory_cost?: unknown;
   image_url?: unknown;
   image_file_id?: unknown;
+  is_sellable?: unknown;
   is_pos_visible?: unknown;
   is_stock_tracked?: unknown;
   is_expiry_tracked?: unknown;
@@ -170,6 +171,7 @@ type BackendProductPayload = {
   description?: string | null;
   image_url?: string | null;
   image_file_id?: string | null;
+  is_sellable?: boolean;
   is_pos_visible?: boolean;
   is_stock_tracked?: boolean;
   is_expiry_tracked?: boolean;
@@ -462,6 +464,7 @@ function parseProduct(value: unknown): Product {
     averageInventoryCost: nullableNumber(product.average_inventory_cost),
     imageUrl: nullableString(product.image_url),
     imageFileId: nullableString(product.image_file_id) ?? nullableString(product.image_url),
+    isSellable: optionalBoolean(product.is_sellable, false),
     isPosVisible: requiredBoolean(product.is_pos_visible, "POS visible"),
     isStockTracked: requiredBoolean(product.is_stock_tracked, "Stock tracked"),
     isExpiryTracked: requiredBoolean(product.is_expiry_tracked, "Expiry tracked"),
@@ -764,6 +767,7 @@ function toBackendProductPayload(
     ...(payload.description !== undefined ? { description: payload.description } : {}),
     ...(payload.imageUrl !== undefined ? { image_url: payload.imageUrl } : {}),
     ...(payload.imageFileId !== undefined ? { image_file_id: payload.imageFileId } : {}),
+    ...(payload.isSellable !== undefined ? { is_sellable: payload.isSellable } : {}),
     ...(payload.isPosVisible !== undefined ? { is_pos_visible: payload.isPosVisible } : {}),
     ...(payload.isStockTracked !== undefined ? { is_stock_tracked: payload.isStockTracked } : {}),
     ...(payload.isExpiryTracked !== undefined

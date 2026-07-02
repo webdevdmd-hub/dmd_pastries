@@ -120,7 +120,7 @@ func VerifySchema(db *gorm.DB) error {
 		"company_settings":                   {"logo_file_id"},
 		"product_categories":                 {"image_file_id"},
 		"product_category_allowed_types":     {"product_category_id", "product_type"},
-		"products":                           {"image_file_id"},
+		"products":                           {"image_file_id", "is_sellable"},
 		"product_variants":                   {"image_file_id"},
 		"product_media":                      {"file_id", "bucket_id"},
 		"inventory_items":                    {"product_variant_id"},

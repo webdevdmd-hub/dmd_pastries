@@ -113,6 +113,7 @@ export type Product = {
   averageInventoryCost: number | null;
   imageUrl: string | null;
   imageFileId: string | null;
+  isSellable: boolean;
   isPosVisible: boolean;
   isStockTracked: boolean;
   isExpiryTracked: boolean;
@@ -157,6 +158,7 @@ export type CreateProductPayload = {
   description: string | null;
   imageUrl: string | null;
   imageFileId: string | null;
+  isSellable: boolean;
   isPosVisible: boolean;
   isStockTracked: boolean;
   isExpiryTracked: boolean;

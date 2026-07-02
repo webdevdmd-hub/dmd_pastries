@@ -36,6 +36,7 @@ type Product struct {
 	LastProductionDate     *time.Time     `json:"last_production_date"`
 	AverageInventoryCost   *float64       `json:"average_inventory_cost"`
 	ImageFileID            string         `gorm:"size:500" json:"image_file_id"`
+	IsSellable             bool           `gorm:"not null;default:false" json:"is_sellable"`
 	IsPOSVisible           bool           `gorm:"not null;default:true" json:"is_pos_visible"`
 	IsStockTracked         bool           `gorm:"not null;default:false" json:"is_stock_tracked"`
 	IsExpiryTracked        bool           `gorm:"not null;default:false" json:"is_expiry_tracked"`

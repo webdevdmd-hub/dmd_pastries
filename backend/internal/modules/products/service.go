@@ -82,7 +82,11 @@ func (s *Service) CreateProduct(currentUser *utils.AuthContext, req CreateProduc
 		return nil, apperrors.Conflict("product_code already exists", nil)
 	}
 
-	isPOSVisible := true
+	isSellable := defaultSellableForProductType(req.ProductType)
+	if req.IsSellable != nil {
+		isSellable = *req.IsSellable
+	}
+	isPOSVisible := isSellable
 	if req.IsPOSVisible != nil {
 		isPOSVisible = *req.IsPOSVisible
 	}
@@ -110,6 +114,7 @@ func (s *Service) CreateProduct(currentUser *utils.AuthContext, req CreateProduc
 		AutoPriceUpdateEnabled: req.AutoPriceUpdateEnabled,
 		SalePriceLocked:        req.SalePriceLocked,
 		ImageFileID:            strings.TrimSpace(req.ImageFileID),
+		IsSellable:             isSellable,
 		IsPOSVisible:           isPOSVisible,
 		IsStockTracked:         req.IsStockTracked,
 		IsExpiryTracked:        req.IsExpiryTracked,
@@ -231,6 +236,9 @@ func (s *Service) UpdateProduct(currentUser *utils.AuthContext, id string, req U
 	if req.ImageFileID != "" {
 		updates["image_file_id"] = strings.TrimSpace(req.ImageFileID)
 	}
+	if req.IsSellable != nil {
+		updates["is_sellable"] = *req.IsSellable
+	}
 	if req.IsPOSVisible != nil {
 		updates["is_pos_visible"] = *req.IsPOSVisible
 	}
@@ -275,6 +283,7 @@ func (s *Service) UpdateProductStatus(currentUser *utils.AuthContext, id string,
 	updates := map[string]interface{}{"status": req.Status, "updated_by": currentUser.UserID, "updated_at": time.Now().UTC()}
 	if req.Status != "active" {
 		updates["is_pos_visible"] = false
+		updates["is_sellable"] = false
 	}
 	if err := s.updateWithAudit(currentUser, "product.status_updated", id, "Product status updated.", ipAddress, userAgent, func(tx *gorm.DB) error {
 		return s.repo.Update(tx, id, currentUser.BusinessID, branchID, updates)
@@ -309,6 +318,7 @@ func (s *Service) DeleteProduct(currentUser *utils.AuthContext, id string, ipAdd
 		return s.repo.Update(tx, id, currentUser.BusinessID, branchID, map[string]interface{}{
 			"status":         "archived",
 			"is_pos_visible": false,
+			"is_sellable":    false,
 			"updated_by":     currentUser.UserID,
 			"updated_at":     time.Now().UTC(),
 			"deleted_at":     gorm.DeletedAt{Time: time.Now().UTC(), Valid: true},
@@ -341,7 +351,7 @@ func (s *Service) LookupProduct(currentUser *utils.AuthContext, barcode, sku, pr
 	if field == "sku" || field == "barcode" {
 		if variant, productID, err := s.repo.FindVariantLookup(currentUser.BusinessID, branchID, field, value); err == nil {
 			product, err := s.repo.FindByID(productID, currentUser.BusinessID, branchID)
-			if err != nil || product.Status != "active" || !product.IsPOSVisible {
+			if err != nil || product.Status != "active" || !product.IsPOSVisible || !product.IsSellable {
 				return nil, apperrors.NotFound("product not found")
 			}
 			response, err := s.repo.LoadProductResponse(currentUser.BusinessID, *product)
@@ -598,6 +608,15 @@ func validateProductType(value string) error {
 	}
 }
 
+func defaultSellableForProductType(value string) bool {
+	switch strings.TrimSpace(value) {
+	case "finished_product", "service", "ready_to_sell", "made_to_order", "retail":
+		return true
+	default:
+		return false
+	}
+}
+
 func validateItemStructure(value string) error {
 	switch normalizeItemStructure(value) {
 	case "single", "variant", "recipe_based", "custom":
@@ -740,6 +759,7 @@ func toProductResponse(product Product, category ProductCategoryInfo, unit Produ
 		AverageInventoryCost:   product.AverageInventoryCost,
 		Description:            product.Description,
 		ImageFileID:            product.ImageFileID,
+		IsSellable:             product.IsSellable,
 		IsPOSVisible:           product.IsPOSVisible,
 		IsStockTracked:         product.IsStockTracked,
 		IsExpiryTracked:        product.IsExpiryTracked,

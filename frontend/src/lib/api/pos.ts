@@ -80,6 +80,7 @@ type BackendPOSProduct = {
   available_quantity?: number | null;
   image_url?: string | null;
   image_file_id?: string | null;
+  is_sellable?: boolean;
   is_pos_visible?: boolean;
   variants?: unknown;
   status?: string;
@@ -609,6 +610,7 @@ function parseProduct(value: unknown): POSProduct {
     ),
     imageUrl: optionalString(product.image_url),
     imageFileId: optionalString(product.image_file_id),
+    isSellable: product.is_sellable === true,
     isPosVisible: product.is_pos_visible !== false,
     variants,
     status: isRecordStatus(product.status) ? product.status : "active",
@@ -843,7 +845,7 @@ function filterPOSProducts(products: POSProduct[], params: POSProductFilters): P
   const normalizedSearch = params.search.trim().toLowerCase();
 
   return products
-    .filter((product) => product.status === "active" && product.isPosVisible)
+    .filter((product) => product.status === "active" && product.isPosVisible && product.isSellable)
     .filter((product) => params.categoryId === "all" || product.categoryId === params.categoryId)
     .filter((product) => !params.itemStructure || product.itemStructure === params.itemStructure)
     .filter((product) => {

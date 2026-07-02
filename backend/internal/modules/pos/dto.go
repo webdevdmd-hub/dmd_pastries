@@ -231,6 +231,8 @@ type POSProductResponse struct {
 	ItemStructure  string               `json:"item_structure"`
 	SalePrice      float64              `json:"sale_price"`
 	ImageFileID    string               `json:"image_file_id"`
+	IsSellable     bool                 `json:"is_sellable"`
+	IsPOSVisible   bool                 `json:"is_pos_visible"`
 	Variants       []POSVariantResponse `json:"variants"`
 	IsStockTracked bool                 `json:"is_stock_tracked"`
 	Status         string               `json:"status"`

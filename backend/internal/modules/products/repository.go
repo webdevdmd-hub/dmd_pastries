@@ -183,7 +183,7 @@ func (r *Repository) List(businessID, branchID string, query ProductListQuery) (
 
 func (r *Repository) POSProducts(businessID, branchID string) ([]Product, error) {
 	var products []Product
-	err := r.db.Where("business_id = ? AND branch_id = ? AND status = ? AND is_pos_visible = ? AND deleted_at IS NULL", businessID, branchID, "active", true).
+	err := r.db.Where("business_id = ? AND branch_id = ? AND status = ? AND is_pos_visible = ? AND is_sellable = ? AND deleted_at IS NULL", businessID, branchID, "active", true, true).
 		Order("product_name ASC").
 		Find(&products).Error
 	return products, err
@@ -191,7 +191,7 @@ func (r *Repository) POSProducts(businessID, branchID string) ([]Product, error)
 
 func (r *Repository) FindPOSByLookup(businessID, branchID, field, value string) (*Product, error) {
 	var product Product
-	err := r.db.Where("business_id = ? AND branch_id = ? AND status = ? AND is_pos_visible = ? AND deleted_at IS NULL", businessID, branchID, "active", true).
+	err := r.db.Where("business_id = ? AND branch_id = ? AND status = ? AND is_pos_visible = ? AND is_sellable = ? AND deleted_at IS NULL", businessID, branchID, "active", true, true).
 		Where(field+" = ?", value).
 		First(&product).Error
 	if err != nil {

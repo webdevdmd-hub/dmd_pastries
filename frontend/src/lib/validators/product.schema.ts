@@ -37,6 +37,7 @@ export const productSchema = z.object({
   barcode: z.string().trim().optional(),
   description: z.string().trim().optional(),
   imageFileId: z.string().trim().optional(),
+  isSellable: z.boolean(),
   isPosVisible: z.boolean(),
   isStockTracked: z.boolean(),
   isExpiryTracked: z.boolean(),

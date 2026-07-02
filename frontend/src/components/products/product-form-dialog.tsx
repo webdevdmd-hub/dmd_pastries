@@ -62,6 +62,10 @@ function FieldError({ message }: { message: string | undefined }): JSX.Element |
   return message ? <p className="text-xs font-medium text-red-700">{message}</p> : null;
 }
 
+function defaultSellableForProductType(productType: ProductSchema["productType"]): boolean {
+  return productType === "finished_product" || productType === "service";
+}
+
 function toDefaultValues(
   product: Product | null,
   defaults: ProductFormDefaults = {
@@ -69,12 +73,15 @@ function toDefaultValues(
     defaultProductType: undefined,
   },
 ): ProductSchema {
+  const productType = product?.productType ?? defaults.defaultProductType ?? "finished_product";
+  const defaultSellable = defaultSellableForProductType(productType);
+
   return {
     productName: product?.productName ?? "",
     categoryId: product?.categoryId ?? "",
     unitId: product?.unitId ?? "",
     taxRateId: product?.taxRateStatus === "active" ? (product.taxRateId ?? "") : "",
-    productType: product?.productType ?? defaults.defaultProductType ?? "finished_product",
+    productType,
     itemStructure: product?.itemStructure ?? defaults.defaultItemStructure ?? "single",
     salePrice: product?.salePrice ?? 0,
     costPrice: product?.costPrice ?? null,
@@ -88,7 +95,8 @@ function toDefaultValues(
     barcode: product?.barcode ?? "",
     description: product?.description ?? "",
     imageFileId: product?.imageFileId ?? "",
-    isPosVisible: product?.isPosVisible ?? true,
+    isSellable: product?.isSellable ?? defaultSellable,
+    isPosVisible: product?.isPosVisible ?? defaultSellable,
     isStockTracked: product?.isStockTracked ?? true,
     isExpiryTracked: product?.isExpiryTracked ?? false,
     isCustomOrderAvailable: product?.isCustomOrderAvailable ?? false,
@@ -117,6 +125,7 @@ export function ProductFormDialog({
   const watchedItemStructure = form.watch("itemStructure");
   const watchedProductType = form.watch("productType");
   const watchedCategoryId = form.watch("categoryId");
+  const watchedIsSellable = form.watch("isSellable");
   const watchedCostPrice = form.watch("costPrice");
   const watchedMinimumSalePrice = form.watch("minimumSalePrice") ?? null;
   const watchedPricingPercent = form.watch("pricingPercent");
@@ -198,6 +207,17 @@ export function ProductFormDialog({
       shouldTouch: true,
       shouldValidate: true,
     });
+    const defaultSellable = defaultSellableForProductType(value);
+    form.setValue("isSellable", defaultSellable, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+    form.setValue("isPosVisible", defaultSellable, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
 
     if (currentCategoryId && !categoryStillValid) {
       form.setValue("categoryId", "", {
@@ -219,6 +239,21 @@ export function ProductFormDialog({
       shouldValidate: true,
     });
     form.clearErrors("categoryId");
+  };
+
+  const handleSellableChange = (checked: boolean): void => {
+    form.setValue("isSellable", checked, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+    if (!checked) {
+      form.setValue("isPosVisible", false, {
+        shouldDirty: true,
+        shouldTouch: true,
+        shouldValidate: true,
+      });
+    }
   };
 
   const onSubmit = async (values: ProductSchema): Promise<void> => {
@@ -268,7 +303,8 @@ export function ProductFormDialog({
       description: values.description?.trim() ? values.description : null,
       imageUrl: null,
       imageFileId,
-      isPosVisible: values.isPosVisible,
+      isSellable: values.isSellable,
+      isPosVisible: values.isSellable && values.isPosVisible,
       isStockTracked: values.isStockTracked,
       isExpiryTracked: values.isExpiryTracked,
       isCustomOrderAvailable: values.isCustomOrderAvailable,
@@ -559,8 +595,22 @@ export function ProductFormDialog({
                 <div className="grid gap-2 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/40 p-3 sm:grid-cols-2">
                   <label className="flex items-center gap-2 rounded-xl bg-white/60 p-2 text-sm text-brand-espresso">
                     <Checkbox
-                      checked={form.watch("isPosVisible")}
-                      onCheckedChange={(checked) => form.setValue("isPosVisible", checked === true)}
+                      checked={watchedIsSellable}
+                      onCheckedChange={(checked) => handleSellableChange(checked === true)}
+                    />
+                    Sellable
+                  </label>
+                  <label className="flex items-center gap-2 rounded-xl bg-white/60 p-2 text-sm text-brand-espresso">
+                    <Checkbox
+                      checked={watchedIsSellable && form.watch("isPosVisible")}
+                      disabled={!watchedIsSellable}
+                      onCheckedChange={(checked) =>
+                        form.setValue("isPosVisible", checked === true, {
+                          shouldDirty: true,
+                          shouldTouch: true,
+                          shouldValidate: true,
+                        })
+                      }
                     />
                     POS visible
                   </label>
