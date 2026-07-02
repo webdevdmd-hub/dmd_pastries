@@ -92,6 +92,37 @@ func (s *Service) CreateOrder(currentUser *utils.AuthContext, req CreateOrderReq
 	return s.GetOrder(currentUser, orderID)
 }
 
+func (s *Service) PreviewOrder(currentUser *utils.AuthContext, req CreateOrderRequest) (*BakeryOrderPreviewResponse, error) {
+	var preview *BakeryOrderPreviewResponse
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		order, items, chargeRows, err := s.buildOrder(tx, currentUser, req)
+		if err != nil {
+			return err
+		}
+
+		chargeResponses := make([]charges.ChargeResponse, 0, len(chargeRows))
+		for _, row := range chargeRows {
+			chargeResponses = append(chargeResponses, charges.ToResponse(row))
+		}
+
+		preview = &BakeryOrderPreviewResponse{
+			SubtotalAmount:  roundMoney(order.SubtotalAmount),
+			DiscountAmount:  roundMoney(order.DiscountAmount),
+			TaxAmount:       roundMoney(order.TaxAmount),
+			ChargeAmount:    roundMoney(order.ChargeAmount),
+			ChargeTaxAmount: roundMoney(order.ChargeTaxAmount),
+			TotalAmount:     roundMoney(order.TotalAmount),
+			Items:           s.itemResponses(currentUser.BusinessID, items),
+			Charges:         chargeResponses,
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return preview, nil
+}
+
 func (s *Service) GetOrder(currentUser *utils.AuthContext, id string) (*BakeryOrderResponse, error) {
 	order, err := s.repo.FindOrder(id, currentUser.BusinessID)
 	if err != nil {

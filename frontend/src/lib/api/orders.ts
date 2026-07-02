@@ -13,6 +13,7 @@ import type {
   BakeryOrderItem,
   BakeryOrderPackaging,
   BakeryOrderPayment,
+  BakeryOrderPreview,
   BakeryOrderSummary,
   ConvertOrderItemToProductPayload,
   ConvertOrderItemToVariantPayload,
@@ -366,6 +367,23 @@ function parseSummary(value: unknown): BakeryOrderSummary {
   };
 }
 
+function parseOrderPreview(value: unknown): BakeryOrderPreview {
+  if (!isObject(value)) {
+    throw new Error("Backend bakery order preview payload is invalid.");
+  }
+
+  return {
+    subtotalAmount: numberValue(value.subtotal_amount),
+    discountAmount: numberValue(value.discount_amount),
+    taxAmount: numberValue(value.tax_amount),
+    chargeAmount: numberValue(value.charge_amount),
+    chargeTaxAmount: numberValue(value.charge_tax_amount),
+    totalAmount: numberValue(value.total_amount),
+    items: Array.isArray(value.items) ? value.items.map(parseOrderItem) : [],
+    charges: parseDocumentCharges(value.charges),
+  };
+}
+
 function itemPayload(
   payload: CreateOrderItemPayload | UpdateOrderItemPayload,
 ): BackendOrderItemPayload {
@@ -521,6 +539,20 @@ export async function createOrder(payload: CreateOrderPayload): Promise<BakeryOr
     body: orderPayload(payload),
     parse: parseOrder,
   });
+
+  return response.data;
+}
+
+export async function previewOrder(payload: CreateOrderPayload): Promise<BakeryOrderPreview> {
+  const response = await apiRequest<BakeryOrderPreview, BackendOrderPayload>(
+    "/api/v1/bakery-orders/preview",
+    {
+      authMode: "appwrite",
+      method: "POST",
+      body: orderPayload(payload),
+      parse: parseOrderPreview,
+    },
+  );
 
   return response.data;
 }

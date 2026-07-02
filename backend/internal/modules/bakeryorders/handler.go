@@ -31,6 +31,15 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 	respondCreated(c, "bakery order created successfully", result, err)
 }
 
+func (h *Handler) PreviewOrder(c *gin.Context) {
+	var req CreateOrderRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.PreviewOrder(utils.MustAuthContext(c), req)
+	respond(c, "bakery order preview calculated successfully", result, err)
+}
+
 func (h *Handler) GetOrder(c *gin.Context) {
 	if !validParam(c, "id") {
 		return

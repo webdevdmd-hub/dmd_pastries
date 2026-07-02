@@ -146,6 +146,17 @@ type PaginatedOrdersResponse struct {
 	Pagination PaginationResponse    `json:"pagination"`
 }
 
+type BakeryOrderPreviewResponse struct {
+	SubtotalAmount  float64                   `json:"subtotal_amount"`
+	DiscountAmount  float64                   `json:"discount_amount"`
+	TaxAmount       float64                   `json:"tax_amount"`
+	ChargeAmount    float64                   `json:"charge_amount"`
+	ChargeTaxAmount float64                   `json:"charge_tax_amount"`
+	TotalAmount     float64                   `json:"total_amount"`
+	Items           []BakeryOrderItemResponse `json:"items"`
+	Charges         []charges.ChargeResponse  `json:"charges"`
+}
+
 type BakeryOrderResponse struct {
 	ID                       string                          `json:"id"`
 	BusinessID               string                          `json:"business_id"`

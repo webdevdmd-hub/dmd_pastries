@@ -16,6 +16,7 @@ func RegisterRoutes(
 
 	group.GET("", view, handler.ListOrders)
 	group.POST("", manage, handler.CreateOrder)
+	group.POST("/preview", manage, handler.PreviewOrder)
 	group.GET("/summary", view, handler.Summary)
 
 	group.GET("/:id", view, handler.GetOrder)

@@ -108,6 +108,17 @@ export type BakeryOrderSummary = {
   todayOrders: number;
 };
 
+export type BakeryOrderPreview = {
+  subtotalAmount: number;
+  discountAmount: number;
+  taxAmount: number;
+  chargeAmount: number;
+  chargeTaxAmount: number;
+  totalAmount: number;
+  items: BakeryOrderItem[];
+  charges: DocumentCharge[];
+};
+
 export type BakeryOrderFilters = {
   search: string;
   status: OrderStatus | "all";

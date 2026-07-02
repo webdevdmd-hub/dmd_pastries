@@ -19,6 +19,7 @@ import {
   getOrderPayments,
   getOrders,
   getOrderSummary,
+  previewOrder,
   updateOrder,
   updateOrderItem,
   updateOrderProductionStatus,
@@ -34,6 +35,7 @@ import type {
   BakeryOrderItem,
   BakeryOrderPackaging,
   BakeryOrderPayment,
+  BakeryOrderPreview,
   BakeryOrderSummary,
   ConvertOrderItemToProductPayload,
   ConvertOrderItemToVariantPayload,
@@ -81,6 +83,23 @@ export function useOrderSummary(enabled = true) {
     queryKey: [ordersQueryKey, branchQueryKey, "summary"],
     queryFn: async () => getOrderSummary(),
     enabled,
+  });
+}
+
+export function useOrderPreview(payload: CreateOrderPayload | null, enabled = true) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<BakeryOrderPreview>({
+    queryKey: [ordersQueryKey, branchQueryKey, "preview", payload],
+    queryFn: async () => {
+      if (!payload) {
+        throw new Error("Order preview payload is required.");
+      }
+
+      return previewOrder(payload);
+    },
+    enabled: enabled && payload !== null,
+    staleTime: 0,
   });
 }
 

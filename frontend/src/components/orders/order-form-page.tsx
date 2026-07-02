@@ -23,7 +23,13 @@ import { Input } from "@/components/ui/input";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useBranches } from "@/hooks/use-branches";
-import { useAddOrderPackaging, useCreateOrder, useOrder, useUpdateOrder } from "@/hooks/use-orders";
+import {
+  useAddOrderPackaging,
+  useCreateOrder,
+  useOrder,
+  useOrderPreview,
+  useUpdateOrder,
+} from "@/hooks/use-orders";
 import { usePermission } from "@/hooks/use-permission";
 import { useProductReferenceData, useProducts } from "@/hooks/use-products";
 import { useSalesChannels } from "@/hooks/use-settings-data";
@@ -33,6 +39,7 @@ import type { Branch } from "@/types/branch";
 import type { DocumentChargeDraft } from "@/types/document-charges";
 import type {
   AddOrderPackagingPayload,
+  BakeryOrderItem,
   CreateOrderItemPayload,
   CreateOrderPayload,
   OrderType,
@@ -48,6 +55,24 @@ function isPermissionDenied(error: unknown): boolean {
 
 function mapOrderToItems(items: CreateOrderItemPayload[]): CreateOrderItemPayload[] {
   return items.map((item) => ({ ...item }));
+}
+
+function mapSavedItemsToPayload(items: BakeryOrderItem[]): CreateOrderItemPayload[] {
+  return items.map((item) => ({
+    customizationsJson: item.customizationsJson,
+    designNotes: item.designNotes,
+    discountAmount: item.discountAmount,
+    flavor: item.flavor,
+    itemName: item.itemSource === "custom" ? item.itemNameSnapshot : null,
+    messageText: item.messageText,
+    productId: item.productId,
+    productVariantId: item.productVariantId,
+    quantity: item.quantity,
+    taxRateId: item.taxRateId,
+    unitId: item.unitId,
+    unitPrice: item.unitPrice,
+    weight: item.weight,
+  }));
 }
 
 function formatCurrency(value: number): string {
@@ -237,27 +262,10 @@ export function OrderFormPage({
     setNotes(order.notes ?? "");
     setCharges(order.charges);
     setDraftPackaging([]);
-    setItems(
-      mapOrderToItems(
-        order.items.map((item) => ({
-          customizationsJson: item.customizationsJson,
-          designNotes: item.designNotes,
-          discountAmount: item.discountAmount,
-          flavor: item.flavor,
-          itemName: item.itemSource === "custom" ? item.itemNameSnapshot : null,
-          messageText: item.messageText,
-          productId: item.productId,
-          productVariantId: item.productVariantId,
-          quantity: item.quantity,
-          taxRateId: item.taxRateId,
-          unitId: item.unitId,
-          unitPrice: item.unitPrice,
-          weight: item.weight,
-        })),
-      ),
-    );
+    setItems(mapOrderToItems(mapSavedItemsToPayload(order.items)));
   }, [orderQuery.data]);
 
+  const currentOrder = orderQuery.data ?? null;
   const selectedSalesChannel =
     salesChannels.find((channel) => channel.id === salesChannelId) ?? null;
 
@@ -267,22 +275,65 @@ export function OrderFormPage({
     }
   }, [externalOrderNumber, selectedSalesChannel?.requiresExternalOrderNumber]);
 
-  const buildPayload = (): CreateOrderPayload => ({
-    branchId,
-    customerId,
-    customerName,
-    customerPhone,
-    salesChannelId: salesChannelId || null,
-    externalOrderNumber: externalOrderNumber.trim().length > 0 ? externalOrderNumber.trim() : null,
-    deliveryAddress: orderType === "delivery" ? deliveryAddress || null : null,
-    deliveryTime: orderType === "delivery" ? deliveryTime || null : null,
-    eventDate,
-    items,
-    charges,
-    notes: notes || null,
-    orderType,
-    pickupTime: orderType === "pickup" ? pickupTime || null : null,
-  });
+  const draftPayload = useMemo<CreateOrderPayload>(
+    () => ({
+      branchId,
+      customerId,
+      customerName,
+      customerPhone,
+      salesChannelId: salesChannelId || null,
+      externalOrderNumber:
+        externalOrderNumber.trim().length > 0 ? externalOrderNumber.trim() : null,
+      deliveryAddress: orderType === "delivery" ? deliveryAddress || null : null,
+      deliveryTime: orderType === "delivery" ? deliveryTime || null : null,
+      eventDate,
+      items,
+      charges,
+      notes: notes || null,
+      orderType,
+      pickupTime: orderType === "pickup" ? pickupTime || null : null,
+    }),
+    [
+      branchId,
+      charges,
+      customerId,
+      customerName,
+      customerPhone,
+      deliveryAddress,
+      deliveryTime,
+      eventDate,
+      externalOrderNumber,
+      items,
+      notes,
+      orderType,
+      pickupTime,
+      salesChannelId,
+    ],
+  );
+
+  const validPreviewPayload = useMemo(() => {
+    const previewPayload =
+      isEdit && currentOrder
+        ? {
+            ...draftPayload,
+            items: mapSavedItemsToPayload(currentOrder.items),
+          }
+        : draftPayload;
+
+    if (
+      (selectedSalesChannel?.requiresExternalOrderNumber === true &&
+        !previewPayload.externalOrderNumber)
+    ) {
+      return null;
+    }
+
+    const result = createOrderSchema.safeParse(previewPayload);
+    return result.success ? result.data : null;
+  }, [currentOrder, draftPayload, isEdit, selectedSalesChannel?.requiresExternalOrderNumber]);
+
+  const previewQuery = useOrderPreview(validPreviewPayload, canManage);
+
+  const buildPayload = (): CreateOrderPayload => draftPayload;
 
   const save = async (): Promise<void> => {
     const payload = buildPayload();
@@ -353,29 +404,35 @@ export function OrderFormPage({
     );
   }
 
-  const order = orderQuery.data ?? null;
+  const order = currentOrder;
   const saving =
     createMutation.isPending || updateMutation.isPending || addPackagingMutation.isPending;
   const itemQuantity = items.reduce((sum, item) => sum + toMoney(item.quantity), 0);
   const draftSubtotal = items.reduce(
-    (sum, item) =>
-      sum +
-      toMoney(item.quantity) * toMoney(item.unitPrice) -
-      Math.max(0, toMoney(item.discountAmount)),
+    (sum, item) => sum + toMoney(item.quantity) * toMoney(item.unitPrice),
+    0,
+  );
+  const draftDiscount = items.reduce(
+    (sum, item) => sum + Math.max(0, toMoney(item.discountAmount)),
     0,
   );
   const draftChargeAmount = charges.reduce((sum, charge) => sum + toMoney(charge.amount), 0);
-  const summarySubtotal = order?.subtotalAmount ?? Math.max(0, draftSubtotal);
-  const summaryDiscount = order?.discountAmount ?? 0;
-  const summaryTax = order?.taxAmount ?? 0;
-  const summaryChargeAmount = order?.chargeAmount ?? draftChargeAmount;
-  const summaryChargeTax = order?.chargeTaxAmount ?? 0;
+  const preview = previewQuery.data ?? null;
+  const summarySubtotal =
+    preview?.subtotalAmount ?? order?.subtotalAmount ?? Math.max(0, draftSubtotal);
+  const summaryDiscount = preview?.discountAmount ?? order?.discountAmount ?? draftDiscount;
+  const summaryTax = preview?.taxAmount ?? order?.taxAmount ?? 0;
+  const summaryChargeAmount = preview?.chargeAmount ?? order?.chargeAmount ?? draftChargeAmount;
+  const summaryChargeTax = preview?.chargeTaxAmount ?? order?.chargeTaxAmount ?? 0;
   const summaryTotal =
+    preview?.totalAmount ??
     order?.totalAmount ??
     Math.max(
       0,
       summarySubtotal - summaryDiscount + summaryTax + summaryChargeAmount + summaryChargeTax,
     );
+  const showPreviewLoading = validPreviewPayload !== null && previewQuery.isFetching;
+  const showPreviewError = validPreviewPayload !== null && previewQuery.isError;
   const closeHref = orderId ? `/orders/${orderId}` : "/orders";
   const closeForm = (): void => {
     if (onClose) {
@@ -569,11 +626,24 @@ export function OrderFormPage({
             <div className="sticky top-0 space-y-5">
               <section className="overflow-hidden rounded-2xl border border-neutral-300 bg-white">
                 <div className="border-b border-neutral-300 bg-neutral-100 px-5 py-4">
-                  <h2 className="text-sm font-black uppercase tracking-[0.18em] text-black">
-                    Order Summary
-                  </h2>
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-black uppercase tracking-[0.18em] text-black">
+                      Order Summary
+                    </h2>
+                    {showPreviewLoading ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-neutral-600">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Previewing
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="space-y-3 px-5 py-5 text-sm text-neutral-700">
+                  {showPreviewError ? (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800">
+                      Draft preview failed: {getErrorMessage(previewQuery.error)}
+                    </div>
+                  ) : null}
                   <div className="flex items-center justify-between gap-4">
                     <span>Subtotal ({formatCurrency(itemQuantity)} items)</span>
                     <span className="font-mono text-black">
