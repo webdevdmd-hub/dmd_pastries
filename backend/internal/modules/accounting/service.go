@@ -2334,17 +2334,26 @@ func (s *Service) GetGeneralLedger(currentUser *utils.AuthContext, query General
 	if query.SortOrder != "asc" && query.SortOrder != "desc" {
 		return nil, apperrors.BadRequest("sort_order must be asc or desc", nil)
 	}
+	isAccountLedger := query.AccountID != ""
+	ledgerMode := "combined"
+	if isAccountLedger {
+		ledgerMode = "account"
+	}
 	var account *GeneralLedgerAccountResponse
-	if query.AccountID != "" {
+	if isAccountLedger {
 		found, err := s.repo.FindAccountForReport(currentUser.BusinessID, query.AccountID)
 		if err != nil {
 			return nil, mapChartAccountNotFound(err)
 		}
 		account = found
 	}
-	openingBalance, err := s.repo.GeneralLedgerOpeningBalance(currentUser.BusinessID, query)
-	if err != nil {
-		return nil, apperrors.Internal("failed to calculate ledger opening balance")
+	openingBalance := 0.0
+	if isAccountLedger {
+		var err error
+		openingBalance, err = s.repo.GeneralLedgerOpeningBalance(currentUser.BusinessID, query)
+		if err != nil {
+			return nil, apperrors.Internal("failed to calculate ledger opening balance")
+		}
 	}
 	periodDebit, periodCredit, err := s.repo.GeneralLedgerPeriodTotals(currentUser.BusinessID, query)
 	if err != nil {
@@ -2358,15 +2367,21 @@ func (s *Service) GetGeneralLedger(currentUser *utils.AuthContext, query General
 	if err != nil {
 		return nil, apperrors.Internal("failed to load general ledger")
 	}
+	closingBalance := 0.0
+	if isAccountLedger {
+		closingBalance = roundMoney(openingBalance + periodDebit - periodCredit)
+	}
 	_ = s.writeReportAudit(currentUser, "accounting.general_ledger_viewed", "general_ledger", query, ipAddress, userAgent)
 	return &GeneralLedgerResponse{
-		Account:        account,
-		OpeningBalance: openingBalance,
-		PeriodDebit:    periodDebit,
-		PeriodCredit:   periodCredit,
-		ClosingBalance: roundMoney(openingBalance + periodDebit - periodCredit),
-		Items:          rows,
-		Pagination:     PaginationResponse{Page: query.Page, Limit: query.Limit, Total: total, TotalPages: totalPages(total, query.Limit)},
+		Account:            account,
+		LedgerMode:         ledgerMode,
+		ShowRunningBalance: isAccountLedger,
+		OpeningBalance:     openingBalance,
+		PeriodDebit:        periodDebit,
+		PeriodCredit:       periodCredit,
+		ClosingBalance:     closingBalance,
+		Items:              rows,
+		Pagination:         PaginationResponse{Page: query.Page, Limit: query.Limit, Total: total, TotalPages: totalPages(total, query.Limit)},
 	}, nil
 }
 

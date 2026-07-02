@@ -1931,12 +1931,19 @@ func (r *Repository) CountGeneralLedgerRows(businessID string, query GeneralLedg
 
 func (r *Repository) ListGeneralLedgerRows(businessID string, query GeneralLedgerQuery, openingBalance float64) ([]GeneralLedgerRowResponse, error) {
 	where, args := ledgerWhereClause(businessID, query.AccountID, query.BranchID)
-	rawArgs := append([]interface{}{openingBalance}, args...)
-	rawArgs = append(rawArgs, query.DateFrom, query.DateTo, (query.Page-1)*query.Limit, query.Limit)
 	order := "ASC"
 	if strings.ToLower(query.SortOrder) == "desc" {
 		order = "DESC"
 	}
+	rawArgs := append([]interface{}{}, args...)
+	runningBalanceSelect := "NULL::numeric AS running_balance"
+	if strings.TrimSpace(query.AccountID) != "" {
+		rawArgs = append([]interface{}{openingBalance}, rawArgs...)
+		runningBalanceSelect = `? + SUM(jel.debit_amount - jel.credit_amount) OVER (
+			ORDER BY je.entry_date ` + order + `, je.entry_number ` + order + `, jel.line_number ` + order + `, jel.id ` + order + `
+		       ) AS running_balance`
+	}
+	rawArgs = append(rawArgs, query.DateFrom, query.DateTo, (query.Page-1)*query.Limit, query.Limit)
 	var rows []GeneralLedgerRowResponse
 	err := r.db.Raw(`
 		SELECT je.id AS entry_id,
@@ -1956,9 +1963,7 @@ func (r *Repository) ListGeneralLedgerRows(businessID string, query GeneralLedge
 		       je.source_id,
 		       jel.debit_amount,
 		       jel.credit_amount,
-		       ? + SUM(jel.debit_amount - jel.credit_amount) OVER (
-		       	ORDER BY je.entry_date `+order+`, je.entry_number `+order+`, jel.line_number `+order+`, jel.id `+order+`
-		       ) AS running_balance
+		       `+runningBalanceSelect+`
 		FROM journal_entry_lines jel
 		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
 		JOIN chart_of_accounts coa ON coa.id = jel.account_id AND coa.business_id = jel.business_id
@@ -1970,7 +1975,10 @@ func (r *Repository) ListGeneralLedgerRows(businessID string, query GeneralLedge
 	for i := range rows {
 		rows[i].DebitAmount = roundMoney(rows[i].DebitAmount)
 		rows[i].CreditAmount = roundMoney(rows[i].CreditAmount)
-		rows[i].RunningBalance = roundMoney(rows[i].RunningBalance)
+		if rows[i].RunningBalance != nil {
+			runningBalance := roundMoney(*rows[i].RunningBalance)
+			rows[i].RunningBalance = &runningBalance
+		}
 	}
 	return rows, err
 }

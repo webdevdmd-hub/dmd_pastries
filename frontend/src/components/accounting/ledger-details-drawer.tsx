@@ -320,7 +320,7 @@ export function LedgerDetailsDrawer({
                                 {money(transaction.creditAmount)}
                               </TableCell>
                               <TableCell className="text-right font-semibold">
-                                {money(transaction.runningBalance)}
+                                {money(transaction.runningBalance ?? 0)}
                               </TableCell>
                               <TableCell>{transaction.branchName || "Business-level"}</TableCell>
                               <TableCell className="text-right">

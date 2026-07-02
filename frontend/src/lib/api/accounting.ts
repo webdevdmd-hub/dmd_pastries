@@ -202,6 +202,10 @@ function numberValue(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function nullableNumberValue(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 function parseList<TItem>(value: unknown, parser: (item: unknown) => TItem): TItem[] {
   if (Array.isArray(value)) {
     return value.map(parser);
@@ -541,7 +545,7 @@ function parseGeneralLedgerItem(value: unknown): GeneralLedgerItem {
     lineDescription: stringValue(value.line_description),
     debitAmount: numberValue(value.debit_amount, 0),
     creditAmount: numberValue(value.credit_amount, 0),
-    runningBalance: numberValue(value.running_balance, 0),
+    runningBalance: nullableNumberValue(value.running_balance),
   };
 }
 
@@ -555,6 +559,8 @@ function parseGeneralLedgerResponse(value: unknown): GeneralLedgerResponse {
 
   return {
     account: parseReportAccount(value.account),
+    ledgerMode: value.ledger_mode === "account" ? "account" : "combined",
+    showRunningBalance: value.show_running_balance === true,
     openingBalance: numberValue(value.opening_balance, 0),
     periodDebit: numberValue(value.period_debit, 0),
     periodCredit: numberValue(value.period_credit, 0),

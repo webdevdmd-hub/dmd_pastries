@@ -2,6 +2,7 @@ package reports
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +34,22 @@ type salesSummarySQLRow struct {
 	ItemsSold     float64
 	DiscountTotal float64
 	TaxTotal      float64
+}
+
+type ledgerFinancialTotals struct {
+	Revenue             float64
+	GrossRevenue        float64
+	Refunded            float64
+	Tax                 float64
+	Collected           float64
+	CashCollected       float64
+	CardCollected       float64
+	BankCollected       float64
+	OutstandingCustomer float64
+	SupplierPayable     float64
+	PurchaseTotal       float64
+	PaymentCount        int64
+	RefundCount         int64
 }
 
 func NewRepository(db *gorm.DB) *Repository {
@@ -1270,59 +1287,24 @@ func (r *Repository) BakeryOrdersTrend(filter *shared.ResolvedFilter) ([]trendSe
 }
 
 func (r *Repository) FinancialSummary(filter *shared.ResolvedFilter) (*FinancialSummaryResponse, error) {
-	row := &FinancialSummaryResponse{}
-	posGrossQuery := "SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE business_id = ? AND sold_at >= ? AND sold_at < ? AND sale_status <> 'voided' AND deleted_at IS NULL"
-	posGrossArgs := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	posGrossQuery, posGrossArgs = addBranchCondition(posGrossQuery, posGrossArgs, filter)
-	var posGross float64
-	if err := r.db.Raw(posGrossQuery, posGrossArgs...).Scan(&posGross).Error; err != nil {
+	ledger, err := r.ledgerFinancialTotals(filter, filter.StartUTC, filter.EndUTC)
+	if err != nil {
 		return nil, err
 	}
-	bakeryGrossQuery := "SELECT COALESCE(SUM(total_amount),0) FROM bakery_orders WHERE business_id = ? AND event_date >= ? AND event_date <= ? AND order_status <> 'cancelled' AND deleted_at IS NULL"
-	bakeryGrossArgs := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
-	bakeryGrossQuery, bakeryGrossArgs = addBranchCondition(bakeryGrossQuery, bakeryGrossArgs, filter)
-	var bakeryGross float64
-	if err := r.db.Raw(bakeryGrossQuery, bakeryGrossArgs...).Scan(&bakeryGross).Error; err != nil {
-		return nil, err
-	}
-	row.GrossSales = posGross + bakeryGross
-
-	var collected struct {
-		TotalCollected        float64
-		PaymentCount          int64
-		CashCollected         float64
-		CardCollected         float64
-		BankTransferCollected float64
-	}
-	collectedQuery, collectedArgs := financialCollectedSummarySQL(filter)
-	if err := r.db.Raw(collectedQuery, collectedArgs...).Scan(&collected).Error; err != nil {
-		return nil, err
-	}
-	row.TotalCollected = collected.TotalCollected
-	row.PaymentCount = collected.PaymentCount
-	row.CashCollected = collected.CashCollected
-	row.CardCollected = collected.CardCollected
-	row.BankTransferCollected = collected.BankTransferCollected
-
-	refundQuery := "SELECT COALESCE(SUM(refund_amount),0) AS total_refunded, COUNT(*) AS refund_count FROM payment_refunds WHERE business_id = ? AND refunded_at >= ? AND refunded_at < ? AND refund_status = 'completed' AND deleted_at IS NULL"
-	refundArgs := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	refundQuery, refundArgs = addBranchCondition(refundQuery, refundArgs, filter)
-	if err := r.db.Raw(refundQuery, refundArgs...).Scan(row).Error; err != nil {
-		return nil, err
-	}
-	row.NetCollected = row.TotalCollected - row.TotalRefunded
-
-	outstandingQuery, outstandingArgs := financialOutstandingSummarySQL(filter)
-	if err := r.db.Raw(outstandingQuery, outstandingArgs...).Scan(&row.OutstandingCustomerBalance).Error; err != nil {
-		return nil, err
-	}
-	purchaseQuery := "SELECT COALESCE(SUM(total_amount),0) AS purchase_total, COALESCE(SUM(balance_amount),0) AS supplier_payable_balance FROM purchase_invoices WHERE business_id = ? AND invoice_date >= ? AND invoice_date <= ? AND status = 'posted' AND deleted_at IS NULL"
-	purchaseArgs := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
-	purchaseQuery, purchaseArgs = addBranchCondition(purchaseQuery, purchaseArgs, filter)
-	if err := r.db.Raw(purchaseQuery, purchaseArgs...).Scan(row).Error; err != nil {
-		return nil, err
-	}
-	return row, nil
+	return &FinancialSummaryResponse{
+		GrossSales:                 ledger.GrossRevenue,
+		TotalCollected:             ledger.Collected,
+		TotalRefunded:              ledger.Refunded,
+		NetCollected:               roundMoney(ledger.Collected - ledger.Refunded),
+		OutstandingCustomerBalance: ledger.OutstandingCustomer,
+		PurchaseTotal:              ledger.PurchaseTotal,
+		SupplierPayableBalance:     ledger.SupplierPayable,
+		CashCollected:              ledger.CashCollected,
+		CardCollected:              ledger.CardCollected,
+		BankTransferCollected:      ledger.BankCollected,
+		RefundCount:                ledger.RefundCount,
+		PaymentCount:               ledger.PaymentCount,
+	}, nil
 }
 
 func (r *Repository) FinancialPayments(filter *shared.ResolvedFilter) ([]FinancialPaymentReportItem, int64, error) {
@@ -1540,8 +1522,18 @@ func (r *Repository) salesSummary(filter *shared.ResolvedFilter) (*SalesSummary,
 	query := "SELECT COALESCE(SUM(total_amount),0) AS total_sales, COUNT(*) AS sales_count, COALESCE(AVG(total_amount),0) AS average_order_value FROM sales WHERE business_id = ? AND sold_at >= ? AND sold_at < ? AND sale_status <> 'voided' AND deleted_at IS NULL"
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
 	query, args = addBranchCondition(query, args, filter)
-	err := r.db.Raw(query, args...).Scan(&row).Error
-	return &row, err
+	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
+		return nil, err
+	}
+	ledger, err := r.ledgerFinancialTotals(filter, filter.StartUTC, filter.EndUTC)
+	if err != nil {
+		return nil, err
+	}
+	row.TotalSales = ledger.Revenue
+	if row.SalesCount > 0 {
+		row.AverageOrderValue = roundMoney(row.TotalSales / float64(row.SalesCount))
+	}
+	return &row, nil
 }
 
 func (r *Repository) salesReportSummaryForRange(filter *shared.ResolvedFilter, startUTC, endUTC time.Time) (*SalesReportSummaryResponse, error) {
@@ -1562,10 +1554,6 @@ func (r *Repository) salesReportSummaryForRange(filter *shared.ResolvedFilter, s
 	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
 		return nil, err
 	}
-	returnTotal, err := r.salesReturnTotalForRange(filter, startUTC, endUTC)
-	if err != nil {
-		return nil, err
-	}
 	var voidCount int64
 	voidQuery := "SELECT COUNT(*) FROM sales s WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.sale_status = 'voided' AND s.deleted_at IS NULL"
 	voidArgs := []interface{}{filter.BusinessID, startUTC, endUTC}
@@ -1573,18 +1561,25 @@ func (r *Repository) salesReportSummaryForRange(filter *shared.ResolvedFilter, s
 	if err := r.db.Raw(voidQuery, voidArgs...).Scan(&voidCount).Error; err != nil {
 		return nil, err
 	}
+	ledgerFilter := *filter
+	ledgerFilter.StartUTC = startUTC
+	ledgerFilter.EndUTC = endUTC
+	ledger, err := r.ledgerFinancialTotals(&ledgerFilter, startUTC, endUTC)
+	if err != nil {
+		return nil, err
+	}
 	response := &SalesReportSummaryResponse{
-		GrossSales:       row.GrossSales,
-		NetSales:         row.NetSales - returnTotal,
+		GrossSales:       ledger.GrossRevenue,
+		NetSales:         ledger.Revenue,
 		SalesCount:       row.SalesCount,
 		ItemsSold:        row.ItemsSold,
 		DiscountTotal:    row.DiscountTotal,
-		TaxTotal:         row.TaxTotal,
-		RefundTotal:      returnTotal,
+		TaxTotal:         ledger.Tax,
+		RefundTotal:      ledger.Refunded,
 		VoidedSalesCount: voidCount,
 	}
 	if response.SalesCount > 0 {
-		response.AverageOrderValue = response.NetSales / float64(response.SalesCount)
+		response.AverageOrderValue = roundMoney(response.NetSales / float64(response.SalesCount))
 	}
 	return response, nil
 }
@@ -1626,21 +1621,11 @@ func (r *Repository) ordersSummary(filter *shared.ResolvedFilter) (*OrdersSummar
 }
 
 func (r *Repository) paymentsSummary(filter *shared.ResolvedFilter) (*PaymentsSummary, error) {
-	var collected float64
-	query := "SELECT COALESCE(SUM(amount),0) FROM sale_payments WHERE business_id = ? AND paid_at >= ? AND paid_at < ? AND payment_status IN ('completed','partially_refunded','refunded') AND deleted_at IS NULL"
-	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	query, args = addBranchCondition(query, args, filter)
-	if err := r.db.Raw(query, args...).Scan(&collected).Error; err != nil {
+	ledger, err := r.ledgerFinancialTotals(filter, filter.StartUTC, filter.EndUTC)
+	if err != nil {
 		return nil, err
 	}
-	var refunded float64
-	refundQuery := "SELECT COALESCE(SUM(refund_amount),0) FROM payment_refunds WHERE business_id = ? AND refunded_at >= ? AND refunded_at < ? AND refund_status = 'completed' AND deleted_at IS NULL"
-	refundArgs := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	refundQuery, refundArgs = addBranchCondition(refundQuery, refundArgs, filter)
-	if err := r.db.Raw(refundQuery, refundArgs...).Scan(&refunded).Error; err != nil {
-		return nil, err
-	}
-	return &PaymentsSummary{CollectedAmount: collected, RefundAmount: refunded}, nil
+	return &PaymentsSummary{CollectedAmount: ledger.Collected, RefundAmount: ledger.Refunded}, nil
 }
 
 func (r *Repository) salesExportRows(filter *shared.ResolvedFilter) ([]string, [][]string, error) {
@@ -1737,6 +1722,235 @@ func addBranchCondition(query string, args []interface{}, filter *shared.Resolve
 		args = append(args, filter.BranchID)
 	}
 	return query, args
+}
+
+func (r *Repository) ledgerFinancialTotals(filter *shared.ResolvedFilter, startUTC, endUTC time.Time) (*ledgerFinancialTotals, error) {
+	dateFrom := startUTC.Format("2006-01-02")
+	dateTo := endUTC.Add(-time.Nanosecond).Format("2006-01-02")
+	if !startUTC.Before(endUTC) {
+		dateTo = startUTC.Format("2006-01-02")
+	}
+	totals := &ledgerFinancialTotals{}
+	revenueSources := []string{"pos_sale", "bakery_order_revenue", "pos_sale_void", "sales_return"}
+	grossRevenueSources := []string{"pos_sale", "bakery_order_revenue", "pos_sale_void"}
+	refundSources := []string{"sales_return", "pos_sale_refund"}
+
+	revenue, err := r.ledgerIncomeAmount(filter.BusinessID, filter.BranchID, filter.AllBranches, dateFrom, dateTo, revenueSources, false)
+	if err != nil {
+		return nil, err
+	}
+	grossRevenue, err := r.ledgerIncomeAmount(filter.BusinessID, filter.BranchID, filter.AllBranches, dateFrom, dateTo, grossRevenueSources, false)
+	if err != nil {
+		return nil, err
+	}
+	tax, err := r.ledgerTaxAmount(filter.BusinessID, filter.BranchID, filter.AllBranches, dateFrom, dateTo, revenueSources)
+	if err != nil {
+		return nil, err
+	}
+	refunded, refundCount, err := r.ledgerPaymentAccountCredits(filter.BusinessID, filter.BranchID, filter.AllBranches, dateFrom, dateTo, refundSources)
+	if err != nil {
+		return nil, err
+	}
+	collected, cash, card, bank, paymentCount, err := r.ledgerPaymentAccountDebits(filter.BusinessID, filter.BranchID, filter.AllBranches, dateFrom, dateTo, []string{"pos_sale", "bakery_order_payment"})
+	if err != nil {
+		return nil, err
+	}
+	outstandingCustomer, err := r.ledgerMappedBalance(filter.BusinessID, filter.BranchID, filter.AllBranches, "accounts_receivable", "1100", dateTo)
+	if err != nil {
+		return nil, err
+	}
+	supplierPayable, err := r.ledgerMappedBalance(filter.BusinessID, filter.BranchID, filter.AllBranches, "accounts_payable", "2000", dateTo)
+	if err != nil {
+		return nil, err
+	}
+	purchaseTotal, err := r.ledgerMappedMovement(filter.BusinessID, filter.BranchID, filter.AllBranches, "accounts_payable", "2000", dateFrom, dateTo, []string{"purchase_invoice", "purchase_invoice_edit", "purchase_invoice_cancel", "purchase_return", "purchase_return_reversal"})
+	if err != nil {
+		return nil, err
+	}
+
+	totals.Revenue = roundMoney(revenue)
+	totals.GrossRevenue = roundMoney(grossRevenue)
+	totals.Refunded = roundMoney(refunded)
+	totals.Tax = roundMoney(tax)
+	totals.Collected = roundMoney(collected)
+	totals.CashCollected = roundMoney(cash)
+	totals.CardCollected = roundMoney(card)
+	totals.BankCollected = roundMoney(bank)
+	totals.OutstandingCustomer = roundMoney(outstandingCustomer)
+	totals.SupplierPayable = roundMoney(supplierPayable)
+	totals.PurchaseTotal = roundMoney(purchaseTotal)
+	totals.PaymentCount = paymentCount
+	totals.RefundCount = refundCount
+	return totals, nil
+}
+
+func (r *Repository) ledgerIncomeAmount(businessID, branchID string, allBranches bool, dateFrom, dateTo string, sourceTypes []string, positiveCreditsOnly bool) (float64, error) {
+	branchClause, args := ledgerBranchClause(branchID, allBranches)
+	args = append([]interface{}{businessID, dateFrom, dateTo, sourceTypes}, args...)
+	expression := "jel.credit_amount - jel.debit_amount"
+	if positiveCreditsOnly {
+		expression = "jel.credit_amount"
+	}
+	var total float64
+	err := r.db.Raw(`
+		SELECT COALESCE(SUM(`+expression+`), 0)
+		FROM journal_entry_lines jel
+		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
+		JOIN chart_of_accounts coa ON coa.id = jel.account_id AND coa.business_id = jel.business_id
+		WHERE jel.business_id = ?
+		  AND jel.deleted_at IS NULL
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted', 'reversed')
+		  AND je.entry_date >= ?
+		  AND je.entry_date <= ?
+		  AND je.source_type IN ?
+		  AND coa.account_type = 'income'
+		  `+branchClause, args...).Scan(&total).Error
+	return roundMoney(total), err
+}
+
+func (r *Repository) ledgerTaxAmount(businessID, branchID string, allBranches bool, dateFrom, dateTo string, sourceTypes []string) (float64, error) {
+	branchClause, args := ledgerBranchClause(branchID, allBranches)
+	args = append([]interface{}{businessID, dateFrom, dateTo, sourceTypes, businessID}, args...)
+	var total float64
+	err := r.db.Raw(`
+		SELECT COALESCE(SUM(jel.credit_amount - jel.debit_amount), 0)
+		FROM journal_entry_lines jel
+		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
+		WHERE jel.business_id = ?
+		  AND jel.deleted_at IS NULL
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted', 'reversed')
+		  AND je.entry_date >= ?
+		  AND je.entry_date <= ?
+		  AND je.source_type IN ?
+		  AND jel.account_id = (
+		    SELECT COALESCE(aam.chart_account_id, coa.id)
+		    FROM chart_of_accounts coa
+		    LEFT JOIN accounting_account_mappings aam ON aam.business_id = coa.business_id AND aam.mapping_key = 'vat_payable' AND aam.deleted_at IS NULL
+		    WHERE coa.business_id = ? AND coa.account_code = '2100' AND coa.deleted_at IS NULL
+		    ORDER BY CASE WHEN aam.chart_account_id IS NOT NULL THEN 0 ELSE 1 END
+		    LIMIT 1
+		  )
+		  `+branchClause, args...).Scan(&total).Error
+	return roundMoney(total), err
+}
+
+func (r *Repository) ledgerPaymentAccountDebits(businessID, branchID string, allBranches bool, dateFrom, dateTo string, sourceTypes []string) (float64, float64, float64, float64, int64, error) {
+	branchClause, args := ledgerBranchClause(branchID, allBranches)
+	args = append([]interface{}{businessID, dateFrom, dateTo, sourceTypes}, args...)
+	var row struct {
+		Total        float64
+		Cash         float64
+		Card         float64
+		Bank         float64
+		PaymentCount int64
+	}
+	err := r.db.Raw(`
+		SELECT COALESCE(SUM(jel.debit_amount), 0) AS total,
+		       COALESCE(SUM(jel.debit_amount) FILTER (WHERE pa.account_type = 'cash'), 0) AS cash,
+		       COALESCE(SUM(jel.debit_amount) FILTER (WHERE pa.account_type = 'card_clearing'), 0) AS card,
+		       COALESCE(SUM(jel.debit_amount) FILTER (WHERE pa.account_type IN ('bank', 'wallet', 'platform_clearing')), 0) AS bank,
+		       COUNT(DISTINCT je.id) AS payment_count
+		FROM journal_entry_lines jel
+		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
+		JOIN payment_accounts pa ON pa.chart_account_id = jel.account_id AND pa.business_id = jel.business_id AND pa.deleted_at IS NULL
+		WHERE jel.business_id = ?
+		  AND jel.deleted_at IS NULL
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted', 'reversed')
+		  AND je.entry_date >= ?
+		  AND je.entry_date <= ?
+		  AND je.source_type IN ?
+		  AND jel.debit_amount > 0
+		  `+branchClause, args...).Scan(&row).Error
+	return roundMoney(row.Total), roundMoney(row.Cash), roundMoney(row.Card), roundMoney(row.Bank), row.PaymentCount, err
+}
+
+func (r *Repository) ledgerPaymentAccountCredits(businessID, branchID string, allBranches bool, dateFrom, dateTo string, sourceTypes []string) (float64, int64, error) {
+	branchClause, args := ledgerBranchClause(branchID, allBranches)
+	args = append([]interface{}{businessID, dateFrom, dateTo, sourceTypes}, args...)
+	var row struct {
+		Total       float64
+		RefundCount int64
+	}
+	err := r.db.Raw(`
+		SELECT COALESCE(SUM(jel.credit_amount), 0) AS total,
+		       COUNT(DISTINCT je.id) AS refund_count
+		FROM journal_entry_lines jel
+		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
+		JOIN payment_accounts pa ON pa.chart_account_id = jel.account_id AND pa.business_id = jel.business_id AND pa.deleted_at IS NULL
+		WHERE jel.business_id = ?
+		  AND jel.deleted_at IS NULL
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted', 'reversed')
+		  AND je.entry_date >= ?
+		  AND je.entry_date <= ?
+		  AND je.source_type IN ?
+		  AND jel.credit_amount > 0
+		  `+branchClause, args...).Scan(&row).Error
+	return roundMoney(row.Total), row.RefundCount, err
+}
+
+func (r *Repository) ledgerMappedBalance(businessID, branchID string, allBranches bool, mappingKey, fallbackCode, asOfDate string) (float64, error) {
+	branchClause, args := ledgerBranchClause(branchID, allBranches)
+	args = append([]interface{}{mappingKey, businessID, fallbackCode, businessID, asOfDate}, args...)
+	var total float64
+	err := r.db.Raw(`
+		WITH target_account AS (
+			SELECT COALESCE(aam.chart_account_id, coa.id) AS account_id, coa.normal_balance
+			FROM chart_of_accounts coa
+			LEFT JOIN accounting_account_mappings aam ON aam.business_id = coa.business_id AND aam.mapping_key = ? AND aam.deleted_at IS NULL
+			WHERE coa.business_id = ? AND coa.account_code = ? AND coa.deleted_at IS NULL
+			ORDER BY CASE WHEN aam.chart_account_id IS NOT NULL THEN 0 ELSE 1 END
+			LIMIT 1
+		)
+		SELECT COALESCE(SUM(CASE WHEN ta.normal_balance = 'credit' THEN jel.credit_amount - jel.debit_amount ELSE jel.debit_amount - jel.credit_amount END), 0)
+		FROM target_account ta
+		JOIN journal_entry_lines jel ON jel.account_id = ta.account_id
+		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
+		WHERE jel.business_id = ?
+		  AND jel.deleted_at IS NULL
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted', 'reversed')
+		  AND je.entry_date <= ?
+		  `+branchClause, args...).Scan(&total).Error
+	return roundMoney(total), err
+}
+
+func (r *Repository) ledgerMappedMovement(businessID, branchID string, allBranches bool, mappingKey, fallbackCode, dateFrom, dateTo string, sourceTypes []string) (float64, error) {
+	branchClause, args := ledgerBranchClause(branchID, allBranches)
+	args = append([]interface{}{mappingKey, businessID, fallbackCode, businessID, dateFrom, dateTo, sourceTypes}, args...)
+	var total float64
+	err := r.db.Raw(`
+		WITH target_account AS (
+			SELECT COALESCE(aam.chart_account_id, coa.id) AS account_id, coa.normal_balance
+			FROM chart_of_accounts coa
+			LEFT JOIN accounting_account_mappings aam ON aam.business_id = coa.business_id AND aam.mapping_key = ? AND aam.deleted_at IS NULL
+			WHERE coa.business_id = ? AND coa.account_code = ? AND coa.deleted_at IS NULL
+			ORDER BY CASE WHEN aam.chart_account_id IS NOT NULL THEN 0 ELSE 1 END
+			LIMIT 1
+		)
+		SELECT COALESCE(SUM(CASE WHEN ta.normal_balance = 'credit' THEN jel.credit_amount - jel.debit_amount ELSE jel.debit_amount - jel.credit_amount END), 0)
+		FROM target_account ta
+		JOIN journal_entry_lines jel ON jel.account_id = ta.account_id
+		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
+		WHERE jel.business_id = ?
+		  AND jel.deleted_at IS NULL
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted', 'reversed')
+		  AND je.entry_date >= ?
+		  AND je.entry_date <= ?
+		  AND je.source_type IN ?
+		  `+branchClause, args...).Scan(&total).Error
+	return roundMoney(total), err
+}
+
+func ledgerBranchClause(branchID string, allBranches bool) (string, []interface{}) {
+	if allBranches {
+		return "", []interface{}{}
+	}
+	return " AND je.branch_id = ?", []interface{}{branchID}
 }
 
 func inventoryItemSelect() string {
@@ -2288,4 +2502,8 @@ func formatBucket(value time.Time, groupBy string) string {
 
 func fmtFloat(value float64) string {
 	return strconv.FormatFloat(value, 'f', 2, 64)
+}
+
+func roundMoney(value float64) float64 {
+	return math.Round(value*100) / 100
 }

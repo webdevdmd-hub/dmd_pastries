@@ -399,34 +399,36 @@ type GeneralLedgerAccountResponse struct {
 }
 
 type GeneralLedgerRowResponse struct {
-	EntryID         string  `json:"entry_id"`
-	EntryNumber     string  `json:"entry_number"`
-	EntryDate       string  `json:"entry_date"`
-	BranchID        *string `json:"branch_id"`
-	BranchName      string  `json:"branch_name"`
-	AccountID       string  `json:"account_id"`
-	AccountCode     string  `json:"account_code"`
-	AccountName     string  `json:"account_name"`
-	AccountType     string  `json:"account_type"`
-	NormalBalance   string  `json:"normal_balance"`
-	ReferenceNumber string  `json:"reference_number"`
-	Narration       string  `json:"narration"`
-	LineDescription string  `json:"line_description"`
-	SourceType      string  `json:"source_type"`
-	SourceID        *string `json:"source_id"`
-	DebitAmount     float64 `json:"debit_amount"`
-	CreditAmount    float64 `json:"credit_amount"`
-	RunningBalance  float64 `json:"running_balance"`
+	EntryID         string   `json:"entry_id"`
+	EntryNumber     string   `json:"entry_number"`
+	EntryDate       string   `json:"entry_date"`
+	BranchID        *string  `json:"branch_id"`
+	BranchName      string   `json:"branch_name"`
+	AccountID       string   `json:"account_id"`
+	AccountCode     string   `json:"account_code"`
+	AccountName     string   `json:"account_name"`
+	AccountType     string   `json:"account_type"`
+	NormalBalance   string   `json:"normal_balance"`
+	ReferenceNumber string   `json:"reference_number"`
+	Narration       string   `json:"narration"`
+	LineDescription string   `json:"line_description"`
+	SourceType      string   `json:"source_type"`
+	SourceID        *string  `json:"source_id"`
+	DebitAmount     float64  `json:"debit_amount"`
+	CreditAmount    float64  `json:"credit_amount"`
+	RunningBalance  *float64 `json:"running_balance"`
 }
 
 type GeneralLedgerResponse struct {
-	Account        *GeneralLedgerAccountResponse `json:"account"`
-	OpeningBalance float64                       `json:"opening_balance"`
-	PeriodDebit    float64                       `json:"period_debit"`
-	PeriodCredit   float64                       `json:"period_credit"`
-	ClosingBalance float64                       `json:"closing_balance"`
-	Items          []GeneralLedgerRowResponse    `json:"items"`
-	Pagination     PaginationResponse            `json:"pagination"`
+	Account            *GeneralLedgerAccountResponse `json:"account"`
+	LedgerMode         string                        `json:"ledger_mode"`
+	ShowRunningBalance bool                          `json:"show_running_balance"`
+	OpeningBalance     float64                       `json:"opening_balance"`
+	PeriodDebit        float64                       `json:"period_debit"`
+	PeriodCredit       float64                       `json:"period_credit"`
+	ClosingBalance     float64                       `json:"closing_balance"`
+	Items              []GeneralLedgerRowResponse    `json:"items"`
+	Pagination         PaginationResponse            `json:"pagination"`
 }
 
 type LedgerDetailsSummaryResponse struct {

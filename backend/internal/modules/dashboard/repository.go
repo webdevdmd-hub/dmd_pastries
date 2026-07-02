@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"math"
 	"time"
 
 	"gorm.io/gorm"
@@ -152,12 +153,11 @@ func (r *Repository) PurchasingDashboard(scope Scope) (*PurchasingDashboardRespo
 	if err := r.db.Raw(receiptQuery, receiptArgs...).Scan(&purchasing.PendingReceipts).Error; err != nil {
 		return nil, err
 	}
-	payableQuery := "SELECT COALESCE(SUM(balance_amount),0) FROM purchase_invoices pi WHERE pi.business_id = ? AND pi.status <> 'cancelled' AND pi.payment_status IN ('unpaid','partial','overdue') AND pi.deleted_at IS NULL"
-	payableArgs := []interface{}{scope.BusinessID}
-	payableQuery, payableArgs = addScopedBranch(payableQuery, payableArgs, "pi.branch_id", scope)
-	if err := r.db.Raw(payableQuery, payableArgs...).Scan(&purchasing.SupplierPayables).Error; err != nil {
+	payable, err := r.dashboardMappedBalance(scope, "accounts_payable", "2000", scope.TodayDate)
+	if err != nil {
 		return nil, err
 	}
+	purchasing.SupplierPayables = payable
 	inventory := PurchasingInventoryWidget{}
 	inventoryQuery := "SELECT COUNT(*) FILTER (WHERE available_quantity <= reorder_level) AS low_stock_items, COUNT(*) FILTER (WHERE available_quantity <= 0) AS critical_low_stock_items FROM inventory_items WHERE business_id = ? AND deleted_at IS NULL"
 	inventoryArgs := []interface{}{scope.BusinessID}
@@ -183,20 +183,16 @@ func (r *Repository) KPISummary(scope Scope) (*KPISummaryResponse, error) {
 	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
 		return nil, err
 	}
-	collectedQuery := "SELECT COALESCE(SUM(amount),0) FROM sale_payments WHERE business_id = ? AND paid_at >= ? AND paid_at < ? AND payment_status IN ('completed','partially_refunded','refunded') AND deleted_at IS NULL"
-	collectedArgs := []interface{}{scope.BusinessID, scope.TodayStart, scope.TodayEnd}
-	collectedQuery, collectedArgs = addScopedBranch(collectedQuery, collectedArgs, "branch_id", scope)
-	if err := r.db.Raw(collectedQuery, collectedArgs...).Scan(&row.TodayCollected).Error; err != nil {
+	ledgerRevenue, err := r.dashboardLedgerRevenue(scope, scope.TodayStart, scope.TodayEnd)
+	if err != nil {
 		return nil, err
 	}
-	bakeryCollectedQuery := "SELECT COALESCE(SUM(bop.amount),0) FROM bakery_order_payments bop JOIN bakery_orders bo ON bo.id = bop.bakery_order_id WHERE bop.business_id = ? AND bop.paid_at >= ? AND bop.paid_at < ? AND bo.deleted_at IS NULL"
-	bakeryCollectedArgs := []interface{}{scope.BusinessID, scope.TodayStart, scope.TodayEnd}
-	bakeryCollectedQuery, bakeryCollectedArgs = addScopedBranch(bakeryCollectedQuery, bakeryCollectedArgs, "bo.branch_id", scope)
-	var bakeryCollected float64
-	if err := r.db.Raw(bakeryCollectedQuery, bakeryCollectedArgs...).Scan(&bakeryCollected).Error; err != nil {
+	collected, _, _, err := r.dashboardLedgerCollections(scope, scope.TodayStart, scope.TodayEnd)
+	if err != nil {
 		return nil, err
 	}
-	row.TodayCollected += bakeryCollected
+	row.TodaySales = ledgerRevenue
+	row.TodayCollected = collected
 	lowQuery := "SELECT COUNT(*) FROM inventory_items WHERE business_id = ? AND available_quantity <= reorder_level AND deleted_at IS NULL"
 	lowArgs := []interface{}{scope.BusinessID}
 	lowQuery, lowArgs = addScopedBranch(lowQuery, lowArgs, "branch_id", scope)
@@ -297,11 +293,18 @@ func (r *Repository) adminSales(scope Scope) (*AdminSalesWidget, error) {
 	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
 		return nil, err
 	}
-	monthQuery := "SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE business_id = ? AND sold_at >= ? AND sold_at < ? AND sale_status <> 'voided' AND deleted_at IS NULL"
-	monthArgs := []interface{}{scope.BusinessID, scope.MonthStart, scope.MonthEnd}
-	monthQuery, monthArgs = addScopedBranch(monthQuery, monthArgs, "branch_id", scope)
-	if err := r.db.Raw(monthQuery, monthArgs...).Scan(&row.MonthlySales).Error; err != nil {
+	todayRevenue, err := r.dashboardLedgerRevenue(scope, scope.TodayStart, scope.TodayEnd)
+	if err != nil {
 		return nil, err
+	}
+	monthlyRevenue, err := r.dashboardLedgerRevenue(scope, scope.MonthStart, scope.MonthEnd)
+	if err != nil {
+		return nil, err
+	}
+	row.TodaySales = todayRevenue
+	row.MonthlySales = monthlyRevenue
+	if row.SalesCountToday > 0 {
+		row.AverageOrderValue = roundDashboardMoney(row.TodaySales / float64(row.SalesCountToday))
 	}
 	return &row, nil
 }
@@ -343,40 +346,21 @@ func (r *Repository) adminManufacturing(scope Scope) (*AdminManufacturingWidget,
 
 func (r *Repository) adminFinancial(scope Scope) (*AdminFinancialWidget, error) {
 	var row AdminFinancialWidget
-	query := "SELECT COALESCE(SUM(amount),0) FROM sale_payments WHERE business_id = ? AND paid_at >= ? AND paid_at < ? AND payment_status IN ('completed','partially_refunded','refunded') AND deleted_at IS NULL"
-	args := []interface{}{scope.BusinessID, scope.TodayStart, scope.TodayEnd}
-	query, args = addScopedBranch(query, args, "branch_id", scope)
-	if err := r.db.Raw(query, args...).Scan(&row.CollectedToday).Error; err != nil {
+	collected, _, _, err := r.dashboardLedgerCollections(scope, scope.TodayStart, scope.TodayEnd)
+	if err != nil {
 		return nil, err
 	}
-	bakeryCollectedQuery := "SELECT COALESCE(SUM(bop.amount),0) FROM bakery_order_payments bop JOIN bakery_orders bo ON bo.id = bop.bakery_order_id WHERE bop.business_id = ? AND bop.paid_at >= ? AND bop.paid_at < ? AND bo.deleted_at IS NULL"
-	bakeryCollectedArgs := []interface{}{scope.BusinessID, scope.TodayStart, scope.TodayEnd}
-	bakeryCollectedQuery, bakeryCollectedArgs = addScopedBranch(bakeryCollectedQuery, bakeryCollectedArgs, "bo.branch_id", scope)
-	var bakeryCollected float64
-	if err := r.db.Raw(bakeryCollectedQuery, bakeryCollectedArgs...).Scan(&bakeryCollected).Error; err != nil {
+	refunded, err := r.dashboardLedgerRefunds(scope, scope.TodayStart, scope.TodayEnd)
+	if err != nil {
 		return nil, err
 	}
-	row.CollectedToday += bakeryCollected
-	refundQuery := "SELECT COALESCE(SUM(refund_amount),0) FROM payment_refunds WHERE business_id = ? AND refunded_at >= ? AND refunded_at < ? AND refund_status = 'completed' AND deleted_at IS NULL"
-	refundArgs := []interface{}{scope.BusinessID, scope.TodayStart, scope.TodayEnd}
-	refundQuery, refundArgs = addScopedBranch(refundQuery, refundArgs, "branch_id", scope)
-	if err := r.db.Raw(refundQuery, refundArgs...).Scan(&row.RefundTotalToday).Error; err != nil {
+	outstanding, err := r.dashboardMappedBalance(scope, "accounts_receivable", "1100", scope.TodayDate)
+	if err != nil {
 		return nil, err
 	}
-	outstandingQuery := "SELECT COALESCE(SUM(balance_amount),0) FROM bakery_orders WHERE business_id = ? AND payment_status IN ('unpaid','partial') AND deleted_at IS NULL"
-	outstandingArgs := []interface{}{scope.BusinessID}
-	outstandingQuery, outstandingArgs = addScopedBranch(outstandingQuery, outstandingArgs, "branch_id", scope)
-	if err := r.db.Raw(outstandingQuery, outstandingArgs...).Scan(&row.OutstandingBalance).Error; err != nil {
-		return nil, err
-	}
-	posOutstandingQuery := "SELECT COALESCE(SUM(total_amount - paid_amount),0) FROM sales WHERE business_id = ? AND payment_status IN ('unpaid','partial') AND sale_status <> 'voided' AND deleted_at IS NULL"
-	posOutstandingArgs := []interface{}{scope.BusinessID}
-	posOutstandingQuery, posOutstandingArgs = addScopedBranch(posOutstandingQuery, posOutstandingArgs, "branch_id", scope)
-	var posOutstanding float64
-	if err := r.db.Raw(posOutstandingQuery, posOutstandingArgs...).Scan(&posOutstanding).Error; err != nil {
-		return nil, err
-	}
-	row.OutstandingBalance += posOutstanding
+	row.CollectedToday = collected
+	row.RefundTotalToday = refunded
+	row.OutstandingBalance = outstanding
 	return &row, nil
 }
 
@@ -395,4 +379,122 @@ func addScopedBranch(query string, args []interface{}, column string, scope Scop
 		args = append(args, scope.BranchID)
 	}
 	return query, args
+}
+
+func (r *Repository) dashboardLedgerRevenue(scope Scope, startUTC, endUTC time.Time) (float64, error) {
+	dateFrom, dateTo := dashboardLedgerDateRange(startUTC, endUTC)
+	branchClause, branchArgs := dashboardLedgerBranchClause(scope)
+	args := append([]interface{}{scope.BusinessID, dateFrom, dateTo, []string{"pos_sale", "bakery_order_revenue", "pos_sale_void", "sales_return"}}, branchArgs...)
+	var total float64
+	err := r.db.Raw(`
+		SELECT COALESCE(SUM(jel.credit_amount - jel.debit_amount), 0)
+		FROM journal_entry_lines jel
+		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
+		JOIN chart_of_accounts coa ON coa.id = jel.account_id AND coa.business_id = jel.business_id
+		WHERE jel.business_id = ?
+		  AND jel.deleted_at IS NULL
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted', 'reversed')
+		  AND je.entry_date >= ?
+		  AND je.entry_date <= ?
+		  AND je.source_type IN ?
+		  AND coa.account_type = 'income'
+		  `+branchClause, args...).Scan(&total).Error
+	return roundDashboardMoney(total), err
+}
+
+func (r *Repository) dashboardLedgerCollections(scope Scope, startUTC, endUTC time.Time) (float64, float64, float64, error) {
+	dateFrom, dateTo := dashboardLedgerDateRange(startUTC, endUTC)
+	branchClause, branchArgs := dashboardLedgerBranchClause(scope)
+	args := append([]interface{}{scope.BusinessID, dateFrom, dateTo, []string{"pos_sale", "bakery_order_payment"}}, branchArgs...)
+	var row struct {
+		Total float64
+		Cash  float64
+		Card  float64
+	}
+	err := r.db.Raw(`
+		SELECT COALESCE(SUM(jel.debit_amount), 0) AS total,
+		       COALESCE(SUM(jel.debit_amount) FILTER (WHERE pa.account_type = 'cash'), 0) AS cash,
+		       COALESCE(SUM(jel.debit_amount) FILTER (WHERE pa.account_type = 'card_clearing'), 0) AS card
+		FROM journal_entry_lines jel
+		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
+		JOIN payment_accounts pa ON pa.chart_account_id = jel.account_id AND pa.business_id = jel.business_id AND pa.deleted_at IS NULL
+		WHERE jel.business_id = ?
+		  AND jel.deleted_at IS NULL
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted', 'reversed')
+		  AND je.entry_date >= ?
+		  AND je.entry_date <= ?
+		  AND je.source_type IN ?
+		  AND jel.debit_amount > 0
+		  `+branchClause, args...).Scan(&row).Error
+	return roundDashboardMoney(row.Total), roundDashboardMoney(row.Cash), roundDashboardMoney(row.Card), err
+}
+
+func (r *Repository) dashboardLedgerRefunds(scope Scope, startUTC, endUTC time.Time) (float64, error) {
+	dateFrom, dateTo := dashboardLedgerDateRange(startUTC, endUTC)
+	branchClause, branchArgs := dashboardLedgerBranchClause(scope)
+	args := append([]interface{}{scope.BusinessID, dateFrom, dateTo, []string{"sales_return", "pos_sale_refund"}}, branchArgs...)
+	var total float64
+	err := r.db.Raw(`
+		SELECT COALESCE(SUM(jel.credit_amount), 0)
+		FROM journal_entry_lines jel
+		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
+		JOIN payment_accounts pa ON pa.chart_account_id = jel.account_id AND pa.business_id = jel.business_id AND pa.deleted_at IS NULL
+		WHERE jel.business_id = ?
+		  AND jel.deleted_at IS NULL
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted', 'reversed')
+		  AND je.entry_date >= ?
+		  AND je.entry_date <= ?
+		  AND je.source_type IN ?
+		  AND jel.credit_amount > 0
+		  `+branchClause, args...).Scan(&total).Error
+	return roundDashboardMoney(total), err
+}
+
+func (r *Repository) dashboardMappedBalance(scope Scope, mappingKey, fallbackCode, asOfDate string) (float64, error) {
+	branchClause, branchArgs := dashboardLedgerBranchClause(scope)
+	args := append([]interface{}{mappingKey, scope.BusinessID, fallbackCode, scope.BusinessID, asOfDate}, branchArgs...)
+	var total float64
+	err := r.db.Raw(`
+		WITH target_account AS (
+			SELECT COALESCE(aam.chart_account_id, coa.id) AS account_id, coa.normal_balance
+			FROM chart_of_accounts coa
+			LEFT JOIN accounting_account_mappings aam ON aam.business_id = coa.business_id AND aam.mapping_key = ? AND aam.deleted_at IS NULL
+			WHERE coa.business_id = ? AND coa.account_code = ? AND coa.deleted_at IS NULL
+			ORDER BY CASE WHEN aam.chart_account_id IS NOT NULL THEN 0 ELSE 1 END
+			LIMIT 1
+		)
+		SELECT COALESCE(SUM(CASE WHEN ta.normal_balance = 'credit' THEN jel.credit_amount - jel.debit_amount ELSE jel.debit_amount - jel.credit_amount END), 0)
+		FROM target_account ta
+		JOIN journal_entry_lines jel ON jel.account_id = ta.account_id
+		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
+		WHERE jel.business_id = ?
+		  AND jel.deleted_at IS NULL
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted', 'reversed')
+		  AND je.entry_date <= ?
+		  `+branchClause, args...).Scan(&total).Error
+	return roundDashboardMoney(total), err
+}
+
+func dashboardLedgerDateRange(startUTC, endUTC time.Time) (string, string) {
+	dateFrom := startUTC.Format("2006-01-02")
+	dateTo := endUTC.Add(-time.Nanosecond).Format("2006-01-02")
+	if !startUTC.Before(endUTC) {
+		dateTo = dateFrom
+	}
+	return dateFrom, dateTo
+}
+
+func dashboardLedgerBranchClause(scope Scope) (string, []interface{}) {
+	if scope.AllBranches {
+		return "", []interface{}{}
+	}
+	return " AND je.branch_id = ?", []interface{}{scope.BranchID}
+}
+
+func roundDashboardMoney(value float64) float64 {
+	return math.Round(value*100) / 100
 }

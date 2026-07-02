@@ -186,11 +186,13 @@ export type GeneralLedgerItem = {
   lineDescription: string;
   debitAmount: number;
   creditAmount: number;
-  runningBalance: number;
+  runningBalance: number | null;
 };
 
 export type GeneralLedgerResponse = {
   account: AccountingReportAccount | null;
+  ledgerMode: "combined" | "account";
+  showRunningBalance: boolean;
   openingBalance: number;
   periodDebit: number;
   periodCredit: number;

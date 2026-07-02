@@ -107,6 +107,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
     [branchesQuery.data],
   );
   const ledger = ledgerQuery.data;
+  const showRunningBalance = ledger?.showRunningBalance === true;
   const currentPage = ledger?.page ?? filters.page;
   const totalPages = ledger?.totalPages ?? 1;
   const accountOptions = useMemo(
@@ -254,15 +255,17 @@ export function GeneralLedgerPageClient(): JSX.Element {
 
       {!ledgerQuery.isLoading && !ledgerQuery.error && ledger ? (
         <>
-          <div className="grid gap-3 md:grid-cols-4">
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Opening</p>
-                <p className="mt-1 text-xl font-bold text-brand-espresso">
-                  {money(ledger.openingBalance)}
-                </p>
-              </CardContent>
-            </Card>
+          <div className={`grid gap-3 ${showRunningBalance ? "md:grid-cols-4" : "md:grid-cols-2"}`}>
+            {showRunningBalance ? (
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Opening</p>
+                  <p className="mt-1 text-xl font-bold text-brand-espresso">
+                    {money(ledger.openingBalance)}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : null}
             <Card>
               <CardContent className="p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Debit</p>
@@ -279,14 +282,16 @@ export function GeneralLedgerPageClient(): JSX.Element {
                 </p>
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Closing</p>
-                <p className="mt-1 text-xl font-bold text-brand-espresso">
-                  {money(ledger.closingBalance)}
-                </p>
-              </CardContent>
-            </Card>
+            {showRunningBalance ? (
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Closing</p>
+                  <p className="mt-1 text-xl font-bold text-brand-espresso">
+                    {money(ledger.closingBalance)}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : null}
           </div>
 
           {ledger.items.length === 0 ? (
@@ -308,10 +313,13 @@ export function GeneralLedgerPageClient(): JSX.Element {
                   <div>
                     <p className="text-sm font-semibold text-brand-espresso">
                       {ledger.account
-                        ? `${ledger.account.accountCode} - ${ledger.account.accountName}`
-                        : "Combined ledger"}
+                        ? `Account Ledger - ${ledger.account.accountCode} ${ledger.account.accountName}`
+                        : "Combined General Ledger"}
                     </p>
                     <p className="text-xs text-brand-mocha">
+                      {showRunningBalance
+                        ? "Running balance is scoped to this selected account."
+                        : "Running balance is hidden because this view combines multiple accounts."}{" "}
                       Showing {ledger.items.length} of {ledger.total} ledger rows
                     </p>
                   </div>
@@ -329,7 +337,9 @@ export function GeneralLedgerPageClient(): JSX.Element {
                         <TableHead>Branch</TableHead>
                         <TableHead className="text-right">Debit</TableHead>
                         <TableHead className="text-right">Credit</TableHead>
-                        <TableHead className="text-right">Running</TableHead>
+                        {showRunningBalance ? (
+                          <TableHead className="text-right">Running</TableHead>
+                        ) : null}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -353,9 +363,11 @@ export function GeneralLedgerPageClient(): JSX.Element {
                           <TableCell>{item.branchName || "Business-level"}</TableCell>
                           <TableCell className="text-right">{money(item.debitAmount)}</TableCell>
                           <TableCell className="text-right">{money(item.creditAmount)}</TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {money(item.runningBalance)}
-                          </TableCell>
+                          {showRunningBalance ? (
+                            <TableCell className="text-right font-semibold">
+                              {money(item.runningBalance ?? 0)}
+                            </TableCell>
+                          ) : null}
                         </TableRow>
                       ))}
                     </TableBody>
