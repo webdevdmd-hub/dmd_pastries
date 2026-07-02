@@ -387,6 +387,20 @@ func (r *Repository) GenerateRefundNumber(tx *gorm.DB, businessID string, create
 	return fmt.Sprintf("%s%06d", prefix, count+1), nil
 }
 
+func (r *Repository) GeneratePaymentRefundNumber(tx *gorm.DB, businessID string, createdAt time.Time) (string, error) {
+	datePart := createdAt.Format("20060102")
+	lockKey := businessID + ":" + datePart + ":payment_refunds"
+	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
+		return "", err
+	}
+	var count int64
+	prefix := "PAY-RFND-" + datePart + "-"
+	if err := tx.Model(&POSPaymentRefund{}).Where("business_id = ? AND refund_number LIKE ?", businessID, prefix+"%").Count(&count).Error; err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s%06d", prefix, count+1), nil
+}
+
 func (r *Repository) CreateSale(tx *gorm.DB, sale *Sale, items []SaleItem, payments []SalePayment) error {
 	if err := tx.Create(sale).Error; err != nil {
 		return err
@@ -573,8 +587,55 @@ func (r *Repository) SumRefunds(tx *gorm.DB, businessID, saleID string) (float64
 	return total, err
 }
 
+func (r *Repository) SumOperationalRefunds(tx *gorm.DB, businessID, saleID string) (float64, error) {
+	var total float64
+	err := tx.Table("payment_refunds").
+		Select("COALESCE(SUM(refund_amount), 0)").
+		Where("business_id = ? AND sale_id = ? AND refund_status = ? AND deleted_at IS NULL", businessID, saleID, "completed").
+		Scan(&total).Error
+	return total, err
+}
+
 func (r *Repository) CreateRefund(tx *gorm.DB, refund *SaleRefund) error {
 	return tx.Create(refund).Error
+}
+
+func (r *Repository) SalePaymentsForRefundAllocation(tx *gorm.DB, businessID, saleID string) ([]SalePayment, error) {
+	var payments []SalePayment
+	err := tx.
+		Where("business_id = ? AND sale_id = ? AND payment_status IN ? AND deleted_at IS NULL", businessID, saleID, []string{"completed", "partially_refunded", "refunded"}).
+		Order("paid_at ASC, created_at ASC").
+		Find(&payments).Error
+	return payments, err
+}
+
+func (r *Repository) SalePaymentRefundedAmount(tx *gorm.DB, businessID, salePaymentID string) (float64, error) {
+	var total float64
+	err := tx.Table("payment_refunds").
+		Select("COALESCE(SUM(refund_amount), 0)").
+		Where("business_id = ? AND sale_payment_id = ? AND refund_status = ? AND deleted_at IS NULL", businessID, salePaymentID, "completed").
+		Scan(&total).Error
+	return total, err
+}
+
+func (r *Repository) CreateOperationalPaymentRefund(tx *gorm.DB, refund *POSPaymentRefund) error {
+	return tx.Create(refund).Error
+}
+
+func (r *Repository) UpdateSalePaymentStatus(tx *gorm.DB, businessID, salePaymentID, status string, updatedAt time.Time) error {
+	result := tx.Model(&SalePayment{}).
+		Where("id = ? AND business_id = ? AND deleted_at IS NULL", salePaymentID, businessID).
+		Updates(map[string]interface{}{
+			"payment_status": status,
+			"updated_at":     updatedAt,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *Repository) CreateVoid(tx *gorm.DB, saleVoid *SaleVoid) error {

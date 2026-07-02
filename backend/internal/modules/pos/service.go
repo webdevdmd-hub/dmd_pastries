@@ -613,12 +613,18 @@ func (s *Service) RefundSale(currentUser *utils.AuthContext, saleID string, req 
 	if !currentUser.CanAccessBranch(sale.BranchID) {
 		return nil, apperrors.Forbidden("branch access denied")
 	}
-	refunded, err := s.repo.SumRefunds(tx, currentUser.BusinessID, saleID)
+	operationalRefunded, err := s.repo.SumOperationalRefunds(tx, currentUser.BusinessID, saleID)
 	if err != nil {
 		return nil, apperrors.Internal("failed to validate refund amount")
 	}
+	legacyRefunded, err := s.repo.SumRefunds(tx, currentUser.BusinessID, saleID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to validate refund amount")
+	}
+	refunded := math.Max(operationalRefunded, legacyRefunded)
 	remaining := roundMoney(sale.TotalAmount - refunded)
-	if req.RefundAmount > remaining {
+	refundAmount := roundMoney(req.RefundAmount)
+	if refundAmount > remaining {
 		return nil, apperrors.BadRequest("refund_amount exceeds refundable amount", nil)
 	}
 
@@ -632,18 +638,21 @@ func (s *Service) RefundSale(currentUser *utils.AuthContext, saleID string, req 
 		BusinessID:       currentUser.BusinessID,
 		SaleID:           sale.ID,
 		RefundNumber:     refundNumber,
-		RefundAmount:     roundMoney(req.RefundAmount),
+		RefundAmount:     refundAmount,
 		Reason:           strings.TrimSpace(req.Reason),
 		ApprovedByUserID: cleanStringPointer(req.ApprovedByUserID),
 		CreatedByUserID:  currentUser.UserID,
 	}
-	newRefunded := roundMoney(refunded + req.RefundAmount)
+	newRefunded := roundMoney(refunded + refundAmount)
 	newSaleStatus := "partially_refunded"
 	if newRefunded >= sale.TotalAmount {
 		newSaleStatus = "refunded"
 	}
 	if err := s.repo.CreateRefund(tx, refund); err != nil {
 		return nil, apperrors.Internal("failed to create refund")
+	}
+	if err := s.createOperationalPaymentRefunds(tx, currentUser, sale, refund, now); err != nil {
+		return nil, err
 	}
 	if err := s.repo.UpdateSale(tx, currentUser.BusinessID, sale.ID, map[string]interface{}{
 		"sale_status":    newSaleStatus,
@@ -660,6 +669,67 @@ func (s *Service) RefundSale(currentUser *utils.AuthContext, saleID string, req 
 	}
 	tx = nil
 	return s.GetSale(currentUser, sale.ID)
+}
+
+func (s *Service) createOperationalPaymentRefunds(tx *gorm.DB, currentUser *utils.AuthContext, sale *Sale, refund *SaleRefund, refundedAt time.Time) error {
+	payments, err := s.repo.SalePaymentsForRefundAllocation(tx, currentUser.BusinessID, sale.ID)
+	if err != nil {
+		return apperrors.Internal("failed to load sale payments for refund allocation")
+	}
+	remaining := roundMoney(refund.RefundAmount)
+	for _, payment := range payments {
+		if remaining <= 0 {
+			break
+		}
+		alreadyRefunded, err := s.repo.SalePaymentRefundedAmount(tx, currentUser.BusinessID, payment.ID)
+		if err != nil {
+			return apperrors.Internal("failed to validate payment refund amount")
+		}
+		paymentAvailable := roundMoney(payment.Amount - alreadyRefunded)
+		if paymentAvailable <= 0 {
+			continue
+		}
+		refundAmount := roundMoney(math.Min(remaining, paymentAvailable))
+		refundNumber, err := s.repo.GeneratePaymentRefundNumber(tx, currentUser.BusinessID, refundedAt)
+		if err != nil {
+			return apperrors.Internal("failed to generate payment refund number")
+		}
+		paymentID := payment.ID
+		operationalRefund := &POSPaymentRefund{
+			ID:                        utils.NewUUID(),
+			BusinessID:                currentUser.BusinessID,
+			BranchID:                  payment.BranchID,
+			SaleID:                    sale.ID,
+			SalePaymentID:             &paymentID,
+			RefundSource:              "pos_sale",
+			RefundNumber:              refundNumber,
+			PaymentMethodID:           payment.PaymentMethodID,
+			PaymentMethodNameSnapshot: payment.PaymentMethodNameSnapshot,
+			RefundAmount:              refundAmount,
+			RefundReason:              refund.Reason,
+			RefundStatus:              "completed",
+			ApprovedByUserID:          refund.ApprovedByUserID,
+			CreatedByUserID:           currentUser.UserID,
+			RefundedAt:                refundedAt,
+			CreatedAt:                 refundedAt,
+			UpdatedAt:                 refundedAt,
+		}
+		if err := s.repo.CreateOperationalPaymentRefund(tx, operationalRefund); err != nil {
+			return apperrors.Internal("failed to create operational payment refund")
+		}
+		status := "partially_refunded"
+		if roundMoney(alreadyRefunded+refundAmount) >= payment.Amount {
+			status = "refunded"
+		}
+		if err := s.repo.UpdateSalePaymentStatus(tx, currentUser.BusinessID, payment.ID, status, refundedAt); err != nil {
+			return apperrors.Internal("failed to update sale payment refund status")
+		}
+		remaining = roundMoney(remaining - refundAmount)
+	}
+	if remaining > 0 {
+		return apperrors.BadRequest("refund_amount exceeds refundable payment amount", nil)
+	}
+	return nil
 }
 
 func (s *Service) VoidSale(currentUser *utils.AuthContext, saleID string, req VoidRequest, ipAddress, userAgent string) (*SaleResponse, error) {

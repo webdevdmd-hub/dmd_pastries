@@ -111,6 +111,32 @@ func (SaleRefund) TableName() string {
 	return "sale_refunds"
 }
 
+type POSPaymentRefund struct {
+	ID                        string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID                string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID                  string         `gorm:"type:uuid;not null;index" json:"branch_id"`
+	SaleID                    string         `gorm:"type:uuid;not null;index" json:"sale_id"`
+	SalePaymentID             *string        `gorm:"type:uuid;index" json:"sale_payment_id"`
+	SalesReturnID             *string        `gorm:"type:uuid;index" json:"sales_return_id"`
+	RefundSource              string         `gorm:"size:50;not null;default:pos_sale" json:"refund_source"`
+	RefundNumber              string         `gorm:"size:100;not null" json:"refund_number"`
+	PaymentMethodID           string         `gorm:"type:uuid;not null;index" json:"payment_method_id"`
+	PaymentMethodNameSnapshot string         `gorm:"size:150;not null" json:"payment_method_name_snapshot"`
+	RefundAmount              float64        `gorm:"not null" json:"refund_amount"`
+	RefundReason              string         `gorm:"not null" json:"refund_reason"`
+	RefundStatus              string         `gorm:"size:50;not null;default:completed" json:"refund_status"`
+	ApprovedByUserID          *string        `gorm:"type:uuid;index" json:"approved_by_user_id"`
+	CreatedByUserID           string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
+	RefundedAt                time.Time      `gorm:"not null" json:"refunded_at"`
+	CreatedAt                 time.Time      `json:"created_at"`
+	UpdatedAt                 time.Time      `json:"updated_at"`
+	DeletedAt                 gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (POSPaymentRefund) TableName() string {
+	return "payment_refunds"
+}
+
 type SaleVoid struct {
 	ID               string    `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID       string    `gorm:"type:uuid;not null;index" json:"business_id"`
