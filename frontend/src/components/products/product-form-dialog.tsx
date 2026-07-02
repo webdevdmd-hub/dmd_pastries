@@ -116,6 +116,7 @@ export function ProductFormDialog({
   const watchedTaxRateId = form.watch("taxRateId") ?? "";
   const watchedItemStructure = form.watch("itemStructure");
   const watchedProductType = form.watch("productType");
+  const watchedCategoryId = form.watch("categoryId");
   const watchedCostPrice = form.watch("costPrice");
   const watchedMinimumSalePrice = form.watch("minimumSalePrice") ?? null;
   const watchedPricingPercent = form.watch("pricingPercent");
@@ -130,6 +131,11 @@ export function ProductFormDialog({
       ),
     [referenceData.categories, watchedProductType],
   );
+  const selectedCategoryId = compatibleCategories.some(
+    (category) => category.id === watchedCategoryId,
+  )
+    ? watchedCategoryId
+    : "";
 
   useEffect(() => {
     form.reset(toDefaultValues(product, { defaultItemStructure, defaultProductType }));
@@ -140,7 +146,11 @@ export function ProductFormDialog({
     const categoryId = form.getValues("categoryId");
 
     if (categoryId && !compatibleCategories.some((category) => category.id === categoryId)) {
-      form.setValue("categoryId", "");
+      form.setValue("categoryId", "", {
+        shouldDirty: true,
+        shouldTouch: true,
+        shouldValidate: true,
+      });
     }
   }, [compatibleCategories, form]);
 
@@ -175,7 +185,54 @@ export function ProductFormDialog({
     return Math.round(price * 100) / 100;
   }, [watchedCostPrice, watchedMinimumSalePrice, watchedPricingPercent, watchedPricingType]);
 
+  const handleProductTypeChange = (value: ProductSchema["productType"]): void => {
+    const currentCategoryId = form.getValues("categoryId");
+    const categoryStillValid = referenceData.categories.some(
+      (category) =>
+        category.id === currentCategoryId &&
+        (category.allowedProductTypes.length === 0 || category.allowedProductTypes.includes(value)),
+    );
+
+    form.setValue("productType", value, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+
+    if (currentCategoryId && !categoryStillValid) {
+      form.setValue("categoryId", "", {
+        shouldDirty: true,
+        shouldTouch: true,
+        shouldValidate: true,
+      });
+      form.setError("categoryId", {
+        message: "Select a category compatible with the selected product type.",
+        type: "manual",
+      });
+    }
+  };
+
+  const handleCategoryChange = (value: string): void => {
+    form.setValue("categoryId", value, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+    form.clearErrors("categoryId");
+  };
+
   const onSubmit = async (values: ProductSchema): Promise<void> => {
+    const categoryIsCompatible = compatibleCategories.some(
+      (category) => category.id === values.categoryId,
+    );
+    if (!categoryIsCompatible) {
+      form.setError("categoryId", {
+        message: "Select a category compatible with the selected product type.",
+        type: "manual",
+      });
+      return;
+    }
+
     let imageFileId = values.imageFileId?.trim() ? values.imageFileId : null;
 
     if (selectedImage) {
@@ -261,7 +318,7 @@ export function ProductFormDialog({
                   <Label>Product type</Label>
                   <Select
                     onValueChange={(value) =>
-                      form.setValue("productType", value as ProductSchema["productType"])
+                      handleProductTypeChange(value as ProductSchema["productType"])
                     }
                     value={form.watch("productType")}
                   >
@@ -305,8 +362,9 @@ export function ProductFormDialog({
                 <div className="flex flex-col gap-1">
                   <Label>Category</Label>
                   <Select
-                    onValueChange={(value) => form.setValue("categoryId", value)}
-                    value={form.watch("categoryId")}
+                    disabled={compatibleCategories.length === 0}
+                    onValueChange={handleCategoryChange}
+                    value={selectedCategoryId}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
@@ -325,7 +383,9 @@ export function ProductFormDialog({
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-brand-mocha">
-                    Categories are filtered by the selected product type.
+                    {compatibleCategories.length === 0
+                      ? "No compatible categories are available for this product type."
+                      : "Categories are filtered by the selected product type."}
                   </p>
                   <FieldError message={form.formState.errors.categoryId?.message} />
                 </div>
