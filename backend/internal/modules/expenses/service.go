@@ -404,15 +404,11 @@ func (s *Service) validateExpenseInput(tx *gorm.DB, businessID, branchID, expens
 	if !expenseAccount.AllowManualPosting {
 		return apperrors.BadRequest("expense account does not allow manual posting", nil)
 	}
-	paidAccount, err := s.repo.ValidateAccount(tx, businessID, paidThroughAccountID)
-	if err != nil {
-		return mapNotFound(err, "paid through account not found")
-	}
-	if paidAccount.AccountType != "asset" {
-		return apperrors.BadRequest("paid_through_account_id must be an asset account", nil)
-	}
-	if !paidAccount.AllowManualPosting {
-		return apperrors.BadRequest("paid through account does not allow manual posting", nil)
+	if _, err := s.repo.ValidatePaidThroughPaymentAccount(tx, businessID, branchID, paidThroughAccountID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.BadRequest("paid_through_account_id must reference an active payment account ledger for this branch", nil)
+		}
+		return err
 	}
 	if supplierID != nil {
 		if err := s.repo.ValidateSupplier(tx, businessID, branchID, *supplierID); err != nil {

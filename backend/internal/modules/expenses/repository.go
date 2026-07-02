@@ -369,6 +369,19 @@ func (r *Repository) ValidateAccount(tx *gorm.DB, businessID, accountID string) 
 	return &account, err
 }
 
+func (r *Repository) ValidatePaidThroughPaymentAccount(tx *gorm.DB, businessID, branchID, accountID string) (*accounting.ChartAccount, error) {
+	var account accounting.ChartAccount
+	err := tx.Table("chart_of_accounts AS coa").
+		Select("coa.*").
+		Joins("JOIN payment_accounts pa ON pa.business_id = coa.business_id AND pa.chart_account_id = coa.id AND pa.deleted_at IS NULL").
+		Where("coa.business_id = ? AND coa.id = ? AND coa.account_type = ? AND coa.status = ? AND coa.allow_manual_posting = ? AND coa.deleted_at IS NULL", businessID, accountID, "asset", "active", true).
+		Where("pa.status = ?", "active").
+		Where("pa.account_type IN ?", []string{"cash", "bank", "card_clearing", "platform_clearing", "wallet", "other"}).
+		Where("(pa.branch_id IS NULL OR pa.branch_id = ?)", branchID).
+		First(&account).Error
+	return &account, err
+}
+
 func applyFilters(db *gorm.DB, query ExpenseListQuery) *gorm.DB {
 	if query.BranchID != "" {
 		db = db.Where("branch_id = ?", query.BranchID)

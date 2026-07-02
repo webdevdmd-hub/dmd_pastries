@@ -275,22 +275,23 @@ type AccountMappingResponse struct {
 }
 
 type PaymentAccountResponse struct {
-	ID               string    `json:"id"`
-	BusinessID       string    `json:"business_id"`
-	BranchID         *string   `json:"branch_id"`
-	BranchName       string    `json:"branch_name"`
-	AccountName      string    `json:"account_name"`
-	AccountType      string    `json:"account_type"`
-	ChartAccountID   string    `json:"chart_account_id"`
-	ChartAccountCode string    `json:"chart_account_code"`
-	ChartAccountName string    `json:"chart_account_name"`
-	ChartAccountType string    `json:"chart_account_type"`
-	Description      string    `json:"description"`
-	CurrentBalance   float64   `json:"current_balance"`
-	BalanceLabel     string    `json:"balance_label"`
-	Status           string    `json:"status"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID                             string    `json:"id"`
+	BusinessID                     string    `json:"business_id"`
+	BranchID                       *string   `json:"branch_id"`
+	BranchName                     string    `json:"branch_name"`
+	AccountName                    string    `json:"account_name"`
+	AccountType                    string    `json:"account_type"`
+	ChartAccountID                 string    `json:"chart_account_id"`
+	ChartAccountCode               string    `json:"chart_account_code"`
+	ChartAccountName               string    `json:"chart_account_name"`
+	ChartAccountType               string    `json:"chart_account_type"`
+	ChartAccountAllowManualPosting bool      `json:"chart_account_allow_manual_posting"`
+	Description                    string    `json:"description"`
+	CurrentBalance                 float64   `json:"current_balance"`
+	BalanceLabel                   string    `json:"balance_label"`
+	Status                         string    `json:"status"`
+	CreatedAt                      time.Time `json:"created_at"`
+	UpdatedAt                      time.Time `json:"updated_at"`
 }
 
 type AccountTransferResponse struct {

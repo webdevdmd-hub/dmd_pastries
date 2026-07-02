@@ -464,6 +464,7 @@ export type PaymentAccount = {
   chartAccountCode: string;
   chartAccountName: string;
   chartAccountType: AccountingAccountType;
+  chartAccountAllowManualPosting: boolean;
   description: string;
   currentBalance: number;
   balanceLabel: string;

@@ -53,7 +53,7 @@ import {
 } from "@/components/ui/table";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
-import { useChartAccounts } from "@/hooks/use-accounting";
+import { useChartAccounts, usePaymentAccounts } from "@/hooks/use-accounting";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useCustomerLookup } from "@/hooks/use-customers";
 import {
@@ -66,7 +66,7 @@ import { usePermission } from "@/hooks/use-permission";
 import { usePurchasingBranches, usePurchasingSuppliers } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import { uploadStorageFile } from "@/lib/appwrite/storage";
-import type { AccountingAccountType, ChartAccount } from "@/types/accounting";
+import type { AccountingAccountType, ChartAccount, PaymentAccount } from "@/types/accounting";
 import type { Customer } from "@/types/customer";
 import type {
   CreateExpensePayload,
@@ -185,6 +185,41 @@ function accountOptions(
     }));
 }
 
+function isPaymentAccountAvailableForBranch(account: PaymentAccount, branchId: string): boolean {
+  return account.branchId === null || account.branchId === branchId;
+}
+
+function paidThroughOptions(
+  accounts: PaymentAccount[],
+  branchId: string,
+): SearchableComboboxOption[] {
+  return accounts
+    .filter(
+      (account) =>
+        account.status === "active" &&
+        account.chartAccountType === "asset" &&
+        account.chartAccountAllowManualPosting &&
+        account.chartAccountId.length > 0 &&
+        isPaymentAccountAvailableForBranch(account, branchId),
+    )
+    .map((account) => ({
+      description: [
+        account.accountType.replaceAll("_", " "),
+        account.branchName || "All branches",
+        `${account.chartAccountCode} - ${account.chartAccountName}`,
+      ].join(" - "),
+      keywords: [
+        account.accountName,
+        account.accountType,
+        account.branchName,
+        account.chartAccountCode,
+        account.chartAccountName,
+      ],
+      label: account.accountName,
+      value: account.chartAccountId,
+    }));
+}
+
 function uniqueAccounts(accounts: ChartAccount[]): ChartAccount[] {
   const accountMap = new Map<string, ChartAccount>();
 
@@ -255,7 +290,7 @@ function ExpenseFormDialog({
   onRetryAccounts,
   onUpdate,
   open,
-  paidThroughAccounts,
+  paymentAccounts,
   suppliers,
 }: {
   accountErrorMessage: string | null;
@@ -270,7 +305,7 @@ function ExpenseFormDialog({
   onRetryAccounts: () => void;
   onUpdate: (id: string, payload: UpdateExpensePayload) => Promise<void>;
   open: boolean;
-  paidThroughAccounts: ChartAccount[];
+  paymentAccounts: PaymentAccount[];
   suppliers: PurchasingSupplierOption[];
 }): JSX.Element {
   const [formState, setFormState] = useState<ExpenseFormState>(emptyForm(defaultBranchId));
@@ -285,10 +320,12 @@ function ExpenseFormDialog({
     () => accountOptions(expenseAccounts, ["expense", "cogs"]),
     [expenseAccounts],
   );
-  const paidThroughOptions = useMemo(
-    () => accountOptions(paidThroughAccounts, ["asset"]),
-    [paidThroughAccounts],
+  const paidThroughAccountOptions = useMemo(
+    () => paidThroughOptions(paymentAccounts, formState.branchId),
+    [formState.branchId, paymentAccounts],
   );
+  const hasNoPaidThroughOptions =
+    !isAccountLoading && !accountErrorMessage && paidThroughAccountOptions.length === 0;
   const supplierComboboxOptions = useMemo(() => supplierOptions(suppliers), [suppliers]);
   const customerComboboxOptions = useMemo(() => customerOptions(knownCustomers), [knownCustomers]);
 
@@ -344,6 +381,31 @@ function ExpenseFormDialog({
     }
   }, [customerLookupQuery.data]);
 
+  useEffect(() => {
+    if (
+      !open ||
+      formState.paidThroughAccountId.length === 0 ||
+      isAccountLoading ||
+      accountErrorMessage
+    ) {
+      return;
+    }
+
+    const selectedIsValid = paidThroughAccountOptions.some(
+      (option) => option.value === formState.paidThroughAccountId,
+    );
+    if (!selectedIsValid) {
+      setFormState((current) => ({ ...current, paidThroughAccountId: "" }));
+      setError("Select an active payment account available for this branch.");
+    }
+  }, [
+    accountErrorMessage,
+    formState.paidThroughAccountId,
+    isAccountLoading,
+    open,
+    paidThroughAccountOptions,
+  ]);
+
   const updateForm = (patch: Partial<ExpenseFormState>): void => {
     setFormState((current) => ({ ...current, ...patch }));
   };
@@ -368,6 +430,11 @@ function ExpenseFormDialog({
 
     if (!payload.paidThroughAccountId) {
       setError("Paid through account is required.");
+      return;
+    }
+
+    if (!paidThroughAccountOptions.some((option) => option.value === payload.paidThroughAccountId)) {
+      setError("Select an active payment account available for this branch.");
       return;
     }
 
@@ -461,19 +528,27 @@ function ExpenseFormDialog({
             <div className="grid gap-2">
               <Label>Paid through</Label>
               <SearchableCombobox
-                emptyMessage="No active asset accounts allow manual posting."
+                disabled={hasNoPaidThroughOptions}
+                emptyMessage="No active payment accounts are available for this branch."
                 errorMessage={accountErrorMessage}
-                groupLabel="Asset accounts"
+                groupLabel="Payment accounts"
                 isLoading={isAccountLoading}
                 loadingMessage="Loading paid-through accounts..."
                 onValueChange={(paidThroughAccountId) => updateForm({ paidThroughAccountId })}
                 onRetry={onRetryAccounts}
-                options={paidThroughOptions}
+                options={paidThroughAccountOptions}
                 placeholder="Select paid-through account"
-                searchPlaceholder="Search cash, bank, petty cash..."
+                searchPlaceholder="Search cash, bank, wallet..."
                 value={formState.paidThroughAccountId}
               />
-              <p className="text-xs text-brand-mocha">Cash, bank, or asset account used to pay.</p>
+              <p className="text-xs text-brand-mocha">
+                Cash, bank, wallet, or clearing payment account used to pay.
+              </p>
+              {hasNoPaidThroughOptions ? (
+                <p className="text-xs text-red-700">
+                  Configure an active payment account for this branch before recording expenses.
+                </p>
+              ) : null}
             </div>
             <div className="grid gap-2">
               <Label>Vendor</Label>
@@ -625,15 +700,14 @@ export function ExpensesPageClient(): JSX.Element {
     },
     canView,
   );
-  const paidThroughAccountsQuery = useChartAccounts(
+  const paymentAccountsQuery = usePaymentAccounts(
     {
-      accountGroup: "",
-      accountType: "asset",
-      limit: 100,
+      accountType: "all",
+      branchId: "",
+      limit: 500,
       page: 1,
-      parentAccountId: "",
       search: "",
-      sortBy: "account_code",
+      sortBy: "account_name",
       sortOrder: "asc",
       status: "active",
     },
@@ -664,18 +738,17 @@ export function ExpensesPageClient(): JSX.Element {
       ]),
     [cogsAccountsQuery.data?.items, expenseAccountsQuery.data?.items],
   );
-  const paidThroughAccountList = paidThroughAccountsQuery.data?.items ?? [];
+  const paymentAccountList = paymentAccountsQuery.data?.items ?? [];
   const isAccountLoading =
     expenseAccountsQuery.isLoading ||
     cogsAccountsQuery.isLoading ||
-    paidThroughAccountsQuery.isLoading;
-  const accountQueryError =
-    expenseAccountsQuery.error ?? cogsAccountsQuery.error ?? paidThroughAccountsQuery.error;
+    paymentAccountsQuery.isLoading;
+  const accountQueryError = expenseAccountsQuery.error ?? cogsAccountsQuery.error ?? paymentAccountsQuery.error;
   const accountErrorMessage = accountQueryError ? getErrorMessage(accountQueryError) : null;
   const retryAccountQueries = (): void => {
     void expenseAccountsQuery.refetch();
     void cogsAccountsQuery.refetch();
-    void paidThroughAccountsQuery.refetch();
+    void paymentAccountsQuery.refetch();
   };
 
   useEffect(() => {
@@ -1011,7 +1084,7 @@ export function ExpensesPageClient(): JSX.Element {
         onRetryAccounts={retryAccountQueries}
         onUpdate={handleUpdate}
         open={formOpen}
-        paidThroughAccounts={paidThroughAccountList}
+        paymentAccounts={paymentAccountList}
         suppliers={suppliersQuery.data ?? []}
       />
 

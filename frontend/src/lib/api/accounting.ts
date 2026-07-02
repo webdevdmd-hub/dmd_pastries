@@ -340,6 +340,10 @@ function parsePaymentAccount(value: unknown): PaymentAccount {
     chartAccountCode: stringValue(value.chart_account_code),
     chartAccountName: stringValue(value.chart_account_name, "Chart account"),
     chartAccountType: isAccountType(value.chart_account_type) ? value.chart_account_type : "asset",
+    chartAccountAllowManualPosting: booleanValue(
+      value.chart_account_allow_manual_posting,
+      true,
+    ),
     description: stringValue(value.description),
     currentBalance: numberValue(value.current_balance, 0),
     balanceLabel: stringValue(value.balance_label),
