@@ -3,9 +3,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle } from "lucide-react";
 import type { JSX } from "react";
-import { useEffect, useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useMemo, useState } from "react";
+import { type FieldErrors, useForm } from "react-hook-form";
+import { toast } from "sonner";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getErrorMessage } from "@/lib/api/client";
 import {
   type CreateRoleSchema,
   createRoleSchema,
@@ -62,6 +65,20 @@ type RoleFormDialogProps = {
 };
 
 const roleStatusOptions: RoleStatus[] = ["active", "inactive"];
+const validationToastMessage = "Validation error: Please fill all required fields.";
+
+function createRoleValidationMessage(errors: FieldErrors<CreateRoleSchema>): string {
+  const firstMessage =
+    errors.roleName?.message ?? errors.permissions?.message ?? errors.description?.message;
+
+  return typeof firstMessage === "string"
+    ? `Validation error: ${firstMessage}`
+    : validationToastMessage;
+}
+
+function createRoleServerErrorMessage(error: unknown): string {
+  return `Server error: Role could not be created. ${getErrorMessage(error)}`;
+}
 
 function groupPermissions(
   permissions: PermissionDefinition[],
@@ -86,6 +103,7 @@ export function RoleFormDialog({
   permissionsUnavailableReason = null,
   role,
 }: RoleFormDialogProps): JSX.Element {
+  const [createSubmitMessage, setCreateSubmitMessage] = useState<string | null>(null);
   const createForm = useForm<CreateRoleSchema>({
     resolver: zodResolver(createRoleSchema),
     defaultValues: {
@@ -109,6 +127,7 @@ export function RoleFormDialog({
     }
 
     if (mode === "create") {
+      setCreateSubmitMessage(null);
       createForm.reset({
         roleName: "",
         description: "",
@@ -118,6 +137,7 @@ export function RoleFormDialog({
     }
 
     if (role) {
+      setCreateSubmitMessage(null);
       updateForm.reset({
         roleName: role.roleName,
         description: role.description,
@@ -131,6 +151,12 @@ export function RoleFormDialog({
   const selectedPermissionIds = new Set(createSelectedPermissions);
   const createDisabled =
     !canManage || permissions.length === 0 || permissionsUnavailableReason !== null;
+  const createBlockingMessage = !canManage
+    ? "You do not have permission to create roles."
+    : permissionsUnavailableReason ??
+      (permissions.length === 0
+        ? "Permission data is not available yet. Role creation requires at least one permission."
+        : null);
   const editingDefaultRole = mode === "edit" && role?.isSystemDefault === true;
 
   return (
@@ -157,15 +183,46 @@ export function RoleFormDialog({
             <form
               className="space-y-6"
               onSubmit={(event) => {
-                void createForm.handleSubmit(async (values) => {
-                  await onCreate({
-                    roleName: values.roleName,
-                    description: values.description ?? "",
-                    permissions: values.permissions,
-                  });
-                })(event);
+                void createForm.handleSubmit(
+                  async (values) => {
+                    setCreateSubmitMessage(null);
+
+                    try {
+                      await onCreate({
+                        roleName: values.roleName,
+                        description: values.description ?? "",
+                        permissions: values.permissions,
+                      });
+                    } catch (error) {
+                      setCreateSubmitMessage(createRoleServerErrorMessage(error));
+                    }
+                  },
+                  (errors) => {
+                    setCreateSubmitMessage(createRoleValidationMessage(errors));
+                    toast.error(validationToastMessage);
+                  },
+                )(event);
               }}
             >
+              {createBlockingMessage || createSubmitMessage ? (
+                <Alert
+                  className={
+                    createSubmitMessage
+                      ? "border-red-200 bg-red-50 text-red-950"
+                      : "border-amber-200 bg-amber-50 text-amber-950"
+                  }
+                  variant={createSubmitMessage ? "destructive" : "default"}
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>
+                    {createSubmitMessage ? "Role creation failed" : "Role creation unavailable"}
+                  </AlertTitle>
+                  <AlertDescription>
+                    {createSubmitMessage ?? createBlockingMessage}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+
               <div className="grid gap-5 md:grid-cols-2">
                 <FormField
                   control={createForm.control}
@@ -174,7 +231,14 @@ export function RoleFormDialog({
                     <FormItem>
                       <FormLabel>Role name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Cashier Supervisor" {...field} />
+                        <Input
+                          placeholder="Cashier Supervisor"
+                          {...field}
+                          onChange={(event) => {
+                            setCreateSubmitMessage(null);
+                            field.onChange(event);
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -191,6 +255,10 @@ export function RoleFormDialog({
                           className="min-h-24 w-full rounded-2xl border border-brand-cappuccino bg-brand-latte px-4 py-3 text-sm text-brand-espresso outline-none ring-offset-background placeholder:text-brand-mocha/60 focus-visible:ring-2 focus-visible:ring-brand-caramel"
                           placeholder="Handles counter operations, end-of-shift reconciliation, and staff oversight."
                           {...field}
+                          onChange={(event) => {
+                            setCreateSubmitMessage(null);
+                            field.onChange(event);
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -198,12 +266,6 @@ export function RoleFormDialog({
                   )}
                 />
               </div>
-
-              {permissionsUnavailableReason ? (
-                <div className="rounded-2xl border border-amber-700/20 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-                  {permissionsUnavailableReason}
-                </div>
-              ) : null}
 
               <FormField
                 control={createForm.control}
@@ -222,6 +284,7 @@ export function RoleFormDialog({
                           disabled={createDisabled}
                           moduleName={moduleName}
                           onToggle={(permissionId, checked) => {
+                            setCreateSubmitMessage(null);
                             const currentValues = createForm.getValues("permissions");
 
                             if (checked) {

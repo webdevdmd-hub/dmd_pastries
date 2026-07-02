@@ -70,7 +70,8 @@ export function useCreateRole() {
 
   return useMutation<Role, Error, CreateRolePayload>({
     mutationFn: async (payload) => createRole(payload),
-    onSuccess: async () => {
+    onSuccess: async (createdRole) => {
+      queryClient.setQueryData([rolesQueryKey, "detail", createdRole.id], createdRole);
       await invalidateRoles(queryClient);
     },
   });

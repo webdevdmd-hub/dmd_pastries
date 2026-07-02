@@ -195,7 +195,7 @@ export function RolesPageClient(): JSX.Element {
       setPermissionDialog({ role: createdRole, mode: "manage" });
       closeDialog();
     } catch (mutationError) {
-      toast.error(getErrorMessage(mutationError));
+      toast.error(`Server error: Role could not be created. ${getErrorMessage(mutationError)}`);
       throw mutationError;
     }
   };
