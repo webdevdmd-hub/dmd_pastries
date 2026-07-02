@@ -880,9 +880,9 @@ func (s *Service) GetUserActivity(currentUser *utils.AuthContext, userID, cursor
 		return nil, apperrors.Internal("failed to load user activity")
 	}
 
-	items := make([]audit.ActivityLogResponse, 0, len(logs))
-	for _, log := range logs {
-		items = append(items, audit.ToActivityLogResponse(log))
+	items, err := s.auditRepo.BuildActivityResponses(currentUser.BusinessID, logs)
+	if err != nil {
+		return nil, apperrors.Internal("failed to enrich user activity")
 	}
 
 	var nextCursor *string

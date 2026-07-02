@@ -21,18 +21,117 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { useActivityLogs, useUserActivityLogs } from "@/hooks/use-activity-logs";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
-import type { ActivityEntityType, ActivityLog } from "@/types/activity-log";
+import type { ActivityLog, ActivityMetadataValue } from "@/types/activity-log";
 
-const entityOptions: { label: string; value: ActivityEntityType | "all" }[] = [
-  { label: "All entities", value: "all" },
-  { label: "Auth", value: "auth" },
-  { label: "Business", value: "business" },
-  { label: "User", value: "user" },
-  { label: "Role", value: "role" },
+const entityOptions: { label: string; value: string }[] = [
+  { label: "All modules", value: "all" },
+  { label: "Authentication", value: "auth" },
+  { label: "Business Settings", value: "business" },
+  { label: "Administration - Users", value: "user" },
+  { label: "Administration - Roles", value: "role" },
   { label: "Settings", value: "settings" },
-  { label: "Branch", value: "branch" },
+  { label: "Settings - Tax Rates", value: "tax_rate" },
+  { label: "Settings - Payment Methods", value: "payment_method" },
+  { label: "Branches", value: "branch" },
+  { label: "Products", value: "product" },
+  { label: "Inventory", value: "inventory" },
+  { label: "Stock Movements", value: "stock_movements" },
   { label: "POS", value: "pos" },
+  { label: "Bakery Orders", value: "bakery_order" },
+  { label: "Purchasing", value: "purchasing" },
+  { label: "Expenses", value: "expenses" },
+  { label: "Customers", value: "customer" },
+  { label: "Suppliers", value: "supplier" },
+  { label: "Manufacturing", value: "manufacturing" },
+  { label: "Recipes", value: "recipe" },
+  { label: "Accounting", value: "accounting" },
 ];
+
+function formatAuditDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown time";
+  }
+
+  return new Intl.DateTimeFormat("en-AE", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function labelFromKey(value: string): string {
+  return value
+    .replaceAll("_", " ")
+    .replaceAll(".", " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatMetadataValue(value: ActivityMetadataValue): string {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item ?? "Empty")).join(", ");
+  }
+
+  if (typeof value === "object" && value !== null) {
+    return Object.entries(value)
+      .map(([key, item]) => `${labelFromKey(key)}: ${String(item ?? "Empty")}`)
+      .join("; ");
+  }
+
+  return String(value ?? "Empty");
+}
+
+function visibleMetadataEntries(metadata: ActivityLog["metadata"]): [string, ActivityMetadataValue][] {
+  const hiddenKeys = new Set([
+    "record_label",
+    "record_name",
+    "name",
+    "full_name",
+    "email",
+    "branch_name",
+    "role_name",
+    "product_name",
+    "variant_name",
+    "tax_rate_name",
+    "tax_name",
+    "payment_method_name",
+    "method_name",
+    "sale_number",
+    "order_number",
+    "expense_number",
+    "transfer_number",
+    "reference_number",
+    "supplier_name",
+    "customer_name",
+    "recipe_name",
+    "batch_number",
+    "production_batch_number",
+    "invoice_number",
+    "receipt_number",
+    "return_number",
+  ]);
+
+  return Object.entries(metadata).filter(([key]) => !hiddenKeys.has(key));
+}
+
+function actorLabel(item: ActivityLog): string {
+  if (item.actorUserName && item.actorUserEmail) {
+    return `${item.actorUserName} (${item.actorUserEmail})`;
+  }
+  return item.actorUserName || item.actorUserEmail || "System";
+}
+
+function targetLabel(item: ActivityLog): string {
+  if (!item.targetUserId && !item.targetUserName && !item.targetUserEmail) {
+    return "";
+  }
+  if (item.targetUserName && item.targetUserEmail) {
+    return `${item.targetUserName} (${item.targetUserEmail})`;
+  }
+  return item.targetUserName || item.targetUserEmail || "Unknown user";
+}
 
 function LogsList({
   emptyMessage,
@@ -53,19 +152,63 @@ function LogsList({
     <div className="space-y-3">
       {items.map((item) => (
         <article
-          className="rounded-3xl border border-brand-cappuccino bg-brand-latte/70 p-4"
+          className="rounded-3xl border border-brand-cappuccino bg-white/80 p-4 shadow-sm"
           key={item.id}
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-semibold text-brand-espresso">{item.summary}</h2>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1">
+              <h2 className="text-base font-semibold text-brand-espresso">{item.actionLabel}</h2>
+              <p className="text-sm text-brand-mocha">
+                <span className="font-medium text-brand-espresso">{actorLabel(item)}</span>
+                {" performed this action"}
+              </p>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">{item.entityType}</Badge>
-              <Badge variant="secondary">{item.eventType}</Badge>
+              <Badge variant="secondary">{item.moduleLabel}</Badge>
+              <Badge variant="outline">{formatAuditDate(item.createdAt)}</Badge>
             </div>
           </div>
-          <p className="mt-2 text-sm text-brand-mocha">{item.createdAt}</p>
-          <p className="mt-1 text-xs text-brand-mocha/80">
-            Actor: {item.actorUserId ?? "N/A"} | Target: {item.targetUserId ?? "N/A"}
+          <div className="mt-4 grid gap-3 text-sm text-brand-mocha md:grid-cols-2">
+            <div className="rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/50 px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
+                Record
+              </p>
+              <p className="mt-1 font-medium text-brand-espresso">
+                {item.recordLabel || "Unknown record"}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/50 px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
+                Module
+              </p>
+              <p className="mt-1 font-medium text-brand-espresso">{item.moduleLabel}</p>
+            </div>
+          </div>
+          {targetLabel(item) ? (
+            <p className="mt-3 text-sm text-brand-mocha">
+              Target user: <span className="font-medium text-brand-espresso">{targetLabel(item)}</span>
+            </p>
+          ) : null}
+          {item.summary && item.summary !== item.actionLabel && item.summary !== item.recordLabel ? (
+            <p className="mt-3 text-sm text-brand-mocha">{item.summary}</p>
+          ) : null}
+          {visibleMetadataEntries(item.metadata).length > 0 ? (
+            <div className="mt-3 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/40 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
+                Details
+              </p>
+              <dl className="mt-2 grid gap-2 text-xs text-brand-mocha md:grid-cols-2">
+                {visibleMetadataEntries(item.metadata).map(([key, value]) => (
+                  <div key={key}>
+                    <dt className="font-semibold text-brand-espresso">{labelFromKey(key)}</dt>
+                    <dd className="break-words">{formatMetadataValue(value)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ) : null}
+          <p className="mt-3 text-xs text-brand-mocha/70">
+            Technical reference: {item.eventType} / {item.entityType}
           </p>
         </article>
       ))}
@@ -77,7 +220,7 @@ export function AuditLogsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const canViewAuditLogs = hasAnyPermission([PERMISSIONS.auditLogsView]);
 
-  const [entityFilter, setEntityFilter] = useState<ActivityEntityType | "all">("all");
+  const [entityFilter, setEntityFilter] = useState("all");
   const [globalCursor, setGlobalCursor] = useState<string | null>(null);
   const [globalItems, setGlobalItems] = useState<ActivityLog[]>([]);
 
@@ -144,7 +287,7 @@ export function AuditLogsPageClient(): JSX.Element {
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <PageHeader
         title="Admin Audit Logs"
-        description="Connected to global and user-specific activity log endpoints with entity filtering and cursor pagination."
+        description="Review who changed business data, which module was affected, and which record was updated."
       />
 
       <Card>
@@ -154,7 +297,7 @@ export function AuditLogsPageClient(): JSX.Element {
           </div>
           <CardTitle>Business Activity Stream</CardTitle>
           <CardDescription>
-            Endpoint: GET /api/v1/activity-logs?entity_type=user&limit=50&cursor=
+            Filter business activity by module and load older entries with cursor pagination.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -162,8 +305,7 @@ export function AuditLogsPageClient(): JSX.Element {
             <Select
               value={entityFilter}
               onValueChange={(value) => {
-                const nextValue = value as ActivityEntityType | "all";
-                setEntityFilter(nextValue);
+                setEntityFilter(value);
                 setGlobalCursor(null);
                 setGlobalItems([]);
               }}
@@ -180,7 +322,8 @@ export function AuditLogsPageClient(): JSX.Element {
               </SelectContent>
             </Select>
             <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/70 px-4 py-3 text-sm text-brand-mocha">
-              Showing up to 50 records per page. Use Load More to continue with cursor pagination.
+              Showing up to 50 records per page. Each entry resolves users, modules, actions, and
+              record references into business-readable labels where available.
             </div>
           </div>
 
@@ -220,13 +363,13 @@ export function AuditLogsPageClient(): JSX.Element {
         <CardHeader>
           <CardTitle>User Activity Stream</CardTitle>
           <CardDescription>
-            Endpoint: GET /api/v1/users/:id/activity?limit=50&cursor=
+            Review activity created by or targeting one user account.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="flex flex-col gap-3 md:flex-row">
             <Input
-              placeholder="Enter user ID"
+              placeholder="Paste user ID"
               value={userIdInput}
               onChange={(event) => {
                 setUserIdInput(event.target.value);
@@ -251,7 +394,7 @@ export function AuditLogsPageClient(): JSX.Element {
 
           {!selectedUserId ? (
             <div className="rounded-3xl border border-brand-cappuccino bg-brand-latte/70 p-4 text-sm font-medium text-brand-mocha">
-              Enter a user ID to fetch activity.
+              Paste a user ID to fetch that user&apos;s activity history.
             </div>
           ) : null}
 

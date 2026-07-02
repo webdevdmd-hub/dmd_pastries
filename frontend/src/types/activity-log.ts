@@ -1,44 +1,29 @@
-export type ActivityEntityType =
-  | "auth"
-  | "business"
-  | "user"
-  | "role"
-  | "settings"
-  | "branch"
-  | "pos";
+export type ActivityEntityType = string;
 
-export type ActivityEventType =
-  | "auth.login"
-  | "auth.logout"
-  | "business.updated"
-  | "branch.created"
-  | "branch.updated"
-  | "user.branch_switched"
-  | "user.invited"
-  | "user.invitation_accepted"
-  | "user.invitation_cancelled"
-  | "user.invitation_resent"
-  | "user.created"
-  | "user.updated"
-  | "user.status_changed"
-  | "user.branch_assigned"
-  | "user.soft_deleted"
-  | "user.restored"
-  | "role.created"
-  | "role.updated"
-  | "role.permissions_updated"
-  | "settings.updated";
+export type ActivityEventType = string;
 
-export type ActivityMetadataValue = string | number | boolean | null;
+export type ActivityMetadataPrimitive = string | number | boolean | null;
+
+export type ActivityMetadataValue =
+  | ActivityMetadataPrimitive
+  | ActivityMetadataPrimitive[]
+  | Record<string, ActivityMetadataPrimitive>;
 
 export type ActivityLog = {
   id: string;
   businessId: string;
   actorUserId: string | null;
+  actorUserName: string;
+  actorUserEmail: string;
   targetUserId: string | null;
+  targetUserName: string;
+  targetUserEmail: string;
   eventType: ActivityEventType;
   entityType: ActivityEntityType;
   entityId: string | null;
+  moduleLabel: string;
+  actionLabel: string;
+  recordLabel: string;
   summary: string;
   metadata: Record<string, ActivityMetadataValue>;
   createdAt: string;

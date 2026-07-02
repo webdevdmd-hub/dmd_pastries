@@ -30,9 +30,9 @@ func (s *Service) ListActivityLogs(currentUser *utils.AuthContext, entityType, c
 		return nil, apperrors.Internal("failed to list activity logs")
 	}
 
-	items := make([]ActivityLogResponse, 0, len(logs))
-	for _, log := range logs {
-		items = append(items, ToActivityLogResponse(log))
+	items, err := s.repo.BuildActivityResponses(currentUser.BusinessID, logs)
+	if err != nil {
+		return nil, apperrors.Internal("failed to enrich activity logs")
 	}
 
 	var nextCursor *string

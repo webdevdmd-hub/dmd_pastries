@@ -1,9 +1,9 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
   ActivityEntityType,
-  ActivityEventType,
   ActivityLog,
   ActivityLogsResponse,
+  ActivityMetadataPrimitive,
   ActivityMetadataValue,
 } from "@/types/activity-log";
 
@@ -11,10 +11,17 @@ type BackendActivityLog = {
   id?: string;
   business_id?: string;
   actor_user_id?: string | null;
+  actor_user_name?: string;
+  actor_user_email?: string;
   target_user_id?: string | null;
+  target_user_name?: string;
+  target_user_email?: string;
   event_type?: string;
   entity_type?: string;
   entity_id?: string | null;
+  module_label?: string;
+  action_label?: string;
+  record_label?: string;
   summary?: string;
   metadata?: unknown;
   created_at?: string;
@@ -35,50 +42,29 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function isActivityEntityType(value: unknown): value is ActivityEntityType {
-  return (
-    value === "auth" ||
-    value === "business" ||
-    value === "user" ||
-    value === "role" ||
-    value === "settings" ||
-    value === "branch" ||
-    value === "pos"
-  );
-}
-
-function isActivityEventType(value: unknown): value is ActivityEventType {
-  return (
-    value === "auth.login" ||
-    value === "auth.logout" ||
-    value === "business.updated" ||
-    value === "branch.created" ||
-    value === "branch.updated" ||
-    value === "user.invited" ||
-    value === "user.invitation_accepted" ||
-    value === "user.invitation_cancelled" ||
-    value === "user.invitation_resent" ||
-    value === "user.created" ||
-    value === "user.updated" ||
-    value === "user.status_changed" ||
-    value === "user.branch_assigned" ||
-    value === "user.branch_switched" ||
-    value === "user.soft_deleted" ||
-    value === "user.restored" ||
-    value === "role.created" ||
-    value === "role.updated" ||
-    value === "role.permissions_updated" ||
-    value === "settings.updated"
-  );
-}
-
-function isActivityMetadataValue(value: unknown): value is ActivityMetadataValue {
+function isActivityMetadataPrimitive(value: unknown): value is ActivityMetadataPrimitive {
   return (
     typeof value === "string" ||
     typeof value === "number" ||
     typeof value === "boolean" ||
     value === null
   );
+}
+
+function isActivityMetadataValue(value: unknown): value is ActivityMetadataValue {
+  if (isActivityMetadataPrimitive(value)) {
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    return value.every(isActivityMetadataPrimitive);
+  }
+
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return Object.values(value).every(isActivityMetadataPrimitive);
 }
 
 function parseMetadata(value: unknown): Record<string, ActivityMetadataValue> {
@@ -110,15 +96,16 @@ function parseActivityLog(value: unknown): ActivityLog {
   const summary = typeof backendActivity.summary === "string" ? backendActivity.summary : "";
   const createdAt =
     typeof backendActivity.created_at === "string" ? backendActivity.created_at : "";
+  const eventType =
+    typeof backendActivity.event_type === "string" && backendActivity.event_type.trim()
+      ? backendActivity.event_type
+      : "unknown.event";
+  const entityType =
+    typeof backendActivity.entity_type === "string" && backendActivity.entity_type.trim()
+      ? backendActivity.entity_type
+      : "unknown";
 
-  if (
-    !id ||
-    !businessId ||
-    !summary ||
-    !createdAt ||
-    !isActivityEventType(backendActivity.event_type) ||
-    !isActivityEntityType(backendActivity.entity_type)
-  ) {
+  if (!id || !businessId || !summary || !createdAt) {
     throw new Error("Backend activity log payload is missing required fields.");
   }
 
@@ -127,11 +114,33 @@ function parseActivityLog(value: unknown): ActivityLog {
     businessId,
     actorUserId:
       typeof backendActivity.actor_user_id === "string" ? backendActivity.actor_user_id : null,
+    actorUserName:
+      typeof backendActivity.actor_user_name === "string"
+        ? backendActivity.actor_user_name
+        : "Unknown user",
+    actorUserEmail:
+      typeof backendActivity.actor_user_email === "string" ? backendActivity.actor_user_email : "",
     targetUserId:
       typeof backendActivity.target_user_id === "string" ? backendActivity.target_user_id : null,
-    eventType: backendActivity.event_type,
-    entityType: backendActivity.entity_type,
+    targetUserName:
+      typeof backendActivity.target_user_name === "string" ? backendActivity.target_user_name : "",
+    targetUserEmail:
+      typeof backendActivity.target_user_email === "string" ? backendActivity.target_user_email : "",
+    eventType,
+    entityType,
     entityId: typeof backendActivity.entity_id === "string" ? backendActivity.entity_id : null,
+    moduleLabel:
+      typeof backendActivity.module_label === "string" && backendActivity.module_label.trim()
+        ? backendActivity.module_label
+        : entityType,
+    actionLabel:
+      typeof backendActivity.action_label === "string" && backendActivity.action_label.trim()
+        ? backendActivity.action_label
+        : summary,
+    recordLabel:
+      typeof backendActivity.record_label === "string" && backendActivity.record_label.trim()
+        ? backendActivity.record_label
+        : "Unknown record",
     summary,
     metadata: parseMetadata(backendActivity.metadata),
     createdAt,
