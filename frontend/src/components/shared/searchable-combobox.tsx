@@ -42,6 +42,9 @@ type SearchableComboboxProps = {
   options: SearchableComboboxOption[];
   optionTextWrap?: boolean | undefined;
   placeholder: string;
+  renderOption?:
+    | ((option: SearchableComboboxOption, state: { selected: boolean }) => ReactNode)
+    | undefined;
   searchPlaceholder?: string | undefined;
   searchValue?: string | undefined;
   triggerClassName?: string | undefined;
@@ -73,6 +76,7 @@ export function SearchableCombobox({
   options,
   optionTextWrap = false,
   placeholder,
+  renderOption,
   searchPlaceholder = "Search...",
   searchValue,
   triggerClassName,
@@ -207,26 +211,30 @@ export function SearchableCombobox({
                           option.value === value ? "opacity-100" : "opacity-0",
                         )}
                       />
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={cn(
-                            "block font-medium",
-                            optionTextWrap ? "whitespace-normal leading-snug" : "truncate",
-                          )}
-                        >
-                          {option.label}
-                        </span>
-                        {option.description ? (
+                      {renderOption ? (
+                        renderOption(option, { selected: option.value === value })
+                      ) : (
+                        <span className="min-w-0 flex-1">
                           <span
                             className={cn(
-                              "block text-xs text-brand-mocha",
+                              "block font-medium",
                               optionTextWrap ? "whitespace-normal leading-snug" : "truncate",
                             )}
                           >
-                            {option.description}
+                            {option.label}
                           </span>
-                        ) : null}
-                      </span>
+                          {option.description ? (
+                            <span
+                              className={cn(
+                                "block text-xs text-brand-mocha",
+                                optionTextWrap ? "whitespace-normal leading-snug" : "truncate",
+                              )}
+                            >
+                              {option.description}
+                            </span>
+                          ) : null}
+                        </span>
+                      )}
                     </CommandItem>
                   ))}
                 </CommandGroup>
