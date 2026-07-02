@@ -442,11 +442,15 @@ func (r *Repository) FindRefund(businessID, refundID string) (*PaymentRefundResp
 func (r *Repository) DailySummary(businessID, date, branchID string) (*DailySummaryResponse, error) {
 	paymentWhere := "business_id = ? AND payment_status IN ? AND deleted_at IS NULL AND paid_at::date = ?"
 	paymentArgs := []interface{}{businessID, []string{"completed", "partially_refunded", "refunded"}, date}
+	bakeryWhere := "bop.business_id = ? AND bo.deleted_at IS NULL AND bop.paid_at::date = ?"
+	bakeryArgs := []interface{}{businessID, date}
 	refundWhere := "business_id = ? AND refund_status = ? AND deleted_at IS NULL AND refunded_at::date = ?"
 	refundArgs := []interface{}{businessID, "completed", date}
 	if branchID != "" {
 		paymentWhere += " AND branch_id = ?"
 		paymentArgs = append(paymentArgs, branchID)
+		bakeryWhere += " AND bo.branch_id = ?"
+		bakeryArgs = append(bakeryArgs, branchID)
 		refundWhere += " AND branch_id = ?"
 		refundArgs = append(refundArgs, branchID)
 	}
@@ -458,6 +462,19 @@ func (r *Repository) DailySummary(businessID, date, branchID string) (*DailySumm
 		Scan(&collectedRows).Error; err != nil {
 		return nil, err
 	}
+	posCollected := sumCollectedAmount(collectedRows)
+	var bakeryRows []PaymentSummaryByMethod
+	if err := r.db.Table("bakery_order_payments bop").
+		Select("bop.payment_method_id, bop.payment_method_name_snapshot AS payment_method_name, COALESCE(pm.method_type, '') AS payment_method_type, COALESCE(SUM(bop.amount), 0) AS collected_amount, COUNT(*) AS transaction_count").
+		Joins("JOIN bakery_orders bo ON bo.id = bop.bakery_order_id AND bo.business_id = bop.business_id").
+		Joins("LEFT JOIN payment_methods pm ON pm.id = bop.payment_method_id AND pm.business_id = bop.business_id").
+		Where(bakeryWhere, bakeryArgs...).
+		Group("bop.payment_method_id, bop.payment_method_name_snapshot, pm.method_type").
+		Scan(&bakeryRows).Error; err != nil {
+		return nil, err
+	}
+	bakeryCollected := sumCollectedAmount(bakeryRows)
+	collectedRows = append(collectedRows, bakeryRows...)
 	var refundRows []PaymentSummaryByMethod
 	if err := r.db.Table("payment_refunds").
 		Select("payment_method_id, payment_method_name_snapshot AS payment_method_name, COALESCE(SUM(refund_amount), 0) AS refunded_amount, COUNT(*) AS count").
@@ -478,30 +495,62 @@ func (r *Repository) DailySummary(businessID, date, branchID string) (*DailySumm
 	if err := r.db.Table("payment_refunds").Where(refundWhere, refundArgs...).Count(&refundsCount).Error; err != nil {
 		return nil, err
 	}
-	return &DailySummaryResponse{Date: date, BranchID: branchID, TotalCollected: roundMoney(totalCollected), TotalRefunded: roundMoney(totalRefunded), NetCollected: roundMoney(totalCollected - totalRefunded), PaymentsCount: count, RefundsCount: refundsCount, ByMethod: rows}, nil
+	type bakeryPaymentTypeTotal struct {
+		PaymentType string
+		Amount      float64
+	}
+	var paymentTypeTotals []bakeryPaymentTypeTotal
+	if err := r.db.Table("bakery_order_payments bop").
+		Select("bop.payment_type, COALESCE(SUM(bop.amount), 0) AS amount").
+		Joins("JOIN bakery_orders bo ON bo.id = bop.bakery_order_id AND bo.business_id = bop.business_id").
+		Where(bakeryWhere, bakeryArgs...).
+		Group("bop.payment_type").
+		Scan(&paymentTypeTotals).Error; err != nil {
+		return nil, err
+	}
+	depositCollected, balanceCollected, fullCollected := 0.0, 0.0, 0.0
+	for _, row := range paymentTypeTotals {
+		switch row.PaymentType {
+		case "deposit":
+			depositCollected += row.Amount
+		case "balance":
+			balanceCollected += row.Amount
+		case "full":
+			fullCollected += row.Amount
+		}
+	}
+	return &DailySummaryResponse{Date: date, BranchID: branchID, TotalCollected: roundMoney(totalCollected), TotalRefunded: roundMoney(totalRefunded), NetCollected: roundMoney(totalCollected - totalRefunded), POSCollected: roundMoney(posCollected), BakeryCollected: roundMoney(bakeryCollected), DepositCollected: roundMoney(depositCollected), BalanceCollected: roundMoney(balanceCollected), FullCollected: roundMoney(fullCollected), PaymentsCount: count, RefundsCount: refundsCount, ByMethod: rows}, nil
 }
 
 func (r *Repository) MethodSummary(businessID, dateFrom, dateTo, branchID string) ([]PaymentSummaryByMethod, error) {
 	paymentWhere := "business_id = ? AND payment_status IN ? AND deleted_at IS NULL"
 	paymentArgs := []interface{}{businessID, []string{"completed", "partially_refunded", "refunded"}}
+	bakeryWhere := "bop.business_id = ? AND bo.deleted_at IS NULL"
+	bakeryArgs := []interface{}{businessID}
 	refundWhere := "business_id = ? AND refund_status = ? AND deleted_at IS NULL"
 	refundArgs := []interface{}{businessID, "completed"}
 	if dateFrom != "" {
 		paymentWhere += " AND paid_at >= ?"
+		bakeryWhere += " AND bop.paid_at >= ?"
 		refundWhere += " AND refunded_at >= ?"
 		paymentArgs = append(paymentArgs, dateFrom)
+		bakeryArgs = append(bakeryArgs, dateFrom)
 		refundArgs = append(refundArgs, dateFrom)
 	}
 	if dateTo != "" {
 		paymentWhere += " AND paid_at <= ?"
+		bakeryWhere += " AND bop.paid_at <= ?"
 		refundWhere += " AND refunded_at <= ?"
 		paymentArgs = append(paymentArgs, dateTo)
+		bakeryArgs = append(bakeryArgs, dateTo)
 		refundArgs = append(refundArgs, dateTo)
 	}
 	if branchID != "" {
 		paymentWhere += " AND branch_id = ?"
+		bakeryWhere += " AND bo.branch_id = ?"
 		refundWhere += " AND branch_id = ?"
 		paymentArgs = append(paymentArgs, branchID)
+		bakeryArgs = append(bakeryArgs, branchID)
 		refundArgs = append(refundArgs, branchID)
 	}
 	var collectedRows []PaymentSummaryByMethod
@@ -512,6 +561,17 @@ func (r *Repository) MethodSummary(businessID, dateFrom, dateTo, branchID string
 		Scan(&collectedRows).Error; err != nil {
 		return nil, err
 	}
+	var bakeryRows []PaymentSummaryByMethod
+	if err := r.db.Table("bakery_order_payments bop").
+		Select("bop.payment_method_id, bop.payment_method_name_snapshot AS payment_method_name, COALESCE(pm.method_type, '') AS payment_method_type, COALESCE(SUM(bop.amount), 0) AS collected_amount, COALESCE(SUM(bop.amount), 0) AS total_amount, COUNT(*) AS transaction_count").
+		Joins("JOIN bakery_orders bo ON bo.id = bop.bakery_order_id AND bo.business_id = bop.business_id").
+		Joins("LEFT JOIN payment_methods pm ON pm.id = bop.payment_method_id AND pm.business_id = bop.business_id").
+		Where(bakeryWhere, bakeryArgs...).
+		Group("bop.payment_method_id, bop.payment_method_name_snapshot, pm.method_type").
+		Scan(&bakeryRows).Error; err != nil {
+		return nil, err
+	}
+	collectedRows = append(collectedRows, bakeryRows...)
 	var refundRows []PaymentSummaryByMethod
 	if err := r.db.Table("payment_refunds").
 		Select("payment_method_id, payment_method_name_snapshot AS payment_method_name, COALESCE(SUM(refund_amount), 0) AS refunded_amount, COALESCE(SUM(refund_amount), 0) AS refund_amount").
@@ -531,14 +591,17 @@ func (r *Repository) MethodSummary(businessID, dateFrom, dateTo, branchID string
 
 func (r *Repository) ExpectedAmount(businessID, branchID, methodID string, date time.Time) (float64, error) {
 	dateString := date.Format("2006-01-02")
-	var collected, refunded float64
+	var collected, bakeryCollected, refunded float64
 	if err := r.db.Table("sale_payments").Select("COALESCE(SUM(amount),0)").Where("business_id = ? AND branch_id = ? AND payment_method_id = ? AND payment_status IN ? AND deleted_at IS NULL AND paid_at::date = ?", businessID, branchID, methodID, []string{"completed", "partially_refunded", "refunded"}, dateString).Scan(&collected).Error; err != nil {
+		return 0, err
+	}
+	if err := r.db.Table("bakery_order_payments bop").Joins("JOIN bakery_orders bo ON bo.id = bop.bakery_order_id AND bo.business_id = bop.business_id").Select("COALESCE(SUM(bop.amount),0)").Where("bop.business_id = ? AND bo.branch_id = ? AND bop.payment_method_id = ? AND bo.deleted_at IS NULL AND bop.paid_at::date = ?", businessID, branchID, methodID, dateString).Scan(&bakeryCollected).Error; err != nil {
 		return 0, err
 	}
 	if err := r.db.Table("payment_refunds").Select("COALESCE(SUM(refund_amount),0)").Where("business_id = ? AND branch_id = ? AND payment_method_id = ? AND refund_status = ? AND deleted_at IS NULL AND refunded_at::date = ?", businessID, branchID, methodID, "completed", dateString).Scan(&refunded).Error; err != nil {
 		return 0, err
 	}
-	return roundMoney(collected - refunded), nil
+	return roundMoney(collected + bakeryCollected - refunded), nil
 }
 
 func (r *Repository) ListReconciliations(businessID string, query ReconciliationListQuery) ([]ReconciliationResponse, int64, error) {
@@ -718,17 +781,43 @@ func toPaymentResponses(rows []paymentScanRow) []PaymentResponse {
 	return responses
 }
 
+func sumCollectedAmount(rows []PaymentSummaryByMethod) float64 {
+	total := 0.0
+	for _, row := range rows {
+		total += row.CollectedAmount
+	}
+	return roundMoney(total)
+}
+
 func mergePaymentSummaryRows(collectedRows, refundRows []PaymentSummaryByMethod) []PaymentSummaryByMethod {
 	byMethod := make(map[string]*PaymentSummaryByMethod)
 	order := make([]string, 0, len(collectedRows)+len(refundRows))
 	for _, row := range collectedRows {
 		key := row.PaymentMethodID
-		copyRow := row
-		if copyRow.Count == 0 {
-			copyRow.Count = copyRow.TransactionCount
+		existing, ok := byMethod[key]
+		if !ok {
+			copyRow := row
+			if copyRow.Count == 0 {
+				copyRow.Count = copyRow.TransactionCount
+			}
+			byMethod[key] = &copyRow
+			order = append(order, key)
+			continue
 		}
-		byMethod[key] = &copyRow
-		order = append(order, key)
+		existing.CollectedAmount = roundMoney(existing.CollectedAmount + row.CollectedAmount)
+		existing.TotalAmount = roundMoney(existing.TotalAmount + row.TotalAmount)
+		existing.TransactionCount += row.TransactionCount
+		if existing.Count == 0 {
+			existing.Count = existing.TransactionCount
+		} else {
+			existing.Count += row.TransactionCount
+		}
+		if existing.PaymentMethodName == "" {
+			existing.PaymentMethodName = row.PaymentMethodName
+		}
+		if existing.PaymentMethodType == "" {
+			existing.PaymentMethodType = row.PaymentMethodType
+		}
 	}
 	for _, row := range refundRows {
 		key := row.PaymentMethodID

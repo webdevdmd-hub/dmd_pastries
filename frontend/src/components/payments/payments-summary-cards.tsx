@@ -17,21 +17,25 @@ export function PaymentsSummaryCards({ summary }: PaymentsSummaryCardsProps): JS
     {
       label: "Total Collected Today",
       value: formatMoney(summary?.totalCollected ?? 0),
+      detail: `POS ${formatMoney(summary?.posCollected ?? 0)} · Bakery ${formatMoney(summary?.bakeryCollected ?? 0)}`,
       icon: Banknote,
     },
     {
       label: "Total Refunded Today",
       value: formatMoney(summary?.totalRefunded ?? 0),
+      detail: "POS refunds",
       icon: RotateCcw,
     },
     {
       label: "Net Collected Today",
       value: formatMoney(summary?.netCollected ?? 0),
+      detail: "Collected minus refunds",
       icon: WalletCards,
     },
     {
       label: "Transactions Count",
       value: String(summary?.transactionsCount ?? 0),
+      detail: `Deposits ${formatMoney(summary?.depositCollected ?? 0)} · Balance ${formatMoney(summary?.balanceCollected ?? 0)} · Full ${formatMoney(summary?.fullCollected ?? 0)}`,
       icon: ReceiptText,
     },
   ];
@@ -47,6 +51,7 @@ export function PaymentsSummaryCards({ summary }: PaymentsSummaryCardsProps): JS
               <div>
                 <p className="text-sm text-brand-mocha">{card.label}</p>
                 <p className="mt-2 text-2xl font-black text-brand-espresso">{card.value}</p>
+                <p className="mt-1 text-xs text-brand-mocha">{card.detail}</p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-cappuccino/40 text-brand-mocha">
                 <Icon className="h-5 w-5" />

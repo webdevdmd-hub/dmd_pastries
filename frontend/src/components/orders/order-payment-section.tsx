@@ -35,6 +35,8 @@ export function OrderPaymentSection({
   const usablePaymentMethods = visiblePaymentMethods.filter((method) =>
     Boolean(method.defaultPaymentAccountId),
   );
+  const defaultPaymentMethod =
+    usablePaymentMethods.find((method) => method.isDefault) ?? usablePaymentMethods[0] ?? null;
   const hasUnconfiguredMethods = visiblePaymentMethods.length > usablePaymentMethods.length;
 
   return (
@@ -139,6 +141,7 @@ export function OrderPaymentSection({
         ) : null}
       </div>
       <OrderPaymentDialog
+        defaultPaymentMethodId={defaultPaymentMethod?.id ?? null}
         isSubmitting={addPaymentMutation.isPending}
         methods={usablePaymentMethods}
         onClose={() => setOpen(false)}

@@ -154,14 +154,19 @@ type PaymentSummaryByMethod struct {
 }
 
 type DailySummaryResponse struct {
-	Date           string                   `json:"date"`
-	BranchID       string                   `json:"branch_id"`
-	TotalCollected float64                  `json:"total_collected"`
-	TotalRefunded  float64                  `json:"total_refunded"`
-	NetCollected   float64                  `json:"net_collected"`
-	PaymentsCount  int64                    `json:"payments_count"`
-	RefundsCount   int64                    `json:"refunds_count"`
-	ByMethod       []PaymentSummaryByMethod `json:"by_method"`
+	Date             string                   `json:"date"`
+	BranchID         string                   `json:"branch_id"`
+	TotalCollected   float64                  `json:"total_collected"`
+	TotalRefunded    float64                  `json:"total_refunded"`
+	NetCollected     float64                  `json:"net_collected"`
+	POSCollected     float64                  `json:"pos_collected"`
+	BakeryCollected  float64                  `json:"bakery_collected"`
+	DepositCollected float64                  `json:"deposit_collected"`
+	BalanceCollected float64                  `json:"balance_collected"`
+	FullCollected    float64                  `json:"full_collected"`
+	PaymentsCount    int64                    `json:"payments_count"`
+	RefundsCount     int64                    `json:"refunds_count"`
+	ByMethod         []PaymentSummaryByMethod `json:"by_method"`
 }
 
 type ReconciliationResponse struct {

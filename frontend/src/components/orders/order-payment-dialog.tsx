@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { JSX } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -30,23 +31,58 @@ import type { AddOrderPaymentPayload } from "@/types/orders";
 import type { PaymentMethod } from "@/types/settings";
 
 export function OrderPaymentDialog({
+  defaultPaymentMethodId,
   isSubmitting,
   methods,
   onClose,
   onSubmit,
   open,
 }: {
+  defaultPaymentMethodId: string | null;
   isSubmitting: boolean;
   methods: PaymentMethod[];
   onClose: () => void;
   onSubmit: (payload: AddOrderPaymentPayload) => Promise<void>;
   open: boolean;
 }): JSX.Element {
+  const methodKey = methods.map((method) => method.id).join("|");
+  const firstMethodId = methods[0]?.id ?? "";
+  const methodIds = useMemo(
+    () => new Set(methodKey.length > 0 ? methodKey.split("|") : []),
+    [methodKey],
+  );
+  const resolvedDefaultPaymentMethodId =
+    defaultPaymentMethodId && methodIds.has(defaultPaymentMethodId)
+      ? defaultPaymentMethodId
+      : firstMethodId;
   const form = useForm<OrderPaymentInputValues, unknown, OrderPaymentFormValues>({
+    defaultValues: {
+      amount: 0,
+      paymentMethodId: resolvedDefaultPaymentMethodId,
+      paymentType: "deposit",
+      referenceNumber: null,
+    },
     resolver: zodResolver(orderPaymentSchema),
-    values: { amount: 0, paymentMethodId: "", paymentType: "deposit", referenceNumber: null },
   });
-  const selectedMethod = methods.find((method) => method.id === form.watch("paymentMethodId"));
+  const selectedPaymentMethodId = form.watch("paymentMethodId");
+  const selectedMethod = methods.find((method) => method.id === selectedPaymentMethodId);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const currentPaymentMethodId = form.getValues("paymentMethodId");
+    if (currentPaymentMethodId === resolvedDefaultPaymentMethodId) {
+      return;
+    }
+
+    form.reset({
+      ...form.getValues(),
+      paymentMethodId: resolvedDefaultPaymentMethodId,
+      referenceNumber: null,
+    });
+  }, [form, methodIds, open, resolvedDefaultPaymentMethodId]);
 
   return (
     <Dialog onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)} open={open}>
@@ -66,17 +102,23 @@ export function OrderPaymentDialog({
                 return;
               }
               await onSubmit(values);
-              form.reset();
+              form.reset({
+                amount: 0,
+                paymentMethodId: resolvedDefaultPaymentMethodId,
+                paymentType: "deposit",
+                referenceNumber: null,
+              });
             })(event);
           }}
         >
           <div className="grid gap-2">
             <Label>Payment method</Label>
             <Select
+              disabled={methods.length === 0}
               onValueChange={(value) =>
                 form.setValue("paymentMethodId", value, { shouldValidate: true })
               }
-              value={form.watch("paymentMethodId")}
+              value={selectedPaymentMethodId}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select payment method" />
@@ -89,6 +131,11 @@ export function OrderPaymentDialog({
                 ))}
               </SelectContent>
             </Select>
+            {methods.length === 0 ? (
+              <p className="text-xs text-amber-700">
+                No configured bakery payment methods are available.
+              </p>
+            ) : null}
             <p className="text-xs text-red-700">{form.formState.errors.paymentMethodId?.message}</p>
           </div>
           <div className="grid gap-2">
@@ -144,7 +191,7 @@ export function OrderPaymentDialog({
             <Button onClick={onClose} type="button" variant="outline">
               Cancel
             </Button>
-            <Button disabled={isSubmitting} type="submit">
+            <Button disabled={isSubmitting || methods.length === 0} type="submit">
               Add payment
             </Button>
           </DialogFooter>

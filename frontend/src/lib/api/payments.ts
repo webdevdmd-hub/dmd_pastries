@@ -323,7 +323,12 @@ function parseDailySummary(value: unknown): DailyPaymentSummary {
     totalCollected: requiredNumber(value.total_collected),
     totalRefunded: requiredNumber(value.total_refunded),
     netCollected: requiredNumber(value.net_collected),
-    transactionsCount: requiredNumber(value.transactions_count),
+    posCollected: requiredNumber(value.pos_collected),
+    bakeryCollected: requiredNumber(value.bakery_collected),
+    depositCollected: requiredNumber(value.deposit_collected),
+    balanceCollected: requiredNumber(value.balance_collected),
+    fullCollected: requiredNumber(value.full_collected),
+    transactionsCount: requiredNumber(value.transactions_count, requiredNumber(value.payments_count)),
   };
 }
 

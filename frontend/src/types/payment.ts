@@ -128,6 +128,11 @@ export type DailyPaymentSummary = {
   totalCollected: number;
   totalRefunded: number;
   netCollected: number;
+  posCollected: number;
+  bakeryCollected: number;
+  depositCollected: number;
+  balanceCollected: number;
+  fullCollected: number;
   transactionsCount: number;
 };
 
