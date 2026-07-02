@@ -90,7 +90,7 @@ func (s *Service) CreateBatch(currentUser *utils.AuthContext, req CreateBatchReq
 	return s.GetBatch(currentUser, batchID)
 }
 
-func (s *Service) CreateProduction(currentUser *utils.AuthContext, req CreateProductionRequest, ipAddress, userAgent string) (*ProductionResponse, error) {
+func (s *Service) CreateProduction(currentUser *utils.AuthContext, req CreateProductionRequest, ipAddress, userAgent string) (*ProductionBatchResponse, error) {
 	if req.QuantityProduced <= 0 {
 		return nil, apperrors.BadRequest("quantity_produced must be greater than zero", nil)
 	}
@@ -114,9 +114,6 @@ func (s *Service) CreateProduction(currentUser *utils.AuthContext, req CreatePro
 		}
 		batch, ingredients, packaging, err := s.buildBatch(tx, currentUser, batchReq)
 		if err != nil {
-			return err
-		}
-		if err := s.validateProductionHasValuedInputs(tx, currentUser.BusinessID, batch.BranchID, batch.RecipeID, ingredients, packaging); err != nil {
 			return err
 		}
 		number, err := s.repo.NextNumber(tx, currentUser.BusinessID)
@@ -145,7 +142,7 @@ func (s *Service) CreateProduction(currentUser *utils.AuthContext, req CreatePro
 	if err != nil {
 		return nil, err
 	}
-	return s.GetProduction(currentUser, productionID)
+	return s.GetBatch(currentUser, productionID)
 }
 
 func (s *Service) ListProductions(currentUser *utils.AuthContext, query BatchListQuery) (*PaginatedBatchResponse, error) {
