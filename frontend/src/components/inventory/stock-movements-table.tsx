@@ -10,6 +10,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  sourceModuleLabel,
+  sourceReferenceLabel,
+  stockMovementDescription,
+} from "@/lib/inventory/stock-movement-display";
 import type { StockMovement } from "@/types/inventory";
 
 type StockMovementsTableProps = {
@@ -66,8 +71,7 @@ export function StockMovementsTable({ movements }: StockMovementsTableProps): JS
           <TableHead>Unit</TableHead>
           <TableHead>Cost</TableHead>
           <TableHead>Journal</TableHead>
-          <TableHead>Reference</TableHead>
-          <TableHead>Reason</TableHead>
+          <TableHead>Description</TableHead>
           <TableHead>Created By</TableHead>
         </TableRow>
       </TableHeader>
@@ -101,8 +105,14 @@ export function StockMovementsTable({ movements }: StockMovementsTableProps): JS
             <TableCell>
               <AccountingJournalLink id={movement.accountingJournalEntryId} />
             </TableCell>
-            <TableCell>{movement.referenceNumber ?? movement.referenceType ?? "Manual"}</TableCell>
-            <TableCell>{movement.reason ?? "No reason"}</TableCell>
+            <TableCell className="min-w-72">
+              <p className="font-medium text-brand-espresso">
+                {stockMovementDescription(movement)}
+              </p>
+              <p className="text-xs text-brand-mocha">
+                {sourceModuleLabel(movement)} - {sourceReferenceLabel(movement)}
+              </p>
+            </TableCell>
             <TableCell>{movement.createdByUserName}</TableCell>
           </TableRow>
         ))}

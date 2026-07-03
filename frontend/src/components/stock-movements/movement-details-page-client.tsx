@@ -16,6 +16,11 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { usePermission } from "@/hooks/use-permission";
 import { useStockMovement } from "@/hooks/use-stock-movements";
 import { getErrorMessage } from "@/lib/api/client";
+import {
+  sourceModuleLabel,
+  sourceReferenceLabel,
+  stockMovementDescription,
+} from "@/lib/inventory/stock-movement-display";
 
 type MovementDetailsPageClientProps = {
   movementId: string;
@@ -78,6 +83,15 @@ export function MovementDetailsPageClient({
             <div className="flex flex-wrap gap-2">
               <MovementTypeBadge type={movement.movementType} />
               <MovementDirectionBadge direction={movement.movementDirection} />
+            </div>
+            <div className="rounded-2xl bg-brand-latte p-4">
+              <p className="text-sm text-brand-mocha">What happened</p>
+              <p className="mt-1 font-bold text-brand-espresso">
+                {stockMovementDescription(movement)}
+              </p>
+              <p className="mt-1 text-sm text-brand-mocha">
+                {sourceModuleLabel(movement)} - {sourceReferenceLabel(movement)}
+              </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div>
@@ -171,7 +185,9 @@ export function MovementDetailsPageClient({
             ) : null}
             <div className="rounded-2xl bg-brand-latte p-4">
               <p className="text-sm text-brand-mocha">Reason</p>
-              <p className="mt-1 text-brand-espresso">{movement.reason ?? "No reason recorded."}</p>
+              <p className="mt-1 text-brand-espresso">
+                {movement.reason ?? stockMovementDescription(movement)}
+              </p>
             </div>
             <Button asChild type="button">
               <Link href={`/inventory/audit/${movement.inventoryItemId}`}>

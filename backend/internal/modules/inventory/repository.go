@@ -1294,6 +1294,7 @@ func safeMovementSortBy(value string) string {
 }
 
 func toStockMovementResponse(movement StockMovement, unit UnitInfo, itemName string, productID, productVariantID *string, variantName, branchName, createdByName, stockLocationName, fromStockLocationName, toStockLocationName string) StockMovementResponse {
+	display := stockMovementDisplay(movement, createdByName, fromStockLocationName, toStockLocationName)
 	return StockMovementResponse{
 		ID:                       movement.ID,
 		BusinessID:               movement.BusinessID,
@@ -1313,6 +1314,10 @@ func toStockMovementResponse(movement StockMovement, unit UnitInfo, itemName str
 		VariantName:              variantName,
 		MovementType:             movement.MovementType,
 		MovementDirection:        movement.MovementDirection,
+		MovementLabel:            display.MovementLabel,
+		SourceModuleLabel:        display.SourceModuleLabel,
+		SourceReferenceLabel:     display.SourceReferenceLabel,
+		MovementDescription:      display.MovementDescription,
 		Quantity:                 roundQuantity(movement.Quantity),
 		BeforeQuantity:           roundQuantity(movement.BeforeQuantity),
 		AfterQuantity:            roundQuantity(movement.AfterQuantity),

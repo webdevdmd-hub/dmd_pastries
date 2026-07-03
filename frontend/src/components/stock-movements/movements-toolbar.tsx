@@ -111,6 +111,8 @@ export function MovementsToolbar({
           <SelectItem value="transfer_out">Transfer Out</SelectItem>
           <SelectItem value="production_in">Production In</SelectItem>
           <SelectItem value="production_out">Production Out</SelectItem>
+          <SelectItem value="purchase_return_out">Vendor Credit</SelectItem>
+          <SelectItem value="purchase_bill_cancel_out">Purchase Cancellation</SelectItem>
           <SelectItem value="reversal">Reversal</SelectItem>
         </SelectContent>
       </Select>

@@ -41,6 +41,8 @@ export const movementFiltersSchema = z.object({
     "transfer_out",
     "production_in",
     "production_out",
+    "purchase_return_out",
+    "purchase_bill_cancel_out",
     "reversal",
   ]),
   direction: z.enum(["all", "in", "out", "neutral", "transfer"]),

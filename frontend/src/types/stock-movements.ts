@@ -17,6 +17,8 @@ export type MovementType =
   | "transfer_out"
   | "production_in"
   | "production_out"
+  | "purchase_return_out"
+  | "purchase_bill_cancel_out"
   | "reversal";
 
 export type MovementDirection = "in" | "out" | "neutral" | "transfer";
@@ -31,6 +33,10 @@ export type StockMovement = {
   itemName: string;
   movementType: MovementType;
   movementDirection: MovementDirection;
+  movementLabel: string;
+  sourceModuleLabel: string | null;
+  sourceReferenceLabel: string | null;
+  movementDescription: string | null;
   quantity: number;
   beforeQuantity: number;
   afterQuantity: number;

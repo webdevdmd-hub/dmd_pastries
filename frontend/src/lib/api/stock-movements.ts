@@ -69,6 +69,8 @@ function isMovementType(value: unknown): value is MovementType {
     value === "transfer_out" ||
     value === "production_in" ||
     value === "production_out" ||
+    value === "purchase_return_out" ||
+    value === "purchase_bill_cancel_out" ||
     value === "reversal"
   );
 }
@@ -92,7 +94,9 @@ function inferMovementDirection(type: MovementType): MovementDirection {
     type === "sale_out" ||
     type === "adjustment_out" ||
     type === "wastage" ||
-    type === "production_out"
+    type === "production_out" ||
+    type === "purchase_return_out" ||
+    type === "purchase_bill_cancel_out"
   ) {
     return "out";
   }
@@ -113,6 +117,10 @@ function parseStockMovement(value: unknown): StockMovement {
     throw new Error("Backend stock movement payload is invalid.");
   }
 
+  if (isObject(value.movement)) {
+    return parseStockMovement(value.movement);
+  }
+
   const movementType = isMovementType(value.movement_type) ? value.movement_type : "adjustment_in";
 
   return {
@@ -127,6 +135,10 @@ function parseStockMovement(value: unknown): StockMovement {
     movementDirection: isMovementDirection(value.movement_direction)
       ? value.movement_direction
       : inferMovementDirection(movementType),
+    movementLabel: stringValue(value.movement_label),
+    sourceModuleLabel: nullableString(value.source_module_label),
+    sourceReferenceLabel: nullableString(value.source_reference_label),
+    movementDescription: nullableString(value.movement_description),
     quantity: numberValue(value.quantity),
     beforeQuantity: numberValue(value.before_quantity),
     afterQuantity: numberValue(value.after_quantity),

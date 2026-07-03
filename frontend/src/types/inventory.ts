@@ -33,7 +33,9 @@ export type MovementType =
   | "transfer_in"
   | "transfer_out"
   | "production_in"
-  | "production_out";
+  | "production_out"
+  | "purchase_return_out"
+  | "purchase_bill_cancel_out";
 
 export type AdjustmentType = "increase" | "decrease";
 
@@ -79,6 +81,10 @@ export type StockMovement = {
   itemType: InventoryItemType;
   itemName: string;
   movementType: MovementType;
+  movementLabel: string;
+  sourceModuleLabel: string | null;
+  sourceReferenceLabel: string | null;
+  movementDescription: string | null;
   quantity: number;
   beforeQuantity: number;
   afterQuantity: number;

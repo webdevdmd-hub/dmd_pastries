@@ -31,6 +31,7 @@ import {
   useStockMovementSummary,
 } from "@/hooks/use-stock-movements";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { movementTypeLabel } from "@/lib/inventory/stock-movement-display";
 import type {
   ManualMovementPayload,
   ReversalPayload,
@@ -49,14 +50,6 @@ const defaultFilters: StockMovementFilters = {
   dateTo: "",
   createdBy: "",
 };
-
-function movementTypeLabel(value: string): string {
-  if (value === "transfer") {
-    return "Stock transfer";
-  }
-
-  return value.replace(/_/g, " ");
-}
 
 export function MovementsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();

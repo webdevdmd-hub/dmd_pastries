@@ -20,6 +20,8 @@ const labels: Record<MovementType, string> = {
   transfer_out: "Transfer Out",
   production_in: "Production In",
   production_out: "Production Out",
+  purchase_return_out: "Vendor Credit",
+  purchase_bill_cancel_out: "Purchase Cancellation",
   reversal: "Reversal",
 };
 
@@ -34,7 +36,9 @@ export function MovementTypeBadge({ type }: MovementTypeBadgeProps): JSX.Element
     type === "sale_out" ||
     type === "adjustment_out" ||
     type === "wastage" ||
-    type === "production_out"
+    type === "production_out" ||
+    type === "purchase_return_out" ||
+    type === "purchase_bill_cancel_out"
   ) {
     return (
       <Badge className="bg-orange-100 text-orange-900 hover:bg-orange-100">{labels[type]}</Badge>

@@ -14,6 +14,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  sourceModuleLabel,
+  sourceReferenceLabel,
+  stockMovementDescription,
+} from "@/lib/inventory/stock-movement-display";
 import type { StockMovement } from "@/types/stock-movements";
 
 type MovementDetailsDrawerProps = {
@@ -75,6 +80,15 @@ export function MovementDetailsDrawer({
               <MovementTypeBadge type={movement.movementType} />
               <MovementDirectionBadge direction={movement.movementDirection} />
             </div>
+            <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">What happened</p>
+              <p className="mt-2 font-semibold text-brand-espresso">
+                {stockMovementDescription(movement)}
+              </p>
+              <p className="mt-1 text-sm text-brand-mocha">
+                {sourceModuleLabel(movement)} - {sourceReferenceLabel(movement)}
+              </p>
+            </div>
             <div className="grid gap-3 md:grid-cols-2">
               <DetailRow label="Movement ID" value={movement.id} />
               <DetailRow label="Branch" value={movement.branchName} />
@@ -135,7 +149,9 @@ export function MovementDetailsDrawer({
             ) : null}
             <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
               <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">Reason</p>
-              <p className="mt-2 text-sm text-brand-espresso">{movement.reason ?? "No reason"}</p>
+              <p className="mt-2 text-sm text-brand-espresso">
+                {movement.reason ?? stockMovementDescription(movement)}
+              </p>
               {movement.notes ? (
                 <>
                   <p className="mt-4 text-xs uppercase tracking-[0.18em] text-brand-mocha">Notes</p>

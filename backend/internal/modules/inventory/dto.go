@@ -313,6 +313,10 @@ type StockMovementResponse struct {
 	VariantName              string    `json:"variant_name"`
 	MovementType             string    `json:"movement_type"`
 	MovementDirection        string    `json:"movement_direction"`
+	MovementLabel            string    `json:"movement_label"`
+	SourceModuleLabel        string    `json:"source_module_label"`
+	SourceReferenceLabel     string    `json:"source_reference_label"`
+	MovementDescription      string    `json:"movement_description"`
 	Quantity                 float64   `json:"quantity"`
 	BeforeQuantity           float64   `json:"before_quantity"`
 	AfterQuantity            float64   `json:"after_quantity"`

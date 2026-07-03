@@ -159,7 +159,9 @@ function isMovementType(value: unknown): value is MovementType {
     value === "transfer_in" ||
     value === "transfer_out" ||
     value === "production_in" ||
-    value === "production_out"
+    value === "production_out" ||
+    value === "purchase_return_out" ||
+    value === "purchase_bill_cancel_out"
   );
 }
 
@@ -238,6 +240,10 @@ function parseStockMovement(value: unknown): StockMovement {
     itemType: isInventoryItemType(value.item_type) ? value.item_type : "product",
     itemName: stringValue(value.item_name, "Inventory item"),
     movementType: isMovementType(value.movement_type) ? value.movement_type : "adjustment_in",
+    movementLabel: stringValue(value.movement_label),
+    sourceModuleLabel: nullableString(value.source_module_label),
+    sourceReferenceLabel: nullableString(value.source_reference_label),
+    movementDescription: nullableString(value.movement_description),
     quantity: numberValue(value.quantity),
     beforeQuantity: numberValue(value.before_quantity),
     afterQuantity: numberValue(value.after_quantity),

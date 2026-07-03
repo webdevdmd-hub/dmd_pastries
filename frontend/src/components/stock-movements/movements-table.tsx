@@ -12,6 +12,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  sourceModuleLabel,
+  sourceReferenceLabel,
+  stockMovementDescription,
+} from "@/lib/inventory/stock-movement-display";
 import type { StockMovement } from "@/types/stock-movements";
 
 type MovementsTableProps = {
@@ -85,8 +90,7 @@ export function MovementsTable({
           <TableHead>Unit</TableHead>
           <TableHead>Cost</TableHead>
           <TableHead>Journal</TableHead>
-          <TableHead>Reference</TableHead>
-          <TableHead>Reason</TableHead>
+          <TableHead>Description</TableHead>
           <TableHead>Created By</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
@@ -129,8 +133,14 @@ export function MovementsTable({
             <TableCell>
               <AccountingJournalLink id={movement.accountingJournalEntryId} />
             </TableCell>
-            <TableCell>{movement.referenceNumber ?? movement.referenceType ?? "Manual"}</TableCell>
-            <TableCell>{movement.reason ?? "No reason"}</TableCell>
+            <TableCell className="min-w-72">
+              <p className="font-medium text-brand-espresso">
+                {stockMovementDescription(movement)}
+              </p>
+              <p className="text-xs text-brand-mocha">
+                {sourceModuleLabel(movement)} - {sourceReferenceLabel(movement)}
+              </p>
+            </TableCell>
             <TableCell>{movement.createdByUserName}</TableCell>
             <TableCell className="text-right">
               <MovementActionsMenu
