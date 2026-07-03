@@ -1440,11 +1440,14 @@ func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, 
 		BusinessID:  currentUser.BusinessID,
 		ActorUserID: currentUser.UserID,
 		EventType:   eventType,
-		EntityType:  "inventory",
+		EntityType:  inventoryAuditEntityType(eventType),
 		EntityID:    entityID,
 		Summary:     summary,
-		IPAddress:   ipAddress,
-		UserAgent:   userAgent,
+		Metadata: audit.Metadata(map[string]interface{}{
+			"source_module": "inventory",
+		}, nil),
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
 	})
 }
 
@@ -1453,12 +1456,30 @@ func (s *Service) auditStockMovement(tx *gorm.DB, currentUser *utils.AuthContext
 		BusinessID:  currentUser.BusinessID,
 		ActorUserID: currentUser.UserID,
 		EventType:   eventType,
-		EntityType:  "stock_movements",
+		EntityType:  "stock_movement",
 		EntityID:    entityID,
 		Summary:     summary,
-		IPAddress:   ipAddress,
-		UserAgent:   userAgent,
+		Metadata: audit.Metadata(map[string]interface{}{
+			"source_module": "inventory",
+		}, nil),
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
 	})
+}
+
+func inventoryAuditEntityType(eventType string) string {
+	switch {
+	case strings.HasPrefix(eventType, "stock_location."):
+		return "stock_location"
+	case strings.HasPrefix(eventType, "stock_transfer."):
+		return "stock_transfer"
+	case strings.HasPrefix(eventType, "stock_movement."):
+		return "stock_movement"
+	case eventType == "inventory.opening_stock_created", eventType == "inventory.adjusted":
+		return "stock_movement"
+	default:
+		return "inventory"
+	}
 }
 
 func normalizeInventoryListQuery(query *InventoryListQuery) {

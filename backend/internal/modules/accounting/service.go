@@ -4079,10 +4079,30 @@ func (s *Service) withTransaction(fn func(tx *gorm.DB) error) error {
 }
 
 func (s *Service) writeAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {
-	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: "chart_account", EntityID: entityID, Summary: summary, Metadata: audit.Metadata(map[string]interface{}{"source_module": "accounting"}, nil), IPAddress: ipAddress, UserAgent: userAgent}); err != nil {
+	entityType := accountingAuditEntityType(eventType)
+	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: entityType, EntityID: entityID, Summary: summary, Metadata: audit.Metadata(map[string]interface{}{"source_module": "accounting"}, nil), IPAddress: ipAddress, UserAgent: userAgent}); err != nil {
 		return apperrors.Internal("failed to create activity log")
 	}
 	return nil
+}
+
+func accountingAuditEntityType(eventType string) string {
+	switch {
+	case strings.Contains(eventType, "journal_entry"):
+		return "journal_entry"
+	case strings.Contains(eventType, "chart_account"):
+		return "chart_account"
+	case strings.Contains(eventType, "payment_account"):
+		return "payment_account"
+	case strings.Contains(eventType, "account_transfer"):
+		return "account_transfer"
+	case strings.Contains(eventType, "platform_settlement"):
+		return "platform_settlement"
+	case strings.Contains(eventType, "settings"), strings.Contains(eventType, "mapping"):
+		return "accounting"
+	default:
+		return "accounting"
+	}
 }
 
 func (s *Service) writeEntityAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityType, entityID, summary, ipAddress, userAgent string) error {

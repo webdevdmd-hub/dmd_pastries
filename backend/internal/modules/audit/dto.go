@@ -138,11 +138,11 @@ func moduleLabel(entityType string) string {
 		return "Packaging"
 	case "inventory", "inventory_item", "inventory_items":
 		return "Inventory"
-	case "stock_movement", "stock_movements", "stock_transfer", "stock_transfers":
+	case "stock_location", "stock_locations", "stock_movement", "stock_movements", "stock_transfer", "stock_transfers":
 		return "Inventory -> Stock Movements"
 	case "pos", "sale", "sales", "sale_refund", "sale_refunds":
 		return "POS"
-	case "bakery_order", "bakery_orders":
+	case "bakery_order", "bakery_orders", "bakery_order_payment", "bakery_order_payments":
 		return "Bakery Orders"
 	case "expense", "expenses":
 		return "Expenses"
@@ -156,7 +156,7 @@ func moduleLabel(entityType string) string {
 		return "Recipes"
 	case "manufacturing", "production_batch", "production_batches":
 		return "Manufacturing"
-	case "chart_account", "chart_accounts", "payment_account", "payment_accounts", "journal_entry", "journal_entries", "accounting":
+	case "chart_account", "chart_accounts", "payment_account", "payment_accounts", "journal_entry", "journal_entries", "account_transfer", "account_transfers", "platform_settlement", "platform_settlements", "accounting":
 		return "Accounting"
 	case "reports", "report":
 		return "Reports"
@@ -166,6 +166,10 @@ func moduleLabel(entityType string) string {
 }
 
 func humanizeEventType(eventType, entityType string) string {
+	if label := businessEventLabel(eventType, entityType); label != "" {
+		return label
+	}
+
 	eventParts := strings.FieldsFunc(eventType, func(r rune) bool {
 		return r == '.' || r == '_' || r == '-'
 	})
@@ -185,6 +189,80 @@ func humanizeEventType(eventType, entityType string) string {
 	}
 
 	return strings.TrimSpace(humanizeAction(action) + " " + humanizeAuditWords(strings.Join(nounParts, " ")))
+}
+
+func businessEventLabel(eventType, entityType string) string {
+	normalizedEvent := normalizeAuditEventKey(eventType)
+	normalizedEntity := normalizeAuditKey(entityType)
+
+	switch normalizedEvent {
+	case "purchase_return_created":
+		return "Created Vendor Credit"
+	case "purchase_return_updated":
+		return "Updated Vendor Credit"
+	case "purchase_return_posted":
+		return "Posted Vendor Credit"
+	case "purchase_return_stock_returned":
+		return "Returned Vendor Credit Stock"
+	case "purchase_return_cancelled":
+		return "Cancelled Vendor Credit"
+	case "purchase_return_reversed":
+		return "Reversed Vendor Credit"
+	case "purchase_return_stock_reversal":
+		return "Reversed Vendor Credit Stock"
+	case "inventory_opening_stock_created":
+		return "Created Opening Stock"
+	case "inventory_adjusted":
+		return "Adjusted Inventory"
+	case "stock_movement_manual_created":
+		return "Created Manual Stock Movement"
+	case "stock_movement_reversed":
+		return "Reversed Stock Movement"
+	case "stock_transfer_created":
+		return "Created Stock Transfer"
+	case "stock_transfer_completed":
+		return "Completed Stock Transfer"
+	case "stock_transfer_cancelled":
+		return "Cancelled Stock Transfer"
+	case "accounting_journal_entry_created":
+		return "Created Journal Entry"
+	case "accounting_journal_entry_updated":
+		return "Updated Journal Entry"
+	case "accounting_journal_entry_posted":
+		return "Posted Journal Entry"
+	case "accounting_journal_entry_reversed":
+		return "Reversed Journal Entry"
+	case "accounting_journal_entry_hard_deleted":
+		return "Deleted Journal Entry"
+	case "sale_created":
+		return "Created POS Sale"
+	case "sale_refunded":
+		return "Created POS Refund"
+	case "sale_voided":
+		return "Voided POS Sale"
+	case "bakery_order_payment_added":
+		return "Added Bakery Order Payment"
+	}
+
+	if normalizedEntity == "purchase_return" {
+		return strings.TrimSpace(humanizeAction(lastAuditEventPart(eventType)) + " Vendor Credit")
+	}
+	return ""
+}
+
+func normalizeAuditEventKey(value string) string {
+	value = strings.ReplaceAll(value, ".", "_")
+	return normalizeAuditKey(value)
+}
+
+func lastAuditEventPart(eventType string) string {
+	parts := strings.FieldsFunc(eventType, func(r rune) bool {
+		return r == '.' || r == '_' || r == '-' || unicode.IsSpace(r)
+	})
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[len(parts)-1]
 }
 
 func humanizeAction(action string) string {

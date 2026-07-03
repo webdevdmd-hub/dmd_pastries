@@ -661,8 +661,25 @@ func (s *Service) RefundSale(currentUser *utils.AuthContext, saleID string, req 
 	}); err != nil {
 		return nil, apperrors.Internal("failed to update sale")
 	}
-	if err := s.writeAudit(tx, currentUser, "sale.refunded", sale.ID, "Sale refunded.", ipAddress, userAgent); err != nil {
-		return nil, err
+	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{
+		BusinessID:  currentUser.BusinessID,
+		ActorUserID: currentUser.UserID,
+		EventType:   "sale.refunded",
+		EntityType:  "sale_refund",
+		EntityID:    refund.ID,
+		Summary:     "Sale refunded.",
+		Metadata: audit.Metadata(map[string]interface{}{
+			"source_module": "pos",
+			"sale_id":       sale.ID,
+			"sale_number":   sale.SaleNumber,
+			"refund_number": refund.RefundNumber,
+			"refund_amount": refund.RefundAmount,
+			"reason":        refund.Reason,
+		}, nil),
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
+	}); err != nil {
+		return nil, apperrors.Internal("failed to create activity log")
 	}
 	if err := tx.Commit().Error; err != nil {
 		return nil, apperrors.Internal("failed to commit refund")

@@ -632,7 +632,24 @@ func (s *Service) AddPayment(currentUser *utils.AuthContext, orderID string, req
 		if err := s.repo.UpdateOrder(tx, orderID, currentUser.BusinessID, map[string]interface{}{"paid_amount": paid, "balance_amount": balance, "payment_status": paymentStatus(order.TotalAmount, paid), "updated_by_user_id": currentUser.UserID, "updated_at": now}); err != nil {
 			return err
 		}
-		return s.audit(tx, currentUser, "bakery_order.payment_added", orderID, "Bakery order payment added", ipAddress, userAgent)
+		return s.auditRepo.CreateActivity(tx, audit.ActivityInput{
+			BusinessID:  currentUser.BusinessID,
+			ActorUserID: currentUser.UserID,
+			EventType:   "bakery_order.payment_added",
+			EntityType:  "bakery_order_payment",
+			EntityID:    payment.ID,
+			Summary:     "Bakery order payment added",
+			Metadata: audit.Metadata(map[string]interface{}{
+				"source_module":       "bakery_orders",
+				"bakery_order_id":     orderID,
+				"payment_method_name": payment.PaymentMethodNameSnapshot,
+				"reference_number":    payment.ReferenceNumber,
+				"payment_type":        payment.PaymentType,
+				"amount":              payment.Amount,
+			}, nil),
+			IPAddress: ipAddress,
+			UserAgent: userAgent,
+		})
 	})
 	if err != nil {
 		return nil, err
