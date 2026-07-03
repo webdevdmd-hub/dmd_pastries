@@ -98,6 +98,7 @@ type ProductionBatchResponse struct {
 	BranchName            string                         `json:"branch_name"`
 	RecipeID              string                         `json:"recipe_id"`
 	RecipeName            string                         `json:"recipe_name"`
+	RecipeVersionNumber   int                            `json:"recipe_version_number"`
 	ProductID             string                         `json:"product_id"`
 	ProductName           string                         `json:"product_name"`
 	ProductVariantID      *string                        `json:"product_variant_id"`

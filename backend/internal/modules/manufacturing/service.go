@@ -485,7 +485,7 @@ func (s *Service) GetOutputs(currentUser *utils.AuthContext, id string) (*Produc
 		return nil, apperrors.Forbidden("branch access denied")
 	}
 
-	_, _, productName, productVariantName, _ := s.repo.NameLookups(currentUser.BusinessID, *batch)
+	_, _, _, productName, productVariantName, _ := s.repo.NameLookups(currentUser.BusinessID, *batch)
 	result := &ProductionOutputsResponse{
 		BatchID:            batch.ID,
 		Status:             batch.Status,
@@ -1135,8 +1135,8 @@ func (s *Service) resolveProductionPackagingInventoryItem(tx *gorm.DB, businessI
 }
 
 func (s *Service) batchResponse(businessID string, batch ProductionBatch, includeDetails bool) ProductionBatchResponse {
-	branchName, recipeName, productName, productVariantName, createdByName := s.repo.NameLookups(businessID, batch)
-	response := ProductionBatchResponse{ID: batch.ID, BusinessID: batch.BusinessID, BranchID: batch.BranchID, BranchName: branchName, RecipeID: batch.RecipeID, RecipeName: recipeName, ProductID: batch.ProductID, ProductName: productName, ProductVariantID: batch.ProductVariantID, ProductVariantName: productVariantName, ProductionBatchNumber: batch.ProductionBatchNumber, PlannedQuantity: roundQuantity(batch.PlannedQuantity), ProducedQuantity: roundQuantity(batch.ProducedQuantity), YieldUnitID: batch.YieldUnitID, YieldUnitSymbol: s.repo.UnitSymbol(batch.YieldUnitID), Status: batch.Status, ProductionDate: batch.ProductionDate, StartedAt: batch.StartedAt, CompletedAt: batch.CompletedAt, CancelledAt: batch.CancelledAt, IngredientCost: roundMoney(batch.IngredientCost), PackagingCost: roundMoney(batch.PackagingCost), TotalProductionCost: roundMoney(batch.TotalProductionCost), CostPerUnit: roundQuantity(batch.CostPerUnit), WastageQuantity: roundQuantity(batch.WastageQuantity), WastageReason: batch.WastageReason, Notes: batch.Notes, CreatedByUserID: batch.CreatedByUserID, CreatedByUserName: createdByName, CompletedByUserID: batch.CompletedByUserID, CreatedAt: batch.CreatedAt, UpdatedAt: batch.UpdatedAt}
+	branchName, recipeName, recipeVersionNumber, productName, productVariantName, createdByName := s.repo.NameLookups(businessID, batch)
+	response := ProductionBatchResponse{ID: batch.ID, BusinessID: batch.BusinessID, BranchID: batch.BranchID, BranchName: branchName, RecipeID: batch.RecipeID, RecipeName: recipeName, RecipeVersionNumber: recipeVersionNumber, ProductID: batch.ProductID, ProductName: productName, ProductVariantID: batch.ProductVariantID, ProductVariantName: productVariantName, ProductionBatchNumber: batch.ProductionBatchNumber, PlannedQuantity: roundQuantity(batch.PlannedQuantity), ProducedQuantity: roundQuantity(batch.ProducedQuantity), YieldUnitID: batch.YieldUnitID, YieldUnitSymbol: s.repo.UnitSymbol(batch.YieldUnitID), Status: batch.Status, ProductionDate: batch.ProductionDate, StartedAt: batch.StartedAt, CompletedAt: batch.CompletedAt, CancelledAt: batch.CancelledAt, IngredientCost: roundMoney(batch.IngredientCost), PackagingCost: roundMoney(batch.PackagingCost), TotalProductionCost: roundMoney(batch.TotalProductionCost), CostPerUnit: roundQuantity(batch.CostPerUnit), WastageQuantity: roundQuantity(batch.WastageQuantity), WastageReason: batch.WastageReason, Notes: batch.Notes, CreatedByUserID: batch.CreatedByUserID, CreatedByUserName: createdByName, CompletedByUserID: batch.CompletedByUserID, CreatedAt: batch.CreatedAt, UpdatedAt: batch.UpdatedAt}
 	if includeDetails {
 		ingredients, _ := s.repo.Ingredients(batch.ID, businessID)
 		packaging, _ := s.repo.Packaging(batch.ID, businessID)

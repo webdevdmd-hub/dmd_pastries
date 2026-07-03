@@ -6,6 +6,7 @@ import type { JSX } from "react";
 import { BatchStatusBadge } from "@/components/manufacturing/batch-status-badge";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/routes";
+import { formatRecipeVersionLabel } from "@/lib/manufacturing/recipe-version-display";
 import type { ProductionBatch } from "@/types/manufacturing";
 
 function batchOutputLabel(batch: ProductionBatch): string {
@@ -45,7 +46,7 @@ export function BatchHeader({
           <p>
             Recipe:{" "}
             <span className="font-semibold text-neutral-950">
-              {batch.recipeName} v{batch.recipeVersionNumber}
+              {batch.recipeName} · {formatRecipeVersionLabel(batch.recipeVersionNumber)}
             </span>
           </p>
           <p>

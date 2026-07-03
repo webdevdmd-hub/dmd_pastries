@@ -2,7 +2,7 @@
 
 import { Plus } from "lucide-react";
 import type { JSX } from "react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import { RecipeIngredientLineEditor } from "@/components/recipes/recipe-ingredient-line-editor";
@@ -22,6 +22,12 @@ import type {
   RecipeProductOption,
   RecipeUnitOption,
 } from "@/types/recipes";
+
+export type IngredientPreviewDraft = {
+  draftIndex: number | null;
+  lineId: string | null;
+  payload: RecipeIngredientPayload;
+};
 
 function componentKey(line: {
   componentProductId: string | null;
@@ -55,6 +61,7 @@ export function RecipeIngredientsSection({
   componentProducts,
   draftLines = [],
   onDraftLinesChange,
+  onPreviewDraftChange,
   recipeId,
   units,
 }: {
@@ -62,6 +69,7 @@ export function RecipeIngredientsSection({
   componentProducts: RecipeProductOption[];
   draftLines?: RecipeIngredientPayload[];
   onDraftLinesChange?: (lines: RecipeIngredientPayload[]) => void;
+  onPreviewDraftChange?: (draft: IngredientPreviewDraft | null) => void;
   recipeId: string | null;
   units: RecipeUnitOption[];
 }): JSX.Element {
@@ -73,6 +81,21 @@ export function RecipeIngredientsSection({
   const updateMutation = useUpdateRecipeIngredient();
   const deleteMutation = useDeleteRecipeIngredient();
   const lines = ingredientsQuery.data ?? [];
+  const updatePreviewDraft = useCallback(
+    (payload: RecipeIngredientPayload | null) => {
+      if (payload === null) {
+        onPreviewDraftChange?.(null);
+        return;
+      }
+
+      onPreviewDraftChange?.({
+        draftIndex: recipeId === null ? editingDraftIndex : null,
+        lineId: recipeId !== null && editingLine !== null ? editingLine.id : null,
+        payload,
+      });
+    },
+    [editingDraftIndex, editingLine, onPreviewDraftChange, recipeId],
+  );
 
   const draftLineToRecipeLine = (
     line: RecipeIngredientPayload,
@@ -125,6 +148,7 @@ export function RecipeIngredientsSection({
       onDraftLinesChange?.(nextLines);
       setEditingDraftIndex(null);
       setEditingLine(null);
+      onPreviewDraftChange?.(null);
       setEditorOpen(false);
       return;
     }
@@ -147,6 +171,7 @@ export function RecipeIngredientsSection({
         toast.success("Ingredient line added.");
       }
       setEditingLine(null);
+      onPreviewDraftChange?.(null);
       setEditorOpen(false);
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -206,8 +231,10 @@ export function RecipeIngredientsSection({
             onCancel={() => {
               setEditingDraftIndex(null);
               setEditingLine(null);
+              onPreviewDraftChange?.(null);
               setEditorOpen(false);
             }}
+            onDraftChange={updatePreviewDraft}
             onSubmit={saveLine}
             submitting={addMutation.isPending || updateMutation.isPending}
             units={units}

@@ -108,6 +108,10 @@ function numberValue(value: unknown, fallback = 0): number {
   return typeof value === "number" ? value : fallback;
 }
 
+function nullableNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 function optionalNumber(value: unknown): number | null {
   if (typeof value === "number") {
     return value;
@@ -193,7 +197,7 @@ function parseBatch(value: unknown): ProductionBatch {
     productVariantName: optionalString(value.product_variant_name),
     recipeId: stringValue(value.recipe_id),
     recipeName: stringValue(value.recipe_name, "Recipe"),
-    recipeVersionNumber: numberValue(value.recipe_version_number),
+    recipeVersionNumber: nullableNumber(value.recipe_version_number),
     batchNumber: stringValue(
       value.production_batch_number,
       stringValue(value.batch_number, "Batch"),

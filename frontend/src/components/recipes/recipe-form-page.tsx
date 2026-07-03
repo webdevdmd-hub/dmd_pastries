@@ -10,11 +10,17 @@ import { toast } from "sonner";
 
 import { ProductFormDialog } from "@/components/products/product-form-dialog";
 import { AccessDeniedCard } from "@/components/recipes/access-denied-card";
-import { RecipeCostCard, type RecipeLiveCostPreview } from "@/components/recipes/recipe-cost-card";
+import { RecipeCostCard } from "@/components/recipes/recipe-cost-card";
 import { RecipeHeader } from "@/components/recipes/recipe-header";
-import { RecipeIngredientsSection } from "@/components/recipes/recipe-ingredients-section";
+import {
+  type IngredientPreviewDraft,
+  RecipeIngredientsSection,
+} from "@/components/recipes/recipe-ingredients-section";
 import { RecipeInstructionsCard } from "@/components/recipes/recipe-instructions-card";
-import { RecipePackagingSection } from "@/components/recipes/recipe-packaging-section";
+import {
+  type PackagingPreviewDraft,
+  RecipePackagingSection,
+} from "@/components/recipes/recipe-packaging-section";
 import { RecipeVersionDialog } from "@/components/recipes/recipe-version-dialog";
 import { RecipeYieldCard } from "@/components/recipes/recipe-yield-card";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
@@ -38,11 +44,21 @@ import { useCreateProduct, useProductReferenceData } from "@/hooks/use-products"
 import {
   useCreateRecipe,
   useRecipe,
+  useRecipeIngredients,
+  useRecipePackaging,
   useRecipeReferenceData,
   useUpdateRecipe,
   useUpdateRecipeStatus,
 } from "@/hooks/use-recipes";
 import { getErrorMessage } from "@/lib/api/client";
+import {
+  calculateRecipeLiveCostPreview,
+  ingredientLineToCostInput,
+  packagingLineToCostInput,
+  type RecipeCostIngredientInput,
+  type RecipeCostPackagingInput,
+  type RecipeLiveCostPreview,
+} from "@/lib/recipes/recipe-cost-preview";
 import {
   type CreateRecipeFormValues,
   type CreateRecipeInputValues,
@@ -57,7 +73,6 @@ import type {
   CreateRecipePayload,
   RecipeIngredientPayload,
   RecipePackagingPayload,
-  RecipeProductOption,
   UpdateRecipePayload,
 } from "@/types/recipes";
 
@@ -135,22 +150,6 @@ function toUpdateRecipePayload(values: CreateRecipeFormValues): UpdateRecipePayl
   };
 }
 
-function componentUnitCost(
-  products: RecipeProductOption[],
-  componentProductId: string,
-  componentVariantId: string | null,
-): number {
-  const product = products.find((item) => item.id === componentProductId);
-  const variant =
-    product?.variants.find((productVariant) => productVariant.id === componentVariantId) ?? null;
-
-  return variant?.costPrice ?? product?.costPrice ?? 0;
-}
-
-function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 export function RecipeFormPage({
   onClose,
   onSaved,
@@ -175,9 +174,15 @@ export function RecipeFormPage({
   const canManageRecipePackaging = canSaveRecipe || canManagePackaging;
   const [draftIngredients, setDraftIngredients] = useState<RecipeIngredientPayload[]>([]);
   const [draftPackaging, setDraftPackaging] = useState<RecipePackagingPayload[]>([]);
+  const [ingredientPreviewDraft, setIngredientPreviewDraft] =
+    useState<IngredientPreviewDraft | null>(null);
+  const [packagingPreviewDraft, setPackagingPreviewDraft] =
+    useState<PackagingPreviewDraft | null>(null);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [versionOpen, setVersionOpen] = useState(false);
   const recipeQuery = useRecipe(recipeId, recipeId !== null);
+  const ingredientsQuery = useRecipeIngredients(recipeId, recipeId !== null);
+  const packagingQuery = useRecipePackaging(recipeId, recipeId !== null);
   const referenceQuery = useRecipeReferenceData(true);
   const canCreateProduct = hasAnyPermission([PERMISSIONS.productsCreate]);
   const productReferenceDataQuery = useProductReferenceData(canCreateProduct);
@@ -330,56 +335,76 @@ export function RecipeFormPage({
   );
   const isSaving = createMutation.isPending || updateMutation.isPending || statusMutation.isPending;
   const liveCostPreview = useMemo<RecipeLiveCostPreview>(() => {
-    const ingredientCost = draftIngredients.reduce((total, line) => {
-      const unitCost = componentUnitCost(
-        data.componentProducts,
-        line.componentProductId,
-        line.componentVariantId,
-      );
-      const effectiveQuantity = line.quantityRequired * (1 + line.wastagePercentage / 100);
+    const ingredientInputs: RecipeCostIngredientInput[] =
+      recipeId === null
+        ? [...draftIngredients]
+        : (ingredientsQuery.data ?? []).map(ingredientLineToCostInput);
+    const packagingInputs: RecipeCostPackagingInput[] =
+      recipeId === null
+        ? [...draftPackaging]
+        : (packagingQuery.data ?? []).map(packagingLineToCostInput);
 
-      return total + effectiveQuantity * unitCost;
-    }, 0);
-    const packagingCost = draftPackaging.reduce((total, line) => {
-      const unitCost = componentUnitCost(
-        data.componentProducts,
-        line.componentProductId,
-        line.componentVariantId,
-      );
+    if (ingredientPreviewDraft) {
+      if (recipeId === null && ingredientPreviewDraft.draftIndex !== null) {
+        ingredientInputs[ingredientPreviewDraft.draftIndex] = ingredientPreviewDraft.payload;
+      } else if (recipeId !== null && ingredientPreviewDraft.lineId !== null) {
+        const lineIndex = (ingredientsQuery.data ?? []).findIndex(
+          (line) => line.id === ingredientPreviewDraft.lineId,
+        );
+        if (lineIndex >= 0) {
+          ingredientInputs[lineIndex] = ingredientPreviewDraft.payload;
+        }
+      } else {
+        ingredientInputs.push(ingredientPreviewDraft.payload);
+      }
+    }
 
-      return total + line.quantityRequired * unitCost;
-    }, 0);
-    const totalCost = ingredientCost + packagingCost;
-    const yieldQuantityValid = Number.isFinite(batchYieldQuantity) && batchYieldQuantity > 0;
-    const hasZeroCostComponents =
-      draftIngredients.some(
-        (line) =>
-          componentUnitCost(
-            data.componentProducts,
-            line.componentProductId,
-            line.componentVariantId,
-          ) <= 0,
-      ) ||
-      draftPackaging.some(
-        (line) =>
-          componentUnitCost(
-            data.componentProducts,
-            line.componentProductId,
-            line.componentVariantId,
-          ) <= 0,
-      );
+    if (packagingPreviewDraft) {
+      if (recipeId === null && packagingPreviewDraft.draftIndex !== null) {
+        packagingInputs[packagingPreviewDraft.draftIndex] = packagingPreviewDraft.payload;
+      } else if (recipeId !== null && packagingPreviewDraft.lineId !== null) {
+        const lineIndex = (packagingQuery.data ?? []).findIndex(
+          (line) => line.id === packagingPreviewDraft.lineId,
+        );
+        if (lineIndex >= 0) {
+          packagingInputs[lineIndex] = packagingPreviewDraft.payload;
+        }
+      } else {
+        packagingInputs.push(packagingPreviewDraft.payload);
+      }
+    }
 
-    return {
-      batchYieldQuantity: yieldQuantityValid ? batchYieldQuantity : 0,
-      costPerYieldUnit: yieldQuantityValid ? roundMoney(totalCost / batchYieldQuantity) : 0,
-      estimatedIngredientCost: roundMoney(ingredientCost),
-      estimatedPackagingCost: roundMoney(packagingCost),
-      estimatedTotalCost: roundMoney(totalCost),
-      hasLines: draftIngredients.length > 0 || draftPackaging.length > 0,
-      hasZeroCostComponents,
-      yieldQuantityValid,
-    };
-  }, [batchYieldQuantity, data.componentProducts, draftIngredients, draftPackaging]);
+    return calculateRecipeLiveCostPreview({
+      batchYieldQuantity,
+      componentProducts: data.componentProducts,
+      ingredients: ingredientInputs,
+      packaging: packagingInputs,
+    });
+  }, [
+    batchYieldQuantity,
+    data.componentProducts,
+    draftIngredients,
+    draftPackaging,
+    ingredientPreviewDraft,
+    ingredientsQuery.data,
+    packagingPreviewDraft,
+    packagingQuery.data,
+    recipeId,
+  ]);
+  const previewIngredientCount =
+    (recipeId === null ? draftIngredients.length : (ingredientsQuery.data?.length ?? 0)) +
+    (ingredientPreviewDraft &&
+    ((recipeId === null && ingredientPreviewDraft.draftIndex === null) ||
+      (recipeId !== null && ingredientPreviewDraft.lineId === null))
+      ? 1
+      : 0);
+  const previewPackagingCount =
+    (recipeId === null ? draftPackaging.length : (packagingQuery.data?.length ?? 0)) +
+    (packagingPreviewDraft &&
+    ((recipeId === null && packagingPreviewDraft.draftIndex === null) ||
+      (recipeId !== null && packagingPreviewDraft.lineId === null))
+      ? 1
+      : 0);
   const productOptions = useMemo<SearchableComboboxOption[]>(
     () =>
       data.products.map((product) => ({
@@ -789,6 +814,7 @@ export function RecipeFormPage({
               componentProducts={ingredientComponentProducts}
               draftLines={draftIngredients}
               onDraftLinesChange={setDraftIngredients}
+              onPreviewDraftChange={setIngredientPreviewDraft}
               recipeId={recipeId}
               units={data.units}
             />
@@ -797,6 +823,7 @@ export function RecipeFormPage({
               componentProducts={packagingComponentProducts}
               draftLines={draftPackaging}
               onDraftLinesChange={setDraftPackaging}
+              onPreviewDraftChange={setPackagingPreviewDraft}
               recipeId={recipeId}
               units={data.units}
             />
@@ -842,8 +869,8 @@ export function RecipeFormPage({
               ) : null}
               <RecipeCostCard
                 canRecalculate={canRecalculateRecipeCost}
-                draftIngredientCount={draftIngredients.length}
-                draftPackagingCount={draftPackaging.length}
+                draftIngredientCount={previewIngredientCount}
+                draftPackagingCount={previewPackagingCount}
                 livePreview={liveCostPreview}
                 recipeId={recipeId}
               />

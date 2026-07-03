@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ROUTES } from "@/constants/routes";
+import { formatRecipeVersionLabel } from "@/lib/manufacturing/recipe-version-display";
 import type { ProductionBatch } from "@/types/manufacturing";
 
 function formatDateTime(value: string | null): string {
@@ -114,7 +115,7 @@ export function BatchesTable({
                 </div>
               </TableCell>
               <TableCell className="text-neutral-700">
-                {batch.recipeName} v{batch.recipeVersionNumber}
+                {batch.recipeName} · {formatRecipeVersionLabel(batch.recipeVersionNumber)}
               </TableCell>
               <TableCell className="font-mono text-neutral-950">
                 {formatQuantity(batch.plannedQuantity, batch.batchUnitName)}

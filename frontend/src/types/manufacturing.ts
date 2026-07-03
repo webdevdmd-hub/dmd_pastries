@@ -19,7 +19,7 @@ export type ProductionBatch = {
   productVariantName: string | null;
   recipeId: string;
   recipeName: string;
-  recipeVersionNumber: number;
+  recipeVersionNumber: number | null;
   batchNumber: string;
   plannedQuantity: number;
   producedQuantity: number;

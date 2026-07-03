@@ -23,6 +23,7 @@ type RecipePackagingLineEditorProps = {
   componentProducts: RecipeProductOption[];
   line: RecipePackagingLine | null;
   onCancel: () => void;
+  onDraftChange?: (payload: RecipePackagingPayload | null) => void;
   onSubmit: (payload: RecipePackagingPayload) => Promise<void>;
   submitting: boolean;
   units: RecipeUnitOption[];
@@ -32,6 +33,7 @@ export function RecipePackagingLineEditor({
   componentProducts,
   line,
   onCancel,
+  onDraftChange,
   onSubmit,
   submitting,
   units,
@@ -96,6 +98,29 @@ export function RecipePackagingLineEditor({
       setUnitId(selectedProduct.unitId);
     }
   }, [selectedProduct, unitId.length]);
+
+  useEffect(() => {
+    const parsed = packagingLineSchema.safeParse({
+      componentProductId,
+      componentVariantId,
+      isOptional,
+      quantityRequired,
+      sortOrder,
+      unitId,
+    });
+
+    onDraftChange?.(parsed.success ? parsed.data : null);
+  }, [
+    componentProductId,
+    componentVariantId,
+    isOptional,
+    onDraftChange,
+    quantityRequired,
+    sortOrder,
+    unitId,
+  ]);
+
+  useEffect(() => () => onDraftChange?.(null), [onDraftChange]);
 
   const submit = async (): Promise<void> => {
     const parsed = packagingLineSchema.safeParse({

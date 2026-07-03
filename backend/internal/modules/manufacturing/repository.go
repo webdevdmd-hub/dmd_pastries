@@ -205,9 +205,15 @@ func (r *Repository) UnitSymbol(unitID string) string {
 	return symbol
 }
 
-func (r *Repository) NameLookups(businessID string, batch ProductionBatch) (branchName, recipeName, productName, productVariantName, createdByName string) {
+func (r *Repository) NameLookups(businessID string, batch ProductionBatch) (branchName, recipeName string, recipeVersionNumber int, productName, productVariantName, createdByName string) {
 	_ = r.db.Table("branches").Select("branch_name").Where("id = ? AND business_id = ?", batch.BranchID, businessID).Scan(&branchName).Error
-	_ = r.db.Table("recipes").Select("recipe_name").Where("id = ? AND business_id = ? AND branch_id = ?", batch.RecipeID, businessID, batch.BranchID).Scan(&recipeName).Error
+	var recipeRow struct {
+		RecipeName    string
+		VersionNumber int
+	}
+	_ = r.db.Table("recipes").Select("recipe_name, version_number").Where("id = ? AND business_id = ? AND branch_id = ?", batch.RecipeID, businessID, batch.BranchID).Scan(&recipeRow).Error
+	recipeName = recipeRow.RecipeName
+	recipeVersionNumber = recipeRow.VersionNumber
 	_ = r.db.Table("products").Select("product_name").Where("id = ? AND business_id = ? AND branch_id = ?", batch.ProductID, businessID, batch.BranchID).Scan(&productName).Error
 	if batch.ProductVariantID != nil {
 		_ = r.db.Table("product_variants").Select("variant_name").Where("id = ? AND business_id = ?", *batch.ProductVariantID, businessID).Scan(&productVariantName).Error
