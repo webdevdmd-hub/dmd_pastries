@@ -974,7 +974,10 @@ func (s *Service) writeAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventT
 		EntityType:  "sales_return",
 		EntityID:    entityID,
 		Summary:     summary,
-		IPAddress:   ipAddress,
-		UserAgent:   userAgent,
+		Metadata: audit.Metadata(map[string]interface{}{
+			"source_module": "sales_returns",
+		}, nil),
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
 	})
 }

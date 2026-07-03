@@ -9,6 +9,13 @@ export type ActivityMetadataValue =
   | ActivityMetadataPrimitive[]
   | Record<string, ActivityMetadataPrimitive>;
 
+export type ActivityChange = {
+  field: string;
+  label: string;
+  oldValue: ActivityMetadataPrimitive;
+  newValue: ActivityMetadataPrimitive;
+};
+
 export type ActivityLog = {
   id: string;
   businessId: string;
@@ -26,6 +33,9 @@ export type ActivityLog = {
   recordLabel: string;
   summary: string;
   metadata: Record<string, ActivityMetadataValue>;
+  changes: ActivityChange[];
+  ipAddress: string;
+  userAgent: string;
   createdAt: string;
 };
 

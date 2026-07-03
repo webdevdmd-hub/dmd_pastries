@@ -78,6 +78,7 @@ func (s *Service) UpdateCompanySettings(currentUser *utils.AuthContext, req Upda
 		response := toCompanySettingsResponse(*settings)
 		return &response, nil
 	}
+	changes := companySettingsChanges(*settings, updates)
 
 	updates["updated_at"] = time.Now().UTC()
 	tx := s.db.Begin()
@@ -95,8 +96,11 @@ func (s *Service) UpdateCompanySettings(currentUser *utils.AuthContext, req Upda
 		EntityType:  "settings",
 		EntityID:    settings.ID,
 		Summary:     "Company settings updated.",
-		IPAddress:   ipAddress,
-		UserAgent:   userAgent,
+		Metadata: audit.RecordMetadata(settings.BusinessDisplayName, map[string]interface{}{
+			"source_module": "settings",
+		}, changes),
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
 	}); err != nil {
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to create activity log")
@@ -217,7 +221,20 @@ func (s *Service) CreatePaymentMethod(currentUser *utils.AuthContext, req Create
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to create payment method")
 	}
-	if err := s.writeSettingsAudit(tx, currentUser, "payment_method.created", "payment_method", method.ID, "Payment method created.", ipAddress, userAgent); err != nil {
+	if err := s.writeSettingsAudit(tx, currentUser, "payment_method.created", "payment_method", method.ID, "Payment method created.", ipAddress, userAgent, audit.RecordMetadata(method.MethodName, map[string]interface{}{
+		"method_name":               method.MethodName,
+		"method_type":               method.MethodType,
+		"status":                    method.Status,
+		"default_payment_account":   method.DefaultPaymentAccountID,
+		"show_in_pos":               method.ShowInPOS,
+		"show_in_bakery_orders":     method.ShowInBakeryOrders,
+		"show_in_purchasing":        method.ShowInPurchasing,
+		"show_in_expenses":          method.ShowInExpenses,
+		"show_in_dashboard":         method.ShowInDashboardCollection,
+		"requires_reference":        method.RequiresReference,
+		"allow_split_payment":       method.AllowSplitPayment,
+		"is_default_payment_method": method.IsDefault,
+	}, nil)); err != nil {
 		tx.Rollback()
 		return nil, err
 	}
@@ -228,7 +245,8 @@ func (s *Service) CreatePaymentMethod(currentUser *utils.AuthContext, req Create
 }
 
 func (s *Service) UpdatePaymentMethod(currentUser *utils.AuthContext, id string, req UpdatePaymentMethodRequest, ipAddress, userAgent string) (*PaymentMethodResponse, error) {
-	if _, err := s.repo.FindPaymentMethod(id, currentUser.BusinessID); err != nil {
+	existing, err := s.repo.FindPaymentMethod(id, currentUser.BusinessID)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, apperrors.NotFound("payment method not found")
 		}
@@ -292,6 +310,7 @@ func (s *Service) UpdatePaymentMethod(currentUser *utils.AuthContext, id string,
 	if len(updates) == 0 {
 		return s.GetPaymentMethod(currentUser, id)
 	}
+	changes := paymentMethodChanges(*existing, updates)
 	updates["updated_at"] = time.Now().UTC()
 
 	tx := s.db.Begin()
@@ -311,7 +330,11 @@ func (s *Service) UpdatePaymentMethod(currentUser *utils.AuthContext, id string,
 		}
 		return nil, apperrors.Internal("failed to update payment method")
 	}
-	if err := s.writeSettingsAudit(tx, currentUser, "payment_method.updated", "payment_method", id, "Payment method updated.", ipAddress, userAgent); err != nil {
+	if err := s.writeSettingsAudit(tx, currentUser, "payment_method.updated", "payment_method", id, "Payment method updated.", ipAddress, userAgent, audit.RecordMetadata(existing.MethodName, map[string]interface{}{
+		"method_name": existing.MethodName,
+		"method_type": existing.MethodType,
+		"status":      existing.Status,
+	}, changes)); err != nil {
 		tx.Rollback()
 		return nil, err
 	}
@@ -322,6 +345,13 @@ func (s *Service) UpdatePaymentMethod(currentUser *utils.AuthContext, id string,
 }
 
 func (s *Service) UpdatePaymentMethodStatus(currentUser *utils.AuthContext, id string, req UpdateStatusRequest, ipAddress, userAgent string) (*PaymentMethodResponse, error) {
+	existing, err := s.repo.FindPaymentMethod(id, currentUser.BusinessID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.NotFound("payment method not found")
+		}
+		return nil, apperrors.Internal("failed to fetch payment method")
+	}
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return nil, apperrors.Internal("failed to start transaction")
@@ -337,7 +367,15 @@ func (s *Service) UpdatePaymentMethodStatus(currentUser *utils.AuthContext, id s
 		}
 		return nil, apperrors.Internal("failed to update payment method status")
 	}
-	if err := s.writeSettingsAudit(tx, currentUser, "payment_method.status_changed", "payment_method", id, "Payment method status changed.", ipAddress, userAgent); err != nil {
+	changes := []audit.AuditChange{}
+	audit.AddChange(&changes, "status", "Status", existing.Status, req.Status)
+	if req.Status == "inactive" {
+		audit.AddChange(&changes, "is_default", "Default", existing.IsDefault, false)
+	}
+	if err := s.writeSettingsAudit(tx, currentUser, "payment_method.status_changed", "payment_method", id, "Payment method status changed.", ipAddress, userAgent, audit.RecordMetadata(existing.MethodName, map[string]interface{}{
+		"method_name": existing.MethodName,
+		"status":      req.Status,
+	}, changes)); err != nil {
 		tx.Rollback()
 		return nil, err
 	}
@@ -723,7 +761,14 @@ func (s *Service) CreateTaxRate(currentUser *utils.AuthContext, req CreateTaxRat
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to create tax rate")
 	}
-	if err := s.writeSettingsAudit(tx, currentUser, "tax_rate.created", "tax_rate", taxRate.ID, "Tax rate created.", ipAddress, userAgent); err != nil {
+	if err := s.writeSettingsAudit(tx, currentUser, "tax_rate.created", "tax_rate", taxRate.ID, "Tax rate created.", ipAddress, userAgent, audit.RecordMetadata(taxRate.TaxName, map[string]interface{}{
+		"tax_name":        taxRate.TaxName,
+		"tax_type":        taxRate.TaxType,
+		"rate_percentage": taxRate.RatePercentage,
+		"is_inclusive":    taxRate.IsInclusive,
+		"is_default":      taxRate.IsDefault,
+		"status":          taxRate.Status,
+	}, nil)); err != nil {
 		tx.Rollback()
 		return nil, err
 	}
@@ -734,7 +779,8 @@ func (s *Service) CreateTaxRate(currentUser *utils.AuthContext, req CreateTaxRat
 }
 
 func (s *Service) UpdateTaxRate(currentUser *utils.AuthContext, id string, req UpdateTaxRateRequest, ipAddress, userAgent string) (*TaxRateResponse, error) {
-	if _, err := s.repo.FindTaxRate(id, currentUser.BusinessID); err != nil {
+	existing, err := s.repo.FindTaxRate(id, currentUser.BusinessID)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, apperrors.NotFound("tax rate not found")
 		}
@@ -781,6 +827,7 @@ func (s *Service) UpdateTaxRate(currentUser *utils.AuthContext, id string, req U
 	if len(updates) == 0 {
 		return s.GetTaxRate(currentUser, id)
 	}
+	changes := taxRateChanges(*existing, updates)
 	updates["updated_at"] = time.Now().UTC()
 
 	tx := s.db.Begin()
@@ -800,7 +847,12 @@ func (s *Service) UpdateTaxRate(currentUser *utils.AuthContext, id string, req U
 		}
 		return nil, apperrors.Internal("failed to update tax rate")
 	}
-	if err := s.writeSettingsAudit(tx, currentUser, "tax_rate.updated", "tax_rate", id, "Tax rate updated.", ipAddress, userAgent); err != nil {
+	if err := s.writeSettingsAudit(tx, currentUser, "tax_rate.updated", "tax_rate", id, "Tax rate updated.", ipAddress, userAgent, audit.RecordMetadata(existing.TaxName, map[string]interface{}{
+		"tax_name":        existing.TaxName,
+		"tax_type":        existing.TaxType,
+		"rate_percentage": existing.RatePercentage,
+		"status":          existing.Status,
+	}, changes)); err != nil {
 		tx.Rollback()
 		return nil, err
 	}
@@ -811,6 +863,13 @@ func (s *Service) UpdateTaxRate(currentUser *utils.AuthContext, id string, req U
 }
 
 func (s *Service) UpdateTaxRateStatus(currentUser *utils.AuthContext, id string, req UpdateStatusRequest, ipAddress, userAgent string) (*TaxRateResponse, error) {
+	existing, err := s.repo.FindTaxRate(id, currentUser.BusinessID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.NotFound("tax rate not found")
+		}
+		return nil, apperrors.Internal("failed to fetch tax rate")
+	}
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return nil, apperrors.Internal("failed to start transaction")
@@ -826,7 +885,15 @@ func (s *Service) UpdateTaxRateStatus(currentUser *utils.AuthContext, id string,
 		}
 		return nil, apperrors.Internal("failed to update tax rate status")
 	}
-	if err := s.writeSettingsAudit(tx, currentUser, "tax_rate.status_changed", "tax_rate", id, "Tax rate status changed.", ipAddress, userAgent); err != nil {
+	changes := []audit.AuditChange{}
+	audit.AddChange(&changes, "status", "Status", existing.Status, req.Status)
+	if req.Status == "inactive" {
+		audit.AddChange(&changes, "is_default", "Default", existing.IsDefault, false)
+	}
+	if err := s.writeSettingsAudit(tx, currentUser, "tax_rate.status_changed", "tax_rate", id, "Tax rate status changed.", ipAddress, userAgent, audit.RecordMetadata(existing.TaxName, map[string]interface{}{
+		"tax_name": existing.TaxName,
+		"status":   req.Status,
+	}, changes)); err != nil {
 		tx.Rollback()
 		return nil, err
 	}
@@ -837,6 +904,13 @@ func (s *Service) UpdateTaxRateStatus(currentUser *utils.AuthContext, id string,
 }
 
 func (s *Service) DeleteTaxRate(currentUser *utils.AuthContext, id string, ipAddress, userAgent string) error {
+	existing, err := s.repo.FindTaxRate(id, currentUser.BusinessID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return apperrors.NotFound("tax rate not found")
+		}
+		return apperrors.Internal("failed to fetch tax rate")
+	}
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return apperrors.Internal("failed to start transaction")
@@ -849,7 +923,13 @@ func (s *Service) DeleteTaxRate(currentUser *utils.AuthContext, id string, ipAdd
 		}
 		return apperrors.Internal("failed to deactivate tax rate")
 	}
-	if err := s.writeSettingsAudit(tx, currentUser, "tax_rate.deleted", "tax_rate", id, "Tax rate deactivated.", ipAddress, userAgent); err != nil {
+	changes := []audit.AuditChange{}
+	audit.AddChange(&changes, "status", "Status", existing.Status, "inactive")
+	audit.AddChange(&changes, "is_default", "Default", existing.IsDefault, false)
+	if err := s.writeSettingsAudit(tx, currentUser, "tax_rate.deleted", "tax_rate", id, "Tax rate deactivated.", ipAddress, userAgent, audit.RecordMetadata(existing.TaxName, map[string]interface{}{
+		"tax_name": existing.TaxName,
+		"status":   "inactive",
+	}, changes)); err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -1150,7 +1230,11 @@ func (s *Service) PreviewReceiptLayout(currentUser *utils.AuthContext, id string
 	return &ReceiptLayoutPreviewResponse{Layout: *layout, PreviewData: previewData}, nil
 }
 
-func (s *Service) writeSettingsAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityType, entityID, summary, ipAddress, userAgent string) error {
+func (s *Service) writeSettingsAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityType, entityID, summary, ipAddress, userAgent string, metadata ...map[string]interface{}) error {
+	auditMetadata := map[string]interface{}(nil)
+	if len(metadata) > 0 {
+		auditMetadata = metadata[0]
+	}
 	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{
 		BusinessID:  currentUser.BusinessID,
 		ActorUserID: currentUser.UserID,
@@ -1158,12 +1242,98 @@ func (s *Service) writeSettingsAudit(tx *gorm.DB, currentUser *utils.AuthContext
 		EntityType:  entityType,
 		EntityID:    entityID,
 		Summary:     summary,
+		Metadata:    auditMetadata,
 		IPAddress:   ipAddress,
 		UserAgent:   userAgent,
 	}); err != nil {
 		return apperrors.Internal("failed to create activity log")
 	}
 	return nil
+}
+
+func companySettingsChanges(existing CompanySettings, updates map[string]interface{}) []audit.AuditChange {
+	changes := []audit.AuditChange{}
+	for field, next := range updates {
+		switch field {
+		case "business_display_name":
+			audit.AddChange(&changes, field, "Business display name", existing.BusinessDisplayName, next)
+		case "logo_file_id":
+			audit.AddChange(&changes, field, "Logo file", existing.LogoFileID, next)
+		case "address":
+			audit.AddChange(&changes, field, "Address", existing.Address, next)
+		case "phone":
+			audit.AddChange(&changes, field, "Phone", existing.Phone, next)
+		case "email":
+			audit.AddChange(&changes, field, "Email", existing.Email, next)
+		case "website":
+			audit.AddChange(&changes, field, "Website", existing.Website, next)
+		case "vat_number":
+			audit.AddChange(&changes, field, "VAT number", existing.VATNumber, next)
+		case "currency":
+			audit.AddChange(&changes, field, "Currency", existing.Currency, next)
+		case "timezone":
+			audit.AddChange(&changes, field, "Timezone", existing.Timezone, next)
+		case "invoice_footer":
+			audit.AddChange(&changes, field, "Invoice footer", existing.InvoiceFooter, next)
+		case "receipt_footer":
+			audit.AddChange(&changes, field, "Receipt footer", existing.ReceiptFooter, next)
+		}
+	}
+	return changes
+}
+
+func taxRateChanges(existing TaxRate, updates map[string]interface{}) []audit.AuditChange {
+	changes := []audit.AuditChange{}
+	for field, next := range updates {
+		switch field {
+		case "tax_name":
+			audit.AddChange(&changes, field, "Tax name", existing.TaxName, next)
+		case "tax_type":
+			audit.AddChange(&changes, field, "Tax type", existing.TaxType, next)
+		case "rate_percentage":
+			audit.AddChange(&changes, field, "Rate percentage", existing.RatePercentage, next)
+		case "is_inclusive":
+			audit.AddChange(&changes, field, "Inclusive tax", existing.IsInclusive, next)
+		case "country":
+			audit.AddChange(&changes, field, "Country", existing.Country, next)
+		case "region":
+			audit.AddChange(&changes, field, "Region", existing.Region, next)
+		case "is_default":
+			audit.AddChange(&changes, field, "Default", existing.IsDefault, next)
+		}
+	}
+	return changes
+}
+
+func paymentMethodChanges(existing PaymentMethod, updates map[string]interface{}) []audit.AuditChange {
+	changes := []audit.AuditChange{}
+	for field, next := range updates {
+		switch field {
+		case "method_name":
+			audit.AddChange(&changes, field, "Method name", existing.MethodName, next)
+		case "method_type":
+			audit.AddChange(&changes, field, "Method type", existing.MethodType, next)
+		case "is_default":
+			audit.AddChange(&changes, field, "Default", existing.IsDefault, next)
+		case "allow_split_payment":
+			audit.AddChange(&changes, field, "Allow split payment", existing.AllowSplitPayment, next)
+		case "requires_reference":
+			audit.AddChange(&changes, field, "Requires reference", existing.RequiresReference, next)
+		case "show_in_pos":
+			audit.AddChange(&changes, field, "Show in POS", existing.ShowInPOS, next)
+		case "show_in_bakery_orders":
+			audit.AddChange(&changes, field, "Show in bakery orders", existing.ShowInBakeryOrders, next)
+		case "show_in_purchasing":
+			audit.AddChange(&changes, field, "Show in purchasing", existing.ShowInPurchasing, next)
+		case "show_in_expenses":
+			audit.AddChange(&changes, field, "Show in expenses", existing.ShowInExpenses, next)
+		case "show_in_dashboard_collection":
+			audit.AddChange(&changes, field, "Show in dashboard collection", existing.ShowInDashboardCollection, next)
+		case "default_payment_account_id":
+			audit.AddChange(&changes, field, "Default payment account", existing.DefaultPaymentAccountID, next)
+		}
+	}
+	return changes
 }
 
 func validateTaxType(taxType string) error {

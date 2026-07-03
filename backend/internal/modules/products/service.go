@@ -133,7 +133,17 @@ func (s *Service) CreateProduct(currentUser *utils.AuthContext, req CreateProduc
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to create product")
 	}
-	if err := s.writeAudit(tx, currentUser, "product.created", product.ID, "Product created.", ipAddress, userAgent); err != nil {
+	if err := s.writeAudit(tx, currentUser, "product.created", product.ID, "Product created.", ipAddress, userAgent, audit.RecordMetadata(product.ProductName, map[string]interface{}{
+		"product_name":   product.ProductName,
+		"product_code":   product.ProductCode,
+		"sku":            product.SKU,
+		"branch_id":      product.BranchID,
+		"category_id":    product.CategoryID,
+		"product_type":   product.ProductType,
+		"is_sellable":    product.IsSellable,
+		"is_pos_visible": product.IsPOSVisible,
+		"status":         product.Status,
+	}, nil)); err != nil {
 		tx.Rollback()
 		return nil, err
 	}
@@ -258,7 +268,13 @@ func (s *Service) UpdateProduct(currentUser *utils.AuthContext, id string, req U
 		updates["status"] = req.Status
 	}
 
-	if err := s.updateWithAudit(currentUser, "product.updated", id, "Product updated.", ipAddress, userAgent, func(tx *gorm.DB) error {
+	changes := productChanges(*product, updates)
+	if err := s.updateWithAudit(currentUser, "product.updated", id, "Product updated.", ipAddress, userAgent, audit.RecordMetadata(product.ProductName, map[string]interface{}{
+		"product_name": product.ProductName,
+		"product_code": product.ProductCode,
+		"sku":          product.SKU,
+		"branch_id":    product.BranchID,
+	}, changes), func(tx *gorm.DB) error {
 		return s.repo.Update(tx, id, currentUser.BusinessID, branchID, updates)
 	}); err != nil {
 		return nil, err
@@ -274,7 +290,8 @@ func (s *Service) UpdateProductStatus(currentUser *utils.AuthContext, id string,
 	if !validProductStatus(req.Status) {
 		return nil, apperrors.BadRequest("invalid status", nil)
 	}
-	if _, err := s.repo.FindByID(id, currentUser.BusinessID, branchID); err != nil {
+	product, err := s.repo.FindByID(id, currentUser.BusinessID, branchID)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, apperrors.NotFound("product not found")
 		}
@@ -285,7 +302,13 @@ func (s *Service) UpdateProductStatus(currentUser *utils.AuthContext, id string,
 		updates["is_pos_visible"] = false
 		updates["is_sellable"] = false
 	}
-	if err := s.updateWithAudit(currentUser, "product.status_updated", id, "Product status updated.", ipAddress, userAgent, func(tx *gorm.DB) error {
+	changes := productChanges(*product, updates)
+	if err := s.updateWithAudit(currentUser, "product.status_updated", id, "Product status updated.", ipAddress, userAgent, audit.RecordMetadata(product.ProductName, map[string]interface{}{
+		"product_name": product.ProductName,
+		"product_code": product.ProductCode,
+		"branch_id":    product.BranchID,
+		"status":       req.Status,
+	}, changes), func(tx *gorm.DB) error {
 		return s.repo.Update(tx, id, currentUser.BusinessID, branchID, updates)
 	}); err != nil {
 		return nil, err
@@ -298,7 +321,8 @@ func (s *Service) DeleteProduct(currentUser *utils.AuthContext, id string, ipAdd
 	if err != nil {
 		return err
 	}
-	if _, err := s.repo.FindByID(id, currentUser.BusinessID, branchID); err != nil {
+	product, err := s.repo.FindByID(id, currentUser.BusinessID, branchID)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return apperrors.NotFound("product not found")
 		}
@@ -314,15 +338,21 @@ func (s *Service) DeleteProduct(currentUser *utils.AuthContext, id string, ipAdd
 			"references": references,
 		})
 	}
-	return s.updateWithAudit(currentUser, "product.deleted", id, "Product deleted.", ipAddress, userAgent, func(tx *gorm.DB) error {
-		return s.repo.Update(tx, id, currentUser.BusinessID, branchID, map[string]interface{}{
-			"status":         "archived",
-			"is_pos_visible": false,
-			"is_sellable":    false,
-			"updated_by":     currentUser.UserID,
-			"updated_at":     time.Now().UTC(),
-			"deleted_at":     gorm.DeletedAt{Time: time.Now().UTC(), Valid: true},
-		})
+	updates := map[string]interface{}{
+		"status":         "archived",
+		"is_pos_visible": false,
+		"is_sellable":    false,
+		"updated_by":     currentUser.UserID,
+		"updated_at":     time.Now().UTC(),
+		"deleted_at":     gorm.DeletedAt{Time: time.Now().UTC(), Valid: true},
+	}
+	return s.updateWithAudit(currentUser, "product.deleted", id, "Product deleted.", ipAddress, userAgent, audit.RecordMetadata(product.ProductName, map[string]interface{}{
+		"product_name": product.ProductName,
+		"product_code": product.ProductCode,
+		"branch_id":    product.BranchID,
+		"status":       "archived",
+	}, productChanges(*product, updates)), func(tx *gorm.DB) error {
+		return s.repo.Update(tx, id, currentUser.BusinessID, branchID, updates)
 	})
 }
 
@@ -546,7 +576,7 @@ func (s *Service) generateProductCode(businessID, branchID string) (string, erro
 	return "PRD-" + strconv.FormatInt(time.Now().UnixNano(), 10), nil
 }
 
-func (s *Service) updateWithAudit(currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string, update func(tx *gorm.DB) error) error {
+func (s *Service) updateWithAudit(currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string, metadata map[string]interface{}, update func(tx *gorm.DB) error) error {
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return apperrors.Internal("failed to start transaction")
@@ -558,7 +588,7 @@ func (s *Service) updateWithAudit(currentUser *utils.AuthContext, eventType, ent
 		}
 		return err
 	}
-	if err := s.writeAudit(tx, currentUser, eventType, entityID, summary, ipAddress, userAgent); err != nil {
+	if err := s.writeAudit(tx, currentUser, eventType, entityID, summary, ipAddress, userAgent, metadata); err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -568,7 +598,11 @@ func (s *Service) updateWithAudit(currentUser *utils.AuthContext, eventType, ent
 	return nil
 }
 
-func (s *Service) writeAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {
+func (s *Service) writeAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string, metadata ...map[string]interface{}) error {
+	auditMetadata := map[string]interface{}(nil)
+	if len(metadata) > 0 {
+		auditMetadata = metadata[0]
+	}
 	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{
 		BusinessID:  currentUser.BusinessID,
 		ActorUserID: currentUser.UserID,
@@ -576,12 +610,74 @@ func (s *Service) writeAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventT
 		EntityType:  "product",
 		EntityID:    entityID,
 		Summary:     summary,
+		Metadata:    auditMetadata,
 		IPAddress:   ipAddress,
 		UserAgent:   userAgent,
 	}); err != nil {
 		return apperrors.Internal("failed to create activity log")
 	}
 	return nil
+}
+
+func productChanges(existing Product, updates map[string]interface{}) []audit.AuditChange {
+	changes := []audit.AuditChange{}
+	for field, next := range updates {
+		switch field {
+		case "product_name":
+			audit.AddChange(&changes, field, "Product name", existing.ProductName, next)
+		case "category_id":
+			audit.AddChange(&changes, field, "Category", existing.CategoryID, next)
+		case "unit_id":
+			audit.AddChange(&changes, field, "Unit", existing.UnitID, next)
+		case "tax_rate_id":
+			audit.AddChange(&changes, field, "Tax rate", existing.TaxRateID, next)
+		case "description":
+			audit.AddChange(&changes, field, "Description", existing.Description, next)
+		case "product_type":
+			audit.AddChange(&changes, field, "Product type", existing.ProductType, next)
+		case "item_structure":
+			audit.AddChange(&changes, field, "Item structure", existing.ItemStructure, next)
+		case "sale_price":
+			audit.AddChange(&changes, field, "Sale price", existing.SalePrice, next)
+		case "cost_price":
+			audit.AddChange(&changes, field, "Cost price", existing.CostPrice, next)
+		case "compare_at_price":
+			audit.AddChange(&changes, field, "Compare at price", existing.CompareAtPrice, next)
+		case "cost_update_policy":
+			audit.AddChange(&changes, field, "Cost update policy", existing.CostUpdatePolicy, next)
+		case "pricing_type":
+			audit.AddChange(&changes, field, "Pricing type", existing.PricingType, next)
+		case "pricing_percent":
+			audit.AddChange(&changes, field, "Pricing percent", existing.PricingPercent, next)
+		case "minimum_sale_price":
+			audit.AddChange(&changes, field, "Minimum sale price", existing.MinimumSalePrice, next)
+		case "auto_price_update_enabled":
+			audit.AddChange(&changes, field, "Auto price update", existing.AutoPriceUpdateEnabled, next)
+		case "sale_price_locked":
+			audit.AddChange(&changes, field, "Sale price locked", existing.SalePriceLocked, next)
+		case "sku":
+			audit.AddChange(&changes, field, "SKU", existing.SKU, next)
+		case "barcode":
+			audit.AddChange(&changes, field, "Barcode", existing.Barcode, next)
+		case "image_file_id":
+			audit.AddChange(&changes, field, "Image file", existing.ImageFileID, next)
+		case "is_sellable":
+			audit.AddChange(&changes, field, "Sellable", existing.IsSellable, next)
+		case "is_pos_visible":
+			audit.AddChange(&changes, field, "POS visible", existing.IsPOSVisible, next)
+		case "is_stock_tracked":
+			audit.AddChange(&changes, field, "Stock tracked", existing.IsStockTracked, next)
+		case "is_expiry_tracked":
+			audit.AddChange(&changes, field, "Expiry tracked", existing.IsExpiryTracked, next)
+		case "is_custom_order_available":
+			audit.AddChange(&changes, field, "Custom order available", existing.IsCustomOrderAvailable, next)
+		case "preparation_time_minutes":
+			audit.AddChange(&changes, field, "Preparation time", existing.PreparationTimeMinutes, next)
+		case "status":
+			audit.AddChange(&changes, field, "Status", existing.Status, next)
+		}
+	}
+	return changes
 }
 
 func normalizeListQuery(query *ProductListQuery) {

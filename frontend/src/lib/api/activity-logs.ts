@@ -1,5 +1,6 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
+  ActivityChange,
   ActivityEntityType,
   ActivityLog,
   ActivityLogsResponse,
@@ -24,6 +25,9 @@ type BackendActivityLog = {
   record_label?: string;
   summary?: string;
   metadata?: unknown;
+  changes?: unknown;
+  ip_address?: string;
+  user_agent?: string;
   created_at?: string;
 };
 
@@ -82,6 +86,42 @@ function parseMetadata(value: unknown): Record<string, ActivityMetadataValue> {
     },
     {},
   );
+}
+
+function parseActivityChange(value: unknown): ActivityChange | null {
+  if (!isObject(value)) {
+    return null;
+  }
+
+  const field = typeof value.field === "string" ? value.field : "";
+  const label = typeof value.label === "string" ? value.label : field;
+  const oldValue = isActivityMetadataPrimitive(value.old_value) ? value.old_value : null;
+  const newValue = isActivityMetadataPrimitive(value.new_value) ? value.new_value : null;
+
+  if (!field && !label) {
+    return null;
+  }
+
+  return {
+    field,
+    label: label || field,
+    oldValue,
+    newValue,
+  };
+}
+
+function parseActivityChanges(value: unknown): ActivityChange[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.reduce<ActivityChange[]>((changes, item) => {
+    const change = parseActivityChange(item);
+    if (change !== null) {
+      changes.push(change);
+    }
+    return changes;
+  }, []);
 }
 
 function parseActivityLog(value: unknown): ActivityLog {
@@ -143,6 +183,9 @@ function parseActivityLog(value: unknown): ActivityLog {
         : "Unknown record",
     summary,
     metadata: parseMetadata(backendActivity.metadata),
+    changes: parseActivityChanges(backendActivity.changes),
+    ipAddress: typeof backendActivity.ip_address === "string" ? backendActivity.ip_address : "",
+    userAgent: typeof backendActivity.user_agent === "string" ? backendActivity.user_agent : "",
     createdAt,
   };
 }

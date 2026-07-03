@@ -301,6 +301,18 @@ func (r *Repository) lookupRecordLabel(businessID, entityType, entityID string) 
 		var row struct{ ReturnNumber string }
 		_ = r.db.Unscoped().Table("purchase_returns").Select("return_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
 		return row.ReturnNumber
+	case "supplier_payment", "supplier_payments":
+		var row struct {
+			ReferenceNumber           string
+			PaymentMethodNameSnapshot string
+			SupplierName              string
+		}
+		_ = r.db.Unscoped().Table("supplier_payments AS sp").
+			Select("sp.reference_number, sp.payment_method_name_snapshot, COALESCE(s.supplier_name, '') AS supplier_name").
+			Joins("LEFT JOIN suppliers s ON s.id = sp.supplier_id AND s.business_id = sp.business_id").
+			Where("sp.business_id = ? AND sp.id = ?", businessID, entityID).
+			Scan(&row).Error
+		return joinLabel(firstNonEmpty(row.ReferenceNumber, row.PaymentMethodNameSnapshot), row.SupplierName)
 	case "supplier", "suppliers":
 		var row struct{ SupplierName, SupplierCode string }
 		_ = r.db.Unscoped().Table("suppliers").Select("supplier_name, supplier_code").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error

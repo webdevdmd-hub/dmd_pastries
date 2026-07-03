@@ -83,8 +83,16 @@ function formatMetadataValue(value: ActivityMetadataValue): string {
   return String(value ?? "Empty");
 }
 
+function formatAuditValue(value: ActivityMetadataValue | null): string {
+  if (value === null) {
+    return "Empty";
+  }
+  return formatMetadataValue(value);
+}
+
 function visibleMetadataEntries(metadata: ActivityLog["metadata"]): [string, ActivityMetadataValue][] {
   const hiddenKeys = new Set([
+    "changes",
     "record_label",
     "record_name",
     "name",
@@ -192,6 +200,35 @@ function LogsList({
           {item.summary && item.summary !== item.actionLabel && item.summary !== item.recordLabel ? (
             <p className="mt-3 text-sm text-brand-mocha">{item.summary}</p>
           ) : null}
+          {item.changes.length > 0 ? (
+            <div className="mt-3 overflow-hidden rounded-2xl border border-brand-cappuccino/70 bg-white">
+              <div className="bg-brand-latte/50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
+                Changed values
+              </div>
+              <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)] border-t border-brand-cappuccino/60 text-xs">
+                <div className="border-r border-brand-cappuccino/60 px-3 py-2 font-semibold text-brand-espresso">
+                  Field
+                </div>
+                <div className="border-r border-brand-cappuccino/60 px-3 py-2 font-semibold text-brand-espresso">
+                  Old value
+                </div>
+                <div className="px-3 py-2 font-semibold text-brand-espresso">New value</div>
+                {item.changes.map((change) => (
+                  <div className="contents" key={`${change.field}-${change.label}`}>
+                    <div className="border-r border-t border-brand-cappuccino/60 px-3 py-2 font-medium text-brand-espresso">
+                      {change.label || labelFromKey(change.field)}
+                    </div>
+                    <div className="break-words border-r border-t border-brand-cappuccino/60 px-3 py-2 text-brand-mocha">
+                      {formatAuditValue(change.oldValue)}
+                    </div>
+                    <div className="break-words border-t border-brand-cappuccino/60 px-3 py-2 text-brand-mocha">
+                      {formatAuditValue(change.newValue)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {visibleMetadataEntries(item.metadata).length > 0 ? (
             <div className="mt-3 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/40 p-3">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
@@ -205,6 +242,15 @@ function LogsList({
                   </div>
                 ))}
               </dl>
+            </div>
+          ) : null}
+          {item.ipAddress || item.userAgent ? (
+            <div className="mt-3 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/30 p-3 text-xs text-brand-mocha">
+              <p className="font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
+                Access context
+              </p>
+              {item.ipAddress ? <p className="mt-1">IP address: {item.ipAddress}</p> : null}
+              {item.userAgent ? <p className="mt-1 break-words">Device: {item.userAgent}</p> : null}
             </div>
           ) : null}
           <p className="mt-3 text-xs text-brand-mocha/70">

@@ -24,6 +24,9 @@ type ActivityLogResponse struct {
 	RecordLabel     string                 `json:"record_label"`
 	Summary         string                 `json:"summary"`
 	Metadata        map[string]interface{} `json:"metadata"`
+	Changes         []AuditChange          `json:"changes"`
+	IPAddress       string                 `json:"ip_address"`
+	UserAgent       string                 `json:"user_agent"`
 	CreatedAt       time.Time              `json:"created_at"`
 }
 
@@ -83,6 +86,9 @@ func ToActivityLogResponseWithDisplay(log AuditLog, actor *ActivityUserDisplay, 
 		RecordLabel:     recordLabel,
 		Summary:         summary,
 		Metadata:        metadata,
+		Changes:         ParseChanges(metadata),
+		IPAddress:       log.IPAddress,
+		UserAgent:       log.UserAgent,
 		CreatedAt:       log.CreatedAt,
 	}
 }
@@ -140,7 +146,7 @@ func moduleLabel(entityType string) string {
 		return "Bakery Orders"
 	case "expense", "expenses":
 		return "Expenses"
-	case "purchase_order", "purchase_orders", "purchase_invoice", "purchase_invoices", "purchase_receipt", "purchase_receipts", "purchase_return", "purchase_returns", "purchasing":
+	case "purchase_order", "purchase_orders", "purchase_invoice", "purchase_invoices", "purchase_receipt", "purchase_receipts", "purchase_return", "purchase_returns", "supplier_payment", "supplier_payments", "purchasing":
 		return "Purchasing"
 	case "supplier", "suppliers":
 		return "Suppliers"

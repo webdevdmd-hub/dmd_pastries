@@ -1415,7 +1415,23 @@ func productionPreviewHasZeroCost(componentLines, packagingLines []ProductionPre
 }
 
 func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {
-	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: "manufacturing", EntityID: entityID, Summary: summary, IPAddress: ipAddress, UserAgent: userAgent})
+	entityType := "manufacturing"
+	if strings.HasPrefix(eventType, "production_batch.") || strings.HasPrefix(eventType, "production.") {
+		entityType = "production_batch"
+	}
+	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{
+		BusinessID:  currentUser.BusinessID,
+		ActorUserID: currentUser.UserID,
+		EventType:   eventType,
+		EntityType:  entityType,
+		EntityID:    entityID,
+		Summary:     summary,
+		Metadata: audit.Metadata(map[string]interface{}{
+			"source_module": "manufacturing",
+		}, nil),
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
+	})
 }
 
 func normalizeQuery(query *BatchListQuery) {

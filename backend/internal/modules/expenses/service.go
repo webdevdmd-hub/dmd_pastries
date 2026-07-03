@@ -119,11 +119,14 @@ func (s *Service) Create(currentUser *utils.AuthContext, req CreateExpenseReques
 			EntityType:  "expenses",
 			EntityID:    created.ID,
 			Summary:     "Expense created and posted",
-			Metadata: map[string]interface{}{
-				"expense_number": created.ExpenseNumber,
-				"amount":         created.Amount,
-				"journal_entry":  entryID,
-			},
+			Metadata: audit.RecordMetadata(created.ExpenseNumber, map[string]interface{}{
+				"expense_number":   created.ExpenseNumber,
+				"reference_number": created.ReferenceNumber,
+				"branch_id":        created.BranchID,
+				"amount":           created.Amount,
+				"journal_entry":    entryID,
+				"status":           created.Status,
+			}, nil),
 			IPAddress: ipAddress,
 			UserAgent: userAgent,
 		})
@@ -214,6 +217,7 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateEx
 		if err := s.repo.Update(tx, currentUser.BusinessID, id, updates); err != nil {
 			return err
 		}
+		changes := expenseChanges(*existing, updated)
 		return s.auditRepo.CreateActivity(tx, audit.ActivityInput{
 			BusinessID:  currentUser.BusinessID,
 			ActorUserID: currentUser.UserID,
@@ -221,10 +225,13 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateEx
 			EntityType:  "expenses",
 			EntityID:    id,
 			Summary:     "Expense updated",
-			Metadata: map[string]interface{}{
+			Metadata: audit.RecordMetadata(existing.ExpenseNumber, map[string]interface{}{
 				"expense_number":     existing.ExpenseNumber,
+				"reference_number":   updated.ReferenceNumber,
+				"branch_id":          updated.BranchID,
+				"amount":             updated.Amount,
 				"accounting_changed": accountingChanged,
-			},
+			}, changes),
 			IPAddress: ipAddress,
 			UserAgent: userAgent,
 		})
@@ -264,14 +271,35 @@ func (s *Service) Delete(currentUser *utils.AuthContext, id string, ipAddress, u
 			EntityType:  "expenses",
 			EntityID:    id,
 			Summary:     "Expense hard deleted",
-			Metadata: map[string]interface{}{
-				"expense_number":  expense.ExpenseNumber,
-				"journal_entries": journalIDs,
-			},
+			Metadata: audit.RecordMetadata(expense.ExpenseNumber, map[string]interface{}{
+				"expense_number":   expense.ExpenseNumber,
+				"reference_number": expense.ReferenceNumber,
+				"branch_id":        expense.BranchID,
+				"amount":           expense.Amount,
+				"journal_entries":  journalIDs,
+			}, []audit.AuditChange{
+				{Field: "status", Label: "Status", OldValue: expense.Status, NewValue: "deleted"},
+			}),
 			IPAddress: ipAddress,
 			UserAgent: userAgent,
 		})
 	})
+}
+
+func expenseChanges(existing, updated Expense) []audit.AuditChange {
+	changes := []audit.AuditChange{}
+	audit.AddChange(&changes, "branch_id", "Branch", existing.BranchID, updated.BranchID)
+	audit.AddChange(&changes, "expense_date", "Expense date", existing.ExpenseDate, updated.ExpenseDate)
+	audit.AddChange(&changes, "expense_account_id", "Expense account", existing.ExpenseAccountID, updated.ExpenseAccountID)
+	audit.AddChange(&changes, "paid_through_account_id", "Paid through", existing.PaidThroughAccountID, updated.PaidThroughAccountID)
+	audit.AddChange(&changes, "supplier_id", "Supplier", existing.SupplierID, updated.SupplierID)
+	audit.AddChange(&changes, "customer_id", "Customer", existing.CustomerID, updated.CustomerID)
+	audit.AddChange(&changes, "amount", "Amount", existing.Amount, updated.Amount)
+	audit.AddChange(&changes, "reference_number", "Reference number", existing.ReferenceNumber, updated.ReferenceNumber)
+	audit.AddChange(&changes, "notes", "Notes", existing.Notes, updated.Notes)
+	audit.AddChange(&changes, "receipt_file_id", "Receipt file", existing.ReceiptFileID, updated.ReceiptFileID)
+	audit.AddChange(&changes, "is_billable", "Billable", existing.IsBillable, updated.IsBillable)
+	return changes
 }
 
 type normalizedExpenseInput struct {

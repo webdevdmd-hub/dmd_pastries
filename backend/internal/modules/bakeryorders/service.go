@@ -1277,11 +1277,11 @@ func (s *Service) itemResponses(businessID string, items []BakeryOrderItem) []Ba
 }
 
 func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {
-	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: "bakery_order", EntityID: entityID, Summary: summary, IPAddress: ipAddress, UserAgent: userAgent})
+	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: "bakery_order", EntityID: entityID, Summary: summary, Metadata: audit.Metadata(map[string]interface{}{"source_module": "bakery_orders"}, nil), IPAddress: ipAddress, UserAgent: userAgent})
 }
 
 func (s *Service) auditEntity(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityType, entityID, summary, ipAddress, userAgent string) error {
-	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: entityType, EntityID: entityID, Summary: summary, IPAddress: ipAddress, UserAgent: userAgent})
+	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: entityType, EntityID: entityID, Summary: summary, Metadata: audit.Metadata(map[string]interface{}{"source_module": "bakery_orders"}, nil), IPAddress: ipAddress, UserAgent: userAgent})
 }
 
 func orderTotals(items []BakeryOrderItem) (float64, float64, float64, float64) {

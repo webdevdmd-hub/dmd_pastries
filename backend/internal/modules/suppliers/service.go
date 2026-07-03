@@ -484,7 +484,7 @@ func (s *Service) withTransaction(fn func(tx *gorm.DB) error) error {
 }
 
 func (s *Service) writeAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {
-	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: "suppliers", EntityID: entityID, Summary: summary, IPAddress: ipAddress, UserAgent: userAgent}); err != nil {
+	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: "suppliers", EntityID: entityID, Summary: summary, Metadata: audit.Metadata(map[string]interface{}{"source_module": "suppliers"}, nil), IPAddress: ipAddress, UserAgent: userAgent}); err != nil {
 		return apperrors.Internal("failed to create activity log")
 	}
 	return nil

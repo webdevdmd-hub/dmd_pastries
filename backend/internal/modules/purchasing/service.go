@@ -3912,7 +3912,37 @@ func (s *Service) receiptResponse(businessID string, receipt PurchaseReceipt, in
 }
 
 func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {
-	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: "purchasing", EntityID: entityID, Summary: summary, IPAddress: ipAddress, UserAgent: userAgent})
+	entityType := purchasingAuditEntityType(eventType)
+	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{
+		BusinessID:  currentUser.BusinessID,
+		ActorUserID: currentUser.UserID,
+		EventType:   eventType,
+		EntityType:  entityType,
+		EntityID:    entityID,
+		Summary:     summary,
+		Metadata: audit.Metadata(map[string]interface{}{
+			"source_module": "purchasing",
+		}, nil),
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
+	})
+}
+
+func purchasingAuditEntityType(eventType string) string {
+	switch {
+	case strings.HasPrefix(eventType, "purchase_order."):
+		return "purchase_order"
+	case strings.HasPrefix(eventType, "purchase_invoice."):
+		return "purchase_invoice"
+	case strings.HasPrefix(eventType, "purchase_receipt."), eventType == "purchase_stock_received":
+		return "purchase_receipt"
+	case strings.HasPrefix(eventType, "purchase_return."):
+		return "purchase_return"
+	case strings.HasPrefix(eventType, "supplier_payment."):
+		return "supplier_payment"
+	default:
+		return "purchasing"
+	}
 }
 
 type totals struct{ Subtotal, Tax, Discount, Total float64 }
