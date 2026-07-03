@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { isBakeryOrderProduct } from "@/lib/selectors/eligibility";
 import { cn } from "@/lib/utils/cn";
 import type { Unit } from "@/types/master-data";
 import type { CreateOrderItemPayload } from "@/types/orders";
@@ -98,7 +99,7 @@ export function OrderItemEditor({
   }, [products]);
   const productOptions = useMemo<SearchableComboboxOption[]>(
     () =>
-      products.map((product) => ({
+      products.filter(isBakeryOrderProduct).map((product) => ({
         value: parentProductValue(product.id),
         label: product.productName,
         description: [

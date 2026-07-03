@@ -22,6 +22,11 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { usePermission } from "@/hooks/use-permission";
 import { useCreateProduct, useProductReferenceData } from "@/hooks/use-products";
 import { getErrorMessage } from "@/lib/api/client";
+import {
+  isLedgerAllowedForContext,
+  isPurchasableProduct,
+  isSelectableTaxRate,
+} from "@/lib/selectors/eligibility";
 import type { ChartAccount } from "@/types/accounting";
 import type { CreateProductPayload, Product } from "@/types/product";
 import { PRODUCT_TYPE_LABELS } from "@/types/product";
@@ -185,7 +190,7 @@ export function PurchasingItemLineEditor({
   const productReferenceDataQuery = useProductReferenceData(canCreateProductInEditor);
   const productOptions = useMemo<SearchableComboboxOption[]>(
     () =>
-      products.map((product) => ({
+      products.filter(isPurchasableProduct).map((product) => ({
         description: [
           PRODUCT_TYPE_LABELS[product.productType],
           product.productCode,
@@ -219,7 +224,7 @@ export function PurchasingItemLineEditor({
   const accountOptions = useMemo<SearchableComboboxOption[]>(
     () =>
       accounts
-        .filter((account) => account.status === "active")
+        .filter((account) => isLedgerAllowedForContext(account, "purchase_line_account"))
         .map((account) => ({
           description: [account.accountType.toUpperCase(), account.accountGroup]
             .filter(Boolean)
@@ -674,7 +679,7 @@ export function PurchasingItemLineEditor({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">No tax</SelectItem>
-                          {taxRates.map((rate) => (
+                          {taxRates.filter(isSelectableTaxRate).map((rate) => (
                             <SelectItem key={rate.id} value={rate.id}>
                               {rate.taxName} ({rate.taxPercentage}%)
                             </SelectItem>

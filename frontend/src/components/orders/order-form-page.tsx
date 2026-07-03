@@ -142,6 +142,7 @@ export function OrderFormPage({
     {
       categoryId: "",
       isPosVisible: "all",
+      isSellable: "true",
       limit: 100,
       page: 1,
       productType: "all",

@@ -71,6 +71,7 @@ type ProductListQuery struct {
 	ItemStructure  string
 	Status         string
 	IsPOSVisible   *bool
+	IsSellable     *bool
 	IsStockTracked *bool
 	Page           int
 	Limit          int

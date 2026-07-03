@@ -38,6 +38,7 @@ import {
   useUpdateSupplierPayment,
 } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { isPurchasingPaymentMethod } from "@/lib/selectors/eligibility";
 import type {
   CreateSupplierPaymentPayload,
   PurchaseInvoice,
@@ -149,10 +150,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   const updatePaymentMutation = useUpdateSupplierPayment();
   const deletePaymentMutation = useDeleteSupplierPayment();
   const purchasingPaymentMethods = useMemo(
-    () =>
-      (methodsQuery.data ?? []).filter(
-        (method) => method.status === "active" && method.showInPurchasing,
-      ),
+    () => (methodsQuery.data ?? []).filter(isPurchasingPaymentMethod),
     [methodsQuery.data],
   );
   const isPermissionDenied =

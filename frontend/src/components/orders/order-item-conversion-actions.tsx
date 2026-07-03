@@ -147,6 +147,7 @@ export function OrderItemConversionActions({
     {
       categoryId: "all",
       isPosVisible: "all",
+      isSellable: "all",
       limit: 250,
       page: 1,
       productType: "all",

@@ -21,6 +21,7 @@ const defaultFilters: ProductListFilters = {
   itemStructure: "all",
   status: "all",
   isPosVisible: "all",
+  isSellable: "all",
   page: 1,
   limit: 20,
   sortBy: "created_at",
@@ -39,6 +40,7 @@ export function ProductsToolbar({
     filters.itemStructure !== "all",
     filters.status !== "all",
     filters.isPosVisible !== "all",
+    filters.isSellable !== "all",
   ].filter(Boolean).length;
 
   return (

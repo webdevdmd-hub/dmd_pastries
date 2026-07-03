@@ -377,6 +377,9 @@ func applyProductFilters(db *gorm.DB, query ProductListQuery) *gorm.DB {
 	if query.IsPOSVisible != nil {
 		db = db.Where("is_pos_visible = ?", *query.IsPOSVisible)
 	}
+	if query.IsSellable != nil {
+		db = db.Where("is_sellable = ?", *query.IsSellable)
+	}
 	if query.IsStockTracked != nil {
 		db = db.Where("is_stock_tracked = ?", *query.IsStockTracked)
 	}

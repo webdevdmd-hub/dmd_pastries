@@ -830,6 +830,9 @@ function buildProductsPath(filters: ProductListFilters): string {
   if (filters.isPosVisible !== "all") {
     params.set("is_pos_visible", filters.isPosVisible);
   }
+  if (filters.isSellable !== "all") {
+    params.set("is_sellable", filters.isSellable);
+  }
   params.set("page", String(filters.page));
   params.set("limit", String(filters.limit));
   params.set("sort_by", filters.sortBy);

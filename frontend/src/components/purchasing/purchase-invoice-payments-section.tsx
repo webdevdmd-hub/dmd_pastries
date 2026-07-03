@@ -14,6 +14,7 @@ import { usePaymentMethods } from "@/hooks/use-payments";
 import { useAddSupplierInvoicePayment, useSupplierInvoicePayments } from "@/hooks/use-purchasing";
 import { getErrorMessage } from "@/lib/api/client";
 import { supplierPaymentErrorMessage } from "@/lib/purchasing/supplier-payment-errors";
+import { isPurchasingPaymentMethod } from "@/lib/selectors/eligibility";
 import type { AddSupplierPaymentPayload, PurchaseInvoice } from "@/types/purchasing";
 
 function formatCurrency(value: number): string {
@@ -32,9 +33,7 @@ export function PurchaseInvoicePaymentsSection({
   const methodsQuery = usePaymentMethods(canManage);
   const addPaymentMutation = useAddSupplierInvoicePayment();
   const canAddPayment = canManage && invoice.status === "posted" && invoice.balanceAmount > 0;
-  const purchasingPaymentMethods = (methodsQuery.data ?? []).filter(
-    (method) => method.status === "active" && method.showInPurchasing,
-  );
+  const purchasingPaymentMethods = (methodsQuery.data ?? []).filter(isPurchasingPaymentMethod);
 
   const handleAddPayment = async (payload: AddSupplierPaymentPayload): Promise<void> => {
     try {

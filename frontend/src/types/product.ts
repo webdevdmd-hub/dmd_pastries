@@ -132,6 +132,7 @@ export type ProductListFilters = {
   itemStructure: ItemStructure | "all";
   status: ProductStatus | "all";
   isPosVisible: "all" | "true" | "false";
+  isSellable: "all" | "true" | "false";
   page: number;
   limit: number;
   sortBy: "created_at" | "updated_at" | "product_name" | "sale_price";

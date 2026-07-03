@@ -73,6 +73,7 @@ const initialFilters: ProductListFilters = {
   itemStructure: "all",
   status: "all",
   isPosVisible: "all",
+  isSellable: "all",
   page: 1,
   limit: 20,
   sortBy: "created_at",

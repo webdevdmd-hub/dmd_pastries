@@ -247,6 +247,7 @@ export function RecipeIngredientsSection({
             }}
             onDraftChange={updatePreviewDraft}
             onSubmit={saveLine}
+            parentProductId={parentProductId}
             submitting={addMutation.isPending || updateMutation.isPending}
             units={units}
           />

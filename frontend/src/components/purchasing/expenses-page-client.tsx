@@ -66,6 +66,10 @@ import { usePermission } from "@/hooks/use-permission";
 import { usePurchasingBranches, usePurchasingSuppliers } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import { uploadStorageFile } from "@/lib/appwrite/storage";
+import {
+  isLedgerAllowedForContext,
+  isPaymentAccountForBranch,
+} from "@/lib/selectors/eligibility";
 import type { AccountingAccountType, ChartAccount, PaymentAccount } from "@/types/accounting";
 import type { Customer } from "@/types/customer";
 import type {
@@ -168,8 +172,7 @@ function accountOptions(
   return accounts
     .filter(
       (account) =>
-        account.status === "active" &&
-        account.allowManualPosting &&
+        isLedgerAllowedForContext(account, "expense_category_account") &&
         types.includes(account.accountType),
     )
     .map((account) => ({
@@ -185,10 +188,6 @@ function accountOptions(
     }));
 }
 
-function isPaymentAccountAvailableForBranch(account: PaymentAccount, branchId: string): boolean {
-  return account.branchId === null || account.branchId === branchId;
-}
-
 function paidThroughOptions(
   accounts: PaymentAccount[],
   branchId: string,
@@ -196,11 +195,8 @@ function paidThroughOptions(
   return accounts
     .filter(
       (account) =>
-        account.status === "active" &&
-        account.chartAccountType === "asset" &&
-        account.chartAccountAllowManualPosting &&
         account.chartAccountId.length > 0 &&
-        isPaymentAccountAvailableForBranch(account, branchId),
+        isPaymentAccountForBranch(account, branchId),
     )
     .map((account) => ({
       description: [

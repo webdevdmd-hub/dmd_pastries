@@ -70,6 +70,7 @@ import {
 import { useBranches } from "@/hooks/use-branches";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
+import { isLedgerAllowedForContext } from "@/lib/selectors/eligibility";
 import { journalEntrySchema } from "@/lib/validators/accounting.schema";
 import type {
   ChartAccount,
@@ -230,7 +231,7 @@ function toPayload(state: EntryFormState): CreateJournalEntryPayload {
 }
 
 function usableAccounts(accounts: ChartAccount[]): ChartAccount[] {
-  return accounts.filter((account) => account.status === "active" && account.allowManualPosting);
+  return accounts.filter((account) => isLedgerAllowedForContext(account, "journal_line_account"));
 }
 
 function mergeAccounts(...groups: ChartAccount[][]): ChartAccount[] {

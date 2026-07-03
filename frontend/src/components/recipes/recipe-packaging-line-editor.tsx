@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { isRecipeComponentProduct } from "@/lib/selectors/eligibility";
 import { packagingLineSchema } from "@/lib/validators/recipes.schema";
 import { PRODUCT_TYPE_LABELS } from "@/types/product";
 import type {
@@ -25,6 +26,7 @@ type RecipePackagingLineEditorProps = {
   onCancel: () => void;
   onDraftChange?: (payload: RecipePackagingPayload | null) => void;
   onSubmit: (payload: RecipePackagingPayload) => Promise<void>;
+  parentProductId: string;
   submitting: boolean;
   units: RecipeUnitOption[];
 };
@@ -35,6 +37,7 @@ export function RecipePackagingLineEditor({
   onCancel,
   onDraftChange,
   onSubmit,
+  parentProductId,
   submitting,
   units,
 }: RecipePackagingLineEditorProps): JSX.Element {
@@ -51,26 +54,28 @@ export function RecipePackagingLineEditor({
     selectedProduct !== undefined && !selectedProductHasDefaultUnit && unitId.length === 0;
   const packagingOptions = useMemo<SearchableComboboxOption[]>(
     () =>
-      componentProducts.map((item) => ({
-        value: item.id,
-        label: item.productName,
-        description: `${PRODUCT_TYPE_LABELS[item.productType]} · ${item.isStockTracked ? "Stock tracked" : "Not stock tracked"} · ${item.unitSymbol || item.unitName}`,
-        keywords: [
-          item.productName,
-          item.productCode,
-          item.sku ?? "",
-          item.barcode ?? "",
-          PRODUCT_TYPE_LABELS[item.productType],
-          item.unitName,
-          item.unitSymbol,
-          ...item.variants.flatMap((variant) => [
-            variant.variantName,
-            variant.sku ?? "",
-            variant.barcode ?? "",
-          ]),
-        ],
-      })),
-    [componentProducts],
+      componentProducts
+        .filter((item) => isRecipeComponentProduct(item, parentProductId))
+        .map((item) => ({
+          value: item.id,
+          label: item.productName,
+          description: `${PRODUCT_TYPE_LABELS[item.productType]} · ${item.isStockTracked ? "Stock tracked" : "Not stock tracked"} · ${item.unitSymbol || item.unitName}`,
+          keywords: [
+            item.productName,
+            item.productCode,
+            item.sku ?? "",
+            item.barcode ?? "",
+            PRODUCT_TYPE_LABELS[item.productType],
+            item.unitName,
+            item.unitSymbol,
+            ...item.variants.flatMap((variant) => [
+              variant.variantName,
+              variant.sku ?? "",
+              variant.barcode ?? "",
+            ]),
+          ],
+        })),
+    [componentProducts, parentProductId],
   );
   const variantOptions = useMemo<SearchableComboboxOption[]>(
     () =>

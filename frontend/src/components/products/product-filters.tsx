@@ -137,6 +137,28 @@ export function ProductFilters({
         </Select>
       </div>
       <div>
+        <Label>Sellable</Label>
+        <Select
+          onValueChange={(value) =>
+            onFiltersChange({
+              ...filters,
+              page: 1,
+              isSellable: value as ProductListFilters["isSellable"],
+            })
+          }
+          value={filters.isSellable}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder="All" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="true">Yes</SelectItem>
+            <SelectItem value="false">No</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
         <Label>POS Visible</Label>
         <Select
           onValueChange={(value) =>

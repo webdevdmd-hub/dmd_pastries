@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getProductImagePreviewUrl, uploadProductImage } from "@/lib/appwrite/storage";
+import { isSelectableTaxRate } from "@/lib/selectors/eligibility";
 import { type ProductSchema, productSchema } from "@/lib/validators/product.schema";
 import type { ProductReferenceData } from "@/types/product";
 import {
@@ -534,7 +535,7 @@ export function ProductFormDialog({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none">No tax rate</SelectItem>
-                      {referenceData.taxRates.map((taxRate) => (
+                      {referenceData.taxRates.filter(isSelectableTaxRate).map((taxRate) => (
                         <SelectItem key={taxRate.id} value={taxRate.id}>
                           {taxRate.taxName} ({taxRate.ratePercentage}%)
                         </SelectItem>
