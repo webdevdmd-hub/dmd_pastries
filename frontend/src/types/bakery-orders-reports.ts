@@ -51,8 +51,12 @@ export type ProductionScheduleRow = {
   assignedBatchNumber: string;
   branchName: string;
   eventDate: string;
+  hasProductionRecord: boolean;
   orderNumber: string;
+  orderStatus: string;
   productName: string;
+  productionBatchStatus: string;
+  productionNote: string;
   productionStatus: string;
   quantity: number;
 };

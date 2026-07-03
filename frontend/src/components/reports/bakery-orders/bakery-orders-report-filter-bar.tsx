@@ -25,6 +25,21 @@ import type { ReportDatePreset } from "@/types/reports";
 
 const allValue = "all";
 
+export type BakeryOrdersReportStatusOption = {
+  label: string;
+  value: string;
+};
+
+const defaultOrderStatusOptions: BakeryOrdersReportStatusOption[] = [
+  { label: "New", value: "new" },
+  { label: "Confirmed", value: "confirmed" },
+  { label: "In production", value: "in_production" },
+  { label: "Ready", value: "ready" },
+  { label: "Delivered", value: "delivered" },
+  { label: "Completed", value: "completed" },
+  { label: "Cancelled", value: "cancelled" },
+];
+
 export type BakeryOrdersReportFilterDraft = {
   branchId: string;
   customerId: string;
@@ -61,6 +76,8 @@ export function BakeryOrdersReportFilterBar({
   onApply,
   onChange,
   onReset,
+  orderStatusAllLabel = "All statuses",
+  orderStatusOptions = defaultOrderStatusOptions,
 }: {
   branches: Branch[];
   canAccessAllBranches: boolean;
@@ -70,6 +87,8 @@ export function BakeryOrdersReportFilterBar({
   onApply: () => void;
   onChange: (filters: BakeryOrdersReportFilterDraft) => void;
   onReset: () => void;
+  orderStatusAllLabel?: string;
+  orderStatusOptions?: BakeryOrdersReportStatusOption[];
 }): JSX.Element {
   const setPreset = (datePreset: ReportDatePreset): void => {
     if (datePreset === "custom") {
@@ -156,13 +175,12 @@ export function BakeryOrdersReportFilterBar({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="new">New</SelectItem>
-              <SelectItem value="confirmed">Confirmed</SelectItem>
-              <SelectItem value="in_production">In production</SelectItem>
-              <SelectItem value="ready">Ready</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="all">{orderStatusAllLabel}</SelectItem>
+              {orderStatusOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

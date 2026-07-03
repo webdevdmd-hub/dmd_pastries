@@ -392,13 +392,17 @@ type BakeryOrderStatusReportItem struct {
 }
 
 type BakeryOrderProductionScheduleItem struct {
-	OrderNumber         string  `json:"order_number"`
-	ProductName         string  `json:"product_name"`
-	EventDate           string  `json:"event_date"`
-	ProductionStatus    string  `json:"production_status"`
-	AssignedBatchNumber *string `json:"assigned_batch_number"`
-	Quantity            float64 `json:"quantity"`
-	BranchName          string  `json:"branch_name"`
+	OrderNumber           string  `json:"order_number"`
+	ProductName           string  `json:"product_name"`
+	EventDate             string  `json:"event_date"`
+	OrderStatus           string  `json:"order_status"`
+	ProductionStatus      string  `json:"production_status"`
+	HasProductionRecord   bool    `json:"has_production_record"`
+	AssignedBatchNumber   *string `json:"assigned_batch_number"`
+	ProductionBatchStatus *string `json:"production_batch_status"`
+	ProductionNote        string  `json:"production_note"`
+	Quantity              float64 `json:"quantity"`
+	BranchName            string  `json:"branch_name"`
 }
 
 type BakeryOrderPendingPaymentsResponse struct {

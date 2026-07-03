@@ -1138,31 +1138,11 @@ func (r *Repository) BakeryOrdersSummary(filter *shared.ResolvedFilter) (*Bakery
 
 func (r *Repository) BakeryOrdersUpcoming(filter *shared.ResolvedFilter) ([]UpcomingBakeryOrderReportItem, int64, error) {
 	items := []UpcomingBakeryOrderReportItem{}
-	endDate := filter.DateTo.Format("2006-01-02")
-	if filter.UpcomingDays > 0 {
-		endDate = filter.DateFrom.AddDate(0, 0, filter.UpcomingDays).Format("2006-01-02")
-	}
-	query := `
-		SELECT bo.id AS order_id,
-			bo.order_number,
-			COALESCE(bo.customer_name_snapshot,'') AS customer_name,
-			bo.event_date::text AS event_date,
-			bo.pickup_time,
-			bo.delivery_time,
-			bo.order_type,
-			bo.order_status,
-			bo.total_amount,
-			bo.balance_amount
-		FROM bakery_orders bo
-		WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.deleted_at IS NULL`
-	args := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), endDate}
-	query, args = addBakeryOrderFilters(query, args, filter)
-	query += " ORDER BY bo.event_date ASC, COALESCE(bo.pickup_time, bo.delivery_time, '') ASC LIMIT ? OFFSET ?"
-	args = append(args, filter.Limit, (filter.Page-1)*filter.Limit)
+	query, args, endDate := bakeryOrdersUpcomingSQL(filter)
 	if err := r.db.Raw(query, args...).Scan(&items).Error; err != nil {
 		return nil, 0, err
 	}
-	total, err := r.countBakeryOrdersBetween(filter, filter.DateFrom.Format("2006-01-02"), endDate)
+	total, err := r.countBakeryOrdersBetween(filter, filter.DateFrom.Format("2006-01-02"), endDate, upcomingBakeryOrderStatuses)
 	return items, total, err
 }
 
@@ -1185,28 +1165,85 @@ func (r *Repository) BakeryOrdersStatus(filter *shared.ResolvedFilter) ([]Bakery
 
 func (r *Repository) BakeryOrdersProductionSchedule(filter *shared.ResolvedFilter) ([]BakeryOrderProductionScheduleItem, error) {
 	items := []BakeryOrderProductionScheduleItem{}
-	query := `
-		SELECT bo.order_number,
-			boi.product_name_snapshot AS product_name,
-			bo.event_date::text AS event_date,
-			COALESCE(bop.status,'pending') AS production_status,
-			pb.production_batch_number AS assigned_batch_number,
-			boi.quantity,
-			b.branch_name
-		FROM bakery_orders bo
-		JOIN bakery_order_items boi ON boi.bakery_order_id = bo.id AND boi.deleted_at IS NULL
-		JOIN branches b ON b.id = bo.branch_id
-		LEFT JOIN bakery_order_productions bop ON bop.bakery_order_id = bo.id
-		LEFT JOIN production_batches pb ON pb.id = bop.production_batch_id
-		WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.deleted_at IS NULL
-			AND bo.order_status IN ('confirmed','in_production','ready')`
-	args := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
-	query, args = addBakeryOrderFilters(query, args, filter)
-	query += " ORDER BY bo.event_date ASC, bo.order_number ASC"
+	query, args := bakeryOrdersProductionScheduleSQL(filter)
 	if err := r.db.Raw(query, args...).Scan(&items).Error; err != nil {
 		return nil, err
 	}
 	return items, nil
+}
+
+var upcomingBakeryOrderStatuses = []string{"new", "confirmed", "in_production", "ready"}
+var productionScheduleBakeryOrderStatuses = []string{"new", "confirmed", "in_production", "ready", "delivered", "completed"}
+
+func bakeryOrdersUpcomingSQL(filter *shared.ResolvedFilter) (string, []interface{}, string) {
+	endDate := filter.DateTo.Format("2006-01-02")
+	if filter.UpcomingDays > 0 {
+		endDate = filter.DateFrom.AddDate(0, 0, filter.UpcomingDays).Format("2006-01-02")
+	}
+	query := `
+		SELECT bo.id AS order_id,
+			bo.order_number,
+			COALESCE(bo.customer_name_snapshot,'') AS customer_name,
+			bo.event_date::text AS event_date,
+			bo.pickup_time,
+			bo.delivery_time,
+			bo.order_type,
+			bo.order_status,
+			bo.total_amount,
+			bo.balance_amount
+		FROM bakery_orders bo
+		WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.deleted_at IS NULL`
+	args := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), endDate}
+	query, args = addBakeryOrderStatusSetFilter(query, args, upcomingBakeryOrderStatuses)
+	query, args = addBakeryOrderFilters(query, args, filter)
+	query += " ORDER BY bo.event_date ASC, COALESCE(bo.pickup_time, bo.delivery_time, '') ASC LIMIT ? OFFSET ?"
+	args = append(args, filter.Limit, (filter.Page-1)*filter.Limit)
+	return query, args, endDate
+}
+
+func bakeryOrdersProductionScheduleSQL(filter *shared.ResolvedFilter) (string, []interface{}) {
+	query := `
+		SELECT bo.order_number,
+			boi.product_name_snapshot AS product_name,
+			bo.event_date::text AS event_date,
+			bo.order_status,
+			COALESCE(bop.status,'not_linked') AS production_status,
+			(bop.id IS NOT NULL) AS has_production_record,
+			pb.production_batch_number AS assigned_batch_number,
+			pb.status AS production_batch_status,
+			CASE
+				WHEN bop.id IS NULL THEN 'No production record linked or created for this order item.'
+				WHEN bop.production_batch_id IS NULL THEN 'Production record exists without a linked batch.'
+				WHEN bop.status = 'completed' THEN 'Production completed and linked to batch.'
+				WHEN bop.status = 'in_progress' THEN 'Production in progress and linked to batch.'
+				WHEN bop.status = 'assigned' THEN 'Production assigned to batch.'
+				ELSE 'Production record linked.'
+			END AS production_note,
+			boi.quantity,
+			b.branch_name
+		FROM bakery_orders bo
+		JOIN bakery_order_items boi ON boi.bakery_order_id = bo.id AND boi.deleted_at IS NULL
+		JOIN branches b ON b.id = bo.branch_id AND b.business_id = bo.business_id
+		LEFT JOIN LATERAL (
+			SELECT bop.id,
+				bop.production_batch_id,
+				bop.status,
+				bop.bakery_order_item_id,
+				bop.created_at
+			FROM bakery_order_productions bop
+			WHERE bop.business_id = bo.business_id
+				AND bop.bakery_order_id = bo.id
+				AND (bop.bakery_order_item_id = boi.id OR bop.bakery_order_item_id IS NULL)
+			ORDER BY CASE WHEN bop.bakery_order_item_id = boi.id THEN 0 ELSE 1 END, bop.created_at ASC
+			LIMIT 1
+		) bop ON true
+		LEFT JOIN production_batches pb ON pb.id = bop.production_batch_id AND pb.business_id = bo.business_id
+		WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.deleted_at IS NULL`
+	args := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
+	query, args = addBakeryOrderStatusSetFilter(query, args, productionScheduleBakeryOrderStatuses)
+	query, args = addBakeryOrderFilters(query, args, filter)
+	query += " ORDER BY bo.event_date ASC, bo.order_number ASC, boi.created_at ASC"
+	return query, args
 }
 
 func (r *Repository) BakeryOrdersPendingPayments(filter *shared.ResolvedFilter) (*BakeryOrderPendingPaymentsResponse, error) {
@@ -2055,6 +2092,15 @@ func addBakeryOrderFilters(query string, args []interface{}, filter *shared.Reso
 	return query, args
 }
 
+func addBakeryOrderStatusSetFilter(query string, args []interface{}, statuses []string) (string, []interface{}) {
+	if len(statuses) == 0 {
+		return query, args
+	}
+	query += " AND bo.order_status IN ?"
+	args = append(args, statuses)
+	return query, args
+}
+
 func addFinancialReconciliationFilters(query string, args []interface{}, filter *shared.ResolvedFilter) (string, []interface{}) {
 	if !filter.AllBranches {
 		query += " AND pr.branch_id = ?"
@@ -2315,10 +2361,11 @@ func (r *Repository) countProductionBatches(filter *shared.ResolvedFilter) (int6
 	return total, err
 }
 
-func (r *Repository) countBakeryOrdersBetween(filter *shared.ResolvedFilter, dateFrom, dateTo string) (int64, error) {
+func (r *Repository) countBakeryOrdersBetween(filter *shared.ResolvedFilter, dateFrom, dateTo string, statuses []string) (int64, error) {
 	var total int64
 	query := "SELECT COUNT(*) FROM bakery_orders bo WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.deleted_at IS NULL"
 	args := []interface{}{filter.BusinessID, dateFrom, dateTo}
+	query, args = addBakeryOrderStatusSetFilter(query, args, statuses)
 	query, args = addBakeryOrderFilters(query, args, filter)
 	err := r.db.Raw(query, args...).Scan(&total).Error
 	return total, err

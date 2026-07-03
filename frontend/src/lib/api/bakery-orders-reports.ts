@@ -47,8 +47,12 @@ type BackendProductionScheduleRow = {
   assigned_batch_number?: string;
   branch_name?: string;
   event_date?: string;
+  has_production_record?: boolean;
   order_number?: string;
+  order_status?: string;
   product_name?: string;
+  production_batch_status?: string;
+  production_note?: string;
   production_status?: string;
   quantity?: number;
 };
@@ -81,6 +85,10 @@ function numberOrZero(value: unknown): number {
 
 function stringOrEmpty(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function booleanOrFalse(value: unknown): boolean {
+  return typeof value === "boolean" ? value : false;
 }
 
 function listSource(value: unknown): unknown[] {
@@ -164,8 +172,12 @@ function parseProductionScheduleRow(value: unknown): ProductionScheduleRow {
     assignedBatchNumber: stringOrEmpty(row.assigned_batch_number),
     branchName: stringOrEmpty(row.branch_name),
     eventDate: stringOrEmpty(row.event_date),
+    hasProductionRecord: booleanOrFalse(row.has_production_record),
     orderNumber: stringOrEmpty(row.order_number),
+    orderStatus: stringOrEmpty(row.order_status),
     productName: stringOrEmpty(row.product_name),
+    productionBatchStatus: stringOrEmpty(row.production_batch_status),
+    productionNote: stringOrEmpty(row.production_note),
     productionStatus: stringOrEmpty(row.production_status),
     quantity: numberOrZero(row.quantity),
   };

@@ -9,6 +9,7 @@ import { BakeryOrdersReportErrorState } from "@/components/reports/bakery-orders
 import {
   BakeryOrdersReportFilterBar,
   type BakeryOrdersReportFilterDraft,
+  type BakeryOrdersReportStatusOption,
   toBakeryOrdersReportFilters,
 } from "@/components/reports/bakery-orders/bakery-orders-report-filter-bar";
 import {
@@ -25,6 +26,15 @@ import { useBranchScope } from "@/hooks/use-branch-scope";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+
+const productionScheduleOrderStatusOptions: BakeryOrdersReportStatusOption[] = [
+  { label: "New", value: "new" },
+  { label: "Confirmed", value: "confirmed" },
+  { label: "In production", value: "in_production" },
+  { label: "Ready", value: "ready" },
+  { label: "Delivered", value: "delivered" },
+  { label: "Completed", value: "completed" },
+];
 
 export function ProductionSchedulePageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -61,6 +71,8 @@ export function ProductionSchedulePageClient(): JSX.Element {
         onApply={applyFilters}
         onChange={setDraft}
         onReset={() => setFilters(toBakeryOrdersReportFilters(initialDraft))}
+        orderStatusAllLabel="All schedule statuses"
+        orderStatusOptions={productionScheduleOrderStatusOptions}
       />
       {reportQuery.error ? (
         <BakeryOrdersReportErrorState

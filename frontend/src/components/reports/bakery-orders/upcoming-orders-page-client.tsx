@@ -9,6 +9,7 @@ import { BakeryOrdersReportErrorState } from "@/components/reports/bakery-orders
 import {
   BakeryOrdersReportFilterBar,
   type BakeryOrdersReportFilterDraft,
+  type BakeryOrdersReportStatusOption,
   toBakeryOrdersReportFilters,
 } from "@/components/reports/bakery-orders/bakery-orders-report-filter-bar";
 import {
@@ -25,6 +26,13 @@ import { useBranchScope } from "@/hooks/use-branch-scope";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+
+const upcomingOrderStatusOptions: BakeryOrdersReportStatusOption[] = [
+  { label: "New", value: "new" },
+  { label: "Confirmed", value: "confirmed" },
+  { label: "In production", value: "in_production" },
+  { label: "Ready", value: "ready" },
+];
 
 export function UpcomingOrdersPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -67,6 +75,8 @@ export function UpcomingOrdersPageClient(): JSX.Element {
         onReset={() =>
           setFilters({ ...toBakeryOrdersReportFilters(initialDraft), limit: 25, page: 1 })
         }
+        orderStatusAllLabel="All active statuses"
+        orderStatusOptions={upcomingOrderStatusOptions}
       />
       {reportQuery.error ? (
         <BakeryOrdersReportErrorState
