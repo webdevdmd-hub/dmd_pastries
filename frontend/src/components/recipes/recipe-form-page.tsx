@@ -60,6 +60,10 @@ import {
   type RecipeLiveCostPreview,
 } from "@/lib/recipes/recipe-cost-preview";
 import {
+  hasSelfReferencingRecipeLine,
+  RECIPE_SELF_REFERENCE_MESSAGE,
+} from "@/lib/recipes/self-reference";
+import {
   type CreateRecipeFormValues,
   type CreateRecipeInputValues,
   createRecipeSchema,
@@ -221,6 +225,15 @@ export function RecipeFormPage({
     values: CreateRecipeFormValues,
     options: { activateAfterSave?: boolean } = {},
   ): Promise<void> => {
+    if (
+      isCreate &&
+      (hasSelfReferencingRecipeLine(values.productId, draftIngredients) ||
+        hasSelfReferencingRecipeLine(values.productId, draftPackaging))
+    ) {
+      toast.error(RECIPE_SELF_REFERENCE_MESSAGE);
+      return;
+    }
+
     try {
       if (isCreate) {
         const payload = toCreateRecipePayload(values, draftIngredients, draftPackaging);
@@ -317,21 +330,26 @@ export function RecipeFormPage({
   const selectedProductVariants = useMemo(() => selectedProduct?.variants ?? [], [selectedProduct]);
   const ingredientComponentProducts = useMemo(
     () =>
-      data.componentProducts.filter((product) =>
-        [
-          "finished_product",
-          "ingredient",
-          "raw_material",
-          "semi_finished",
-          "consumable",
-          "equipment",
-        ].includes(product.productType),
+      data.componentProducts.filter(
+        (product) =>
+          product.id !== selectedProductId &&
+          [
+            "finished_product",
+            "ingredient",
+            "raw_material",
+            "semi_finished",
+            "consumable",
+            "equipment",
+          ].includes(product.productType),
       ),
-    [data.componentProducts],
+    [data.componentProducts, selectedProductId],
   );
   const packagingComponentProducts = useMemo(
-    () => data.componentProducts.filter((product) => product.productType === "packaging"),
-    [data.componentProducts],
+    () =>
+      data.componentProducts.filter(
+        (product) => product.id !== selectedProductId && product.productType === "packaging",
+      ),
+    [data.componentProducts, selectedProductId],
   );
   const isSaving = createMutation.isPending || updateMutation.isPending || statusMutation.isPending;
   const liveCostPreview = useMemo<RecipeLiveCostPreview>(() => {
@@ -815,6 +833,7 @@ export function RecipeFormPage({
               draftLines={draftIngredients}
               onDraftLinesChange={setDraftIngredients}
               onPreviewDraftChange={setIngredientPreviewDraft}
+              parentProductId={selectedProductId}
               recipeId={recipeId}
               units={data.units}
             />
@@ -824,6 +843,7 @@ export function RecipeFormPage({
               draftLines={draftPackaging}
               onDraftLinesChange={setDraftPackaging}
               onPreviewDraftChange={setPackagingPreviewDraft}
+              parentProductId={selectedProductId}
               recipeId={recipeId}
               units={data.units}
             />

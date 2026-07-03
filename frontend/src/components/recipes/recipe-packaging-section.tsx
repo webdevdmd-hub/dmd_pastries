@@ -16,6 +16,10 @@ import {
   useUpdateRecipePackaging,
 } from "@/hooks/use-recipes";
 import { getErrorMessage } from "@/lib/api/client";
+import {
+  isSelfReferencingRecipeLine,
+  RECIPE_SELF_REFERENCE_MESSAGE,
+} from "@/lib/recipes/self-reference";
 import type {
   RecipePackagingLine,
   RecipePackagingPayload,
@@ -61,6 +65,7 @@ export function RecipePackagingSection({
   draftLines = [],
   onDraftLinesChange,
   onPreviewDraftChange,
+  parentProductId,
   recipeId,
   units,
 }: {
@@ -69,6 +74,7 @@ export function RecipePackagingSection({
   draftLines?: RecipePackagingPayload[];
   onDraftLinesChange?: (lines: RecipePackagingPayload[]) => void;
   onPreviewDraftChange?: (draft: PackagingPreviewDraft | null) => void;
+  parentProductId: string;
   recipeId: string | null;
   units: RecipeUnitOption[];
 }): JSX.Element {
@@ -128,6 +134,11 @@ export function RecipePackagingSection({
   };
 
   const saveLine = async (payload: RecipePackagingPayload): Promise<void> => {
+    if (isSelfReferencingRecipeLine(parentProductId, payload)) {
+      toast.error(RECIPE_SELF_REFERENCE_MESSAGE);
+      return;
+    }
+
     if (!recipeId) {
       const duplicate = draftLines.some(
         (line, index) =>

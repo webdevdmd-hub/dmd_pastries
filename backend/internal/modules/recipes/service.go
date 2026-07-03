@@ -22,6 +22,8 @@ type Service struct {
 	pricingService *products.Service
 }
 
+const recipeSelfReferenceMessage = "The parent product cannot be used as an ingredient in its own recipe."
+
 func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository) *Service {
 	return &Service{db: db, repo: repo, auditRepo: auditRepo}
 }
@@ -239,10 +241,11 @@ func (s *Service) AddIngredient(currentUser *utils.AuthContext, recipeID string,
 	}
 	var lineID string
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		if _, err := s.repo.FindRecipeForUpdate(tx, recipeID, currentUser.BusinessID, branchID); err != nil {
+		recipe, err := s.repo.FindRecipeForUpdate(tx, recipeID, currentUser.BusinessID, branchID)
+		if err != nil {
 			return notFound(err, "recipe not found")
 		}
-		line, err := s.buildIngredientLine(tx, currentUser.BusinessID, branchID, recipeID, req)
+		line, err := s.buildIngredientLine(tx, currentUser.BusinessID, branchID, recipeID, recipe.ProductID, req)
 		if err != nil {
 			return err
 		}
@@ -270,10 +273,11 @@ func (s *Service) UpdateIngredient(currentUser *utils.AuthContext, recipeID, lin
 		return nil, err
 	}
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		if _, err := s.repo.FindRecipeForUpdate(tx, recipeID, currentUser.BusinessID, branchID); err != nil {
+		recipe, err := s.repo.FindRecipeForUpdate(tx, recipeID, currentUser.BusinessID, branchID)
+		if err != nil {
 			return notFound(err, "recipe not found")
 		}
-		line, err := s.buildIngredientLine(tx, currentUser.BusinessID, branchID, recipeID, req)
+		line, err := s.buildIngredientLine(tx, currentUser.BusinessID, branchID, recipeID, recipe.ProductID, req)
 		if err != nil {
 			return err
 		}
@@ -327,10 +331,11 @@ func (s *Service) AddPackaging(currentUser *utils.AuthContext, recipeID string, 
 	}
 	var lineID string
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		if _, err := s.repo.FindRecipeForUpdate(tx, recipeID, currentUser.BusinessID, branchID); err != nil {
+		recipe, err := s.repo.FindRecipeForUpdate(tx, recipeID, currentUser.BusinessID, branchID)
+		if err != nil {
 			return notFound(err, "recipe not found")
 		}
-		line, err := s.buildPackagingLine(tx, currentUser.BusinessID, branchID, recipeID, req)
+		line, err := s.buildPackagingLine(tx, currentUser.BusinessID, branchID, recipeID, recipe.ProductID, req)
 		if err != nil {
 			return err
 		}
@@ -358,10 +363,11 @@ func (s *Service) UpdatePackaging(currentUser *utils.AuthContext, recipeID, line
 		return nil, err
 	}
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		if _, err := s.repo.FindRecipeForUpdate(tx, recipeID, currentUser.BusinessID, branchID); err != nil {
+		recipe, err := s.repo.FindRecipeForUpdate(tx, recipeID, currentUser.BusinessID, branchID)
+		if err != nil {
 			return notFound(err, "recipe not found")
 		}
-		line, err := s.buildPackagingLine(tx, currentUser.BusinessID, branchID, recipeID, req)
+		line, err := s.buildPackagingLine(tx, currentUser.BusinessID, branchID, recipeID, recipe.ProductID, req)
 		if err != nil {
 			return err
 		}
@@ -562,14 +568,14 @@ func (s *Service) buildRecipe(tx *gorm.DB, currentUser *utils.AuthContext, branc
 	ingredients := make([]RecipeIngredient, 0, len(req.Ingredients))
 	packaging := make([]RecipePackaging, 0, len(req.Packaging))
 	for _, input := range req.Ingredients {
-		line, err := s.buildIngredientLine(tx, currentUser.BusinessID, branchID, recipeID, input)
+		line, err := s.buildIngredientLine(tx, currentUser.BusinessID, branchID, recipeID, product.ID, input)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		ingredients = append(ingredients, *line)
 	}
 	for _, input := range req.Packaging {
-		line, err := s.buildPackagingLine(tx, currentUser.BusinessID, branchID, recipeID, input)
+		line, err := s.buildPackagingLine(tx, currentUser.BusinessID, branchID, recipeID, product.ID, input)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -729,7 +735,7 @@ func validRecipeComponentProductType(value, role string) bool {
 	}
 }
 
-func (s *Service) buildIngredientLine(tx *gorm.DB, businessID, branchID, recipeID string, req RecipeIngredientInput) (*RecipeIngredient, error) {
+func (s *Service) buildIngredientLine(tx *gorm.DB, businessID, branchID, recipeID, recipeProductID string, req RecipeIngredientInput) (*RecipeIngredient, error) {
 	if req.QuantityRequired <= 0 {
 		return nil, apperrors.BadRequest("quantity_required must be greater than zero", nil)
 	}
@@ -745,6 +751,9 @@ func (s *Service) buildIngredientLine(tx *gorm.DB, businessID, branchID, recipeI
 	if strings.TrimSpace(req.IngredientID) != "" || strings.TrimSpace(req.InventoryItemID) != "" {
 		return nil, apperrors.BadRequest("recipe components must use component_product_id from Product Master; ingredient_id and inventory_item_id are no longer supported for new recipe lines", nil)
 	}
+	if err := validateNotSelfReferencingComponent(recipeProductID, req.ComponentProductID); err != nil {
+		return nil, err
+	}
 	component, err := s.resolveRecipeComponentProduct(tx, businessID, branchID, req.ComponentProductID, req.ComponentVariantID, req.UnitID, "ingredient")
 	if err != nil {
 		return nil, err
@@ -753,7 +762,7 @@ func (s *Service) buildIngredientLine(tx *gorm.DB, businessID, branchID, recipeI
 	return &RecipeIngredient{ID: utils.NewUUID(), BusinessID: businessID, BranchID: branchID, RecipeID: recipeID, ComponentProductID: &component.ProductID, ComponentVariantID: component.VariantID, ItemNameSnapshot: component.Name, QuantityRequired: req.QuantityRequired, UnitID: req.UnitID, UnitCostSnapshot: roundMoney(component.UnitCost), TotalCost: roundMoney(effectiveQty * component.UnitCost), WastagePercentage: req.WastagePercentage, SortOrder: req.SortOrder, Notes: strings.TrimSpace(req.Notes)}, nil
 }
 
-func (s *Service) buildPackagingLine(tx *gorm.DB, businessID, branchID, recipeID string, req RecipePackagingInput) (*RecipePackaging, error) {
+func (s *Service) buildPackagingLine(tx *gorm.DB, businessID, branchID, recipeID, recipeProductID string, req RecipePackagingInput) (*RecipePackaging, error) {
 	if req.QuantityRequired <= 0 {
 		return nil, apperrors.BadRequest("quantity_required must be greater than zero", nil)
 	}
@@ -762,6 +771,9 @@ func (s *Service) buildPackagingLine(tx *gorm.DB, businessID, branchID, recipeID
 	}
 	if strings.TrimSpace(req.PackagingItemID) != "" {
 		return nil, apperrors.BadRequest("recipe packaging components must use component_product_id from Product Master; packaging_item_id is no longer supported for new recipe lines", nil)
+	}
+	if err := validateNotSelfReferencingComponent(recipeProductID, req.ComponentProductID); err != nil {
+		return nil, err
 	}
 	component, err := s.resolveRecipeComponentProduct(tx, businessID, branchID, req.ComponentProductID, req.ComponentVariantID, req.UnitID, "packaging")
 	if err != nil {
@@ -974,6 +986,13 @@ func validStatus(value string) bool {
 func validateUUID(value, field string) error {
 	if _, err := uuid.Parse(strings.TrimSpace(value)); err != nil {
 		return apperrors.BadRequest(field+" must be a valid UUID", nil)
+	}
+	return nil
+}
+
+func validateNotSelfReferencingComponent(recipeProductID, componentProductID string) error {
+	if strings.TrimSpace(recipeProductID) != "" && strings.TrimSpace(recipeProductID) == strings.TrimSpace(componentProductID) {
+		return apperrors.BadRequest(recipeSelfReferenceMessage, nil)
 	}
 	return nil
 }
