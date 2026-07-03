@@ -1165,6 +1165,9 @@ func (s *Service) createSupplierPayment(currentUser *utils.AuthContext, req Crea
 		if err != nil {
 			return err
 		}
+		if err := s.ensureSupplierPaymentAccountHasBalance(tx, currentUser.BusinessID, paidThroughAccount, amount); err != nil {
+			return err
+		}
 		allocations := make([]SupplierPaymentAllocation, 0, len(req.Allocations))
 		allocatedAmount := 0.0
 		seenInvoices := map[string]struct{}{}
@@ -1326,6 +1329,9 @@ func (s *Service) UpdateSupplierPayment(currentUser *utils.AuthContext, id strin
 		}
 		paidThroughAccount, err := s.resolveSupplierPaidThroughAccount(tx, currentUser.BusinessID, branchID, method, req.PaidThroughAccountID)
 		if err != nil {
+			return err
+		}
+		if err := s.ensureSupplierPaymentAccountHasBalance(tx, currentUser.BusinessID, paidThroughAccount, amount); err != nil {
 			return err
 		}
 
@@ -1517,6 +1523,34 @@ func (s *Service) resolveSupplierPaidThroughAccount(tx *gorm.DB, businessID, bra
 		return nil, err
 	}
 	return account, nil
+}
+
+func (s *Service) ensureSupplierPaymentAccountHasBalance(tx *gorm.DB, businessID string, account *PaymentAccountInfo, amount float64) error {
+	if account == nil {
+		return apperrors.BadRequest("payment method is not linked to an active payment account", nil)
+	}
+	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":payment-account-balance:"+account.ID).Error; err != nil {
+		return apperrors.Internal("failed to lock paid-through account balance")
+	}
+	availableBalance, err := s.repo.PaymentAccountCurrentBalance(tx, businessID, account.ChartAccountID, account.BranchID)
+	if err != nil {
+		return apperrors.Internal("failed to check paid-through account balance")
+	}
+	availableBalance = roundMoney(availableBalance)
+	paymentAmount := roundMoney(amount)
+	if paymentAmount <= availableBalance {
+		return nil
+	}
+	return apperrors.BadRequest(
+		fmt.Sprintf("Insufficient balance in selected payment account. Available balance is AED %.2f, payment amount is AED %.2f.", availableBalance, paymentAmount),
+		map[string]interface{}{
+			"reason":             "insufficient_payment_account_balance",
+			"payment_account_id": account.ID,
+			"available_balance":  availableBalance,
+			"payment_amount":     paymentAmount,
+			"shortfall_amount":   roundMoney(paymentAmount - availableBalance),
+		},
+	)
 }
 
 func (s *Service) UpdateInvoice(currentUser *utils.AuthContext, id string, req UpdatePurchaseInvoiceRequest, ipAddress, userAgent string) (*PurchaseInvoiceResponse, error) {

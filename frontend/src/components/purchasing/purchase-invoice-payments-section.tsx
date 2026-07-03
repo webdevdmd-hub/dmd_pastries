@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePaymentMethods } from "@/hooks/use-payments";
 import { useAddSupplierInvoicePayment, useSupplierInvoicePayments } from "@/hooks/use-purchasing";
 import { getErrorMessage } from "@/lib/api/client";
+import { supplierPaymentErrorMessage } from "@/lib/purchasing/supplier-payment-errors";
 import type { AddSupplierPaymentPayload, PurchaseInvoice } from "@/types/purchasing";
 
 function formatCurrency(value: number): string {
@@ -41,7 +42,8 @@ export function PurchaseInvoicePaymentsSection({
       toast.success("Payment made recorded.");
       setDialogOpen(false);
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error));
+      toast.error(supplierPaymentErrorMessage(error));
+      throw error;
     }
   };
 

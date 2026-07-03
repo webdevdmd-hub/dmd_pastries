@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { supplierPaymentErrorMessage } from "@/lib/purchasing/supplier-payment-errors";
 import {
   type SupplierPaymentFormValues,
   type SupplierPaymentInputValues,
@@ -108,14 +109,21 @@ export function PurchaseSupplierPaymentDialog({
       return;
     }
 
-    await onSubmit({
-      amount: values.amount,
-      notes: values.notes,
-      paidAt: values.paidAt ? new Date(values.paidAt).toISOString() : null,
-      paymentMethodId: values.paymentMethodId,
-      referenceNumber: values.referenceNumber,
-    });
-    form.reset();
+    try {
+      await onSubmit({
+        amount: values.amount,
+        notes: values.notes,
+        paidAt: values.paidAt ? new Date(values.paidAt).toISOString() : null,
+        paymentMethodId: values.paymentMethodId,
+        referenceNumber: values.referenceNumber,
+      });
+      form.reset();
+    } catch (error) {
+      form.setError("root", {
+        message: supplierPaymentErrorMessage(error),
+        type: "server",
+      });
+    }
   };
 
   return (
@@ -253,6 +261,11 @@ export function PurchaseSupplierPaymentDialog({
           </div>
 
           <DialogFooter>
+            {form.formState.errors.root?.message ? (
+              <p className="mr-auto text-sm text-red-700">
+                {form.formState.errors.root.message}
+              </p>
+            ) : null}
             <Button onClick={onClose} type="button" variant="outline">
               Cancel
             </Button>

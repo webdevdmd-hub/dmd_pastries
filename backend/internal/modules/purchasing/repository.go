@@ -1224,6 +1224,28 @@ func (r *Repository) PaymentAccount(tx *gorm.DB, businessID, accountID string) (
 	return &account, err
 }
 
+func (r *Repository) PaymentAccountCurrentBalance(tx *gorm.DB, businessID, chartAccountID string, branchID *string) (float64, error) {
+	branchFilter := ""
+	args := []interface{}{businessID, chartAccountID}
+	if branchID != nil && strings.TrimSpace(*branchID) != "" {
+		branchFilter = "AND je.branch_id = ?"
+		args = append(args, strings.TrimSpace(*branchID))
+	}
+	var balance float64
+	err := tx.Raw(`
+		SELECT COALESCE(SUM(jel.debit_amount - jel.credit_amount), 0)
+		FROM journal_entry_lines jel
+		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
+		WHERE jel.business_id = ?
+		  AND jel.account_id = ?
+		  AND jel.deleted_at IS NULL
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted', 'reversed')
+		  `+branchFilter+`
+	`, args...).Scan(&balance).Error
+	return roundMoney(balance), err
+}
+
 func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string) (*ProductInfo, error) {
 	var product ProductInfo
 	err := tx.Table("products").

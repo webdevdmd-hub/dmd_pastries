@@ -33,7 +33,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { ApiError } from "@/lib/api/client";
+import { supplierPaymentErrorMessage } from "@/lib/purchasing/supplier-payment-errors";
 import type {
   CreateSupplierPaymentPayload,
   PurchaseInvoice,
@@ -307,7 +308,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
         }
       }
 
-      const message = getErrorMessage(error);
+      const message = supplierPaymentErrorMessage(error);
       setSubmitError(message);
       toast.error(message);
     } finally {
