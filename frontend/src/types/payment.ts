@@ -124,6 +124,13 @@ export type PaymentSummaryParams = {
   dateTo?: string | null;
 };
 
+export type PaymentConsistencyWarning = {
+  code: string;
+  message: string;
+  sourceType: string;
+  missingCount: number;
+};
+
 export type DailyPaymentSummary = {
   totalCollected: number;
   totalRefunded: number;
@@ -134,6 +141,8 @@ export type DailyPaymentSummary = {
   balanceCollected: number;
   fullCollected: number;
   transactionsCount: number;
+  sourceOfTruth: string;
+  consistencyWarnings: PaymentConsistencyWarning[];
 };
 
 export type PaymentMethodSummary = {
@@ -144,4 +153,7 @@ export type PaymentMethodSummary = {
   netAmount: number;
   totalAmount: number;
   transactionsCount: number;
+  grossTransactionCount: number;
+  refundTransactionCount: number;
+  netTransactionCount: number;
 };

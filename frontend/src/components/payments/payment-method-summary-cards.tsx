@@ -37,6 +37,9 @@ export function PaymentMethodSummaryCards({
             netAmount: 0,
             totalAmount: 0,
             transactionsCount: 0,
+            grossTransactionCount: 0,
+            refundTransactionCount: 0,
+            netTransactionCount: 0,
           },
           {
             paymentMethodId: "card",
@@ -46,6 +49,9 @@ export function PaymentMethodSummaryCards({
             netAmount: 0,
             totalAmount: 0,
             transactionsCount: 0,
+            grossTransactionCount: 0,
+            refundTransactionCount: 0,
+            netTransactionCount: 0,
           },
           {
             paymentMethodId: "bank-transfer",
@@ -55,6 +61,9 @@ export function PaymentMethodSummaryCards({
             netAmount: 0,
             totalAmount: 0,
             transactionsCount: 0,
+            grossTransactionCount: 0,
+            refundTransactionCount: 0,
+            netTransactionCount: 0,
           },
         ];
 
@@ -80,9 +89,11 @@ export function PaymentMethodSummaryCards({
                     <p className="text-sm font-semibold text-brand-espresso">
                       {summary.paymentMethodName}
                     </p>
-                    <p className="text-xs text-brand-mocha">
-                      {summary.transactionsCount} transactions
-                    </p>
+                    <div className="mt-1 grid gap-1 text-xs text-brand-mocha">
+                      <span>Gross Transactions: {summary.grossTransactionCount}</span>
+                      <span>Refund Transactions: {summary.refundTransactionCount}</span>
+                      <span>Net Transactions: {summary.netTransactionCount}</span>
+                    </div>
                   </div>
                   <div className="rounded-2xl bg-brand-cappuccino/40 p-3 text-brand-mocha">
                     <Icon className="h-5 w-5" />

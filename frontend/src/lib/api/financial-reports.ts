@@ -16,15 +16,24 @@ type BackendSummary = {
   bank_transfer_collected?: number;
   card_collected?: number;
   cash_collected?: number;
+  consistency_warnings?: unknown;
   gross_sales?: number;
   net_collected?: number;
   outstanding_customer_balance?: number;
   payment_count?: number;
   purchase_total?: number;
   refund_count?: number;
+  source_of_truth?: string;
   supplier_payable_balance?: number;
   total_collected?: number;
   total_refunded?: number;
+};
+
+type BackendConsistencyWarning = {
+  code?: string;
+  message?: string;
+  missing_count?: number;
+  source_type?: string;
 };
 
 type BackendPaymentRow = {
@@ -42,10 +51,13 @@ type BackendPaymentRow = {
 };
 
 type BackendPaymentMethodRow = {
+  gross_transaction_count?: number;
   net_collected?: number;
+  net_transaction_count?: number;
   payment_method_id?: string;
   payment_method_name?: string;
   payment_method_type?: string;
+  refund_transaction_count?: number;
   total_collected?: number;
   total_refunded?: number;
   transaction_count?: number;
@@ -127,6 +139,16 @@ function parseList<TItem>(value: unknown, parser: (item: unknown) => TItem): TIt
   return listSource(value).map(parser);
 }
 
+function parseConsistencyWarning(value: unknown) {
+  const row = isObject(value) ? (value as BackendConsistencyWarning) : {};
+  return {
+    code: stringOrEmpty(row.code),
+    message: stringOrEmpty(row.message),
+    missingCount: numberOrZero(row.missing_count),
+    sourceType: stringOrEmpty(row.source_type),
+  };
+}
+
 function toSearchParams(filters: FinancialReportFilters): string {
   const params = new URLSearchParams();
   const entries: [string, number | string | undefined][] = [
@@ -157,12 +179,16 @@ function parseSummary(value: unknown): FinancialSummary {
     bankTransferCollected: numberOrZero(row.bank_transfer_collected),
     cardCollected: numberOrZero(row.card_collected),
     cashCollected: numberOrZero(row.cash_collected),
+    consistencyWarnings: Array.isArray(row.consistency_warnings)
+      ? row.consistency_warnings.map(parseConsistencyWarning)
+      : [],
     grossSales: numberOrZero(row.gross_sales),
     netCollected: numberOrZero(row.net_collected),
     outstandingCustomerBalance: numberOrZero(row.outstanding_customer_balance),
     paymentCount: numberOrZero(row.payment_count),
     purchaseTotal: numberOrZero(row.purchase_total),
     refundCount: numberOrZero(row.refund_count),
+    sourceOfTruth: stringOrEmpty(row.source_of_truth),
     supplierPayableBalance: numberOrZero(row.supplier_payable_balance),
     totalCollected: numberOrZero(row.total_collected),
     totalRefunded: numberOrZero(row.total_refunded),
@@ -188,14 +214,25 @@ function parsePaymentRow(value: unknown): PaymentsReportRow {
 
 function parsePaymentMethodRow(value: unknown): PaymentMethodReportRow {
   const row = isObject(value) ? (value as BackendPaymentMethodRow) : {};
+  const grossTransactionCount = numberOrZero(
+    row.gross_transaction_count ?? row.transaction_count,
+  );
+  const refundTransactionCount = numberOrZero(row.refund_transaction_count);
+  const netTransactionCount = numberOrZero(
+    row.net_transaction_count ?? Math.max(grossTransactionCount - refundTransactionCount, 0),
+  );
+
   return {
+    grossTransactionCount,
     netCollected: numberOrZero(row.net_collected),
+    netTransactionCount,
     paymentMethodId: stringOrEmpty(row.payment_method_id),
     paymentMethodName: stringOrEmpty(row.payment_method_name),
     paymentMethodType: stringOrEmpty(row.payment_method_type),
+    refundTransactionCount,
     totalCollected: numberOrZero(row.total_collected),
     totalRefunded: numberOrZero(row.total_refunded),
-    transactionCount: numberOrZero(row.transaction_count),
+    transactionCount: grossTransactionCount,
   };
 }
 

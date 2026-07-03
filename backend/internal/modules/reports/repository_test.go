@@ -72,6 +72,24 @@ func TestFinancialRefundSummarySQLDefaultsToCompletedAndAppliesSource(t *testing
 	}
 }
 
+func TestFinancialPaymentsByMethodSQLReturnsExplicitTransactionCounts(t *testing.T) {
+	query, _ := financialPaymentsByMethodSQL(testBakeryOrdersReportFilter())
+
+	for _, expected := range []string{
+		"COUNT(*) AS refund_transaction_count",
+		"COUNT(*) AS gross_transaction_count",
+		"COALESCE(collected.gross_transaction_count,0) AS transaction_count",
+		"COALESCE(collected.gross_transaction_count,0) AS gross_transaction_count",
+		"COALESCE(refunds.refund_transaction_count,0) AS refund_transaction_count",
+		"GREATEST(COALESCE(collected.gross_transaction_count,0) - COALESCE(refunds.refund_transaction_count,0), 0) AS net_transaction_count",
+		"FULL OUTER JOIN",
+	} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("expected payment method query to contain %q: %s", expected, query)
+		}
+	}
+}
+
 func TestFinancialReconciliationTransactionsSQLUsesTransactionSources(t *testing.T) {
 	query, _ := financialReconciliationTransactionsSQL(testBakeryOrdersReportFilter())
 

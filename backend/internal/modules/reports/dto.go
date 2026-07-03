@@ -1,11 +1,20 @@
 package reports
 
 type DashboardSummaryResponse struct {
-	Sales         SalesSummary         `json:"sales"`
-	Inventory     InventorySummary     `json:"inventory"`
-	Manufacturing ManufacturingSummary `json:"manufacturing"`
-	Orders        OrdersSummary        `json:"orders"`
-	Payments      PaymentsSummary      `json:"payments"`
+	Sales               SalesSummary               `json:"sales"`
+	Inventory           InventorySummary           `json:"inventory"`
+	Manufacturing       ManufacturingSummary       `json:"manufacturing"`
+	Orders              OrdersSummary              `json:"orders"`
+	Payments            PaymentsSummary            `json:"payments"`
+	SourceOfTruth       string                     `json:"source_of_truth,omitempty"`
+	ConsistencyWarnings []ReportConsistencyWarning `json:"consistency_warnings,omitempty"`
+}
+
+type ReportConsistencyWarning struct {
+	Code         string `json:"code"`
+	Message      string `json:"message"`
+	SourceType   string `json:"source_type"`
+	MissingCount int64  `json:"missing_count"`
 }
 
 type SalesSummary struct {
@@ -49,16 +58,18 @@ type ExportOptionResponse struct {
 }
 
 type SalesReportSummaryResponse struct {
-	GrossSales        float64                       `json:"gross_sales"`
-	NetSales          float64                       `json:"net_sales"`
-	SalesCount        int64                         `json:"sales_count"`
-	ItemsSold         float64                       `json:"items_sold"`
-	AverageOrderValue float64                       `json:"average_order_value"`
-	DiscountTotal     float64                       `json:"discount_total"`
-	TaxTotal          float64                       `json:"tax_total"`
-	RefundTotal       float64                       `json:"refund_total"`
-	VoidedSalesCount  int64                         `json:"voided_sales_count"`
-	PreviousPeriod    SalesPreviousPeriodComparison `json:"previous_period"`
+	GrossSales          float64                       `json:"gross_sales"`
+	NetSales            float64                       `json:"net_sales"`
+	SalesCount          int64                         `json:"sales_count"`
+	ItemsSold           float64                       `json:"items_sold"`
+	AverageOrderValue   float64                       `json:"average_order_value"`
+	DiscountTotal       float64                       `json:"discount_total"`
+	TaxTotal            float64                       `json:"tax_total"`
+	RefundTotal         float64                       `json:"refund_total"`
+	VoidedSalesCount    int64                         `json:"voided_sales_count"`
+	PreviousPeriod      SalesPreviousPeriodComparison `json:"previous_period"`
+	SourceOfTruth       string                        `json:"source_of_truth,omitempty"`
+	ConsistencyWarnings []ReportConsistencyWarning    `json:"consistency_warnings,omitempty"`
 }
 
 type SalesPreviousPeriodComparison struct {
@@ -440,18 +451,20 @@ type BakeryOrderDeliveryVsPickupResponse struct {
 }
 
 type FinancialSummaryResponse struct {
-	GrossSales                 float64 `json:"gross_sales"`
-	TotalCollected             float64 `json:"total_collected"`
-	TotalRefunded              float64 `json:"total_refunded"`
-	NetCollected               float64 `json:"net_collected"`
-	OutstandingCustomerBalance float64 `json:"outstanding_customer_balance"`
-	PurchaseTotal              float64 `json:"purchase_total"`
-	SupplierPayableBalance     float64 `json:"supplier_payable_balance"`
-	CashCollected              float64 `json:"cash_collected"`
-	CardCollected              float64 `json:"card_collected"`
-	BankTransferCollected      float64 `json:"bank_transfer_collected"`
-	RefundCount                int64   `json:"refund_count"`
-	PaymentCount               int64   `json:"payment_count"`
+	GrossSales                 float64                    `json:"gross_sales"`
+	TotalCollected             float64                    `json:"total_collected"`
+	TotalRefunded              float64                    `json:"total_refunded"`
+	NetCollected               float64                    `json:"net_collected"`
+	OutstandingCustomerBalance float64                    `json:"outstanding_customer_balance"`
+	PurchaseTotal              float64                    `json:"purchase_total"`
+	SupplierPayableBalance     float64                    `json:"supplier_payable_balance"`
+	CashCollected              float64                    `json:"cash_collected"`
+	CardCollected              float64                    `json:"card_collected"`
+	BankTransferCollected      float64                    `json:"bank_transfer_collected"`
+	RefundCount                int64                      `json:"refund_count"`
+	PaymentCount               int64                      `json:"payment_count"`
+	SourceOfTruth              string                     `json:"source_of_truth,omitempty"`
+	ConsistencyWarnings        []ReportConsistencyWarning `json:"consistency_warnings,omitempty"`
 }
 
 type FinancialPaymentReportItem struct {
@@ -469,13 +482,16 @@ type FinancialPaymentReportItem struct {
 }
 
 type FinancialPaymentMethodReportItem struct {
-	PaymentMethodID   string  `json:"payment_method_id"`
-	PaymentMethodName string  `json:"payment_method_name"`
-	PaymentMethodType string  `json:"payment_method_type"`
-	TotalCollected    float64 `json:"total_collected"`
-	TotalRefunded     float64 `json:"total_refunded"`
-	NetCollected      float64 `json:"net_collected"`
-	TransactionCount  int64   `json:"transaction_count"`
+	PaymentMethodID        string  `json:"payment_method_id"`
+	PaymentMethodName      string  `json:"payment_method_name"`
+	PaymentMethodType      string  `json:"payment_method_type"`
+	TotalCollected         float64 `json:"total_collected"`
+	TotalRefunded          float64 `json:"total_refunded"`
+	NetCollected           float64 `json:"net_collected"`
+	TransactionCount       int64   `json:"transaction_count"`
+	GrossTransactionCount  int64   `json:"gross_transaction_count"`
+	RefundTransactionCount int64   `json:"refund_transaction_count"`
+	NetTransactionCount    int64   `json:"net_transaction_count"`
 }
 
 type FinancialRefundReportItem struct {

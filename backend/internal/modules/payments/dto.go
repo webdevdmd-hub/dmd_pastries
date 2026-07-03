@@ -142,32 +142,44 @@ type PaymentRefundResponse struct {
 }
 
 type PaymentSummaryByMethod struct {
-	PaymentMethodID   string  `json:"payment_method_id"`
-	PaymentMethodName string  `json:"payment_method_name"`
-	PaymentMethodType string  `json:"payment_method_type"`
-	TotalAmount       float64 `json:"total_amount,omitempty"`
-	CollectedAmount   float64 `json:"collected_amount"`
-	RefundAmount      float64 `json:"refund_amount,omitempty"`
-	RefundedAmount    float64 `json:"refunded_amount"`
-	NetAmount         float64 `json:"net_amount"`
-	Count             int64   `json:"-"`
-	TransactionCount  int64   `json:"transaction_count,omitempty"`
+	PaymentMethodID        string  `json:"payment_method_id"`
+	PaymentMethodName      string  `json:"payment_method_name"`
+	PaymentMethodType      string  `json:"payment_method_type"`
+	TotalAmount            float64 `json:"total_amount,omitempty"`
+	CollectedAmount        float64 `json:"collected_amount"`
+	RefundAmount           float64 `json:"refund_amount,omitempty"`
+	RefundedAmount         float64 `json:"refunded_amount"`
+	NetAmount              float64 `json:"net_amount"`
+	Count                  int64   `json:"-"`
+	TransactionCount       int64   `json:"transaction_count,omitempty"`
+	GrossTransactionCount  int64   `json:"gross_transaction_count"`
+	RefundTransactionCount int64   `json:"refund_transaction_count"`
+	NetTransactionCount    int64   `json:"net_transaction_count"`
 }
 
 type DailySummaryResponse struct {
-	Date             string                   `json:"date"`
-	BranchID         string                   `json:"branch_id"`
-	TotalCollected   float64                  `json:"total_collected"`
-	TotalRefunded    float64                  `json:"total_refunded"`
-	NetCollected     float64                  `json:"net_collected"`
-	POSCollected     float64                  `json:"pos_collected"`
-	BakeryCollected  float64                  `json:"bakery_collected"`
-	DepositCollected float64                  `json:"deposit_collected"`
-	BalanceCollected float64                  `json:"balance_collected"`
-	FullCollected    float64                  `json:"full_collected"`
-	PaymentsCount    int64                    `json:"payments_count"`
-	RefundsCount     int64                    `json:"refunds_count"`
-	ByMethod         []PaymentSummaryByMethod `json:"by_method"`
+	Date                string                      `json:"date"`
+	BranchID            string                      `json:"branch_id"`
+	TotalCollected      float64                     `json:"total_collected"`
+	TotalRefunded       float64                     `json:"total_refunded"`
+	NetCollected        float64                     `json:"net_collected"`
+	POSCollected        float64                     `json:"pos_collected"`
+	BakeryCollected     float64                     `json:"bakery_collected"`
+	DepositCollected    float64                     `json:"deposit_collected"`
+	BalanceCollected    float64                     `json:"balance_collected"`
+	FullCollected       float64                     `json:"full_collected"`
+	PaymentsCount       int64                       `json:"payments_count"`
+	RefundsCount        int64                       `json:"refunds_count"`
+	ByMethod            []PaymentSummaryByMethod    `json:"by_method"`
+	SourceOfTruth       string                      `json:"source_of_truth,omitempty"`
+	ConsistencyWarnings []PaymentConsistencyWarning `json:"consistency_warnings,omitempty"`
+}
+
+type PaymentConsistencyWarning struct {
+	Code         string `json:"code"`
+	Message      string `json:"message"`
+	SourceType   string `json:"source_type"`
+	MissingCount int64  `json:"missing_count"`
 }
 
 type ReconciliationResponse struct {

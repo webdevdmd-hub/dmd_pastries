@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	reportshared "pastries-pos/internal/modules/reports/shared"
 )
 
 type Repository struct {
@@ -440,6 +442,11 @@ func (r *Repository) FindRefund(businessID, refundID string) (*PaymentRefundResp
 }
 
 func (r *Repository) DailySummary(businessID, date, branchID string) (*DailySummaryResponse, error) {
+	startUTC, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return nil, err
+	}
+	endUTC := startUTC.AddDate(0, 0, 1)
 	paymentWhere := "business_id = ? AND payment_status IN ? AND deleted_at IS NULL AND paid_at::date = ?"
 	paymentArgs := []interface{}{businessID, []string{"completed", "partially_refunded", "refunded"}, date}
 	bakeryWhere := "bop.business_id = ? AND bo.deleted_at IS NULL AND bop.paid_at::date = ?"
@@ -477,23 +484,15 @@ func (r *Repository) DailySummary(businessID, date, branchID string) (*DailySumm
 	collectedRows = append(collectedRows, bakeryRows...)
 	var refundRows []PaymentSummaryByMethod
 	if err := r.db.Table("payment_refunds").
-		Select("payment_method_id, payment_method_name_snapshot AS payment_method_name, COALESCE(SUM(refund_amount), 0) AS refunded_amount, COUNT(*) AS count").
+		Select("payment_method_id, payment_method_name_snapshot AS payment_method_name, COALESCE(SUM(refund_amount), 0) AS refunded_amount, COUNT(*) AS refund_transaction_count").
 		Where(refundWhere, refundArgs...).
 		Group("payment_method_id, payment_method_name_snapshot").
 		Scan(&refundRows).Error; err != nil {
 		return nil, err
 	}
 	rows := mergePaymentSummaryRows(collectedRows, refundRows)
-	totalCollected, totalRefunded, count := 0.0, 0.0, int64(0)
 	for i := range rows {
 		rows[i].NetAmount = roundMoney(rows[i].CollectedAmount - rows[i].RefundedAmount)
-		totalCollected += rows[i].CollectedAmount
-		totalRefunded += rows[i].RefundedAmount
-		count += rows[i].TransactionCount
-	}
-	refundsCount := int64(0)
-	if err := r.db.Table("payment_refunds").Where(refundWhere, refundArgs...).Count(&refundsCount).Error; err != nil {
-		return nil, err
 	}
 	type bakeryPaymentTypeTotal struct {
 		PaymentType string
@@ -519,7 +518,20 @@ func (r *Repository) DailySummary(businessID, date, branchID string) (*DailySumm
 			fullCollected += row.Amount
 		}
 	}
-	return &DailySummaryResponse{Date: date, BranchID: branchID, TotalCollected: roundMoney(totalCollected), TotalRefunded: roundMoney(totalRefunded), NetCollected: roundMoney(totalCollected - totalRefunded), POSCollected: roundMoney(posCollected), BakeryCollected: roundMoney(bakeryCollected), DepositCollected: roundMoney(depositCollected), BalanceCollected: roundMoney(balanceCollected), FullCollected: roundMoney(fullCollected), PaymentsCount: count, RefundsCount: refundsCount, ByMethod: rows}, nil
+	scope := reportshared.MetricScope{BusinessID: businessID, BranchID: branchID, AllBranches: branchID == ""}
+	ledger, err := reportshared.LedgerFinancialTotals(r.db, scope, startUTC, endUTC)
+	if err != nil {
+		return nil, err
+	}
+	warningRows, err := reportshared.JournalConsistencyWarnings(r.db, scope, startUTC, endUTC)
+	if err != nil {
+		return nil, err
+	}
+	warnings := make([]PaymentConsistencyWarning, 0, len(warningRows))
+	for _, row := range warningRows {
+		warnings = append(warnings, PaymentConsistencyWarning{Code: row.Code, Message: row.Message, SourceType: row.SourceType, MissingCount: row.MissingCount})
+	}
+	return &DailySummaryResponse{Date: date, BranchID: branchID, TotalCollected: roundMoney(ledger.Collected), TotalRefunded: roundMoney(ledger.Refunded), NetCollected: roundMoney(ledger.Collected - ledger.Refunded), POSCollected: roundMoney(posCollected), BakeryCollected: roundMoney(bakeryCollected), DepositCollected: roundMoney(depositCollected), BalanceCollected: roundMoney(balanceCollected), FullCollected: roundMoney(fullCollected), PaymentsCount: ledger.PaymentCount, RefundsCount: ledger.RefundCount, ByMethod: rows, SourceOfTruth: "journal_entries", ConsistencyWarnings: warnings}, nil
 }
 
 func (r *Repository) MethodSummary(businessID, dateFrom, dateTo, branchID string) ([]PaymentSummaryByMethod, error) {
@@ -574,7 +586,7 @@ func (r *Repository) MethodSummary(businessID, dateFrom, dateTo, branchID string
 	collectedRows = append(collectedRows, bakeryRows...)
 	var refundRows []PaymentSummaryByMethod
 	if err := r.db.Table("payment_refunds").
-		Select("payment_method_id, payment_method_name_snapshot AS payment_method_name, COALESCE(SUM(refund_amount), 0) AS refunded_amount, COALESCE(SUM(refund_amount), 0) AS refund_amount").
+		Select("payment_method_id, payment_method_name_snapshot AS payment_method_name, COALESCE(SUM(refund_amount), 0) AS refunded_amount, COALESCE(SUM(refund_amount), 0) AS refund_amount, COUNT(*) AS refund_transaction_count").
 		Where(refundWhere, refundArgs...).
 		Group("payment_method_id, payment_method_name_snapshot").
 		Scan(&refundRows).Error; err != nil {
@@ -793,25 +805,20 @@ func mergePaymentSummaryRows(collectedRows, refundRows []PaymentSummaryByMethod)
 	byMethod := make(map[string]*PaymentSummaryByMethod)
 	order := make([]string, 0, len(collectedRows)+len(refundRows))
 	for _, row := range collectedRows {
+		normalizePaymentSummaryCounts(&row)
 		key := row.PaymentMethodID
 		existing, ok := byMethod[key]
 		if !ok {
 			copyRow := row
-			if copyRow.Count == 0 {
-				copyRow.Count = copyRow.TransactionCount
-			}
 			byMethod[key] = &copyRow
 			order = append(order, key)
 			continue
 		}
 		existing.CollectedAmount = roundMoney(existing.CollectedAmount + row.CollectedAmount)
 		existing.TotalAmount = roundMoney(existing.TotalAmount + row.TotalAmount)
-		existing.TransactionCount += row.TransactionCount
-		if existing.Count == 0 {
-			existing.Count = existing.TransactionCount
-		} else {
-			existing.Count += row.TransactionCount
-		}
+		existing.GrossTransactionCount += row.GrossTransactionCount
+		existing.TransactionCount = existing.GrossTransactionCount
+		existing.Count = existing.GrossTransactionCount
 		if existing.PaymentMethodName == "" {
 			existing.PaymentMethodName = row.PaymentMethodName
 		}
@@ -820,6 +827,7 @@ func mergePaymentSummaryRows(collectedRows, refundRows []PaymentSummaryByMethod)
 		}
 	}
 	for _, row := range refundRows {
+		normalizePaymentSummaryCounts(&row)
 		key := row.PaymentMethodID
 		existing, ok := byMethod[key]
 		if !ok {
@@ -828,8 +836,9 @@ func mergePaymentSummaryRows(collectedRows, refundRows []PaymentSummaryByMethod)
 			order = append(order, key)
 			continue
 		}
-		existing.RefundedAmount = row.RefundedAmount
-		existing.RefundAmount = row.RefundAmount
+		existing.RefundedAmount = roundMoney(existing.RefundedAmount + row.RefundedAmount)
+		existing.RefundAmount = roundMoney(existing.RefundAmount + row.RefundAmount)
+		existing.RefundTransactionCount += row.RefundTransactionCount
 		if existing.PaymentMethodName == "" {
 			existing.PaymentMethodName = row.PaymentMethodName
 		}
@@ -841,7 +850,24 @@ func mergePaymentSummaryRows(collectedRows, refundRows []PaymentSummaryByMethod)
 			continue
 		}
 		seen[key] = struct{}{}
-		result = append(result, *byMethod[key])
+		row := *byMethod[key]
+		normalizePaymentSummaryCounts(&row)
+		result = append(result, row)
 	}
 	return result
+}
+
+func normalizePaymentSummaryCounts(row *PaymentSummaryByMethod) {
+	if row.GrossTransactionCount == 0 {
+		row.GrossTransactionCount = row.TransactionCount
+	}
+	if row.RefundTransactionCount == 0 && row.Count > 0 && row.GrossTransactionCount == 0 {
+		row.RefundTransactionCount = row.Count
+	}
+	row.TransactionCount = row.GrossTransactionCount
+	row.Count = row.GrossTransactionCount
+	row.NetTransactionCount = row.GrossTransactionCount - row.RefundTransactionCount
+	if row.NetTransactionCount < 0 {
+		row.NetTransactionCount = 0
+	}
 }

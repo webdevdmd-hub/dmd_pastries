@@ -52,6 +52,8 @@ type ledgerFinancialTotals struct {
 	RefundCount         int64
 }
 
+const journalSourceOfTruth = "journal_entries"
+
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
@@ -77,12 +79,18 @@ func (r *Repository) DashboardSummary(filter *shared.ResolvedFilter) (*Dashboard
 	if err != nil {
 		return nil, err
 	}
+	warnings, err := r.consistencyWarnings(filter, filter.StartUTC, filter.EndUTC)
+	if err != nil {
+		return nil, err
+	}
 	return &DashboardSummaryResponse{
-		Sales:         *sales,
-		Inventory:     *inventory,
-		Manufacturing: *manufacturing,
-		Orders:        *orders,
-		Payments:      *payments,
+		Sales:               *sales,
+		Inventory:           *inventory,
+		Manufacturing:       *manufacturing,
+		Orders:              *orders,
+		Payments:            *payments,
+		SourceOfTruth:       journalSourceOfTruth,
+		ConsistencyWarnings: warnings,
 	}, nil
 }
 
@@ -646,6 +654,12 @@ func (r *Repository) SalesReportSummary(filter *shared.ResolvedFilter) (*SalesRe
 		NetSalesChangePercentage:   percentageChange(current.NetSales, previous.NetSales),
 		SalesCountChangePercentage: percentageChange(float64(current.SalesCount), float64(previous.SalesCount)),
 	}
+	warnings, err := r.consistencyWarnings(filter, filter.StartUTC, filter.EndUTC)
+	if err != nil {
+		return nil, err
+	}
+	current.SourceOfTruth = journalSourceOfTruth
+	current.ConsistencyWarnings = warnings
 	return current, nil
 }
 
@@ -1807,48 +1821,29 @@ func (r *Repository) BakeryOrdersTrend(filter *shared.ResolvedFilter) ([]trendSe
 }
 
 func (r *Repository) FinancialSummary(filter *shared.ResolvedFilter) (*FinancialSummaryResponse, error) {
-	var collected financialCollectedSummaryRow
-	collectedQuery, collectedArgs := financialCollectedSummarySQL(filter)
-	if err := r.db.Raw(collectedQuery, collectedArgs...).Scan(&collected).Error; err != nil {
+	ledger, err := r.ledgerFinancialTotals(filter, filter.StartUTC, filter.EndUTC)
+	if err != nil {
 		return nil, err
 	}
-	var refunded financialRefundSummaryRow
-	refundQuery, refundArgs := financialRefundSummarySQL(filter)
-	if err := r.db.Raw(refundQuery, refundArgs...).Scan(&refunded).Error; err != nil {
-		return nil, err
-	}
-	var grossSales float64
-	grossQuery, grossArgs := financialGrossSalesSummarySQL(filter)
-	if err := r.db.Raw(grossQuery, grossArgs...).Scan(&grossSales).Error; err != nil {
-		return nil, err
-	}
-	var outstanding float64
-	outstandingQuery, outstandingArgs := financialOutstandingSummarySQL(filter)
-	if err := r.db.Raw(outstandingQuery, outstandingArgs...).Scan(&outstanding).Error; err != nil {
-		return nil, err
-	}
-	var supplierPayable float64
-	supplierQuery, supplierArgs := financialSupplierPayableSummarySQL(filter)
-	if err := r.db.Raw(supplierQuery, supplierArgs...).Scan(&supplierPayable).Error; err != nil {
-		return nil, err
-	}
-	purchaseTotals, err := r.FinancialPurchaseTotals(filter)
+	warnings, err := r.consistencyWarnings(filter, filter.StartUTC, filter.EndUTC)
 	if err != nil {
 		return nil, err
 	}
 	return &FinancialSummaryResponse{
-		GrossSales:                 roundMoney(grossSales),
-		TotalCollected:             roundMoney(collected.TotalCollected),
-		TotalRefunded:              roundMoney(refunded.TotalRefunded),
-		NetCollected:               roundMoney(collected.TotalCollected - refunded.TotalRefunded),
-		OutstandingCustomerBalance: roundMoney(outstanding),
-		PurchaseTotal:              roundMoney(purchaseTotals.TotalPurchaseAmount),
-		SupplierPayableBalance:     roundMoney(supplierPayable),
-		CashCollected:              roundMoney(collected.CashCollected),
-		CardCollected:              roundMoney(collected.CardCollected),
-		BankTransferCollected:      roundMoney(collected.BankTransferCollected),
-		RefundCount:                refunded.RefundCount,
-		PaymentCount:               collected.PaymentCount,
+		GrossSales:                 roundMoney(ledger.GrossRevenue),
+		TotalCollected:             roundMoney(ledger.Collected),
+		TotalRefunded:              roundMoney(ledger.Refunded),
+		NetCollected:               roundMoney(ledger.Collected - ledger.Refunded),
+		OutstandingCustomerBalance: roundMoney(ledger.OutstandingCustomer),
+		PurchaseTotal:              roundMoney(ledger.PurchaseTotal),
+		SupplierPayableBalance:     roundMoney(ledger.SupplierPayable),
+		CashCollected:              roundMoney(ledger.CashCollected),
+		CardCollected:              roundMoney(ledger.CardCollected),
+		BankTransferCollected:      roundMoney(ledger.BankCollected),
+		RefundCount:                ledger.RefundCount,
+		PaymentCount:               ledger.PaymentCount,
+		SourceOfTruth:              journalSourceOfTruth,
+		ConsistencyWarnings:        warnings,
 	}, nil
 }
 
@@ -2253,6 +2248,23 @@ func (r *Repository) ledgerFinancialTotals(filter *shared.ResolvedFilter, startU
 		PaymentCount:        totals.PaymentCount,
 		RefundCount:         totals.RefundCount,
 	}, nil
+}
+
+func (r *Repository) consistencyWarnings(filter *shared.ResolvedFilter, startUTC, endUTC time.Time) ([]ReportConsistencyWarning, error) {
+	rows, err := shared.JournalConsistencyWarnings(r.db, shared.MetricScopeFromFilter(filter), startUTC, endUTC)
+	if err != nil {
+		return nil, err
+	}
+	warnings := make([]ReportConsistencyWarning, 0, len(rows))
+	for _, row := range rows {
+		warnings = append(warnings, ReportConsistencyWarning{
+			Code:         row.Code,
+			Message:      row.Message,
+			SourceType:   row.SourceType,
+			MissingCount: row.MissingCount,
+		})
+	}
+	return warnings, nil
 }
 
 func (r *Repository) ledgerIncomeAmount(businessID, branchID string, allBranches bool, dateFrom, dateTo string, sourceTypes []string, positiveCreditsOnly bool) (float64, error) {
@@ -2728,32 +2740,39 @@ func financialPaymentsByMethodSQL(filter *shared.ResolvedFilter) (string, []inte
 	union, args := financialPaymentsUnionSQL(filter)
 	refund := `
 		SELECT payment_method_id,
-			COALESCE(SUM(refund_amount),0) AS total_refunded
+			payment_method_name_snapshot AS payment_method_name,
+			COALESCE(pm.method_type, '') AS payment_method_type,
+			COALESCE(SUM(refund_amount),0) AS total_refunded,
+			COUNT(*) AS refund_transaction_count
 		FROM payment_refunds pr
+		LEFT JOIN payment_methods pm ON pm.id = pr.payment_method_id AND pm.business_id = pr.business_id
 		WHERE pr.business_id = ? AND pr.refunded_at >= ? AND pr.refunded_at < ? AND pr.deleted_at IS NULL`
 	refundArgs := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
 	refund, refundArgs = addFinancialRefundFilters(refund, refundArgs, filter)
-	refund += " GROUP BY payment_method_id"
+	refund += " GROUP BY payment_method_id, payment_method_name_snapshot, pm.method_type"
 	args = append(args, refundArgs...)
 	return `
-		SELECT collected.payment_method_id::text AS payment_method_id,
-			collected.payment_method_name,
-			collected.payment_method_type,
-			collected.total_collected,
+		SELECT COALESCE(collected.payment_method_id, refunds.payment_method_id)::text AS payment_method_id,
+			COALESCE(collected.payment_method_name, refunds.payment_method_name, '') AS payment_method_name,
+			COALESCE(collected.payment_method_type, refunds.payment_method_type, '') AS payment_method_type,
+			COALESCE(collected.total_collected,0) AS total_collected,
 			COALESCE(refunds.total_refunded,0) AS total_refunded,
-			(collected.total_collected - COALESCE(refunds.total_refunded,0)) AS net_collected,
-			collected.transaction_count
+			(COALESCE(collected.total_collected,0) - COALESCE(refunds.total_refunded,0)) AS net_collected,
+			COALESCE(collected.gross_transaction_count,0) AS transaction_count,
+			COALESCE(collected.gross_transaction_count,0) AS gross_transaction_count,
+			COALESCE(refunds.refund_transaction_count,0) AS refund_transaction_count,
+			GREATEST(COALESCE(collected.gross_transaction_count,0) - COALESCE(refunds.refund_transaction_count,0), 0) AS net_transaction_count
 		FROM (
 			SELECT payment_method_id,
 				payment_method_name,
 				payment_method_type,
 				COALESCE(SUM(amount),0) AS total_collected,
-				COUNT(*) AS transaction_count
+				COUNT(*) AS gross_transaction_count
 			FROM (` + union + `) method_payments
 			GROUP BY payment_method_id, payment_method_name, payment_method_type
 		) collected
-		LEFT JOIN (` + refund + `) refunds ON refunds.payment_method_id = collected.payment_method_id
-		ORDER BY collected.total_collected DESC`, args
+		FULL OUTER JOIN (` + refund + `) refunds ON refunds.payment_method_id = collected.payment_method_id
+		ORDER BY COALESCE(collected.total_collected,0) DESC`, args
 }
 
 func financialOutstandingSummarySQL(filter *shared.ResolvedFilter) (string, []interface{}) {

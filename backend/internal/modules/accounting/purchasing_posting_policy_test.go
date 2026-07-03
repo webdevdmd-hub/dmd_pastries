@@ -71,9 +71,45 @@ func TestPaymentRefundBackfillTargetsPOSRefundsOnly(t *testing.T) {
 	}
 }
 
+func TestJournalEntryFiltersAcceptAllOrigin(t *testing.T) {
+	if err := validateJournalEntryFilters(JournalEntryListQuery{JournalOrigin: "all"}); err != nil {
+		t.Fatalf("journal_origin=all should be accepted: %v", err)
+	}
+}
+
+func TestJournalEntrySystemSourceTypeFilterIncludesPurchaseReturn(t *testing.T) {
+	conditions := journalEntryFilterConditions(JournalEntryListQuery{
+		JournalOrigin: "system",
+		Search:        "VC-000001",
+		SourceType:    "purchase_return",
+	})
+
+	if !hasJournalEntryFilterCondition(conditions, "COALESCE(source_type, '') <> ?", "manual") {
+		t.Fatalf("expected system-origin condition, got %#v", conditions)
+	}
+	if !hasJournalEntryFilterCondition(conditions, "source_type = ?", "purchase_return") {
+		t.Fatalf("expected purchase_return source_type condition, got %#v", conditions)
+	}
+	if !hasJournalEntryFilterCondition(conditions, "LOWER(entry_number) LIKE ? OR LOWER(reference_number) LIKE ? OR LOWER(narration) LIKE ?", "%vc-000001%") {
+		t.Fatalf("expected reference-number search condition for VC-000001, got %#v", conditions)
+	}
+}
+
 func containsSQLToken(value, token string) bool {
 	for i := 0; i+len(token) <= len(value); i++ {
 		if value[i:i+len(token)] == token {
+			return true
+		}
+	}
+	return false
+}
+
+func hasJournalEntryFilterCondition(conditions []journalEntryFilterCondition, clause string, arg interface{}) bool {
+	for _, condition := range conditions {
+		if condition.Clause != clause || len(condition.Args) == 0 {
+			continue
+		}
+		if condition.Args[0] == arg {
 			return true
 		}
 	}

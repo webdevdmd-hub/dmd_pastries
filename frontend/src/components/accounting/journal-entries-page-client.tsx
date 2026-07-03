@@ -88,7 +88,7 @@ const defaultFilters: JournalEntriesFilters = {
   branchId: "",
   dateFrom: "",
   dateTo: "",
-  journalOrigin: "manual",
+  journalOrigin: "all",
   limit: 25,
   page: 1,
   search: "",
@@ -97,6 +97,28 @@ const defaultFilters: JournalEntriesFilters = {
   sourceType: "",
   status: "all",
 };
+
+const journalOriginLabels: Record<JournalEntriesFilters["journalOrigin"], string> = {
+  all: "All Journals",
+  manual: "Manual Journals",
+  system: "System Generated",
+};
+
+const journalOriginDescriptions: Record<JournalEntriesFilters["journalOrigin"], string> = {
+  all: "Manual and backend-posted accounting journals.",
+  manual: "Draft, posted, and reversed manual vouchers.",
+  system: "Read-only journals posted automatically from source documents.",
+};
+
+function journalHeaderDescription(origin: JournalEntriesFilters["journalOrigin"]): string {
+  if (origin === "all") {
+    return "Review manual and system-generated accounting journals from sales, purchasing, expenses, inventory, and manufacturing.";
+  }
+  if (origin === "manual") {
+    return "Create and manage balanced debit/credit manual accounting vouchers.";
+  }
+  return "Review backend-posted accounting journals from sales, purchasing, expenses, inventory, and manufacturing.";
+}
 
 type PendingAction =
   | { entry: JournalEntry; type: "post" }
@@ -879,10 +901,8 @@ export function JournalEntriesPageClient(): JSX.Element {
   const selectedEntry = detailEntryQuery.data ?? selectedSummaryEntry;
   const formEntry = formMode === "edit" ? (formEntryQuery.data ?? null) : null;
   const isManualView = filters.journalOrigin === "manual";
-  const journalViewLabel = isManualView ? "Manual Journals" : "System Generated";
-  const journalViewDescription = isManualView
-    ? "Draft, posted, and reversed manual vouchers."
-    : "Read-only journals posted automatically from source documents.";
+  const journalViewLabel = journalOriginLabels[filters.journalOrigin];
+  const journalViewDescription = journalOriginDescriptions[filters.journalOrigin];
 
   useEffect(() => {
     setFilters((current) =>
@@ -990,11 +1010,7 @@ export function JournalEntriesPageClient(): JSX.Element {
             </Button>
           ) : undefined
         }
-        description={
-          isManualView
-            ? "Create and manage balanced debit/credit manual accounting vouchers."
-            : "Review backend-posted accounting journals from sales, purchasing, expenses, inventory, and manufacturing."
-        }
+        description={journalHeaderDescription(filters.journalOrigin)}
         title="Journal Entries"
       />
 
@@ -1045,7 +1061,20 @@ export function JournalEntriesPageClient(): JSX.Element {
               </div>
 
               <div className="grid gap-3 border-b border-brand-cappuccino/70 bg-brand-latte/25 p-4">
-                <div className="grid grid-cols-2 rounded-2xl border border-brand-cappuccino/70 bg-white p-1">
+                <div className="grid grid-cols-3 rounded-2xl border border-brand-cappuccino/70 bg-white p-1">
+                  <Button
+                    className="rounded-xl"
+                    onClick={() =>
+                      updateFilters({
+                        journalOrigin: "all",
+                        sourceType: "",
+                      })
+                    }
+                    type="button"
+                    variant={filters.journalOrigin === "all" ? "default" : "ghost"}
+                  >
+                    All
+                  </Button>
                   <Button
                     className="rounded-xl"
                     onClick={() =>
@@ -1068,7 +1097,7 @@ export function JournalEntriesPageClient(): JSX.Element {
                       })
                     }
                     type="button"
-                    variant={!isManualView ? "default" : "ghost"}
+                    variant={filters.journalOrigin === "system" ? "default" : "ghost"}
                   >
                     System Generated
                   </Button>
@@ -1101,7 +1130,7 @@ export function JournalEntriesPageClient(): JSX.Element {
                     </SelectContent>
                   </Select>
                   <div className="flex items-center rounded-2xl border border-brand-cappuccino/70 bg-white px-3 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha">
-                    {isManualView ? "Manual source" : "System sources"}
+                    {journalViewLabel}
                   </div>
                 </div>
                 <Select
@@ -1173,9 +1202,7 @@ export function JournalEntriesPageClient(): JSX.Element {
                     </div>
                     <p className="font-semibold text-brand-espresso">No journal entries found.</p>
                     <p className="text-sm text-brand-mocha">
-                      {isManualView
-                        ? "Create a balanced voucher or adjust filters."
-                        : "No system-generated journals match these filters."}
+                      No journals match {journalViewLabel.toLowerCase()} and the current filters.
                     </p>
                   </div>
                 ) : null}

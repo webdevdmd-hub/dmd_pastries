@@ -1,6 +1,7 @@
 import { Banknote, ReceiptText, RotateCcw, WalletCards } from "lucide-react";
 import type { JSX } from "react";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import type { DailyPaymentSummary } from "@/types/payment";
 
@@ -13,11 +14,12 @@ function formatMoney(value: number): string {
 }
 
 export function PaymentsSummaryCards({ summary }: PaymentsSummaryCardsProps): JSX.Element {
+  const warnings = summary?.consistencyWarnings ?? [];
   const cards = [
     {
       label: "Total Collected Today",
       value: formatMoney(summary?.totalCollected ?? 0),
-      detail: `POS ${formatMoney(summary?.posCollected ?? 0)} · Bakery ${formatMoney(summary?.bakeryCollected ?? 0)}`,
+      detail: `POS ${formatMoney(summary?.posCollected ?? 0)} / Bakery ${formatMoney(summary?.bakeryCollected ?? 0)}`,
       icon: Banknote,
     },
     {
@@ -35,31 +37,46 @@ export function PaymentsSummaryCards({ summary }: PaymentsSummaryCardsProps): JS
     {
       label: "Transactions Count",
       value: String(summary?.transactionsCount ?? 0),
-      detail: `Deposits ${formatMoney(summary?.depositCollected ?? 0)} · Balance ${formatMoney(summary?.balanceCollected ?? 0)} · Full ${formatMoney(summary?.fullCollected ?? 0)}`,
+      detail: `Deposits ${formatMoney(summary?.depositCollected ?? 0)} / Balance ${formatMoney(summary?.balanceCollected ?? 0)} / Full ${formatMoney(summary?.fullCollected ?? 0)}`,
       icon: ReceiptText,
     },
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {cards.map((card) => {
-        const Icon = card.icon;
+    <div className="space-y-4">
+      {warnings.length > 0 ? (
+        <Alert>
+          <AlertTitle>Accounting consistency warning</AlertTitle>
+          <AlertDescription>
+            {warnings
+              .map(
+                (warning) =>
+                  `${String(warning.missingCount)} ${warning.sourceType}: ${warning.message}`,
+              )
+              .join(" ")}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {cards.map((card) => {
+          const Icon = card.icon;
 
-        return (
-          <Card className="bg-white/80" key={card.label}>
-            <CardContent className="flex items-center justify-between p-5">
-              <div>
-                <p className="text-sm text-brand-mocha">{card.label}</p>
-                <p className="mt-2 text-2xl font-black text-brand-espresso">{card.value}</p>
-                <p className="mt-1 text-xs text-brand-mocha">{card.detail}</p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-cappuccino/40 text-brand-mocha">
-                <Icon className="h-5 w-5" />
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+          return (
+            <Card className="bg-white/80" key={card.label}>
+              <CardContent className="flex items-center justify-between p-5">
+                <div>
+                  <p className="text-sm text-brand-mocha">{card.label}</p>
+                  <p className="mt-2 text-2xl font-black text-brand-espresso">{card.value}</p>
+                  <p className="mt-1 text-xs text-brand-mocha">{card.detail}</p>
+                </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-cappuccino/40 text-brand-mocha">
+                  <Icon className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -36,6 +36,13 @@ type FinancialTotals struct {
 	RefundCount         int64
 }
 
+type ConsistencyWarning struct {
+	Code         string `json:"code"`
+	Message      string `json:"message"`
+	SourceType   string `json:"source_type"`
+	MissingCount int64  `json:"missing_count"`
+}
+
 func MetricScopeFromFilter(filter *ResolvedFilter) MetricScope {
 	return MetricScope{
 		BusinessID:  filter.BusinessID,
@@ -95,6 +102,234 @@ func LedgerFinancialTotals(db *gorm.DB, scope MetricScope, startUTC, endUTC time
 	totals.PaymentCount = paymentCount
 	totals.RefundCount = refundCount
 	return totals, nil
+}
+
+func JournalConsistencyWarnings(db *gorm.DB, scope MetricScope, startUTC, endUTC time.Time) ([]ConsistencyWarning, error) {
+	dateFrom, dateTo := LedgerDateRange(startUTC, endUTC)
+	checks := []struct {
+		code       string
+		sourceType string
+		message    string
+		branchCol  string
+		query      string
+		args       []interface{}
+	}{
+		{
+			code:       "pos_sales_missing_journals",
+			sourceType: "pos_sale",
+			message:    "Completed POS sales are missing posted accounting journals.",
+			branchCol:  "s.branch_id",
+			query: `
+				SELECT COUNT(*)
+				FROM sales s
+				WHERE s.business_id = ?
+				  AND s.deleted_at IS NULL
+				  AND s.sale_status <> 'voided'
+				  AND s.sold_at >= ?
+				  AND s.sold_at < ?
+				  AND NOT EXISTS (
+				    SELECT 1 FROM journal_entries je
+				    WHERE je.business_id = s.business_id
+				      AND je.source_type = 'pos_sale'
+				      AND je.source_id = s.id
+				      AND je.status IN ('posted', 'reversed')
+				      AND je.deleted_at IS NULL
+				  )`,
+			args: []interface{}{scope.BusinessID, startUTC, endUTC},
+		},
+		{
+			code:       "bakery_order_revenue_missing_journals",
+			sourceType: "bakery_order_revenue",
+			message:    "Bakery orders are missing posted revenue journals.",
+			branchCol:  "bo.branch_id",
+			query: `
+				SELECT COUNT(*)
+				FROM bakery_orders bo
+				WHERE bo.business_id = ?
+				  AND bo.deleted_at IS NULL
+				  AND bo.order_status NOT IN ('cancelled')
+				  AND bo.event_date >= ?
+				  AND bo.event_date <= ?
+				  AND NOT EXISTS (
+				    SELECT 1 FROM journal_entries je
+				    WHERE je.business_id = bo.business_id
+				      AND je.source_type = 'bakery_order_revenue'
+				      AND je.source_id = bo.id
+				      AND je.status IN ('posted', 'reversed')
+				      AND je.deleted_at IS NULL
+				  )`,
+			args: []interface{}{scope.BusinessID, dateFrom, dateTo},
+		},
+		{
+			code:       "bakery_payments_missing_journals",
+			sourceType: "bakery_order_payment",
+			message:    "Bakery order payments are missing posted accounting journals.",
+			branchCol:  "bo.branch_id",
+			query: `
+				SELECT COUNT(*)
+				FROM bakery_order_payments bop
+				JOIN bakery_orders bo ON bo.id = bop.bakery_order_id AND bo.business_id = bop.business_id
+				WHERE bop.business_id = ?
+				  AND bo.deleted_at IS NULL
+				  AND bop.paid_at >= ?
+				  AND bop.paid_at < ?
+				  AND (bop.journal_entry_id IS NULL OR NOT EXISTS (
+				    SELECT 1 FROM journal_entries je
+				    WHERE je.id = bop.journal_entry_id
+				      AND je.business_id = bop.business_id
+				      AND je.source_type = 'bakery_order_payment'
+				      AND je.status IN ('posted', 'reversed')
+				      AND je.deleted_at IS NULL
+				  ))`,
+			args: []interface{}{scope.BusinessID, startUTC, endUTC},
+		},
+		{
+			code:       "pos_refunds_missing_journals",
+			sourceType: "pos_sale_refund",
+			message:    "Completed POS refunds are missing posted accounting journals.",
+			branchCol:  "pr.branch_id",
+			query: `
+				SELECT COUNT(*)
+				FROM payment_refunds pr
+				WHERE pr.business_id = ?
+				  AND pr.deleted_at IS NULL
+				  AND pr.refund_status = 'completed'
+				  AND pr.refunded_at >= ?
+				  AND pr.refunded_at < ?
+				  AND COALESCE(pr.refund_source, 'payment_adjustment') IN ('pos_sale', 'payment_adjustment')
+				  AND (pr.journal_entry_id IS NULL OR NOT EXISTS (
+				    SELECT 1 FROM journal_entries je
+				    WHERE je.business_id = pr.business_id
+				      AND je.source_type = 'pos_sale_refund'
+				      AND je.source_id = pr.id
+				      AND je.status IN ('posted', 'reversed')
+				      AND je.deleted_at IS NULL
+				  ))`,
+			args: []interface{}{scope.BusinessID, startUTC, endUTC},
+		},
+		{
+			code:       "purchase_bills_missing_journals",
+			sourceType: "purchase_invoice",
+			message:    "Posted purchase bills are missing posted accounting journals.",
+			branchCol:  "pi.branch_id",
+			query: `
+				SELECT COUNT(*)
+				FROM purchase_invoices pi
+				WHERE pi.business_id = ?
+				  AND pi.deleted_at IS NULL
+				  AND pi.status = 'posted'
+				  AND pi.invoice_date >= ?
+				  AND pi.invoice_date <= ?
+				  AND pi.journal_entry_id IS NULL`,
+			args: []interface{}{scope.BusinessID, dateFrom, dateTo},
+		},
+		{
+			code:       "supplier_payments_missing_journals",
+			sourceType: "supplier_payment",
+			message:    "Completed supplier payments are missing posted accounting journals.",
+			branchCol:  "sp.branch_id",
+			query: `
+				SELECT COUNT(*)
+				FROM supplier_payments sp
+				WHERE sp.business_id = ?
+				  AND sp.deleted_at IS NULL
+				  AND sp.status = 'completed'
+				  AND sp.payment_date >= ?
+				  AND sp.payment_date <= ?
+				  AND sp.journal_entry_id IS NULL`,
+			args: []interface{}{scope.BusinessID, dateFrom, dateTo},
+		},
+		{
+			code:       "expenses_missing_journals",
+			sourceType: "expense",
+			message:    "Posted expenses are missing posted accounting journals.",
+			branchCol:  "e.branch_id",
+			query: `
+				SELECT COUNT(*)
+				FROM expenses e
+				WHERE e.business_id = ?
+				  AND e.deleted_at IS NULL
+				  AND e.status = 'posted'
+				  AND e.expense_date >= ?
+				  AND e.expense_date <= ?
+				  AND e.journal_entry_id IS NULL`,
+			args: []interface{}{scope.BusinessID, dateFrom, dateTo},
+		},
+		{
+			code:       "vendor_credits_missing_journals",
+			sourceType: "purchase_return",
+			message:    "Posted Vendor Credits are missing posted accounting journals.",
+			branchCol:  "prt.branch_id",
+			query: `
+				SELECT COUNT(*)
+				FROM purchase_returns prt
+				WHERE prt.business_id = ?
+				  AND prt.deleted_at IS NULL
+				  AND prt.status = 'posted'
+				  AND prt.return_date >= ?
+				  AND prt.return_date <= ?
+				  AND prt.journal_entry_id IS NULL`,
+			args: []interface{}{scope.BusinessID, dateFrom, dateTo},
+		},
+		{
+			code:       "manufacturing_batches_missing_journals",
+			sourceType: "manufacturing_batch",
+			message:    "Completed manufacturing batches are missing posted accounting journals.",
+			branchCol:  "pb.branch_id",
+			query: `
+				SELECT COUNT(*)
+				FROM production_batches pb
+				WHERE pb.business_id = ?
+				  AND pb.deleted_at IS NULL
+				  AND pb.status = 'completed'
+				  AND pb.completed_at >= ?
+				  AND pb.completed_at < ?
+				  AND NOT EXISTS (
+				    SELECT 1 FROM journal_entries je
+				    WHERE je.business_id = pb.business_id
+				      AND je.source_type = 'manufacturing_batch'
+				      AND je.source_id = pb.id
+				      AND je.status IN ('posted', 'reversed')
+				      AND je.deleted_at IS NULL
+				  )`,
+			args: []interface{}{scope.BusinessID, startUTC, endUTC},
+		},
+		{
+			code:       "stock_movements_missing_journals",
+			sourceType: "stock_movement",
+			message:    "Valued stock movements are missing posted accounting journals.",
+			branchCol:  "sm.branch_id",
+			query: `
+				SELECT COUNT(*)
+				FROM stock_movements sm
+				WHERE sm.business_id = ?
+				  AND sm.deleted_at IS NULL
+				  AND sm.created_at >= ?
+				  AND sm.created_at < ?
+				  AND sm.movement_type IN ('opening_stock','adjustment_in','adjustment_out','wastage','purchase_return_out','purchase_bill_cancel_out')
+				  AND COALESCE(sm.total_cost, 0) <> 0
+				  AND sm.accounting_journal_entry_id IS NULL`,
+			args: []interface{}{scope.BusinessID, startUTC, endUTC},
+		},
+	}
+
+	warnings := make([]ConsistencyWarning, 0)
+	for _, check := range checks {
+		query, args := addConsistencyBranchFilter(check.query, check.args, scope, check.branchCol)
+		var count int64
+		if err := db.Raw(query, args...).Scan(&count).Error; err != nil {
+			return nil, err
+		}
+		if count > 0 {
+			warnings = append(warnings, ConsistencyWarning{
+				Code:         check.code,
+				Message:      check.message,
+				SourceType:   check.sourceType,
+				MissingCount: count,
+			})
+		}
+	}
+	return warnings, nil
 }
 
 func LedgerIncomeAmount(db *gorm.DB, scope MetricScope, dateFrom, dateTo string, sourceTypes []string, positiveCreditsOnly bool) (float64, error) {
@@ -288,6 +523,15 @@ func ledgerBranchClause(scope MetricScope) (string, []interface{}) {
 		return "", []interface{}{}
 	}
 	return " AND je.branch_id = ?", []interface{}{scope.BranchID}
+}
+
+func addConsistencyBranchFilter(query string, args []interface{}, scope MetricScope, branchColumn string) (string, []interface{}) {
+	if scope.AllBranches {
+		return query, args
+	}
+	query += " AND " + branchColumn + " = ?"
+	args = append(args, scope.BranchID)
+	return query, args
 }
 
 func roundMetricMoney(value float64) float64 {

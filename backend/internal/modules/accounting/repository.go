@@ -2598,32 +2598,45 @@ func applyPlatformSettlementFilters(db *gorm.DB, query PlatformSettlementListQue
 	return db
 }
 
-func applyJournalEntryFilters(db *gorm.DB, query JournalEntryListQuery) *gorm.DB {
+type journalEntryFilterCondition struct {
+	Clause string
+	Args   []interface{}
+}
+
+func journalEntryFilterConditions(query JournalEntryListQuery) []journalEntryFilterCondition {
+	conditions := make([]journalEntryFilterCondition, 0, 7)
 	if query.Search != "" {
 		like := "%" + strings.ToLower(strings.TrimSpace(query.Search)) + "%"
-		db = db.Where("LOWER(entry_number) LIKE ? OR LOWER(reference_number) LIKE ? OR LOWER(narration) LIKE ?", like, like, like)
+		conditions = append(conditions, journalEntryFilterCondition{Clause: "LOWER(entry_number) LIKE ? OR LOWER(reference_number) LIKE ? OR LOWER(narration) LIKE ?", Args: []interface{}{like, like, like}})
 	}
 	if query.BranchID != "" {
-		db = db.Where("branch_id = ?", query.BranchID)
+		conditions = append(conditions, journalEntryFilterCondition{Clause: "branch_id = ?", Args: []interface{}{query.BranchID}})
 	}
 	if query.Status != "" {
-		db = db.Where("status = ?", query.Status)
+		conditions = append(conditions, journalEntryFilterCondition{Clause: "status = ?", Args: []interface{}{query.Status}})
 	}
 	switch query.JournalOrigin {
 	case "manual":
-		db = db.Where("source_type = ?", "manual")
+		conditions = append(conditions, journalEntryFilterCondition{Clause: "source_type = ?", Args: []interface{}{"manual"}})
 	case "system":
-		db = db.Where("COALESCE(source_type, '') <> ?", "manual")
-	case "":
+		conditions = append(conditions, journalEntryFilterCondition{Clause: "COALESCE(source_type, '') <> ?", Args: []interface{}{"manual"}})
+	case "", "all":
 	}
-	if query.JournalOrigin == "" && query.SourceType != "" {
-		db = db.Where("source_type = ?", query.SourceType)
+	if query.SourceType != "" {
+		conditions = append(conditions, journalEntryFilterCondition{Clause: "source_type = ?", Args: []interface{}{query.SourceType}})
 	}
 	if query.DateFrom != "" {
-		db = db.Where("entry_date >= ?", query.DateFrom)
+		conditions = append(conditions, journalEntryFilterCondition{Clause: "entry_date >= ?", Args: []interface{}{query.DateFrom}})
 	}
 	if query.DateTo != "" {
-		db = db.Where("entry_date <= ?", query.DateTo)
+		conditions = append(conditions, journalEntryFilterCondition{Clause: "entry_date <= ?", Args: []interface{}{query.DateTo}})
+	}
+	return conditions
+}
+
+func applyJournalEntryFilters(db *gorm.DB, query JournalEntryListQuery) *gorm.DB {
+	for _, condition := range journalEntryFilterConditions(query) {
+		db = db.Where(condition.Clause, condition.Args...)
 	}
 	return db
 }

@@ -2412,6 +2412,9 @@ func (s *Service) ListJournalEntries(currentUser *utils.AuthContext, query Journ
 	query.Page, query.Limit = normalizePagination(query.Page, query.Limit)
 	query.Search = strings.TrimSpace(query.Search)
 	query.JournalOrigin = strings.ToLower(strings.TrimSpace(query.JournalOrigin))
+	if query.JournalOrigin == "all" {
+		query.JournalOrigin = ""
+	}
 	if err := validateJournalEntryFilters(query); err != nil {
 		return nil, err
 	}
@@ -3360,8 +3363,8 @@ func validateJournalEntryFilters(query JournalEntryListQuery) error {
 	if query.Status != "" && !validJournalEntryStatus(query.Status) {
 		return apperrors.BadRequest("invalid status", nil)
 	}
-	if query.JournalOrigin != "" && query.JournalOrigin != "manual" && query.JournalOrigin != "system" {
-		return apperrors.BadRequest("journal_origin must be manual or system", nil)
+	if query.JournalOrigin != "" && query.JournalOrigin != "manual" && query.JournalOrigin != "system" && query.JournalOrigin != "all" {
+		return apperrors.BadRequest("journal_origin must be all, manual, or system", nil)
 	}
 	if query.DateFrom != "" {
 		if _, err := time.Parse("2006-01-02", query.DateFrom); err != nil {

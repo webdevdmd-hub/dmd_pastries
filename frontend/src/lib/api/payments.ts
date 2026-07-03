@@ -11,6 +11,7 @@ import type {
   PaymentRefund,
   PaymentSourceType,
   PaymentStatus,
+  PaymentSummaryParams,
   ReconciliationFilters,
   ReconciliationStatus,
   RefundFilters,
@@ -109,6 +110,13 @@ type BackendCreateReconciliationPayload = {
   payment_method_id: string;
   counted_amount: number;
   notes?: string | null;
+};
+
+type BackendConsistencyWarning = {
+  code?: string;
+  message?: string;
+  missing_count?: number;
+  source_type?: string;
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -319,6 +327,10 @@ function parseDailySummary(value: unknown): DailyPaymentSummary {
     throw new Error("Backend daily payment summary payload is invalid.");
   }
 
+  const warnings = Array.isArray(value.consistency_warnings)
+    ? value.consistency_warnings.map(parseConsistencyWarning)
+    : [];
+
   return {
     totalCollected: requiredNumber(value.total_collected),
     totalRefunded: requiredNumber(value.total_refunded),
@@ -329,6 +341,18 @@ function parseDailySummary(value: unknown): DailyPaymentSummary {
     balanceCollected: requiredNumber(value.balance_collected),
     fullCollected: requiredNumber(value.full_collected),
     transactionsCount: requiredNumber(value.transactions_count, requiredNumber(value.payments_count)),
+    sourceOfTruth: requiredString(value.source_of_truth),
+    consistencyWarnings: warnings,
+  };
+}
+
+function parseConsistencyWarning(value: unknown): DailyPaymentSummary["consistencyWarnings"][number] {
+  const warning = isObject(value) ? (value as BackendConsistencyWarning) : {};
+  return {
+    code: requiredString(warning.code),
+    message: requiredString(warning.message),
+    missingCount: requiredNumber(warning.missing_count),
+    sourceType: requiredString(warning.source_type),
   };
 }
 
@@ -337,6 +361,16 @@ function parseMethodSummary(value: unknown): PaymentMethodSummary {
     throw new Error("Backend payment method summary payload is invalid.");
   }
 
+  const grossTransactionCount = requiredNumber(
+    value.gross_transaction_count,
+    requiredNumber(value.transaction_count),
+  );
+  const refundTransactionCount = requiredNumber(value.refund_transaction_count);
+  const netTransactionCount = requiredNumber(
+    value.net_transaction_count,
+    Math.max(grossTransactionCount - refundTransactionCount, 0),
+  );
+
   return {
     paymentMethodId: requiredString(value.payment_method_id),
     paymentMethodName: requiredString(value.payment_method_name, "Payment"),
@@ -344,7 +378,10 @@ function parseMethodSummary(value: unknown): PaymentMethodSummary {
     refundedAmount: requiredNumber(value.refunded_amount ?? value.total_refunded),
     netAmount: requiredNumber(value.net_amount ?? value.net_collected ?? value.total_amount),
     totalAmount: requiredNumber(value.total_amount ?? value.net_amount ?? value.net_collected),
-    transactionsCount: requiredNumber(value.transactions_count),
+    transactionsCount: grossTransactionCount,
+    grossTransactionCount,
+    refundTransactionCount,
+    netTransactionCount,
   };
 }
 
@@ -361,6 +398,17 @@ function toQueryString(
 
   const query = searchParams.toString();
   return query ? `?${query}` : "";
+}
+
+function toPaymentSummaryQueryParams(
+  params: PaymentSummaryParams,
+): Record<string, string | null | undefined> {
+  return {
+    branch_id: params.branchId,
+    date: params.date,
+    date_from: params.dateFrom,
+    date_to: params.dateTo,
+  };
 }
 
 function toBackendAddPaymentPayload(payload: AddPaymentPayload): BackendAddPaymentPayload {
@@ -492,10 +540,10 @@ export async function getRefundById(id: string): Promise<PaymentRefund> {
 }
 
 export async function getDailyPaymentSummary(
-  params: Record<string, string | null | undefined>,
+  params: PaymentSummaryParams,
 ): Promise<DailyPaymentSummary> {
   const response = await apiRequest<DailyPaymentSummary>(
-    `/api/v1/payments/summary/daily${toQueryString(params)}`,
+    `/api/v1/payments/summary/daily${toQueryString(toPaymentSummaryQueryParams(params))}`,
     {
       authMode: "appwrite",
       parse: parseDailySummary,
@@ -506,10 +554,10 @@ export async function getDailyPaymentSummary(
 }
 
 export async function getPaymentSummaryByMethod(
-  params: Record<string, string | null | undefined>,
+  params: PaymentSummaryParams,
 ): Promise<PaymentMethodSummary[]> {
   const response = await apiRequest<PaymentMethodSummary[]>(
-    `/api/v1/payments/summary/by-method${toQueryString(params)}`,
+    `/api/v1/payments/summary/by-method${toQueryString(toPaymentSummaryQueryParams(params))}`,
     {
       authMode: "appwrite",
       parse: (data) => parseList(data, parseMethodSummary),

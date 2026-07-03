@@ -17,16 +17,25 @@ export type FinancialReportFilters = {
   timezone?: string;
 };
 
+export type ReportConsistencyWarning = {
+  code: string;
+  message: string;
+  sourceType: string;
+  missingCount: number;
+};
+
 export type FinancialSummary = {
   bankTransferCollected: number;
   cardCollected: number;
   cashCollected: number;
+  consistencyWarnings: ReportConsistencyWarning[];
   grossSales: number;
   netCollected: number;
   outstandingCustomerBalance: number;
   paymentCount: number;
   purchaseTotal: number;
   refundCount: number;
+  sourceOfTruth: string;
   supplierPayableBalance: number;
   totalCollected: number;
   totalRefunded: number;
@@ -47,10 +56,13 @@ export type PaymentsReportRow = {
 };
 
 export type PaymentMethodReportRow = {
+  grossTransactionCount: number;
   netCollected: number;
+  netTransactionCount: number;
   paymentMethodId: string;
   paymentMethodName: string;
   paymentMethodType: string;
+  refundTransactionCount: number;
   totalCollected: number;
   totalRefunded: number;
   transactionCount: number;
