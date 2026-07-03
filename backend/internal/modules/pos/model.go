@@ -125,6 +125,7 @@ type POSPaymentRefund struct {
 	RefundAmount              float64        `gorm:"not null" json:"refund_amount"`
 	RefundReason              string         `gorm:"not null" json:"refund_reason"`
 	RefundStatus              string         `gorm:"size:50;not null;default:completed" json:"refund_status"`
+	JournalEntryID            *string        `gorm:"type:uuid;index" json:"journal_entry_id"`
 	ApprovedByUserID          *string        `gorm:"type:uuid;index" json:"approved_by_user_id"`
 	CreatedByUserID           string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
 	RefundedAt                time.Time      `gorm:"not null" json:"refunded_at"`

@@ -317,6 +317,10 @@ func (h *Handler) FinancialTrend(c *gin.Context) {
 	h.writeFinancialReport(c, data, err)
 }
 
+func (h *Handler) ExportOptions(c *gin.Context) {
+	response.Success(c, http.StatusOK, "Report export options loaded successfully", h.service.ExportOptions())
+}
+
 func (h *Handler) ExportCSVGet(c *gin.Context) {
 	reportType := c.DefaultQuery("report_type", "sales")
 	h.exportCSV(c, reportType, c.Request.URL.Query())

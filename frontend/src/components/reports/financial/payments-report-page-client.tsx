@@ -61,6 +61,20 @@ export function PaymentsReportPageClient(): JSX.Element {
         currentBranchId={branchScope.effectiveBranchId}
         defaultFilters={initialDraft}
         filters={draft}
+        refundStatusOptions={[]}
+        sourceTypeOptions={[
+          { label: "All payment sources", value: "all" },
+          { label: "POS sale", value: "pos_sale" },
+          { label: "Bakery order", value: "bakery_order" },
+        ]}
+        statusOptions={[
+          { label: "Financial impact", value: "all" },
+          { label: "Completed", value: "completed" },
+          { label: "Partially refunded", value: "partially_refunded" },
+          { label: "Refunded", value: "refunded" },
+          { label: "Pending", value: "pending" },
+          { label: "Failed", value: "failed" },
+        ]}
         onApply={applyFilters}
         onChange={setDraft}
         onReset={() => setFilters(toFinancialReportFilters(initialDraft))}

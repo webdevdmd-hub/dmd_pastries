@@ -7,19 +7,25 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
 
 type Service struct {
-	db        *gorm.DB
-	repo      *Repository
-	auditRepo *audit.Repository
+	db                *gorm.DB
+	repo              *Repository
+	auditRepo         *audit.Repository
+	accountingService *accounting.Service
 }
 
-func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository) *Service {
-	return &Service{db: db, repo: repo, auditRepo: auditRepo}
+func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository, accountingService ...*accounting.Service) *Service {
+	service := &Service{db: db, repo: repo, auditRepo: auditRepo}
+	if len(accountingService) > 0 {
+		service.accountingService = accountingService[0]
+	}
+	return service
 }
 
 func (s *Service) ListPayments(currentUser *utils.AuthContext, query PaymentListQuery) (*PaginatedResponse[PaymentResponse], error) {
@@ -242,6 +248,12 @@ func (s *Service) RefundPayment(currentUser *utils.AuthContext, paymentID string
 	}
 	if err := s.repo.CreateRefund(tx, refund); err != nil {
 		return nil, apperrors.Internal("failed to create payment refund")
+	}
+	if s.accountingService == nil {
+		return nil, apperrors.Internal("payment refund accounting service is not configured")
+	}
+	if _, err := s.accountingService.PostPOSPaymentRefundJournal(tx, currentUser, refund.ID); err != nil {
+		return nil, err
 	}
 	newRefunded := roundMoney(refunded + refund.RefundAmount)
 	status := "partially_refunded"

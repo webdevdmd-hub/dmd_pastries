@@ -150,7 +150,7 @@ func VerifySchema(db *gorm.DB) error {
 		"platform_settlements":           {"branch_id", "settlement_number", "settlement_date", "platform_payment_account_id", "deposit_payment_account_id", "platform_chart_account_id", "deposit_chart_account_id", "gross_amount", "deductions_total", "net_received_amount", "status", "journal_entry_id", "deleted_at"},
 		"platform_settlement_deductions": {"platform_settlement_id", "expense_account_id", "deduction_type", "amount", "deleted_at"},
 		"sale_payments":                  {"branch_id", "payment_method_type_snapshot", "provider_transaction_id", "payment_status", "paid_by_user_id", "notes", "journal_entry_id", "deleted_at"},
-		"payment_refunds":                {"sales_return_id", "refund_source"},
+		"payment_refunds":                {"sales_return_id", "refund_source", "journal_entry_id"},
 		"sales":                          {"sales_channel_id", "sales_channel_name_snapshot", "external_order_number", "accounting_journal_entry_id", "return_status", "returned_amount", "return_refunded_amount"},
 		"sales_returns":                  {"return_number", "return_date", "status", "refund_mode", "refund_payment_method_id", "payment_refund_id", "journal_entry_id", "deleted_at"},
 		"sales_return_items":             {"sales_return_id", "sale_item_id", "product_id", "product_variant_id", "restock_action", "stock_location_id", "stock_movement_id", "deleted_at"},

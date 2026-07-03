@@ -61,6 +61,10 @@ export function SupplierPayablesPageClient(): JSX.Element {
         currentBranchId={branchScope.effectiveBranchId}
         defaultFilters={initialDraft}
         filters={draft}
+        refundStatusOptions={[]}
+        showGroupBy={false}
+        sourceTypeOptions={[]}
+        statusOptions={[]}
         onApply={applyFilters}
         onChange={setDraft}
         onReset={() => setFilters(toFinancialReportFilters(initialDraft))}

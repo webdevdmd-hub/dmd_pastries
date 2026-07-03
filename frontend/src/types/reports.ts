@@ -12,13 +12,16 @@ export type ReportGroupBy = "day" | "week" | "month" | "payment_method" | "categ
 
 export type ReportScope = "current_branch" | "all_branches";
 
-export type ReportType =
-  | "sales"
-  | "payments"
-  | "orders"
-  | "inventory"
-  | "manufacturing"
-  | "purchasing";
+export type ReportType = string;
+
+export type ReportExportOption = {
+  category: string;
+  description: string;
+  label: string;
+  reportType: ReportType;
+  supported: boolean;
+  unsupportedReason: string;
+};
 
 export type ReportBaseFilters = {
   branchId?: string;

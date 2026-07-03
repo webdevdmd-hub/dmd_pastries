@@ -734,6 +734,12 @@ func (s *Service) createOperationalPaymentRefunds(tx *gorm.DB, currentUser *util
 		if err := s.repo.CreateOperationalPaymentRefund(tx, operationalRefund); err != nil {
 			return apperrors.Internal("failed to create operational payment refund")
 		}
+		if s.accountingService == nil {
+			return apperrors.Internal("payment refund accounting service is not configured")
+		}
+		if _, err := s.accountingService.PostPOSPaymentRefundJournal(tx, currentUser, operationalRefund.ID); err != nil {
+			return err
+		}
 		status := "partially_refunded"
 		if roundMoney(alreadyRefunded+refundAmount) >= payment.Amount {
 			status = "refunded"

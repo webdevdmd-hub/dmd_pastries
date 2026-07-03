@@ -87,15 +87,17 @@ type BackendSupplierPayableRow = {
 };
 
 type BackendReconciliationRow = {
+  amount?: number;
   branch_name?: string;
-  counted_amount?: number;
   created_by_user_name?: string;
-  difference_amount?: number;
-  expected_amount?: number;
   payment_method_name?: string;
-  reconciliation_date?: string;
-  reconciliation_id?: string;
+  direction?: string;
+  source_number?: string;
+  source_type?: string;
   status?: string;
+  transaction_at?: string;
+  transaction_id?: string;
+  transaction_type?: string;
 };
 
 type BackendTrend = { datasets?: unknown; labels?: unknown };
@@ -244,15 +246,17 @@ function parseSupplierPayableRow(value: unknown): SupplierPayableRow {
 function parseReconciliationRow(value: unknown): ReconciliationRow {
   const row = isObject(value) ? (value as BackendReconciliationRow) : {};
   return {
+    amount: numberOrZero(row.amount),
     branchName: stringOrEmpty(row.branch_name),
-    countedAmount: numberOrZero(row.counted_amount),
     createdByUserName: stringOrEmpty(row.created_by_user_name),
-    differenceAmount: numberOrZero(row.difference_amount),
-    expectedAmount: numberOrZero(row.expected_amount),
+    direction: stringOrEmpty(row.direction),
     paymentMethodName: stringOrEmpty(row.payment_method_name),
-    reconciliationDate: stringOrEmpty(row.reconciliation_date),
-    reconciliationId: stringOrEmpty(row.reconciliation_id),
+    sourceNumber: stringOrEmpty(row.source_number),
+    sourceType: stringOrEmpty(row.source_type),
     status: stringOrEmpty(row.status),
+    transactionAt: stringOrEmpty(row.transaction_at),
+    transactionId: stringOrEmpty(row.transaction_id),
+    transactionType: stringOrEmpty(row.transaction_type),
   };
 }
 

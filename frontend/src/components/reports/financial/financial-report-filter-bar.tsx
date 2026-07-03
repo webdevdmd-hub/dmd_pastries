@@ -22,6 +22,35 @@ import type { ReportDatePreset } from "@/types/reports";
 
 const allValue = "all";
 
+type FinancialReportSelectOption = {
+  label: string;
+  value: string;
+};
+
+const defaultSourceTypeOptions: FinancialReportSelectOption[] = [
+  { label: "All sources", value: "all" },
+  { label: "POS sale", value: "pos_sale" },
+  { label: "Bakery order", value: "bakery_order" },
+  { label: "Purchase invoice", value: "purchase_invoice" },
+];
+
+const defaultStatusOptions: FinancialReportSelectOption[] = [
+  { label: "All statuses", value: "all" },
+  { label: "Completed", value: "completed" },
+  { label: "Pending", value: "pending" },
+  { label: "Failed", value: "failed" },
+  { label: "Paid", value: "paid" },
+  { label: "Partial", value: "partial" },
+  { label: "Unpaid", value: "unpaid" },
+];
+
+const defaultRefundStatusOptions: FinancialReportSelectOption[] = [
+  { label: "Financial impact", value: "all" },
+  { label: "Completed", value: "completed" },
+  { label: "Pending", value: "pending" },
+  { label: "Failed", value: "failed" },
+];
+
 export type FinancialReportFilterDraft = {
   branchId: string;
   dateFrom: string;
@@ -58,6 +87,10 @@ export function FinancialReportFilterBar({
   onApply,
   onChange,
   onReset,
+  refundStatusOptions = defaultRefundStatusOptions,
+  showGroupBy = true,
+  sourceTypeOptions = defaultSourceTypeOptions,
+  statusOptions = defaultStatusOptions,
 }: {
   branches: Branch[];
   canAccessAllBranches: boolean;
@@ -67,6 +100,10 @@ export function FinancialReportFilterBar({
   onApply: () => void;
   onChange: (filters: FinancialReportFilterDraft) => void;
   onReset: () => void;
+  refundStatusOptions?: FinancialReportSelectOption[];
+  showGroupBy?: boolean;
+  sourceTypeOptions?: FinancialReportSelectOption[];
+  statusOptions?: FinancialReportSelectOption[];
 }): JSX.Element {
   const setPreset = (datePreset: ReportDatePreset): void => {
     if (datePreset === "custom") {
@@ -107,76 +144,86 @@ export function FinancialReportFilterBar({
             onChange={(event) => onChange({ ...filters, paymentMethodId: event.target.value })}
           />
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-brand-espresso">Group by</label>
-          <Select
-            value={filters.groupBy}
-            onValueChange={(groupBy: FinancialReportGroupBy) => onChange({ ...filters, groupBy })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="day">Day</SelectItem>
-              <SelectItem value="week">Week</SelectItem>
-              <SelectItem value="month">Month</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-brand-espresso">Source type</label>
-          <Select
-            value={filters.sourceType}
-            onValueChange={(sourceType) => onChange({ ...filters, sourceType })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All sources</SelectItem>
-              <SelectItem value="pos_sale">POS sale</SelectItem>
-              <SelectItem value="bakery_order">Bakery order</SelectItem>
-              <SelectItem value="purchase_invoice">Purchase invoice</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-brand-espresso">Status</label>
-          <Select
-            value={filters.status}
-            onValueChange={(status) => onChange({ ...filters, status })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="partial">Partial</SelectItem>
-              <SelectItem value="unpaid">Unpaid</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-brand-espresso">Refund status</label>
-          <Select
-            value={filters.refundStatus}
-            onValueChange={(refundStatus) => onChange({ ...filters, refundStatus })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All refunds</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {showGroupBy ? (
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-brand-espresso">Group by</label>
+            <Select
+              value={filters.groupBy}
+              onValueChange={(groupBy: FinancialReportGroupBy) =>
+                onChange({ ...filters, groupBy })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="day">Day</SelectItem>
+                <SelectItem value="week">Week</SelectItem>
+                <SelectItem value="month">Month</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+        {sourceTypeOptions.length > 0 ? (
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-brand-espresso">Source type</label>
+            <Select
+              value={filters.sourceType}
+              onValueChange={(sourceType) => onChange({ ...filters, sourceType })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {sourceTypeOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+        {statusOptions.length > 0 ? (
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-brand-espresso">Status</label>
+            <Select
+              value={filters.status}
+              onValueChange={(status) => onChange({ ...filters, status })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+        {refundStatusOptions.length > 0 ? (
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-brand-espresso">Refund status</label>
+            <Select
+              value={filters.refundStatus}
+              onValueChange={(refundStatus) => onChange({ ...filters, refundStatus })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {refundStatusOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
         <div className="flex items-end gap-2 xl:col-span-6">
           <Button type="button" onClick={onApply}>
             Apply

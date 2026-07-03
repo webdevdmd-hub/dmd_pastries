@@ -10,6 +10,12 @@ import type {
   PurchasingDashboard,
 } from "@/types/dashboard";
 
+export type DashboardRequestFilters = {
+  branchId?: string;
+  scope?: "all_branches" | "current_branch";
+  timezone?: string;
+};
+
 type BackendAlert = {
   alert_type?: string;
   created_at?: string;
@@ -61,6 +67,21 @@ function listSource(value: unknown): unknown[] {
   return [];
 }
 
+function toSearchParams(filters?: DashboardRequestFilters): string {
+  const params = new URLSearchParams();
+  if (filters?.branchId) {
+    params.set("branch_id", filters.branchId);
+  }
+  if (filters?.scope) {
+    params.set("scope", filters.scope);
+  }
+  if (filters?.timezone) {
+    params.set("timezone", filters.timezone);
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
 function parseSeverity(value: string): DashboardSeverity {
   if (value === "critical" || value === "warning" || value === "info") return value;
   return "info";
@@ -80,10 +101,10 @@ function parseAdminDashboard(value: unknown): AdminDashboard {
     financial: {
       collectedToday: numberField(financial, "collected_today"),
       outstandingBalance: numberField(financial, "outstanding_balance"),
-      refundsToday: numberField(financial, "refunds_today"),
+      refundsToday: numberField(financial, "refund_total_today"),
     },
     inventory: {
-      expiringItems: numberField(inventory, "expiring_items"),
+      expiringItems: numberField(inventory, "expiring_items_count"),
       lowStockCount: numberField(inventory, "low_stock_count"),
       outOfStock: numberField(inventory, "out_of_stock"),
     },
@@ -222,8 +243,8 @@ async function getDashboard<TResponse>(
   return response.data;
 }
 
-export async function getAdminDashboard(): Promise<AdminDashboard> {
-  return getDashboard("/api/v1/dashboard/admin", parseAdminDashboard);
+export async function getAdminDashboard(filters?: DashboardRequestFilters): Promise<AdminDashboard> {
+  return getDashboard(`/api/v1/dashboard/admin${toSearchParams(filters)}`, parseAdminDashboard);
 }
 
 export async function getCashierDashboard(): Promise<CashierDashboard> {

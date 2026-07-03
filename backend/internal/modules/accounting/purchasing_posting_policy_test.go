@@ -1,6 +1,7 @@
 package accounting
 
 import (
+	"strings"
 	"testing"
 
 	"pastries-pos/internal/shared/utils"
@@ -48,6 +49,25 @@ func TestPurchaseInvoiceBackfillStillEnabled(t *testing.T) {
 	}
 	if missingCondition != "journal_entry_id IS NULL" {
 		t.Fatalf("purchase invoice missing condition = %q, want journal_entry_id IS NULL", missingCondition)
+	}
+}
+
+func TestPaymentRefundBackfillTargetsPOSRefundsOnly(t *testing.T) {
+	table, _, _, _, _, dateColumn, statusColumn, statusValue, missingCondition, extraCondition := backfillTargetQuery("payment_refunds")
+	if table != "payment_refunds" {
+		t.Fatalf("payment refund backfill table = %q, want payment_refunds", table)
+	}
+	if dateColumn != "refunded_at" || statusColumn != "refund_status" || statusValue != "completed" {
+		t.Fatalf("payment refund backfill status/date = %q/%q/%q", dateColumn, statusColumn, statusValue)
+	}
+	if !strings.Contains(missingCondition, "journal_entry_id IS NULL") || !strings.Contains(missingCondition, "pos_sale_refund") {
+		t.Fatalf("payment refund missing condition should find unlinked pos_sale_refund journals, got %q", missingCondition)
+	}
+	if !strings.Contains(extraCondition, "'pos_sale'") || !strings.Contains(extraCondition, "'payment_adjustment'") || strings.Contains(extraCondition, "'sales_return'") {
+		t.Fatalf("payment refund extra condition should include only POS/payment adjustment refunds, got %q", extraCondition)
+	}
+	if !validBackfillTarget("payment_refunds") {
+		t.Fatal("payment_refunds must be an accepted accounting backfill target")
 	}
 }
 

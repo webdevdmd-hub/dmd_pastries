@@ -142,12 +142,491 @@ func (r *Repository) ExportRows(reportType string, filter *shared.ResolvedFilter
 	switch reportType {
 	case "sales":
 		return r.salesExportRows(filter)
+	case "sales_daily":
+		items, err := r.DailySalesReport(filter)
+		return csvFromItems(items, err, []csvColumn[DailySalesReportItem]{
+			{"Date", func(item DailySalesReportItem) string { return item.Date }},
+			{"Gross Sales", func(item DailySalesReportItem) string { return fmtFloat(item.GrossSales) }},
+			{"Net Sales", func(item DailySalesReportItem) string { return fmtFloat(item.NetSales) }},
+			{"Sales Count", func(item DailySalesReportItem) string { return fmtInt64(item.SalesCount) }},
+			{"Items Sold", func(item DailySalesReportItem) string { return fmtFloat(item.ItemsSold) }},
+			{"Discount Total", func(item DailySalesReportItem) string { return fmtFloat(item.DiscountTotal) }},
+			{"Tax Total", func(item DailySalesReportItem) string { return fmtFloat(item.TaxTotal) }},
+		})
+	case "sales_by_product":
+		items, _, err := r.SalesByProduct(filter)
+		return csvFromItems(items, err, []csvColumn[ProductSalesReportItem]{
+			{"Product", func(item ProductSalesReportItem) string { return item.ProductName }},
+			{"SKU", func(item ProductSalesReportItem) string { return item.SKU }},
+			{"Quantity Sold", func(item ProductSalesReportItem) string { return fmtFloat(item.QuantitySold) }},
+			{"Gross Sales", func(item ProductSalesReportItem) string { return fmtFloat(item.GrossSales) }},
+			{"Discount Total", func(item ProductSalesReportItem) string { return fmtFloat(item.DiscountTotal) }},
+			{"Tax Total", func(item ProductSalesReportItem) string { return fmtFloat(item.TaxTotal) }},
+			{"Net Sales", func(item ProductSalesReportItem) string { return fmtFloat(item.NetSales) }},
+		})
+	case "sales_by_category":
+		items, err := r.SalesByCategory(filter)
+		return csvFromItems(items, err, []csvColumn[CategorySalesReportItem]{
+			{"Category", func(item CategorySalesReportItem) string { return item.CategoryName }},
+			{"Quantity Sold", func(item CategorySalesReportItem) string { return fmtFloat(item.QuantitySold) }},
+			{"Sales Count", func(item CategorySalesReportItem) string { return fmtInt64(item.SalesCount) }},
+			{"Gross Sales", func(item CategorySalesReportItem) string { return fmtFloat(item.GrossSales) }},
+			{"Net Sales", func(item CategorySalesReportItem) string { return fmtFloat(item.NetSales) }},
+		})
+	case "sales_by_cashier":
+		items, err := r.SalesByCashier(filter)
+		return csvFromItems(items, err, []csvColumn[CashierSalesReportItem]{
+			{"Cashier", func(item CashierSalesReportItem) string { return item.CashierName }},
+			{"Sales Count", func(item CashierSalesReportItem) string { return fmtInt64(item.SalesCount) }},
+			{"Items Sold", func(item CashierSalesReportItem) string { return fmtFloat(item.ItemsSold) }},
+			{"Gross Sales", func(item CashierSalesReportItem) string { return fmtFloat(item.GrossSales) }},
+			{"Net Sales", func(item CashierSalesReportItem) string { return fmtFloat(item.NetSales) }},
+			{"Refund Count", func(item CashierSalesReportItem) string { return fmtInt64(item.RefundCount) }},
+			{"Void Count", func(item CashierSalesReportItem) string { return fmtInt64(item.VoidCount) }},
+		})
+	case "sales_by_branch":
+		items, err := r.SalesByBranch(filter)
+		return csvFromItems(items, err, []csvColumn[BranchSalesReportItem]{
+			{"Branch", func(item BranchSalesReportItem) string { return item.BranchName }},
+			{"Sales Count", func(item BranchSalesReportItem) string { return fmtInt64(item.SalesCount) }},
+			{"Items Sold", func(item BranchSalesReportItem) string { return fmtFloat(item.ItemsSold) }},
+			{"Gross Sales", func(item BranchSalesReportItem) string { return fmtFloat(item.GrossSales) }},
+			{"Net Sales", func(item BranchSalesReportItem) string { return fmtFloat(item.NetSales) }},
+			{"Tax Total", func(item BranchSalesReportItem) string { return fmtFloat(item.TaxTotal) }},
+		})
+	case "sales_discounts":
+		report, err := r.DiscountReport(filter)
+		items := []DiscountReportItem{}
+		if report != nil {
+			items = report.Items
+		}
+		return csvFromItems(items, err, []csvColumn[DiscountReportItem]{
+			{"Sale Number", func(item DiscountReportItem) string { return item.SaleNumber }},
+			{"Cashier", func(item DiscountReportItem) string { return item.Cashier }},
+			{"Discount Type", func(item DiscountReportItem) string { return item.DiscountType }},
+			{"Discount Amount", func(item DiscountReportItem) string { return fmtFloat(item.DiscountAmount) }},
+			{"Sale Total", func(item DiscountReportItem) string { return fmtFloat(item.SaleTotal) }},
+			{"Sold At", func(item DiscountReportItem) string { return item.SoldAt }},
+		})
+	case "sales_taxes":
+		items, err := r.TaxReport(filter)
+		return csvFromItems(items, err, []csvColumn[TaxReportItem]{
+			{"Tax Name", func(item TaxReportItem) string { return item.TaxName }},
+			{"Tax Percentage", func(item TaxReportItem) string { return fmtFloat(item.TaxPercentage) }},
+			{"Taxable Amount", func(item TaxReportItem) string { return fmtFloat(item.TaxableAmount) }},
+			{"Tax Collected", func(item TaxReportItem) string { return fmtFloat(item.TaxCollected) }},
+			{"Sales Count", func(item TaxReportItem) string { return fmtInt64(item.SalesCount) }},
+		})
 	case "payments":
 		return r.paymentsExportRows(filter)
 	case "orders":
 		return r.ordersExportRows(filter)
+	case "inventory_current_stock":
+		items, _, err := r.CurrentStock(filter)
+		return csvFromItems(items, err, currentStockExportColumns())
+	case "inventory_stock_valuation":
+		report, err := r.StockValuation(filter)
+		items := []StockValuationReportItem{}
+		if report != nil {
+			items = report.Items
+		}
+		return csvFromItems(items, err, stockValuationExportColumns())
+	case "inventory_low_stock":
+		items, err := r.LowStock(filter)
+		return csvFromItems(items, err, []csvColumn[LowStockReportItem]{
+			{"Item", func(item LowStockReportItem) string { return item.ItemName }},
+			{"Branch", func(item LowStockReportItem) string { return item.BranchName }},
+			{"Available Quantity", func(item LowStockReportItem) string { return fmtFloat(item.AvailableQuantity) }},
+			{"Reorder Level", func(item LowStockReportItem) string { return fmtFloat(item.ReorderLevel) }},
+			{"Shortage Quantity", func(item LowStockReportItem) string { return fmtFloat(item.ShortageQuantity) }},
+			{"Unit", func(item LowStockReportItem) string { return item.UnitSymbol }},
+		})
+	case "inventory_expiry":
+		items, err := r.ExpiryReport(filter)
+		return csvFromItems(items, err, []csvColumn[ExpiryReportItem]{
+			{"Item", func(item ExpiryReportItem) string { return item.ItemName }},
+			{"Branch", func(item ExpiryReportItem) string { return item.BranchName }},
+			{"Batch Number", func(item ExpiryReportItem) string { return item.BatchNumber }},
+			{"Quantity", func(item ExpiryReportItem) string { return fmtFloat(item.Quantity) }},
+			{"Unit", func(item ExpiryReportItem) string { return item.UnitSymbol }},
+			{"Received Date", func(item ExpiryReportItem) string { return item.ReceivedDate }},
+			{"Expiry Date", func(item ExpiryReportItem) string { return item.ExpiryDate }},
+			{"Days Remaining", func(item ExpiryReportItem) string { return strconv.Itoa(item.DaysRemaining) }},
+			{"Status", func(item ExpiryReportItem) string { return item.Status }},
+		})
+	case "inventory_movements":
+		items, _, err := r.InventoryMovements(filter)
+		return csvFromItems(items, err, inventoryMovementExportColumns())
+	case "inventory_wastage":
+		report, err := r.WastageReport(filter)
+		items := []WastageReportItem{}
+		if report != nil {
+			items = report.Items
+		}
+		return csvFromItems(items, err, []csvColumn[WastageReportItem]{
+			{"Item", func(item WastageReportItem) string { return item.ItemName }},
+			{"Item Type", func(item WastageReportItem) string { return item.ItemType }},
+			{"Branch", func(item WastageReportItem) string { return item.BranchName }},
+			{"Quantity", func(item WastageReportItem) string { return fmtFloat(item.Quantity) }},
+			{"Unit", func(item WastageReportItem) string { return item.UnitSymbol }},
+			{"Reason", func(item WastageReportItem) string { return item.Reason }},
+			{"Created At", func(item WastageReportItem) string { return item.CreatedAt }},
+		})
+	case "inventory_packaging_stock":
+		items, err := r.PackagingStock(filter)
+		return csvFromItems(items, err, packagingStockExportColumns())
+	case "inventory_audit":
+		items, _, err := r.InventoryAudit(filter)
+		return csvFromItems(items, err, []csvColumn[InventoryAuditReportItem]{
+			{"Item", func(item InventoryAuditReportItem) string { return item.ItemName }},
+			{"Branch", func(item InventoryAuditReportItem) string { return item.BranchName }},
+			{"Current Quantity", func(item InventoryAuditReportItem) string { return fmtFloat(item.CurrentQuantity) }},
+			{"Calculated Quantity", func(item InventoryAuditReportItem) string { return fmtFloat(item.CalculatedQuantityFromMovements) }},
+			{"Difference", func(item InventoryAuditReportItem) string { return fmtFloat(item.Difference) }},
+			{"Balanced", func(item InventoryAuditReportItem) string { return fmtBool(item.IsBalanced) }},
+		})
+	case "manufacturing_batches":
+		items, _, err := r.ManufacturingBatches(filter)
+		return csvFromItems(items, err, manufacturingBatchExportColumns())
+	case "manufacturing_ingredient_consumption":
+		items, err := r.ManufacturingIngredientConsumption(filter)
+		return csvFromItems(items, err, []csvColumn[IngredientConsumptionReportItem]{
+			{"Ingredient", func(item IngredientConsumptionReportItem) string { return item.IngredientName }},
+			{"Branch", func(item IngredientConsumptionReportItem) string { return item.BranchName }},
+			{"Consumed Quantity", func(item IngredientConsumptionReportItem) string { return fmtFloat(item.TotalConsumedQuantity) }},
+			{"Unit", func(item IngredientConsumptionReportItem) string { return item.UnitSymbol }},
+			{"Estimated Cost", func(item IngredientConsumptionReportItem) string { return fmtFloat(item.EstimatedCost) }},
+			{"Batch Count", func(item IngredientConsumptionReportItem) string { return fmtInt64(item.BatchCount) }},
+		})
+	case "manufacturing_yield_variance":
+		items, err := r.ManufacturingYieldVariance(filter)
+		return csvFromItems(items, err, []csvColumn[YieldVarianceReportItem]{
+			{"Batch Number", func(item YieldVarianceReportItem) string { return item.BatchNumber }},
+			{"Product", func(item YieldVarianceReportItem) string { return item.ProductName }},
+			{"Planned Quantity", func(item YieldVarianceReportItem) string { return fmtFloat(item.PlannedQuantity) }},
+			{"Produced Quantity", func(item YieldVarianceReportItem) string { return fmtFloat(item.ProducedQuantity) }},
+			{"Variance Quantity", func(item YieldVarianceReportItem) string { return fmtFloat(item.VarianceQuantity) }},
+			{"Variance Percentage", func(item YieldVarianceReportItem) string { return fmtFloat(item.VariancePercentage) }},
+			{"Branch", func(item YieldVarianceReportItem) string { return item.BranchName }},
+		})
+	case "manufacturing_wastage":
+		report, err := r.ManufacturingWastage(filter)
+		items := []ManufacturingWastageReportItem{}
+		if report != nil {
+			items = report.Items
+		}
+		return csvFromItems(items, err, manufacturingWastageExportColumns())
+	case "manufacturing_recipe_costs":
+		items, err := r.ManufacturingRecipeCosts(filter)
+		return csvFromItems(items, err, recipeCostExportColumns())
+	case "bakery_orders_upcoming":
+		items, _, err := r.BakeryOrdersUpcoming(filter)
+		return csvFromItems(items, err, upcomingBakeryOrderExportColumns())
+	case "bakery_orders_status":
+		items, err := r.BakeryOrdersStatus(filter)
+		return csvFromItems(items, err, []csvColumn[BakeryOrderStatusReportItem]{
+			{"Order Status", func(item BakeryOrderStatusReportItem) string { return item.OrderStatus }},
+			{"Orders Count", func(item BakeryOrderStatusReportItem) string { return fmtInt64(item.OrdersCount) }},
+			{"Total Order Value", func(item BakeryOrderStatusReportItem) string { return fmtFloat(item.TotalOrderValue) }},
+		})
+	case "bakery_orders_production_schedule":
+		items, err := r.BakeryOrdersProductionSchedule(filter)
+		return csvFromItems(items, err, bakeryProductionScheduleExportColumns())
+	case "bakery_orders_pending_payments":
+		report, err := r.BakeryOrdersPendingPayments(filter)
+		items := []BakeryOrderPendingPaymentItem{}
+		if report != nil {
+			items = report.Orders
+		}
+		return csvFromItems(items, err, pendingBakeryPaymentExportColumns())
+	case "bakery_orders_delivery_vs_pickup":
+		report, err := r.BakeryOrdersDeliveryVsPickup(filter)
+		headers := []string{"Order Type", "Count", "Total Value"}
+		if err != nil {
+			return headers, nil, err
+		}
+		if report == nil {
+			return headers, nil, nil
+		}
+		return headers, [][]string{
+			{"Pickup", fmtInt64(report.PickupOrders.Count), fmtFloat(report.PickupOrders.TotalValue)},
+			{"Delivery", fmtInt64(report.DeliveryOrders.Count), fmtFloat(report.DeliveryOrders.TotalValue)},
+		}, nil
+	case "financial_payments":
+		items, _, err := r.FinancialPayments(filter)
+		return csvFromItems(items, err, financialPaymentExportColumns())
+	case "financial_refunds":
+		items, _, err := r.FinancialRefunds(filter)
+		return csvFromItems(items, err, financialRefundExportColumns())
+	case "financial_supplier_payables":
+		items, _, err := r.FinancialSupplierPayables(filter)
+		return csvFromItems(items, err, supplierPayableExportColumns())
+	case "financial_purchase_totals":
+		report, err := r.FinancialPurchaseTotals(filter)
+		items := []PurchaseTotalsBySupplier{}
+		if report != nil {
+			items = report.BySupplier
+		}
+		return csvFromItems(items, err, []csvColumn[PurchaseTotalsBySupplier]{
+			{"Supplier", func(item PurchaseTotalsBySupplier) string { return item.SupplierName }},
+			{"Total Purchase Amount", func(item PurchaseTotalsBySupplier) string { return fmtFloat(item.TotalPurchaseAmount) }},
+			{"Invoice Count", func(item PurchaseTotalsBySupplier) string { return fmtInt64(item.InvoiceCount) }},
+		})
+	case "financial_reconciliation":
+		items, _, err := r.FinancialReconciliation(filter)
+		return csvFromItems(items, err, reconciliationExportColumns())
 	default:
 		return nil, nil, fmt.Errorf("unsupported report type")
+	}
+}
+
+type csvColumn[T any] struct {
+	Header string
+	Value  func(T) string
+}
+
+func csvFromItems[T any](items []T, err error, columns []csvColumn[T]) ([]string, [][]string, error) {
+	headers := make([]string, 0, len(columns))
+	for _, column := range columns {
+		headers = append(headers, column.Header)
+	}
+	if err != nil {
+		return headers, nil, err
+	}
+	rows := make([][]string, 0, len(items))
+	for _, item := range items {
+		row := make([]string, 0, len(columns))
+		for _, column := range columns {
+			row = append(row, column.Value(item))
+		}
+		rows = append(rows, row)
+	}
+	return headers, rows, nil
+}
+
+func fmtInt64(value int64) string {
+	return strconv.FormatInt(value, 10)
+}
+
+func fmtBool(value bool) string {
+	if value {
+		return "Yes"
+	}
+	return "No"
+}
+
+func fmtStringPointer(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func currentStockExportColumns() []csvColumn[CurrentStockReportItem] {
+	return []csvColumn[CurrentStockReportItem]{
+		{"Item", func(item CurrentStockReportItem) string { return item.ItemName }},
+		{"Item Code", func(item CurrentStockReportItem) string { return item.ItemCode }},
+		{"Item Type", func(item CurrentStockReportItem) string { return item.ItemType }},
+		{"Branch", func(item CurrentStockReportItem) string { return item.BranchName }},
+		{"Current Quantity", func(item CurrentStockReportItem) string { return fmtFloat(item.CurrentQuantity) }},
+		{"Reserved Quantity", func(item CurrentStockReportItem) string { return fmtFloat(item.ReservedQuantity) }},
+		{"Available Quantity", func(item CurrentStockReportItem) string { return fmtFloat(item.AvailableQuantity) }},
+		{"Reorder Level", func(item CurrentStockReportItem) string { return fmtFloat(item.ReorderLevel) }},
+		{"Unit", func(item CurrentStockReportItem) string { return item.UnitSymbol }},
+		{"Status", func(item CurrentStockReportItem) string { return item.Status }},
+		{"Low Stock", func(item CurrentStockReportItem) string { return fmtBool(item.IsLowStock) }},
+		{"Out of Stock", func(item CurrentStockReportItem) string { return fmtBool(item.IsOutOfStock) }},
+	}
+}
+
+func stockValuationExportColumns() []csvColumn[StockValuationReportItem] {
+	return []csvColumn[StockValuationReportItem]{
+		{"Item", func(item StockValuationReportItem) string { return item.ItemName }},
+		{"Item Type", func(item StockValuationReportItem) string { return item.ItemType }},
+		{"Branch", func(item StockValuationReportItem) string { return item.BranchName }},
+		{"Current Quantity", func(item StockValuationReportItem) string { return fmtFloat(item.CurrentQuantity) }},
+		{"Unit", func(item StockValuationReportItem) string { return item.UnitSymbol }},
+		{"Unit Cost", func(item StockValuationReportItem) string { return fmtFloat(item.UnitCost) }},
+		{"Stock Value", func(item StockValuationReportItem) string { return fmtFloat(item.StockValue) }},
+	}
+}
+
+func inventoryMovementExportColumns() []csvColumn[InventoryMovementReportItem] {
+	return []csvColumn[InventoryMovementReportItem]{
+		{"Date", func(item InventoryMovementReportItem) string { return item.Date }},
+		{"Branch", func(item InventoryMovementReportItem) string { return item.BranchName }},
+		{"Item", func(item InventoryMovementReportItem) string { return item.ItemName }},
+		{"Item Type", func(item InventoryMovementReportItem) string { return item.ItemType }},
+		{"Movement Type", func(item InventoryMovementReportItem) string { return item.MovementType }},
+		{"Direction", func(item InventoryMovementReportItem) string { return item.MovementDirection }},
+		{"Quantity", func(item InventoryMovementReportItem) string { return fmtFloat(item.Quantity) }},
+		{"Before Quantity", func(item InventoryMovementReportItem) string { return fmtFloat(item.BeforeQuantity) }},
+		{"After Quantity", func(item InventoryMovementReportItem) string { return fmtFloat(item.AfterQuantity) }},
+		{"Unit", func(item InventoryMovementReportItem) string { return item.UnitSymbol }},
+		{"Reference Number", func(item InventoryMovementReportItem) string { return item.ReferenceNumber }},
+		{"Created By", func(item InventoryMovementReportItem) string { return item.CreatedBy }},
+	}
+}
+
+func packagingStockExportColumns() []csvColumn[PackagingStockReportItem] {
+	return []csvColumn[PackagingStockReportItem]{
+		{"Packaging", func(item PackagingStockReportItem) string { return item.PackagingName }},
+		{"Product", func(item PackagingStockReportItem) string { return item.ProductName }},
+		{"Product Code", func(item PackagingStockReportItem) string { return item.ProductCode }},
+		{"Category", func(item PackagingStockReportItem) string { return item.CategoryName }},
+		{"Branch", func(item PackagingStockReportItem) string { return item.BranchName }},
+		{"Current Quantity", func(item PackagingStockReportItem) string { return fmtFloat(item.CurrentQuantity) }},
+		{"Available Quantity", func(item PackagingStockReportItem) string { return fmtFloat(item.AvailableQuantity) }},
+		{"Reorder Level", func(item PackagingStockReportItem) string { return fmtFloat(item.ReorderLevel) }},
+		{"Unit", func(item PackagingStockReportItem) string { return item.UnitSymbol }},
+		{"Cost Per Unit", func(item PackagingStockReportItem) string { return fmtFloat(item.CostPerUnit) }},
+		{"Stock Value", func(item PackagingStockReportItem) string { return fmtFloat(item.StockValue) }},
+		{"Low Stock", func(item PackagingStockReportItem) string { return fmtBool(item.IsLowStock) }},
+	}
+}
+
+func manufacturingBatchExportColumns() []csvColumn[ManufacturingBatchReportItem] {
+	return []csvColumn[ManufacturingBatchReportItem]{
+		{"Batch Number", func(item ManufacturingBatchReportItem) string { return item.BatchNumber }},
+		{"Product", func(item ManufacturingBatchReportItem) string { return item.ProductName }},
+		{"Recipe", func(item ManufacturingBatchReportItem) string { return item.RecipeName }},
+		{"Branch", func(item ManufacturingBatchReportItem) string { return item.BranchName }},
+		{"Planned Quantity", func(item ManufacturingBatchReportItem) string { return fmtFloat(item.PlannedQuantity) }},
+		{"Produced Quantity", func(item ManufacturingBatchReportItem) string { return fmtFloat(item.ProducedQuantity) }},
+		{"Yield Variance", func(item ManufacturingBatchReportItem) string { return fmtFloat(item.YieldVariance) }},
+		{"Yield Efficiency %", func(item ManufacturingBatchReportItem) string { return fmtFloat(item.YieldEfficiencyPercentage) }},
+		{"Status", func(item ManufacturingBatchReportItem) string { return item.Status }},
+		{"Start Time", func(item ManufacturingBatchReportItem) string { return item.StartTime }},
+		{"End Time", func(item ManufacturingBatchReportItem) string { return item.EndTime }},
+	}
+}
+
+func manufacturingWastageExportColumns() []csvColumn[ManufacturingWastageReportItem] {
+	return []csvColumn[ManufacturingWastageReportItem]{
+		{"Item", func(item ManufacturingWastageReportItem) string { return item.ItemName }},
+		{"Wastage Type", func(item ManufacturingWastageReportItem) string { return item.WastageType }},
+		{"Quantity", func(item ManufacturingWastageReportItem) string { return fmtFloat(item.Quantity) }},
+		{"Unit", func(item ManufacturingWastageReportItem) string { return item.UnitSymbol }},
+		{"Reason", func(item ManufacturingWastageReportItem) string { return item.Reason }},
+		{"Batch Number", func(item ManufacturingWastageReportItem) string { return item.BatchNumber }},
+		{"Created At", func(item ManufacturingWastageReportItem) string { return item.CreatedAt }},
+	}
+}
+
+func recipeCostExportColumns() []csvColumn[RecipeCostReportItem] {
+	return []csvColumn[RecipeCostReportItem]{
+		{"Recipe", func(item RecipeCostReportItem) string { return item.RecipeName }},
+		{"Product", func(item RecipeCostReportItem) string { return item.ProductName }},
+		{"Ingredient Cost", func(item RecipeCostReportItem) string { return fmtFloat(item.EstimatedIngredientCost) }},
+		{"Packaging Cost", func(item RecipeCostReportItem) string { return fmtFloat(item.EstimatedPackagingCost) }},
+		{"Total Cost", func(item RecipeCostReportItem) string { return fmtFloat(item.EstimatedTotalCost) }},
+		{"Cost Per Yield Unit", func(item RecipeCostReportItem) string { return fmtFloat(item.CostPerYieldUnit) }},
+		{"Batch Yield Quantity", func(item RecipeCostReportItem) string { return fmtFloat(item.BatchYieldQuantity) }},
+		{"Version Number", func(item RecipeCostReportItem) string { return strconv.Itoa(item.VersionNumber) }},
+		{"Active", func(item RecipeCostReportItem) string { return fmtBool(item.IsActive) }},
+	}
+}
+
+func upcomingBakeryOrderExportColumns() []csvColumn[UpcomingBakeryOrderReportItem] {
+	return []csvColumn[UpcomingBakeryOrderReportItem]{
+		{"Order Number", func(item UpcomingBakeryOrderReportItem) string { return item.OrderNumber }},
+		{"Customer", func(item UpcomingBakeryOrderReportItem) string { return item.CustomerName }},
+		{"Event Date", func(item UpcomingBakeryOrderReportItem) string { return item.EventDate }},
+		{"Pickup Time", func(item UpcomingBakeryOrderReportItem) string { return fmtStringPointer(item.PickupTime) }},
+		{"Delivery Time", func(item UpcomingBakeryOrderReportItem) string { return fmtStringPointer(item.DeliveryTime) }},
+		{"Order Type", func(item UpcomingBakeryOrderReportItem) string { return item.OrderType }},
+		{"Order Status", func(item UpcomingBakeryOrderReportItem) string { return item.OrderStatus }},
+		{"Total Amount", func(item UpcomingBakeryOrderReportItem) string { return fmtFloat(item.TotalAmount) }},
+		{"Balance Amount", func(item UpcomingBakeryOrderReportItem) string { return fmtFloat(item.BalanceAmount) }},
+	}
+}
+
+func bakeryProductionScheduleExportColumns() []csvColumn[BakeryOrderProductionScheduleItem] {
+	return []csvColumn[BakeryOrderProductionScheduleItem]{
+		{"Order Number", func(item BakeryOrderProductionScheduleItem) string { return item.OrderNumber }},
+		{"Product", func(item BakeryOrderProductionScheduleItem) string { return item.ProductName }},
+		{"Event Date", func(item BakeryOrderProductionScheduleItem) string { return item.EventDate }},
+		{"Order Status", func(item BakeryOrderProductionScheduleItem) string { return item.OrderStatus }},
+		{"Production Status", func(item BakeryOrderProductionScheduleItem) string { return item.ProductionStatus }},
+		{"Has Production Record", func(item BakeryOrderProductionScheduleItem) string { return fmtBool(item.HasProductionRecord) }},
+		{"Assigned Batch Number", func(item BakeryOrderProductionScheduleItem) string { return fmtStringPointer(item.AssignedBatchNumber) }},
+		{"Production Batch Status", func(item BakeryOrderProductionScheduleItem) string {
+			return fmtStringPointer(item.ProductionBatchStatus)
+		}},
+		{"Production Note", func(item BakeryOrderProductionScheduleItem) string { return item.ProductionNote }},
+		{"Quantity", func(item BakeryOrderProductionScheduleItem) string { return fmtFloat(item.Quantity) }},
+		{"Branch", func(item BakeryOrderProductionScheduleItem) string { return item.BranchName }},
+	}
+}
+
+func pendingBakeryPaymentExportColumns() []csvColumn[BakeryOrderPendingPaymentItem] {
+	return []csvColumn[BakeryOrderPendingPaymentItem]{
+		{"Order Number", func(item BakeryOrderPendingPaymentItem) string { return item.OrderNumber }},
+		{"Customer", func(item BakeryOrderPendingPaymentItem) string { return item.CustomerName }},
+		{"Total Amount", func(item BakeryOrderPendingPaymentItem) string { return fmtFloat(item.TotalAmount) }},
+		{"Paid Amount", func(item BakeryOrderPendingPaymentItem) string { return fmtFloat(item.PaidAmount) }},
+		{"Balance Amount", func(item BakeryOrderPendingPaymentItem) string { return fmtFloat(item.BalanceAmount) }},
+		{"Payment Status", func(item BakeryOrderPendingPaymentItem) string { return item.PaymentStatus }},
+		{"Event Date", func(item BakeryOrderPendingPaymentItem) string { return item.EventDate }},
+	}
+}
+
+func financialPaymentExportColumns() []csvColumn[FinancialPaymentReportItem] {
+	return []csvColumn[FinancialPaymentReportItem]{
+		{"Source Type", func(item FinancialPaymentReportItem) string { return item.SourceType }},
+		{"Source Number", func(item FinancialPaymentReportItem) string { return item.SourceNumber }},
+		{"Branch", func(item FinancialPaymentReportItem) string { return item.BranchName }},
+		{"Payment Method", func(item FinancialPaymentReportItem) string { return item.PaymentMethodName }},
+		{"Payment Method Type", func(item FinancialPaymentReportItem) string { return item.PaymentMethodType }},
+		{"Amount", func(item FinancialPaymentReportItem) string { return fmtFloat(item.Amount) }},
+		{"Status", func(item FinancialPaymentReportItem) string { return item.Status }},
+		{"Reference Number", func(item FinancialPaymentReportItem) string { return fmtStringPointer(item.ReferenceNumber) }},
+		{"Paid By", func(item FinancialPaymentReportItem) string { return item.PaidByUserName }},
+		{"Paid At", func(item FinancialPaymentReportItem) string { return item.PaidAt }},
+	}
+}
+
+func financialRefundExportColumns() []csvColumn[FinancialRefundReportItem] {
+	return []csvColumn[FinancialRefundReportItem]{
+		{"Refund Source", func(item FinancialRefundReportItem) string { return item.RefundSource }},
+		{"Source Type", func(item FinancialRefundReportItem) string { return item.SourceType }},
+		{"Source Number", func(item FinancialRefundReportItem) string { return item.SourceNumber }},
+		{"Sale Number", func(item FinancialRefundReportItem) string { return item.SaleNumber }},
+		{"Sales Return Number", func(item FinancialRefundReportItem) string { return item.SalesReturnNumber }},
+		{"Branch", func(item FinancialRefundReportItem) string { return item.BranchName }},
+		{"Payment Method", func(item FinancialRefundReportItem) string { return item.PaymentMethodName }},
+		{"Refund Amount", func(item FinancialRefundReportItem) string { return fmtFloat(item.RefundAmount) }},
+		{"Refund Reason", func(item FinancialRefundReportItem) string { return item.RefundReason }},
+		{"Refund Status", func(item FinancialRefundReportItem) string { return item.RefundStatus }},
+		{"Created By", func(item FinancialRefundReportItem) string { return item.CreatedByUserName }},
+		{"Refunded At", func(item FinancialRefundReportItem) string { return item.RefundedAt }},
+	}
+}
+
+func supplierPayableExportColumns() []csvColumn[SupplierPayableReportItem] {
+	return []csvColumn[SupplierPayableReportItem]{
+		{"Supplier", func(item SupplierPayableReportItem) string { return item.SupplierName }},
+		{"Invoice Count", func(item SupplierPayableReportItem) string { return fmtInt64(item.InvoiceCount) }},
+		{"Total Invoice Amount", func(item SupplierPayableReportItem) string { return fmtFloat(item.TotalInvoiceAmount) }},
+		{"Paid Amount", func(item SupplierPayableReportItem) string { return fmtFloat(item.PaidAmount) }},
+		{"Payable Balance", func(item SupplierPayableReportItem) string { return fmtFloat(item.PayableBalance) }},
+		{"Open Credit Amount", func(item SupplierPayableReportItem) string { return fmtFloat(item.OpenCreditAmount) }},
+		{"Oldest Due Date", func(item SupplierPayableReportItem) string { return fmtStringPointer(item.OldestDueDate) }},
+	}
+}
+
+func reconciliationExportColumns() []csvColumn[ReconciliationReportItem] {
+	return []csvColumn[ReconciliationReportItem]{
+		{"Transaction Type", func(item ReconciliationReportItem) string { return item.TransactionType }},
+		{"Source Type", func(item ReconciliationReportItem) string { return item.SourceType }},
+		{"Source Number", func(item ReconciliationReportItem) string { return item.SourceNumber }},
+		{"Branch", func(item ReconciliationReportItem) string { return item.BranchName }},
+		{"Payment Method", func(item ReconciliationReportItem) string { return item.PaymentMethodName }},
+		{"Amount", func(item ReconciliationReportItem) string { return fmtFloat(item.Amount) }},
+		{"Direction", func(item ReconciliationReportItem) string { return item.Direction }},
+		{"Status", func(item ReconciliationReportItem) string { return item.Status }},
+		{"Transaction At", func(item ReconciliationReportItem) string { return item.TransactionAt }},
+		{"Created By", func(item ReconciliationReportItem) string { return item.CreatedByUserName }},
 	}
 }
 
@@ -1324,23 +1803,48 @@ func (r *Repository) BakeryOrdersTrend(filter *shared.ResolvedFilter) ([]trendSe
 }
 
 func (r *Repository) FinancialSummary(filter *shared.ResolvedFilter) (*FinancialSummaryResponse, error) {
-	ledger, err := r.ledgerFinancialTotals(filter, filter.StartUTC, filter.EndUTC)
+	var collected financialCollectedSummaryRow
+	collectedQuery, collectedArgs := financialCollectedSummarySQL(filter)
+	if err := r.db.Raw(collectedQuery, collectedArgs...).Scan(&collected).Error; err != nil {
+		return nil, err
+	}
+	var refunded financialRefundSummaryRow
+	refundQuery, refundArgs := financialRefundSummarySQL(filter)
+	if err := r.db.Raw(refundQuery, refundArgs...).Scan(&refunded).Error; err != nil {
+		return nil, err
+	}
+	var grossSales float64
+	grossQuery, grossArgs := financialGrossSalesSummarySQL(filter)
+	if err := r.db.Raw(grossQuery, grossArgs...).Scan(&grossSales).Error; err != nil {
+		return nil, err
+	}
+	var outstanding float64
+	outstandingQuery, outstandingArgs := financialOutstandingSummarySQL(filter)
+	if err := r.db.Raw(outstandingQuery, outstandingArgs...).Scan(&outstanding).Error; err != nil {
+		return nil, err
+	}
+	var supplierPayable float64
+	supplierQuery, supplierArgs := financialSupplierPayableSummarySQL(filter)
+	if err := r.db.Raw(supplierQuery, supplierArgs...).Scan(&supplierPayable).Error; err != nil {
+		return nil, err
+	}
+	purchaseTotals, err := r.FinancialPurchaseTotals(filter)
 	if err != nil {
 		return nil, err
 	}
 	return &FinancialSummaryResponse{
-		GrossSales:                 ledger.GrossRevenue,
-		TotalCollected:             ledger.Collected,
-		TotalRefunded:              ledger.Refunded,
-		NetCollected:               roundMoney(ledger.Collected - ledger.Refunded),
-		OutstandingCustomerBalance: ledger.OutstandingCustomer,
-		PurchaseTotal:              ledger.PurchaseTotal,
-		SupplierPayableBalance:     ledger.SupplierPayable,
-		CashCollected:              ledger.CashCollected,
-		CardCollected:              ledger.CardCollected,
-		BankTransferCollected:      ledger.BankCollected,
-		RefundCount:                ledger.RefundCount,
-		PaymentCount:               ledger.PaymentCount,
+		GrossSales:                 roundMoney(grossSales),
+		TotalCollected:             roundMoney(collected.TotalCollected),
+		TotalRefunded:              roundMoney(refunded.TotalRefunded),
+		NetCollected:               roundMoney(collected.TotalCollected - refunded.TotalRefunded),
+		OutstandingCustomerBalance: roundMoney(outstanding),
+		PurchaseTotal:              roundMoney(purchaseTotals.TotalPurchaseAmount),
+		SupplierPayableBalance:     roundMoney(supplierPayable),
+		CashCollected:              roundMoney(collected.CashCollected),
+		CardCollected:              roundMoney(collected.CardCollected),
+		BankTransferCollected:      roundMoney(collected.BankTransferCollected),
+		RefundCount:                refunded.RefundCount,
+		PaymentCount:               collected.PaymentCount,
 	}, nil
 }
 
@@ -1396,14 +1900,7 @@ func (r *Repository) FinancialRefunds(filter *shared.ResolvedFilter) ([]Financia
 		LEFT JOIN users u ON u.id = pr.created_by_user_id
 		WHERE pr.business_id = ? AND pr.refunded_at >= ? AND pr.refunded_at < ? AND pr.deleted_at IS NULL`
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	if !filter.AllBranches {
-		query += " AND pr.branch_id = ?"
-		args = append(args, filter.BranchID)
-	}
-	if filter.PaymentMethodID != "" {
-		query += " AND pr.payment_method_id = ?"
-		args = append(args, filter.PaymentMethodID)
-	}
+	query, args = addFinancialRefundFilters(query, args, filter)
 	query += " ORDER BY pr.refunded_at DESC LIMIT ? OFFSET ?"
 	queryArgs := append(args, filter.Limit, (filter.Page-1)*filter.Limit)
 	if err := r.db.Raw(query, queryArgs...).Scan(&items).Error; err != nil {
@@ -1412,14 +1909,7 @@ func (r *Repository) FinancialRefunds(filter *shared.ResolvedFilter) ([]Financia
 	var total int64
 	countQuery := "SELECT COUNT(*) FROM payment_refunds pr WHERE pr.business_id = ? AND pr.refunded_at >= ? AND pr.refunded_at < ? AND pr.deleted_at IS NULL"
 	countArgs := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	if !filter.AllBranches {
-		countQuery += " AND pr.branch_id = ?"
-		countArgs = append(countArgs, filter.BranchID)
-	}
-	if filter.PaymentMethodID != "" {
-		countQuery += " AND pr.payment_method_id = ?"
-		countArgs = append(countArgs, filter.PaymentMethodID)
-	}
+	countQuery, countArgs = addFinancialRefundFilters(countQuery, countArgs, filter)
 	if err := r.db.Raw(countQuery, countArgs...).Scan(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -1513,33 +2003,14 @@ func (r *Repository) FinancialPurchaseTotals(filter *shared.ResolvedFilter) (*Pu
 
 func (r *Repository) FinancialReconciliation(filter *shared.ResolvedFilter) ([]ReconciliationReportItem, int64, error) {
 	items := []ReconciliationReportItem{}
-	query := `
-		SELECT pr.id AS reconciliation_id,
-			b.branch_name,
-			pm.method_name AS payment_method_name,
-			pr.reconciliation_date::text AS reconciliation_date,
-			pr.expected_amount,
-			pr.counted_amount,
-			pr.difference_amount,
-			pr.status,
-			u.full_name AS created_by_user_name
-		FROM payment_reconciliations pr
-		JOIN branches b ON b.id = pr.branch_id
-		JOIN payment_methods pm ON pm.id = pr.payment_method_id
-		LEFT JOIN users u ON u.id = pr.created_by_user_id
-		WHERE pr.business_id = ? AND pr.reconciliation_date >= ? AND pr.reconciliation_date <= ? AND pr.deleted_at IS NULL`
-	args := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
-	query, args = addFinancialReconciliationFilters(query, args, filter)
-	query += " ORDER BY pr.reconciliation_date DESC LIMIT ? OFFSET ?"
+	baseQuery, args := financialReconciliationTransactionsSQL(filter)
+	query := baseQuery + " ORDER BY transaction_at DESC LIMIT ? OFFSET ?"
 	queryArgs := append(args, filter.Limit, (filter.Page-1)*filter.Limit)
 	if err := r.db.Raw(query, queryArgs...).Scan(&items).Error; err != nil {
 		return nil, 0, err
 	}
 	var total int64
-	countQuery := "SELECT COUNT(*) FROM payment_reconciliations pr WHERE pr.business_id = ? AND pr.reconciliation_date >= ? AND pr.reconciliation_date <= ? AND pr.deleted_at IS NULL"
-	countArgs := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
-	countQuery, countArgs = addFinancialReconciliationFilters(countQuery, countArgs, filter)
-	if err := r.db.Raw(countQuery, countArgs...).Scan(&total).Error; err != nil {
+	if err := r.db.Raw("SELECT COUNT(*) FROM ("+baseQuery+") reconciliation_transactions", args...).Scan(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	return items, total, nil
@@ -1629,11 +2100,8 @@ func (r *Repository) inventorySummary(filter *shared.ResolvedFilter) (*Inventory
 	if err := r.db.Raw(query, args...).Scan(&lowStock).Error; err != nil {
 		return nil, err
 	}
-	var expiring int64
-	expiryQuery := "SELECT COUNT(*) FROM expiry_batches WHERE business_id = ? AND status = 'active' AND deleted_at IS NULL AND expiry_date >= CURRENT_DATE AND expiry_date <= CURRENT_DATE + INTERVAL '7 days'"
-	expiryArgs := []interface{}{filter.BusinessID}
-	expiryQuery, expiryArgs = addBranchCondition(expiryQuery, expiryArgs, filter)
-	if err := r.db.Raw(expiryQuery, expiryArgs...).Scan(&expiring).Error; err != nil {
+	expiring, err := shared.ExpiringItemsCount(r.db, shared.MetricScopeFromFilter(filter), 7)
+	if err != nil {
 		return nil, err
 	}
 	return &InventorySummary{LowStockCount: lowStock, ExpiringItemsCount: expiring}, nil
@@ -1686,7 +2154,7 @@ func (r *Repository) salesExportRows(filter *shared.ResolvedFilter) ([]string, [
 	for _, row := range rows {
 		out = append(out, []string{row.SaleNumber, row.SoldAt.Format(time.RFC3339), row.SaleStatus, row.PaymentStatus, fmtFloat(row.TotalAmount), fmtFloat(row.PaidAmount)})
 	}
-	return []string{"sale_number", "sold_at", "sale_status", "payment_status", "total_amount", "paid_amount"}, out, nil
+	return []string{"Sale Number", "Sold At", "Sale Status", "Payment Status", "Total Amount", "Paid Amount"}, out, nil
 }
 
 func (r *Repository) paymentsExportRows(filter *shared.ResolvedFilter) ([]string, [][]string, error) {
@@ -1708,7 +2176,7 @@ func (r *Repository) paymentsExportRows(filter *shared.ResolvedFilter) ([]string
 	for _, row := range rows {
 		out = append(out, []string{row.Method, row.PaidAt.Format(time.RFC3339), row.Status, fmtFloat(row.Amount)})
 	}
-	return []string{"payment_method", "paid_at", "payment_status", "amount"}, out, nil
+	return []string{"Payment Method", "Paid At", "Payment Status", "Amount"}, out, nil
 }
 
 func (r *Repository) ordersExportRows(filter *shared.ResolvedFilter) ([]string, [][]string, error) {
@@ -1732,7 +2200,7 @@ func (r *Repository) ordersExportRows(filter *shared.ResolvedFilter) ([]string, 
 	for _, row := range rows {
 		out = append(out, []string{row.OrderNumber, row.EventDate.Format("2006-01-02"), row.OrderStatus, row.PaymentStatus, fmtFloat(row.TotalAmount), fmtFloat(row.BalanceAmount)})
 	}
-	return []string{"order_number", "event_date", "order_status", "payment_status", "total_amount", "balance_amount"}, out, nil
+	return []string{"Order Number", "Event Date", "Order Status", "Payment Status", "Total Amount", "Balance Amount"}, out, nil
 }
 
 func baseTimeSeriesQuery(dateColumn, aggregate, table, extraWhere string, filter *shared.ResolvedFilter) (string, []interface{}) {
@@ -1762,63 +2230,25 @@ func addBranchCondition(query string, args []interface{}, filter *shared.Resolve
 }
 
 func (r *Repository) ledgerFinancialTotals(filter *shared.ResolvedFilter, startUTC, endUTC time.Time) (*ledgerFinancialTotals, error) {
-	dateFrom := startUTC.Format("2006-01-02")
-	dateTo := endUTC.Add(-time.Nanosecond).Format("2006-01-02")
-	if !startUTC.Before(endUTC) {
-		dateTo = startUTC.Format("2006-01-02")
-	}
-	totals := &ledgerFinancialTotals{}
-	revenueSources := []string{"pos_sale", "bakery_order_revenue", "pos_sale_void", "sales_return"}
-	grossRevenueSources := []string{"pos_sale", "bakery_order_revenue", "pos_sale_void"}
-	refundSources := []string{"sales_return", "pos_sale_refund"}
-
-	revenue, err := r.ledgerIncomeAmount(filter.BusinessID, filter.BranchID, filter.AllBranches, dateFrom, dateTo, revenueSources, false)
+	totals, err := shared.LedgerFinancialTotals(r.db, shared.MetricScopeFromFilter(filter), startUTC, endUTC)
 	if err != nil {
 		return nil, err
 	}
-	grossRevenue, err := r.ledgerIncomeAmount(filter.BusinessID, filter.BranchID, filter.AllBranches, dateFrom, dateTo, grossRevenueSources, false)
-	if err != nil {
-		return nil, err
-	}
-	tax, err := r.ledgerTaxAmount(filter.BusinessID, filter.BranchID, filter.AllBranches, dateFrom, dateTo, revenueSources)
-	if err != nil {
-		return nil, err
-	}
-	refunded, refundCount, err := r.ledgerPaymentAccountCredits(filter.BusinessID, filter.BranchID, filter.AllBranches, dateFrom, dateTo, refundSources)
-	if err != nil {
-		return nil, err
-	}
-	collected, cash, card, bank, paymentCount, err := r.ledgerPaymentAccountDebits(filter.BusinessID, filter.BranchID, filter.AllBranches, dateFrom, dateTo, []string{"pos_sale", "bakery_order_payment"})
-	if err != nil {
-		return nil, err
-	}
-	outstandingCustomer, err := r.ledgerMappedBalance(filter.BusinessID, filter.BranchID, filter.AllBranches, "accounts_receivable", "1100", dateTo)
-	if err != nil {
-		return nil, err
-	}
-	supplierPayable, err := r.ledgerMappedBalance(filter.BusinessID, filter.BranchID, filter.AllBranches, "accounts_payable", "2000", dateTo)
-	if err != nil {
-		return nil, err
-	}
-	purchaseTotal, err := r.ledgerMappedMovement(filter.BusinessID, filter.BranchID, filter.AllBranches, "accounts_payable", "2000", dateFrom, dateTo, []string{"purchase_invoice", "purchase_invoice_edit", "purchase_invoice_cancel", "purchase_return", "purchase_return_reversal"})
-	if err != nil {
-		return nil, err
-	}
-
-	totals.Revenue = roundMoney(revenue)
-	totals.GrossRevenue = roundMoney(grossRevenue)
-	totals.Refunded = roundMoney(refunded)
-	totals.Tax = roundMoney(tax)
-	totals.Collected = roundMoney(collected)
-	totals.CashCollected = roundMoney(cash)
-	totals.CardCollected = roundMoney(card)
-	totals.BankCollected = roundMoney(bank)
-	totals.OutstandingCustomer = roundMoney(outstandingCustomer)
-	totals.SupplierPayable = roundMoney(supplierPayable)
-	totals.PurchaseTotal = roundMoney(purchaseTotal)
-	totals.PaymentCount = paymentCount
-	totals.RefundCount = refundCount
-	return totals, nil
+	return &ledgerFinancialTotals{
+		Revenue:             totals.Revenue,
+		GrossRevenue:        totals.GrossRevenue,
+		Refunded:            totals.Refunded,
+		Tax:                 totals.Tax,
+		Collected:           totals.Collected,
+		CashCollected:       totals.CashCollected,
+		CardCollected:       totals.CardCollected,
+		BankCollected:       totals.BankCollected,
+		OutstandingCustomer: totals.OutstandingCustomer,
+		SupplierPayable:     totals.SupplierPayable,
+		PurchaseTotal:       totals.PurchaseTotal,
+		PaymentCount:        totals.PaymentCount,
+		RefundCount:         totals.RefundCount,
+	}, nil
 }
 
 func (r *Repository) ledgerIncomeAmount(businessID, branchID string, allBranches bool, dateFrom, dateTo string, sourceTypes []string, positiveCreditsOnly bool) (float64, error) {
@@ -2117,64 +2547,131 @@ func addFinancialReconciliationFilters(query string, args []interface{}, filter 
 	return query, args
 }
 
+var financialImpactPaymentStatuses = []string{"completed", "partially_refunded", "refunded"}
+
+type financialCollectedSummaryRow struct {
+	TotalCollected        float64
+	PaymentCount          int64
+	CashCollected         float64
+	CardCollected         float64
+	BankTransferCollected float64
+}
+
+type financialRefundSummaryRow struct {
+	TotalRefunded float64
+	RefundCount   int64
+}
+
+func financialPaymentStatuses(filter *shared.ResolvedFilter) []string {
+	if filter.Status != "" {
+		return []string{filter.Status}
+	}
+	return financialImpactPaymentStatuses
+}
+
+func financialRefundStatuses(filter *shared.ResolvedFilter) []string {
+	if filter.RefundStatus != "" {
+		return []string{filter.RefundStatus}
+	}
+	if filter.Status != "" {
+		return []string{filter.Status}
+	}
+	return []string{"completed"}
+}
+
+func includesFinancialSource(filter *shared.ResolvedFilter, sourceType string) bool {
+	return filter.SourceType == "" || filter.SourceType == sourceType
+}
+
+func emptyFinancialPaymentsUnionSQL() string {
+	return `
+		SELECT NULL::uuid AS payment_id,
+			NULL::uuid AS payment_method_id,
+			'' AS source_type,
+			'' AS source_number,
+			'' AS branch_name,
+			'' AS payment_method_name,
+			'' AS payment_method_type,
+			0::numeric AS amount,
+			'' AS status,
+			NULL::text AS reference_number,
+			'' AS paid_by_user_name,
+			NULL::text AS paid_at
+		WHERE 1 = 0`
+}
+
 func financialPaymentsUnionSQL(filter *shared.ResolvedFilter) (string, []interface{}) {
-	pos := `
-		SELECT sp.id AS payment_id,
-			sp.payment_method_id,
-			'pos_sale' AS source_type,
-			s.sale_number AS source_number,
-			b.branch_name,
-			sp.payment_method_name_snapshot AS payment_method_name,
-			COALESCE(NULLIF(sp.payment_method_type_snapshot,''), pm.method_type, '') AS payment_method_type,
-			sp.amount,
-			sp.payment_status AS status,
-			sp.reference_number,
-			COALESCE(u.full_name,'') AS paid_by_user_name,
-			sp.paid_at::text AS paid_at
-		FROM sale_payments sp
-		JOIN sales s ON s.id = sp.sale_id
-		JOIN branches b ON b.id = sp.branch_id
-		LEFT JOIN payment_methods pm ON pm.id = sp.payment_method_id
-		LEFT JOIN users u ON u.id = sp.paid_by_user_id
-		WHERE sp.business_id = ? AND sp.paid_at >= ? AND sp.paid_at < ? AND sp.deleted_at IS NULL`
-	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	if !filter.AllBranches {
-		pos += " AND sp.branch_id = ?"
-		args = append(args, filter.BranchID)
+	parts := []string{}
+	args := []interface{}{}
+	if includesFinancialSource(filter, "pos_sale") {
+		pos := `
+			SELECT sp.id AS payment_id,
+				sp.payment_method_id,
+				'pos_sale' AS source_type,
+				s.sale_number AS source_number,
+				b.branch_name,
+				sp.payment_method_name_snapshot AS payment_method_name,
+				COALESCE(NULLIF(sp.payment_method_type_snapshot,''), pm.method_type, '') AS payment_method_type,
+				sp.amount,
+				sp.payment_status AS status,
+				sp.reference_number,
+				COALESCE(u.full_name,'') AS paid_by_user_name,
+				sp.paid_at::text AS paid_at
+			FROM sale_payments sp
+			JOIN sales s ON s.id = sp.sale_id
+			JOIN branches b ON b.id = sp.branch_id
+			LEFT JOIN payment_methods pm ON pm.id = sp.payment_method_id
+			LEFT JOIN users u ON u.id = sp.paid_by_user_id
+			WHERE sp.business_id = ? AND sp.paid_at >= ? AND sp.paid_at < ? AND sp.deleted_at IS NULL AND sp.payment_status IN ?`
+		args = append(args, filter.BusinessID, filter.StartUTC, filter.EndUTC, financialPaymentStatuses(filter))
+		if !filter.AllBranches {
+			pos += " AND sp.branch_id = ?"
+			args = append(args, filter.BranchID)
+		}
+		if filter.PaymentMethodID != "" {
+			pos += " AND sp.payment_method_id = ?"
+			args = append(args, filter.PaymentMethodID)
+		}
+		parts = append(parts, pos)
 	}
-	if filter.PaymentMethodID != "" {
-		pos += " AND sp.payment_method_id = ?"
-		args = append(args, filter.PaymentMethodID)
+	if includesFinancialSource(filter, "bakery_order") {
+		bakery := `
+			SELECT bop.id AS payment_id,
+				bop.payment_method_id,
+				'bakery_order' AS source_type,
+				bo.order_number AS source_number,
+				b.branch_name,
+				bop.payment_method_name_snapshot AS payment_method_name,
+				COALESCE(pm.method_type, '') AS payment_method_type,
+				bop.amount,
+				'completed' AS status,
+				bop.reference_number,
+				COALESCE(u.full_name,'') AS paid_by_user_name,
+				bop.paid_at::text AS paid_at
+			FROM bakery_order_payments bop
+			JOIN bakery_orders bo ON bo.id = bop.bakery_order_id
+			JOIN branches b ON b.id = bo.branch_id
+			LEFT JOIN payment_methods pm ON pm.id = bop.payment_method_id
+			LEFT JOIN users u ON u.id = bop.paid_by_user_id
+			WHERE bop.business_id = ? AND bop.paid_at >= ? AND bop.paid_at < ? AND bo.deleted_at IS NULL`
+		args = append(args, filter.BusinessID, filter.StartUTC, filter.EndUTC)
+		if filter.Status != "" && filter.Status != "completed" {
+			bakery += " AND 1 = 0"
+		}
+		if !filter.AllBranches {
+			bakery += " AND bo.branch_id = ?"
+			args = append(args, filter.BranchID)
+		}
+		if filter.PaymentMethodID != "" {
+			bakery += " AND bop.payment_method_id = ?"
+			args = append(args, filter.PaymentMethodID)
+		}
+		parts = append(parts, bakery)
 	}
-	bakery := `
-		SELECT bop.id AS payment_id,
-			bop.payment_method_id,
-			'bakery_order' AS source_type,
-			bo.order_number AS source_number,
-			b.branch_name,
-			bop.payment_method_name_snapshot AS payment_method_name,
-			COALESCE(pm.method_type, '') AS payment_method_type,
-			bop.amount,
-			'completed' AS status,
-			bop.reference_number,
-			COALESCE(u.full_name,'') AS paid_by_user_name,
-			bop.paid_at::text AS paid_at
-		FROM bakery_order_payments bop
-		JOIN bakery_orders bo ON bo.id = bop.bakery_order_id
-		JOIN branches b ON b.id = bo.branch_id
-		LEFT JOIN payment_methods pm ON pm.id = bop.payment_method_id
-		LEFT JOIN users u ON u.id = bop.paid_by_user_id
-		WHERE bop.business_id = ? AND bop.paid_at >= ? AND bop.paid_at < ? AND bo.deleted_at IS NULL`
-	args = append(args, filter.BusinessID, filter.StartUTC, filter.EndUTC)
-	if !filter.AllBranches {
-		bakery += " AND bo.branch_id = ?"
-		args = append(args, filter.BranchID)
+	if len(parts) == 0 {
+		return emptyFinancialPaymentsUnionSQL(), args
 	}
-	if filter.PaymentMethodID != "" {
-		bakery += " AND bop.payment_method_id = ?"
-		args = append(args, filter.PaymentMethodID)
-	}
-	return pos + " UNION ALL " + bakery, args
+	return strings.Join(parts, " UNION ALL "), args
 }
 
 func financialCollectedSummarySQL(filter *shared.ResolvedFilter) (string, []interface{}) {
@@ -2185,8 +2682,42 @@ func financialCollectedSummarySQL(filter *shared.ResolvedFilter) (string, []inte
 			COALESCE(SUM(amount) FILTER (WHERE payment_method_type = 'cash'),0) AS cash_collected,
 			COALESCE(SUM(amount) FILTER (WHERE payment_method_type = 'card'),0) AS card_collected,
 			COALESCE(SUM(amount) FILTER (WHERE payment_method_type = 'bank_transfer'),0) AS bank_transfer_collected
-		FROM (` + union + `) collected
-		WHERE status IN ('completed','partially_refunded','refunded')`, args
+		FROM (` + union + `) collected`, args
+}
+
+func financialRefundSummarySQL(filter *shared.ResolvedFilter) (string, []interface{}) {
+	query := `
+		SELECT COALESCE(SUM(pr.refund_amount),0) AS total_refunded,
+			COUNT(*) AS refund_count
+		FROM payment_refunds pr
+		WHERE pr.business_id = ? AND pr.refunded_at >= ? AND pr.refunded_at < ? AND pr.deleted_at IS NULL`
+	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
+	query, args = addFinancialRefundFilters(query, args, filter)
+	return query, args
+}
+
+func addFinancialRefundFilters(query string, args []interface{}, filter *shared.ResolvedFilter) (string, []interface{}) {
+	query += " AND pr.refund_status IN ?"
+	args = append(args, financialRefundStatuses(filter))
+	if !filter.AllBranches {
+		query += " AND pr.branch_id = ?"
+		args = append(args, filter.BranchID)
+	}
+	if filter.PaymentMethodID != "" {
+		query += " AND pr.payment_method_id = ?"
+		args = append(args, filter.PaymentMethodID)
+	}
+	switch filter.SourceType {
+	case "", "pos_sale":
+		if filter.SourceType == "pos_sale" {
+			query += " AND COALESCE(pr.refund_source, 'payment_adjustment') <> 'sales_return'"
+		}
+	case "sales_return":
+		query += " AND COALESCE(pr.refund_source, 'payment_adjustment') = 'sales_return'"
+	default:
+		query += " AND 1 = 0"
+	}
+	return query, args
 }
 
 func financialPaymentsByMethodSQL(filter *shared.ResolvedFilter) (string, []interface{}) {
@@ -2194,17 +2725,10 @@ func financialPaymentsByMethodSQL(filter *shared.ResolvedFilter) (string, []inte
 	refund := `
 		SELECT payment_method_id,
 			COALESCE(SUM(refund_amount),0) AS total_refunded
-		FROM payment_refunds
-		WHERE business_id = ? AND refunded_at >= ? AND refunded_at < ? AND refund_status = 'completed' AND deleted_at IS NULL`
+		FROM payment_refunds pr
+		WHERE pr.business_id = ? AND pr.refunded_at >= ? AND pr.refunded_at < ? AND pr.deleted_at IS NULL`
 	refundArgs := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	if !filter.AllBranches {
-		refund += " AND branch_id = ?"
-		refundArgs = append(refundArgs, filter.BranchID)
-	}
-	if filter.PaymentMethodID != "" {
-		refund += " AND payment_method_id = ?"
-		refundArgs = append(refundArgs, filter.PaymentMethodID)
-	}
+	refund, refundArgs = addFinancialRefundFilters(refund, refundArgs, filter)
 	refund += " GROUP BY payment_method_id"
 	args = append(args, refundArgs...)
 	return `
@@ -2222,7 +2746,6 @@ func financialPaymentsByMethodSQL(filter *shared.ResolvedFilter) (string, []inte
 				COALESCE(SUM(amount),0) AS total_collected,
 				COUNT(*) AS transaction_count
 			FROM (` + union + `) method_payments
-			WHERE status IN ('completed','partially_refunded','refunded')
 			GROUP BY payment_method_id, payment_method_name, payment_method_type
 		) collected
 		LEFT JOIN (` + refund + `) refunds ON refunds.payment_method_id = collected.payment_method_id
@@ -2235,101 +2758,372 @@ func financialOutstandingSummarySQL(filter *shared.ResolvedFilter) (string, []in
 }
 
 func financialOutstandingRowsSQL(filter *shared.ResolvedFilter) (string, []interface{}) {
-	pos := `
-		SELECT 'pos_sale' AS source_type,
-			s.sale_number AS source_number,
-			COALESCE(c.full_name,'Walk-in Customer') AS customer_name,
-			b.branch_name,
-			s.total_amount,
-			s.paid_amount,
-			(s.total_amount - s.paid_amount) AS balance_amount,
-			s.sold_at::date::text AS due_date,
-			s.payment_status
-		FROM sales s
-		JOIN branches b ON b.id = s.branch_id
-		LEFT JOIN customers c ON c.id = s.customer_id
-		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.payment_status IN ('unpaid','partial') AND s.sale_status <> 'voided' AND s.deleted_at IS NULL AND (s.total_amount - s.paid_amount) > 0`
-	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
+	parts := []string{}
+	args := []interface{}{}
+	if includesFinancialSource(filter, "pos_sale") {
+		pos := `
+			SELECT 'pos_sale' AS source_type,
+				s.sale_number AS source_number,
+				COALESCE(c.full_name,'Walk-in Customer') AS customer_name,
+				b.branch_name,
+				s.total_amount,
+				s.paid_amount,
+				(s.total_amount - s.paid_amount) AS balance_amount,
+				s.sold_at::date::text AS due_date,
+				s.payment_status
+			FROM sales s
+			JOIN branches b ON b.id = s.branch_id
+			LEFT JOIN customers c ON c.id = s.customer_id
+			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.payment_status IN ('unpaid','partial') AND s.sale_status <> 'voided' AND s.deleted_at IS NULL AND (s.total_amount - s.paid_amount) > 0`
+		args = append(args, filter.BusinessID, filter.StartUTC, filter.EndUTC)
+		if !filter.AllBranches {
+			pos += " AND s.branch_id = ?"
+			args = append(args, filter.BranchID)
+		}
+		parts = append(parts, pos)
+	}
+	if includesFinancialSource(filter, "bakery_order") {
+		bakery := `
+			SELECT 'bakery_order' AS source_type,
+				bo.order_number AS source_number,
+				COALESCE(bo.customer_name_snapshot,'Walk-in Customer') AS customer_name,
+				b.branch_name,
+				bo.total_amount,
+				bo.paid_amount,
+				bo.balance_amount,
+				bo.event_date::text AS due_date,
+				bo.payment_status
+			FROM bakery_orders bo
+			JOIN branches b ON b.id = bo.branch_id
+			WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.payment_status IN ('unpaid','partial') AND bo.order_status <> 'cancelled' AND bo.deleted_at IS NULL AND bo.balance_amount > 0`
+		args = append(args, filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02"))
+		if !filter.AllBranches {
+			bakery += " AND bo.branch_id = ?"
+			args = append(args, filter.BranchID)
+		}
+		parts = append(parts, bakery)
+	}
+	if len(parts) == 0 {
+		return `
+			SELECT '' AS source_type,
+				'' AS source_number,
+				'' AS customer_name,
+				'' AS branch_name,
+				0::numeric AS total_amount,
+				0::numeric AS paid_amount,
+				0::numeric AS balance_amount,
+				NULL::text AS due_date,
+				'' AS payment_status
+			WHERE 1 = 0`, args
+	}
+	return strings.Join(parts, " UNION ALL "), args
+}
+
+func financialGrossSalesSummarySQL(filter *shared.ResolvedFilter) (string, []interface{}) {
+	parts := []string{}
+	args := []interface{}{}
+	if includesFinancialSource(filter, "pos_sale") {
+		pos := `
+			SELECT COALESCE(SUM(s.total_amount),0) AS gross_sales
+			FROM sales s
+			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.sale_status <> 'voided' AND s.deleted_at IS NULL`
+		args = append(args, filter.BusinessID, filter.StartUTC, filter.EndUTC)
+		if !filter.AllBranches {
+			pos += " AND s.branch_id = ?"
+			args = append(args, filter.BranchID)
+		}
+		if filter.PaymentMethodID != "" || filter.Status != "" {
+			pos += " AND EXISTS (SELECT 1 FROM sale_payments sp WHERE sp.sale_id = s.id AND sp.business_id = s.business_id AND sp.deleted_at IS NULL AND sp.payment_status IN ?"
+			args = append(args, financialPaymentStatuses(filter))
+			if filter.PaymentMethodID != "" {
+				pos += " AND sp.payment_method_id = ?"
+				args = append(args, filter.PaymentMethodID)
+			}
+			pos += ")"
+		}
+		parts = append(parts, pos)
+	}
+	if includesFinancialSource(filter, "bakery_order") {
+		bakery := `
+			SELECT COALESCE(SUM(bo.total_amount),0) AS gross_sales
+			FROM bakery_orders bo
+			WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.order_status <> 'cancelled' AND bo.deleted_at IS NULL`
+		args = append(args, filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02"))
+		if filter.Status != "" && filter.Status != "completed" {
+			bakery += " AND 1 = 0"
+		}
+		if !filter.AllBranches {
+			bakery += " AND bo.branch_id = ?"
+			args = append(args, filter.BranchID)
+		}
+		if filter.PaymentMethodID != "" {
+			bakery += " AND EXISTS (SELECT 1 FROM bakery_order_payments bop WHERE bop.bakery_order_id = bo.id AND bop.business_id = bo.business_id AND bop.payment_method_id = ?)"
+			args = append(args, filter.PaymentMethodID)
+		}
+		parts = append(parts, bakery)
+	}
+	if len(parts) == 0 {
+		return "SELECT 0::numeric AS gross_sales", args
+	}
+	return "SELECT COALESCE(SUM(gross_sales),0) FROM (" + strings.Join(parts, " UNION ALL ") + ") gross_sales", args
+}
+
+func financialSupplierPayableSummarySQL(filter *shared.ResolvedFilter) (string, []interface{}) {
+	if filter.SourceType != "" && filter.SourceType != "purchase_invoice" {
+		return "SELECT 0::numeric", []interface{}{}
+	}
+	query := `
+		SELECT COALESCE(SUM(pi.balance_amount),0)
+		FROM purchase_invoices pi
+		WHERE pi.business_id = ? AND pi.invoice_date >= ? AND pi.invoice_date <= ? AND pi.status <> 'cancelled' AND pi.payment_status IN ('unpaid','partial','overdue') AND pi.deleted_at IS NULL`
+	args := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
 	if !filter.AllBranches {
-		pos += " AND s.branch_id = ?"
+		query += " AND pi.branch_id = ?"
 		args = append(args, filter.BranchID)
 	}
-	bakery := `
-		SELECT 'bakery_order' AS source_type,
-			bo.order_number AS source_number,
-			COALESCE(bo.customer_name_snapshot,'Walk-in Customer') AS customer_name,
-			b.branch_name,
-			bo.total_amount,
-			bo.paid_amount,
-			bo.balance_amount,
-			bo.event_date::text AS due_date,
-			bo.payment_status
-		FROM bakery_orders bo
-		JOIN branches b ON b.id = bo.branch_id
-		WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.payment_status IN ('unpaid','partial') AND bo.order_status <> 'cancelled' AND bo.deleted_at IS NULL AND bo.balance_amount > 0`
-	args = append(args, filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02"))
-	if !filter.AllBranches {
-		bakery += " AND bo.branch_id = ?"
-		args = append(args, filter.BranchID)
+	return query, args
+}
+
+func financialReconciliationTransactionsSQL(filter *shared.ResolvedFilter) (string, []interface{}) {
+	parts := []string{}
+	args := []interface{}{}
+	if includesFinancialSource(filter, "pos_sale") {
+		pos := `
+			SELECT sp.id AS transaction_id,
+				'collection' AS transaction_type,
+				'pos_sale' AS source_type,
+				s.sale_number AS source_number,
+				b.branch_name,
+				sp.payment_method_name_snapshot AS payment_method_name,
+				sp.amount,
+				'in' AS direction,
+				sp.payment_status AS status,
+				sp.paid_at::text AS transaction_at,
+				COALESCE(u.full_name,'') AS created_by_user_name
+			FROM sale_payments sp
+			JOIN sales s ON s.id = sp.sale_id
+			JOIN branches b ON b.id = sp.branch_id
+			LEFT JOIN users u ON u.id = sp.paid_by_user_id
+			WHERE sp.business_id = ? AND sp.paid_at >= ? AND sp.paid_at < ? AND sp.payment_status IN ? AND sp.deleted_at IS NULL`
+		args = append(args, filter.BusinessID, filter.StartUTC, filter.EndUTC, financialPaymentStatuses(filter))
+		if !filter.AllBranches {
+			pos += " AND sp.branch_id = ?"
+			args = append(args, filter.BranchID)
+		}
+		if filter.PaymentMethodID != "" {
+			pos += " AND sp.payment_method_id = ?"
+			args = append(args, filter.PaymentMethodID)
+		}
+		parts = append(parts, pos)
 	}
-	return pos + " UNION ALL " + bakery, args
+	if includesFinancialSource(filter, "bakery_order") {
+		bakery := `
+			SELECT bop.id AS transaction_id,
+				'collection' AS transaction_type,
+				'bakery_order' AS source_type,
+				bo.order_number AS source_number,
+				b.branch_name,
+				bop.payment_method_name_snapshot AS payment_method_name,
+				bop.amount,
+				'in' AS direction,
+				'completed' AS status,
+				bop.paid_at::text AS transaction_at,
+				COALESCE(u.full_name,'') AS created_by_user_name
+			FROM bakery_order_payments bop
+			JOIN bakery_orders bo ON bo.id = bop.bakery_order_id
+			JOIN branches b ON b.id = bo.branch_id
+			LEFT JOIN users u ON u.id = bop.paid_by_user_id
+			WHERE bop.business_id = ? AND bop.paid_at >= ? AND bop.paid_at < ? AND bo.deleted_at IS NULL`
+		args = append(args, filter.BusinessID, filter.StartUTC, filter.EndUTC)
+		if filter.Status != "" && filter.Status != "completed" {
+			bakery += " AND 1 = 0"
+		}
+		if !filter.AllBranches {
+			bakery += " AND bo.branch_id = ?"
+			args = append(args, filter.BranchID)
+		}
+		if filter.PaymentMethodID != "" {
+			bakery += " AND bop.payment_method_id = ?"
+			args = append(args, filter.PaymentMethodID)
+		}
+		parts = append(parts, bakery)
+	}
+	if filter.SourceType == "" || filter.SourceType == "pos_sale" || filter.SourceType == "sales_return" {
+		refunds := `
+			SELECT pr.id AS transaction_id,
+				'refund' AS transaction_type,
+				CASE WHEN COALESCE(pr.refund_source, 'payment_adjustment') = 'sales_return' THEN 'sales_return' ELSE 'pos_sale' END AS source_type,
+				CASE WHEN COALESCE(pr.refund_source, 'payment_adjustment') = 'sales_return' THEN COALESCE(sr.return_number, '') ELSE s.sale_number END AS source_number,
+				b.branch_name,
+				pr.payment_method_name_snapshot AS payment_method_name,
+				pr.refund_amount AS amount,
+				'out' AS direction,
+				pr.refund_status AS status,
+				pr.refunded_at::text AS transaction_at,
+				COALESCE(u.full_name,'') AS created_by_user_name
+			FROM payment_refunds pr
+			JOIN sales s ON s.id = pr.sale_id
+			JOIN branches b ON b.id = pr.branch_id
+			LEFT JOIN sales_returns sr ON sr.id = pr.sales_return_id AND sr.business_id = pr.business_id
+			LEFT JOIN users u ON u.id = pr.created_by_user_id
+			WHERE pr.business_id = ? AND pr.refunded_at >= ? AND pr.refunded_at < ? AND pr.deleted_at IS NULL`
+		refundArgs := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
+		refunds, refundArgs = addFinancialRefundFilters(refunds, refundArgs, filter)
+		args = append(args, refundArgs...)
+		parts = append(parts, refunds)
+	}
+	if filter.SourceType == "supplier_payment" {
+		supplier := `
+			SELECT sp.id AS transaction_id,
+				'supplier_payment' AS transaction_type,
+				'supplier_payment' AS source_type,
+				COALESCE(NULLIF(sp.reference_number,''), s.supplier_name) AS source_number,
+				b.branch_name,
+				sp.payment_method_name_snapshot AS payment_method_name,
+				sp.amount,
+				'out' AS direction,
+				sp.status,
+				sp.payment_date::text AS transaction_at,
+				COALESCE(u.full_name,'') AS created_by_user_name
+			FROM supplier_payments sp
+			JOIN suppliers s ON s.id = sp.supplier_id
+			JOIN branches b ON b.id = sp.branch_id
+			LEFT JOIN users u ON u.id = sp.paid_by_user_id
+			WHERE sp.business_id = ? AND sp.payment_date >= ? AND sp.payment_date < ? AND sp.deleted_at IS NULL AND sp.status = ?`
+		args = append(args, filter.BusinessID, filter.StartUTC, filter.EndUTC, "completed")
+		if filter.Status != "" {
+			args[len(args)-1] = filter.Status
+		}
+		if !filter.AllBranches {
+			supplier += " AND sp.branch_id = ?"
+			args = append(args, filter.BranchID)
+		}
+		if filter.PaymentMethodID != "" {
+			supplier += " AND sp.payment_method_id = ?"
+			args = append(args, filter.PaymentMethodID)
+		}
+		parts = append(parts, supplier)
+	}
+	if filter.SourceType == "purchase_invoice_payment" {
+		purchasePayment := `
+			SELECT pip.id AS transaction_id,
+				'supplier_payment' AS transaction_type,
+				'purchase_invoice_payment' AS source_type,
+				pi.invoice_number AS source_number,
+				b.branch_name,
+				pip.payment_method_name_snapshot AS payment_method_name,
+				pip.amount,
+				'out' AS direction,
+				pip.payment_status AS status,
+				pip.paid_at::text AS transaction_at,
+				COALESCE(u.full_name,'') AS created_by_user_name
+			FROM purchase_invoice_payments pip
+			JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id
+			JOIN branches b ON b.id = pip.branch_id
+			LEFT JOIN users u ON u.id = pip.paid_by_user_id
+			WHERE pip.business_id = ? AND pip.paid_at >= ? AND pip.paid_at < ? AND pip.deleted_at IS NULL AND pip.payment_status = ?`
+		args = append(args, filter.BusinessID, filter.StartUTC, filter.EndUTC, "completed")
+		if filter.Status != "" {
+			args[len(args)-1] = filter.Status
+		}
+		if !filter.AllBranches {
+			purchasePayment += " AND pip.branch_id = ?"
+			args = append(args, filter.BranchID)
+		}
+		if filter.PaymentMethodID != "" {
+			purchasePayment += " AND pip.payment_method_id = ?"
+			args = append(args, filter.PaymentMethodID)
+		}
+		parts = append(parts, purchasePayment)
+	}
+	if len(parts) == 0 {
+		return `
+			SELECT NULL::uuid AS transaction_id,
+				'' AS transaction_type,
+				'' AS source_type,
+				'' AS source_number,
+				'' AS branch_name,
+				'' AS payment_method_name,
+				0::numeric AS amount,
+				'' AS direction,
+				'' AS status,
+				NULL::text AS transaction_at,
+				'' AS created_by_user_name
+			WHERE 1 = 0`, args
+	}
+	return strings.Join(parts, " UNION ALL "), args
 }
 
 func financialTrendSQL(filter *shared.ResolvedFilter) (string, []interface{}) {
-	pos := fmt.Sprintf(`
-		SELECT %s AS bucket,
-			COALESCE(SUM(sp.amount),0) AS collected,
-			0::numeric AS refunded
-		FROM sale_payments sp
-		WHERE sp.business_id = ? AND sp.paid_at >= ? AND sp.paid_at < ? AND sp.payment_status IN ('completed','partially_refunded','refunded') AND sp.deleted_at IS NULL`, dateTrunc(filter.GroupBy, "sp.paid_at"))
-	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	if !filter.AllBranches {
-		pos += " AND sp.branch_id = ?"
-		args = append(args, filter.BranchID)
+	parts := []string{}
+	args := []interface{}{}
+	if includesFinancialSource(filter, "pos_sale") {
+		pos := fmt.Sprintf(`
+			SELECT %s AS bucket,
+				COALESCE(SUM(sp.amount),0) AS collected,
+				0::numeric AS refunded
+			FROM sale_payments sp
+			WHERE sp.business_id = ? AND sp.paid_at >= ? AND sp.paid_at < ? AND sp.payment_status IN ? AND sp.deleted_at IS NULL`, dateTrunc(filter.GroupBy, "sp.paid_at"))
+		args = append(args, filter.BusinessID, filter.StartUTC, filter.EndUTC, financialPaymentStatuses(filter))
+		if !filter.AllBranches {
+			pos += " AND sp.branch_id = ?"
+			args = append(args, filter.BranchID)
+		}
+		if filter.PaymentMethodID != "" {
+			pos += " AND sp.payment_method_id = ?"
+			args = append(args, filter.PaymentMethodID)
+		}
+		pos += " GROUP BY bucket"
+		parts = append(parts, pos)
 	}
-	if filter.PaymentMethodID != "" {
-		pos += " AND sp.payment_method_id = ?"
-		args = append(args, filter.PaymentMethodID)
+	if includesFinancialSource(filter, "bakery_order") {
+		bakery := fmt.Sprintf(`
+			SELECT %s AS bucket,
+				COALESCE(SUM(bop.amount),0) AS collected,
+				0::numeric AS refunded
+			FROM bakery_order_payments bop
+			JOIN bakery_orders bo ON bo.id = bop.bakery_order_id
+			WHERE bop.business_id = ? AND bop.paid_at >= ? AND bop.paid_at < ? AND bo.deleted_at IS NULL`, dateTrunc(filter.GroupBy, "bop.paid_at"))
+		args = append(args, filter.BusinessID, filter.StartUTC, filter.EndUTC)
+		if filter.Status != "" && filter.Status != "completed" {
+			bakery += " AND 1 = 0"
+		}
+		if !filter.AllBranches {
+			bakery += " AND bo.branch_id = ?"
+			args = append(args, filter.BranchID)
+		}
+		if filter.PaymentMethodID != "" {
+			bakery += " AND bop.payment_method_id = ?"
+			args = append(args, filter.PaymentMethodID)
+		}
+		bakery += " GROUP BY bucket"
+		parts = append(parts, bakery)
 	}
-	pos += " GROUP BY bucket"
-	bakery := fmt.Sprintf(`
-		SELECT %s AS bucket,
-			COALESCE(SUM(bop.amount),0) AS collected,
-			0::numeric AS refunded
-		FROM bakery_order_payments bop
-		JOIN bakery_orders bo ON bo.id = bop.bakery_order_id
-		WHERE bop.business_id = ? AND bop.paid_at >= ? AND bop.paid_at < ? AND bo.deleted_at IS NULL`, dateTrunc(filter.GroupBy, "bop.paid_at"))
-	args = append(args, filter.BusinessID, filter.StartUTC, filter.EndUTC)
-	if !filter.AllBranches {
-		bakery += " AND bo.branch_id = ?"
-		args = append(args, filter.BranchID)
+	if filter.SourceType == "" || filter.SourceType == "pos_sale" || filter.SourceType == "sales_return" {
+		refunds := fmt.Sprintf(`
+			SELECT %s AS bucket,
+				0::numeric AS collected,
+				COALESCE(SUM(pr.refund_amount),0) AS refunded
+			FROM payment_refunds pr
+			WHERE pr.business_id = ? AND pr.refunded_at >= ? AND pr.refunded_at < ? AND pr.deleted_at IS NULL`, dateTrunc(filter.GroupBy, "pr.refunded_at"))
+		refundArgs := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
+		refunds, refundArgs = addFinancialRefundFilters(refunds, refundArgs, filter)
+		refunds += " GROUP BY bucket"
+		args = append(args, refundArgs...)
+		parts = append(parts, refunds)
 	}
-	if filter.PaymentMethodID != "" {
-		bakery += " AND bop.payment_method_id = ?"
-		args = append(args, filter.PaymentMethodID)
+	if len(parts) == 0 {
+		return `
+			SELECT NULL::date AS bucket,
+				0::numeric AS net_sales,
+				0::numeric AS sales_count
+			WHERE 1 = 0`, args
 	}
-	bakery += " GROUP BY bucket"
-	refunds := fmt.Sprintf(`
-		SELECT %s AS bucket,
-			0::numeric AS collected,
-			COALESCE(SUM(refund_amount),0) AS refunded
-		FROM payment_refunds
-		WHERE business_id = ? AND refunded_at >= ? AND refunded_at < ? AND refund_status = 'completed' AND deleted_at IS NULL`, dateTrunc(filter.GroupBy, "refunded_at"))
-	args = append(args, filter.BusinessID, filter.StartUTC, filter.EndUTC)
-	if !filter.AllBranches {
-		refunds += " AND branch_id = ?"
-		args = append(args, filter.BranchID)
-	}
-	if filter.PaymentMethodID != "" {
-		refunds += " AND payment_method_id = ?"
-		args = append(args, filter.PaymentMethodID)
-	}
-	refunds += " GROUP BY bucket"
 	query := `
 		SELECT bucket,
 			COALESCE(SUM(collected),0) AS net_sales,
 			COALESCE(SUM(refunded),0) AS sales_count
-		FROM (` + pos + " UNION ALL " + bakery + " UNION ALL " + refunds + `) financial_trend
+		FROM (` + strings.Join(parts, " UNION ALL ") + `) financial_trend
 		GROUP BY bucket ORDER BY bucket ASC`
 	return query, args
 }

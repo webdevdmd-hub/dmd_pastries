@@ -10,6 +10,7 @@ import {
   getPaymentsChart,
   getReceiptRecords,
   getReportBranches,
+  getReportExportOptions,
   getReportsDashboardSummary,
   getSalesChart,
 } from "@/lib/api/reports";
@@ -19,6 +20,7 @@ import type {
   ReceiptRecordRow,
   ReceiptRecordsFilters,
   ReportChartData,
+  ReportExportOption,
   ReportExportPayload,
   ReportFilters,
   ReportsDashboardSummary,
@@ -93,6 +95,14 @@ export function useSaleReceipt() {
 export function useExportReportCsv() {
   return useMutation<Blob, Error, ReportExportPayload>({
     mutationFn: async (payload) => exportReportCsv(payload),
+  });
+}
+
+export function useReportExportOptions(enabled = true) {
+  return useQuery<ReportExportOption[]>({
+    queryKey: [reportsQueryKey, "export-options"],
+    queryFn: async () => getReportExportOptions(),
+    enabled,
   });
 }
 

@@ -16,7 +16,7 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { resolveReportPresetRange } from "@/constants/report-presets";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { usePermission } from "@/hooks/use-permission";
-import { useExportReportCsv, useReportBranches } from "@/hooks/use-reports";
+import { useExportReportCsv, useReportBranches, useReportExportOptions } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
 import type { ExportReportSchema } from "@/lib/validators/reports.schema";
 import type { ReportBaseFilters } from "@/types/reports";
@@ -46,6 +46,7 @@ export function ReportsExportClient(): JSX.Element {
   const canView = hasAnyPermission([PERMISSIONS.reportsView]);
   const canExport = hasAnyPermission([PERMISSIONS.reportsExport]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedReportType, setSelectedReportType] = useState("");
   const timezone = useMemo(resolveTimezone, []);
   const defaultFilters = useMemo<ReportBaseFilters>(() => {
     const range = resolveReportPresetRange("this_month");
@@ -59,9 +60,15 @@ export function ReportsExportClient(): JSX.Element {
     };
   }, [branchScope.effectiveBranchId, timezone]);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
+  const exportOptionsQuery = useReportExportOptions(canView && canExport);
   const exportCsvMutation = useExportReportCsv();
   const hasReportBranchScope =
     branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
+  const exportOptions = exportOptionsQuery.data ?? [];
+  const selectedExportOption = exportOptions.find(
+    (option) => option.reportType === selectedReportType && option.supported,
+  );
+  const firstSupportedOption = exportOptions.find((option) => option.supported);
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -94,8 +101,8 @@ export function ReportsExportClient(): JSX.Element {
         filters,
         reportType: values.reportType,
       });
-      saveBlob(blob, `${values.reportType}-report-${filters.dateFrom}-to-${filters.dateTo}.csv`);
-      toast.success("Report CSV exported.");
+      saveBlob(blob, `${values.reportType}-${filters.dateFrom}-to-${filters.dateTo}.csv`);
+      toast.success(`${selectedExportOption?.label ?? "Report"} CSV exported.`);
       setDialogOpen(false);
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -108,22 +115,37 @@ export function ReportsExportClient(): JSX.Element {
         title="Export Center"
         description="Export report data as CSV for review, accounting, or backup."
         actions={
-          <Button disabled={!canExport} type="button" onClick={() => setDialogOpen(true)}>
+          <Button
+            disabled={!canExport || exportOptionsQuery.isLoading}
+            type="button"
+            onClick={() => {
+              if (!selectedReportType && firstSupportedOption) {
+                setSelectedReportType(firstSupportedOption.reportType);
+              }
+              setDialogOpen(true);
+            }}
+          >
             <Download className="h-4 w-4" />
-            Export CSV
+            {selectedExportOption ? `Export ${selectedExportOption.label} CSV` : "Select report to export"}
           </Button>
         }
       />
       <Card className="bg-white/85 shadow-soft">
         <CardHeader>
-          <CardTitle className="text-brand-espresso">CSV export foundation</CardTitle>
+          <CardTitle className="text-brand-espresso">Available CSV exports</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-brand-mocha">
-          <p>Supported backend report types for Sprint 5.1 are sales, payments, and orders.</p>
           <p>
-            Inventory, manufacturing, and purchasing options are prepared in the UI for future
-            report expansion and remain backend-dependent.
+            Select a report type to preview the date range, branch scope, and CSV file name before
+            downloading.
           </p>
+          <p>
+            Inventory, Manufacturing, Bakery Orders, Financial, Sales, Payments, and Orders exports
+            are shown from backend availability.
+          </p>
+          {exportOptionsQuery.error ? (
+            <p className="font-medium text-red-700">{getErrorMessage(exportOptionsQuery.error)}</p>
+          ) : null}
           {!canExport ? <p>You need `reports.export` to export CSV files.</p> : null}
         </CardContent>
       </Card>
@@ -132,9 +154,14 @@ export function ReportsExportClient(): JSX.Element {
         branches={branchesQuery.data ?? []}
         canAccessAllBranches={branchScope.canAccessAllBranches}
         defaultFilters={defaultFilters}
+        defaultReportType={
+          selectedReportType ? selectedReportType : (firstSupportedOption?.reportType ?? "")
+        }
+        exportOptions={exportOptions}
         isSubmitting={exportCsvMutation.isPending}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        onReportTypeChange={setSelectedReportType}
         onSubmit={handleExport}
       />
     </div>

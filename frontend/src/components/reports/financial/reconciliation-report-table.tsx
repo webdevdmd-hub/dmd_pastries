@@ -12,14 +12,11 @@ import {
 } from "@/components/ui/table";
 import type { ReconciliationRow } from "@/types/financial-reports";
 
-function differenceBadge(value: number): JSX.Element {
-  if (value === 0) {
-    return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">Balanced</Badge>;
+function directionBadge(direction: string): JSX.Element {
+  if (direction === "in") {
+    return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">In</Badge>;
   }
-  if (value > 0) {
-    return <Badge className="border-sky-200 bg-sky-50 text-sky-800">Surplus</Badge>;
-  }
-  return <Badge className="border-red-200 bg-red-50 text-red-800">Shortage</Badge>;
+  return <Badge className="border-red-200 bg-red-50 text-red-800">Out</Badge>;
 }
 
 export function ReconciliationReportTable({ rows }: { rows: ReconciliationRow[] }): JSX.Element {
@@ -29,25 +26,29 @@ export function ReconciliationReportTable({ rows }: { rows: ReconciliationRow[] 
         <TableRow>
           <TableHead>Date</TableHead>
           <TableHead>Branch</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead>Source</TableHead>
+          <TableHead>Reference</TableHead>
           <TableHead>Payment Method</TableHead>
-          <TableHead>Expected</TableHead>
-          <TableHead>Counted</TableHead>
-          <TableHead>Difference</TableHead>
+          <TableHead>Amount</TableHead>
+          <TableHead>Direction</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Created By</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.map((row) => (
-          <TableRow key={row.reconciliationId || `${row.branchName}-${row.reconciliationDate}`}>
-            <TableCell>{formatDate(row.reconciliationDate)}</TableCell>
+          <TableRow key={row.transactionId || `${row.sourceType}-${row.sourceNumber}-${row.transactionAt}`}>
+            <TableCell>{formatDate(row.transactionAt)}</TableCell>
             <TableCell>{row.branchName || "-"}</TableCell>
+            <TableCell>{row.transactionType || "-"}</TableCell>
+            <TableCell>{row.sourceType || "-"}</TableCell>
+            <TableCell>{row.sourceNumber || "-"}</TableCell>
             <TableCell>{row.paymentMethodName || "-"}</TableCell>
-            <TableCell>{formatCurrency(row.expectedAmount)}</TableCell>
-            <TableCell>{formatCurrency(row.countedAmount)}</TableCell>
-            <TableCell>{formatCurrency(row.differenceAmount)}</TableCell>
-            <TableCell>{differenceBadge(row.differenceAmount)}</TableCell>
-            <TableCell>{row.createdByUserName || row.status || "-"}</TableCell>
+            <TableCell>{formatCurrency(row.amount)}</TableCell>
+            <TableCell>{directionBadge(row.direction)}</TableCell>
+            <TableCell>{row.status || "-"}</TableCell>
+            <TableCell>{row.createdByUserName || "-"}</TableCell>
           </TableRow>
         ))}
       </TableBody>

@@ -62,6 +62,14 @@ export function OutstandingBalancesPageClient(): JSX.Element {
         currentBranchId={branchScope.effectiveBranchId}
         defaultFilters={initialDraft}
         filters={draft}
+        refundStatusOptions={[]}
+        showGroupBy={false}
+        sourceTypeOptions={[
+          { label: "All customer sources", value: "all" },
+          { label: "POS sale", value: "pos_sale" },
+          { label: "Bakery order", value: "bakery_order" },
+        ]}
+        statusOptions={[]}
         onApply={applyFilters}
         onChange={setDraft}
         onReset={() => setFilters(toFinancialReportFilters(initialDraft))}

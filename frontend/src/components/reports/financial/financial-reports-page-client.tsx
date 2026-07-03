@@ -83,6 +83,14 @@ export function FinancialReportsPageClient(): JSX.Element {
         currentBranchId={branchScope.effectiveBranchId}
         defaultFilters={initialDraft}
         filters={draft}
+        sourceTypeOptions={[
+          { label: "All sources", value: "all" },
+          { label: "POS sale", value: "pos_sale" },
+          { label: "Bakery order", value: "bakery_order" },
+          { label: "Sales return", value: "sales_return" },
+          { label: "Purchase invoice", value: "purchase_invoice" },
+        ]}
+        statusOptions={[]}
         onApply={applyFilters}
         onChange={setDraft}
         onReset={() => setFilters(toFinancialReportFilters(initialDraft))}
@@ -127,7 +135,7 @@ export function FinancialReportsPageClient(): JSX.Element {
           <Landmark className="h-5 w-5 text-brand-mocha" aria-hidden="true" />
           <p className="text-sm">
             Backend remains authoritative for totals, payments, refunds, supplier balances, and
-            reconciliation status.
+            reconciliation transactions.
           </p>
         </CardContent>
       </Card>

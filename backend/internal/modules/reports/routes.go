@@ -64,6 +64,7 @@ func RegisterRoutes(
 	group.GET("/financial/purchase-totals", view, handler.FinancialPurchaseTotals)
 	group.GET("/financial/reconciliation", view, handler.FinancialReconciliation)
 	group.GET("/financial/trend", view, handler.FinancialTrend)
+	group.GET("/export/options", export, handler.ExportOptions)
 	group.GET("/export/csv", export, handler.ExportCSVGet)
 	group.POST("/export/csv", export, handler.ExportCSVPost)
 }

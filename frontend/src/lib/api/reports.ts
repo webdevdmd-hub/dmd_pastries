@@ -6,6 +6,7 @@ import type {
   ReceiptRecordsFilters,
   ReportBaseFilters,
   ReportChartData,
+  ReportExportOption,
   ReportExportPayload,
   ReportFilters,
   ReportsDashboardSummary,
@@ -49,6 +50,15 @@ type BackendReportChartData = {
 type BackendReportExportPayload = {
   report_type: ReportType;
   filters: Record<string, string | number>;
+};
+
+type BackendReportExportOption = {
+  category?: string;
+  description?: string;
+  label?: string;
+  report_type?: string;
+  supported?: boolean;
+  unsupported_reason?: string;
 };
 
 type BackendReceiptRecordRow = {
@@ -240,6 +250,25 @@ function parseReceiptRecords(value: unknown): ReceiptRecordRow[] {
   return listSource(value).map(parseReceiptRecord);
 }
 
+function parseReportExportOption(value: unknown): ReportExportOption {
+  const option = isObject(value) ? (value as BackendReportExportOption) : {};
+
+  return {
+    category: stringOrEmpty(option.category),
+    description: stringOrEmpty(option.description),
+    label: stringOrEmpty(option.label),
+    reportType: stringOrEmpty(option.report_type),
+    supported: option.supported === true,
+    unsupportedReason: stringOrEmpty(option.unsupported_reason),
+  };
+}
+
+function parseReportExportOptions(value: unknown): ReportExportOption[] {
+  return listSource(value)
+    .map(parseReportExportOption)
+    .filter((option) => option.reportType && option.label);
+}
+
 function toBackendFilters(filters: ReportBaseFilters): Record<string, string | number> {
   const result: Record<string, string | number> = {};
 
@@ -338,6 +367,15 @@ export async function exportReportCsv(payload: ReportExportPayload): Promise<Blo
       filters: toBackendFilters(payload.filters),
     },
   });
+}
+
+export async function getReportExportOptions(): Promise<ReportExportOption[]> {
+  const response = await apiRequest<ReportExportOption[]>("/api/v1/reports/export/options", {
+    authMode: "appwrite",
+    parse: parseReportExportOptions,
+  });
+
+  return response.data;
 }
 
 export async function getReportBranches(): Promise<Branch[]> {

@@ -25,6 +25,24 @@ func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository, cach
 	return &Service{db: db, repo: repo, auditRepo: auditRepo, cache: cache}
 }
 
+const maxExportRows = 10000
+
+func (s *Service) ExportOptions() []ExportOptionResponse {
+	options := reportExportOptions()
+	response := make([]ExportOptionResponse, 0, len(options))
+	for _, option := range options {
+		response = append(response, ExportOptionResponse{
+			ReportType:        option.ReportType,
+			Label:             option.Label,
+			Category:          option.Category,
+			Description:       option.Description,
+			Supported:         option.Supported,
+			UnsupportedReason: option.UnsupportedReason,
+		})
+	}
+	return response
+}
+
 func (s *Service) DashboardSummary(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*DashboardSummaryResponse, error) {
 	filter, err := shared.Resolve(currentUser, shared.ParseQuery(values))
 	if err != nil {
@@ -559,23 +577,39 @@ func (s *Service) FinancialTrend(currentUser *utils.AuthContext, values url.Valu
 }
 
 func (s *Service) ExportCSV(currentUser *utils.AuthContext, reportType string, values url.Values, ipAddress, userAgent string) (*shared.CSVFile, error) {
-	if reportType != "sales" && reportType != "payments" && reportType != "orders" {
+	option, ok := exportOptionByType(reportType)
+	if !ok {
 		return nil, apperrors.BadRequest("invalid report_type", nil)
+	}
+	if !option.Supported {
+		return nil, apperrors.BadRequest(option.UnsupportedReason, map[string]string{"report_type": reportType})
 	}
 	filter, err := shared.Resolve(currentUser, shared.ParseQuery(values))
 	if err != nil {
 		return nil, err
 	}
+	filter.Page = 1
+	filter.Limit = maxExportRows + 1
 	headers, rows, err := s.repo.ExportRows(reportType, filter)
 	if err != nil {
 		return nil, apperrors.Internal("failed to export report")
 	}
-	filename := fmt.Sprintf("%s-report-%s.csv", reportType, time.Now().UTC().Format("20060102150405"))
+	if len(rows) > maxExportRows {
+		return nil, apperrors.BadRequest("export row limit exceeded; narrow filters and try again", map[string]int{"max_rows": maxExportRows})
+	}
+	filename := fmt.Sprintf("%s-%s-to-%s.csv", reportType, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02"))
 	file, err := shared.BuildCSV(filename, headers, rows)
 	if err != nil {
 		return nil, apperrors.Internal("failed to build CSV")
 	}
-	_ = s.writeAudit(currentUser, "report.exported", "reports", reportType, "Report exported.", filter, ipAddress, userAgent)
+	_ = s.writeAudit(currentUser, "report.exported", "reports", reportType, "Report exported.", map[string]interface{}{
+		"report_type":  reportType,
+		"report_label": option.Label,
+		"date_from":    filter.DateFrom.Format("2006-01-02"),
+		"date_to":      filter.DateTo.Format("2006-01-02"),
+		"branch_scope": branchScopeLabel(filter),
+		"row_count":    len(rows),
+	}, ipAddress, userAgent)
 	return file, nil
 }
 
@@ -599,9 +633,14 @@ func (s *Service) chart(
 	return &chart, nil
 }
 
-func (s *Service) writeAudit(currentUser *utils.AuthContext, eventType, entityType, entityID, summary string, filter *shared.ResolvedFilter, ipAddress, userAgent string) error {
+func (s *Service) writeAudit(currentUser *utils.AuthContext, eventType, entityType, entityID, summary string, metadataSource interface{}, ipAddress, userAgent string) error {
 	metadata := map[string]interface{}{}
-	if filter != nil {
+	switch value := metadataSource.(type) {
+	case *shared.ResolvedFilter:
+		filter := value
+		if filter == nil {
+			break
+		}
 		metadata = map[string]interface{}{
 			"branch_id":     filter.BranchID,
 			"all_branches":  filter.AllBranches,
@@ -612,6 +651,10 @@ func (s *Service) writeAudit(currentUser *utils.AuthContext, eventType, entityTy
 			"generated_at":  time.Now().UTC().Format(time.RFC3339),
 			"cache_enabled": s.cache != nil,
 		}
+	case map[string]interface{}:
+		metadata = value
+		metadata["generated_at"] = time.Now().UTC().Format(time.RFC3339)
+		metadata["cache_enabled"] = s.cache != nil
 	}
 	return s.auditRepo.CreateActivity(s.db, audit.ActivityInput{
 		BusinessID:  currentUser.BusinessID,

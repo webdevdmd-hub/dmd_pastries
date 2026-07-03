@@ -33,6 +33,7 @@ import { useAdminDashboard } from "@/hooks/use-dashboard";
 import { usePermission } from "@/hooks/use-permission";
 import { useOrdersChart, usePaymentsChart, useSalesChart } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import type { DashboardRequestFilters } from "@/lib/api/dashboard";
 import type { ReportFilters } from "@/types/reports";
 
 const actions = [
@@ -42,7 +43,32 @@ const actions = [
   { href: ROUTES.inventoryLowStock, icon: PackageSearch, label: "View Low Stock" },
 ] as const;
 
-function monthFilters(): ReportFilters {
+function resolveTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Dubai";
+  } catch {
+    return "Asia/Dubai";
+  }
+}
+
+function branchFilterParams(
+  canAccessAllBranches: boolean,
+  effectiveBranchId: string | null,
+): Pick<ReportFilters, "branchId" | "scope"> {
+  if (canAccessAllBranches) {
+    return { branchId: "all", scope: "all_branches" };
+  }
+  if (effectiveBranchId) {
+    return { branchId: effectiveBranchId, scope: "current_branch" };
+  }
+  return { scope: "current_branch" };
+}
+
+function monthFilters(
+  canAccessAllBranches: boolean,
+  effectiveBranchId: string | null,
+  timezone: string,
+): ReportFilters {
   const now = new Date();
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -55,12 +81,22 @@ function monthFilters(): ReportFilters {
   };
 
   return {
+    ...branchFilterParams(canAccessAllBranches, effectiveBranchId),
     dateFrom: toDateInputValue(firstDay),
     dateTo: toDateInputValue(lastDay),
     groupBy: "day",
-    // Embedded admin dashboard widgets must not fail when the backend host lacks
-    // IANA timezone data. Detailed Reports pages still use browser/business timezone.
-    timezone: "UTC",
+    timezone,
+  };
+}
+
+function adminDashboardFilters(
+  canAccessAllBranches: boolean,
+  effectiveBranchId: string | null,
+  timezone: string,
+): DashboardRequestFilters {
+  return {
+    ...branchFilterParams(canAccessAllBranches, effectiveBranchId),
+    timezone,
   };
 }
 
@@ -83,8 +119,21 @@ export function AdminDashboardClient(): JSX.Element {
     PERMISSIONS.reportsView,
   ]);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
-  const dashboardQuery = useAdminDashboard(canView && hasScope);
-  const reportFilters = useMemo(monthFilters, []);
+  const timezone = useMemo(resolveTimezone, []);
+  const dashboardFilters = useMemo(
+    () =>
+      adminDashboardFilters(
+        branchScope.canAccessAllBranches,
+        branchScope.effectiveBranchId,
+        timezone,
+      ),
+    [branchScope.canAccessAllBranches, branchScope.effectiveBranchId, timezone],
+  );
+  const dashboardQuery = useAdminDashboard(dashboardFilters, canView && hasScope);
+  const reportFilters = useMemo(
+    () => monthFilters(branchScope.canAccessAllBranches, branchScope.effectiveBranchId, timezone),
+    [branchScope.canAccessAllBranches, branchScope.effectiveBranchId, timezone],
+  );
   const salesChartQuery = useSalesChart(reportFilters, canView && hasScope);
   const paymentsChartQuery = usePaymentsChart(reportFilters, canView && hasScope);
   const ordersChartQuery = useOrdersChart(reportFilters, canView && hasScope);

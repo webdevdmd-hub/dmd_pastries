@@ -92,15 +92,17 @@ export type SupplierPayableRow = {
 };
 
 export type ReconciliationRow = {
+  amount: number;
   branchName: string;
-  countedAmount: number;
   createdByUserName: string;
-  differenceAmount: number;
-  expectedAmount: number;
+  direction: string;
   paymentMethodName: string;
-  reconciliationDate: string;
-  reconciliationId: string;
+  sourceNumber: string;
+  sourceType: string;
   status: string;
+  transactionAt: string;
+  transactionId: string;
+  transactionType: string;
 };
 
 export type PurchaseTotalsReport = {

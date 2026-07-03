@@ -57,6 +57,12 @@ export function RefundsReportPageClient(): JSX.Element {
         currentBranchId={branchScope.effectiveBranchId}
         defaultFilters={initialDraft}
         filters={draft}
+        sourceTypeOptions={[
+          { label: "All refund sources", value: "all" },
+          { label: "POS sale", value: "pos_sale" },
+          { label: "Sales return", value: "sales_return" },
+        ]}
+        statusOptions={[]}
         onApply={applyFilters}
         onChange={setDraft}
         onReset={() => setFilters(toFinancialReportFilters(initialDraft))}

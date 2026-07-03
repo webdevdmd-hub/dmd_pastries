@@ -1117,6 +1117,58 @@ func (s *Service) PostPOSSaleVoidJournal(tx *gorm.DB, currentUser *utils.AuthCon
 	return journalID, nil
 }
 
+func (s *Service) PostPOSPaymentRefundJournal(tx *gorm.DB, currentUser *utils.AuthContext, paymentRefundID string) (string, error) {
+	refund, err := s.repo.FindPOSPaymentRefundForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(paymentRefundID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load payment refund for accounting")
+	}
+	if refund.RefundSource == "sales_return" {
+		return "", nil
+	}
+	if refund.JournalEntryID != nil && strings.TrimSpace(*refund.JournalEntryID) != "" {
+		return strings.TrimSpace(*refund.JournalEntryID), nil
+	}
+	if refund.RefundStatus != "completed" {
+		return "", nil
+	}
+	refundAmount := roundMoney(refund.RefundAmount)
+	if refundAmount <= 0 {
+		return "", apperrors.BadRequest("completed payment refund must have a positive amount before accounting can be posted", map[string]interface{}{"payment_refund_id": refund.ID, "refund_amount": refundAmount})
+	}
+	if refund.DefaultPaymentAccountID == nil || strings.TrimSpace(refund.ChartAccountID) == "" {
+		return "", apperrors.BadRequest("refund payment method is not linked to an active payment account", map[string]interface{}{"payment_method": refund.PaymentMethodNameSnapshot})
+	}
+	if err := validatePaymentAccountBranch(refund.PaymentAccountBranchID, refund.BranchID, refund.PaymentAccountName); err != nil {
+		return "", err
+	}
+	existing, err := s.repo.FindPostedJournalBySource(tx, currentUser.BusinessID, "pos_sale_refund", refund.ID)
+	if err == nil && existing.ID != "" {
+		if err := s.repo.UpdatePOSPaymentRefundJournalID(tx, currentUser.BusinessID, refund.ID, existing.ID); err != nil {
+			return "", apperrors.Internal("failed to update payment refund accounting journal")
+		}
+		return existing.ID, nil
+	}
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return "", apperrors.Internal("failed to validate existing payment refund journal")
+	}
+	salesReturnsAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "sales_returns", "4040", "Sales Returns and Allowances")
+	if err != nil {
+		return "", err
+	}
+	lines := []JournalEntryLineRequest{
+		{AccountID: salesReturnsAccount.ID, DebitAmount: refundAmount, Description: "POS refund allowance " + refund.RefundNumber},
+		{AccountID: refund.ChartAccountID, CreditAmount: refundAmount, Description: "POS refund via " + refund.PaymentMethodNameSnapshot},
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, refund.RefundedAt, &refund.BranchID, "pos_sale_refund", refund.ID, refund.RefundNumber, "POS refund "+refund.RefundNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdatePOSPaymentRefundJournalID(tx, currentUser.BusinessID, refund.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update payment refund accounting journal")
+	}
+	return journalID, nil
+}
+
 func (s *Service) PostSalesReturnInventoryJournal(tx *gorm.DB, currentUser *utils.AuthContext, salesReturnID string) (string, error) {
 	salesReturn, err := s.repo.FindSalesReturnForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(salesReturnID))
 	if err != nil {
@@ -2316,6 +2368,8 @@ func (s *Service) backfillOneJournal(currentUser *utils.AuthContext, target, id 
 			journalID, err = s.PostBakeryOrderRevenueJournal(tx, currentUser, id)
 		case "bakery_order_payments":
 			journalID, err = s.PostBakeryOrderPaymentJournal(tx, currentUser, id)
+		case "payment_refunds":
+			journalID, err = s.PostPOSPaymentRefundJournal(tx, currentUser, id)
 		case "purchase_invoices":
 			journalID, err = s.PostPurchaseInvoiceJournal(tx, currentUser, id)
 		case "purchase_invoice_payments":
@@ -3521,6 +3575,7 @@ func defaultBackfillTargets() []string {
 	return []string{
 		"pos_sales",
 		"bakery_order_payments",
+		"payment_refunds",
 		"bakery_orders",
 		"purchase_invoices",
 		"supplier_payments",
@@ -3534,7 +3589,7 @@ func defaultBackfillTargets() []string {
 
 func validBackfillTarget(value string) bool {
 	switch value {
-	case "pos_sales", "bakery_orders", "bakery_order_payments", "purchase_invoices", "purchase_invoice_payments", "supplier_payments", "stock_movements", "manufacturing_batches", "sales_returns", "purchase_returns", "expenses":
+	case "pos_sales", "bakery_orders", "bakery_order_payments", "payment_refunds", "purchase_invoices", "purchase_invoice_payments", "supplier_payments", "stock_movements", "manufacturing_batches", "sales_returns", "purchase_returns", "expenses":
 		return true
 	default:
 		return false

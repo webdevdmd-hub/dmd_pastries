@@ -49,7 +49,7 @@ export function ReconciliationReportPageClient(): JSX.Element {
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <ReportPageHeader
         title="Reconciliation Report"
-        description="Review expected versus counted payment amounts by branch and method."
+        description="Review completed collection, refund, and supplier-payment transactions by branch and method."
       />
       <FinancialReportFilterBar
         branches={branchesQuery.data ?? []}
@@ -57,6 +57,22 @@ export function ReconciliationReportPageClient(): JSX.Element {
         currentBranchId={branchScope.effectiveBranchId}
         defaultFilters={initialDraft}
         filters={draft}
+        refundStatusOptions={[]}
+        sourceTypeOptions={[
+          { label: "Customer activity", value: "all" },
+          { label: "POS sale", value: "pos_sale" },
+          { label: "Bakery order", value: "bakery_order" },
+          { label: "Sales return", value: "sales_return" },
+          { label: "Supplier payment", value: "supplier_payment" },
+          { label: "Invoice payment", value: "purchase_invoice_payment" },
+        ]}
+        statusOptions={[
+          { label: "Financial impact", value: "all" },
+          { label: "Completed", value: "completed" },
+          { label: "Partially refunded", value: "partially_refunded" },
+          { label: "Refunded", value: "refunded" },
+          { label: "Voided", value: "voided" },
+        ]}
         onApply={applyFilters}
         onChange={setDraft}
         onReset={() => setFilters(toFinancialReportFilters(initialDraft))}
@@ -72,7 +88,7 @@ export function ReconciliationReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <ReconciliationReportTable rows={reportQuery.data} />
           ) : (
-            <FinancialReportEmptyState message="No reconciliation rows found." />
+            <FinancialReportEmptyState message="No financial transactions found." />
           )}
         </CardContent>
       </Card>

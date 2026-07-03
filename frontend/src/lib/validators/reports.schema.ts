@@ -2,14 +2,7 @@ import { z } from "zod";
 
 export const reportGroupBySchema = z.enum(["day", "week", "month", "payment_method", "category"]);
 
-export const exportReportTypeSchema = z.enum([
-  "sales",
-  "payments",
-  "orders",
-  "inventory",
-  "manufacturing",
-  "purchasing",
-]);
+export const exportReportTypeSchema = z.string().min(1, "Select a report to export.");
 
 const branchIdSchema = z
   .string()

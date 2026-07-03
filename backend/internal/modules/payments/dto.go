@@ -133,6 +133,7 @@ type PaymentRefundResponse struct {
 	RefundAmount              float64   `json:"refund_amount"`
 	RefundReason              string    `json:"refund_reason"`
 	RefundStatus              string    `json:"refund_status"`
+	JournalEntryID            *string   `json:"journal_entry_id"`
 	ApprovedByUserID          *string   `json:"approved_by_user_id"`
 	CreatedByUserID           string    `json:"created_by_user_id"`
 	RefundedAt                time.Time `json:"refunded_at"`

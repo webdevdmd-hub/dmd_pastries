@@ -33,6 +33,8 @@ type ReportBaseFilter struct {
 	PaymentMethodID   string
 	PaymentStatus     string
 	SaleStatus        string
+	RefundStatus      string
+	SourceType        string
 	ItemType          string
 	Status            string
 	MovementType      string
@@ -68,6 +70,8 @@ type ResolvedFilter struct {
 	PaymentMethodID   string
 	PaymentStatus     string
 	SaleStatus        string
+	RefundStatus      string
+	SourceType        string
 	ItemType          string
 	Status            string
 	MovementType      string
@@ -112,6 +116,8 @@ func ParseQuery(values url.Values) ReportBaseFilter {
 		PaymentMethodID:   strings.TrimSpace(values.Get("payment_method_id")),
 		PaymentStatus:     strings.TrimSpace(values.Get("payment_status")),
 		SaleStatus:        strings.TrimSpace(values.Get("sale_status")),
+		RefundStatus:      strings.TrimSpace(values.Get("refund_status")),
+		SourceType:        strings.TrimSpace(values.Get("source_type")),
 		ItemType:          strings.TrimSpace(values.Get("item_type")),
 		Status:            strings.TrimSpace(values.Get("status")),
 		MovementType:      strings.TrimSpace(values.Get("movement_type")),
@@ -204,6 +210,8 @@ func Resolve(currentUser *utils.AuthContext, filter ReportBaseFilter) (*Resolved
 		PaymentMethodID:   filter.PaymentMethodID,
 		PaymentStatus:     filter.PaymentStatus,
 		SaleStatus:        filter.SaleStatus,
+		RefundStatus:      filter.RefundStatus,
+		SourceType:        filter.SourceType,
 		ItemType:          filter.ItemType,
 		Status:            filter.Status,
 		MovementType:      filter.MovementType,

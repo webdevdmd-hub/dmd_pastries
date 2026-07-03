@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	reportshared "pastries-pos/internal/modules/reports/shared"
 )
 
 type Repository struct {
@@ -153,7 +155,7 @@ func (r *Repository) PurchasingDashboard(scope Scope) (*PurchasingDashboardRespo
 	if err := r.db.Raw(receiptQuery, receiptArgs...).Scan(&purchasing.PendingReceipts).Error; err != nil {
 		return nil, err
 	}
-	payable, err := r.dashboardMappedBalance(scope, "accounts_payable", "2000", scope.TodayDate)
+	payable, err := reportshared.LedgerMappedBalance(r.db, dashboardMetricScope(scope), "accounts_payable", "2000", scope.TodayDate)
 	if err != nil {
 		return nil, err
 	}
@@ -183,16 +185,12 @@ func (r *Repository) KPISummary(scope Scope) (*KPISummaryResponse, error) {
 	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
 		return nil, err
 	}
-	ledgerRevenue, err := r.dashboardLedgerRevenue(scope, scope.TodayStart, scope.TodayEnd)
+	todayTotals, err := reportshared.LedgerFinancialTotals(r.db, dashboardMetricScope(scope), scope.TodayStart, scope.TodayEnd)
 	if err != nil {
 		return nil, err
 	}
-	collected, _, _, err := r.dashboardLedgerCollections(scope, scope.TodayStart, scope.TodayEnd)
-	if err != nil {
-		return nil, err
-	}
-	row.TodaySales = ledgerRevenue
-	row.TodayCollected = collected
+	row.TodaySales = todayTotals.Revenue
+	row.TodayCollected = todayTotals.Collected
 	lowQuery := "SELECT COUNT(*) FROM inventory_items WHERE business_id = ? AND available_quantity <= reorder_level AND deleted_at IS NULL"
 	lowArgs := []interface{}{scope.BusinessID}
 	lowQuery, lowArgs = addScopedBranch(lowQuery, lowArgs, "branch_id", scope)
@@ -293,16 +291,16 @@ func (r *Repository) adminSales(scope Scope) (*AdminSalesWidget, error) {
 	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
 		return nil, err
 	}
-	todayRevenue, err := r.dashboardLedgerRevenue(scope, scope.TodayStart, scope.TodayEnd)
+	todayTotals, err := reportshared.LedgerFinancialTotals(r.db, dashboardMetricScope(scope), scope.TodayStart, scope.TodayEnd)
 	if err != nil {
 		return nil, err
 	}
-	monthlyRevenue, err := r.dashboardLedgerRevenue(scope, scope.MonthStart, scope.MonthEnd)
+	monthlyTotals, err := reportshared.LedgerFinancialTotals(r.db, dashboardMetricScope(scope), scope.MonthStart, scope.MonthEnd)
 	if err != nil {
 		return nil, err
 	}
-	row.TodaySales = todayRevenue
-	row.MonthlySales = monthlyRevenue
+	row.TodaySales = todayTotals.Revenue
+	row.MonthlySales = monthlyTotals.Revenue
 	if row.SalesCountToday > 0 {
 		row.AverageOrderValue = roundDashboardMoney(row.TodaySales / float64(row.SalesCountToday))
 	}
@@ -317,12 +315,11 @@ func (r *Repository) adminInventory(scope Scope) (*AdminInventoryWidget, error) 
 	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
 		return nil, err
 	}
-	expiryQuery := "SELECT COUNT(*) FROM expiry_batches WHERE business_id = ? AND status = 'active' AND deleted_at IS NULL AND expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'"
-	expiryArgs := []interface{}{scope.BusinessID}
-	expiryQuery, expiryArgs = addScopedBranch(expiryQuery, expiryArgs, "branch_id", scope)
-	if err := r.db.Raw(expiryQuery, expiryArgs...).Scan(&row.ExpiringItemsCount).Error; err != nil {
+	expiring, err := reportshared.ExpiringItemsCount(r.db, dashboardMetricScope(scope), 7)
+	if err != nil {
 		return nil, err
 	}
+	row.ExpiringItemsCount = expiring
 	return &row, nil
 }
 
@@ -346,20 +343,16 @@ func (r *Repository) adminManufacturing(scope Scope) (*AdminManufacturingWidget,
 
 func (r *Repository) adminFinancial(scope Scope) (*AdminFinancialWidget, error) {
 	var row AdminFinancialWidget
-	collected, _, _, err := r.dashboardLedgerCollections(scope, scope.TodayStart, scope.TodayEnd)
+	todayTotals, err := reportshared.LedgerFinancialTotals(r.db, dashboardMetricScope(scope), scope.TodayStart, scope.TodayEnd)
 	if err != nil {
 		return nil, err
 	}
-	refunded, err := r.dashboardLedgerRefunds(scope, scope.TodayStart, scope.TodayEnd)
+	outstanding, err := reportshared.LedgerMappedBalance(r.db, dashboardMetricScope(scope), "accounts_receivable", "1100", scope.TodayDate)
 	if err != nil {
 		return nil, err
 	}
-	outstanding, err := r.dashboardMappedBalance(scope, "accounts_receivable", "1100", scope.TodayDate)
-	if err != nil {
-		return nil, err
-	}
-	row.CollectedToday = collected
-	row.RefundTotalToday = refunded
+	row.CollectedToday = todayTotals.Collected
+	row.RefundTotalToday = todayTotals.Refunded
 	row.OutstandingBalance = outstanding
 	return &row, nil
 }
@@ -381,118 +374,12 @@ func addScopedBranch(query string, args []interface{}, column string, scope Scop
 	return query, args
 }
 
-func (r *Repository) dashboardLedgerRevenue(scope Scope, startUTC, endUTC time.Time) (float64, error) {
-	dateFrom, dateTo := dashboardLedgerDateRange(startUTC, endUTC)
-	branchClause, branchArgs := dashboardLedgerBranchClause(scope)
-	args := append([]interface{}{scope.BusinessID, dateFrom, dateTo, []string{"pos_sale", "bakery_order_revenue", "pos_sale_void", "sales_return"}}, branchArgs...)
-	var total float64
-	err := r.db.Raw(`
-		SELECT COALESCE(SUM(jel.credit_amount - jel.debit_amount), 0)
-		FROM journal_entry_lines jel
-		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
-		JOIN chart_of_accounts coa ON coa.id = jel.account_id AND coa.business_id = jel.business_id
-		WHERE jel.business_id = ?
-		  AND jel.deleted_at IS NULL
-		  AND je.deleted_at IS NULL
-		  AND je.status IN ('posted', 'reversed')
-		  AND je.entry_date >= ?
-		  AND je.entry_date <= ?
-		  AND je.source_type IN ?
-		  AND coa.account_type = 'income'
-		  `+branchClause, args...).Scan(&total).Error
-	return roundDashboardMoney(total), err
-}
-
-func (r *Repository) dashboardLedgerCollections(scope Scope, startUTC, endUTC time.Time) (float64, float64, float64, error) {
-	dateFrom, dateTo := dashboardLedgerDateRange(startUTC, endUTC)
-	branchClause, branchArgs := dashboardLedgerBranchClause(scope)
-	args := append([]interface{}{scope.BusinessID, dateFrom, dateTo, []string{"pos_sale", "bakery_order_payment"}}, branchArgs...)
-	var row struct {
-		Total float64
-		Cash  float64
-		Card  float64
+func dashboardMetricScope(scope Scope) reportshared.MetricScope {
+	return reportshared.MetricScope{
+		BusinessID:  scope.BusinessID,
+		BranchID:    scope.BranchID,
+		AllBranches: scope.AllBranches,
 	}
-	err := r.db.Raw(`
-		SELECT COALESCE(SUM(jel.debit_amount), 0) AS total,
-		       COALESCE(SUM(jel.debit_amount) FILTER (WHERE pa.account_type = 'cash'), 0) AS cash,
-		       COALESCE(SUM(jel.debit_amount) FILTER (WHERE pa.account_type = 'card_clearing'), 0) AS card
-		FROM journal_entry_lines jel
-		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
-		JOIN payment_accounts pa ON pa.chart_account_id = jel.account_id AND pa.business_id = jel.business_id AND pa.deleted_at IS NULL
-		WHERE jel.business_id = ?
-		  AND jel.deleted_at IS NULL
-		  AND je.deleted_at IS NULL
-		  AND je.status IN ('posted', 'reversed')
-		  AND je.entry_date >= ?
-		  AND je.entry_date <= ?
-		  AND je.source_type IN ?
-		  AND jel.debit_amount > 0
-		  `+branchClause, args...).Scan(&row).Error
-	return roundDashboardMoney(row.Total), roundDashboardMoney(row.Cash), roundDashboardMoney(row.Card), err
-}
-
-func (r *Repository) dashboardLedgerRefunds(scope Scope, startUTC, endUTC time.Time) (float64, error) {
-	dateFrom, dateTo := dashboardLedgerDateRange(startUTC, endUTC)
-	branchClause, branchArgs := dashboardLedgerBranchClause(scope)
-	args := append([]interface{}{scope.BusinessID, dateFrom, dateTo, []string{"sales_return", "pos_sale_refund"}}, branchArgs...)
-	var total float64
-	err := r.db.Raw(`
-		SELECT COALESCE(SUM(jel.credit_amount), 0)
-		FROM journal_entry_lines jel
-		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
-		JOIN payment_accounts pa ON pa.chart_account_id = jel.account_id AND pa.business_id = jel.business_id AND pa.deleted_at IS NULL
-		WHERE jel.business_id = ?
-		  AND jel.deleted_at IS NULL
-		  AND je.deleted_at IS NULL
-		  AND je.status IN ('posted', 'reversed')
-		  AND je.entry_date >= ?
-		  AND je.entry_date <= ?
-		  AND je.source_type IN ?
-		  AND jel.credit_amount > 0
-		  `+branchClause, args...).Scan(&total).Error
-	return roundDashboardMoney(total), err
-}
-
-func (r *Repository) dashboardMappedBalance(scope Scope, mappingKey, fallbackCode, asOfDate string) (float64, error) {
-	branchClause, branchArgs := dashboardLedgerBranchClause(scope)
-	args := append([]interface{}{mappingKey, scope.BusinessID, fallbackCode, scope.BusinessID, asOfDate}, branchArgs...)
-	var total float64
-	err := r.db.Raw(`
-		WITH target_account AS (
-			SELECT COALESCE(aam.chart_account_id, coa.id) AS account_id, coa.normal_balance
-			FROM chart_of_accounts coa
-			LEFT JOIN accounting_account_mappings aam ON aam.business_id = coa.business_id AND aam.mapping_key = ? AND aam.deleted_at IS NULL
-			WHERE coa.business_id = ? AND coa.account_code = ? AND coa.deleted_at IS NULL
-			ORDER BY CASE WHEN aam.chart_account_id IS NOT NULL THEN 0 ELSE 1 END
-			LIMIT 1
-		)
-		SELECT COALESCE(SUM(CASE WHEN ta.normal_balance = 'credit' THEN jel.credit_amount - jel.debit_amount ELSE jel.debit_amount - jel.credit_amount END), 0)
-		FROM target_account ta
-		JOIN journal_entry_lines jel ON jel.account_id = ta.account_id
-		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
-		WHERE jel.business_id = ?
-		  AND jel.deleted_at IS NULL
-		  AND je.deleted_at IS NULL
-		  AND je.status IN ('posted', 'reversed')
-		  AND je.entry_date <= ?
-		  `+branchClause, args...).Scan(&total).Error
-	return roundDashboardMoney(total), err
-}
-
-func dashboardLedgerDateRange(startUTC, endUTC time.Time) (string, string) {
-	dateFrom := startUTC.Format("2006-01-02")
-	dateTo := endUTC.Add(-time.Nanosecond).Format("2006-01-02")
-	if !startUTC.Before(endUTC) {
-		dateTo = dateFrom
-	}
-	return dateFrom, dateTo
-}
-
-func dashboardLedgerBranchClause(scope Scope) (string, []interface{}) {
-	if scope.AllBranches {
-		return "", []interface{}{}
-	}
-	return " AND je.branch_id = ?", []interface{}{scope.BranchID}
 }
 
 func roundDashboardMoney(value float64) float64 {

@@ -35,8 +35,17 @@ type PaymentsSummary struct {
 }
 
 type CSVExportRequest struct {
-	ReportType string                 `json:"report_type" binding:"required,oneof=sales payments orders"`
+	ReportType string                 `json:"report_type" binding:"required"`
 	Filters    map[string]interface{} `json:"filters"`
+}
+
+type ExportOptionResponse struct {
+	ReportType        string `json:"report_type"`
+	Label             string `json:"label"`
+	Category          string `json:"category"`
+	Description       string `json:"description"`
+	Supported         bool   `json:"supported"`
+	UnsupportedReason string `json:"unsupported_reason"`
 }
 
 type SalesReportSummaryResponse struct {
@@ -525,15 +534,17 @@ type PurchaseTotalsBySupplier struct {
 }
 
 type ReconciliationReportItem struct {
-	ReconciliationID   string  `json:"reconciliation_id"`
-	BranchName         string  `json:"branch_name"`
-	PaymentMethodName  string  `json:"payment_method_name"`
-	ReconciliationDate string  `json:"reconciliation_date"`
-	ExpectedAmount     float64 `json:"expected_amount"`
-	CountedAmount      float64 `json:"counted_amount"`
-	DifferenceAmount   float64 `json:"difference_amount"`
-	Status             string  `json:"status"`
-	CreatedByUserName  string  `json:"created_by_user_name"`
+	TransactionID     string  `json:"transaction_id"`
+	TransactionType   string  `json:"transaction_type"`
+	SourceType        string  `json:"source_type"`
+	SourceNumber      string  `json:"source_number"`
+	BranchName        string  `json:"branch_name"`
+	PaymentMethodName string  `json:"payment_method_name"`
+	Amount            float64 `json:"amount"`
+	Direction         string  `json:"direction"`
+	Status            string  `json:"status"`
+	TransactionAt     string  `json:"transaction_at"`
+	CreatedByUserName string  `json:"created_by_user_name"`
 }
 
 type ReceiptRecordReportItem struct {

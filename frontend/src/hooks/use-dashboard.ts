@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { useBranchQueryKey } from "@/hooks/use-branch-scope";
 import {
+  type DashboardRequestFilters,
   getAdminDashboard,
   getCashierDashboard,
   getDashboardAlerts,
@@ -31,18 +32,25 @@ function useDashboardQuery<TData>(
   queryFn: () => Promise<TData>,
   enabled: boolean,
   refetchInterval = dashboardRefreshMs,
+  keyArgs?: unknown,
 ) {
   const branchQueryKey = useBranchQueryKey();
   return useQuery<TData>({
     enabled,
     queryFn,
-    queryKey: [dashboardQueryKey, branchQueryKey, segment],
+    queryKey: [dashboardQueryKey, branchQueryKey, segment, keyArgs],
     refetchInterval,
   });
 }
 
-export function useAdminDashboard(enabled = true) {
-  return useDashboardQuery<AdminDashboard>("admin", getAdminDashboard, enabled);
+export function useAdminDashboard(filters?: DashboardRequestFilters, enabled = true) {
+  return useDashboardQuery<AdminDashboard>(
+    "admin",
+    async () => getAdminDashboard(filters),
+    enabled,
+    dashboardRefreshMs,
+    filters,
+  );
 }
 
 export function useCashierDashboard(enabled = true) {

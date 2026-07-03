@@ -146,7 +146,7 @@ func main() {
 	inventoryHandler := inventory.NewHandler(inventoryService)
 	posService := pos.NewService(db, posRepo, inventoryService, auditRepo, accountingService)
 	posHandler := pos.NewHandler(posService)
-	paymentService := payments.NewService(db, paymentRepo, auditRepo)
+	paymentService := payments.NewService(db, paymentRepo, auditRepo, accountingService)
 	paymentHandler := payments.NewHandler(paymentService)
 	customerService := customers.NewService(db, customerRepo, auditRepo)
 	customerHandler := customers.NewHandler(customerService)
