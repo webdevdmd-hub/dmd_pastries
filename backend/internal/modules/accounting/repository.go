@@ -496,6 +496,24 @@ func (r *Repository) CountDuplicateActiveReceiptsForInvoice(businessID string) (
 	return count, err
 }
 
+func (r *Repository) CountPostedPurchaseReturnsMissingJournal(businessID string) (int64, error) {
+	var count int64
+	err := r.db.Table("purchase_returns").
+		Where("business_id = ? AND status = ? AND deleted_at IS NULL AND journal_entry_id IS NULL", businessID, "posted").
+		Count(&count).Error
+	return count, err
+}
+
+func (r *Repository) CountPurchaseReturnMovementsMissingAccountingJournal(businessID string) (int64, error) {
+	var count int64
+	err := r.db.Table("stock_movements sm").
+		Joins("JOIN purchase_returns pr ON pr.id = sm.reference_id AND pr.business_id = sm.business_id").
+		Where("sm.business_id = ? AND sm.reference_type = ? AND sm.movement_type = ? AND sm.accounting_journal_entry_id IS NULL", businessID, "purchase_return", "purchase_return_out").
+		Where("pr.status = ? AND pr.deleted_at IS NULL", "posted").
+		Count(&count).Error
+	return count, err
+}
+
 func (r *Repository) FindAccountMapping(tx *gorm.DB, businessID, mappingKey string) (*AccountMapping, error) {
 	var mapping AccountMapping
 	err := tx.Where("business_id = ? AND mapping_key = ? AND deleted_at IS NULL", businessID, mappingKey).First(&mapping).Error

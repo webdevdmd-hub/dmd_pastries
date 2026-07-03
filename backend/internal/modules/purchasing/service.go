@@ -2284,6 +2284,9 @@ func (s *Service) PostReturn(currentUser *utils.AuthContext, id, ipAddress, user
 	if err := requireAllOrOverride(currentUser, []string{"purchasing.returns.post", "purchasing.receive_stock"}, []string{"purchasing.returns.manage", "purchasing.manage", "inventory.manage"}); err != nil {
 		return nil, err
 	}
+	if s.accountingService == nil {
+		return nil, apperrors.Internal("purchase return accounting service is not configured")
+	}
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		purchaseReturn, err := s.repo.FindPurchaseReturnForUpdate(tx, id, currentUser.BusinessID)
 		if err != nil {
@@ -2388,10 +2391,8 @@ func (s *Service) PostReturn(currentUser *utils.AuthContext, id, ipAddress, user
 				return err
 			}
 		}
-		if s.accountingService != nil {
-			if _, err := s.accountingService.PostPurchaseReturnJournal(tx, currentUser, purchaseReturn.ID); err != nil {
-				return err
-			}
+		if _, err := s.accountingService.PostPurchaseReturnJournal(tx, currentUser, purchaseReturn.ID); err != nil {
+			return err
 		}
 		if err := s.audit(tx, currentUser, "purchase_return.posted", purchaseReturn.ID, "Purchase return vendor credit posted", ipAddress, userAgent); err != nil {
 			return err
@@ -2439,6 +2440,9 @@ func (s *Service) ReverseReturn(currentUser *utils.AuthContext, id string, req R
 	if reason == "" {
 		return nil, apperrors.BadRequest("reversal reason is required", nil)
 	}
+	if s.accountingService == nil {
+		return nil, apperrors.Internal("purchase return accounting service is not configured")
+	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		purchaseReturn, err := s.repo.FindPurchaseReturnForUpdate(tx, id, currentUser.BusinessID)
@@ -2450,6 +2454,9 @@ func (s *Service) ReverseReturn(currentUser *utils.AuthContext, id string, req R
 		}
 		if purchaseReturn.Status != "posted" {
 			return apperrors.BadRequest("only posted vendor credits can be reversed", nil)
+		}
+		if purchaseReturn.JournalEntryID == nil || strings.TrimSpace(*purchaseReturn.JournalEntryID) == "" {
+			return apperrors.Conflict("posted vendor credit is missing its accounting journal; run purchase return journal backfill before reversing", map[string]interface{}{"reason": "purchase_return_journal_missing"})
 		}
 
 		var invoice *PurchaseInvoice
@@ -2502,12 +2509,9 @@ func (s *Service) ReverseReturn(currentUser *utils.AuthContext, id string, req R
 
 		now := time.Now().UTC()
 
-		reversalJournalID := ""
-		if s.accountingService != nil && purchaseReturn.JournalEntryID != nil && strings.TrimSpace(*purchaseReturn.JournalEntryID) != "" {
-			reversalJournalID, err = s.accountingService.ReversePurchaseReturnJournal(tx, currentUser, *purchaseReturn.JournalEntryID, purchaseReturn.ReturnNumber)
-			if err != nil {
-				return err
-			}
+		reversalJournalID, err := s.accountingService.ReversePurchaseReturnJournal(tx, currentUser, strings.TrimSpace(*purchaseReturn.JournalEntryID), purchaseReturn.ReturnNumber)
+		if err != nil {
+			return err
 		}
 
 		returnUpdates := map[string]interface{}{

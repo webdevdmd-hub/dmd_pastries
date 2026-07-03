@@ -1337,15 +1337,29 @@ func (s *Service) PostPurchaseReturnJournal(tx *gorm.DB, currentUser *utils.Auth
 	if err != nil {
 		return "", apperrors.Internal("failed to load purchase return for accounting")
 	}
-	if purchaseReturn.JournalEntryID != nil && *purchaseReturn.JournalEntryID != "" {
-		return *purchaseReturn.JournalEntryID, nil
-	}
 	if purchaseReturn.Status != "posted" {
-		return "", nil
+		return "", apperrors.BadRequest("only posted purchase returns can be posted to accounting", map[string]interface{}{"purchase_return_id": purchaseReturn.ID, "status": purchaseReturn.Status})
 	}
 	returnTotal := roundMoney(purchaseReturn.ReturnTotal)
 	if returnTotal <= 0 {
-		return "", nil
+		return "", apperrors.BadRequest("posted purchase return must have a positive total before accounting can be posted", map[string]interface{}{"purchase_return_id": purchaseReturn.ID, "return_total": returnTotal})
+	}
+	if purchaseReturn.JournalEntryID != nil && strings.TrimSpace(*purchaseReturn.JournalEntryID) != "" {
+		journalID := strings.TrimSpace(*purchaseReturn.JournalEntryID)
+		if err := s.syncPurchaseReturnJournalLinks(tx, currentUser.BusinessID, purchaseReturn.ID, journalID); err != nil {
+			return "", err
+		}
+		return journalID, nil
+	}
+	existing, err := s.repo.FindPostedJournalBySource(tx, currentUser.BusinessID, "purchase_return", purchaseReturn.ID)
+	if err == nil && existing.ID != "" {
+		if err := s.syncPurchaseReturnJournalLinks(tx, currentUser.BusinessID, purchaseReturn.ID, existing.ID); err != nil {
+			return "", err
+		}
+		return existing.ID, nil
+	}
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return "", apperrors.Internal("failed to validate existing purchase return accounting journal")
 	}
 	accountsPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "accounts_payable", "2000", "Accounts Payable")
 	if err != nil {
@@ -1393,13 +1407,20 @@ func (s *Service) PostPurchaseReturnJournal(tx *gorm.DB, currentUser *utils.Auth
 	if err != nil {
 		return "", err
 	}
-	if err := s.repo.UpdatePurchaseReturnJournalID(tx, currentUser.BusinessID, purchaseReturn.ID, journalID); err != nil {
-		return "", apperrors.Internal("failed to update purchase return accounting journal")
-	}
-	if err := s.repo.UpdateStockMovementJournalByReference(tx, currentUser.BusinessID, "purchase_return", purchaseReturn.ID, "out", journalID); err != nil {
-		return "", apperrors.Internal("failed to update purchase return stock movement journal")
+	if err := s.syncPurchaseReturnJournalLinks(tx, currentUser.BusinessID, purchaseReturn.ID, journalID); err != nil {
+		return "", err
 	}
 	return journalID, nil
+}
+
+func (s *Service) syncPurchaseReturnJournalLinks(tx *gorm.DB, businessID, purchaseReturnID, journalID string) error {
+	if err := s.repo.UpdatePurchaseReturnJournalID(tx, businessID, purchaseReturnID, journalID); err != nil {
+		return apperrors.Internal("failed to update purchase return accounting journal")
+	}
+	if err := s.repo.UpdateStockMovementJournalByReference(tx, businessID, "purchase_return", purchaseReturnID, "out", journalID); err != nil {
+		return apperrors.Internal("failed to update purchase return stock movement journal")
+	}
+	return nil
 }
 
 func (s *Service) PostPurchaseInvoiceJournal(tx *gorm.DB, currentUser *utils.AuthContext, invoiceID string) (string, error) {
@@ -2232,6 +2253,18 @@ func (s *Service) GetPurchasingPostingIntegrity(currentUser *utils.AuthContext, 
 			key:     "duplicate_active_receipts_for_purchase_bill",
 			message: "A purchase bill has more than one active stock receipt. This can duplicate received stock for the same bill.",
 			count:   s.repo.CountDuplicateActiveReceiptsForInvoice,
+		},
+		{
+			key:     "posted_purchase_return_missing_journal",
+			message: "Posted vendor credits without accounting journals were found. Run purchase return journal backfill before trusting inventory, AP, GL, Trial Balance, or Balance Sheet reports.",
+			count:   s.repo.CountPostedPurchaseReturnsMissingJournal,
+			details: map[string]interface{}{"backfill_target": "purchase_returns"},
+		},
+		{
+			key:     "purchase_return_stock_movement_missing_accounting_journal",
+			message: "Vendor credit stock movements without accounting journal links were found. Re-run purchase return journal backfill to reconnect inventory movement history to accounting.",
+			count:   s.repo.CountPurchaseReturnMovementsMissingAccountingJournal,
+			details: map[string]interface{}{"backfill_target": "purchase_returns"},
 		},
 	}
 

@@ -2,7 +2,7 @@
 
 import { FileClock, ShieldAlert } from "lucide-react";
 import type { JSX } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -141,6 +141,14 @@ function targetLabel(item: ActivityLog): string {
   return item.targetUserName || item.targetUserEmail || "Unknown user";
 }
 
+function activityLogsEndpoint(entityType: string | null): string {
+  if (!entityType) {
+    return "GET /api/v1/activity-logs";
+  }
+
+  return `GET /api/v1/activity-logs?entity_type=${encodeURIComponent(entityType)}`;
+}
+
 function LogsList({
   emptyMessage,
   items,
@@ -275,14 +283,21 @@ export function AuditLogsPageClient(): JSX.Element {
   const [userCursor, setUserCursor] = useState<string | null>(null);
   const [userItems, setUserItems] = useState<ActivityLog[]>([]);
 
-  const globalLogsQuery = useActivityLogs(
-    {
-      ...(entityFilter !== "all" ? { entityType: entityFilter } : {}),
+  const activeEntityType = entityFilter === "all" ? null : entityFilter;
+  const activeEntityLabel =
+    entityOptions.find((option) => option.value === entityFilter)?.label ??
+    (activeEntityType ? labelFromKey(activeEntityType) : "All modules");
+  const activeEndpointLabel = activityLogsEndpoint(activeEntityType);
+  const globalLogFilters = useMemo(
+    () => ({
+      ...(activeEntityType ? { entityType: activeEntityType } : {}),
       limit: 50,
       cursor: globalCursor,
-    },
-    canViewAuditLogs,
+    }),
+    [activeEntityType, globalCursor],
   );
+
+  const globalLogsQuery = useActivityLogs(globalLogFilters, canViewAuditLogs);
 
   const userLogsQuery = useUserActivityLogs(
     selectedUserId,
@@ -292,6 +307,11 @@ export function AuditLogsPageClient(): JSX.Element {
     },
     canViewAuditLogs && selectedUserId !== null,
   );
+
+  useEffect(() => {
+    setGlobalCursor(null);
+    setGlobalItems([]);
+  }, [activeEntityType]);
 
   useEffect(() => {
     if (!globalLogsQuery.data) {
@@ -352,8 +372,6 @@ export function AuditLogsPageClient(): JSX.Element {
               value={entityFilter}
               onValueChange={(value) => {
                 setEntityFilter(value);
-                setGlobalCursor(null);
-                setGlobalItems([]);
               }}
             >
               <SelectTrigger>
@@ -368,14 +386,19 @@ export function AuditLogsPageClient(): JSX.Element {
               </SelectContent>
             </Select>
             <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/70 px-4 py-3 text-sm text-brand-mocha">
-              Showing up to 50 records per page. Each entry resolves users, modules, actions, and
-              record references into business-readable labels where available.
+              <p>
+                Showing up to 50 records per page for{" "}
+                <span className="font-semibold text-brand-espresso">{activeEntityLabel}</span>.
+              </p>
+              <p className="mt-2 break-all font-mono text-xs text-brand-mocha">
+                {activeEndpointLabel}
+              </p>
             </div>
           </div>
 
           {globalLogsQuery.isLoading && globalCursor === null ? (
             <div className="rounded-3xl border border-brand-cappuccino bg-brand-latte/70 p-4 text-sm font-medium text-brand-mocha">
-              Loading activity logs...
+              Loading activity logs for {activeEntityLabel}...
             </div>
           ) : null}
 
