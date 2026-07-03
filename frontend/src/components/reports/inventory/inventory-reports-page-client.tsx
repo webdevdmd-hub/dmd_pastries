@@ -5,6 +5,7 @@ import {
   ClockAlert,
   PackageSearch,
   PackageX,
+  Scale,
   ShieldAlert,
   Trash2,
 } from "lucide-react";
@@ -45,6 +46,11 @@ const navigationCards = [
   { href: ROUTES.reportsInventoryWastage, icon: Trash2, label: "Wastage" },
   { href: ROUTES.reportsInventoryPackaging, icon: PackageSearch, label: "Packaging Stock" },
   { href: ROUTES.reportsInventoryAudit, icon: ShieldAlert, label: "Inventory Audit" },
+  {
+    href: ROUTES.reportsInventoryAccountingReconciliation,
+    icon: Scale,
+    label: "Inventory Accounting",
+  },
 ] as const;
 
 function isTrendEmpty(chart: ReturnType<typeof useInventoryTrend>["data"]): boolean {

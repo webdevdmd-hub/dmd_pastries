@@ -2,9 +2,13 @@ import { apiRequest } from "@/lib/api/client";
 import type {
   CurrentStockRow,
   ExpiryReportRow,
+  InventoryAccountingReconciliationReport,
+  InventoryAccountingReconciliationRow,
+  InventoryAccountingReconciliationStatus,
   InventoryAuditRow,
   InventoryMovementReportRow,
   InventoryReportFilters,
+  InventoryReportPagination,
   InventorySummary,
   InventoryTrendChart,
   LowStockRow,
@@ -132,6 +136,50 @@ type BackendInventoryAuditRow = {
   item_name?: string;
 };
 
+type BackendPagination = {
+  limit?: number;
+  page?: number;
+  total?: number;
+  total_pages?: number;
+};
+
+type BackendInventoryAccountingReconciliationRow = {
+  accounting_inventory_value?: number;
+  branch_id?: string;
+  branch_name?: string;
+  difference_amount?: number;
+  inventory_item_id?: string;
+  inventory_ledger_value?: number;
+  item_name?: string;
+  item_type?: string;
+  last_transaction_at?: string;
+  last_transaction_id?: string | null;
+  last_transaction_reference?: string;
+  last_transaction_type?: string;
+  operational_inventory_value?: number;
+  operational_quantity?: number;
+  possible_reason?: string;
+  product_id?: string | null;
+  product_variant_id?: string | null;
+  status?: string;
+  stock_location_id?: string | null;
+  stock_location_name?: string;
+};
+
+type BackendInventoryAccountingReconciliationReport = {
+  as_of_date?: string;
+  branch_id?: string;
+  general_ledger_inventory_balance?: number;
+  items?: unknown;
+  matched_count?: number;
+  mismatch_count?: number;
+  pagination?: unknown;
+  total_accounting_inventory_value?: number;
+  total_inventory_ledger_value?: number;
+  total_operational_value?: number;
+  unassigned_accounting_difference?: number;
+};
+
 type BackendTrend = {
   datasets?: unknown;
   labels?: unknown;
@@ -152,6 +200,10 @@ function numberOrZero(value: unknown): number {
 
 function stringOrEmpty(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === "string" && value !== "" ? value : null;
 }
 
 function booleanOrFalse(value: unknown): boolean {
@@ -187,6 +239,7 @@ function parseList<TItem>(value: unknown, parser: (item: unknown) => TItem): TIt
 function toSearchParams(filters: InventoryReportFilters): string {
   const params = new URLSearchParams();
   const entries: [string, number | string | undefined][] = [
+    ["as_of_date", filters.asOfDate],
     ["branch_id", filters.branchId],
     ["item_type", filters.itemType],
     ["date_from", filters.dateFrom],
@@ -367,6 +420,72 @@ function parseInventoryAuditRow(value: unknown): InventoryAuditRow {
   };
 }
 
+function parsePagination(value: unknown): InventoryReportPagination {
+  const pagination = isObject(value) ? (value as BackendPagination) : {};
+
+  return {
+    limit: numberOrZero(pagination.limit),
+    page: numberOrZero(pagination.page),
+    total: numberOrZero(pagination.total),
+    totalPages: numberOrZero(pagination.total_pages),
+  };
+}
+
+function parseInventoryAccountingReconciliationStatus(
+  value: unknown,
+): InventoryAccountingReconciliationStatus {
+  return value === "matched" ? "matched" : "mismatch";
+}
+
+function parseInventoryAccountingReconciliationRow(
+  value: unknown,
+): InventoryAccountingReconciliationRow {
+  const row = isObject(value) ? (value as BackendInventoryAccountingReconciliationRow) : {};
+
+  return {
+    accountingInventoryValue: numberOrZero(row.accounting_inventory_value),
+    branchId: stringOrEmpty(row.branch_id),
+    branchName: stringOrEmpty(row.branch_name),
+    differenceAmount: numberOrZero(row.difference_amount),
+    inventoryItemId: stringOrEmpty(row.inventory_item_id),
+    inventoryLedgerValue: numberOrZero(row.inventory_ledger_value),
+    itemName: stringOrEmpty(row.item_name),
+    itemType: stringOrEmpty(row.item_type),
+    lastTransactionAt: stringOrEmpty(row.last_transaction_at),
+    lastTransactionId: stringOrEmpty(row.last_transaction_id),
+    lastTransactionReference: stringOrEmpty(row.last_transaction_reference),
+    lastTransactionType: stringOrEmpty(row.last_transaction_type),
+    operationalInventoryValue: numberOrZero(row.operational_inventory_value),
+    operationalQuantity: numberOrZero(row.operational_quantity),
+    possibleReason: stringOrEmpty(row.possible_reason),
+    productId: stringOrNull(row.product_id),
+    productVariantId: stringOrNull(row.product_variant_id),
+    status: parseInventoryAccountingReconciliationStatus(row.status),
+    stockLocationId: stringOrNull(row.stock_location_id),
+    stockLocationName: stringOrEmpty(row.stock_location_name),
+  };
+}
+
+function parseInventoryAccountingReconciliationReport(
+  value: unknown,
+): InventoryAccountingReconciliationReport {
+  const report = isObject(value) ? (value as BackendInventoryAccountingReconciliationReport) : {};
+
+  return {
+    asOfDate: stringOrEmpty(report.as_of_date),
+    branchId: stringOrEmpty(report.branch_id),
+    generalLedgerInventoryBalance: numberOrZero(report.general_ledger_inventory_balance),
+    items: parseList(report.items, parseInventoryAccountingReconciliationRow),
+    matchedCount: numberOrZero(report.matched_count),
+    mismatchCount: numberOrZero(report.mismatch_count),
+    pagination: parsePagination(report.pagination),
+    totalAccountingInventoryValue: numberOrZero(report.total_accounting_inventory_value),
+    totalInventoryLedgerValue: numberOrZero(report.total_inventory_ledger_value),
+    totalOperationalValue: numberOrZero(report.total_operational_value),
+    unassignedAccountingDifference: numberOrZero(report.unassigned_accounting_difference),
+  };
+}
+
 function parseInventoryTrend(value: unknown): InventoryTrendChart {
   const chart = isObject(value) ? (value as BackendTrend) : {};
   const labels = Array.isArray(chart.labels)
@@ -460,6 +579,16 @@ export async function getInventoryAuditReport(
 ): Promise<InventoryAuditRow[]> {
   return getReport("/api/v1/reports/inventory/audit", filters, (value) =>
     parseList(value, parseInventoryAuditRow),
+  );
+}
+
+export async function getInventoryAccountingReconciliationReport(
+  filters: InventoryReportFilters,
+): Promise<InventoryAccountingReconciliationReport> {
+  return getReport(
+    "/api/v1/accounting/reconciliation/inventory/details",
+    filters,
+    parseInventoryAccountingReconciliationReport,
   );
 }
 

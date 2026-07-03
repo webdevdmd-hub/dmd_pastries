@@ -18,6 +18,19 @@ import type { InventoryReportFilters, InventoryReportItemType } from "@/types/in
 
 const allValue = "all";
 
+export type InventoryReportSelectOption = {
+  label: string;
+  value: string;
+};
+
+const defaultStatusOptions: InventoryReportSelectOption[] = [
+  { label: "All statuses", value: allValue },
+  { label: "Active", value: "active" },
+  { label: "Inactive", value: "inactive" },
+  { label: "Low stock", value: "low_stock" },
+  { label: "Out of stock", value: "out_of_stock" },
+];
+
 export type InventoryReportFilterDraft = {
   branchId: string;
   dateFrom: string;
@@ -47,6 +60,7 @@ export function InventoryReportFilterBar({
   onApply,
   onChange,
   onReset,
+  statusOptions = defaultStatusOptions,
 }: {
   branches: Branch[];
   canAccessAllBranches: boolean;
@@ -56,6 +70,7 @@ export function InventoryReportFilterBar({
   onApply: () => void;
   onChange: (filters: InventoryReportFilterDraft) => void;
   onReset: () => void;
+  statusOptions?: InventoryReportSelectOption[];
 }): JSX.Element {
   return (
     <Card className="bg-white/85 shadow-soft">
@@ -97,11 +112,11 @@ export function InventoryReportFilterBar({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-              <SelectItem value="low_stock">Low stock</SelectItem>
-              <SelectItem value="out_of_stock">Out of stock</SelectItem>
+              {statusOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

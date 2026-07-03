@@ -3552,9 +3552,70 @@ func normalizeReconciliationQuery(query ReconciliationQuery) ReconciliationQuery
 	return query
 }
 
+func normalizeInventoryReconciliationDetailsQuery(query InventoryReconciliationDetailsQuery) InventoryReconciliationDetailsQuery {
+	query.BranchID = strings.TrimSpace(query.BranchID)
+	query.AsOfDate = strings.TrimSpace(query.AsOfDate)
+	query.DateFrom = strings.TrimSpace(query.DateFrom)
+	query.DateTo = strings.TrimSpace(query.DateTo)
+	query.ItemType = strings.ToLower(strings.TrimSpace(query.ItemType))
+	query.Status = strings.ToLower(strings.TrimSpace(query.Status))
+	if query.Status == "unmatched" {
+		query.Status = "mismatch"
+	}
+	if query.AsOfDate == "" && query.DateTo != "" {
+		query.AsOfDate = query.DateTo
+	}
+	if query.AsOfDate == "" {
+		query.AsOfDate = time.Now().UTC().Format("2006-01-02")
+	}
+	query.Page, query.Limit = normalizePagination(query.Page, query.Limit)
+	query.SortBy = strings.ToLower(strings.TrimSpace(query.SortBy))
+	if query.SortBy == "" {
+		query.SortBy = "difference_amount"
+	}
+	query.SortOrder = strings.ToLower(strings.TrimSpace(query.SortOrder))
+	if query.SortOrder != "asc" {
+		query.SortOrder = "desc"
+	}
+	return query
+}
+
 func (s *Service) validateReconciliationQuery(currentUser *utils.AuthContext, query ReconciliationQuery) error {
 	if _, err := parseRequiredDate(query.AsOfDate, "as_of_date"); err != nil {
 		return err
+	}
+	branchID := cleanStringPointer(&query.BranchID)
+	return s.validateJournalBranch(s.db, currentUser, branchID)
+}
+
+func (s *Service) validateInventoryReconciliationDetailsQuery(currentUser *utils.AuthContext, query InventoryReconciliationDetailsQuery) error {
+	asOfDate, err := parseRequiredDate(query.AsOfDate, "as_of_date")
+	if err != nil {
+		return err
+	}
+	if query.DateFrom != "" {
+		dateFrom, err := parseRequiredDate(query.DateFrom, "date_from")
+		if err != nil {
+			return err
+		}
+		if dateFrom.After(asOfDate) {
+			return apperrors.BadRequest("date_from must be on or before as_of_date", nil)
+		}
+	}
+	if query.DateTo != "" {
+		if _, err := parseRequiredDate(query.DateTo, "date_to"); err != nil {
+			return err
+		}
+	}
+	if query.ItemType != "" {
+		switch query.ItemType {
+		case "product", "product_variant", "ingredient", "packaging":
+		default:
+			return apperrors.BadRequest("item_type must be product, product_variant, ingredient, or packaging", nil)
+		}
+	}
+	if query.Status != "" && query.Status != "matched" && query.Status != "mismatch" {
+		return apperrors.BadRequest("status must be matched or mismatch", nil)
 	}
 	branchID := cleanStringPointer(&query.BranchID)
 	return s.validateJournalBranch(s.db, currentUser, branchID)
@@ -3579,6 +3640,155 @@ func reconciliationCheck(key, label string, operational, ledger float64, notes s
 		Status:            status,
 		Notes:             notes,
 	}
+}
+
+func inventoryReconciliationDetailFromRow(row inventoryReconciliationDetailRow) InventoryReconciliationDetailItem {
+	operational := roundMoney(row.OperationalInventoryValue)
+	ledger := roundMoney(row.InventoryLedgerValue)
+	accounting := roundMoney(row.AccountingInventoryValue)
+	difference := roundMoney(operational - accounting)
+	status := "matched"
+	if absMoney(roundMoney(operational-ledger)) > 0.01 || absMoney(difference) > 0.01 {
+		status = "mismatch"
+	}
+	item := InventoryReconciliationDetailItem{
+		InventoryItemID:           row.InventoryItemID,
+		ItemName:                  row.ItemName,
+		ItemType:                  row.ItemType,
+		ProductID:                 row.ProductID,
+		ProductVariantID:          row.ProductVariantID,
+		BranchID:                  row.BranchID,
+		BranchName:                row.BranchName,
+		StockLocationID:           row.StockLocationID,
+		StockLocationName:         row.StockLocationName,
+		OperationalQuantity:       roundMoney(row.OperationalQuantity),
+		OperationalInventoryValue: operational,
+		InventoryLedgerValue:      ledger,
+		AccountingInventoryValue:  accounting,
+		DifferenceAmount:          difference,
+		LastTransactionID:         row.LastTransactionID,
+		LastTransactionType:       row.LastTransactionType,
+		LastTransactionReference:  row.LastTransactionReference,
+		LastTransactionAt:         row.LastTransactionAt,
+		Status:                    status,
+	}
+	item.PossibleReason = inventoryReconciliationReason(row, item)
+	return item
+}
+
+func inventoryReconciliationReason(row inventoryReconciliationDetailRow, item InventoryReconciliationDetailItem) string {
+	if item.Status == "matched" {
+		return "Operational inventory, stock movement valuation, and linked accounting value are matched."
+	}
+	if row.MissingCostCount > 0 {
+		return "One or more value-affecting stock movements have missing or zero total cost."
+	}
+	if row.LinkedUnpostedCount > 0 {
+		return "A stock movement is linked to a journal that is not posted."
+	}
+	if row.LinkedNoInventoryLineCount > 0 {
+		return "A linked journal does not include the mapped Inventory / Stock account."
+	}
+	if row.PurchaseReturnMissingCount > 0 {
+		return "Purchase return or Vendor Credit stock-out movement is missing its accounting journal link."
+	}
+	if row.POSCOGSMissingCount > 0 {
+		return "POS sale stock-out movement is missing its COGS accounting journal link."
+	}
+	if row.ManufacturingMissingCount > 0 {
+		return "Manufacturing stock movement is missing its accounting journal link."
+	}
+	if row.AdjustmentMissingCount > 0 {
+		return "Opening stock, adjustment, or wastage stock movement is missing accounting posting."
+	}
+	if row.GRNOnlyCount > 0 {
+		return "Goods receipt stock exists operationally but bill-only accounting has not linked item-level inventory value yet."
+	}
+	if row.MissingJournalCount > 0 {
+		return "A value-affecting stock movement is missing accounting_journal_entry_id."
+	}
+	if row.TransferMovementCount > 0 && absMoney(roundMoney(item.OperationalInventoryValue-item.InventoryLedgerValue)) > 0.01 {
+		return "Stock transfer location valuation may not align with the current operational location value."
+	}
+	if absMoney(roundMoney(item.OperationalInventoryValue-item.InventoryLedgerValue)) > 0.01 {
+		return "Operational inventory value differs from signed stock movement valuation."
+	}
+	if absMoney(roundMoney(item.InventoryLedgerValue-item.AccountingInventoryValue)) > 0.01 {
+		return "Stock movement valuation differs from linked posted accounting journals."
+	}
+	return "Inventory valuation differs from accounting value; review the last related transaction and unassigned Inventory / Stock journals."
+}
+
+func sortInventoryReconciliationDetails(items []InventoryReconciliationDetailItem, sortBy, sortOrder string) {
+	desc := strings.ToLower(sortOrder) != "asc"
+	sort.SliceStable(items, func(i, j int) bool {
+		compare := 0
+		switch sortBy {
+		case "item_name":
+			compare = strings.Compare(strings.ToLower(items[i].ItemName), strings.ToLower(items[j].ItemName))
+		case "branch_name":
+			compare = strings.Compare(strings.ToLower(items[i].BranchName), strings.ToLower(items[j].BranchName))
+		case "stock_location_name":
+			compare = strings.Compare(strings.ToLower(items[i].StockLocationName), strings.ToLower(items[j].StockLocationName))
+		case "status":
+			compare = strings.Compare(items[i].Status, items[j].Status)
+		case "operational_inventory_value":
+			compare = compareFloat(items[i].OperationalInventoryValue, items[j].OperationalInventoryValue)
+		case "inventory_ledger_value":
+			compare = compareFloat(items[i].InventoryLedgerValue, items[j].InventoryLedgerValue)
+		case "accounting_inventory_value":
+			compare = compareFloat(items[i].AccountingInventoryValue, items[j].AccountingInventoryValue)
+		case "last_transaction_at":
+			if items[i].LastTransactionAt == nil {
+				compare = -1
+			} else if items[j].LastTransactionAt == nil {
+				compare = 1
+			} else {
+				compare = compareTime(*items[i].LastTransactionAt, *items[j].LastTransactionAt)
+			}
+		default:
+			compare = compareFloat(absMoney(items[i].DifferenceAmount), absMoney(items[j].DifferenceAmount))
+		}
+		if compare == 0 {
+			compare = strings.Compare(items[i].InventoryItemID+items[i].StockLocationName, items[j].InventoryItemID+items[j].StockLocationName)
+		}
+		if desc {
+			return compare > 0
+		}
+		return compare < 0
+	})
+}
+
+func compareFloat(left, right float64) int {
+	if left < right {
+		return -1
+	}
+	if left > right {
+		return 1
+	}
+	return 0
+}
+
+func compareTime(left, right time.Time) int {
+	if left.Before(right) {
+		return -1
+	}
+	if left.After(right) {
+		return 1
+	}
+	return 0
+}
+
+func paginateInventoryReconciliationDetails(items []InventoryReconciliationDetailItem, page, limit int) []InventoryReconciliationDetailItem {
+	start := (page - 1) * limit
+	if start >= len(items) {
+		return []InventoryReconciliationDetailItem{}
+	}
+	end := start + limit
+	if end > len(items) {
+		end = len(items)
+	}
+	return items[start:end]
 }
 
 func normalizeBackfillRequest(req BackfillJournalsRequest) BackfillJournalsRequest {

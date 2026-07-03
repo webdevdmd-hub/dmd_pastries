@@ -398,15 +398,26 @@ type ApplyStockMovementInput struct {
 }
 
 type ExpiryBatchResponse struct {
-	ID              string    `json:"id"`
-	BusinessID      string    `json:"business_id"`
-	BranchID        string    `json:"branch_id"`
-	InventoryItemID string    `json:"inventory_item_id"`
-	BatchNumber     string    `json:"batch_number"`
-	Quantity        float64   `json:"quantity"`
-	ExpiryDate      time.Time `json:"expiry_date"`
-	ReceivedDate    time.Time `json:"received_date"`
-	Status          string    `json:"status"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID                      string    `json:"id"`
+	BusinessID              string    `json:"business_id"`
+	BranchID                string    `json:"branch_id"`
+	BranchName              string    `json:"branch_name"`
+	InventoryItemID         string    `json:"inventory_item_id"`
+	ItemType                string    `json:"item_type"`
+	ItemName                string    `json:"item_name"`
+	ItemCode                string    `json:"item_code"`
+	SKU                     string    `json:"sku"`
+	ProductType             string    `json:"product_type"`
+	CategoryName            string    `json:"category_name"`
+	UnitSymbol              string    `json:"unit_symbol"`
+	StockLocationName       string    `json:"stock_location_name"`
+	SupplierName            string    `json:"supplier_name"`
+	PurchaseReferenceNumber string    `json:"purchase_reference_number"`
+	BatchNumber             string    `json:"batch_number"`
+	Quantity                float64   `json:"quantity"`
+	ExpiryDate              time.Time `json:"expiry_date"`
+	ReceivedDate            time.Time `json:"received_date"`
+	Status                  string    `json:"status"`
+	CreatedAt               time.Time `json:"created_at"`
+	UpdatedAt               time.Time `json:"updated_at"`
 }

@@ -18,7 +18,7 @@ export const inventoryReportFiltersSchema = z
     branchId: uuidOrAllSchema.optional(),
     dateFrom: optionalDateSchema,
     dateTo: optionalDateSchema,
-    itemType: z.enum(["product", "product_variant"]).optional(),
+    itemType: z.enum(["product", "product_variant", "ingredient", "packaging"]).optional(),
     productType: z
       .enum([
         "finished_product",

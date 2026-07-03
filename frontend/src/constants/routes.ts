@@ -66,6 +66,7 @@ export const ROUTES = {
   reportsFinancialRefunds: "/reports/financial/refunds",
   reportsFinancialSupplierPayables: "/reports/financial/supplier-payables",
   reportsInventory: "/reports/inventory",
+  reportsInventoryAccountingReconciliation: "/reports/inventory/accounting-reconciliation",
   reportsInventoryAudit: "/reports/inventory/audit",
   reportsInventoryCurrentStock: "/reports/inventory/current-stock",
   reportsInventoryExpiry: "/reports/inventory/expiry",

@@ -6,6 +6,7 @@ import { useBranchQueryKey } from "@/hooks/use-branch-scope";
 import {
   getCurrentStockReport,
   getExpiryReport,
+  getInventoryAccountingReconciliationReport,
   getInventoryAuditReport,
   getInventoryMovementsReport,
   getInventorySummary,
@@ -18,6 +19,7 @@ import {
 import type {
   CurrentStockRow,
   ExpiryReportRow,
+  InventoryAccountingReconciliationReport,
   InventoryAuditRow,
   InventoryMovementReportRow,
   InventoryReportFilters,
@@ -123,6 +125,18 @@ export function useInventoryAuditReport(filters: InventoryReportFilters, enabled
     "audit",
     filters,
     async () => getInventoryAuditReport(filters),
+    enabled,
+  );
+}
+
+export function useInventoryAccountingReconciliationReport(
+  filters: InventoryReportFilters,
+  enabled = true,
+) {
+  return useInventoryReportQuery<InventoryAccountingReconciliationReport>(
+    "accounting-reconciliation",
+    filters,
+    async () => getInventoryAccountingReconciliationReport(filters),
     enabled,
   );
 }

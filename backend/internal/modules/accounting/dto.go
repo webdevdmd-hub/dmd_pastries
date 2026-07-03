@@ -641,26 +641,26 @@ type PaymentAccountReconciliationResponse struct {
 }
 
 type InventoryReconciliationDetailItem struct {
-	InventoryItemID          string  `json:"inventory_item_id"`
-	ItemName                 string  `json:"item_name"`
-	ItemType                 string  `json:"item_type"`
-	ProductID                *string `json:"product_id"`
-	ProductVariantID         *string `json:"product_variant_id"`
-	BranchID                 string  `json:"branch_id"`
-	BranchName               string  `json:"branch_name"`
-	StockLocationID          *string `json:"stock_location_id"`
-	StockLocationName        string  `json:"stock_location_name"`
-	OperationalQuantity      float64 `json:"operational_quantity"`
-	OperationalInventoryValue float64 `json:"operational_inventory_value"`
-	InventoryLedgerValue     float64 `json:"inventory_ledger_value"`
-	AccountingInventoryValue float64 `json:"accounting_inventory_value"`
-	DifferenceAmount         float64 `json:"difference_amount"`
-	LastTransactionID         *string `json:"last_transaction_id"`
-	LastTransactionType       string  `json:"last_transaction_type"`
-	LastTransactionReference  string  `json:"last_transaction_reference"`
+	InventoryItemID           string     `json:"inventory_item_id"`
+	ItemName                  string     `json:"item_name"`
+	ItemType                  string     `json:"item_type"`
+	ProductID                 *string    `json:"product_id"`
+	ProductVariantID          *string    `json:"product_variant_id"`
+	BranchID                  string     `json:"branch_id"`
+	BranchName                string     `json:"branch_name"`
+	StockLocationID           *string    `json:"stock_location_id"`
+	StockLocationName         string     `json:"stock_location_name"`
+	OperationalQuantity       float64    `json:"operational_quantity"`
+	OperationalInventoryValue float64    `json:"operational_inventory_value"`
+	InventoryLedgerValue      float64    `json:"inventory_ledger_value"`
+	AccountingInventoryValue  float64    `json:"accounting_inventory_value"`
+	DifferenceAmount          float64    `json:"difference_amount"`
+	LastTransactionID         *string    `json:"last_transaction_id"`
+	LastTransactionType       string     `json:"last_transaction_type"`
+	LastTransactionReference  string     `json:"last_transaction_reference"`
 	LastTransactionAt         *time.Time `json:"last_transaction_at"`
-	PossibleReason           string  `json:"possible_reason"`
-	Status                   string  `json:"status"`
+	PossibleReason            string     `json:"possible_reason"`
+	Status                    string     `json:"status"`
 }
 
 type InventoryReconciliationDetailsResponse struct {
@@ -678,33 +678,33 @@ type InventoryReconciliationDetailsResponse struct {
 }
 
 type inventoryReconciliationDetailRow struct {
-	InventoryItemID             string
-	ItemName                    string
-	ItemType                    string
-	ProductID                   *string
-	ProductVariantID            *string
-	BranchID                    string
-	BranchName                  string
-	StockLocationID             *string
-	StockLocationName           string
-	OperationalQuantity         float64
-	OperationalInventoryValue   float64
-	InventoryLedgerValue        float64
-	AccountingInventoryValue    float64
-	LastTransactionID            *string
-	LastTransactionType          string
-	LastTransactionReference     string
-	LastTransactionAt            *time.Time
-	MissingCostCount             int64
-	MissingJournalCount          int64
-	LinkedUnpostedCount          int64
-	LinkedNoInventoryLineCount   int64
-	GRNOnlyCount                 int64
-	PurchaseReturnMissingCount   int64
-	POSCOGSMissingCount          int64
-	ManufacturingMissingCount    int64
-	AdjustmentMissingCount       int64
-	TransferMovementCount        int64
+	InventoryItemID            string
+	ItemName                   string
+	ItemType                   string
+	ProductID                  *string
+	ProductVariantID           *string
+	BranchID                   string
+	BranchName                 string
+	StockLocationID            *string
+	StockLocationName          string
+	OperationalQuantity        float64
+	OperationalInventoryValue  float64
+	InventoryLedgerValue       float64
+	AccountingInventoryValue   float64
+	LastTransactionID          *string
+	LastTransactionType        string
+	LastTransactionReference   string
+	LastTransactionAt          *time.Time
+	MissingCostCount           int64
+	MissingJournalCount        int64
+	LinkedUnpostedCount        int64
+	LinkedNoInventoryLineCount int64
+	GRNOnlyCount               int64
+	PurchaseReturnMissingCount int64
+	POSCOGSMissingCount        int64
+	ManufacturingMissingCount  int64
+	AdjustmentMissingCount     int64
+	TransferMovementCount      int64
 }
 
 type PaginatedResponse[T any] struct {

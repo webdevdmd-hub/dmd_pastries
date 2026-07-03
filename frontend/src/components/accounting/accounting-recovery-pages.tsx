@@ -486,12 +486,16 @@ export function AccountMappingsPageClient(): JSX.Element {
 }
 
 function ReconciliationSection({
+  actionHref,
+  actionLabel,
   errorMessage,
   isLoading,
   onRetry,
   response,
   title,
 }: {
+  actionHref?: string | undefined;
+  actionLabel?: string | undefined;
   errorMessage?: string | undefined;
   isLoading?: boolean | undefined;
   onRetry?: (() => void) | undefined;
@@ -520,6 +524,11 @@ function ReconciliationSection({
           >
             {unmatchedCount > 0 ? `${String(unmatchedCount)} unmatched` : "All matched"}
           </Badge>
+          {actionHref && actionLabel ? (
+            <Button asChild size="sm" type="button" variant="outline">
+              <Link href={actionHref}>{actionLabel}</Link>
+            </Button>
+          ) : null}
         </div>
 
         {isLoading ? (
@@ -698,6 +707,8 @@ export function AccountingReconciliationPageClient(): JSX.Element {
         title="Health check"
       />
       <ReconciliationSection
+        actionHref={ROUTES.reportsInventoryAccountingReconciliation}
+        actionLabel="Open detail report"
         errorMessage={inventoryQuery.isError ? inventoryQuery.error.message : undefined}
         isLoading={inventoryQuery.isLoading}
         onRetry={() => void inventoryQuery.refetch()}

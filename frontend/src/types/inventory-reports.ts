@@ -3,6 +3,7 @@ export type InventoryReportItemType = "product" | "product_variant" | "ingredien
 export type InventoryReportSortOrder = "asc" | "desc";
 
 export type InventoryReportFilters = {
+  asOfDate?: string;
   branchId?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -12,6 +13,13 @@ export type InventoryReportFilters = {
   sortBy?: string;
   sortOrder?: InventoryReportSortOrder;
   status?: string;
+};
+
+export type InventoryReportPagination = {
+  limit: number;
+  page: number;
+  total: number;
+  totalPages: number;
 };
 
 export type InventorySummary = {
@@ -130,6 +138,45 @@ export type InventoryAuditRow = {
   inventoryItemId: string;
   isBalanced: boolean;
   itemName: string;
+};
+
+export type InventoryAccountingReconciliationStatus = "matched" | "mismatch";
+
+export type InventoryAccountingReconciliationRow = {
+  accountingInventoryValue: number;
+  branchId: string;
+  branchName: string;
+  differenceAmount: number;
+  inventoryItemId: string;
+  inventoryLedgerValue: number;
+  itemName: string;
+  itemType: string;
+  lastTransactionAt: string;
+  lastTransactionId: string;
+  lastTransactionReference: string;
+  lastTransactionType: string;
+  operationalInventoryValue: number;
+  operationalQuantity: number;
+  possibleReason: string;
+  productId: string | null;
+  productVariantId: string | null;
+  status: InventoryAccountingReconciliationStatus;
+  stockLocationId: string | null;
+  stockLocationName: string;
+};
+
+export type InventoryAccountingReconciliationReport = {
+  asOfDate: string;
+  branchId: string;
+  generalLedgerInventoryBalance: number;
+  items: InventoryAccountingReconciliationRow[];
+  matchedCount: number;
+  mismatchCount: number;
+  pagination: InventoryReportPagination;
+  totalAccountingInventoryValue: number;
+  totalInventoryLedgerValue: number;
+  totalOperationalValue: number;
+  unassignedAccountingDifference: number;
 };
 
 export type InventoryTrendDataset = {
