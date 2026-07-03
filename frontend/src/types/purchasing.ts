@@ -236,6 +236,7 @@ export type PurchaseReturn = {
   appliedCreditAmount: number;
   openCreditAmount: number;
   journalEntryId: string | null;
+  journalEntryNumber: string | null;
   createdByUserName: string;
   postedAt: string | null;
   cancelledAt: string | null;
@@ -247,6 +248,7 @@ export type PurchaseReturn = {
   reversalReturnId: string | null;
   reversalReturnNumber: string | null;
   reversalJournalEntryId: string | null;
+  reversalJournalEntryNumber: string | null;
   reversalReason: string | null;
   createdAt: string;
   updatedAt: string;

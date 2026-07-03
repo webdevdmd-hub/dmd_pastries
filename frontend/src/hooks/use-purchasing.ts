@@ -668,10 +668,15 @@ export function useUpdatePurchaseReturn() {
 
 export function usePostPurchaseReturn() {
   const queryClient = useQueryClient();
+  const branchQueryKey = useBranchQueryKey();
 
   return useMutation<PurchaseReturn, Error, string>({
     mutationFn: async (id) => postPurchaseReturn(id),
-    onSuccess: async () => {
+    onSuccess: async (purchaseReturn) => {
+      queryClient.setQueryData(
+        [purchasingQueryKey, branchQueryKey, "return", purchaseReturn.id],
+        purchaseReturn,
+      );
       await invalidatePurchaseStockImpact(queryClient);
     },
   });

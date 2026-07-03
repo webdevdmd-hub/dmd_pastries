@@ -49,6 +49,23 @@ function nextStepForReturn(purchaseReturn: PurchaseReturn): string {
   return "No action";
 }
 
+function creditDisplayForReturn(purchaseReturn: PurchaseReturn): {
+  helper: string | null;
+  value: string;
+} {
+  if (purchaseReturn.status === "draft") {
+    return {
+      helper: "Open after posting",
+      value: `Draft ${formatCurrency(purchaseReturn.returnTotal)}`,
+    };
+  }
+
+  return {
+    helper: null,
+    value: formatCurrency(purchaseReturn.openCreditAmount),
+  };
+}
+
 export function PurchaseReturnsTable({
   canCancel,
   canPost,
@@ -83,84 +100,93 @@ export function PurchaseReturnsTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {returns.map((purchaseReturn) => (
-          <TableRow key={purchaseReturn.id}>
-            <TableCell>
-              <Link
-                className="font-semibold text-brand-espresso"
-                href={`${ROUTES.purchasingReturns}/${purchaseReturn.id}`}
-              >
-                {purchaseReturn.returnNumber}
-              </Link>
-            </TableCell>
-            <TableCell>{purchaseReturn.supplierName}</TableCell>
-            <TableCell>
-              <Link
-                className="text-brand-mocha hover:text-brand-espresso"
-                href={`${ROUTES.purchasingReceipts}/${purchaseReturn.purchaseReceiptId}`}
-              >
-                {purchaseReturn.purchaseReceiptNumber}
-              </Link>
-            </TableCell>
-            <TableCell>{purchaseReturn.purchaseInvoiceNumber}</TableCell>
-            <TableCell>{formatDate(purchaseReturn.returnDate)}</TableCell>
-            <TableCell>{formatCurrency(purchaseReturn.returnTotal)}</TableCell>
-            <TableCell>{formatCurrency(purchaseReturn.openCreditAmount)}</TableCell>
-            <TableCell>
-              <PurchaseReturnStatusBadge status={purchaseReturn.status} />
-            </TableCell>
-            <TableCell>
-              <span className="text-sm font-medium text-brand-mocha">
-                {nextStepForReturn(purchaseReturn)}
-              </span>
-            </TableCell>
-            <TableCell>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    aria-label={`Open actions for ${purchaseReturn.returnNumber}`}
-                    size="icon"
-                    type="button"
-                    variant="ghost"
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href={`${ROUTES.purchasingReturns}/${purchaseReturn.id}`}>
-                      View details
-                    </Link>
-                  </DropdownMenuItem>
-                  {canPost ? (
-                    <DropdownMenuItem
-                      disabled={purchaseReturn.status !== "draft"}
-                      onSelect={() => onPost(purchaseReturn)}
+        {returns.map((purchaseReturn) => {
+          const creditDisplay = creditDisplayForReturn(purchaseReturn);
+
+          return (
+            <TableRow key={purchaseReturn.id}>
+              <TableCell>
+                <Link
+                  className="font-semibold text-brand-espresso"
+                  href={`${ROUTES.purchasingReturns}/${purchaseReturn.id}`}
+                >
+                  {purchaseReturn.returnNumber}
+                </Link>
+              </TableCell>
+              <TableCell>{purchaseReturn.supplierName}</TableCell>
+              <TableCell>
+                <Link
+                  className="text-brand-mocha hover:text-brand-espresso"
+                  href={`${ROUTES.purchasingReceipts}/${purchaseReturn.purchaseReceiptId}`}
+                >
+                  {purchaseReturn.purchaseReceiptNumber}
+                </Link>
+              </TableCell>
+              <TableCell>{purchaseReturn.purchaseInvoiceNumber}</TableCell>
+              <TableCell>{formatDate(purchaseReturn.returnDate)}</TableCell>
+              <TableCell>{formatCurrency(purchaseReturn.returnTotal)}</TableCell>
+              <TableCell>
+                <div className="font-medium text-brand-espresso">{creditDisplay.value}</div>
+                {creditDisplay.helper ? (
+                  <div className="text-xs text-brand-mocha">{creditDisplay.helper}</div>
+                ) : null}
+              </TableCell>
+              <TableCell>
+                <PurchaseReturnStatusBadge status={purchaseReturn.status} />
+              </TableCell>
+              <TableCell>
+                <span className="text-sm font-medium text-brand-mocha">
+                  {nextStepForReturn(purchaseReturn)}
+                </span>
+              </TableCell>
+              <TableCell>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      aria-label={`Open actions for ${purchaseReturn.returnNumber}`}
+                      size="icon"
+                      type="button"
+                      variant="ghost"
                     >
-                      Post vendor credit
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link href={`${ROUTES.purchasingReturns}/${purchaseReturn.id}`}>
+                        View details
+                      </Link>
                     </DropdownMenuItem>
-                  ) : null}
-                  {canCancel ? (
-                    <DropdownMenuItem
-                      disabled={purchaseReturn.status !== "draft"}
-                      onSelect={() => onCancel(purchaseReturn)}
-                    >
-                      Cancel draft
-                    </DropdownMenuItem>
-                  ) : null}
-                  {canReverse ? (
-                    <DropdownMenuItem
-                      disabled={purchaseReturn.status !== "posted"}
-                      onSelect={() => onReverse(purchaseReturn)}
-                    >
-                      Reverse vendor credit
-                    </DropdownMenuItem>
-                  ) : null}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </TableCell>
-          </TableRow>
-        ))}
+                    {canPost ? (
+                      <DropdownMenuItem
+                        disabled={purchaseReturn.status !== "draft"}
+                        onSelect={() => onPost(purchaseReturn)}
+                      >
+                        Post vendor credit
+                      </DropdownMenuItem>
+                    ) : null}
+                    {canCancel ? (
+                      <DropdownMenuItem
+                        disabled={purchaseReturn.status !== "draft"}
+                        onSelect={() => onCancel(purchaseReturn)}
+                      >
+                        Cancel draft
+                      </DropdownMenuItem>
+                    ) : null}
+                    {canReverse ? (
+                      <DropdownMenuItem
+                        disabled={purchaseReturn.status !== "posted"}
+                        onSelect={() => onReverse(purchaseReturn)}
+                      >
+                        Reverse vendor credit
+                      </DropdownMenuItem>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );

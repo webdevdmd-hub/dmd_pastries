@@ -101,6 +101,9 @@ export function PurchaseReturnDetailsPageClient({
   const purchaseReturn = returnQuery.data;
   const isDraft = purchaseReturn.status === "draft";
   const isPosted = purchaseReturn.status === "posted";
+  const journalSearchValue = purchaseReturn.journalEntryNumber ?? purchaseReturn.journalEntryId;
+  const reversalJournalSearchValue =
+    purchaseReturn.reversalJournalEntryNumber ?? purchaseReturn.reversalJournalEntryId;
 
   const confirmAction = async (): Promise<void> => {
     if (!pendingAction) return;
@@ -188,10 +191,17 @@ export function PurchaseReturnDetailsPageClient({
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Open credit</p>
+            <p className="text-sm text-brand-mocha">{isDraft ? "Draft credit" : "Open credit"}</p>
             <p className="text-2xl font-semibold text-brand-espresso">
-              {formatCurrency(purchaseReturn.openCreditAmount)}
+              {formatCurrency(
+                isDraft ? purchaseReturn.returnTotal : purchaseReturn.openCreditAmount,
+              )}
             </p>
+            {isDraft ? (
+              <p className="mt-1 text-xs text-brand-mocha">
+                Open credit is AED 0.00 until this Vendor Credit is posted.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
         <Card>
@@ -234,15 +244,22 @@ export function PurchaseReturnDetailsPageClient({
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-brand-mocha">Journal reference</p>
-            {purchaseReturn.journalEntryId ? (
+            {journalSearchValue ? (
               <Link
                 className="text-lg font-semibold text-brand-espresso hover:text-brand-mocha"
-                href={`${ROUTES.accountingJournalEntries}?search=${purchaseReturn.journalEntryId}`}
+                href={`${ROUTES.accountingJournalEntries}?search=${journalSearchValue}`}
               >
-                View journal
+                {purchaseReturn.journalEntryNumber ?? "View journal"}
               </Link>
+            ) : isPosted ? (
+              <div className="space-y-1">
+                <p className="text-lg font-semibold text-red-700">Journal missing</p>
+                <p className="text-xs text-red-700">
+                  Posted without linked journal. Run purchase-return journal backfill.
+                </p>
+              </div>
             ) : (
-              <p className="text-lg font-semibold text-brand-espresso">Not posted</p>
+              <p className="text-lg font-semibold text-brand-espresso">Not posted yet</p>
             )}
           </CardContent>
         </Card>
@@ -292,12 +309,12 @@ export function PurchaseReturnDetailsPageClient({
             </div>
             <div>
               <p className="text-sm text-brand-mocha">Reversal journal</p>
-              {purchaseReturn.reversalJournalEntryId ? (
+              {reversalJournalSearchValue ? (
                 <Link
                   className="font-semibold text-brand-espresso hover:text-brand-mocha"
-                  href={`${ROUTES.accountingJournalEntries}?search=${purchaseReturn.reversalJournalEntryId}`}
+                  href={`${ROUTES.accountingJournalEntries}?search=${reversalJournalSearchValue}`}
                 >
-                  View reversal journal
+                  {purchaseReturn.reversalJournalEntryNumber ?? "View reversal journal"}
                 </Link>
               ) : (
                 <p className="font-semibold text-brand-espresso">Not linked</p>

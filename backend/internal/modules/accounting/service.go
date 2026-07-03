@@ -1399,6 +1399,13 @@ func (s *Service) PostPurchaseReturnJournal(tx *gorm.DB, currentUser *utils.Auth
 	}
 	if purchaseReturn.JournalEntryID != nil && strings.TrimSpace(*purchaseReturn.JournalEntryID) != "" {
 		journalID := strings.TrimSpace(*purchaseReturn.JournalEntryID)
+		entry, err := s.repo.FindJournalEntryForUpdate(tx, currentUser.BusinessID, journalID)
+		if err != nil {
+			return "", apperrors.Conflict("linked purchase return journal is missing or invalid; run purchase return journal backfill before posting accounting", map[string]interface{}{"purchase_return_id": purchaseReturn.ID, "journal_entry_id": journalID})
+		}
+		if err := validatePurchaseReturnPostedJournal(entry, purchaseReturn.ID); err != nil {
+			return "", err
+		}
 		if err := s.syncPurchaseReturnJournalLinks(tx, currentUser.BusinessID, purchaseReturn.ID, journalID); err != nil {
 			return "", err
 		}
@@ -1406,6 +1413,9 @@ func (s *Service) PostPurchaseReturnJournal(tx *gorm.DB, currentUser *utils.Auth
 	}
 	existing, err := s.repo.FindPostedJournalBySource(tx, currentUser.BusinessID, "purchase_return", purchaseReturn.ID)
 	if err == nil && existing.ID != "" {
+		if err := validatePurchaseReturnPostedJournal(existing, purchaseReturn.ID); err != nil {
+			return "", err
+		}
 		if err := s.syncPurchaseReturnJournalLinks(tx, currentUser.BusinessID, purchaseReturn.ID, existing.ID); err != nil {
 			return "", err
 		}
@@ -1464,6 +1474,26 @@ func (s *Service) PostPurchaseReturnJournal(tx *gorm.DB, currentUser *utils.Auth
 		return "", err
 	}
 	return journalID, nil
+}
+
+func validatePurchaseReturnPostedJournal(entry *JournalEntry, purchaseReturnID string) error {
+	if entry == nil || strings.TrimSpace(entry.ID) == "" {
+		return apperrors.Conflict("linked purchase return journal is missing or invalid; run purchase return journal backfill before posting accounting", map[string]interface{}{"purchase_return_id": strings.TrimSpace(purchaseReturnID)})
+	}
+	sourceID := ""
+	if entry.SourceID != nil {
+		sourceID = strings.TrimSpace(*entry.SourceID)
+	}
+	if strings.TrimSpace(entry.SourceType) != "purchase_return" || sourceID != strings.TrimSpace(purchaseReturnID) || strings.TrimSpace(entry.Status) != "posted" {
+		return apperrors.Conflict("linked purchase return journal is not a posted Vendor Credit journal", map[string]interface{}{
+			"purchase_return_id": strings.TrimSpace(purchaseReturnID),
+			"journal_entry_id":   entry.ID,
+			"source_type":        entry.SourceType,
+			"source_id":          sourceID,
+			"status":             entry.Status,
+		})
+	}
+	return nil
 }
 
 func (s *Service) syncPurchaseReturnJournalLinks(tx *gorm.DB, businessID, purchaseReturnID, journalID string) error {

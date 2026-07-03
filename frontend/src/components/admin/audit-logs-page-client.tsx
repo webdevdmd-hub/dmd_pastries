@@ -329,6 +329,12 @@ export function AuditLogsPageClient(): JSX.Element {
     setGlobalItems([]);
   }, [activeEntityType]);
 
+  function handleEntityFilterChange(value: string): void {
+    setGlobalCursor(null);
+    setGlobalItems([]);
+    setEntityFilter(value);
+  }
+
   useEffect(() => {
     if (!globalLogsQuery.data) {
       return;
@@ -386,9 +392,7 @@ export function AuditLogsPageClient(): JSX.Element {
           <div className="grid gap-3 md:grid-cols-[220px_1fr]">
             <Select
               value={entityFilter}
-              onValueChange={(value) => {
-                setEntityFilter(value);
-              }}
+              onValueChange={handleEntityFilterChange}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Filter by entity" />

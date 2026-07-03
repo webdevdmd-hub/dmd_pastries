@@ -1,9 +1,11 @@
 package accounting
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 
+	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
 
@@ -68,6 +70,105 @@ func TestPaymentRefundBackfillTargetsPOSRefundsOnly(t *testing.T) {
 	}
 	if !validBackfillTarget("payment_refunds") {
 		t.Fatal("payment_refunds must be an accepted accounting backfill target")
+	}
+}
+
+func TestPurchaseReturnBackfillTargetsPostedMissingJournals(t *testing.T) {
+	table, _, _, _, _, dateColumn, statusColumn, statusValue, missingCondition, extraCondition := backfillTargetQuery("purchase_returns")
+	if table != "purchase_returns" {
+		t.Fatalf("purchase return backfill table = %q, want purchase_returns", table)
+	}
+	if dateColumn != "return_date" || statusColumn != "status" || statusValue != "posted" {
+		t.Fatalf("purchase return backfill status/date = %q/%q/%q", dateColumn, statusColumn, statusValue)
+	}
+	if missingCondition != "journal_entry_id IS NULL" {
+		t.Fatalf("purchase return missing condition = %q, want journal_entry_id IS NULL", missingCondition)
+	}
+	if extraCondition != "" {
+		t.Fatalf("purchase return extra condition = %q, want empty", extraCondition)
+	}
+	if !validBackfillTarget("purchase_returns") {
+		t.Fatal("purchase_returns must be an accepted accounting backfill target")
+	}
+}
+
+func TestValidatePurchaseReturnPostedJournalAcceptsMatchingPostedJournal(t *testing.T) {
+	purchaseReturnID := "purchase-return-id"
+	entry := &JournalEntry{
+		ID:         "journal-id",
+		SourceType: "purchase_return",
+		SourceID:   &purchaseReturnID,
+		Status:     "posted",
+	}
+
+	if err := validatePurchaseReturnPostedJournal(entry, purchaseReturnID); err != nil {
+		t.Fatalf("expected matching posted purchase return journal to be accepted: %v", err)
+	}
+}
+
+func TestValidatePurchaseReturnPostedJournalRejectsInvalidLinkedJournal(t *testing.T) {
+	purchaseReturnID := "purchase-return-id"
+	otherSourceID := "other-id"
+	cases := []struct {
+		name  string
+		entry *JournalEntry
+	}{
+		{
+			name:  "missing entry",
+			entry: nil,
+		},
+		{
+			name: "wrong source type",
+			entry: &JournalEntry{
+				ID:         "journal-id",
+				SourceType: "purchase_invoice",
+				SourceID:   &purchaseReturnID,
+				Status:     "posted",
+			},
+		},
+		{
+			name: "wrong source id",
+			entry: &JournalEntry{
+				ID:         "journal-id",
+				SourceType: "purchase_return",
+				SourceID:   &otherSourceID,
+				Status:     "posted",
+			},
+		},
+		{
+			name: "unposted journal",
+			entry: &JournalEntry{
+				ID:         "journal-id",
+				SourceType: "purchase_return",
+				SourceID:   &purchaseReturnID,
+				Status:     "draft",
+			},
+		},
+		{
+			name: "reversed journal",
+			entry: &JournalEntry{
+				ID:         "journal-id",
+				SourceType: "purchase_return",
+				SourceID:   &purchaseReturnID,
+				Status:     "reversed",
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePurchaseReturnPostedJournal(tt.entry, purchaseReturnID)
+			if err == nil {
+				t.Fatal("expected invalid linked journal to be rejected")
+			}
+			appErr, ok := err.(*apperrors.AppError)
+			if !ok {
+				t.Fatalf("expected AppError, got %T", err)
+			}
+			if appErr.StatusCode != http.StatusConflict {
+				t.Fatalf("status = %d, want %d", appErr.StatusCode, http.StatusConflict)
+			}
+		})
 	}
 }
 

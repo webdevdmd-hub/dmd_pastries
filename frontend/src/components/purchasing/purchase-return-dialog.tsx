@@ -42,6 +42,10 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
 }
 
+function defaultReturnQuantity(returnableQuantity: number): number {
+  return returnableQuantity > 0 ? 1 : 0;
+}
+
 export function PurchaseReturnDialog({
   onClose,
   open,
@@ -96,18 +100,25 @@ export function PurchaseReturnDialog({
       return;
     }
 
+    const validItems = returnableItemsQuery.data.filter((item) => item.returnableQuantity > 0);
+    const shouldAutoSelect = validItems.length === 1;
+
     setLines(
-      returnableItemsQuery.data.map((item) => ({
-        purchaseReceiptItemId: item.purchaseReceiptItemId,
-        quantity: item.returnableQuantity > 0 ? 1 : 0,
-        reason: "",
-        selected: false,
-        stockLocationId: defaultLocationId,
-      })),
+      returnableItemsQuery.data.map((item) => {
+        const selected = shouldAutoSelect && item.returnableQuantity > 0;
+        return {
+          purchaseReceiptItemId: item.purchaseReceiptItemId,
+          quantity: selected ? defaultReturnQuantity(item.returnableQuantity) : 0,
+          reason: "",
+          selected,
+          stockLocationId: defaultLocationId,
+        };
+      }),
     );
   }, [defaultLocationId, open, returnableItemsQuery.data]);
 
   const selectedLines = lines.filter((line) => line.selected && line.quantity > 0);
+  const selectedLineCountText = String(selectedLines.length);
   const selectedTotal = selectedLines.reduce((total, line) => {
     const item = (returnableItemsQuery.data ?? []).find(
       (returnableItem) => returnableItem.purchaseReceiptItemId === line.purchaseReceiptItemId,
@@ -121,6 +132,13 @@ export function PurchaseReturnDialog({
         line.purchaseReceiptItemId === itemId ? { ...line, ...patch } : line,
       ),
     );
+  };
+
+  const setLineSelected = (itemId: string, checked: boolean, returnableQuantity: number): void => {
+    updateLine(itemId, {
+      quantity: checked ? defaultReturnQuantity(returnableQuantity) : 0,
+      selected: checked,
+    });
   };
 
   const handleSubmit = async (): Promise<void> => {
@@ -220,8 +238,13 @@ export function PurchaseReturnDialog({
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-brand-cappuccino">
-          <div className="grid grid-cols-[auto_1.6fr_0.8fr_0.8fr_1fr_1.2fr] gap-3 bg-brand-latte px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-brand-mocha">
-            <span />
+          <div className="border-b border-brand-cappuccino bg-brand-cream px-4 py-3 text-sm font-medium text-brand-mocha">
+            {selectedLines.length === 0
+              ? "Please select at least one return line to create the Vendor Credit."
+              : `${selectedLineCountText} return line${selectedLines.length === 1 ? "" : "s"} selected.`}
+          </div>
+          <div className="grid grid-cols-[7rem_1.6fr_0.8fr_0.8fr_1fr_1.2fr] gap-3 bg-brand-latte px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-brand-mocha">
+            <span>Select</span>
             <span>Item</span>
             <span>Returnable</span>
             <span>Quantity</span>
@@ -262,16 +285,23 @@ export function PurchaseReturnDialog({
 
             return (
               <div
-                className="grid grid-cols-[auto_1.6fr_0.8fr_0.8fr_1fr_1.2fr] items-center gap-3 border-t border-brand-cappuccino px-4 py-3"
+                className="grid grid-cols-[7rem_1.6fr_0.8fr_0.8fr_1fr_1.2fr] items-center gap-3 border-t border-brand-cappuccino px-4 py-3"
                 key={item.purchaseReceiptItemId}
               >
-                <Checkbox
-                  checked={line.selected}
-                  disabled={disabled}
-                  onCheckedChange={(checked) =>
-                    updateLine(item.purchaseReceiptItemId, { selected: checked === true })
-                  }
-                />
+                <label className="flex items-center gap-2 text-sm font-medium text-brand-espresso">
+                  <Checkbox
+                    checked={line.selected}
+                    disabled={disabled}
+                    onCheckedChange={(checked) =>
+                      setLineSelected(
+                        item.purchaseReceiptItemId,
+                        checked === true,
+                        item.returnableQuantity,
+                      )
+                    }
+                  />
+                  <span>{line.selected ? "Selected" : "Select"}</span>
+                </label>
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-brand-espresso">
                     {item.itemNameSnapshot}

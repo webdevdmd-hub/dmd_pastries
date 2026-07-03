@@ -660,6 +660,7 @@ function parsePurchaseReturn(value: unknown): PurchaseReturn {
     id: stringValue(value.id),
     items: Array.isArray(value.items) ? value.items.map(parsePurchaseReturnItem) : [],
     journalEntryId: optionalString(value.journal_entry_id),
+    journalEntryNumber: optionalString(value.journal_entry_number),
     openCreditAmount: numberValue(value.open_credit_amount),
     postedAt: optionalString(value.posted_at),
     purchaseInvoiceId: optionalString(value.purchase_invoice_id),
@@ -682,6 +683,7 @@ function parsePurchaseReturn(value: unknown): PurchaseReturn {
     reversalReturnId: optionalString(value.reversal_return_id),
     reversalReturnNumber: optionalString(value.reversal_return_number),
     reversalJournalEntryId: optionalString(value.reversal_journal_entry_id),
+    reversalJournalEntryNumber: optionalString(value.reversal_journal_entry_number),
     reversalReason: optionalString(value.reversal_reason),
     updatedAt: stringValue(value.updated_at),
   };
@@ -890,6 +892,7 @@ function parseDocumentChainPurchaseReturn(value: unknown): PurchaseReturn {
     id: stringValue(value.id),
     items: [],
     journalEntryId: optionalString(value.journal_entry_id),
+    journalEntryNumber: optionalString(value.journal_entry_number),
     openCreditAmount: numberValue(value.open_credit_amount),
     postedAt: optionalString(value.posted_at),
     purchaseInvoiceId: optionalString(value.purchase_invoice_id),
@@ -915,6 +918,7 @@ function parseDocumentChainPurchaseReturn(value: unknown): PurchaseReturn {
     reversalReturnId: optionalString(value.reversal_return_id),
     reversalReturnNumber: optionalString(value.reversal_return_number),
     reversalJournalEntryId: optionalString(value.reversal_journal_entry_id),
+    reversalJournalEntryNumber: optionalString(value.reversal_journal_entry_number),
     reversalReason: optionalString(value.reversal_reason),
     updatedAt: "",
   };

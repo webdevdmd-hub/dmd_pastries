@@ -657,6 +657,26 @@ func (r *Repository) HardDeleteSupplierPaymentJournal(tx *gorm.DB, businessID, s
 		Delete(&accounting.JournalEntry{}).Error
 }
 
+func (r *Repository) JournalEntryNumber(businessID string, journalEntryID *string) *string {
+	if journalEntryID == nil || strings.TrimSpace(*journalEntryID) == "" {
+		return nil
+	}
+
+	var row struct {
+		EntryNumber string
+	}
+	if err := r.db.Table("journal_entries").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, strings.TrimSpace(*journalEntryID)).
+		Select("entry_number").
+		Take(&row).Error; err != nil {
+		return nil
+	}
+	if strings.TrimSpace(row.EntryNumber) == "" {
+		return nil
+	}
+	return &row.EntryNumber
+}
+
 func (r *Repository) ListSupplierPayments(businessID string, query PaymentListQuery) ([]SupplierPaymentResponse, int64, error) {
 	db := r.db.Table("supplier_payments sp").
 		Joins("JOIN suppliers s ON s.id = sp.supplier_id").
