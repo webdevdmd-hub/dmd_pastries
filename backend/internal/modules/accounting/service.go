@@ -1351,6 +1351,10 @@ func (s *Service) PostPurchaseReturnJournal(tx *gorm.DB, currentUser *utils.Auth
 	if err != nil {
 		return "", err
 	}
+	inventoryAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "inventory_stock", "1200", "Inventory / Stock")
+	if err != nil {
+		return "", err
+	}
 	purchaseReturnAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "purchase_returns", "5020", "Purchase Return")
 	if err != nil {
 		return "", err
@@ -1360,11 +1364,15 @@ func (s *Service) PostPurchaseReturnJournal(tx *gorm.DB, currentUser *utils.Auth
 	if err != nil {
 		return "", err
 	}
-	netReturn := roundMoney(returnTotal - taxAmount - chargeNetAmount)
-	lines := make([]JournalEntryLineRequest, 0, 3+len(chargeLines))
+	inventoryCreditAmount, err := s.repo.SumStockMovementCostByReferenceAndType(tx, currentUser.BusinessID, "purchase_return", purchaseReturn.ID, "purchase_return_out")
+	if err != nil {
+		return "", apperrors.Internal("failed to load purchase return stock valuation")
+	}
+	inventoryCreditAmount = roundMoney(inventoryCreditAmount)
+	lines := make([]JournalEntryLineRequest, 0, 4+len(chargeLines))
 	lines = append(lines, JournalEntryLineRequest{AccountID: accountsPayable.ID, DebitAmount: returnTotal, Description: "Vendor credit " + purchaseReturn.ReturnNumber})
-	if netReturn > 0 {
-		lines = append(lines, JournalEntryLineRequest{AccountID: purchaseReturnAccount.ID, CreditAmount: netReturn, Description: "Purchase return " + purchaseReturn.ReturnNumber})
+	if inventoryCreditAmount > 0 {
+		lines = append(lines, JournalEntryLineRequest{AccountID: inventoryAccount.ID, CreditAmount: inventoryCreditAmount, Description: "Inventory returned to supplier " + purchaseReturn.ReturnNumber})
 	}
 	lines = append(lines, chargeLines...)
 	if taxAmount > 0 {
@@ -1374,12 +1382,22 @@ func (s *Service) PostPurchaseReturnJournal(tx *gorm.DB, currentUser *utils.Auth
 		}
 		lines = append(lines, JournalEntryLineRequest{AccountID: vatReceivable.ID, CreditAmount: taxAmount, Description: "VAT receivable reversed on purchase return"})
 	}
+	creditedAmount := roundMoney(inventoryCreditAmount + chargeNetAmount + taxAmount)
+	varianceAmount := roundMoney(returnTotal - creditedAmount)
+	if varianceAmount > 0 {
+		lines = append(lines, JournalEntryLineRequest{AccountID: purchaseReturnAccount.ID, CreditAmount: varianceAmount, Description: "Vendor credit price variance " + purchaseReturn.ReturnNumber})
+	} else if varianceAmount < 0 {
+		lines = append(lines, JournalEntryLineRequest{AccountID: purchaseReturnAccount.ID, DebitAmount: roundMoney(-varianceAmount), Description: "Vendor credit price variance " + purchaseReturn.ReturnNumber})
+	}
 	journalID, err := s.createPostedSystemJournal(tx, currentUser, purchaseReturn.ReturnDate, &purchaseReturn.BranchID, "purchase_return", purchaseReturn.ID, purchaseReturn.ReturnNumber, "Purchase return "+purchaseReturn.ReturnNumber, lines)
 	if err != nil {
 		return "", err
 	}
 	if err := s.repo.UpdatePurchaseReturnJournalID(tx, currentUser.BusinessID, purchaseReturn.ID, journalID); err != nil {
 		return "", apperrors.Internal("failed to update purchase return accounting journal")
+	}
+	if err := s.repo.UpdateStockMovementJournalByReference(tx, currentUser.BusinessID, "purchase_return", purchaseReturn.ID, "out", journalID); err != nil {
+		return "", apperrors.Internal("failed to update purchase return stock movement journal")
 	}
 	return journalID, nil
 }

@@ -2388,7 +2388,7 @@ func (s *Service) PostReturn(currentUser *utils.AuthContext, id, ipAddress, user
 				return err
 			}
 		}
-		if s.accountingService != nil && invoice != nil {
+		if s.accountingService != nil {
 			if _, err := s.accountingService.PostPurchaseReturnJournal(tx, currentUser, purchaseReturn.ID); err != nil {
 				return err
 			}
