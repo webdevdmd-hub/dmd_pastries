@@ -586,6 +586,19 @@ type ReconciliationQuery struct {
 	AsOfDate string
 }
 
+type InventoryReconciliationDetailsQuery struct {
+	BranchID  string
+	AsOfDate  string
+	DateFrom  string
+	DateTo    string
+	ItemType  string
+	Status    string
+	Page      int
+	Limit     int
+	SortBy    string
+	SortOrder string
+}
+
 type ReconciliationCheckResponse struct {
 	CheckKey          string  `json:"check_key"`
 	Label             string  `json:"label"`
@@ -625,6 +638,73 @@ type PaymentAccountReconciliationResponse struct {
 	AsOfDate string                             `json:"as_of_date"`
 	BranchID string                             `json:"branch_id,omitempty"`
 	Items    []PaymentAccountReconciliationItem `json:"items"`
+}
+
+type InventoryReconciliationDetailItem struct {
+	InventoryItemID          string  `json:"inventory_item_id"`
+	ItemName                 string  `json:"item_name"`
+	ItemType                 string  `json:"item_type"`
+	ProductID                *string `json:"product_id"`
+	ProductVariantID         *string `json:"product_variant_id"`
+	BranchID                 string  `json:"branch_id"`
+	BranchName               string  `json:"branch_name"`
+	StockLocationID          *string `json:"stock_location_id"`
+	StockLocationName        string  `json:"stock_location_name"`
+	OperationalQuantity      float64 `json:"operational_quantity"`
+	OperationalInventoryValue float64 `json:"operational_inventory_value"`
+	InventoryLedgerValue     float64 `json:"inventory_ledger_value"`
+	AccountingInventoryValue float64 `json:"accounting_inventory_value"`
+	DifferenceAmount         float64 `json:"difference_amount"`
+	LastTransactionID         *string `json:"last_transaction_id"`
+	LastTransactionType       string  `json:"last_transaction_type"`
+	LastTransactionReference  string  `json:"last_transaction_reference"`
+	LastTransactionAt         *time.Time `json:"last_transaction_at"`
+	PossibleReason           string  `json:"possible_reason"`
+	Status                   string  `json:"status"`
+}
+
+type InventoryReconciliationDetailsResponse struct {
+	AsOfDate                       string                              `json:"as_of_date"`
+	BranchID                       string                              `json:"branch_id,omitempty"`
+	TotalOperationalValue          float64                             `json:"total_operational_value"`
+	TotalInventoryLedgerValue      float64                             `json:"total_inventory_ledger_value"`
+	TotalAccountingInventoryValue  float64                             `json:"total_accounting_inventory_value"`
+	GeneralLedgerInventoryBalance  float64                             `json:"general_ledger_inventory_balance"`
+	UnassignedAccountingDifference float64                             `json:"unassigned_accounting_difference"`
+	MatchedCount                   int64                               `json:"matched_count"`
+	MismatchCount                  int64                               `json:"mismatch_count"`
+	Items                          []InventoryReconciliationDetailItem `json:"items"`
+	Pagination                     PaginationResponse                  `json:"pagination"`
+}
+
+type inventoryReconciliationDetailRow struct {
+	InventoryItemID             string
+	ItemName                    string
+	ItemType                    string
+	ProductID                   *string
+	ProductVariantID            *string
+	BranchID                    string
+	BranchName                  string
+	StockLocationID             *string
+	StockLocationName           string
+	OperationalQuantity         float64
+	OperationalInventoryValue   float64
+	InventoryLedgerValue        float64
+	AccountingInventoryValue    float64
+	LastTransactionID            *string
+	LastTransactionType          string
+	LastTransactionReference     string
+	LastTransactionAt            *time.Time
+	MissingCostCount             int64
+	MissingJournalCount          int64
+	LinkedUnpostedCount          int64
+	LinkedNoInventoryLineCount   int64
+	GRNOnlyCount                 int64
+	PurchaseReturnMissingCount   int64
+	POSCOGSMissingCount          int64
+	ManufacturingMissingCount    int64
+	AdjustmentMissingCount       int64
+	TransferMovementCount        int64
 }
 
 type PaginatedResponse[T any] struct {

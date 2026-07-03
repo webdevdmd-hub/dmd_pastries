@@ -2242,6 +2242,188 @@ func (r *Repository) SumInventoryOperationalValue(businessID, branchID string) (
 	return roundMoney(total), err
 }
 
+func (r *Repository) ListInventoryReconciliationDetailRows(businessID, inventoryAccountID string, query InventoryReconciliationDetailsQuery) ([]inventoryReconciliationDetailRow, error) {
+	branchFilter := ""
+	itemTypeFilter := ""
+	dateFromFilter := ""
+	args := []interface{}{inventoryAccountID, businessID, query.AsOfDate}
+	if strings.TrimSpace(query.BranchID) != "" {
+		branchFilter = "AND sm.branch_id = ?"
+		args = append(args, strings.TrimSpace(query.BranchID))
+	}
+	if strings.TrimSpace(query.DateFrom) != "" {
+		dateFromFilter = "AND sm.created_at >= ?::date"
+		args = append(args, strings.TrimSpace(query.DateFrom))
+	}
+	itemArgs := []interface{}{businessID}
+	if strings.TrimSpace(query.BranchID) != "" {
+		itemTypeFilter += " AND ii.branch_id = ?"
+		itemArgs = append(itemArgs, strings.TrimSpace(query.BranchID))
+	}
+	if strings.TrimSpace(query.ItemType) != "" {
+		itemTypeFilter += " AND ii.item_type = ?"
+		itemArgs = append(itemArgs, strings.TrimSpace(query.ItemType))
+	}
+	args = append(args, itemArgs...)
+
+	var rows []inventoryReconciliationDetailRow
+	err := r.db.Raw(`
+		WITH movement_rows AS (
+			SELECT
+				sm.id,
+				sm.inventory_item_id,
+				CASE
+					WHEN sm.movement_direction = 'in' THEN COALESCE(sm.stock_location_id, sm.to_stock_location_id)
+					WHEN sm.movement_direction = 'out' THEN COALESCE(sm.stock_location_id, sm.from_stock_location_id)
+					ELSE COALESCE(sm.stock_location_id, sm.to_stock_location_id, sm.from_stock_location_id)
+				END AS effective_stock_location_id,
+				sm.movement_type,
+				sm.movement_direction,
+				sm.reference_type,
+				sm.reference_number,
+				sm.total_cost,
+				sm.accounting_journal_entry_id,
+				sm.created_at,
+				je.status AS journal_status,
+				EXISTS (
+					SELECT 1
+					FROM journal_entry_lines jel
+					WHERE jel.business_id = sm.business_id
+					  AND jel.journal_entry_id = sm.accounting_journal_entry_id
+					  AND jel.account_id = ?
+					  AND jel.deleted_at IS NULL
+				) AS has_inventory_line,
+				CASE
+					WHEN sm.movement_direction = 'in' THEN COALESCE(sm.total_cost, 0)
+					WHEN sm.movement_direction = 'out' THEN -COALESCE(sm.total_cost, 0)
+					ELSE 0
+				END AS signed_cost
+			FROM stock_movements sm
+			LEFT JOIN journal_entries je ON je.id = sm.accounting_journal_entry_id
+				AND je.business_id = sm.business_id
+				AND je.deleted_at IS NULL
+			WHERE sm.business_id = ?
+			  AND sm.created_at < (?::date + INTERVAL '1 day')
+			  `+branchFilter+`
+			  `+dateFromFilter+`
+		),
+		movement_summary AS (
+			SELECT
+				inventory_item_id,
+				effective_stock_location_id AS stock_location_id,
+				COALESCE(SUM(signed_cost), 0) AS inventory_ledger_value,
+				COALESCE(SUM(CASE
+					WHEN accounting_journal_entry_id IS NOT NULL
+					 AND journal_status IN ('posted', 'reversed')
+					 AND has_inventory_line
+					THEN signed_cost ELSE 0 END), 0) AS accounting_inventory_value,
+				COUNT(*) FILTER (WHERE movement_type IN ('opening_stock','adjustment_in','adjustment_out','wastage','purchase_in','sale_out','production_in','production_out','purchase_return_out','purchase_bill_cancel_out','return_in') AND COALESCE(total_cost, 0) <= 0) AS missing_cost_count,
+				COUNT(*) FILTER (WHERE movement_type IN ('opening_stock','adjustment_in','adjustment_out','wastage','purchase_in','sale_out','production_in','production_out','purchase_return_out','purchase_bill_cancel_out','return_in') AND accounting_journal_entry_id IS NULL) AS missing_journal_count,
+				COUNT(*) FILTER (WHERE accounting_journal_entry_id IS NOT NULL AND COALESCE(journal_status, '') NOT IN ('posted', 'reversed')) AS linked_unposted_count,
+				COUNT(*) FILTER (WHERE accounting_journal_entry_id IS NOT NULL AND journal_status IN ('posted', 'reversed') AND NOT has_inventory_line) AS linked_no_inventory_line_count,
+				COUNT(*) FILTER (WHERE movement_type = 'purchase_in' AND reference_type = 'purchase_receipt' AND accounting_journal_entry_id IS NULL) AS grn_only_count,
+				COUNT(*) FILTER (WHERE movement_type = 'purchase_return_out' AND accounting_journal_entry_id IS NULL) AS purchase_return_missing_count,
+				COUNT(*) FILTER (WHERE movement_type = 'sale_out' AND reference_type = 'sale' AND accounting_journal_entry_id IS NULL) AS pos_cogs_missing_count,
+				COUNT(*) FILTER (WHERE movement_type IN ('production_in','production_out') AND accounting_journal_entry_id IS NULL) AS manufacturing_missing_count,
+				COUNT(*) FILTER (WHERE movement_type IN ('opening_stock','adjustment_in','adjustment_out','wastage') AND accounting_journal_entry_id IS NULL) AS adjustment_missing_count,
+				COUNT(*) FILTER (WHERE movement_type IN ('transfer_in','transfer_out')) AS transfer_movement_count
+			FROM movement_rows
+			GROUP BY inventory_item_id, effective_stock_location_id
+		),
+		last_movements AS (
+			SELECT *
+			FROM (
+				SELECT
+					id,
+					inventory_item_id,
+					effective_stock_location_id AS stock_location_id,
+					movement_type,
+					reference_number,
+					created_at,
+					ROW_NUMBER() OVER (
+						PARTITION BY inventory_item_id, effective_stock_location_id
+						ORDER BY created_at DESC, id DESC
+					) AS row_number
+				FROM movement_rows
+			) ranked
+			WHERE row_number = 1
+		),
+		item_rows AS (
+			SELECT
+				ii.id AS inventory_item_id,
+				CASE
+					WHEN ii.item_type = 'product_variant' THEN TRIM(COALESCE(p.product_name, '') || ' - ' || COALESCE(pv.variant_name, ''))
+					WHEN ii.item_type = 'product' THEN COALESCE(p.product_name, '')
+					WHEN ii.item_type = 'ingredient' THEN COALESCE(ing.ingredient_name, '')
+					ELSE COALESCE(pi.packaging_name, '')
+				END AS item_name,
+				ii.item_type,
+				ii.product_id,
+				ii.product_variant_id,
+				ii.branch_id,
+				COALESCE(b.branch_name, '') AS branch_name,
+				ilb.stock_location_id,
+				COALESCE(sl.location_name, 'Unassigned') AS stock_location_name,
+				CASE WHEN ilb.id IS NOT NULL THEN COALESCE(ilb.current_quantity, 0) ELSE COALESCE(ii.current_quantity, 0) END AS operational_quantity,
+				CASE
+					WHEN ilb.id IS NOT NULL AND COALESCE(ii.current_quantity, 0) <> 0
+						THEN COALESCE(ii.inventory_value, 0) * (COALESCE(ilb.current_quantity, 0) / NULLIF(ii.current_quantity, 0))
+					WHEN ilb.id IS NOT NULL THEN 0
+					ELSE COALESCE(ii.inventory_value, 0)
+				END AS operational_inventory_value
+			FROM inventory_items ii
+			JOIN branches b ON b.id = ii.branch_id
+			LEFT JOIN inventory_location_balances ilb ON ilb.inventory_item_id = ii.id
+				AND ilb.business_id = ii.business_id
+			LEFT JOIN stock_locations sl ON sl.id = ilb.stock_location_id
+				AND sl.business_id = ii.business_id
+				AND sl.deleted_at IS NULL
+			LEFT JOIN products p ON p.id = ii.product_id
+			LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
+			LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
+			LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
+			WHERE ii.business_id = ?
+			  AND ii.deleted_at IS NULL
+			  `+itemTypeFilter+`
+		)
+		SELECT
+			ir.inventory_item_id,
+			COALESCE(NULLIF(ir.item_name, ''), ir.inventory_item_id::text) AS item_name,
+			ir.item_type,
+			ir.product_id,
+			ir.product_variant_id,
+			ir.branch_id,
+			ir.branch_name,
+			ir.stock_location_id,
+			ir.stock_location_name,
+			ir.operational_quantity,
+			ir.operational_inventory_value,
+			COALESCE(ms.inventory_ledger_value, 0) AS inventory_ledger_value,
+			COALESCE(ms.accounting_inventory_value, 0) AS accounting_inventory_value,
+			lm.id AS last_transaction_id,
+			COALESCE(lm.movement_type, '') AS last_transaction_type,
+			COALESCE(lm.reference_number, '') AS last_transaction_reference,
+			lm.created_at AS last_transaction_at,
+			COALESCE(ms.missing_cost_count, 0) AS missing_cost_count,
+			COALESCE(ms.missing_journal_count, 0) AS missing_journal_count,
+			COALESCE(ms.linked_unposted_count, 0) AS linked_unposted_count,
+			COALESCE(ms.linked_no_inventory_line_count, 0) AS linked_no_inventory_line_count,
+			COALESCE(ms.grn_only_count, 0) AS grn_only_count,
+			COALESCE(ms.purchase_return_missing_count, 0) AS purchase_return_missing_count,
+			COALESCE(ms.pos_cogs_missing_count, 0) AS pos_cogs_missing_count,
+			COALESCE(ms.manufacturing_missing_count, 0) AS manufacturing_missing_count,
+			COALESCE(ms.adjustment_missing_count, 0) AS adjustment_missing_count,
+			COALESCE(ms.transfer_movement_count, 0) AS transfer_movement_count
+		FROM item_rows ir
+		LEFT JOIN movement_summary ms ON ms.inventory_item_id = ir.inventory_item_id
+			AND (ms.stock_location_id = ir.stock_location_id OR (ms.stock_location_id IS NULL AND ir.stock_location_id IS NULL))
+		LEFT JOIN last_movements lm ON lm.inventory_item_id = ir.inventory_item_id
+			AND (lm.stock_location_id = ir.stock_location_id OR (lm.stock_location_id IS NULL AND ir.stock_location_id IS NULL))
+		ORDER BY ir.item_name ASC, ir.stock_location_name ASC
+	`, args...).Scan(&rows).Error
+	return rows, err
+}
+
 func (r *Repository) SumAccountsPayableOperational(businessID, branchID string) (float64, error) {
 	var total float64
 	db := r.db.Table("purchase_invoices").

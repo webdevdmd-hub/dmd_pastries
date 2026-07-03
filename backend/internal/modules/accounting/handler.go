@@ -428,6 +428,15 @@ func (h *Handler) GetInventoryReconciliation(c *gin.Context) {
 	response.Success(c, 200, "inventory reconciliation fetched successfully", result)
 }
 
+func (h *Handler) GetInventoryReconciliationDetails(c *gin.Context) {
+	result, err := h.service.GetInventoryReconciliationDetails(utils.MustAuthContext(c), parseInventoryReconciliationDetailsQuery(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "inventory reconciliation details fetched successfully", result)
+}
+
 func (h *Handler) GetAPReconciliation(c *gin.Context) {
 	result, err := h.service.GetAPReconciliation(utils.MustAuthContext(c), parseReconciliationQuery(c), c.ClientIP(), c.Request.UserAgent())
 	if err != nil {
@@ -672,6 +681,27 @@ func parseReconciliationQuery(c *gin.Context) ReconciliationQuery {
 	return ReconciliationQuery{
 		BranchID: c.Query("branch_id"),
 		AsOfDate: c.Query("as_of_date"),
+	}
+}
+
+func parseInventoryReconciliationDetailsQuery(c *gin.Context) InventoryReconciliationDetailsQuery {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	asOfDate := c.Query("as_of_date")
+	if asOfDate == "" {
+		asOfDate = c.Query("date_to")
+	}
+	return InventoryReconciliationDetailsQuery{
+		BranchID:  c.Query("branch_id"),
+		AsOfDate:  asOfDate,
+		DateFrom:  c.Query("date_from"),
+		DateTo:    c.Query("date_to"),
+		ItemType:  c.Query("item_type"),
+		Status:    c.Query("status"),
+		Page:      page,
+		Limit:     limit,
+		SortBy:    c.DefaultQuery("sort_by", "difference_amount"),
+		SortOrder: c.DefaultQuery("sort_order", "desc"),
 	}
 }
 

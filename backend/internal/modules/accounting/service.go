@@ -1,6 +1,7 @@
 package accounting
 
 import (
+	"sort"
 	"strings"
 	"time"
 
@@ -2679,6 +2680,73 @@ func (s *Service) GetInventoryReconciliation(currentUser *utils.AuthContext, que
 	check := reconciliationCheck("inventory", "Inventory valuation vs Inventory ledger", operational, ledger, "Compares inventory_items.inventory_value with the mapped Inventory / Stock ledger.")
 	_ = s.writeReportAudit(currentUser, "accounting.reconciliation_inventory_viewed", "reconciliation_inventory", query, ipAddress, userAgent)
 	return &check, nil
+}
+
+func (s *Service) GetInventoryReconciliationDetails(currentUser *utils.AuthContext, query InventoryReconciliationDetailsQuery, ipAddress, userAgent string) (*InventoryReconciliationDetailsResponse, error) {
+	query = normalizeInventoryReconciliationDetailsQuery(query)
+	if err := s.validateInventoryReconciliationDetailsQuery(currentUser, query); err != nil {
+		return nil, err
+	}
+	inventoryAccount, err := s.requiredMappedAccount(s.db, currentUser.BusinessID, "inventory_stock", "1200", defaultAccountMappingDescription("inventory_stock"))
+	if err != nil {
+		return nil, err
+	}
+	rawRows, err := s.repo.ListInventoryReconciliationDetailRows(currentUser.BusinessID, inventoryAccount.ID, query)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load inventory reconciliation details")
+	}
+
+	items := make([]InventoryReconciliationDetailItem, 0, len(rawRows))
+	var allMatchedCount int64
+	var allMismatchCount int64
+	for _, row := range rawRows {
+		item := inventoryReconciliationDetailFromRow(row)
+		if item.Status == "matched" {
+			allMatchedCount++
+		} else {
+			allMismatchCount++
+		}
+		if query.Status != "" && item.Status != query.Status {
+			continue
+		}
+		items = append(items, item)
+	}
+	sortInventoryReconciliationDetails(items, query.SortBy, query.SortOrder)
+
+	total := int64(len(items))
+	totalOperational := 0.0
+	totalLedger := 0.0
+	totalAccounting := 0.0
+	for _, item := range items {
+		totalOperational = roundMoney(totalOperational + item.OperationalInventoryValue)
+		totalLedger = roundMoney(totalLedger + item.InventoryLedgerValue)
+		totalAccounting = roundMoney(totalAccounting + item.AccountingInventoryValue)
+	}
+	pagedItems := paginateInventoryReconciliationDetails(items, query.Page, query.Limit)
+	glBalance, err := s.repo.LedgerBalanceForAccount(currentUser.BusinessID, inventoryAccount.ID, inventoryAccount.NormalBalance, query.BranchID, query.AsOfDate)
+	if err != nil {
+		return nil, apperrors.Internal("failed to calculate inventory ledger balance")
+	}
+
+	_ = s.writeReportAudit(currentUser, "accounting.reconciliation_inventory_details_viewed", "reconciliation_inventory_details", query, ipAddress, userAgent)
+	return &InventoryReconciliationDetailsResponse{
+		AsOfDate:                       query.AsOfDate,
+		BranchID:                       query.BranchID,
+		TotalOperationalValue:          roundMoney(totalOperational),
+		TotalInventoryLedgerValue:      roundMoney(totalLedger),
+		TotalAccountingInventoryValue:  roundMoney(totalAccounting),
+		GeneralLedgerInventoryBalance:  roundMoney(glBalance),
+		UnassignedAccountingDifference: roundMoney(glBalance - totalAccounting),
+		MatchedCount:                   allMatchedCount,
+		MismatchCount:                  allMismatchCount,
+		Items:                          pagedItems,
+		Pagination: PaginationResponse{
+			Page:       query.Page,
+			Limit:      query.Limit,
+			Total:      total,
+			TotalPages: totalPages(total, query.Limit),
+		},
+	}, nil
 }
 
 func (s *Service) GetAPReconciliation(currentUser *utils.AuthContext, query ReconciliationQuery, ipAddress, userAgent string) (*ReconciliationCheckResponse, error) {
