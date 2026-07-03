@@ -152,3 +152,58 @@ func TestBakeryOrdersProductionScheduleSQLIncludesCompletedAndProductionExplanat
 		}
 	}
 }
+
+func TestInventorySummarySQLUsesOperationalInventoryValue(t *testing.T) {
+	query, _ := inventorySummarySQL(testBakeryOrdersReportFilter())
+
+	if !strings.Contains(query, "SUM(ii.inventory_value)") {
+		t.Fatalf("inventory summary must sum operational inventory value: %s", query)
+	}
+	for _, forbidden := range []string{"cost_price", "cost_per_unit", "current_quantity *"} {
+		if strings.Contains(query, forbidden) {
+			t.Fatalf("inventory summary must not use master-cost valuation %q: %s", forbidden, query)
+		}
+	}
+}
+
+func TestStockValuationRowsSQLUsesOperationalWeightedAverageValue(t *testing.T) {
+	filter := testBakeryOrdersReportFilter()
+	filter.AllBranches = false
+	filter.BranchID = "branch-id"
+	filter.ItemType = "ingredient"
+	filter.Status = "active"
+	query, args := stockValuationRowsSQL(filter)
+
+	for _, expected := range []string{
+		"COALESCE(ii.average_unit_cost, 0) AS unit_cost",
+		"COALESCE(ii.inventory_value, 0) AS stock_value",
+		"AND ii.branch_id = ?",
+		"AND ii.item_type = ?",
+		"AND ii.status = ?",
+	} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("expected stock valuation query to contain %q: %s", expected, query)
+		}
+	}
+	for _, forbidden := range []string{"cost_price", "cost_per_unit", "current_quantity *"} {
+		if strings.Contains(query, forbidden) {
+			t.Fatalf("stock valuation rows must not use master-cost valuation %q: %s", forbidden, query)
+		}
+	}
+	if !reflect.DeepEqual(args, []interface{}{"business-id", "branch-id", "ingredient", "active"}) {
+		t.Fatalf("unexpected stock valuation args: %#v", args)
+	}
+}
+
+func TestStockValuationByItemTypeSQLUsesOperationalInventoryValue(t *testing.T) {
+	query, _ := stockValuationByItemTypeSQL(testBakeryOrdersReportFilter())
+
+	if !strings.Contains(query, "SUM(ii.inventory_value)") {
+		t.Fatalf("stock valuation by type must sum operational inventory value: %s", query)
+	}
+	for _, forbidden := range []string{"cost_price", "cost_per_unit", "current_quantity *"} {
+		if strings.Contains(query, forbidden) {
+			t.Fatalf("stock valuation by type must not use master-cost valuation %q: %s", forbidden, query)
+		}
+	}
+}

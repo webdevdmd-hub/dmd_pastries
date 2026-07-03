@@ -84,11 +84,15 @@ function itemTypeLabel(itemType: ExpiryBatch["itemType"]): string {
     return "Packaging";
   }
 
-  return "Unknown type";
+  return "Inventory item";
 }
 
 function shortId(value: string): string {
   return value.length > 8 ? value.slice(0, 8) : value;
+}
+
+function compactList(values: (string | null | undefined)[]): string {
+  return values.filter((value): value is string => Boolean(value?.trim())).join(" · ");
 }
 
 export function ExpiryAlertsPageClient(): JSX.Element {
@@ -269,10 +273,15 @@ export function ExpiryAlertsPageClient(): JSX.Element {
                     <TableRow key={batch.id}>
                       <TableCell>
                         <div className="font-bold text-brand-espresso">
-                          {batch.itemName ?? `Inventory item ${shortId(batch.inventoryItemId)}`}
+                          {batch.itemName ?? "Item details unavailable"}
                         </div>
                         <div className="text-xs text-brand-mocha">
-                          {batch.itemCode ? `Code: ${batch.itemCode}` : "Item details unavailable"}
+                          {compactList([
+                            batch.sku ? `SKU: ${batch.sku}` : null,
+                            batch.itemCode ? `Code: ${batch.itemCode}` : null,
+                            batch.categoryName ? `Category: ${batch.categoryName}` : null,
+                            batch.productType ? PRODUCT_TYPE_LABELS[batch.productType] : null,
+                          ]) || "Item details unavailable"}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -280,8 +289,20 @@ export function ExpiryAlertsPageClient(): JSX.Element {
                           {itemTypeLabel(batch.itemType)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-bold">{batch.batchNumber}</TableCell>
-                      <TableCell>{getBranchLabel(batch)}</TableCell>
+                      <TableCell>
+                        <div className="font-bold">{batch.batchNumber || "-"}</div>
+                        <div className="text-xs text-brand-mocha">
+                          {batch.purchaseReferenceNumber
+                            ? `Purchase: ${batch.purchaseReferenceNumber}`
+                            : "-"}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>{getBranchLabel(batch)}</div>
+                        <div className="text-xs text-brand-mocha">
+                          {compactList([batch.stockLocationName, batch.supplierName]) || "-"}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         {batch.quantity}
                         {batch.unitSymbol ? ` ${batch.unitSymbol}` : ""}

@@ -117,6 +117,12 @@ export type ExpiryBatch = {
   itemType: InventoryItemType | null;
   itemName: string | null;
   itemCode: string | null;
+  sku: string | null;
+  productType: ProductType | null;
+  categoryName: string | null;
+  stockLocationName: string | null;
+  supplierName: string | null;
+  purchaseReferenceNumber: string | null;
   batchNumber: string;
   quantity: number;
   unitSymbol: string | null;

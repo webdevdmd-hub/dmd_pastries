@@ -1056,24 +1056,32 @@ func (s *Service) LowStock(currentUser *utils.AuthContext, branchID, itemType st
 	return result.Items, nil
 }
 
-func (s *Service) ExpiryAlerts(currentUser *utils.AuthContext, branchID string, days int) ([]ExpiryBatchResponse, error) {
-	if days <= 0 || days > 365 {
-		days = 7
+func (s *Service) ExpiryAlerts(currentUser *utils.AuthContext, query ExpiryAlertQuery) ([]ExpiryBatchResponse, error) {
+	if query.Days <= 0 || query.Days > 365 {
+		query.Days = 7
 	}
-	resolvedBranchID, allBranches, err := currentUser.ResolveBranchScope(branchID, "")
+	itemType := normalizeAllFilter(query.ItemType)
+	if itemType != "" && itemType != "product" && itemType != "product_variant" && itemType != "ingredient" && itemType != "packaging" {
+		return nil, apperrors.BadRequest("invalid item_type", nil)
+	}
+	productType := normalizeAllFilter(query.ProductType)
+	status := normalizeAllFilter(query.Status)
+	if status != "" && status != "active" && status != "expired" && status != "depleted" {
+		return nil, apperrors.BadRequest("invalid status", nil)
+	}
+	resolvedBranchID, allBranches, err := currentUser.ResolveBranchScope(query.BranchID, "")
 	if err != nil {
 		return nil, err
 	}
+	branchID := ""
 	if !allBranches {
 		branchID = resolvedBranchID
-	} else {
-		branchID = ""
 	}
-	batches, err := s.repo.ExpiryAlerts(currentUser.BusinessID, branchID, days)
+	batches, err := s.repo.ExpiryAlerts(currentUser.BusinessID, branchID, itemType, productType, status, query.Days)
 	if err != nil {
 		return nil, err
 	}
-	return toExpiryBatchResponses(batches), nil
+	return toExpiryAlertResponses(batches), nil
 }
 
 func (s *Service) ListExpiryBatches(currentUser *utils.AuthContext, inventoryItemID string) ([]ExpiryBatchResponse, error) {
@@ -1790,6 +1798,14 @@ func parseDate(value, field string) (time.Time, error) {
 	return parsed, nil
 }
 
+func normalizeAllFilter(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.EqualFold(value, "all") {
+		return ""
+	}
+	return value
+}
+
 func mapNotFound(err error, message string) error {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return apperrors.NotFound(message)
@@ -1817,6 +1833,37 @@ func toExpiryBatchResponses(batches []ExpiryBatch) []ExpiryBatchResponse {
 	responses := make([]ExpiryBatchResponse, 0, len(batches))
 	for _, batch := range batches {
 		responses = append(responses, toExpiryBatchResponse(batch))
+	}
+	return responses
+}
+
+func toExpiryAlertResponses(batches []expiryBatchAlertRow) []ExpiryBatchResponse {
+	responses := make([]ExpiryBatchResponse, 0, len(batches))
+	for _, batch := range batches {
+		responses = append(responses, ExpiryBatchResponse{
+			ID:                      batch.ID,
+			BusinessID:              batch.BusinessID,
+			BranchID:                batch.BranchID,
+			BranchName:              batch.BranchName,
+			InventoryItemID:         batch.InventoryItemID,
+			ItemType:                batch.ItemType,
+			ItemName:                batch.ItemName,
+			ItemCode:                batch.ItemCode,
+			SKU:                     batch.SKU,
+			ProductType:             batch.ProductType,
+			CategoryName:            batch.CategoryName,
+			UnitSymbol:              batch.UnitSymbol,
+			StockLocationName:       batch.StockLocationName,
+			SupplierName:            batch.SupplierName,
+			PurchaseReferenceNumber: batch.PurchaseReferenceNumber,
+			BatchNumber:             batch.BatchNumber,
+			Quantity:                roundQuantity(batch.Quantity),
+			ExpiryDate:              batch.ExpiryDate,
+			ReceivedDate:            batch.ReceivedDate,
+			Status:                  batch.Status,
+			CreatedAt:               batch.CreatedAt,
+			UpdatedAt:               batch.UpdatedAt,
+		})
 	}
 	return responses
 }

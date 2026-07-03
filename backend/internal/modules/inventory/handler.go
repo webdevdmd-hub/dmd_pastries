@@ -360,7 +360,13 @@ func (h *Handler) LowStock(c *gin.Context) {
 
 func (h *Handler) ExpiryAlerts(c *gin.Context) {
 	days, _ := strconv.Atoi(c.DefaultQuery("days", "7"))
-	result, err := h.service.ExpiryAlerts(utils.MustAuthContext(c), c.Query("branch_id"), days)
+	result, err := h.service.ExpiryAlerts(utils.MustAuthContext(c), ExpiryAlertQuery{
+		BranchID:    c.Query("branch_id"),
+		ItemType:    c.Query("item_type"),
+		ProductType: c.Query("product_type"),
+		Status:      c.Query("status"),
+		Days:        days,
+	})
 	if err != nil {
 		handleError(c, err)
 		return

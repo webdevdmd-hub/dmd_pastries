@@ -1051,21 +1051,7 @@ func (r *Repository) ReceiptRecords(filter *shared.ResolvedFilter) ([]ReceiptRec
 
 func (r *Repository) InventorySummary(filter *shared.ResolvedFilter) (*InventoryReportSummaryResponse, error) {
 	var row InventoryReportSummaryResponse
-	query := `
-		SELECT COUNT(*) AS total_inventory_items,
-			COUNT(*) FILTER (WHERE ii.status = 'active') AS active_inventory_items,
-			COUNT(*) FILTER (WHERE ii.available_quantity <= ii.reorder_level) AS low_stock_count,
-			COUNT(*) FILTER (WHERE ii.available_quantity <= 0) AS out_of_stock_count,
-			COUNT(*) FILTER (WHERE ii.is_expiry_tracked) AS expiry_tracked_count,
-			COALESCE(SUM(ii.current_quantity * COALESCE(pv.cost_price, p.cost_price, ing.cost_per_unit, pi.cost_per_unit, 0)),0) AS total_stock_value
-		FROM inventory_items ii
-		LEFT JOIN products p ON p.id = ii.product_id
-		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
-		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
-		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
-		WHERE ii.business_id = ? AND ii.deleted_at IS NULL`
-	args := []interface{}{filter.BusinessID}
-	query, args = addInventoryItemFilters(query, args, filter)
+	query, args := inventorySummarySQL(filter)
 	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
 		return nil, err
 	}
@@ -1104,22 +1090,7 @@ func (r *Repository) CurrentStock(filter *shared.ResolvedFilter) ([]CurrentStock
 
 func (r *Repository) StockValuation(filter *shared.ResolvedFilter) (*StockValuationReportResponse, error) {
 	items := []StockValuationReportItem{}
-	query := `
-		SELECT ii.id AS inventory_item_id,
-			CASE WHEN ii.item_type = 'product_variant' THEN CONCAT(p.product_name, ' - ', pv.variant_name) ELSE COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') END AS item_name,
-			ii.item_type, b.branch_name, ii.current_quantity, u.symbol AS unit_symbol,
-			COALESCE(pv.cost_price, p.cost_price, ing.cost_per_unit, pi.cost_per_unit, 0) AS unit_cost,
-			(ii.current_quantity * COALESCE(pv.cost_price, p.cost_price, ing.cost_per_unit, pi.cost_per_unit, 0)) AS stock_value
-		FROM inventory_items ii
-		JOIN branches b ON b.id = ii.branch_id
-		JOIN units u ON u.id = ii.unit_id
-		LEFT JOIN products p ON p.id = ii.product_id
-		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
-		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
-		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
-		WHERE ii.business_id = ? AND ii.deleted_at IS NULL`
-	args := []interface{}{filter.BusinessID}
-	query, args = addInventoryItemFilters(query, args, filter)
+	query, args := stockValuationRowsSQL(filter)
 	query += " ORDER BY stock_value " + filter.SortOrder + " LIMIT ? OFFSET ?"
 	args = append(args, filter.Limit, (filter.Page-1)*filter.Limit)
 	if err := r.db.Raw(query, args...).Scan(&items).Error; err != nil {
@@ -1130,16 +1101,7 @@ func (r *Repository) StockValuation(filter *shared.ResolvedFilter) (*StockValuat
 		return nil, err
 	}
 	byType := []StockValueByItemType{}
-	summaryQuery := `
-		SELECT ii.item_type, COALESCE(SUM(ii.current_quantity * COALESCE(pv.cost_price, p.cost_price, ing.cost_per_unit, pi.cost_per_unit, 0)),0) AS stock_value
-		FROM inventory_items ii
-		LEFT JOIN products p ON p.id = ii.product_id
-		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
-		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
-		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
-		WHERE ii.business_id = ? AND ii.deleted_at IS NULL`
-	summaryArgs := []interface{}{filter.BusinessID}
-	summaryQuery, summaryArgs = addInventoryItemFilters(summaryQuery, summaryArgs, filter)
+	summaryQuery, summaryArgs := stockValuationByItemTypeSQL(filter)
 	summaryQuery += " GROUP BY ii.item_type ORDER BY ii.item_type"
 	if err := r.db.Raw(summaryQuery, summaryArgs...).Scan(&byType).Error; err != nil {
 		return nil, err
@@ -1149,6 +1111,48 @@ func (r *Repository) StockValuation(filter *shared.ResolvedFilter) (*StockValuat
 		totalValue += item.StockValue
 	}
 	return &StockValuationReportResponse{TotalStockValue: totalValue, ByItemType: byType, Items: items, Pagination: shared.NewPagination(filter.Page, filter.Limit, total)}, nil
+}
+
+func inventorySummarySQL(filter *shared.ResolvedFilter) (string, []interface{}) {
+	query := `
+		SELECT COUNT(*) AS total_inventory_items,
+			COUNT(*) FILTER (WHERE ii.status = 'active') AS active_inventory_items,
+			COUNT(*) FILTER (WHERE ii.available_quantity <= ii.reorder_level) AS low_stock_count,
+			COUNT(*) FILTER (WHERE ii.available_quantity <= 0) AS out_of_stock_count,
+			COUNT(*) FILTER (WHERE ii.is_expiry_tracked) AS expiry_tracked_count,
+			COALESCE(SUM(ii.inventory_value),0) AS total_stock_value
+		FROM inventory_items ii
+		WHERE ii.business_id = ? AND ii.deleted_at IS NULL`
+	args := []interface{}{filter.BusinessID}
+	return addInventoryItemFilters(query, args, filter)
+}
+
+func stockValuationRowsSQL(filter *shared.ResolvedFilter) (string, []interface{}) {
+	query := `
+		SELECT ii.id AS inventory_item_id,
+			CASE WHEN ii.item_type = 'product_variant' THEN CONCAT(p.product_name, ' - ', pv.variant_name) ELSE COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') END AS item_name,
+			ii.item_type, b.branch_name, ii.current_quantity, u.symbol AS unit_symbol,
+			COALESCE(ii.average_unit_cost, 0) AS unit_cost,
+			COALESCE(ii.inventory_value, 0) AS stock_value
+		FROM inventory_items ii
+		JOIN branches b ON b.id = ii.branch_id
+		JOIN units u ON u.id = ii.unit_id
+		LEFT JOIN products p ON p.id = ii.product_id
+		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
+		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
+		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
+		WHERE ii.business_id = ? AND ii.deleted_at IS NULL`
+	args := []interface{}{filter.BusinessID}
+	return addInventoryItemFilters(query, args, filter)
+}
+
+func stockValuationByItemTypeSQL(filter *shared.ResolvedFilter) (string, []interface{}) {
+	query := `
+		SELECT ii.item_type, COALESCE(SUM(ii.inventory_value),0) AS stock_value
+		FROM inventory_items ii
+		WHERE ii.business_id = ? AND ii.deleted_at IS NULL`
+	args := []interface{}{filter.BusinessID}
+	return addInventoryItemFilters(query, args, filter)
 }
 
 func (r *Repository) LowStock(filter *shared.ResolvedFilter) ([]LowStockReportItem, error) {

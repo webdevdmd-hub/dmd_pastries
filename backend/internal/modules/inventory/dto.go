@@ -67,6 +67,14 @@ type StockTransferListQuery struct {
 	SortOrder       string
 }
 
+type ExpiryAlertQuery struct {
+	BranchID    string
+	ItemType    string
+	ProductType string
+	Status      string
+	Days        int
+}
+
 type OpeningStockRequest struct {
 	BranchID         string  `json:"branch_id" binding:"required"`
 	ItemType         string  `json:"item_type" binding:"required"`

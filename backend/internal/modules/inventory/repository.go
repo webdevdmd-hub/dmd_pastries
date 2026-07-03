@@ -557,14 +557,105 @@ func (r *Repository) ListExpiryBatches(businessID, inventoryItemID string) ([]Ex
 	return batches, err
 }
 
-func (r *Repository) ExpiryAlerts(businessID, branchID string, days int) ([]ExpiryBatch, error) {
-	query := r.db.Where("business_id = ? AND status = ? AND deleted_at IS NULL", businessID, "active")
+type expiryBatchAlertRow struct {
+	ID                      string
+	BusinessID              string
+	BranchID                string
+	BranchName              string
+	InventoryItemID         string
+	ItemType                string
+	ItemName                string
+	ItemCode                string
+	SKU                     string
+	ProductType             string
+	CategoryName            string
+	UnitSymbol              string
+	StockLocationName       string
+	SupplierName            string
+	PurchaseReferenceNumber string
+	BatchNumber             string
+	Quantity                float64
+	ExpiryDate              time.Time
+	ReceivedDate            time.Time
+	Status                  string
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+}
+
+func (r *Repository) ExpiryAlerts(businessID, branchID, itemType, productType, status string, days int) ([]expiryBatchAlertRow, error) {
+	query := r.db.Table("expiry_batches eb").
+		Select(`
+			eb.id::text AS id,
+			eb.business_id::text AS business_id,
+			eb.branch_id::text AS branch_id,
+			b.branch_name,
+			eb.inventory_item_id::text AS inventory_item_id,
+			ii.item_type,
+			CASE
+				WHEN ii.item_type = 'product_variant' THEN NULLIF(TRIM(COALESCE(p.product_name, '') || ' - ' || COALESCE(pv.variant_name, '')), ' -')
+				WHEN ii.item_type = 'product' THEN COALESCE(NULLIF(p.product_name, ''), 'Deleted product')
+				WHEN ii.item_type = 'ingredient' THEN COALESCE(NULLIF(ing.ingredient_name, ''), 'Deleted ingredient')
+				WHEN ii.item_type = 'packaging' THEN COALESCE(NULLIF(pi.packaging_name, ''), 'Deleted packaging item')
+				ELSE 'Item details unavailable'
+			END AS item_name,
+			COALESCE(NULLIF(pv.sku, ''), NULLIF(p.sku, ''), NULLIF(ing.ingredient_code, ''), NULLIF(pi.packaging_code, ''), '') AS item_code,
+			COALESCE(NULLIF(pv.sku, ''), NULLIF(p.sku, ''), '') AS sku,
+			COALESCE(p.product_type, '') AS product_type,
+			COALESCE(pc.category_name, ic.category_name, pac.category_name, '') AS category_name,
+			COALESCE(u.symbol, '') AS unit_symbol,
+			COALESCE(sl.location_name, '') AS stock_location_name,
+			COALESCE(s.supplier_name, '') AS supplier_name,
+			COALESCE(pr.receipt_number, '') AS purchase_reference_number,
+			COALESCE(eb.batch_number, '') AS batch_number,
+			eb.quantity,
+			eb.expiry_date,
+			eb.received_date,
+			eb.status,
+			eb.created_at,
+			eb.updated_at
+		`).
+		Joins("JOIN inventory_items ii ON ii.id = eb.inventory_item_id AND ii.business_id = eb.business_id AND ii.deleted_at IS NULL").
+		Joins("JOIN branches b ON b.id = eb.branch_id AND b.business_id = eb.business_id").
+		Joins("LEFT JOIN units u ON u.id = ii.unit_id").
+		Joins("LEFT JOIN products p ON p.id = ii.product_id AND p.business_id = ii.business_id").
+		Joins("LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id AND pv.business_id = ii.business_id").
+		Joins("LEFT JOIN product_categories pc ON pc.id = p.category_id AND pc.business_id = p.business_id").
+		Joins("LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id AND ing.business_id = ii.business_id").
+		Joins("LEFT JOIN ingredient_categories ic ON ic.id = ing.ingredient_category_id AND ic.business_id = ing.business_id").
+		Joins("LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id AND pi.business_id = ii.business_id").
+		Joins("LEFT JOIN packaging_categories pac ON pac.id = pi.packaging_category_id AND pac.business_id = pi.business_id").
+		Joins(`
+			LEFT JOIN LATERAL (
+				SELECT pri.purchase_receipt_id, pri.stock_movement_id
+				FROM purchase_receipt_items pri
+				WHERE pri.business_id = eb.business_id
+					AND pri.inventory_item_id = eb.inventory_item_id
+					AND pri.deleted_at IS NULL
+					AND (pri.batch_number = eb.batch_number OR (pri.batch_number IS NULL AND eb.batch_number = ''))
+					AND (pri.expiry_date = eb.expiry_date OR pri.expiry_date IS NULL)
+				ORDER BY pri.created_at DESC
+				LIMIT 1
+			) pri ON TRUE`).
+		Joins("LEFT JOIN purchase_receipts pr ON pr.id = pri.purchase_receipt_id AND pr.business_id = eb.business_id AND pr.deleted_at IS NULL").
+		Joins("LEFT JOIN suppliers s ON s.id = pr.supplier_id AND s.business_id = pr.business_id").
+		Joins("LEFT JOIN stock_movements sm ON sm.id = pri.stock_movement_id AND sm.business_id = eb.business_id").
+		Joins("LEFT JOIN stock_locations sl ON sl.id = sm.stock_location_id AND sl.business_id = eb.business_id").
+		Where("eb.business_id = ? AND eb.deleted_at IS NULL", businessID)
 	if branchID != "" {
-		query = query.Where("branch_id = ?", branchID)
+		query = query.Where("eb.branch_id = ?", branchID)
+	}
+	if itemType != "" {
+		query = query.Where("ii.item_type = ?", itemType)
+	}
+	if productType != "" {
+		query = query.Where("p.product_type = ?", productType)
+	}
+	if status != "" {
+		query = query.Where("eb.status = ?", status)
 	}
 	until := time.Now().UTC().AddDate(0, 0, days)
-	var batches []ExpiryBatch
-	err := query.Where("expiry_date <= ?", until).Order("expiry_date ASC").Find(&batches).Error
+	var batches []expiryBatchAlertRow
+	err := query.Where("eb.expiry_date <= ?", until).Order("eb.expiry_date ASC").Scan(&batches).Error
 	return batches, err
 }
 
