@@ -51,9 +51,10 @@ type UserFormDialogProps = {
   branches: Branch[];
   canEditRole: boolean;
   currentBranchId: string | null;
+  currentUserId: string | null;
   mode: UserFormMode;
   onClose: () => void;
-  onCreate: (payload: CreateUserPayload, nextStatus: UserStatus) => Promise<void>;
+  onCreate: (payload: CreateUserPayload) => Promise<void>;
   onUpdate: (userId: string, payload: UpdateUserPayload, nextStatus: UserStatus) => Promise<void>;
   open: boolean;
   roleOptions: UserRoleOption[];
@@ -68,7 +69,7 @@ function getBranchSelectValue(branchId: string | null): string {
 }
 
 function getPayloadBranchId(branchId: string): string | null {
-  return branchId === unassignedBranchValue ? null : branchId;
+  return branchId === "" || branchId === unassignedBranchValue ? null : branchId;
 }
 
 function hasBranchOption(branches: Branch[], branchId: string): boolean {
@@ -91,6 +92,7 @@ export function UserFormDialog({
   branches,
   canEditRole,
   currentBranchId,
+  currentUserId,
   mode,
   onClose,
   onCreate,
@@ -115,8 +117,8 @@ export function UserFormDialog({
       phone: "",
       password: "",
       roleId: "",
-      status: "active",
-      branchId: unassignedBranchValue,
+      status: "",
+      branchId: "",
     },
   });
 
@@ -131,10 +133,9 @@ export function UserFormDialog({
       branchId: unassignedBranchValue,
     },
   });
-  const createRoleId = createForm.watch("roleId");
   const updateRoleId = updateForm.watch("roleId");
-  const canCreateRoleUseUnassignedBranch = canRoleUseUnassignedBranch(roleOptions, createRoleId);
   const canUpdateRoleUseUnassignedBranch = canRoleUseUnassignedBranch(roleOptions, updateRoleId);
+  const isSelfEdit = mode === "edit" && user?.id === currentUserId;
 
   useEffect(() => {
     if (!open) {
@@ -147,9 +148,9 @@ export function UserFormDialog({
         email: "",
         phone: "",
         password: "",
-        roleId: roleOptions[0]?.id ?? "",
-        status: "active",
-        branchId: getBranchSelectValue(defaultBranchId),
+        roleId: "",
+        status: "",
+        branchId: "",
       });
       return;
     }
@@ -164,20 +165,7 @@ export function UserFormDialog({
         branchId: getBranchSelectValue(user.branchId),
       });
     }
-  }, [createForm, defaultBranchId, mode, open, roleOptions, updateForm, user]);
-
-  useEffect(() => {
-    if (!open || mode !== "create" || canCreateRoleUseUnassignedBranch) {
-      return;
-    }
-
-    if (createForm.getValues("branchId") === unassignedBranchValue && defaultBranchId) {
-      createForm.setValue("branchId", defaultBranchId, {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
-    }
-  }, [canCreateRoleUseUnassignedBranch, createForm, defaultBranchId, mode, open]);
+  }, [createForm, mode, open, updateForm, user]);
 
   useEffect(() => {
     if (!open || mode !== "edit" || canUpdateRoleUseUnassignedBranch) {
@@ -217,27 +205,36 @@ export function UserFormDialog({
               className="space-y-5"
               onSubmit={(event) => {
                 void createForm.handleSubmit(async (values) => {
-                  if (
-                    values.branchId === unassignedBranchValue &&
-                    !canRoleUseUnassignedBranch(roleOptions, values.roleId)
-                  ) {
-                    createForm.setError("branchId", {
-                      message: "Cashier and operational staff must be assigned to a branch.",
+                  if (values.roleId === "") {
+                    createForm.setError("roleId", {
+                      message: "Please select a role before creating the user.",
                     });
                     return;
                   }
 
-                  await onCreate(
-                    {
-                      fullName: values.fullName,
-                      email: values.email,
-                      phone: values.phone,
-                      password: values.password,
-                      roleId: values.roleId,
-                      branchId: getPayloadBranchId(values.branchId),
-                    },
-                    values.status,
-                  );
+                  if (values.branchId === "" || values.branchId === unassignedBranchValue) {
+                    createForm.setError("branchId", {
+                      message: "Please select a branch before creating the user.",
+                    });
+                    return;
+                  }
+
+                  if (values.status === "") {
+                    createForm.setError("status", {
+                      message: "Please select the user status before saving.",
+                    });
+                    return;
+                  }
+
+                  await onCreate({
+                    fullName: values.fullName,
+                    email: values.email,
+                    phone: values.phone,
+                    password: values.password,
+                    roleId: values.roleId,
+                    branchId: getPayloadBranchId(values.branchId),
+                    status: values.status,
+                  });
                 })(event);
               }}
             >
@@ -342,11 +339,7 @@ export function UserFormDialog({
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {canCreateRoleUseUnassignedBranch ? (
-                              <SelectItem value={unassignedBranchValue}>
-                                No branch assigned
-                              </SelectItem>
-                            ) : assignableBranches.length === 0 ? (
+                            {assignableBranches.length === 0 ? (
                               <SelectItem disabled value={unassignedBranchValue}>
                                 No active branches available
                               </SelectItem>
@@ -363,8 +356,7 @@ export function UserFormDialog({
                           </SelectContent>
                         </Select>
                         <FormDescription>
-                          Operational staff must have a real branch. Branchless accounts are only
-                          for owner/admin setup cases.
+                          Select the branch intentionally before creating this account.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -421,6 +413,7 @@ export function UserFormDialog({
                   }
 
                   if (
+                    !isSelfEdit &&
                     values.branchId === unassignedBranchValue &&
                     !canRoleUseUnassignedBranch(roleOptions, values.roleId)
                   ) {
@@ -435,15 +428,22 @@ export function UserFormDialog({
                     {
                       fullName: values.fullName,
                       phone: values.phone,
-                      roleId: canEditRole ? values.roleId : user.roleId,
-                      branchId: getPayloadBranchId(values.branchId),
+                      roleId: isSelfEdit ? null : canEditRole ? values.roleId : user.roleId,
+                      branchId: isSelfEdit ? user.branchId : getPayloadBranchId(values.branchId),
                     },
-                    values.status,
+                    isSelfEdit ? user.status : values.status,
                   );
                 })(event);
               }}
             >
               <div className="grid gap-5">
+                {isSelfEdit ? (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+                    Your own role, status, branch, and email are protected. Ask another authorized
+                    admin to change those fields.
+                  </div>
+                ) : null}
+
                 <div className="grid gap-5 md:grid-cols-2">
                   <FormField
                     control={updateForm.control}
@@ -465,8 +465,17 @@ export function UserFormDialog({
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input readOnly type="email" placeholder="staff@bakery.com" {...field} />
+                          <Input
+                            disabled={isSelfEdit}
+                            readOnly
+                            type="email"
+                            placeholder="staff@bakery.com"
+                            {...field}
+                          />
                         </FormControl>
+                        {isSelfEdit ? (
+                          <FormDescription>Your own email cannot be changed here.</FormDescription>
+                        ) : null}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -494,7 +503,7 @@ export function UserFormDialog({
                       <FormItem>
                         <FormLabel>Role</FormLabel>
                         <Select
-                          disabled={!canEditRole}
+                          disabled={!canEditRole || isSelfEdit}
                           value={field.value}
                           onValueChange={field.onChange}
                         >
@@ -511,6 +520,9 @@ export function UserFormDialog({
                             ))}
                           </SelectContent>
                         </Select>
+                        {isSelfEdit ? (
+                          <FormDescription>Your own role is protected.</FormDescription>
+                        ) : null}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -524,7 +536,11 @@ export function UserFormDialog({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Assigned branch</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
+                        <Select
+                          disabled={isSelfEdit}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select a branch" />
@@ -552,8 +568,9 @@ export function UserFormDialog({
                           </SelectContent>
                         </Select>
                         <FormDescription>
-                          Operational staff must have a real branch. Use this field to fix users
-                          marked as needing setup.
+                          {isSelfEdit
+                            ? "Your own branch assignment is protected."
+                            : "Operational staff must have a real branch. Use this field to fix users marked as needing setup."}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -565,7 +582,11 @@ export function UserFormDialog({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Status</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
+                        <Select
+                          disabled={isSelfEdit}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select status" />
@@ -579,6 +600,9 @@ export function UserFormDialog({
                             ))}
                           </SelectContent>
                         </Select>
+                        {isSelfEdit ? (
+                          <FormDescription>Your own account status is protected.</FormDescription>
+                        ) : null}
                         <FormMessage />
                       </FormItem>
                     )}

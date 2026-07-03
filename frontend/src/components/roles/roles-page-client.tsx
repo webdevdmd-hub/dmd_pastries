@@ -57,6 +57,26 @@ function enrichRoles(roles: Role[], users: User[] | undefined): Role[] {
   }));
 }
 
+function getPermissionFieldError(error: unknown): string | null {
+  if (!(error instanceof ApiError)) {
+    return null;
+  }
+
+  const permissionErrors = error.errors?.permission_keys ?? error.errors?.permissions;
+  const firstPermissionError = permissionErrors?.[0];
+
+  return typeof firstPermissionError === "string" && firstPermissionError.length > 0
+    ? firstPermissionError
+    : null;
+}
+
+function getCreateRoleErrorMessage(error: unknown): string {
+  return (
+    getPermissionFieldError(error) ??
+    `Server error: Role could not be created. ${getErrorMessage(error)}`
+  );
+}
+
 export function RolesPageClient(): JSX.Element {
   const router = useRouter();
   const { logout, user } = useAuth();
@@ -195,7 +215,7 @@ export function RolesPageClient(): JSX.Element {
       setPermissionDialog({ role: createdRole, mode: "manage" });
       closeDialog();
     } catch (mutationError) {
-      toast.error(`Server error: Role could not be created. ${getErrorMessage(mutationError)}`);
+      toast.error(getCreateRoleErrorMessage(mutationError));
       throw mutationError;
     }
   };
@@ -358,8 +378,8 @@ export function RolesPageClient(): JSX.Element {
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[90vh] max-w-6xl flex-col overflow-hidden p-0">
+          <DialogHeader className="border-b border-brand-cappuccino px-6 pb-4 pt-6">
             <DialogTitle>
               {permissionDialog?.mode === "manage" ? "Manage permissions" : "View permissions"}
             </DialogTitle>
@@ -369,22 +389,24 @@ export function RolesPageClient(): JSX.Element {
                 : "Role permissions across POS modules."}
             </DialogDescription>
           </DialogHeader>
-          <PermissionMatrix
-            canManage={canUpdateRolePermissions && permissionDialog?.mode === "manage"}
-            errorMessage={permissionMatrixErrorMessage}
-            isLoading={permissionsQuery.isLoading || rolePermissionsQuery.isLoading}
-            isSaving={updateRolePermissionsMutation.isPending}
-            onSave={handleSaveRolePermissions}
-            onRetry={() => {
-              void permissionsQuery.refetch();
-              void rolePermissionsQuery.refetch();
-            }}
-            permissions={permissionsQuery.data ?? []}
-            role={selectedRole}
-            rolePermissions={rolePermissionsQuery.data}
-            saveDisabledReason={permissionEndpointWarning}
-            showSave={permissionDialog?.mode === "manage"}
-          />
+          <div className="min-h-0 flex-1 overflow-hidden px-6 py-5">
+            <PermissionMatrix
+              canManage={canUpdateRolePermissions && permissionDialog?.mode === "manage"}
+              errorMessage={permissionMatrixErrorMessage}
+              isLoading={permissionsQuery.isLoading || rolePermissionsQuery.isLoading}
+              isSaving={updateRolePermissionsMutation.isPending}
+              onSave={handleSaveRolePermissions}
+              onRetry={() => {
+                void permissionsQuery.refetch();
+                void rolePermissionsQuery.refetch();
+              }}
+              permissions={permissionsQuery.data ?? []}
+              role={selectedRole}
+              rolePermissions={rolePermissionsQuery.data}
+              saveDisabledReason={permissionEndpointWarning}
+              showSave={permissionDialog?.mode === "manage"}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

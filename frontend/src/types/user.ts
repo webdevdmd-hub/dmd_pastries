@@ -57,6 +57,7 @@ export type CreateUserPayload = {
   password: string;
   roleId: string;
   branchId: string | null;
+  status: UserStatus;
   avatarUrl?: string | null;
 };
 

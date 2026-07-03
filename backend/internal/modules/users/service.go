@@ -29,6 +29,8 @@ type Service struct {
 	auditRepo      *audit.Repository
 }
 
+const selfPrivilegedFieldUpdateMessage = "You cannot modify your own role, status, or branch."
+
 func NewService(
 	db *gorm.DB,
 	appwriteClient *utils.AppwriteClient,
@@ -99,16 +101,11 @@ func (s *Service) CreateInvitation(currentUser *utils.AuthContext, req CreateInv
 		return nil, apperrors.Internal("failed to load role")
 	}
 
-	if err := s.validateBranch(currentUser.BusinessID, req.BranchID); err != nil {
+	resolvedBranchID, err := s.resolveInvitationBranch(currentUser, role.RoleName, req.BranchID)
+	if err != nil {
 		return nil, err
 	}
-	if req.BranchID != nil {
-		resolvedBranchID, err := currentUser.ResolveOperationalBranch(*req.BranchID)
-		if err != nil {
-			return nil, err
-		}
-		req.BranchID = &resolvedBranchID
-	}
+	req.BranchID = resolvedBranchID
 
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	exists, err := s.repo.ExistsByEmailAndBusinessID(email, currentUser.BusinessID)
@@ -399,6 +396,10 @@ func (s *Service) AcceptInvitation(req AcceptInvitationRequest, ipAddress, userA
 }
 
 func (s *Service) CreateUser(currentUser *utils.AuthContext, req CreateUserRequest, ipAddress, userAgent string) (*UserResponse, error) {
+	if !allowedUserStatus(req.Status) {
+		return nil, apperrors.BadRequest("invalid status", map[string]interface{}{"allowed_statuses": []string{"active", "inactive", "suspended", "invited"}})
+	}
+
 	role, err := s.roleRepo.FindByIDAndBusinessID(req.RoleID, currentUser.BusinessID)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -407,16 +408,11 @@ func (s *Service) CreateUser(currentUser *utils.AuthContext, req CreateUserReque
 		return nil, apperrors.Internal("failed to load role")
 	}
 
-	if err := s.validateBranch(currentUser.BusinessID, req.BranchID); err != nil {
+	resolvedBranchID, err := s.resolveAssignableBranch(currentUser, req.BranchID)
+	if err != nil {
 		return nil, err
 	}
-	if req.BranchID != nil {
-		resolvedBranchID, err := currentUser.ResolveOperationalBranch(*req.BranchID)
-		if err != nil {
-			return nil, err
-		}
-		req.BranchID = &resolvedBranchID
-	}
+	req.BranchID = &resolvedBranchID
 
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	exists, err := s.repo.ExistsByEmailAndBusinessID(email, currentUser.BusinessID)
@@ -439,7 +435,7 @@ func (s *Service) CreateUser(currentUser *utils.AuthContext, req CreateUserReque
 		Email:           email,
 		Phone:           req.Phone,
 		AvatarFileID:    strings.TrimSpace(req.AvatarFileID),
-		Status:          "active",
+		Status:          req.Status,
 	}
 
 	tx := s.db.Begin()
@@ -600,6 +596,10 @@ func (s *Service) InviteUser(currentUser *utils.AuthContext, req InviteUserReque
 }
 
 func (s *Service) UpdateUser(currentUser *utils.AuthContext, userID string, req UpdateUserRequest, ipAddress, userAgent string) (*UserResponse, error) {
+	if currentUser.UserID == userID && (req.RoleID != nil || req.BranchID != nil) {
+		return nil, apperrors.Forbidden(selfPrivilegedFieldUpdateMessage)
+	}
+
 	user, err := s.repo.FindByIDAndBusinessID(userID, currentUser.BusinessID)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -810,6 +810,10 @@ func (s *Service) RestoreUser(currentUser *utils.AuthContext, userID string, ipA
 }
 
 func (s *Service) AssignUserBranch(currentUser *utils.AuthContext, userID string, req AssignBranchRequest, ipAddress, userAgent string) (*UserResponse, error) {
+	if currentUser.UserID == userID {
+		return nil, apperrors.Forbidden(selfPrivilegedFieldUpdateMessage)
+	}
+
 	resolvedBranchID, err := s.resolveAssignableBranch(currentUser, req.BranchID)
 	if err != nil {
 		return nil, err
@@ -893,6 +897,13 @@ func (s *Service) GetUserActivity(currentUser *utils.AuthContext, userID, cursor
 }
 
 func (s *Service) UpdateUserStatus(currentUser *utils.AuthContext, userID string, req UpdateUserStatusRequest, ipAddress, userAgent string) (*UserResponse, error) {
+	if currentUser.UserID == userID {
+		return nil, apperrors.Forbidden(selfPrivilegedFieldUpdateMessage)
+	}
+	if !allowedUserStatus(req.Status) {
+		return nil, apperrors.BadRequest("invalid status", map[string]interface{}{"allowed_statuses": []string{"active", "inactive", "suspended", "invited"}})
+	}
+
 	if err := s.repo.UpdateByBusinessID(userID, currentUser.BusinessID, map[string]interface{}{
 		"status":     req.Status,
 		"updated_at": time.Now().UTC(),
@@ -990,6 +1001,43 @@ func (s *Service) validateBranch(businessID string, branchID *string) error {
 		return apperrors.BadRequest("branch is inactive", nil)
 	}
 	return nil
+}
+
+func isBranchOptionalRoleName(roleName string) bool {
+	normalizedRoleName := strings.ToLower(strings.TrimSpace(roleName))
+
+	return strings.Contains(normalizedRoleName, "admin") || strings.Contains(normalizedRoleName, "owner")
+}
+
+func allowedUserStatus(status string) bool {
+	switch status {
+	case "active", "inactive", "suspended", "invited":
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Service) resolveInvitationBranch(currentUser *utils.AuthContext, roleName string, branchID *string) (*string, error) {
+	if branchID == nil || strings.TrimSpace(*branchID) == "" {
+		if isBranchOptionalRoleName(roleName) {
+			return nil, nil
+		}
+
+		return nil, apperrors.BadRequest("branch_id is required", nil)
+	}
+
+	requestedBranchID := strings.TrimSpace(*branchID)
+	if err := s.validateBranch(currentUser.BusinessID, &requestedBranchID); err != nil {
+		return nil, err
+	}
+
+	resolvedBranchID, err := currentUser.ResolveOperationalBranch(requestedBranchID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resolvedBranchID, nil
 }
 
 func (s *Service) resolveAssignableBranch(currentUser *utils.AuthContext, branchID *string) (string, error) {

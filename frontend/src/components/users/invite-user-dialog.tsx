@@ -46,7 +46,9 @@ type InviteUserDialogProps = {
   roleOptions: UserRoleOption[];
 };
 
+const noBranchSelectedValue = "";
 const unassignedBranchValue = "__unassigned__";
+const noActiveBranchesValue = "__no_active_branches__";
 
 function isBranchOptionalRoleName(roleName: string): boolean {
   const normalizedRoleName = roleName.trim().toLowerCase();
@@ -75,7 +77,7 @@ export function InviteUserDialog({
       email: "",
       phone: "",
       roleId: "",
-      branchId: unassignedBranchValue,
+      branchId: noBranchSelectedValue,
     },
   });
   const selectedRoleId = form.watch("roleId");
@@ -90,32 +92,39 @@ export function InviteUserDialog({
         fullName: "",
         email: "",
         phone: "",
-        roleId: roleOptions[0]?.id ?? "",
-        branchId: branches[0]?.id ?? unassignedBranchValue,
+        roleId: "",
+        branchId: noBranchSelectedValue,
       });
     }
-  }, [branches, form, open, roleOptions]);
+  }, [form, open]);
 
   useEffect(() => {
     if (!open || canSelectedRoleUseUnassignedBranch) {
       return;
     }
 
-    if (form.getValues("branchId") === unassignedBranchValue && branches[0]?.id) {
-      form.setValue("branchId", branches[0].id, {
+    if (form.getValues("branchId") === unassignedBranchValue) {
+      form.setValue("branchId", noBranchSelectedValue, {
         shouldDirty: true,
         shouldValidate: true,
       });
     }
-  }, [branches, canSelectedRoleUseUnassignedBranch, form, open]);
+  }, [canSelectedRoleUseUnassignedBranch, form, open]);
 
   const handleSubmit = form.handleSubmit(async (values) => {
+    if (values.branchId === noBranchSelectedValue) {
+      form.setError("branchId", {
+        message: "Please select a branch before sending the invitation.",
+      });
+      return;
+    }
+
     if (
       values.branchId === unassignedBranchValue &&
       !canRoleUseUnassignedBranch(roleOptions, values.roleId)
     ) {
       form.setError("branchId", {
-        message: "Cashier and operational staff must be assigned to a branch.",
+        message: "Please select a branch before sending the invitation.",
       });
       return;
     }
@@ -202,7 +211,22 @@ export function InviteUserDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Role</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      onValueChange={(nextRoleId) => {
+                        field.onChange(nextRoleId);
+
+                        if (
+                          form.getValues("branchId") === unassignedBranchValue &&
+                          !canRoleUseUnassignedBranch(roleOptions, nextRoleId)
+                        ) {
+                          form.setValue("branchId", noBranchSelectedValue, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                        }
+                      }}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a role" />
@@ -238,7 +262,7 @@ export function InviteUserDialog({
                       {canSelectedRoleUseUnassignedBranch ? (
                         <SelectItem value={unassignedBranchValue}>No branch assigned</SelectItem>
                       ) : branches.length === 0 ? (
-                        <SelectItem disabled value={unassignedBranchValue}>
+                        <SelectItem disabled value={noActiveBranchesValue}>
                           No active branches available
                         </SelectItem>
                       ) : null}

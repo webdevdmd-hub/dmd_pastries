@@ -225,3 +225,68 @@ func TestStockValuationByItemTypeSQLUsesOperationalInventoryValue(t *testing.T) 
 		}
 	}
 }
+
+func TestSalesRefundAllocationsSQLUsesCompletedRefundsByRefundDate(t *testing.T) {
+	filter := testBakeryOrdersReportFilter()
+	filter.AllBranches = false
+	filter.BranchID = "branch-id"
+	filter.CashierUserID = "cashier-id"
+	filter.PaymentStatus = "partially_refunded"
+	filter.SaleStatus = "partially_refunded"
+	filter.ProductID = "product-id"
+	filter.CategoryID = "category-id"
+
+	query, args := salesRefundAllocationsSQL(filter, filter.StartUTC, filter.EndUTC)
+
+	for _, expected := range []string{
+		"FROM payment_refunds pr",
+		"pr.refunded_at >= ?",
+		"pr.refunded_at < ?",
+		"pr.refund_status = 'completed'",
+		"JOIN sales_return_items sri",
+		"NOT EXISTS",
+		"pr.refund_amount * (si.line_total / COALESCE(NULLIF(s.total_amount, 0), NULLIF(sale_totals.sale_total, 0)))",
+		"AND branch_id = ?",
+		"AND cashier_user_id = ?",
+		"AND payment_status = ?",
+		"AND sale_status = ?",
+		"AND product_id = ?",
+		"AND category_id = ?",
+	} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("expected refund allocation query to contain %q: %s", expected, query)
+		}
+	}
+	if len(args) != 12 {
+		t.Fatalf("unexpected refund allocation arg count: %#v", args)
+	}
+}
+
+func TestSalesRefundTotalsByBucketUsesRefundedAtBucket(t *testing.T) {
+	query, _ := salesRefundAllocationsSQL(testBakeryOrdersReportFilter(), testBakeryOrdersReportFilter().StartUTC, testBakeryOrdersReportFilter().EndUTC)
+
+	if strings.Contains(query, "sr.return_date >= ?") {
+		t.Fatalf("sales refund allocations must not bucket by sales return date: %s", query)
+	}
+	if !strings.Contains(query, "pr.refunded_at >= ?") {
+		t.Fatalf("sales refund allocations must use payment refund date: %s", query)
+	}
+}
+
+func TestSlowMovingProductsSQLFiltersSellableVisibleActiveProducts(t *testing.T) {
+	query, args := slowMovingProductsSQL(testBakeryOrdersReportFilter())
+
+	for _, expected := range []string{
+		"p.status = 'active'",
+		"p.is_sellable = TRUE",
+		"p.is_pos_visible = TRUE",
+		"p.deleted_at IS NULL",
+	} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("expected slow moving products query to contain %q: %s", expected, query)
+		}
+	}
+	if len(args) != 6 {
+		t.Fatalf("unexpected slow moving products arg count: %#v", args)
+	}
+}

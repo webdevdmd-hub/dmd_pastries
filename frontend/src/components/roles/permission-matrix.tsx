@@ -55,6 +55,7 @@ const matrixColumns: {
   { column: "status", label: "Status" },
   { column: "manage", label: "Manage" },
 ];
+const permissionRequiredMessage = "Please select at least one permission.";
 
 function buildInitialSelection(rolePermissions: RolePermission[] | undefined): Set<string> {
   return new Set(
@@ -328,9 +329,14 @@ export function PermissionMatrix({
   }
 
   const matrixDisabled = !showSave || !canManage || adminRole || saveDisabledReason !== null;
+  const footerStatusMessage = !hasSelectedPermissions
+    ? permissionRequiredMessage
+    : hasChanges
+      ? "Unsaved permission changes are ready to save."
+      : "No unsaved changes.";
 
   return (
-    <Card>
+    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <CardHeader className="space-y-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
@@ -358,8 +364,7 @@ export function PermissionMatrix({
         ) : null}
         {!hasSelectedPermissions ? (
           <div className="rounded-2xl border border-amber-700/20 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-            The current backend role update flow requires at least one allowed permission. Select at
-            least one permission before saving.
+            {permissionRequiredMessage}
           </div>
         ) : null}
         {saveDisabledReason ? (
@@ -377,7 +382,7 @@ export function PermissionMatrix({
           </div>
         )}
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto">
         <div className="overflow-hidden rounded-[1.5rem] border border-brand-cappuccino bg-white/80">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] border-collapse text-left text-sm">
@@ -558,29 +563,27 @@ export function PermissionMatrix({
             `roles.permissions.update` is missing.
           </div>
         ) : null}
-        {showSave ? (
-          <div className="sticky bottom-0 -mx-6 flex items-center justify-between gap-3 border-t border-brand-cappuccino bg-white/95 px-6 py-4 backdrop-blur">
-            <div className="text-sm text-brand-mocha">
-              {hasChanges ? "Unsaved permission changes are ready to save." : "No unsaved changes."}
-            </div>
-            <Button
-              disabled={saveDisabled}
-              onClick={() => {
-                const payload = permissions.map<RolePermission>((permission) => ({
-                  roleId: role.id,
-                  permissionId: permission.id,
-                  allowed: selectedPermissionIds.has(permission.id),
-                }));
-
-                void onSave(payload);
-              }}
-            >
-              <Save className="h-4 w-4" />
-              {isSaving ? "Saving..." : "Save permissions"}
-            </Button>
-          </div>
-        ) : null}
       </CardContent>
+      {showSave ? (
+        <div className="flex items-center justify-between gap-3 border-t border-brand-cappuccino bg-white/95 px-6 py-4 backdrop-blur">
+          <div className="text-sm text-brand-mocha">{footerStatusMessage}</div>
+          <Button
+            disabled={saveDisabled}
+            onClick={() => {
+              const payload = permissions.map<RolePermission>((permission) => ({
+                roleId: role.id,
+                permissionId: permission.id,
+                allowed: selectedPermissionIds.has(permission.id),
+              }));
+
+              void onSave(payload);
+            }}
+          >
+            <Save className="h-4 w-4" />
+            {isSaving ? "Saving..." : "Save permissions"}
+          </Button>
+        </div>
+      ) : null}
     </Card>
   );
 }

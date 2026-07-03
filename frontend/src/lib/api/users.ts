@@ -36,6 +36,7 @@ type BackendCreateUserPayload = {
   password: string;
   role_id: string;
   branch_id: string | null;
+  status: CreateUserPayload["status"];
   avatar_url?: string | null;
 };
 
@@ -198,6 +199,7 @@ function toBackendCreateUserPayload(payload: CreateUserPayload): BackendCreateUs
     password: payload.password,
     role_id: payload.roleId,
     branch_id: payload.branchId,
+    status: payload.status,
     ...(payload.avatarUrl !== undefined ? { avatar_url: payload.avatarUrl } : {}),
   };
 }

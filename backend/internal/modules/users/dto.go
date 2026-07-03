@@ -8,7 +8,8 @@ type CreateUserRequest struct {
 	Phone        string  `json:"phone" binding:"required"`
 	Password     string  `json:"password" binding:"required,min=8"`
 	RoleID       string  `json:"role_id" binding:"required,uuid"`
-	BranchID     *string `json:"branch_id"`
+	BranchID     *string `json:"branch_id" binding:"required"`
+	Status       string  `json:"status" binding:"required,oneof=active inactive suspended invited"`
 	AvatarFileID string  `json:"avatar_file_id"`
 }
 

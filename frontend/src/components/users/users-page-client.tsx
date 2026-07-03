@@ -276,21 +276,9 @@ export function UsersPageClient(): JSX.Element {
     setInviteDialogOpen(false);
   };
 
-  const handleCreate = async (
-    payload: CreateUserPayload,
-    nextStatus: UserStatus,
-  ): Promise<void> => {
+  const handleCreate = async (payload: CreateUserPayload): Promise<void> => {
     try {
       const createdUser = await createUserMutation.mutateAsync(payload);
-
-      if (nextStatus !== "active") {
-        await updateUserStatusMutation.mutateAsync({
-          id: createdUser.id,
-          payload: {
-            status: nextStatus,
-          },
-        });
-      }
 
       if (createdUser.branchId === null && branchScope.canAccessAllBranches) {
         setFilters((currentFilters) => ({
@@ -568,6 +556,7 @@ export function UsersPageClient(): JSX.Element {
         branches={branchesQuery.data ?? []}
         canEditRole={canEditUsers}
         currentBranchId={branchScope.effectiveBranchId}
+        currentUserId={user?.id ?? null}
         mode={dialogMode}
         onClose={closeDialog}
         onCreate={handleCreate}

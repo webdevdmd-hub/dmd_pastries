@@ -10,6 +10,8 @@ import (
 	"pastries-pos/internal/shared/utils"
 )
 
+const permissionRequiredMessage = "Please select at least one permission."
+
 type Service struct {
 	db             *gorm.DB
 	repo           *Repository
@@ -73,7 +75,7 @@ func (s *Service) CreateRole(currentUser *utils.AuthContext, req CreateRoleReque
 	}
 
 	if len(normalizedKeys) == 0 {
-		return nil, apperrors.BadRequest("permission_keys must include at least one valid permission", nil)
+		return nil, permissionRequiredError()
 	}
 
 	exists, err := s.repo.ExistsByNameAndBusinessID(roleName, currentUser.BusinessID)
@@ -216,7 +218,7 @@ func (s *Service) UpdateRole(currentUser *utils.AuthContext, roleID string, req 
 		}
 
 		if len(normalizedKeys) == 0 {
-			return nil, apperrors.BadRequest("permission_keys must include at least one valid permission", nil)
+			return nil, permissionRequiredError()
 		}
 		if isAdminRole(role) && !hasAllPermissionKeys(normalizedKeys) {
 			return nil, apperrors.Forbidden("admin role must keep full permission access")
@@ -375,18 +377,6 @@ func (s *Service) GetRolePermissions(currentUser *utils.AuthContext, roleID stri
 }
 
 func (s *Service) UpdateRolePermissions(currentUser *utils.AuthContext, roleID string, req UpdateRolePermissionsRequest) (*RolePermissionsResponse, error) {
-	role, err := s.repo.FindByIDAndBusinessID(roleID, currentUser.BusinessID)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, apperrors.NotFound("role not found")
-		}
-		return nil, apperrors.Internal("failed to load role")
-	}
-
-	if role.BusinessID == nil {
-		return nil, apperrors.Forbidden("global system roles cannot be updated")
-	}
-
 	normalizedKeys := make([]string, 0, len(req.PermissionKeys))
 	seen := make(map[string]struct{}, len(req.PermissionKeys))
 	for _, key := range req.PermissionKeys {
@@ -402,8 +392,21 @@ func (s *Service) UpdateRolePermissions(currentUser *utils.AuthContext, roleID s
 	}
 
 	if len(normalizedKeys) == 0 {
-		return nil, apperrors.BadRequest("permission_keys must include at least one valid permission", nil)
+		return nil, permissionRequiredError()
 	}
+
+	role, err := s.repo.FindByIDAndBusinessID(roleID, currentUser.BusinessID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.NotFound("role not found")
+		}
+		return nil, apperrors.Internal("failed to load role")
+	}
+
+	if role.BusinessID == nil {
+		return nil, apperrors.Forbidden("global system roles cannot be updated")
+	}
+
 	if isAdminRole(role) && !hasAllPermissionKeys(normalizedKeys) {
 		return nil, apperrors.Forbidden("admin role must keep full permission access")
 	}
@@ -460,6 +463,12 @@ func (s *Service) UpdateRolePermissions(currentUser *utils.AuthContext, roleID s
 		IsSystemDefault: role.IsSystemDefault,
 		PermissionKeys:  visiblePermissionKeys(normalizedKeys),
 	}, nil
+}
+
+func permissionRequiredError() *apperrors.AppError {
+	return apperrors.BadRequest(permissionRequiredMessage, map[string][]string{
+		"permission_keys": {permissionRequiredMessage},
+	})
 }
 
 func isAdminRole(role *Role) bool {

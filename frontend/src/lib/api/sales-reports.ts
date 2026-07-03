@@ -128,12 +128,28 @@ function stringOrEmpty(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-function parseList<TItem>(value: unknown, parser: (item: unknown) => TItem): TItem[] {
-  if (!Array.isArray(value)) {
+function listSource(value: unknown): unknown[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (!isObject(value)) {
     return [];
   }
 
-  return value.map(parser);
+  if (Array.isArray(value.items)) {
+    return value.items;
+  }
+
+  if (Array.isArray(value.rows)) {
+    return value.rows;
+  }
+
+  return [];
+}
+
+function parseList<TItem>(value: unknown, parser: (item: unknown) => TItem): TItem[] {
+  return listSource(value).map(parser);
 }
 
 function toSearchParams(filters: SalesReportFilters): string {

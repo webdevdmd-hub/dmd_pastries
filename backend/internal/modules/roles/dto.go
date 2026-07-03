@@ -5,7 +5,7 @@ import "time"
 type CreateRoleRequest struct {
 	RoleName       string   `json:"role_name" binding:"required"`
 	Description    string   `json:"description"`
-	PermissionKeys []string `json:"permission_keys" binding:"required,min=1"`
+	PermissionKeys []string `json:"permission_keys" binding:"required"`
 }
 
 type UpdateRoleRequest struct {
@@ -15,7 +15,7 @@ type UpdateRoleRequest struct {
 }
 
 type UpdateRolePermissionsRequest struct {
-	PermissionKeys []string `json:"permission_keys" binding:"required,min=1"`
+	PermissionKeys []string `json:"permission_keys" binding:"required"`
 }
 
 type RolePermissionsResponse struct {
