@@ -17,6 +17,7 @@ import {
 import type { Branch } from "@/types/branch";
 import type { SaleReceipt } from "@/types/pos";
 import type {
+  ExportReportDownload,
   ReceiptRecordRow,
   ReceiptRecordsFilters,
   ReportChartData,
@@ -98,7 +99,7 @@ export function useSaleReceipt() {
 }
 
 export function useExportReportCsv() {
-  return useMutation<Blob, Error, ReportExportPayload>({
+  return useMutation<ExportReportDownload, Error, ReportExportPayload>({
     mutationFn: async (payload) => exportReportCsv(payload),
   });
 }

@@ -2,7 +2,7 @@
 
 import { Download } from "lucide-react";
 import type { JSX } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/reports/access-denied-card";
@@ -21,6 +21,11 @@ import { getErrorMessage } from "@/lib/api/client";
 import type { ExportReportSchema } from "@/lib/validators/reports.schema";
 import type { ReportBaseFilters } from "@/types/reports";
 
+type ExportDownloadState = {
+  filename: string;
+  url: string;
+};
+
 function resolveTimezone(): string {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Dubai";
@@ -29,15 +34,13 @@ function resolveTimezone(): string {
   }
 }
 
-function saveBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
+function triggerDownload(url: string, filename: string): void {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
 }
 
 export function ReportsExportClient(): JSX.Element {
@@ -46,6 +49,8 @@ export function ReportsExportClient(): JSX.Element {
   const canView = hasAnyPermission([PERMISSIONS.reportsView]);
   const canExport = hasAnyPermission([PERMISSIONS.reportsExport]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [latestDownload, setLatestDownload] = useState<ExportDownloadState | null>(null);
   const [selectedReportType, setSelectedReportType] = useState("");
   const timezone = useMemo(resolveTimezone, []);
   const defaultFilters = useMemo<ReportBaseFilters>(() => {
@@ -70,6 +75,14 @@ export function ReportsExportClient(): JSX.Element {
   );
   const firstSupportedOption = exportOptions.find((option) => option.supported);
 
+  useEffect(() => {
+    return () => {
+      if (latestDownload) {
+        URL.revokeObjectURL(latestDownload.url);
+      }
+    };
+  }, [latestDownload]);
+
   if (!canView) {
     return <AccessDeniedCard />;
   }
@@ -78,9 +91,37 @@ export function ReportsExportClient(): JSX.Element {
     return <NoBranchScopeCard />;
   }
 
+  const clearExportStatus = (): void => {
+    setExportError(null);
+    setLatestDownload((current) => {
+      if (current) {
+        URL.revokeObjectURL(current.url);
+      }
+
+      return null;
+    });
+  };
+
+  const handleDialogOpenChange = (open: boolean): void => {
+    if (!open && exportCsvMutation.isPending) {
+      return;
+    }
+
+    setDialogOpen(open);
+
+    if (!open) {
+      clearExportStatus();
+    }
+  };
+
   const handleExport = async (values: ExportReportSchema): Promise<void> => {
+    clearExportStatus();
+
     if (!canExport) {
-      toast.error("You need reports.export to export CSV files.");
+      const message = "You need reports.export to export CSV files.";
+
+      setExportError(message);
+      toast.error(message);
       return;
     }
 
@@ -101,11 +142,16 @@ export function ReportsExportClient(): JSX.Element {
         filters,
         reportType: values.reportType,
       });
-      saveBlob(blob, `${values.reportType}-${filters.dateFrom}-to-${filters.dateTo}.csv`);
-      toast.success(`${selectedExportOption?.label ?? "Report"} CSV exported.`);
-      setDialogOpen(false);
+      const url = URL.createObjectURL(blob.blob);
+
+      setLatestDownload({ filename: blob.filename, url });
+      triggerDownload(url, blob.filename);
+      toast.success(`${selectedExportOption?.label ?? "Report"} CSV export started: ${blob.filename}`);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      const message = getErrorMessage(error);
+
+      setExportError(message);
+      toast.error(message);
     }
   };
 
@@ -122,6 +168,7 @@ export function ReportsExportClient(): JSX.Element {
               if (!selectedReportType && firstSupportedOption) {
                 setSelectedReportType(firstSupportedOption.reportType);
               }
+              clearExportStatus();
               setDialogOpen(true);
             }}
           >
@@ -158,9 +205,17 @@ export function ReportsExportClient(): JSX.Element {
           selectedReportType ? selectedReportType : (firstSupportedOption?.reportType ?? "")
         }
         exportOptions={exportOptions}
+        exportError={exportError}
         isSubmitting={exportCsvMutation.isPending}
+        latestDownload={latestDownload}
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onDownloadAgain={() => {
+          if (latestDownload) {
+            triggerDownload(latestDownload.url, latestDownload.filename);
+          }
+        }}
+        onInputChange={clearExportStatus}
+        onOpenChange={handleDialogOpenChange}
         onReportTypeChange={setSelectedReportType}
         onSubmit={handleExport}
       />

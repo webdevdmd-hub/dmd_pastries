@@ -23,6 +23,12 @@ type ApiErrorOptions = {
   errorDetails?: Record<string, unknown>;
 };
 
+export type ApiBlobResponse = {
+  blob: Blob;
+  contentType: string;
+  filename: string | null;
+};
+
 export class ApiError extends Error {
   readonly status: number;
   readonly errors: FieldErrorMap | undefined;
@@ -213,6 +219,25 @@ function normalizeApiResponse(value: unknown): ApiResponse<unknown> {
   } satisfies ApiSuccess<unknown>;
 }
 
+function parseContentDispositionFilename(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const encodedFilename = /filename\*=UTF-8''([^;]+)/i.exec(value);
+  if (encodedFilename?.[1]) {
+    try {
+      return decodeURIComponent(encodedFilename[1].trim());
+    } catch {
+      return encodedFilename[1].trim();
+    }
+  }
+
+  const filename = /filename="?([^";]+)"?/i.exec(value);
+
+  return filename?.[1]?.trim() ?? null;
+}
+
 async function buildHeaders(authMode: AuthMode): Promise<HeadersInit> {
   const headers = new Headers({
     "Content-Type": "application/json",
@@ -370,7 +395,7 @@ export async function apiRequest<TResponse, TBody = undefined>(
 export async function apiBlobRequest<TBody = undefined>(
   path: string,
   options: RequestOptions<TBody> = {},
-): Promise<Blob> {
+): Promise<ApiBlobResponse> {
   const method = options.method ?? "GET";
   const url = `${getApiBaseUrl()}${path}`;
   const startedAt = nowMs();
@@ -477,7 +502,13 @@ export async function apiBlobRequest<TBody = undefined>(
     success: true,
   });
 
-  return response.blob();
+  const blob = await response.blob();
+
+  return {
+    blob,
+    contentType: response.headers.get("Content-Type") ?? blob.type,
+    filename: parseContentDispositionFilename(response.headers.get("Content-Disposition")),
+  };
 }
 
 export async function apiProbeRequest(path: string, signal?: AbortSignal): Promise<ApiProbeResult> {

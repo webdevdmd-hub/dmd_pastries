@@ -6,6 +6,7 @@ import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,8 +33,15 @@ type ExportReportDialogProps = {
   canAccessAllBranches: boolean;
   defaultFilters: ReportBaseFilters;
   defaultReportType: ReportType;
+  exportError: string | null;
   exportOptions: ReportExportOption[];
   isSubmitting: boolean;
+  latestDownload: {
+    filename: string;
+    url: string;
+  } | null;
+  onDownloadAgain: () => void;
+  onInputChange: () => void;
   onOpenChange: (open: boolean) => void;
   onReportTypeChange: (reportType: ReportType) => void;
   onSubmit: (values: ExportReportSchema) => Promise<void>;
@@ -55,8 +63,12 @@ export function ExportReportDialog({
   canAccessAllBranches,
   defaultFilters,
   defaultReportType,
+  exportError,
   exportOptions,
   isSubmitting,
+  latestDownload,
+  onDownloadAgain,
+  onInputChange,
   onOpenChange,
   onReportTypeChange,
   onSubmit,
@@ -113,6 +125,8 @@ export function ExportReportDialog({
   const handleSubmit = form.handleSubmit(async (values) => {
     await onSubmit(values);
   });
+  const dateFromField = form.register("filters.dateFrom");
+  const dateToField = form.register("filters.dateTo");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -132,8 +146,10 @@ export function ExportReportDialog({
           <div className="space-y-2">
             <label className="text-sm font-medium text-brand-espresso">Category</label>
             <Select
+              disabled={isSubmitting}
               value={selectedCategory}
               onValueChange={(value) => {
+                onInputChange();
                 setSelectedCategory(value);
                 const nextReport = exportOptions.find(
                   (option) => option.category === value && option.supported,
@@ -159,8 +175,10 @@ export function ExportReportDialog({
           <div className="space-y-2">
             <label className="text-sm font-medium text-brand-espresso">Report type</label>
             <Select
+              disabled={isSubmitting}
               value={selectedReportType}
               onValueChange={(value: ReportType) => {
+                onInputChange();
                 form.setValue("reportType", value, { shouldValidate: true });
                 onReportTypeChange(value);
               }}
@@ -183,12 +201,21 @@ export function ExportReportDialog({
             {selectedOption && !selectedOption.supported ? (
               <p className="text-xs font-medium text-red-700">{selectedOption.unsupportedReason}</p>
             ) : null}
+            {form.formState.errors.reportType ? (
+              <p className="text-xs font-medium text-red-700">
+                {form.formState.errors.reportType.message}
+              </p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-brand-espresso">Branch</label>
             <Select
+              disabled={isSubmitting}
               value={selectedBranchId ?? ""}
-              onValueChange={(branchId) => form.setValue("filters.branchId", branchId)}
+              onValueChange={(branchId) => {
+                onInputChange();
+                form.setValue("filters.branchId", branchId, { shouldValidate: true });
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Current branch" />
@@ -201,21 +228,49 @@ export function ExportReportDialog({
                     <SelectItem key={branch.id} value={branch.id}>
                       {branch.name} ({branch.code})
                     </SelectItem>
-                  ))}
+                ))}
               </SelectContent>
             </Select>
+            {form.formState.errors.filters?.branchId ? (
+              <p className="text-xs font-medium text-red-700">
+                {form.formState.errors.filters.branchId.message}
+              </p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-brand-espresso" htmlFor="export-date-from">
               Date from
             </label>
-            <Input id="export-date-from" type="date" {...form.register("filters.dateFrom")} />
+            <Input
+              id="export-date-from"
+              type="date"
+              {...dateFromField}
+              disabled={isSubmitting}
+              onChange={(event) => {
+                onInputChange();
+                void dateFromField.onChange(event);
+              }}
+            />
+            {form.formState.errors.filters?.dateFrom ? (
+              <p className="text-xs font-medium text-red-700">
+                {form.formState.errors.filters.dateFrom.message}
+              </p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-brand-espresso" htmlFor="export-date-to">
               Date to
             </label>
-            <Input id="export-date-to" type="date" {...form.register("filters.dateTo")} />
+            <Input
+              id="export-date-to"
+              type="date"
+              {...dateToField}
+              disabled={isSubmitting}
+              onChange={(event) => {
+                onInputChange();
+                void dateToField.onChange(event);
+              }}
+            />
           </div>
           {form.formState.errors.filters?.dateTo ? (
             <p className="md:col-span-2 text-sm text-red-700">
@@ -260,8 +315,33 @@ export function ExportReportDialog({
             </dl>
             {selectedOption?.description ? <p className="mt-3">{selectedOption.description}</p> : null}
           </div>
+          {exportError ? (
+            <Alert className="md:col-span-2 border-red-200 bg-red-50 text-red-950">
+              <AlertTitle>Export failed</AlertTitle>
+              <AlertDescription>{exportError}</AlertDescription>
+            </Alert>
+          ) : null}
+          {latestDownload ? (
+            <Alert className="md:col-span-2 border-emerald-200 bg-emerald-50 text-emerald-950">
+              <AlertTitle>Export ready</AlertTitle>
+              <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span className="break-all">
+                  Download started for <span className="font-mono">{latestDownload.filename}</span>.
+                </span>
+                <Button type="button" variant="outline" onClick={onDownloadAgain}>
+                  <Download className="h-4 w-4" />
+                  Download again
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <DialogFooter className="md:col-span-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              disabled={isSubmitting}
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button disabled={isSubmitting || !selectedOption?.supported} type="submit">

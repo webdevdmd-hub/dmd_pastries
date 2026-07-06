@@ -2,6 +2,7 @@ import { getBranches as getBranchList } from "@/lib/api/branches";
 import { apiBlobRequest, apiRequest } from "@/lib/api/client";
 import type { Branch } from "@/types/branch";
 import type {
+  ExportReportDownload,
   ReceiptRecordRow,
   ReceiptRecordsFilters,
   ReportBaseFilters,
@@ -294,6 +295,16 @@ function toBackendFilters(filters: ReportBaseFilters): Record<string, string | n
   return result;
 }
 
+function isCsvContentType(contentType: string): boolean {
+  const normalized = contentType.toLowerCase();
+
+  return normalized.includes("text/csv") || normalized.includes("application/csv");
+}
+
+function fallbackExportFilename(payload: ReportExportPayload): string {
+  return `${payload.reportType}-${payload.filters.dateFrom}-to-${payload.filters.dateTo}.csv`;
+}
+
 export async function getReportsDashboardSummary(
   filters: ReportFilters,
 ): Promise<ReportsDashboardSummary> {
@@ -358,8 +369,8 @@ export async function getReceiptRecords(
   return response.data;
 }
 
-export async function exportReportCsv(payload: ReportExportPayload): Promise<Blob> {
-  return apiBlobRequest<BackendReportExportPayload>("/api/v1/reports/export/csv", {
+export async function exportReportCsv(payload: ReportExportPayload): Promise<ExportReportDownload> {
+  const response = await apiBlobRequest<BackendReportExportPayload>("/api/v1/reports/export/csv", {
     method: "POST",
     authMode: "appwrite",
     body: {
@@ -367,6 +378,21 @@ export async function exportReportCsv(payload: ReportExportPayload): Promise<Blo
       filters: toBackendFilters(payload.filters),
     },
   });
+
+  if (response.blob.size === 0) {
+    throw new Error("The export completed but the backend returned an empty CSV file.");
+  }
+
+  if (!isCsvContentType(response.contentType)) {
+    throw new Error(
+      `The export completed but the backend returned ${response.contentType || "an unknown content type"} instead of CSV.`,
+    );
+  }
+
+  return {
+    ...response,
+    filename: response.filename ?? fallbackExportFilename(payload),
+  };
 }
 
 export async function getReportExportOptions(): Promise<ReportExportOption[]> {

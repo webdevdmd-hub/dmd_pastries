@@ -117,6 +117,12 @@ export type ReportExportPayload = {
   filters: ReportBaseFilters;
 };
 
+export type ExportReportDownload = {
+  blob: Blob;
+  contentType: string;
+  filename: string;
+};
+
 export type ExportReportResponse = {
   fileUrl?: string;
   filename?: string;
