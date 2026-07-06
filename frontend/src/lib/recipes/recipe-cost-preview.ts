@@ -1,19 +1,21 @@
 import type { RecipeIngredientLine, RecipePackagingLine, RecipeProductOption } from "@/types/recipes";
 
+type NumericInput = number | string | null | undefined;
+
 export type RecipeCostIngredientInput = {
   componentProductId: string | null;
   componentVariantId: string | null;
-  quantityRequired: number;
-  unitCostSnapshot?: number;
+  quantityRequired: NumericInput;
+  unitCostSnapshot?: NumericInput;
   unitId: string;
-  wastagePercentage: number;
+  wastagePercentage: NumericInput;
 };
 
 export type RecipeCostPackagingInput = {
   componentProductId: string | null;
   componentVariantId: string | null;
-  quantityRequired: number;
-  unitCostSnapshot?: number;
+  quantityRequired: NumericInput;
+  unitCostSnapshot?: NumericInput;
   unitId: string;
 };
 
@@ -33,6 +35,28 @@ function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+function roundQuantity(value: number): number {
+  return Math.round(value * 10000) / 10000;
+}
+
+function numberOrZero(value: NumericInput): number {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return 0;
+    }
+
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+}
+
 function productForLine(
   products: RecipeProductOption[],
   componentProductId: string | null,
@@ -44,13 +68,13 @@ function unitCostForLine(
   products: RecipeProductOption[],
   componentProductId: string | null,
   componentVariantId: string | null,
-  snapshot = 0,
+  snapshot: NumericInput = 0,
 ): number {
   const product = productForLine(products, componentProductId);
   const variant =
     product?.variants.find((productVariant) => productVariant.id === componentVariantId) ?? null;
 
-  return variant?.costPrice ?? product?.costPrice ?? snapshot;
+  return variant?.costPrice ?? product?.costPrice ?? numberOrZero(snapshot);
 }
 
 function lineHasUnitMismatch(
@@ -91,11 +115,12 @@ export function calculateRecipeLiveCostPreview({
   ingredients,
   packaging,
 }: {
-  batchYieldQuantity: number;
+  batchYieldQuantity: NumericInput;
   componentProducts: RecipeProductOption[];
   ingredients: RecipeCostIngredientInput[];
   packaging: RecipeCostPackagingInput[];
 }): RecipeLiveCostPreview {
+  const normalizedYieldQuantity = numberOrZero(batchYieldQuantity);
   const ingredientCost = ingredients.reduce((total, line) => {
     const unitCost = unitCostForLine(
       componentProducts,
@@ -103,8 +128,10 @@ export function calculateRecipeLiveCostPreview({
       line.componentVariantId,
       line.unitCostSnapshot,
     );
-    const effectiveQuantity = line.quantityRequired * (1 + line.wastagePercentage / 100);
-    return total + effectiveQuantity * unitCost;
+    const quantityRequired = numberOrZero(line.quantityRequired);
+    const wastagePercentage = numberOrZero(line.wastagePercentage);
+    const effectiveQuantity = quantityRequired * (1 + wastagePercentage / 100);
+    return total + roundMoney(effectiveQuantity * unitCost);
   }, 0);
 
   const packagingCost = packaging.reduce((total, line) => {
@@ -114,11 +141,14 @@ export function calculateRecipeLiveCostPreview({
       line.componentVariantId,
       line.unitCostSnapshot,
     );
-    return total + line.quantityRequired * unitCost;
+    const quantityRequired = numberOrZero(line.quantityRequired);
+    return total + roundMoney(quantityRequired * unitCost);
   }, 0);
 
-  const totalCost = ingredientCost + packagingCost;
-  const yieldQuantityValid = Number.isFinite(batchYieldQuantity) && batchYieldQuantity > 0;
+  const roundedIngredientCost = roundMoney(ingredientCost);
+  const roundedPackagingCost = roundMoney(packagingCost);
+  const totalCost = roundMoney(roundedIngredientCost + roundedPackagingCost);
+  const yieldQuantityValid = normalizedYieldQuantity > 0;
   const hasZeroCostComponents =
     ingredients.some(
       (line) =>
@@ -147,11 +177,11 @@ export function calculateRecipeLiveCostPreview({
     );
 
   return {
-    batchYieldQuantity: yieldQuantityValid ? batchYieldQuantity : 0,
-    costPerYieldUnit: yieldQuantityValid ? roundMoney(totalCost / batchYieldQuantity) : 0,
-    estimatedIngredientCost: roundMoney(ingredientCost),
-    estimatedPackagingCost: roundMoney(packagingCost),
-    estimatedTotalCost: roundMoney(totalCost),
+    batchYieldQuantity: yieldQuantityValid ? normalizedYieldQuantity : 0,
+    costPerYieldUnit: yieldQuantityValid ? roundQuantity(totalCost / normalizedYieldQuantity) : 0,
+    estimatedIngredientCost: roundedIngredientCost,
+    estimatedPackagingCost: roundedPackagingCost,
+    estimatedTotalCost: totalCost,
     hasLines: ingredients.length > 0 || packaging.length > 0,
     hasUnitMismatch,
     hasZeroCostComponents,
