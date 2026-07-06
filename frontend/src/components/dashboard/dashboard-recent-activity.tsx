@@ -47,8 +47,8 @@ export function DashboardRecentActivity({
                 <p className="font-semibold text-brand-espresso">{activity.title || "Activity"}</p>
                 <p className="mt-1 text-sm leading-6 text-brand-mocha">{activity.description}</p>
                 <p className="mt-2 text-xs uppercase tracking-[0.18em] text-brand-mocha">
-                  {activity.referenceNumber || "No reference"} - {activity.createdBy || "System"} -{" "}
-                  {formatDate(activity.createdAt)}
+                  {activity.referenceNumber || "No business reference"} -{" "}
+                  {activity.createdBy || "System"} - {formatDate(activity.createdAt)}
                 </p>
               </article>
             ))}

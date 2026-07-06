@@ -242,7 +242,10 @@ func (r *Repository) RecentActivity(scope Scope, limit int) ([]ActivityFeedItem,
 		SELECT COALESCE(NULLIF(event_type,''), action_type) AS activity_type,
 			COALESCE(NULLIF(summary,''), action_type) AS title,
 			COALESCE(NULLIF(summary,''), action_type) AS description,
-			reference_id AS reference_number,
+			'' AS reference_number,
+			'' AS record_label,
+			COALESCE(NULLIF(entity_type,''), module_name) AS entity_type,
+			'' AS module_label,
 			COALESCE(u.full_name,'System') AS created_by,
 			a.created_at::text AS created_at
 		FROM audit_logs a

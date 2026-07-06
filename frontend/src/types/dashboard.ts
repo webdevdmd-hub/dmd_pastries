@@ -14,6 +14,9 @@ export type DashboardActivity = {
   createdAt: string;
   createdBy: string;
   description: string;
+  entityType: string;
+  moduleLabel: string;
+  recordLabel: string;
   referenceNumber: string;
   title: string;
 };

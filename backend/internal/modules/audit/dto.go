@@ -150,7 +150,7 @@ func moduleLabel(entityType string) string {
 		return "Inventory"
 	case "stock_location", "stock_locations", "stock_movement", "stock_movements", "stock_transfer", "stock_transfers":
 		return "Inventory -> Stock Movements"
-	case "pos", "sale", "sales", "sale_refund", "sale_refunds":
+	case "pos", "sale", "sales", "sale_refund", "sale_refunds", "payment", "payments", "sale_payment", "sale_payments", "payment_refund", "payment_refunds", "sales_return", "sales_returns":
 		return "POS"
 	case "bakery_order", "bakery_orders", "bakery_order_payment", "bakery_order_payments":
 		return "Bakery Orders"
@@ -343,6 +343,25 @@ func metadataRecordLabel(metadata map[string]interface{}) string {
 		if value, ok := metadata[key]; ok {
 			if label := metadataString(value); label != "" {
 				return label
+			}
+		}
+	}
+	return ""
+}
+
+func metadataBusinessReference(metadata map[string]interface{}) string {
+	keys := []string{
+		"record_label", "record_number", "reference_number",
+		"sale_number", "refund_number", "payment_refund_number",
+		"order_number", "expense_number", "transfer_number", "settlement_number",
+		"entry_number", "journal_entry_number", "invoice_number", "receipt_number",
+		"return_number", "sales_return_number", "purchase_order_number",
+		"batch_number", "production_batch_number", "source_number",
+	}
+	for _, key := range keys {
+		if value, ok := metadata[key]; ok {
+			if reference := metadataString(value); reference != "" {
+				return reference
 			}
 		}
 	}

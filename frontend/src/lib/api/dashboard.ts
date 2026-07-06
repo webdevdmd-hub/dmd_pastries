@@ -34,6 +34,9 @@ type BackendActivity = {
   created_at?: string;
   created_by?: string;
   description?: string;
+  entity_type?: string;
+  module_label?: string;
+  record_label?: string;
   reference_number?: string;
   title?: string;
 };
@@ -229,6 +232,9 @@ function parseActivity(value: unknown): DashboardActivity {
     createdAt: stringField(row, "created_at"),
     createdBy: stringField(row, "created_by"),
     description: stringField(row, "description"),
+    entityType: stringField(row, "entity_type"),
+    moduleLabel: stringField(row, "module_label"),
+    recordLabel: stringField(row, "record_label"),
     referenceNumber: stringField(row, "reference_number"),
     title: stringField(row, "title"),
   };

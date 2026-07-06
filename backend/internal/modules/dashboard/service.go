@@ -102,11 +102,46 @@ func (s *Service) RecentActivity(currentUser *utils.AuthContext, values url.Valu
 	if err != nil {
 		return nil, err
 	}
-	result, err := s.repo.RecentActivity(scope, parseLimit(values.Get("limit"), 20, 100))
+	if s.auditRepo == nil {
+		return nil, apperrors.Internal("failed to load recent activity")
+	}
+	limit := parseLimit(values.Get("limit"), 20, 100)
+	logs, _, err := s.auditRepo.ListActivity(&audit.ActivityLogFilter{
+		BusinessID: scope.BusinessID,
+		Limit:      limit,
+	})
 	if err != nil {
 		return nil, apperrors.Internal("failed to load recent activity")
 	}
-	return result, nil
+	responses, err := s.auditRepo.BuildActivityResponses(scope.BusinessID, logs)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load recent activity")
+	}
+	items := make([]ActivityFeedItem, 0, len(responses))
+	for index, response := range responses {
+		referenceNumber := ""
+		if index < len(logs) {
+			referenceNumber = s.auditRepo.BusinessRecordReference(scope.BusinessID, logs[index])
+		}
+		items = append(items, activityFeedItemFromAuditResponse(response, referenceNumber))
+	}
+	return items, nil
+}
+
+func activityFeedItemFromAuditResponse(response audit.ActivityLogResponse, referenceNumber string) ActivityFeedItem {
+	title := firstNonEmpty(response.ActionLabel, response.Summary, "Activity")
+	description := firstNonEmpty(response.Summary, response.ActionLabel, "Activity recorded.")
+	return ActivityFeedItem{
+		ActivityType:    response.EventType,
+		Title:           title,
+		Description:     description,
+		ReferenceNumber: strings.TrimSpace(referenceNumber),
+		RecordLabel:     response.RecordLabel,
+		EntityType:      response.EntityType,
+		ModuleLabel:     response.ModuleLabel,
+		CreatedBy:       firstNonEmpty(response.ActorUserName, "System"),
+		CreatedAt:       response.CreatedAt.Format(time.RFC3339),
+	}
 }
 
 func (s *Service) Alerts(currentUser *utils.AuthContext, values url.Values) (*AlertsResponse, error) {
@@ -233,4 +268,13 @@ func hasAnyPermission(currentUser *utils.AuthContext, keys ...string) bool {
 		}
 	}
 	return false
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }

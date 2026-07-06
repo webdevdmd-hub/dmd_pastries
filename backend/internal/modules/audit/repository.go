@@ -226,10 +226,7 @@ func (r *Repository) loadActivityUserDisplays(businessID string, logs []AuditLog
 }
 
 func (r *Repository) resolveRecordLabel(businessID string, log AuditLog) string {
-	metadata := map[string]interface{}{}
-	if log.Metadata != "" {
-		_ = json.Unmarshal([]byte(log.Metadata), &metadata)
-	}
+	metadata := activityMetadata(log)
 
 	if label := metadataRecordLabel(metadata); label != "" {
 		return label
@@ -245,6 +242,27 @@ func (r *Repository) resolveRecordLabel(businessID string, log AuditLog) string 
 	}
 
 	return fallbackRecordLabel(entityID, log.Summary, metadata)
+}
+
+func (r *Repository) BusinessRecordReference(businessID string, log AuditLog) string {
+	metadata := activityMetadata(log)
+	if reference := metadataBusinessReference(metadata); reference != "" {
+		return reference
+	}
+
+	entityID := firstNonEmpty(log.EntityID, log.ReferenceID)
+	if entityID == "" {
+		return ""
+	}
+	return r.lookupBusinessReference(businessID, normalizeAuditKey(firstNonEmpty(log.EntityType, log.ModuleName)), entityID)
+}
+
+func activityMetadata(log AuditLog) map[string]interface{} {
+	metadata := map[string]interface{}{}
+	if log.Metadata != "" {
+		_ = json.Unmarshal([]byte(log.Metadata), &metadata)
+	}
+	return metadata
 }
 
 func (r *Repository) lookupRecordLabel(businessID, entityType, entityID string) string {
@@ -328,6 +346,43 @@ func (r *Repository) lookupRecordLabel(businessID, entityType, entityID string) 
 			Where("sr.business_id = ? AND sr.id = ?", businessID, entityID).
 			Scan(&row).Error
 		return joinLabel(row.RefundNumber, row.SaleNumber)
+	case "payment", "payments", "sale_payment", "sale_payments":
+		var row struct {
+			ReferenceNumber           string
+			ProviderTransactionID     string
+			PaymentMethodNameSnapshot string
+			SaleNumber                string
+		}
+		_ = r.db.Unscoped().Table("sale_payments AS sp").
+			Select("sp.reference_number, sp.provider_transaction_id, sp.payment_method_name_snapshot, COALESCE(s.sale_number, '') AS sale_number").
+			Joins("LEFT JOIN sales s ON s.id = sp.sale_id AND s.business_id = sp.business_id").
+			Where("sp.business_id = ? AND sp.id = ?", businessID, entityID).
+			Scan(&row).Error
+		return joinLabel(firstNonEmpty(row.ReferenceNumber, row.ProviderTransactionID, row.PaymentMethodNameSnapshot), row.SaleNumber)
+	case "payment_refund", "payment_refunds":
+		var row struct {
+			RefundNumber      string
+			SaleNumber        string
+			SalesReturnNumber string
+		}
+		_ = r.db.Unscoped().Table("payment_refunds AS pr").
+			Select("pr.refund_number, COALESCE(s.sale_number, '') AS sale_number, COALESCE(sr.return_number, '') AS sales_return_number").
+			Joins("LEFT JOIN sales s ON s.id = pr.sale_id AND s.business_id = pr.business_id").
+			Joins("LEFT JOIN sales_returns sr ON sr.id = pr.sales_return_id AND sr.business_id = pr.business_id").
+			Where("pr.business_id = ? AND pr.id = ?", businessID, entityID).
+			Scan(&row).Error
+		return joinLabel(row.RefundNumber, firstNonEmpty(row.SalesReturnNumber, row.SaleNumber))
+	case "sales_return", "sales_returns":
+		var row struct {
+			ReturnNumber string
+			SaleNumber   string
+		}
+		_ = r.db.Unscoped().Table("sales_returns AS sr").
+			Select("sr.return_number, COALESCE(s.sale_number, '') AS sale_number").
+			Joins("LEFT JOIN sales s ON s.id = sr.sale_id AND s.business_id = sr.business_id").
+			Where("sr.business_id = ? AND sr.id = ?", businessID, entityID).
+			Scan(&row).Error
+		return joinLabel(row.ReturnNumber, row.SaleNumber)
 	case "bakery_order", "bakery_orders":
 		var row struct{ OrderNumber, ExternalOrderNumber, CustomerNameSnapshot string }
 		_ = r.db.Unscoped().Table("bakery_orders").Select("order_number, external_order_number, customer_name_snapshot").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
@@ -404,6 +459,100 @@ func (r *Repository) lookupRecordLabel(businessID, entityType, entityID string) 
 		var row struct{ AccountName, AccountType string }
 		_ = r.db.Unscoped().Table("payment_accounts").Select("account_name, account_type").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
 		return joinLabel(row.AccountName, humanizeAuditWords(row.AccountType))
+	case "journal_entry", "journal_entries":
+		var row struct{ EntryNumber, ReferenceNumber string }
+		_ = r.db.Unscoped().Table("journal_entries").Select("entry_number, reference_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return firstNonEmpty(row.EntryNumber, row.ReferenceNumber)
+	case "account_transfer", "account_transfers":
+		var row struct{ TransferNumber, ReferenceNumber string }
+		_ = r.db.Unscoped().Table("account_transfers").Select("transfer_number, reference_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return firstNonEmpty(row.TransferNumber, row.ReferenceNumber)
+	case "platform_settlement", "platform_settlements":
+		var row struct{ SettlementNumber, ReferenceNumber string }
+		_ = r.db.Unscoped().Table("platform_settlements").Select("settlement_number, reference_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return firstNonEmpty(row.SettlementNumber, row.ReferenceNumber)
+	default:
+		return ""
+	}
+}
+
+func (r *Repository) lookupBusinessReference(businessID, entityType, entityID string) string {
+	if r == nil || r.db == nil {
+		return ""
+	}
+	switch entityType {
+	case "stock_movement", "stock_movements":
+		var row struct{ ReferenceNumber string }
+		_ = r.db.Unscoped().Table("stock_movements").Select("reference_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return row.ReferenceNumber
+	case "stock_transfer", "stock_transfers":
+		var row struct{ TransferNumber string }
+		_ = r.db.Unscoped().Table("stock_transfers").Select("transfer_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return row.TransferNumber
+	case "pos", "sale", "sales":
+		var row struct{ SaleNumber, ExternalOrderNumber string }
+		_ = r.db.Unscoped().Table("sales").Select("sale_number, external_order_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return firstNonEmpty(row.SaleNumber, row.ExternalOrderNumber)
+	case "sale_refund", "sale_refunds":
+		var row struct{ RefundNumber string }
+		_ = r.db.Unscoped().Table("sale_refunds").Select("refund_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return row.RefundNumber
+	case "payment", "payments", "sale_payment", "sale_payments":
+		var row struct{ ReferenceNumber, ProviderTransactionID, SaleNumber string }
+		_ = r.db.Unscoped().Table("sale_payments AS sp").
+			Select("sp.reference_number, sp.provider_transaction_id, COALESCE(s.sale_number, '') AS sale_number").
+			Joins("LEFT JOIN sales s ON s.id = sp.sale_id AND s.business_id = sp.business_id").
+			Where("sp.business_id = ? AND sp.id = ?", businessID, entityID).
+			Scan(&row).Error
+		return firstNonEmpty(row.ReferenceNumber, row.ProviderTransactionID, row.SaleNumber)
+	case "payment_refund", "payment_refunds":
+		var row struct{ RefundNumber string }
+		_ = r.db.Unscoped().Table("payment_refunds").Select("refund_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return row.RefundNumber
+	case "sales_return", "sales_returns":
+		var row struct{ ReturnNumber string }
+		_ = r.db.Unscoped().Table("sales_returns").Select("return_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return row.ReturnNumber
+	case "bakery_order", "bakery_orders":
+		var row struct{ OrderNumber, ExternalOrderNumber string }
+		_ = r.db.Unscoped().Table("bakery_orders").Select("order_number, external_order_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return firstNonEmpty(row.OrderNumber, row.ExternalOrderNumber)
+	case "bakery_order_payment", "bakery_order_payments":
+		var row struct{ ReferenceNumber, OrderNumber string }
+		_ = r.db.Unscoped().Table("bakery_order_payments AS bop").
+			Select("bop.reference_number, COALESCE(bo.order_number, '') AS order_number").
+			Joins("LEFT JOIN bakery_orders bo ON bo.id = bop.bakery_order_id AND bo.business_id = bop.business_id").
+			Where("bop.business_id = ? AND bop.id = ?", businessID, entityID).
+			Scan(&row).Error
+		return firstNonEmpty(row.ReferenceNumber, row.OrderNumber)
+	case "expense", "expenses":
+		var row struct{ ExpenseNumber, ReferenceNumber string }
+		_ = r.db.Unscoped().Table("expenses").Select("expense_number, reference_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return firstNonEmpty(row.ExpenseNumber, row.ReferenceNumber)
+	case "purchase_order", "purchase_orders":
+		var row struct{ PurchaseOrderNumber string }
+		_ = r.db.Unscoped().Table("purchase_orders").Select("purchase_order_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return row.PurchaseOrderNumber
+	case "purchase_invoice", "purchase_invoices":
+		var row struct{ InvoiceNumber, SupplierBillNumber string }
+		_ = r.db.Unscoped().Table("purchase_invoices").Select("invoice_number, supplier_bill_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return firstNonEmpty(row.InvoiceNumber, row.SupplierBillNumber)
+	case "purchase_receipt", "purchase_receipts":
+		var row struct{ ReceiptNumber string }
+		_ = r.db.Unscoped().Table("purchase_receipts").Select("receipt_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return row.ReceiptNumber
+	case "purchase_return", "purchase_returns":
+		var row struct{ ReturnNumber string }
+		_ = r.db.Unscoped().Table("purchase_returns").Select("return_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return row.ReturnNumber
+	case "supplier_payment", "supplier_payments":
+		var row struct{ ReferenceNumber string }
+		_ = r.db.Unscoped().Table("supplier_payments").Select("reference_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return row.ReferenceNumber
+	case "manufacturing", "production_batch", "production_batches":
+		var row struct{ ProductionBatchNumber string }
+		_ = r.db.Unscoped().Table("production_batches").Select("production_batch_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		return row.ProductionBatchNumber
 	case "journal_entry", "journal_entries":
 		var row struct{ EntryNumber, ReferenceNumber string }
 		_ = r.db.Unscoped().Table("journal_entries").Select("entry_number, reference_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error

@@ -132,6 +132,9 @@ type ActivityFeedItem struct {
 	Title           string `json:"title"`
 	Description     string `json:"description"`
 	ReferenceNumber string `json:"reference_number"`
+	RecordLabel     string `json:"record_label"`
+	EntityType      string `json:"entity_type"`
+	ModuleLabel     string `json:"module_label"`
 	CreatedBy       string `json:"created_by"`
 	CreatedAt       string `json:"created_at"`
 }
