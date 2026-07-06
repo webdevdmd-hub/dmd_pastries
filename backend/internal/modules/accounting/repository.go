@@ -16,6 +16,8 @@ type Repository struct {
 	db *gorm.DB
 }
 
+const accountForReportWhereClause = "business_id = ? AND id = ? AND deleted_at IS NULL"
+
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
@@ -359,11 +361,15 @@ func (r *Repository) FindByID(businessID, id string) (*ChartAccount, error) {
 
 func (r *Repository) FindAccountForReport(businessID, id string) (*GeneralLedgerAccountResponse, error) {
 	var account GeneralLedgerAccountResponse
-	err := r.db.Table("chart_of_accounts").
-		Select("id AS account_id, account_code, account_name, account_type, normal_balance").
-		Where("business_id = ? AND id = ?", businessID, id).
+	err := r.accountForReportQuery(businessID, id).
 		First(&account).Error
 	return &account, err
+}
+
+func (r *Repository) accountForReportQuery(businessID, id string) *gorm.DB {
+	return r.db.Table("chart_of_accounts").
+		Select("id AS account_id, account_code, account_name, account_type, normal_balance").
+		Where(accountForReportWhereClause, businessID, id)
 }
 
 func (r *Repository) FindJournalEntryByID(businessID, id string) (*JournalEntry, error) {

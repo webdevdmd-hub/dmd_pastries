@@ -7,7 +7,10 @@ import { useMemo, useState } from "react";
 import { AccountingAccessDeniedCard } from "@/components/accounting/accounting-access-denied-card";
 import { ChartAccountTypeBadge } from "@/components/accounting/chart-account-badges";
 import { PageHeader } from "@/components/shared/page-header";
-import { SearchableSelect } from "@/components/shared/searchable-select";
+import {
+  SearchableSelect,
+  type SearchableSelectOption,
+} from "@/components/shared/searchable-select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -110,13 +113,31 @@ export function GeneralLedgerPageClient(): JSX.Element {
   const showRunningBalance = ledger?.showRunningBalance === true;
   const currentPage = ledger?.page ?? filters.page;
   const totalPages = ledger?.totalPages ?? 1;
-  const accountOptions = useMemo(
+  const selectedReportAccountOption = useMemo<SearchableSelectOption | null>(() => {
+    if (!filters.accountId || accounts.some((account) => account.id === filters.accountId)) {
+      return null;
+    }
+
+    const reportAccount = ledger?.account;
+    if (reportAccount?.accountId !== filters.accountId) {
+      return null;
+    }
+
+    return {
+      description: `${reportAccount.accountType.replace(/_/g, " ")} - loaded from report`,
+      keywords: [reportAccount.accountCode, reportAccount.accountName, reportAccount.accountType],
+      label: `${reportAccount.accountCode} - ${reportAccount.accountName}`,
+      value: reportAccount.accountId,
+    };
+  }, [accounts, filters.accountId, ledger?.account]);
+  const accountOptions = useMemo<SearchableSelectOption[]>(
     () => [
       {
         description: "Combined ledger activity",
         label: "All accounts",
         value: allValue,
       },
+      ...(selectedReportAccountOption ? [selectedReportAccountOption] : []),
       ...accounts.map((account) => ({
         description: account.accountType.replace(/_/g, " "),
         keywords: [account.accountCode, account.accountName, account.accountGroup],
@@ -124,7 +145,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
         value: account.id,
       })),
     ],
-    [accounts],
+    [accounts, selectedReportAccountOption],
   );
   const branchOptions = useMemo(
     () => [
