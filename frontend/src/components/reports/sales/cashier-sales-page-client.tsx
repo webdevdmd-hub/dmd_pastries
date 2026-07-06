@@ -17,6 +17,7 @@ import {
   toSalesReportFilters,
 } from "@/components/reports/sales/sales-report-filter-bar";
 import { formatCurrency, formatNumber } from "@/components/reports/sales/sales-report-format";
+import { SalesReportSkeleton } from "@/components/reports/sales/sales-report-skeleton";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -55,7 +56,10 @@ export function CashierSalesPageClient(): JSX.Element {
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useSalesByCashier(filters, canView && hasScope);
-  const topNetSales = (reportQuery.data ?? []).reduce(
+  const reportError = reportQuery.error;
+  const canShowReport = reportQuery.isSuccess && !reportError;
+  const rows = reportQuery.data ?? [];
+  const topNetSales = rows.reduce(
     (top, row) => (row.netSales > top.netSales ? row : top),
     {
       cashierName: "-",
@@ -68,7 +72,7 @@ export function CashierSalesPageClient(): JSX.Element {
       voidCount: 0,
     },
   );
-  const topSalesCount = (reportQuery.data ?? []).reduce(
+  const topSalesCount = rows.reduce(
     (top, row) => (row.salesCount > top.salesCount ? row : top),
     topNetSales,
   );
@@ -102,33 +106,38 @@ export function CashierSalesPageClient(): JSX.Element {
         onChange={setDraft}
         onReset={() => setFilters(toSalesReportFilters(initialDraft, currentTimezone))}
       />
-      <div className="grid gap-4 md:grid-cols-2">
-        <ReportKpiCard
-          icon={UserRound}
-          label="Highest Net Sales"
-          value={`${topNetSales.cashierName} - ${formatCurrency(topNetSales.netSales)}`}
-        />
-        <ReportKpiCard
-          icon={ReceiptText}
-          label="Highest Sales Count"
-          value={`${topSalesCount.cashierName} - ${formatNumber(topSalesCount.salesCount)}`}
-        />
-      </div>
-      {reportQuery.error ? (
+      {reportQuery.isLoading && !reportError ? <SalesReportSkeleton /> : null}
+      {reportError ? (
         <SalesReportErrorState
-          description={getErrorMessage(reportQuery.error)}
+          description={getErrorMessage(reportError)}
           onRetry={() => void reportQuery.refetch()}
         />
       ) : null}
-      <Card className="bg-white/85 shadow-soft">
-        <CardContent className="p-5">
-          {reportQuery.data && reportQuery.data.length > 0 ? (
-            <CashierSalesTable rows={reportQuery.data} />
-          ) : (
-            <SalesReportEmptyState message="No cashier sales returned." />
-          )}
-        </CardContent>
-      </Card>
+      {canShowReport ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-2">
+            <ReportKpiCard
+              icon={UserRound}
+              label="Highest Net Sales"
+              value={`${topNetSales.cashierName} - ${formatCurrency(topNetSales.netSales)}`}
+            />
+            <ReportKpiCard
+              icon={ReceiptText}
+              label="Highest Sales Count"
+              value={`${topSalesCount.cashierName} - ${formatNumber(topSalesCount.salesCount)}`}
+            />
+          </div>
+          <Card className="bg-white/85 shadow-soft">
+            <CardContent className="p-5">
+              {rows.length > 0 ? (
+                <CashierSalesTable rows={rows} />
+              ) : (
+                <SalesReportEmptyState message="No cashier sales returned." />
+              )}
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
     </div>
   );
 }

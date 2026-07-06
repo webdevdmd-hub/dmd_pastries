@@ -17,6 +17,7 @@ import {
   type SalesReportFilterDraft,
   toSalesReportFilters,
 } from "@/components/reports/sales/sales-report-filter-bar";
+import { SalesReportSkeleton } from "@/components/reports/sales/sales-report-skeleton";
 import { SalesSummaryCards } from "@/components/reports/sales/sales-summary-cards";
 import { SalesTrendChart } from "@/components/reports/sales/sales-trend-chart";
 import { SlowMovingProductsCard } from "@/components/reports/sales/slow-moving-products-card";
@@ -120,7 +121,43 @@ export function SalesReportsPageClient(): JSX.Element {
     setFilters(toSalesReportFilters(initialDraft, currentTimezone));
   };
 
-  const firstError = summaryQuery.error ?? trendQuery.error ?? dailyQuery.error;
+  const firstError =
+    summaryQuery.error ??
+    trendQuery.error ??
+    dailyQuery.error ??
+    topProductsQuery.error ??
+    slowProductsQuery.error;
+  const isReportLoading =
+    summaryQuery.isLoading ||
+    trendQuery.isLoading ||
+    dailyQuery.isLoading ||
+    topProductsQuery.isLoading ||
+    slowProductsQuery.isLoading;
+  const reportData =
+    !isReportLoading &&
+    !firstError &&
+    summaryQuery.data &&
+    trendQuery.data &&
+    dailyQuery.data &&
+    topProductsQuery.data &&
+    slowProductsQuery.data
+      ? {
+          daily: dailyQuery.data,
+          slowProducts: slowProductsQuery.data,
+          summary: summaryQuery.data,
+          topProducts: topProductsQuery.data,
+          trend: trendQuery.data,
+        }
+      : null;
+  const retryReports = (): void => {
+    void Promise.all([
+      summaryQuery.refetch(),
+      trendQuery.refetch(),
+      dailyQuery.refetch(),
+      topProductsQuery.refetch(),
+      slowProductsQuery.refetch(),
+    ]);
+  };
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -138,36 +175,46 @@ export function SalesReportsPageClient(): JSX.Element {
         onChange={setDraft}
         onReset={resetFilters}
       />
-      {firstError ? (
-        <SalesReportErrorState description={getErrorMessage(firstError)} onRetry={applyFilters} />
+      {isReportLoading && !firstError ? (
+        <div className="grid gap-4">
+          <SalesReportSkeleton />
+          <SalesReportSkeleton />
+        </div>
       ) : null}
-      <SalesSummaryCards summary={summaryQuery.data} />
-      <ReportChartCard
-        caption="Net sales and sales count trend for the selected period."
-        error={trendQuery.error}
-        isEmpty={isTrendEmpty(trendQuery.data)}
-        isLoading={trendQuery.isLoading}
-        title="Sales Trend"
-        onRetry={() => void trendQuery.refetch()}
-      >
-        {trendQuery.data ? <SalesTrendChart chart={trendQuery.data} /> : null}
-      </ReportChartCard>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <TopProductsCard products={topProductsQuery.data ?? []} />
-        <SlowMovingProductsCard products={slowProductsQuery.data ?? []} />
-      </div>
-      <Card className="bg-white/85 shadow-soft">
-        <CardHeader>
-          <CardTitle className="text-brand-espresso">Daily Sales</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {dailyQuery.data && dailyQuery.data.length > 0 ? (
-            <DailySalesTable rows={dailyQuery.data} />
-          ) : (
-            <SalesReportEmptyState message="No daily sales returned for this filter range." />
-          )}
-        </CardContent>
-      </Card>
+      {firstError ? (
+        <SalesReportErrorState description={getErrorMessage(firstError)} onRetry={retryReports} />
+      ) : null}
+      {reportData ? (
+        <>
+          <SalesSummaryCards summary={reportData.summary} />
+          <ReportChartCard
+            caption="Net sales and sales count trend for the selected period."
+            error={null}
+            isEmpty={isTrendEmpty(reportData.trend)}
+            isLoading={false}
+            title="Sales Trend"
+            onRetry={retryReports}
+          >
+            <SalesTrendChart chart={reportData.trend} />
+          </ReportChartCard>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <TopProductsCard products={reportData.topProducts} />
+            <SlowMovingProductsCard products={reportData.slowProducts} />
+          </div>
+          <Card className="bg-white/85 shadow-soft">
+            <CardHeader>
+              <CardTitle className="text-brand-espresso">Daily Sales</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {reportData.daily.length > 0 ? (
+                <DailySalesTable rows={reportData.daily} />
+              ) : (
+                <SalesReportEmptyState message="No daily sales returned for this filter range." />
+              )}
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {navigationCards.map((item) => {
           const Icon = item.icon;

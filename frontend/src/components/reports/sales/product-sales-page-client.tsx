@@ -14,6 +14,7 @@ import {
   type SalesReportFilterDraft,
   toSalesReportFilters,
 } from "@/components/reports/sales/sales-report-filter-bar";
+import { SalesReportSkeleton } from "@/components/reports/sales/sales-report-skeleton";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,6 +61,9 @@ export function ProductSalesPageClient(): JSX.Element {
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useSalesByProduct(filters, canView && hasScope);
+  const reportError = reportQuery.error;
+  const canShowReport = reportQuery.isSuccess && !reportError;
+  const rows = reportQuery.data ?? [];
 
   if (!canView) return <AccessDeniedCard />;
   if (!hasScope) return <NoBranchScopeCard />;
@@ -99,21 +103,24 @@ export function ProductSalesPageClient(): JSX.Element {
           setFilters({ ...toSalesReportFilters(initialDraft, currentTimezone), limit: 25, page: 1 })
         }
       />
-      {reportQuery.error ? (
+      {reportQuery.isLoading && !reportError ? <SalesReportSkeleton /> : null}
+      {reportError ? (
         <SalesReportErrorState
-          description={getErrorMessage(reportQuery.error)}
+          description={getErrorMessage(reportError)}
           onRetry={() => void reportQuery.refetch()}
         />
       ) : null}
-      <Card className="bg-white/85 shadow-soft">
-        <CardContent className="p-5">
-          {reportQuery.data && reportQuery.data.length > 0 ? (
-            <ProductSalesTable rows={reportQuery.data} />
-          ) : (
-            <SalesReportEmptyState message="No product sales returned." />
-          )}
-        </CardContent>
-      </Card>
+      {canShowReport ? (
+        <Card className="bg-white/85 shadow-soft">
+          <CardContent className="p-5">
+            {rows.length > 0 ? (
+              <ProductSalesTable rows={rows} />
+            ) : (
+              <SalesReportEmptyState message="No product sales returned." />
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

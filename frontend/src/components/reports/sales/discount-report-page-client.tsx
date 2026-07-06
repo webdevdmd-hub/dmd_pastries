@@ -15,6 +15,7 @@ import {
   type SalesReportFilterDraft,
   toSalesReportFilters,
 } from "@/components/reports/sales/sales-report-filter-bar";
+import { SalesReportSkeleton } from "@/components/reports/sales/sales-report-skeleton";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -53,6 +54,9 @@ export function DiscountReportPageClient(): JSX.Element {
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useDiscountReport(filters, canView && hasScope);
+  const reportError = reportQuery.error;
+  const canShowReport = reportQuery.isSuccess && !reportError;
+  const report = reportQuery.data;
 
   if (!canView) return <AccessDeniedCard />;
   if (!hasScope) return <NoBranchScopeCard />;
@@ -83,22 +87,27 @@ export function DiscountReportPageClient(): JSX.Element {
         onChange={setDraft}
         onReset={() => setFilters(toSalesReportFilters(initialDraft, currentTimezone))}
       />
-      <DiscountSummaryCard report={reportQuery.data} />
-      {reportQuery.error ? (
+      {reportQuery.isLoading && !reportError ? <SalesReportSkeleton /> : null}
+      {reportError ? (
         <SalesReportErrorState
-          description={getErrorMessage(reportQuery.error)}
+          description={getErrorMessage(reportError)}
           onRetry={() => void reportQuery.refetch()}
         />
       ) : null}
-      <Card className="bg-white/85 shadow-soft">
-        <CardContent className="p-5">
-          {reportQuery.data && reportQuery.data.items.length > 0 ? (
-            <DiscountSalesTable rows={reportQuery.data.items} />
-          ) : (
-            <SalesReportEmptyState message="No discounted sales returned." />
-          )}
-        </CardContent>
-      </Card>
+      {canShowReport && report ? (
+        <>
+          <DiscountSummaryCard report={report} />
+          <Card className="bg-white/85 shadow-soft">
+            <CardContent className="p-5">
+              {report.items.length > 0 ? (
+                <DiscountSalesTable rows={report.items} />
+              ) : (
+                <SalesReportEmptyState message="No discounted sales returned." />
+              )}
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
     </div>
   );
 }

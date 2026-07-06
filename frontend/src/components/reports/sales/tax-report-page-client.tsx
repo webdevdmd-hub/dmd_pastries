@@ -13,6 +13,7 @@ import {
   type SalesReportFilterDraft,
   toSalesReportFilters,
 } from "@/components/reports/sales/sales-report-filter-bar";
+import { SalesReportSkeleton } from "@/components/reports/sales/sales-report-skeleton";
 import { TaxReportTable } from "@/components/reports/sales/tax-report-table";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Card, CardContent } from "@/components/ui/card";
@@ -52,6 +53,9 @@ export function TaxReportPageClient(): JSX.Element {
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useTaxReport(filters, canView && hasScope);
+  const reportError = reportQuery.error;
+  const canShowReport = reportQuery.isSuccess && !reportError;
+  const rows = reportQuery.data ?? [];
 
   if (!canView) return <AccessDeniedCard />;
   if (!hasScope) return <NoBranchScopeCard />;
@@ -82,21 +86,24 @@ export function TaxReportPageClient(): JSX.Element {
         onChange={setDraft}
         onReset={() => setFilters(toSalesReportFilters(initialDraft, currentTimezone))}
       />
-      {reportQuery.error ? (
+      {reportQuery.isLoading && !reportError ? <SalesReportSkeleton /> : null}
+      {reportError ? (
         <SalesReportErrorState
-          description={getErrorMessage(reportQuery.error)}
+          description={getErrorMessage(reportError)}
           onRetry={() => void reportQuery.refetch()}
         />
       ) : null}
-      <Card className="bg-white/85 shadow-soft">
-        <CardContent className="p-5">
-          {reportQuery.data && reportQuery.data.length > 0 ? (
-            <TaxReportTable rows={reportQuery.data} />
-          ) : (
-            <SalesReportEmptyState message="No tax rows returned." />
-          )}
-        </CardContent>
-      </Card>
+      {canShowReport ? (
+        <Card className="bg-white/85 shadow-soft">
+          <CardContent className="p-5">
+            {rows.length > 0 ? (
+              <TaxReportTable rows={rows} />
+            ) : (
+              <SalesReportEmptyState message="No tax rows returned." />
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

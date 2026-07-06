@@ -15,6 +15,7 @@ import {
   type SalesReportFilterDraft,
   toSalesReportFilters,
 } from "@/components/reports/sales/sales-report-filter-bar";
+import { SalesReportSkeleton } from "@/components/reports/sales/sales-report-skeleton";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -53,6 +54,9 @@ export function CategorySalesPageClient(): JSX.Element {
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useSalesByCategory(filters, canView && hasScope);
+  const reportError = reportQuery.error;
+  const canShowReport = reportQuery.isSuccess && !reportError;
+  const rows = reportQuery.data ?? [];
 
   if (!canView) return <AccessDeniedCard />;
   if (!hasScope) return <NoBranchScopeCard />;
@@ -83,39 +87,42 @@ export function CategorySalesPageClient(): JSX.Element {
         onChange={setDraft}
         onReset={() => setFilters(toSalesReportFilters(initialDraft, currentTimezone))}
       />
-      {reportQuery.error ? (
+      {reportQuery.isLoading && !reportError ? <SalesReportSkeleton /> : null}
+      {reportError ? (
         <SalesReportErrorState
-          description={getErrorMessage(reportQuery.error)}
+          description={getErrorMessage(reportError)}
           onRetry={() => void reportQuery.refetch()}
         />
       ) : null}
-      <Card className="bg-white/85 shadow-soft">
-        <CardContent className="p-5">
-          {reportQuery.data && reportQuery.data.length > 0 ? (
-            <div className="space-y-6">
-              <div className="h-72" aria-label="Category net sales chart">
-                <ResponsiveContainer height="100%" width="100%">
-                  <BarChart
-                    data={reportQuery.data.map((row) => ({
-                      name: row.categoryName,
-                      value: row.netSales,
-                    }))}
-                  >
-                    <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
-                    <XAxis dataKey="name" stroke="#7A553A" />
-                    <YAxis stroke="#7A553A" />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#B08968" radius={8} />
-                  </BarChart>
-                </ResponsiveContainer>
+      {canShowReport ? (
+        <Card className="bg-white/85 shadow-soft">
+          <CardContent className="p-5">
+            {rows.length > 0 ? (
+              <div className="space-y-6">
+                <div className="h-72" aria-label="Category net sales chart">
+                  <ResponsiveContainer height="100%" width="100%">
+                    <BarChart
+                      data={rows.map((row) => ({
+                        name: row.categoryName,
+                        value: row.netSales,
+                      }))}
+                    >
+                      <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
+                      <XAxis dataKey="name" stroke="#7A553A" />
+                      <YAxis stroke="#7A553A" />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#B08968" radius={8} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <CategorySalesTable rows={rows} />
               </div>
-              <CategorySalesTable rows={reportQuery.data} />
-            </div>
-          ) : (
-            <SalesReportEmptyState message="No category sales returned." />
-          )}
-        </CardContent>
-      </Card>
+            ) : (
+              <SalesReportEmptyState message="No category sales returned." />
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }
