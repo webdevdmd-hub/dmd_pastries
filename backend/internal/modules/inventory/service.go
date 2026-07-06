@@ -10,6 +10,7 @@ import (
 
 	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
+	"pastries-pos/internal/modules/inventory/expirystate"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
@@ -1069,6 +1070,10 @@ func (s *Service) ExpiryAlerts(currentUser *utils.AuthContext, query ExpiryAlert
 	if status != "" && status != "active" && status != "expired" && status != "depleted" {
 		return nil, apperrors.BadRequest("invalid status", nil)
 	}
+	expiryState := normalizeAllFilter(query.ExpiryState)
+	if !expirystate.IsValidFilter(expiryState) {
+		return nil, apperrors.BadRequest("invalid expiry_state", nil)
+	}
 	resolvedBranchID, allBranches, err := currentUser.ResolveBranchScope(query.BranchID, "")
 	if err != nil {
 		return nil, err
@@ -1077,11 +1082,23 @@ func (s *Service) ExpiryAlerts(currentUser *utils.AuthContext, query ExpiryAlert
 	if !allBranches {
 		branchID = resolvedBranchID
 	}
-	batches, err := s.repo.ExpiryAlerts(currentUser.BusinessID, branchID, itemType, productType, status, query.Days)
+	timezone := strings.TrimSpace(query.Timezone)
+	if timezone == "" {
+		timezone, err = s.repo.BusinessTimezone(currentUser.BusinessID)
+		if err != nil {
+			return nil, apperrors.Internal("failed to resolve business timezone")
+		}
+	}
+	location, _, err := expirystate.ResolveTimezone(timezone)
+	if err != nil {
+		return nil, apperrors.BadRequest("invalid timezone", map[string]string{"timezone": timezone})
+	}
+	today := expirystate.LocalDate(time.Now(), location)
+	batches, err := s.repo.ExpiryAlerts(currentUser.BusinessID, branchID, itemType, productType, status, today, query.Days)
 	if err != nil {
 		return nil, err
 	}
-	return toExpiryAlertResponses(batches), nil
+	return toExpiryAlertResponses(batches, today, expiryState), nil
 }
 
 func (s *Service) ListExpiryBatches(currentUser *utils.AuthContext, inventoryItemID string) ([]ExpiryBatchResponse, error) {
@@ -1814,18 +1831,25 @@ func mapNotFound(err error, message string) error {
 }
 
 func toExpiryBatchResponse(batch ExpiryBatch) ExpiryBatchResponse {
+	location, _, _ := expirystate.ResolveTimezone("")
+	today := expirystate.LocalDate(time.Now(), location)
+	daysRemaining := expirystate.DaysRemaining(batch.ExpiryDate, today)
+	expiryState := expirystate.State(daysRemaining)
 	return ExpiryBatchResponse{
-		ID:              batch.ID,
-		BusinessID:      batch.BusinessID,
-		BranchID:        batch.BranchID,
-		InventoryItemID: batch.InventoryItemID,
-		BatchNumber:     batch.BatchNumber,
-		Quantity:        roundQuantity(batch.Quantity),
-		ExpiryDate:      batch.ExpiryDate,
-		ReceivedDate:    batch.ReceivedDate,
-		Status:          batch.Status,
-		CreatedAt:       batch.CreatedAt,
-		UpdatedAt:       batch.UpdatedAt,
+		ID:               batch.ID,
+		BusinessID:       batch.BusinessID,
+		BranchID:         batch.BranchID,
+		InventoryItemID:  batch.InventoryItemID,
+		BatchNumber:      batch.BatchNumber,
+		Quantity:         roundQuantity(batch.Quantity),
+		ExpiryDate:       batch.ExpiryDate,
+		ReceivedDate:     batch.ReceivedDate,
+		Status:           batch.Status,
+		DaysRemaining:    daysRemaining,
+		ExpiryState:      expiryState,
+		ExpiryStateLabel: expirystate.Label(expiryState),
+		CreatedAt:        batch.CreatedAt,
+		UpdatedAt:        batch.UpdatedAt,
 	}
 }
 
@@ -1837,9 +1861,14 @@ func toExpiryBatchResponses(batches []ExpiryBatch) []ExpiryBatchResponse {
 	return responses
 }
 
-func toExpiryAlertResponses(batches []expiryBatchAlertRow) []ExpiryBatchResponse {
+func toExpiryAlertResponses(batches []expiryBatchAlertRow, today time.Time, stateFilter string) []ExpiryBatchResponse {
 	responses := make([]ExpiryBatchResponse, 0, len(batches))
 	for _, batch := range batches {
+		daysRemaining := expirystate.DaysRemaining(batch.ExpiryDate, today)
+		expiryState := expirystate.State(daysRemaining)
+		if stateFilter != "" && expiryState != stateFilter {
+			continue
+		}
 		responses = append(responses, ExpiryBatchResponse{
 			ID:                      batch.ID,
 			BusinessID:              batch.BusinessID,
@@ -1861,6 +1890,9 @@ func toExpiryAlertResponses(batches []expiryBatchAlertRow) []ExpiryBatchResponse
 			ExpiryDate:              batch.ExpiryDate,
 			ReceivedDate:            batch.ReceivedDate,
 			Status:                  batch.Status,
+			DaysRemaining:           daysRemaining,
+			ExpiryState:             expiryState,
+			ExpiryStateLabel:        expirystate.Label(expiryState),
 			CreatedAt:               batch.CreatedAt,
 			UpdatedAt:               batch.UpdatedAt,
 		})

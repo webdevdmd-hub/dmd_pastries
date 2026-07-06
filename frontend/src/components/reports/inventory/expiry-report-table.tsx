@@ -12,18 +12,14 @@ import {
 } from "@/components/ui/table";
 import type { ExpiryReportRow } from "@/types/inventory-reports";
 
-function expiryBadge(daysRemaining: number, status: string): JSX.Element {
-  if (daysRemaining < 0 || status === "expired") {
-    return <Badge className="border-red-200 bg-red-50 text-red-800">Expired</Badge>;
+function expiryBadge(state: string, label: string): JSX.Element {
+  if (state === "expired") {
+    return <Badge className="border-red-200 bg-red-50 text-red-800">{label}</Badge>;
   }
-  if (daysRemaining <= 7) {
-    return <Badge className="border-red-200 bg-red-50 text-red-800">Urgent</Badge>;
+  if (state === "expires_today") {
+    return <Badge className="border-orange-200 bg-orange-50 text-orange-800">{label}</Badge>;
   }
-  if (daysRemaining <= 30) {
-    return <Badge className="border-amber-200 bg-amber-50 text-amber-800">Expiring soon</Badge>;
-  }
-
-  return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">Safe</Badge>;
+  return <Badge className="border-amber-200 bg-amber-50 text-amber-800">{label}</Badge>;
 }
 
 export function ExpiryReportTable({ rows }: { rows: ExpiryReportRow[] }): JSX.Element {
@@ -53,7 +49,7 @@ export function ExpiryReportTable({ rows }: { rows: ExpiryReportRow[] }): JSX.El
             <TableCell>{formatDate(row.receivedDate)}</TableCell>
             <TableCell>{formatDate(row.expiryDate)}</TableCell>
             <TableCell>{row.daysRemaining}</TableCell>
-            <TableCell>{expiryBadge(row.daysRemaining, row.status)}</TableCell>
+            <TableCell>{expiryBadge(row.expiryState, row.expiryStateLabel)}</TableCell>
           </TableRow>
         ))}
       </TableBody>

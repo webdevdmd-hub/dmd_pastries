@@ -494,12 +494,12 @@ func LedgerMappedMovement(db *gorm.DB, scope MetricScope, mappingKey, fallbackCo
 	return roundMetricMoney(total), err
 }
 
-func ExpiringItemsCount(db *gorm.DB, scope MetricScope, days int) (int64, error) {
+func ExpiringItemsCount(db *gorm.DB, scope MetricScope, todayDate string, days int) (int64, error) {
 	if days <= 0 {
 		days = 7
 	}
-	query := "SELECT COUNT(*) FROM expiry_batches WHERE business_id = ? AND status = 'active' AND deleted_at IS NULL AND expiry_date <= CURRENT_DATE + (? * INTERVAL '1 day')"
-	args := []interface{}{scope.BusinessID, days}
+	query := "SELECT COUNT(*) FROM expiry_batches WHERE business_id = ? AND status = 'active' AND deleted_at IS NULL AND expiry_date > ?::date AND expiry_date <= ?::date + (? * INTERVAL '1 day')"
+	args := []interface{}{scope.BusinessID, todayDate, todayDate, days}
 	if !scope.AllBranches {
 		query += " AND branch_id = ?"
 		args = append(args, scope.BranchID)

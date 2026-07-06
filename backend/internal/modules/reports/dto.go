@@ -230,17 +230,19 @@ type LowStockReportItem struct {
 }
 
 type ExpiryReportItem struct {
-	BatchID         string  `json:"batch_id"`
-	InventoryItemID string  `json:"inventory_item_id"`
-	ItemName        string  `json:"item_name"`
-	BranchName      string  `json:"branch_name"`
-	BatchNumber     string  `json:"batch_number"`
-	Quantity        float64 `json:"quantity"`
-	UnitSymbol      string  `json:"unit_symbol"`
-	ReceivedDate    string  `json:"received_date"`
-	ExpiryDate      string  `json:"expiry_date"`
-	DaysRemaining   int     `json:"days_remaining"`
-	Status          string  `json:"status"`
+	BatchID          string  `json:"batch_id"`
+	InventoryItemID  string  `json:"inventory_item_id"`
+	ItemName         string  `json:"item_name"`
+	BranchName       string  `json:"branch_name"`
+	BatchNumber      string  `json:"batch_number"`
+	Quantity         float64 `json:"quantity"`
+	UnitSymbol       string  `json:"unit_symbol"`
+	ReceivedDate     string  `json:"received_date"`
+	ExpiryDate       string  `json:"expiry_date"`
+	DaysRemaining    int     `json:"days_remaining"`
+	Status           string  `json:"status"`
+	ExpiryState      string  `json:"expiry_state"`
+	ExpiryStateLabel string  `json:"expiry_state_label"`
 }
 
 type InventoryMovementReportItem struct {

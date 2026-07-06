@@ -34,14 +34,15 @@ import { useBranches } from "@/hooks/use-branches";
 import { useExpiryAlerts } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
-import type { ExpiryAlertFilters, ExpiryBatch, ExpiryBatchStatus } from "@/types/inventory";
+import { resolveDashboardTimezone } from "@/lib/reports/dashboard-filters";
+import type { ExpiryAlertFilters, ExpiryBatch, ExpiryState } from "@/types/inventory";
 import { PRODUCT_TYPE_LABELS, PRODUCT_TYPES } from "@/types/product";
 
 const defaultFilters: ExpiryAlertFilters = {
   branchId: "",
   itemType: "all",
   productType: "all",
-  status: "all",
+  expiryState: "all",
   days: 30,
 };
 
@@ -49,22 +50,16 @@ function formatDate(value: string): string {
   return value ? new Date(value).toLocaleDateString("en-AE") : "Not recorded";
 }
 
-function daysRemaining(value: string): number {
-  const expiryTime = new Date(value).getTime();
-  const now = new Date().getTime();
-  return Math.ceil((expiryTime - now) / 86_400_000);
-}
-
-function statusBadge(status: ExpiryBatchStatus): JSX.Element {
-  if (status === "expired") {
-    return <Badge className="border-red-200 bg-red-100 text-red-900">Expired</Badge>;
+function expiryStateBadge(state: ExpiryState, label: string): JSX.Element {
+  if (state === "expired") {
+    return <Badge className="border-red-200 bg-red-100 text-red-900">{label}</Badge>;
   }
 
-  if (status === "depleted") {
-    return <Badge variant="secondary">Depleted</Badge>;
+  if (state === "expires_today") {
+    return <Badge className="border-orange-200 bg-orange-100 text-orange-900">{label}</Badge>;
   }
 
-  return <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">Expiring</Badge>;
+  return <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">{label}</Badge>;
 }
 
 function itemTypeLabel(itemType: ExpiryBatch["itemType"]): string {
@@ -99,10 +94,12 @@ export function ExpiryAlertsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
   const { normalizeBranchId } = branchScope;
+  const timezone = useMemo(resolveDashboardTimezone, []);
   const canView = hasAnyPermission([PERMISSIONS.inventoryExpiryView, PERMISSIONS.inventoryView]);
   const [filters, setFilters] = useState<ExpiryAlertFilters>({
     ...defaultFilters,
     branchId: branchScope.defaultBranchId,
+    timezone,
   });
   const alertsQuery = useExpiryAlerts(filters, canView && branchScope.hasBranchScope);
   const branchesQuery = useBranches(canView);
@@ -203,19 +200,22 @@ export function ExpiryAlertsPageClient(): JSX.Element {
           </SelectContent>
         </Select>
         <Select
-          onValueChange={(status) =>
-            setFilters({ ...filters, status: status as ExpiryAlertFilters["status"] })
+          onValueChange={(expiryState) =>
+            setFilters({
+              ...filters,
+              expiryState: expiryState as ExpiryAlertFilters["expiryState"],
+            })
           }
-          value={filters.status}
+          value={filters.expiryState}
         >
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="expired">Expired</SelectItem>
-            <SelectItem value="depleted">Depleted</SelectItem>
+            <SelectItem value="all">All expiry states</SelectItem>
+            <SelectItem value="expiring_soon">Expiring Soon</SelectItem>
+            <SelectItem value="expires_today">Expires Today</SelectItem>
+            <SelectItem value="expired">Expired / Overdue</SelectItem>
           </SelectContent>
         </Select>
         <Input
@@ -226,7 +226,9 @@ export function ExpiryAlertsPageClient(): JSX.Element {
           value={filters.days}
         />
         <Button
-          onClick={() => setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })}
+          onClick={() =>
+            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId, timezone })
+          }
           type="button"
           variant="outline"
         >
@@ -268,7 +270,7 @@ export function ExpiryAlertsPageClient(): JSX.Element {
               </TableHeader>
               <TableBody>
                 {(alertsQuery.data ?? []).map((batch) => {
-                  const remaining = daysRemaining(batch.expiryDate);
+                  const remaining = batch.daysRemaining;
                   return (
                     <TableRow key={batch.id}>
                       <TableCell>
@@ -314,7 +316,9 @@ export function ExpiryAlertsPageClient(): JSX.Element {
                           ? `${String(Math.abs(remaining))} days overdue`
                           : `${String(remaining)} days`}
                       </TableCell>
-                      <TableCell>{statusBadge(batch.status)}</TableCell>
+                      <TableCell>
+                        {expiryStateBadge(batch.expiryState, batch.expiryStateLabel)}
+                      </TableCell>
                     </TableRow>
                   );
                 })}

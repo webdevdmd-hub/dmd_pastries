@@ -31,6 +31,10 @@ const defaultStatusOptions: InventoryReportSelectOption[] = [
   { label: "Out of stock", value: "out_of_stock" },
 ];
 
+function isExpiryState(value: string): value is NonNullable<InventoryReportFilters["expiryState"]> {
+  return value === "expired" || value === "expires_today" || value === "expiring_soon";
+}
+
 export type InventoryReportFilterDraft = {
   branchId: string;
   dateFrom: string;
@@ -41,13 +45,23 @@ export type InventoryReportFilterDraft = {
 
 export function toInventoryReportFilters(
   filters: InventoryReportFilterDraft,
+  statusFilterKey: "expiryState" | "status" = "status",
 ): InventoryReportFilters {
+  const statusFilter =
+    filters.status !== allValue
+      ? statusFilterKey === "expiryState" && isExpiryState(filters.status)
+        ? { expiryState: filters.status }
+        : statusFilterKey === "status"
+          ? { status: filters.status }
+          : {}
+      : {};
+
   return {
     ...(filters.branchId ? { branchId: filters.branchId } : {}),
     ...(filters.dateFrom ? { dateFrom: filters.dateFrom } : {}),
     ...(filters.dateTo ? { dateTo: filters.dateTo } : {}),
     ...(filters.itemType !== allValue ? { itemType: filters.itemType } : {}),
-    ...(filters.status !== allValue ? { status: filters.status } : {}),
+    ...statusFilter,
   };
 }
 

@@ -25,6 +25,14 @@ import { useExpiryReport } from "@/hooks/use-inventory-reports";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { resolveDashboardTimezone } from "@/lib/reports/dashboard-filters";
+
+const expiryStatusOptions = [
+  { label: "All expiry states", value: "all" },
+  { label: "Expiring Soon", value: "expiring_soon" },
+  { label: "Expires Today", value: "expires_today" },
+  { label: "Expired / Overdue", value: "expired" },
+];
 
 export function ExpiryReportPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -36,7 +44,11 @@ export function ExpiryReportPageClient(): JSX.Element {
     [branchScope.effectiveBranchId],
   );
   const [draft, setDraft] = useState<InventoryReportFilterDraft>(initialDraft);
-  const [filters, setFilters] = useState(() => toInventoryReportFilters(initialDraft));
+  const timezone = useMemo(resolveDashboardTimezone, []);
+  const [filters, setFilters] = useState(() => ({
+    ...toInventoryReportFilters(initialDraft, "expiryState"),
+    timezone,
+  }));
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useExpiryReport(filters, canView && hasScope);
@@ -45,8 +57,8 @@ export function ExpiryReportPageClient(): JSX.Element {
   if (!hasScope) return <NoBranchScopeCard />;
 
   const applyFilters = (): void => {
-    const next = parseInventoryReportDraft(draft);
-    if (next) setFilters(next);
+    const next = parseInventoryReportDraft(draft, "expiryState");
+    if (next) setFilters({ ...next, timezone });
   };
 
   return (
@@ -63,7 +75,10 @@ export function ExpiryReportPageClient(): JSX.Element {
         filters={draft}
         onApply={applyFilters}
         onChange={setDraft}
-        onReset={() => setFilters(toInventoryReportFilters(initialDraft))}
+        onReset={() =>
+          setFilters({ ...toInventoryReportFilters(initialDraft, "expiryState"), timezone })
+        }
+        statusOptions={expiryStatusOptions}
       />
       {reportQuery.error ? (
         <InventoryReportErrorState

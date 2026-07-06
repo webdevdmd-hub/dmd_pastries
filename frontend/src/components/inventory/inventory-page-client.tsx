@@ -48,6 +48,7 @@ import {
 import { usePermission } from "@/hooks/use-permission";
 import { useProductReferenceData, useProducts } from "@/hooks/use-products";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { resolveDashboardTimezone } from "@/lib/reports/dashboard-filters";
 import type { Branch } from "@/types/branch";
 import type {
   CreateExpiryBatchPayload,
@@ -125,13 +126,15 @@ export function InventoryPageClient(): JSX.Element {
   const [adjustmentItem, setAdjustmentItem] = useState<InventoryItem | null>(null);
   const [batchItem, setBatchItem] = useState<InventoryItem | null>(null);
   const [openingStockItem, setOpeningStockItem] = useState<InventoryItem | null>(null);
+  const timezone = useMemo(resolveDashboardTimezone, []);
   const inventoryQuery = useInventory(filters, canView && branchScope.hasBranchScope);
   const expiryAlertsQuery = useExpiryAlerts(
     {
       branchId: filters.branchId,
       itemType: "all",
       productType: "all",
-      status: "all",
+      expiryState: "all",
+      timezone,
       days: 30,
     },
     canView && branchScope.hasBranchScope,

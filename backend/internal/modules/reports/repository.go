@@ -264,7 +264,7 @@ func (r *Repository) ExportRows(reportType string, filter *shared.ResolvedFilter
 			{"Received Date", func(item ExpiryReportItem) string { return item.ReceivedDate }},
 			{"Expiry Date", func(item ExpiryReportItem) string { return item.ExpiryDate }},
 			{"Days Remaining", func(item ExpiryReportItem) string { return strconv.Itoa(item.DaysRemaining) }},
-			{"Status", func(item ExpiryReportItem) string { return item.Status }},
+			{"Status", func(item ExpiryReportItem) string { return item.ExpiryStateLabel }},
 		})
 	case "inventory_movements":
 		items, _, err := r.InventoryMovements(filter)
@@ -1212,8 +1212,9 @@ func (r *Repository) InventorySummary(filter *shared.ResolvedFilter) (*Inventory
 		days = 30
 	}
 	var expiring int64
-	expiryQuery := "SELECT COUNT(*) FROM expiry_batches eb WHERE eb.business_id = ? AND eb.deleted_at IS NULL AND eb.status = 'active' AND eb.expiry_date <= CURRENT_DATE + (? * INTERVAL '1 day')"
-	expiryArgs := []interface{}{filter.BusinessID, days}
+	todayDate := filter.DateFrom.Format("2006-01-02")
+	expiryQuery := "SELECT COUNT(*) FROM expiry_batches eb WHERE eb.business_id = ? AND eb.deleted_at IS NULL AND eb.status = 'active' AND eb.expiry_date > ?::date AND eb.expiry_date <= ?::date + (? * INTERVAL '1 day')"
+	expiryArgs := []interface{}{filter.BusinessID, todayDate, todayDate, days}
 	if !filter.AllBranches {
 		expiryQuery += " AND eb.branch_id = ?"
 		expiryArgs = append(expiryArgs, filter.BranchID)
@@ -1344,7 +1345,17 @@ func (r *Repository) ExpiryReport(filter *shared.ResolvedFilter) ([]ExpiryReport
 			b.branch_name, COALESCE(eb.batch_number,'') AS batch_number,
 			eb.quantity, u.symbol AS unit_symbol,
 			eb.received_date::text AS received_date, eb.expiry_date::text AS expiry_date,
-			(eb.expiry_date - CURRENT_DATE)::int AS days_remaining,
+			(eb.expiry_date - ?::date)::int AS days_remaining,
+			CASE
+				WHEN eb.expiry_date < ?::date THEN 'expired'
+				WHEN eb.expiry_date = ?::date THEN 'expires_today'
+				ELSE 'expiring_soon'
+			END AS expiry_state,
+			CASE
+				WHEN eb.expiry_date < ?::date THEN 'Expired / Overdue'
+				WHEN eb.expiry_date = ?::date THEN 'Expires Today'
+				ELSE 'Expiring Soon'
+			END AS expiry_state_label,
 			eb.status
 		FROM expiry_batches eb
 		JOIN inventory_items ii ON ii.id = eb.inventory_item_id
@@ -1354,8 +1365,9 @@ func (r *Repository) ExpiryReport(filter *shared.ResolvedFilter) ([]ExpiryReport
 		LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id
 		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
 		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
-		WHERE eb.business_id = ? AND eb.deleted_at IS NULL AND eb.expiry_date <= CURRENT_DATE + (? * INTERVAL '1 day')`
-	args := []interface{}{filter.BusinessID, days}
+		WHERE eb.business_id = ? AND eb.deleted_at IS NULL AND eb.expiry_date <= ?::date + (? * INTERVAL '1 day')`
+	todayDate := filter.DateFrom.Format("2006-01-02")
+	args := []interface{}{todayDate, todayDate, todayDate, todayDate, todayDate, filter.BusinessID, todayDate, days}
 	if !filter.AllBranches {
 		query += " AND eb.branch_id = ?"
 		args = append(args, filter.BranchID)
@@ -1363,6 +1375,14 @@ func (r *Repository) ExpiryReport(filter *shared.ResolvedFilter) ([]ExpiryReport
 	if filter.ItemType != "" {
 		query += " AND ii.item_type = ?"
 		args = append(args, filter.ItemType)
+	}
+	if filter.ExpiryState != "" {
+		query += ` AND CASE
+			WHEN eb.expiry_date < ?::date THEN 'expired'
+			WHEN eb.expiry_date = ?::date THEN 'expires_today'
+			ELSE 'expiring_soon'
+		END = ?`
+		args = append(args, todayDate, todayDate, filter.ExpiryState)
 	}
 	if filter.Status != "" {
 		query += " AND eb.status = ?"
@@ -2263,7 +2283,7 @@ func (r *Repository) inventorySummary(filter *shared.ResolvedFilter) (*Inventory
 	if err := r.db.Raw(query, args...).Scan(&lowStock).Error; err != nil {
 		return nil, err
 	}
-	expiring, err := shared.ExpiringItemsCount(r.db, shared.MetricScopeFromFilter(filter), 7)
+	expiring, err := shared.ExpiringItemsCount(r.db, shared.MetricScopeFromFilter(filter), filter.DateFrom.Format("2006-01-02"), 7)
 	if err != nil {
 		return nil, err
 	}

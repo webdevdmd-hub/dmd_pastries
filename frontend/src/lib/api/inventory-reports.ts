@@ -72,6 +72,8 @@ type BackendExpiryReportRow = {
   branch_name?: string;
   days_remaining?: number;
   expiry_date?: string;
+  expiry_state?: string;
+  expiry_state_label?: string;
   inventory_item_id?: string;
   item_name?: string;
   quantity?: number;
@@ -244,7 +246,9 @@ function toSearchParams(filters: InventoryReportFilters): string {
     ["item_type", filters.itemType],
     ["date_from", filters.dateFrom],
     ["date_to", filters.dateTo],
+    ["expiry_state", filters.expiryState],
     ["status", filters.status],
+    ["timezone", filters.timezone],
     ["page", filters.page],
     ["limit", filters.limit],
     ["sort_by", filters.sortBy],
@@ -335,6 +339,8 @@ function parseExpiryReportRow(value: unknown): ExpiryReportRow {
     branchName: stringOrEmpty(row.branch_name),
     daysRemaining: numberOrZero(row.days_remaining),
     expiryDate: stringOrEmpty(row.expiry_date),
+    expiryState: stringOrEmpty(row.expiry_state),
+    expiryStateLabel: stringOrEmpty(row.expiry_state_label),
     inventoryItemId: stringOrEmpty(row.inventory_item_id),
     itemName: stringOrEmpty(row.item_name),
     quantity: numberOrZero(row.quantity),

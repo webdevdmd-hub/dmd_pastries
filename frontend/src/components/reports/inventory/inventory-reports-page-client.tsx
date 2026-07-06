@@ -36,6 +36,7 @@ import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useInventorySummary, useInventoryTrend } from "@/hooks/use-inventory-reports";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
+import { resolveDashboardTimezone } from "@/lib/reports/dashboard-filters";
 
 const navigationCards = [
   { href: ROUTES.reportsInventoryCurrentStock, icon: PackageSearch, label: "Current Stock" },
@@ -71,7 +72,11 @@ export function InventoryReportsPageClient(): JSX.Element {
     [branchScope.effectiveBranchId],
   );
   const [draft, setDraft] = useState<InventoryReportFilterDraft>(initialDraft);
-  const [filters, setFilters] = useState(() => toInventoryReportFilters(initialDraft));
+  const timezone = useMemo(resolveDashboardTimezone, []);
+  const [filters, setFilters] = useState(() => ({
+    ...toInventoryReportFilters(initialDraft),
+    timezone,
+  }));
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const summaryQuery = useInventorySummary(filters, canView && hasScope);
@@ -82,10 +87,10 @@ export function InventoryReportsPageClient(): JSX.Element {
 
   const applyFilters = (): void => {
     const next = parseInventoryReportDraft(draft);
-    if (next) setFilters(next);
+    if (next) setFilters({ ...next, timezone });
   };
 
-  const resetFilters = (): void => setFilters(toInventoryReportFilters(initialDraft));
+  const resetFilters = (): void => setFilters({ ...toInventoryReportFilters(initialDraft), timezone });
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">

@@ -188,7 +188,10 @@ func resolveScope(currentUser *utils.AuthContext, values url.Values) (Scope, err
 		return Scope{}, err
 	}
 
-	location := time.UTC
+	location, _ := time.LoadLocation("Asia/Dubai")
+	if location == nil {
+		location = time.UTC
+	}
 	if timezone := strings.TrimSpace(values.Get("timezone")); timezone != "" {
 		loaded, err := time.LoadLocation(timezone)
 		if err != nil {

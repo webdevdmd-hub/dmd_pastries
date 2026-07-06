@@ -72,6 +72,8 @@ type ExpiryAlertQuery struct {
 	ItemType    string
 	ProductType string
 	Status      string
+	ExpiryState string
+	Timezone    string
 	Days        int
 }
 
@@ -426,6 +428,9 @@ type ExpiryBatchResponse struct {
 	ExpiryDate              time.Time `json:"expiry_date"`
 	ReceivedDate            time.Time `json:"received_date"`
 	Status                  string    `json:"status"`
+	DaysRemaining           int       `json:"days_remaining"`
+	ExpiryState             string    `json:"expiry_state"`
+	ExpiryStateLabel        string    `json:"expiry_state_label"`
 	CreatedAt               time.Time `json:"created_at"`
 	UpdatedAt               time.Time `json:"updated_at"`
 }

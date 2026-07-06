@@ -17,8 +17,9 @@ export function defaultInventoryReportDraft(branchId: string): InventoryReportFi
 
 export function parseInventoryReportDraft(
   draft: InventoryReportFilterDraft,
+  statusFilterKey: "expiryState" | "status" = "status",
 ): InventoryReportFilters | null {
-  const filters = toInventoryReportFilters(draft);
+  const filters = toInventoryReportFilters(draft, statusFilterKey);
   const parsed = inventoryReportFiltersSchema.safeParse(filters);
 
   if (!parsed.success) {

@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -582,7 +583,25 @@ type expiryBatchAlertRow struct {
 	UpdatedAt               time.Time
 }
 
-func (r *Repository) ExpiryAlerts(businessID, branchID, itemType, productType, status string, days int) ([]expiryBatchAlertRow, error) {
+func (r *Repository) BusinessTimezone(businessID string) (string, error) {
+	var row struct {
+		Timezone string
+	}
+	err := r.db.
+		Table("company_settings").
+		Select("timezone").
+		Where("business_id = ? AND deleted_at IS NULL", businessID).
+		Take(&row).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", nil
+		}
+		return "", err
+	}
+	return strings.TrimSpace(row.Timezone), nil
+}
+
+func (r *Repository) ExpiryAlerts(businessID, branchID, itemType, productType, status string, today time.Time, days int) ([]expiryBatchAlertRow, error) {
 	query := r.db.Table("expiry_batches eb").
 		Select(`
 			eb.id::text AS id,
@@ -653,7 +672,7 @@ func (r *Repository) ExpiryAlerts(businessID, branchID, itemType, productType, s
 	if status != "" {
 		query = query.Where("eb.status = ?", status)
 	}
-	until := time.Now().UTC().AddDate(0, 0, days)
+	until := today.AddDate(0, 0, days)
 	var batches []expiryBatchAlertRow
 	err := query.Where("eb.expiry_date <= ?", until).Order("eb.expiry_date ASC").Scan(&batches).Error
 	return batches, err

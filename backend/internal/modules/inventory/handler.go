@@ -365,6 +365,8 @@ func (h *Handler) ExpiryAlerts(c *gin.Context) {
 		ItemType:    c.Query("item_type"),
 		ProductType: c.Query("product_type"),
 		Status:      c.Query("status"),
+		ExpiryState: c.Query("expiry_state"),
+		Timezone:    c.Query("timezone"),
 		Days:        days,
 	})
 	if err != nil {

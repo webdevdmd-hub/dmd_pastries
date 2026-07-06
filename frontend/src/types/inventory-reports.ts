@@ -7,12 +7,14 @@ export type InventoryReportFilters = {
   branchId?: string;
   dateFrom?: string;
   dateTo?: string;
+  expiryState?: "expired" | "expires_today" | "expiring_soon";
   itemType?: InventoryReportItemType;
   limit?: number;
   page?: number;
   sortBy?: string;
   sortOrder?: InventoryReportSortOrder;
   status?: string;
+  timezone?: string;
 };
 
 export type InventoryReportPagination = {
@@ -76,6 +78,8 @@ export type ExpiryReportRow = {
   branchName: string;
   daysRemaining: number;
   expiryDate: string;
+  expiryState: string;
+  expiryStateLabel: string;
   inventoryItemId: string;
   itemName: string;
   quantity: number;

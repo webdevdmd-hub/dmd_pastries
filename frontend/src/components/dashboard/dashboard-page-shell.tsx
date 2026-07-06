@@ -1,10 +1,12 @@
 "use client";
 
 import type { JSX, ReactNode } from "react";
+import { useMemo } from "react";
 
 import { DashboardAlertsPanel } from "@/components/dashboard/dashboard-alerts-panel";
 import { DashboardRecentActivity } from "@/components/dashboard/dashboard-recent-activity";
 import { useDashboardAlerts, useRecentActivity } from "@/hooks/use-dashboard";
+import { resolveDashboardTimezone } from "@/lib/reports/dashboard-filters";
 
 export function DashboardPageShell({
   children,
@@ -13,7 +15,8 @@ export function DashboardPageShell({
   canLoad: boolean;
   children: ReactNode;
 }): JSX.Element {
-  const alertsQuery = useDashboardAlerts(canLoad);
+  const timezone = useMemo(resolveDashboardTimezone, []);
+  const alertsQuery = useDashboardAlerts({ timezone }, canLoad);
   const activityQuery = useRecentActivity(canLoad);
   return (
     <div className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">

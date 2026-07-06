@@ -40,6 +40,7 @@ export type MovementType =
 export type AdjustmentType = "increase" | "decrease";
 
 export type ExpiryBatchStatus = "active" | "expired" | "depleted";
+export type ExpiryState = "expired" | "expires_today" | "expiring_soon";
 
 export type InventoryItem = {
   id: string;
@@ -129,6 +130,9 @@ export type ExpiryBatch = {
   expiryDate: string;
   receivedDate: string;
   status: ExpiryBatchStatus;
+  daysRemaining: number;
+  expiryState: ExpiryState;
+  expiryStateLabel: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -294,7 +298,9 @@ export type ExpiryAlertFilters = {
   branchId: string;
   itemType: InventoryItemTypeFilter;
   productType: InventoryProductTypeFilter;
-  status: ExpiryBatchStatus | "all";
+  status?: ExpiryBatchStatus | "all";
+  expiryState: ExpiryState | "all";
+  timezone?: string;
   days: number;
 };
 

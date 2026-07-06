@@ -18,6 +18,7 @@ export const inventoryReportFiltersSchema = z
     branchId: uuidOrAllSchema.optional(),
     dateFrom: optionalDateSchema,
     dateTo: optionalDateSchema,
+    expiryState: z.enum(["expired", "expires_today", "expiring_soon"]).optional(),
     itemType: z.enum(["product", "product_variant", "ingredient", "packaging"]).optional(),
     productType: z
       .enum([
@@ -36,6 +37,7 @@ export const inventoryReportFiltersSchema = z
     sortBy: z.string().optional(),
     sortOrder: z.enum(["asc", "desc"]).optional(),
     status: z.string().optional(),
+    timezone: z.string().optional(),
   })
   .refine(
     (value) => {

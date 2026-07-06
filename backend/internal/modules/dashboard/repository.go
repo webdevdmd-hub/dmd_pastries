@@ -148,8 +148,8 @@ func (r *Repository) ProductionDashboard(scope Scope) (*ProductionDashboardRespo
 	if err := r.db.Raw(ingredientQuery, ingredientArgs...).Scan(&ingredients).Error; err != nil {
 		return nil, err
 	}
-	expiryQuery := "SELECT COUNT(*) FROM expiry_batches eb JOIN inventory_items ii ON ii.id = eb.inventory_item_id WHERE eb.business_id = ? AND ii.item_type = 'ingredient' AND eb.status = 'active' AND eb.deleted_at IS NULL AND eb.expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'"
-	expiryArgs := []interface{}{scope.BusinessID}
+	expiryQuery := "SELECT COUNT(*) FROM expiry_batches eb JOIN inventory_items ii ON ii.id = eb.inventory_item_id WHERE eb.business_id = ? AND ii.item_type = 'ingredient' AND eb.status = 'active' AND eb.deleted_at IS NULL AND eb.expiry_date > ?::date AND eb.expiry_date <= ?::date + INTERVAL '7 days'"
+	expiryArgs := []interface{}{scope.BusinessID, scope.TodayDate, scope.TodayDate}
 	expiryQuery, expiryArgs = addScopedBranch(expiryQuery, expiryArgs, "eb.branch_id", scope)
 	if err := r.db.Raw(expiryQuery, expiryArgs...).Scan(&ingredients.ExpiringIngredients).Error; err != nil {
 		return nil, err
@@ -279,14 +279,24 @@ func (r *Repository) Alerts(scope Scope) (*AlertsResponse, error) {
 	expiryQuery := `
 		SELECT COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '') AS item_name,
 			eb.expiry_date::text AS expiry_date,
-			(eb.expiry_date - CURRENT_DATE)::int AS days_remaining
+			(eb.expiry_date - ?::date)::int AS days_remaining,
+			CASE
+				WHEN eb.expiry_date < ?::date THEN 'expired'
+				WHEN eb.expiry_date = ?::date THEN 'expires_today'
+				ELSE 'expiring_soon'
+			END AS expiry_state,
+			CASE
+				WHEN eb.expiry_date < ?::date THEN 'Expired / Overdue'
+				WHEN eb.expiry_date = ?::date THEN 'Expires Today'
+				ELSE 'Expiring Soon'
+			END AS expiry_state_label
 		FROM expiry_batches eb
 		JOIN inventory_items ii ON ii.id = eb.inventory_item_id
 		LEFT JOIN products p ON p.id = ii.product_id
 		LEFT JOIN ingredients ing ON ing.id = ii.ingredient_id
 		LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id
-		WHERE eb.business_id = ? AND eb.status = 'active' AND eb.deleted_at IS NULL AND eb.expiry_date <= CURRENT_DATE + INTERVAL '7 days'`
-	expiryArgs := []interface{}{scope.BusinessID}
+		WHERE eb.business_id = ? AND eb.status = 'active' AND eb.deleted_at IS NULL AND eb.expiry_date <= ?::date + INTERVAL '7 days'`
+	expiryArgs := []interface{}{scope.TodayDate, scope.TodayDate, scope.TodayDate, scope.TodayDate, scope.TodayDate, scope.BusinessID, scope.TodayDate}
 	expiryQuery, expiryArgs = addScopedBranch(expiryQuery, expiryArgs, "eb.branch_id", scope)
 	expiryQuery += " ORDER BY eb.expiry_date ASC LIMIT 10"
 	if err := r.db.Raw(expiryQuery, expiryArgs...).Scan(&response.ExpiryAlerts).Error; err != nil {
@@ -348,7 +358,7 @@ func (r *Repository) adminInventory(scope Scope) (*AdminInventoryWidget, error) 
 	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
 		return nil, err
 	}
-	expiring, err := reportshared.ExpiringItemsCount(r.db, dashboardMetricScope(scope), 7)
+	expiring, err := reportshared.ExpiringItemsCount(r.db, dashboardMetricScope(scope), scope.TodayDate, 7)
 	if err != nil {
 		return nil, err
 	}

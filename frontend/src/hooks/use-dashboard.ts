@@ -74,12 +74,16 @@ export function useRecentActivity(enabled = true) {
   );
 }
 
-export function useDashboardAlerts(enabled = true) {
+export function useDashboardAlerts(
+  filters?: Pick<DashboardRequestFilters, "timezone">,
+  enabled = true,
+) {
   return useDashboardQuery<DashboardAlert[]>(
     "alerts",
-    getDashboardAlerts,
+    async () => getDashboardAlerts(filters),
     enabled,
     alertsRefreshMs,
+    filters,
   );
 }
 

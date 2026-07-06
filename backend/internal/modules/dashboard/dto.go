@@ -154,9 +154,11 @@ type LowStockAlert struct {
 }
 
 type ExpiryAlert struct {
-	ItemName      string `json:"item_name"`
-	ExpiryDate    string `json:"expiry_date"`
-	DaysRemaining int    `json:"days_remaining"`
+	ItemName         string `json:"item_name"`
+	ExpiryDate       string `json:"expiry_date"`
+	DaysRemaining    int    `json:"days_remaining"`
+	ExpiryState      string `json:"expiry_state"`
+	ExpiryStateLabel string `json:"expiry_state_label"`
 }
 
 type PendingOrderAlert struct {

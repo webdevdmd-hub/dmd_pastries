@@ -4,6 +4,7 @@ import type {
   ExpiryAlertFilters,
   ExpiryBatch,
   ExpiryBatchStatus,
+  ExpiryState,
   InventoryFilters,
   InventoryItem,
   InventoryItemLocationBreakdown,
@@ -169,6 +170,10 @@ function isExpiryBatchStatus(value: unknown): value is ExpiryBatchStatus {
   return value === "active" || value === "expired" || value === "depleted";
 }
 
+function isExpiryState(value: unknown): value is ExpiryState {
+  return value === "expired" || value === "expires_today" || value === "expiring_soon";
+}
+
 function parseList<TItem>(value: unknown, parser: (item: unknown) => TItem): TItem[] {
   if (Array.isArray(value)) {
     return value.map(parser);
@@ -294,6 +299,9 @@ function parseExpiryBatch(value: unknown): ExpiryBatch {
     expiryDate: stringValue(value.expiry_date),
     receivedDate: stringValue(value.received_date),
     status: isExpiryBatchStatus(value.status) ? value.status : "active",
+    daysRemaining: numberValue(value.days_remaining),
+    expiryState: isExpiryState(value.expiry_state) ? value.expiry_state : "expiring_soon",
+    expiryStateLabel: stringValue(value.expiry_state_label, "Expiring Soon"),
     createdAt: stringValue(value.created_at),
     updatedAt: stringValue(value.updated_at),
   };
@@ -611,6 +619,8 @@ export async function getExpiryAlerts(params: ExpiryAlertFilters): Promise<Expir
       item_type: params.itemType,
       product_type: params.productType,
       status: params.status,
+      expiry_state: params.expiryState,
+      timezone: params.timezone,
       days: params.days,
     })}`,
     {

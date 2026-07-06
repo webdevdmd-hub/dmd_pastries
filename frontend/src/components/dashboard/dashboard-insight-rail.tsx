@@ -1,12 +1,14 @@
 "use client";
 
 import type { JSX } from "react";
+import { useMemo } from "react";
 
 import { DashboardAlertsPanel } from "@/components/dashboard/dashboard-alerts-panel";
 import type { DashboardQuickAction } from "@/components/dashboard/dashboard-quick-actions";
 import { DashboardQuickActions } from "@/components/dashboard/dashboard-quick-actions";
 import { DashboardRecentActivity } from "@/components/dashboard/dashboard-recent-activity";
 import { useDashboardAlerts, useRecentActivity } from "@/hooks/use-dashboard";
+import { resolveDashboardTimezone } from "@/lib/reports/dashboard-filters";
 
 export function DashboardInsightRail({
   actions,
@@ -15,7 +17,8 @@ export function DashboardInsightRail({
   actions: DashboardQuickAction[];
   canLoad: boolean;
 }): JSX.Element {
-  const alertsQuery = useDashboardAlerts(canLoad);
+  const timezone = useMemo(resolveDashboardTimezone, []);
+  const alertsQuery = useDashboardAlerts({ timezone }, canLoad);
   const activityQuery = useRecentActivity(canLoad);
 
   return (

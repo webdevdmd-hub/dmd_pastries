@@ -40,6 +40,7 @@ type ReportBaseFilter struct {
 	MovementType      string
 	MovementDirection string
 	ReferenceType     string
+	ExpiryState       string
 	Days              int
 	UpcomingDays      int
 }
@@ -77,6 +78,7 @@ type ResolvedFilter struct {
 	MovementType      string
 	MovementDirection string
 	ReferenceType     string
+	ExpiryState       string
 	Days              int
 	UpcomingDays      int
 }
@@ -123,6 +125,7 @@ func ParseQuery(values url.Values) ReportBaseFilter {
 		MovementType:      strings.TrimSpace(values.Get("movement_type")),
 		MovementDirection: strings.TrimSpace(values.Get("movement_direction")),
 		ReferenceType:     strings.TrimSpace(values.Get("reference_type")),
+		ExpiryState:       strings.TrimSpace(values.Get("expiry_state")),
 		Days:              days,
 		UpcomingDays:      upcomingDays,
 	}
@@ -135,7 +138,7 @@ func Resolve(currentUser *utils.AuthContext, filter ReportBaseFilter) (*Resolved
 	}
 	locationName := filter.Timezone
 	if locationName == "" {
-		locationName = "UTC"
+		locationName = "Asia/Dubai"
 	}
 	location, err := time.LoadLocation(locationName)
 	if err != nil {
@@ -168,6 +171,9 @@ func Resolve(currentUser *utils.AuthContext, filter ReportBaseFilter) (*Resolved
 	}
 	if filter.MovementDirection != "" && filter.MovementDirection != "in" && filter.MovementDirection != "out" && filter.MovementDirection != "neutral" {
 		return nil, apperrors.BadRequest("invalid movement_direction", nil)
+	}
+	if filter.ExpiryState != "" && filter.ExpiryState != "expired" && filter.ExpiryState != "expires_today" && filter.ExpiryState != "expiring_soon" {
+		return nil, apperrors.BadRequest("invalid expiry_state", nil)
 	}
 	if filter.BatchStatus != "" && filter.BatchStatus != "draft" && filter.BatchStatus != "planned" && filter.BatchStatus != "in_progress" && filter.BatchStatus != "completed" && filter.BatchStatus != "cancelled" {
 		return nil, apperrors.BadRequest("invalid batch_status", nil)
@@ -217,6 +223,7 @@ func Resolve(currentUser *utils.AuthContext, filter ReportBaseFilter) (*Resolved
 		MovementType:      filter.MovementType,
 		MovementDirection: filter.MovementDirection,
 		ReferenceType:     filter.ReferenceType,
+		ExpiryState:       filter.ExpiryState,
 		Days:              filter.Days,
 		UpcomingDays:      filter.UpcomingDays,
 	}, nil

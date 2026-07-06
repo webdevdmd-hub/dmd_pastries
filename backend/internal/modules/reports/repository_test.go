@@ -1,6 +1,7 @@
 package reports
 
 import (
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -19,6 +20,16 @@ func testBakeryOrdersReportFilter() *shared.ResolvedFilter {
 		DateTo:      time.Date(2026, 7, 31, 23, 59, 59, 0, time.UTC),
 		Page:        1,
 		Limit:       25,
+	}
+}
+
+func TestExpiryReportSQLUsesBusinessDateParameter(t *testing.T) {
+	source, err := os.ReadFile("repository.go")
+	if err != nil {
+		t.Fatalf("read reports repository source: %v", err)
+	}
+	if strings.Contains(string(source), "CURRENT_DATE") {
+		t.Fatal("expiry report SQL should use the resolved business-local date instead of CURRENT_DATE")
 	}
 }
 

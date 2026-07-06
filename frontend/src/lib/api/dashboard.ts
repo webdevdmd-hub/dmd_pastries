@@ -41,6 +41,14 @@ type BackendActivity = {
   title?: string;
 };
 
+type BackendDashboardAlerts = {
+  expiry_alerts?: unknown[];
+  low_stock_alerts?: unknown[];
+  outstanding_payment_alerts?: unknown[];
+  pending_order_alerts?: unknown[];
+  production_delay_alerts?: unknown[];
+};
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -225,6 +233,83 @@ function parseAlert(value: unknown): DashboardAlert {
   };
 }
 
+function parseDashboardAlerts(value: unknown): DashboardAlert[] {
+  if (Array.isArray(value)) return value.map(parseAlert);
+  if (!isObject(value)) return [];
+  const alerts = value as BackendDashboardAlerts;
+  const rows: DashboardAlert[] = [];
+
+  (alerts.low_stock_alerts ?? []).forEach((item) => {
+    const row = isObject(item) ? item : {};
+    rows.push({
+      alertType: "low_stock",
+      createdAt: "",
+      description: `${stringField(row, "item_name")} is at ${String(numberField(row, "available_quantity"))}, below reorder level ${String(numberField(row, "reorder_level"))}.`,
+      referenceId: stringField(row, "item_name"),
+      severity: "warning",
+      title: "Low stock",
+    });
+  });
+
+  (alerts.expiry_alerts ?? []).forEach((item) => {
+    const row = isObject(item) ? item : {};
+    const state = stringField(row, "expiry_state");
+    const label = stringField(row, "expiry_state_label") || "Expiring Soon";
+    const days = numberField(row, "days_remaining");
+    rows.push({
+      alertType: "expiry",
+      createdAt: "",
+      description:
+        state === "expired"
+          ? `${stringField(row, "item_name")} expired ${String(Math.abs(days))} day(s) ago.`
+          : state === "expires_today"
+            ? `${stringField(row, "item_name")} expires today.`
+            : `${stringField(row, "item_name")} expires in ${String(days)} day(s).`,
+      referenceId: stringField(row, "item_name"),
+      severity: state === "expired" ? "critical" : "warning",
+      title: label,
+    });
+  });
+
+  (alerts.pending_order_alerts ?? []).forEach((item) => {
+    const row = isObject(item) ? item : {};
+    rows.push({
+      alertType: "pending_order",
+      createdAt: "",
+      description: `Order ${stringField(row, "order_number")} is ${stringField(row, "order_status")}.`,
+      referenceId: stringField(row, "order_number"),
+      severity: "info",
+      title: "Pending order",
+    });
+  });
+
+  (alerts.outstanding_payment_alerts ?? []).forEach((item) => {
+    const row = isObject(item) ? item : {};
+    rows.push({
+      alertType: "outstanding_payment",
+      createdAt: "",
+      description: `Order ${stringField(row, "order_number")} has AED ${String(numberField(row, "balance_amount"))} outstanding.`,
+      referenceId: stringField(row, "order_number"),
+      severity: "warning",
+      title: "Outstanding payment",
+    });
+  });
+
+  (alerts.production_delay_alerts ?? []).forEach((item) => {
+    const row = isObject(item) ? item : {};
+    rows.push({
+      alertType: "production_delay",
+      createdAt: "",
+      description: `Batch ${stringField(row, "batch_number")} is still ${stringField(row, "status")}.`,
+      referenceId: stringField(row, "batch_number"),
+      severity: "warning",
+      title: "Production delay",
+    });
+  });
+
+  return rows;
+}
+
 function parseActivity(value: unknown): DashboardActivity {
   const row = isObject(value) ? (value as BackendActivity) : {};
   return {
@@ -284,8 +369,10 @@ export async function getRecentActivity(): Promise<DashboardActivity[]> {
   );
 }
 
-export async function getDashboardAlerts(): Promise<DashboardAlert[]> {
-  return getDashboard("/api/v1/dashboard/alerts", (value) => listSource(value).map(parseAlert));
+export async function getDashboardAlerts(
+  filters?: Pick<DashboardRequestFilters, "timezone">,
+): Promise<DashboardAlert[]> {
+  return getDashboard(`/api/v1/dashboard/alerts${toSearchParams(filters)}`, parseDashboardAlerts);
 }
 
 export async function getKpiSummary(): Promise<KpiSummary> {
