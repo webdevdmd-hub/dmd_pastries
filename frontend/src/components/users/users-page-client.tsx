@@ -124,6 +124,7 @@ export function UsersPageClient(): JSX.Element {
   const [dialogMode, setDialogMode] = useState<UserFormMode>("create");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [createFormError, setCreateFormError] = useState<string | null>(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [statusDialogState, setStatusDialogState] = useState<{
     nextStatus: UserStatus;
@@ -202,6 +203,13 @@ export function UsersPageClient(): JSX.Element {
   const currentStaffBranchFilter = branchScope.canAccessAllBranches
     ? allBranchesFilterValue
     : branchScope.defaultBranchId || allBranchesFilterValue;
+  const rolesLoading = canAccessRolesEndpoint && rolesQuery.isLoading;
+  const roleLoadError =
+    rolesQuery.error && !(rolesQuery.error instanceof ApiError && rolesQuery.error.status === 403)
+      ? getErrorMessage(rolesQuery.error)
+      : null;
+  const branchesLoading = canViewUsers && canLoadBranches && branchesQuery.isLoading;
+  const branchLoadError = branchesQuery.error ? getErrorMessage(branchesQuery.error) : null;
 
   useEffect(() => {
     setFilters((currentFilters) => {
@@ -248,6 +256,7 @@ export function UsersPageClient(): JSX.Element {
   const openCreateDialog = (): void => {
     setDialogMode("create");
     setSelectedUser(null);
+    setCreateFormError(null);
     setDialogOpen(true);
   };
 
@@ -258,18 +267,21 @@ export function UsersPageClient(): JSX.Element {
   const openEditDialog = (targetUser: User): void => {
     setDialogMode("edit");
     setSelectedUser(targetUser);
+    setCreateFormError(null);
     setDialogOpen(true);
   };
 
   const viewUserDetails = (targetUser: User): void => {
     setDialogMode("edit");
     setSelectedUser(targetUser);
+    setCreateFormError(null);
     setDialogOpen(true);
   };
 
   const closeDialog = (): void => {
     setDialogOpen(false);
     setSelectedUser(null);
+    setCreateFormError(null);
   };
 
   const closeInviteDialog = (): void => {
@@ -277,6 +289,8 @@ export function UsersPageClient(): JSX.Element {
   };
 
   const handleCreate = async (payload: CreateUserPayload): Promise<void> => {
+    setCreateFormError(null);
+
     try {
       const createdUser = await createUserMutation.mutateAsync(payload);
 
@@ -290,7 +304,10 @@ export function UsersPageClient(): JSX.Element {
       toast.success("Staff user created successfully.");
       closeDialog();
     } catch (mutationError) {
-      toast.error(getErrorMessage(mutationError));
+      const message = getErrorMessage(mutationError);
+
+      setCreateFormError(message);
+      toast.error(message);
     }
   };
 
@@ -553,8 +570,11 @@ export function UsersPageClient(): JSX.Element {
       />
 
       <UserFormDialog
+        branchLoadError={branchLoadError}
         branches={branchesQuery.data ?? []}
+        branchesLoading={branchesLoading}
         canEditRole={canEditUsers}
+        createError={createFormError}
         currentBranchId={branchScope.effectiveBranchId}
         currentUserId={user?.id ?? null}
         mode={dialogMode}
@@ -562,7 +582,9 @@ export function UsersPageClient(): JSX.Element {
         onCreate={handleCreate}
         onUpdate={handleUpdate}
         open={dialogOpen}
+        roleLoadError={roleLoadError}
         roleOptions={roleOptions}
+        rolesLoading={rolesLoading}
         user={selectedUser}
       />
 

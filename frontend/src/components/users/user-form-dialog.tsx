@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -48,8 +49,11 @@ import type {
 } from "@/types/user";
 
 type UserFormDialogProps = {
+  branchLoadError: string | null;
   branches: Branch[];
+  branchesLoading: boolean;
   canEditRole: boolean;
+  createError: string | null;
   currentBranchId: string | null;
   currentUserId: string | null;
   mode: UserFormMode;
@@ -57,7 +61,9 @@ type UserFormDialogProps = {
   onCreate: (payload: CreateUserPayload) => Promise<void>;
   onUpdate: (userId: string, payload: UpdateUserPayload, nextStatus: UserStatus) => Promise<void>;
   open: boolean;
+  roleLoadError: string | null;
   roleOptions: UserRoleOption[];
+  rolesLoading: boolean;
   user: User | null;
 };
 
@@ -76,6 +82,10 @@ function hasBranchOption(branches: Branch[], branchId: string): boolean {
   return branches.some((branch) => branch.id === branchId);
 }
 
+function hasNonEmptySelectValue(value: string): boolean {
+  return value.trim().length > 0;
+}
+
 function isBranchOptionalRoleName(roleName: string): boolean {
   const normalizedRoleName = roleName.trim().toLowerCase();
 
@@ -89,8 +99,11 @@ function canRoleUseUnassignedBranch(roleOptions: UserRoleOption[], roleId: strin
 }
 
 export function UserFormDialog({
+  branchLoadError,
   branches,
+  branchesLoading,
   canEditRole,
+  createError,
   currentBranchId,
   currentUserId,
   mode,
@@ -98,7 +111,9 @@ export function UserFormDialog({
   onCreate,
   onUpdate,
   open,
+  roleLoadError,
   roleOptions,
+  rolesLoading,
   user,
 }: UserFormDialogProps): JSX.Element {
   const assignableBranches = branches.filter(
@@ -136,6 +151,44 @@ export function UserFormDialog({
   const updateRoleId = updateForm.watch("roleId");
   const canUpdateRoleUseUnassignedBranch = canRoleUseUnassignedBranch(roleOptions, updateRoleId);
   const isSelfEdit = mode === "edit" && user?.id === currentUserId;
+  const createDataNotice =
+    rolesLoading
+      ? {
+          title: "Roles are loading",
+          message: "Wait for role options to load before creating a user.",
+          variant: "default" as const,
+        }
+      : roleLoadError
+        ? {
+            title: "Roles could not be loaded",
+            message: roleLoadError,
+            variant: "destructive" as const,
+          }
+        : roleOptions.length === 0
+          ? {
+              title: "No roles available",
+              message: "Create or load at least one role before creating a user.",
+              variant: "destructive" as const,
+            }
+          : branchesLoading
+            ? {
+                title: "Branches are loading",
+                message: "Wait for active branches to load before creating a user.",
+                variant: "default" as const,
+              }
+            : branchLoadError
+              ? {
+                  title: "Branches could not be loaded",
+                  message: branchLoadError,
+                  variant: "destructive" as const,
+                }
+              : assignableBranches.length === 0
+                ? {
+                    title: "No active branches available",
+                    message: "Create or activate a branch before creating an operational user.",
+                    variant: "destructive" as const,
+                  }
+                : null;
 
   useEffect(() => {
     if (!open) {
@@ -239,6 +292,20 @@ export function UserFormDialog({
               }}
             >
               <div className="grid gap-5">
+                {createError ? (
+                  <Alert variant="destructive">
+                    <AlertTitle>User could not be created</AlertTitle>
+                    <AlertDescription>{createError}</AlertDescription>
+                  </Alert>
+                ) : null}
+
+                {createDataNotice ? (
+                  <Alert variant={createDataNotice.variant}>
+                    <AlertTitle>{createDataNotice.title}</AlertTitle>
+                    <AlertDescription>{createDataNotice.message}</AlertDescription>
+                  </Alert>
+                ) : null}
+
                 <div className="grid gap-5 md:grid-cols-2">
                   <FormField
                     control={createForm.control}
@@ -344,7 +411,8 @@ export function UserFormDialog({
                                 No active branches available
                               </SelectItem>
                             ) : null}
-                            {field.value !== unassignedBranchValue &&
+                            {hasNonEmptySelectValue(field.value) &&
+                            field.value !== unassignedBranchValue &&
                             !hasBranchOption(assignableBranches, field.value) ? (
                               <SelectItem value={field.value}>Selected branch</SelectItem>
                             ) : null}
@@ -556,7 +624,8 @@ export function UserFormDialog({
                                 No active branches available
                               </SelectItem>
                             ) : null}
-                            {field.value !== unassignedBranchValue &&
+                            {hasNonEmptySelectValue(field.value) &&
+                            field.value !== unassignedBranchValue &&
                             !hasBranchOption(assignableBranches, field.value) ? (
                               <SelectItem value={field.value}>Selected branch</SelectItem>
                             ) : null}
