@@ -29,6 +29,7 @@ import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useFinancialSummary, useFinancialTrend } from "@/hooks/use-financial-reports";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
+import { getErrorMessage } from "@/lib/api/client";
 import type { FinancialTrendChart as FinancialTrendChartData } from "@/types/financial-reports";
 
 const navigationCards = [
@@ -95,7 +96,13 @@ export function FinancialReportsPageClient(): JSX.Element {
         onChange={setDraft}
         onReset={() => setFilters(toFinancialReportFilters(initialDraft))}
       />
-      <FinancialSummaryCards summary={summaryQuery.data} />
+      <FinancialSummaryCards
+        errorMessage={summaryQuery.error ? getErrorMessage(summaryQuery.error) : undefined}
+        onRetry={() => {
+          void summaryQuery.refetch();
+        }}
+        summary={summaryQuery.data}
+      />
       <ReportChartCard
         caption="Collected, refunded, and net collected movement for the selected period."
         error={trendQuery.error}

@@ -90,6 +90,89 @@ func TestFinancialPaymentsByMethodSQLReturnsExplicitTransactionCounts(t *testing
 	}
 }
 
+func TestFinancialSummarySQLUsesOperationalFinancialSources(t *testing.T) {
+	filter := testBakeryOrdersReportFilter()
+	collectedQuery, _ := financialCollectedSummarySQL(filter)
+	refundQuery, _ := financialRefundSummarySQL(filter)
+	grossSalesQuery, _ := financialGrossSalesSummarySQL(filter)
+	outstandingQuery, _ := financialOutstandingSummarySQL(filter)
+	purchaseQuery, _ := financialPurchaseTotalSummarySQL(filter)
+
+	for _, expected := range []string{
+		"FROM sale_payments sp",
+		"FROM bakery_order_payments bop",
+		"COUNT(*) AS payment_count",
+		"cash_collected",
+		"card_collected",
+		"bank_transfer_collected",
+	} {
+		if !strings.Contains(collectedQuery, expected) {
+			t.Fatalf("expected collected summary query to contain %q: %s", expected, collectedQuery)
+		}
+	}
+	for _, expected := range []string{"FROM payment_refunds pr", "pr.refund_status IN ?", "COUNT(*) AS refund_count"} {
+		if !strings.Contains(refundQuery, expected) {
+			t.Fatalf("expected refund summary query to contain %q: %s", expected, refundQuery)
+		}
+	}
+	for name, query := range map[string]string{
+		"collected":   collectedQuery,
+		"refund":      refundQuery,
+		"gross_sales": grossSalesQuery,
+		"outstanding": outstandingQuery,
+		"purchase":    purchaseQuery,
+	} {
+		if strings.Contains(query, "journal_entries") || strings.Contains(query, "journal_entry_lines") {
+			t.Fatalf("%s summary query must not use journal tables: %s", name, query)
+		}
+	}
+}
+
+func TestFinancialSummarySalesReturnSourceAffectsRefundsOnly(t *testing.T) {
+	filter := testBakeryOrdersReportFilter()
+	filter.SourceType = "sales_return"
+
+	collectedQuery, _ := financialCollectedSummarySQL(filter)
+	refundQuery, _ := financialRefundSummarySQL(filter)
+	grossSalesQuery, _ := financialGrossSalesSummarySQL(filter)
+	outstandingQuery, _ := financialOutstandingSummarySQL(filter)
+
+	if strings.Contains(collectedQuery, "FROM sale_payments sp") || strings.Contains(collectedQuery, "FROM bakery_order_payments bop") {
+		t.Fatalf("sales_return summary collections should not include payment collections: %s", collectedQuery)
+	}
+	if !strings.Contains(refundQuery, "COALESCE(pr.refund_source, 'payment_adjustment') = 'sales_return'") {
+		t.Fatalf("sales_return summary refunds must filter to sales return refunds: %s", refundQuery)
+	}
+	if !strings.Contains(grossSalesQuery, "SELECT 0::numeric AS gross_sales") {
+		t.Fatalf("sales_return summary gross sales should be zero-only: %s", grossSalesQuery)
+	}
+	if !strings.Contains(outstandingQuery, "WHERE 1 = 0") {
+		t.Fatalf("sales_return summary outstanding balances should be empty: %s", outstandingQuery)
+	}
+}
+
+func TestFinancialPurchaseTotalSummarySQLAppliesBranchAndSource(t *testing.T) {
+	filter := testBakeryOrdersReportFilter()
+	filter.AllBranches = false
+	filter.BranchID = "branch-id"
+	query, args := financialPurchaseTotalSummarySQL(filter)
+
+	for _, expected := range []string{"FROM purchase_invoices", "status = 'posted'", "AND branch_id = ?"} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("expected purchase total summary query to contain %q: %s", expected, query)
+		}
+	}
+	if !reflect.DeepEqual(args, []interface{}{"business-id", "2026-07-01", "2026-07-31", "branch-id"}) {
+		t.Fatalf("unexpected purchase summary args: %#v", args)
+	}
+
+	filter.SourceType = "pos_sale"
+	query, args = financialPurchaseTotalSummarySQL(filter)
+	if !strings.Contains(query, "SELECT 0::numeric") || len(args) != 0 {
+		t.Fatalf("non-purchase source should zero purchase totals, query=%s args=%#v", query, args)
+	}
+}
+
 func TestFinancialReconciliationTransactionsSQLUsesTransactionSources(t *testing.T) {
 	query, _ := financialReconciliationTransactionsSQL(testBakeryOrdersReportFilter())
 

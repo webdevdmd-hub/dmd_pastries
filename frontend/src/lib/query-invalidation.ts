@@ -168,6 +168,7 @@ export function invalidateOrderData(queryClient: QueryClient): Promise<void[]> {
     QUERY_ROOTS.manufacturing,
     QUERY_ROOTS.reports,
     QUERY_ROOTS.salesReports,
+    QUERY_ROOTS.financialReports,
     QUERY_ROOTS.dashboard,
   ]);
 }

@@ -55,6 +55,7 @@ type ledgerFinancialTotals struct {
 const (
 	journalSourceOfTruth          = "journal_entries"
 	operationalSalesSourceOfTruth = "sales_and_completed_payment_refunds"
+	financialTransactionsSource   = "financial_transactions"
 )
 
 func NewRepository(db *gorm.DB) *Repository {
@@ -1958,28 +1959,54 @@ func (r *Repository) BakeryOrdersTrend(filter *shared.ResolvedFilter) ([]trendSe
 }
 
 func (r *Repository) FinancialSummary(filter *shared.ResolvedFilter) (*FinancialSummaryResponse, error) {
-	ledger, err := r.ledgerFinancialTotals(filter, filter.StartUTC, filter.EndUTC)
-	if err != nil {
-		return nil, err
-	}
 	warnings, err := r.consistencyWarnings(filter, filter.StartUTC, filter.EndUTC)
 	if err != nil {
 		return nil, err
 	}
+	var grossSales float64
+	query, args := financialGrossSalesSummarySQL(filter)
+	if err := r.db.Raw(query, args...).Scan(&grossSales).Error; err != nil {
+		return nil, err
+	}
+	var collected financialCollectedSummaryRow
+	query, args = financialCollectedSummarySQL(filter)
+	if err := r.db.Raw(query, args...).Scan(&collected).Error; err != nil {
+		return nil, err
+	}
+	var refunded financialRefundSummaryRow
+	query, args = financialRefundSummarySQL(filter)
+	if err := r.db.Raw(query, args...).Scan(&refunded).Error; err != nil {
+		return nil, err
+	}
+	var outstandingCustomerBalance float64
+	query, args = financialOutstandingSummarySQL(filter)
+	if err := r.db.Raw(query, args...).Scan(&outstandingCustomerBalance).Error; err != nil {
+		return nil, err
+	}
+	var supplierPayableBalance float64
+	query, args = financialSupplierPayableSummarySQL(filter)
+	if err := r.db.Raw(query, args...).Scan(&supplierPayableBalance).Error; err != nil {
+		return nil, err
+	}
+	var purchaseTotal float64
+	query, args = financialPurchaseTotalSummarySQL(filter)
+	if err := r.db.Raw(query, args...).Scan(&purchaseTotal).Error; err != nil {
+		return nil, err
+	}
 	return &FinancialSummaryResponse{
-		GrossSales:                 roundMoney(ledger.GrossRevenue),
-		TotalCollected:             roundMoney(ledger.Collected),
-		TotalRefunded:              roundMoney(ledger.Refunded),
-		NetCollected:               roundMoney(ledger.Collected - ledger.Refunded),
-		OutstandingCustomerBalance: roundMoney(ledger.OutstandingCustomer),
-		PurchaseTotal:              roundMoney(ledger.PurchaseTotal),
-		SupplierPayableBalance:     roundMoney(ledger.SupplierPayable),
-		CashCollected:              roundMoney(ledger.CashCollected),
-		CardCollected:              roundMoney(ledger.CardCollected),
-		BankTransferCollected:      roundMoney(ledger.BankCollected),
-		RefundCount:                ledger.RefundCount,
-		PaymentCount:               ledger.PaymentCount,
-		SourceOfTruth:              journalSourceOfTruth,
+		GrossSales:                 roundMoney(grossSales),
+		TotalCollected:             roundMoney(collected.TotalCollected),
+		TotalRefunded:              roundMoney(refunded.TotalRefunded),
+		NetCollected:               roundMoney(collected.TotalCollected - refunded.TotalRefunded),
+		OutstandingCustomerBalance: roundMoney(outstandingCustomerBalance),
+		PurchaseTotal:              roundMoney(purchaseTotal),
+		SupplierPayableBalance:     roundMoney(supplierPayableBalance),
+		CashCollected:              roundMoney(collected.CashCollected),
+		CardCollected:              roundMoney(collected.CardCollected),
+		BankTransferCollected:      roundMoney(collected.BankTransferCollected),
+		RefundCount:                refunded.RefundCount,
+		PaymentCount:               collected.PaymentCount,
+		SourceOfTruth:              financialTransactionsSource,
 		ConsistencyWarnings:        warnings,
 	}, nil
 }
@@ -3039,6 +3066,22 @@ func financialSupplierPayableSummarySQL(filter *shared.ResolvedFilter) (string, 
 	args := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
 	if !filter.AllBranches {
 		query += " AND pi.branch_id = ?"
+		args = append(args, filter.BranchID)
+	}
+	return query, args
+}
+
+func financialPurchaseTotalSummarySQL(filter *shared.ResolvedFilter) (string, []interface{}) {
+	if filter.SourceType != "" && filter.SourceType != "purchase_invoice" {
+		return "SELECT 0::numeric", []interface{}{}
+	}
+	query := `
+		SELECT COALESCE(SUM(total_amount),0)
+		FROM purchase_invoices
+		WHERE business_id = ? AND invoice_date >= ? AND invoice_date <= ? AND status = 'posted' AND deleted_at IS NULL`
+	args := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
+	if !filter.AllBranches {
+		query += " AND branch_id = ?"
 		args = append(args, filter.BranchID)
 	}
 	return query, args
