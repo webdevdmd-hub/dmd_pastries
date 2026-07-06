@@ -20,6 +20,14 @@ type Service struct {
 	accountingService *accounting.Service
 }
 
+type paymentSummaryRange struct {
+	DateLabel       string
+	DateFrom        string
+	DateTo          string
+	WarningStartUTC *time.Time
+	WarningEndUTC   *time.Time
+}
+
 func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository, accountingService ...*accounting.Service) *Service {
 	service := &Service{db: db, repo: repo, auditRepo: auditRepo}
 	if len(accountingService) > 0 {
@@ -33,6 +41,7 @@ func (s *Service) ListPayments(currentUser *utils.AuthContext, query PaymentList
 	if err := validatePaymentListQuery(query); err != nil {
 		return nil, err
 	}
+	query.DateFrom, query.DateTo = normalizePaymentDateBounds(query.DateFrom, query.DateTo)
 	branchID, allBranches, err := currentUser.ResolveBranchScope(query.BranchID, "")
 	if err != nil {
 		return nil, err
@@ -312,12 +321,10 @@ func (s *Service) GetRefund(currentUser *utils.AuthContext, id string) (*Payment
 	return refund, nil
 }
 
-func (s *Service) DailySummary(currentUser *utils.AuthContext, date, branchID, ipAddress, userAgent string) (*DailySummaryResponse, error) {
-	if strings.TrimSpace(date) == "" {
-		date = time.Now().UTC().Format("2006-01-02")
-	}
-	if _, err := time.Parse("2006-01-02", date); err != nil {
-		return nil, apperrors.BadRequest("date must be YYYY-MM-DD", nil)
+func (s *Service) DailySummary(currentUser *utils.AuthContext, date, dateFrom, dateTo, branchID, ipAddress, userAgent string) (*DailySummaryResponse, error) {
+	summaryRange, err := resolvePaymentSummaryRange(date, dateFrom, dateTo)
+	if err != nil {
+		return nil, err
 	}
 	resolvedBranchID, allBranches, err := currentUser.ResolveBranchScope(branchID, "")
 	if err != nil {
@@ -328,7 +335,7 @@ func (s *Service) DailySummary(currentUser *utils.AuthContext, date, branchID, i
 	} else {
 		branchID = ""
 	}
-	result, err := s.repo.DailySummary(currentUser.BusinessID, date, branchID)
+	result, err := s.repo.DailySummary(currentUser.BusinessID, summaryRange.DateLabel, summaryRange.DateFrom, summaryRange.DateTo, branchID, summaryRange.WarningStartUTC, summaryRange.WarningEndUTC)
 	if err != nil {
 		return nil, apperrors.Internal("failed to load daily payment summary")
 	}
@@ -340,6 +347,7 @@ func (s *Service) MethodSummary(currentUser *utils.AuthContext, dateFrom, dateTo
 	if err := validateDateRange(dateFrom, dateTo); err != nil {
 		return nil, err
 	}
+	dateFrom, dateTo = normalizePaymentDateBounds(dateFrom, dateTo)
 	resolvedBranchID, allBranches, err := currentUser.ResolveBranchScope(branchID, "")
 	if err != nil {
 		return nil, err
@@ -511,13 +519,15 @@ func (s *Service) syncSalePaymentStatus(tx *gorm.DB, businessID, saleID string, 
 func validateDateRange(dateFrom, dateTo string) error {
 	var from, to time.Time
 	var err error
-	if strings.TrimSpace(dateFrom) != "" {
+	dateFrom = strings.TrimSpace(dateFrom)
+	dateTo = strings.TrimSpace(dateTo)
+	if dateFrom != "" {
 		from, err = time.Parse("2006-01-02", dateFrom)
 		if err != nil {
 			return apperrors.BadRequest("date_from must be YYYY-MM-DD", nil)
 		}
 	}
-	if strings.TrimSpace(dateTo) != "" {
+	if dateTo != "" {
 		to, err = time.Parse("2006-01-02", dateTo)
 		if err != nil {
 			return apperrors.BadRequest("date_to must be YYYY-MM-DD", nil)
@@ -527,6 +537,52 @@ func validateDateRange(dateFrom, dateTo string) error {
 		return apperrors.BadRequest("date_from cannot be after date_to", nil)
 	}
 	return nil
+}
+
+func resolvePaymentSummaryRange(date, dateFrom, dateTo string) (paymentSummaryRange, error) {
+	date = strings.TrimSpace(date)
+	dateFrom = strings.TrimSpace(dateFrom)
+	dateTo = strings.TrimSpace(dateTo)
+	if date != "" && dateFrom == "" && dateTo == "" {
+		parsedDate, err := time.Parse("2006-01-02", date)
+		if err != nil {
+			return paymentSummaryRange{}, apperrors.BadRequest("date must be YYYY-MM-DD", nil)
+		}
+		end := parsedDate.AddDate(0, 0, 1)
+		return paymentSummaryRange{
+			DateLabel:       date,
+			DateFrom:        date,
+			DateTo:          endOfDayBound(date),
+			WarningStartUTC: &parsedDate,
+			WarningEndUTC:   &end,
+		}, nil
+	}
+	if err := validateDateRange(dateFrom, dateTo); err != nil {
+		return paymentSummaryRange{}, err
+	}
+	normalizedFrom, normalizedTo := normalizePaymentDateBounds(dateFrom, dateTo)
+	summaryRange := paymentSummaryRange{DateFrom: normalizedFrom, DateTo: normalizedTo}
+	if dateFrom != "" && dateTo != "" {
+		start, _ := time.Parse("2006-01-02", dateFrom)
+		endDate, _ := time.Parse("2006-01-02", dateTo)
+		end := endDate.AddDate(0, 0, 1)
+		summaryRange.WarningStartUTC = &start
+		summaryRange.WarningEndUTC = &end
+	}
+	return summaryRange, nil
+}
+
+func normalizePaymentDateBounds(dateFrom, dateTo string) (string, string) {
+	dateFrom = strings.TrimSpace(dateFrom)
+	dateTo = strings.TrimSpace(dateTo)
+	if dateTo != "" {
+		dateTo = endOfDayBound(dateTo)
+	}
+	return dateFrom, dateTo
+}
+
+func endOfDayBound(date string) string {
+	return date + " 23:59:59.999999"
 }
 
 func validatePaymentListQuery(query PaymentListQuery) error {

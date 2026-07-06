@@ -46,6 +46,7 @@ import { ApiError, getErrorMessage } from "@/lib/api/client";
 import type {
   AddPaymentPayload,
   PaymentFilters,
+  PaymentSummaryParams,
   RefundPaymentPayload,
   SalePayment,
 } from "@/types/payment";
@@ -130,13 +131,18 @@ export function PaymentsPageClient(): JSX.Element {
   const canViewUsers = hasPermission(PERMISSIONS.usersView);
   const canSelectRefundApprover =
     hasAnyPermission([PERMISSIONS.paymentsRefund]) || user?.roles.some(isOwnerOrAdminRole) === true;
+  const summaryParams: PaymentSummaryParams = {
+    branchId: filters.branchId,
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+  };
   const paymentsQuery = usePayments(filters, canView && branchScope.hasBranchScope);
   const summaryQuery = useDailyPaymentSummary(
-    { branchId: filters.branchId },
+    summaryParams,
     canView && branchScope.hasBranchScope,
   );
   const methodSummaryQuery = usePaymentSummaryByMethod(
-    { branchId: filters.branchId },
+    summaryParams,
     canView && branchScope.hasBranchScope,
   );
   const refundsQuery = useRefunds(
@@ -271,7 +277,13 @@ export function PaymentsPageClient(): JSX.Element {
         }
       />
 
-      <PaymentsSummaryCards summary={summaryQuery.data} />
+      <PaymentsSummaryCards
+        errorMessage={summaryQuery.error ? getErrorMessage(summaryQuery.error) : undefined}
+        onRetry={() => {
+          void summaryQuery.refetch();
+        }}
+        summary={summaryQuery.data}
+      />
 
       <section className="grid gap-3 md:grid-cols-3" aria-label="Payments sections">
         {workspaceLinks

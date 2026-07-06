@@ -2,6 +2,108 @@ package payments
 
 import "testing"
 
+func TestDailySummaryFromOperationalUsesMethodSummaryTotals(t *testing.T) {
+	rows := mergePaymentSummaryRows([]PaymentSummaryByMethod{
+		{
+			PaymentMethodID:   "cash",
+			PaymentMethodName: "Cash",
+			CollectedAmount:   150,
+			TransactionCount:  2,
+		},
+		{
+			PaymentMethodID:   "card",
+			PaymentMethodName: "Card",
+			CollectedAmount:   100,
+			TransactionCount:  1,
+		},
+	}, []PaymentSummaryByMethod{
+		{
+			PaymentMethodID:        "card",
+			PaymentMethodName:      "Card",
+			RefundedAmount:         25,
+			RefundTransactionCount: 1,
+		},
+	})
+	for i := range rows {
+		rows[i].RefundAmount = rows[i].RefundedAmount
+		rows[i].TotalAmount = rows[i].CollectedAmount
+		rows[i].NetAmount = roundMoney(rows[i].CollectedAmount - rows[i].RefundedAmount)
+	}
+
+	operational := operationalSummaryFromRows(rows, 180, 70, 20, 30, 20)
+	daily := dailySummaryFromOperational("2026-07-06", "branch-1", operational, nil)
+
+	if daily.TotalCollected != 250 {
+		t.Fatalf("total_collected = %v, want 250", daily.TotalCollected)
+	}
+	if daily.TotalRefunded != 25 {
+		t.Fatalf("total_refunded = %v, want 25", daily.TotalRefunded)
+	}
+	if daily.NetCollected != 225 {
+		t.Fatalf("net_collected = %v, want 225", daily.NetCollected)
+	}
+	if daily.PaymentsCount != 3 {
+		t.Fatalf("payments_count = %d, want 3", daily.PaymentsCount)
+	}
+	if daily.RefundsCount != 1 {
+		t.Fatalf("refunds_count = %d, want 1", daily.RefundsCount)
+	}
+	if daily.SourceOfTruth != "payment_transactions" {
+		t.Fatalf("source_of_truth = %q, want payment_transactions", daily.SourceOfTruth)
+	}
+	if len(daily.ByMethod) != len(rows) {
+		t.Fatalf("by_method length = %d, want %d", len(daily.ByMethod), len(rows))
+	}
+}
+
+func TestResolvePaymentSummaryRangeDefaultsToAllTime(t *testing.T) {
+	summaryRange, err := resolvePaymentSummaryRange("", "", "")
+	if err != nil {
+		t.Fatalf("resolvePaymentSummaryRange returned error: %v", err)
+	}
+	if summaryRange.DateFrom != "" || summaryRange.DateTo != "" {
+		t.Fatalf("expected all-time empty bounds, got from=%q to=%q", summaryRange.DateFrom, summaryRange.DateTo)
+	}
+	if summaryRange.WarningStartUTC != nil || summaryRange.WarningEndUTC != nil {
+		t.Fatalf("all-time summary should not request bounded journal warnings")
+	}
+}
+
+func TestResolvePaymentSummaryRangeDateShortcutUsesSingleDay(t *testing.T) {
+	summaryRange, err := resolvePaymentSummaryRange("2026-07-06", "", "")
+	if err != nil {
+		t.Fatalf("resolvePaymentSummaryRange returned error: %v", err)
+	}
+	if summaryRange.DateLabel != "2026-07-06" {
+		t.Fatalf("date label = %q, want 2026-07-06", summaryRange.DateLabel)
+	}
+	if summaryRange.DateFrom != "2026-07-06" {
+		t.Fatalf("date_from = %q, want 2026-07-06", summaryRange.DateFrom)
+	}
+	if summaryRange.DateTo != "2026-07-06 23:59:59.999999" {
+		t.Fatalf("date_to = %q, want end-of-day bound", summaryRange.DateTo)
+	}
+	if summaryRange.WarningStartUTC == nil || summaryRange.WarningEndUTC == nil {
+		t.Fatalf("date shortcut should request bounded journal warnings")
+	}
+}
+
+func TestResolvePaymentSummaryRangeRangeNormalizesDateToEndOfDay(t *testing.T) {
+	summaryRange, err := resolvePaymentSummaryRange("", "2026-07-01", "2026-07-06")
+	if err != nil {
+		t.Fatalf("resolvePaymentSummaryRange returned error: %v", err)
+	}
+	if summaryRange.DateFrom != "2026-07-01" {
+		t.Fatalf("date_from = %q, want 2026-07-01", summaryRange.DateFrom)
+	}
+	if summaryRange.DateTo != "2026-07-06 23:59:59.999999" {
+		t.Fatalf("date_to = %q, want end-of-day bound", summaryRange.DateTo)
+	}
+	if summaryRange.WarningStartUTC == nil || summaryRange.WarningEndUTC == nil {
+		t.Fatalf("closed range should request bounded journal warnings")
+	}
+}
+
 func TestMergePaymentSummaryRowsNoRefundsUsesGrossAsNetCount(t *testing.T) {
 	rows := mergePaymentSummaryRows([]PaymentSummaryByMethod{
 		{
