@@ -2,7 +2,7 @@
 
 import { FileClock, ShieldAlert } from "lucide-react";
 import type { JSX } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -20,6 +20,7 @@ import {
 import { PERMISSIONS } from "@/constants/permissions";
 import { useActivityLogs, useUserActivityLogs } from "@/hooks/use-activity-logs";
 import { usePermission } from "@/hooks/use-permission";
+import { useCompanySettings } from "@/hooks/use-settings-data";
 import { getErrorMessage } from "@/lib/api/client";
 import type { ActivityLog, ActivityMetadataValue } from "@/types/activity-log";
 
@@ -63,7 +64,21 @@ const entityOptions: { label: string; value: string }[] = [
   { label: "Platform Settlements", value: "platform_settlement" },
 ];
 
-function formatAuditDate(value: string): string {
+const fallbackAuditTimezone = "Asia/Dubai";
+
+function resolveAuditTimezone(value: string | undefined): string {
+  const trimmedTimezone = value?.trim();
+  const timezone =
+    trimmedTimezone && trimmedTimezone.length > 0 ? trimmedTimezone : fallbackAuditTimezone;
+  try {
+    new Intl.DateTimeFormat("en-AE", { timeZone: timezone }).format(new Date());
+    return timezone;
+  } catch {
+    return fallbackAuditTimezone;
+  }
+}
+
+function formatAuditDate(value: string, timezone: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return "Unknown time";
@@ -72,6 +87,7 @@ function formatAuditDate(value: string): string {
   return new Intl.DateTimeFormat("en-AE", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: timezone,
   }).format(date);
 }
 
@@ -157,20 +173,84 @@ function targetLabel(item: ActivityLog): string {
   return item.targetUserName || item.targetUserEmail || "Unknown user";
 }
 
-function activityLogsEndpoint(entityType: string | null): string {
-  if (!entityType) {
-    return "GET /api/v1/activity-logs";
+function activityLogsEndpoint({
+  dateFrom,
+  dateTo,
+  entityType,
+  timezone,
+}: {
+  dateFrom: string;
+  dateTo: string;
+  entityType: string | null;
+  timezone: string;
+}): string {
+  const params = new URLSearchParams();
+  if (entityType) {
+    params.set("entity_type", entityType);
   }
+  if (dateFrom) {
+    params.set("date_from", dateFrom);
+  }
+  if (dateTo) {
+    params.set("date_to", dateTo);
+  }
+  params.set("timezone", timezone);
 
-  return `GET /api/v1/activity-logs?entity_type=${encodeURIComponent(entityType)}`;
+  const query = params.toString();
+  return query ? `GET /api/v1/activity-logs?${query}` : "GET /api/v1/activity-logs";
+}
+
+function AuditDateRangeControls({
+  dateFrom,
+  dateTo,
+  idPrefix,
+  onDateFromChange,
+  onDateToChange,
+  timezone,
+}: {
+  dateFrom: string;
+  dateTo: string;
+  idPrefix: string;
+  onDateFromChange: (value: string) => void;
+  onDateToChange: (value: string) => void;
+  timezone: string;
+}): JSX.Element {
+  return (
+    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(16rem,1.2fr)]">
+      <label className="grid gap-2 text-sm font-medium text-brand-espresso">
+        Date from
+        <Input
+          id={`${idPrefix}-date-from`}
+          onChange={(event) => onDateFromChange(event.target.value)}
+          type="date"
+          value={dateFrom}
+        />
+      </label>
+      <label className="grid gap-2 text-sm font-medium text-brand-espresso">
+        Date to
+        <Input
+          id={`${idPrefix}-date-to`}
+          onChange={(event) => onDateToChange(event.target.value)}
+          type="date"
+          value={dateTo}
+        />
+      </label>
+      <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/70 px-4 py-3 text-sm text-brand-mocha">
+        Date filters use the business timezone:{" "}
+        <span className="font-semibold text-brand-espresso">{timezone}</span>
+      </div>
+    </div>
+  );
 }
 
 function LogsList({
   emptyMessage,
   items,
+  timezone,
 }: {
   emptyMessage: string;
   items: ActivityLog[];
+  timezone: string;
 }): JSX.Element {
   if (items.length === 0) {
     return (
@@ -197,7 +277,7 @@ function LogsList({
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary">{item.moduleLabel}</Badge>
-              <Badge variant="outline">{formatAuditDate(item.createdAt)}</Badge>
+              <Badge variant="outline">{formatAuditDate(item.createdAt, timezone)}</Badge>
             </div>
           </div>
           <div className="mt-4 grid gap-3 text-sm text-brand-mocha md:grid-cols-2">
@@ -289,8 +369,11 @@ function LogsList({
 export function AuditLogsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const canViewAuditLogs = hasAnyPermission([PERMISSIONS.auditLogsView]);
+  const companySettingsQuery = useCompanySettings(canViewAuditLogs);
 
   const [entityFilter, setEntityFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [globalCursor, setGlobalCursor] = useState<string | null>(null);
   const [globalItems, setGlobalItems] = useState<ActivityLog[]>([]);
 
@@ -300,17 +383,41 @@ export function AuditLogsPageClient(): JSX.Element {
   const [userItems, setUserItems] = useState<ActivityLog[]>([]);
 
   const activeEntityType = entityFilter === "all" ? null : entityFilter;
+  const auditTimezone = useMemo(
+    () => resolveAuditTimezone(companySettingsQuery.data?.timezone),
+    [companySettingsQuery.data?.timezone],
+  );
   const activeEntityLabel =
     entityOptions.find((option) => option.value === entityFilter)?.label ??
     (activeEntityType ? labelFromKey(activeEntityType) : "All modules");
-  const activeEndpointLabel = activityLogsEndpoint(activeEntityType);
+  const activeEndpointLabel = activityLogsEndpoint({
+    dateFrom,
+    dateTo,
+    entityType: activeEntityType,
+    timezone: auditTimezone,
+  });
+  const resetGlobalActivity = useCallback((): void => {
+    setGlobalCursor(null);
+    setGlobalItems([]);
+  }, []);
+  const resetUserActivity = useCallback((): void => {
+    setUserCursor(null);
+    setUserItems([]);
+  }, []);
+  const resetActivityPagination = useCallback((): void => {
+    resetGlobalActivity();
+    resetUserActivity();
+  }, [resetGlobalActivity, resetUserActivity]);
   const globalLogFilters = useMemo(
     () => ({
       ...(activeEntityType ? { entityType: activeEntityType } : {}),
+      ...(dateFrom ? { dateFrom } : {}),
+      ...(dateTo ? { dateTo } : {}),
+      timezone: auditTimezone,
       limit: 50,
       cursor: globalCursor,
     }),
-    [activeEntityType, globalCursor],
+    [activeEntityType, auditTimezone, dateFrom, dateTo, globalCursor],
   );
 
   const globalLogsQuery = useActivityLogs(globalLogFilters, canViewAuditLogs);
@@ -318,6 +425,9 @@ export function AuditLogsPageClient(): JSX.Element {
   const userLogsQuery = useUserActivityLogs(
     selectedUserId,
     {
+      ...(dateFrom ? { dateFrom } : {}),
+      ...(dateTo ? { dateTo } : {}),
+      timezone: auditTimezone,
       limit: 50,
       cursor: userCursor,
     },
@@ -325,14 +435,26 @@ export function AuditLogsPageClient(): JSX.Element {
   );
 
   useEffect(() => {
-    setGlobalCursor(null);
-    setGlobalItems([]);
-  }, [activeEntityType]);
+    resetGlobalActivity();
+  }, [activeEntityType, auditTimezone, dateFrom, dateTo, resetGlobalActivity]);
+
+  useEffect(() => {
+    resetUserActivity();
+  }, [auditTimezone, dateFrom, dateTo, resetUserActivity]);
 
   function handleEntityFilterChange(value: string): void {
-    setGlobalCursor(null);
-    setGlobalItems([]);
+    resetGlobalActivity();
     setEntityFilter(value);
+  }
+
+  function handleDateFromChange(value: string): void {
+    resetActivityPagination();
+    setDateFrom(value);
+  }
+
+  function handleDateToChange(value: string): void {
+    resetActivityPagination();
+    setDateTo(value);
   }
 
   useEffect(() => {
@@ -389,6 +511,14 @@ export function AuditLogsPageClient(): JSX.Element {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
+          <AuditDateRangeControls
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            idPrefix="global-activity"
+            onDateFromChange={handleDateFromChange}
+            onDateToChange={handleDateToChange}
+            timezone={auditTimezone}
+          />
           <div className="grid gap-3 md:grid-cols-[220px_1fr]">
             <Select
               value={entityFilter}
@@ -430,7 +560,11 @@ export function AuditLogsPageClient(): JSX.Element {
             </Alert>
           ) : null}
 
-          <LogsList emptyMessage="No activity logs found for this filter." items={globalItems} />
+          <LogsList
+            emptyMessage="No activity logs found for this filter."
+            items={globalItems}
+            timezone={auditTimezone}
+          />
 
           <div className="flex items-center justify-end">
             <Button
@@ -456,6 +590,14 @@ export function AuditLogsPageClient(): JSX.Element {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
+          <AuditDateRangeControls
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            idPrefix="user-activity"
+            onDateFromChange={handleDateFromChange}
+            onDateToChange={handleDateToChange}
+            timezone={auditTimezone}
+          />
           <div className="flex flex-col gap-3 md:flex-row">
             <Input
               placeholder="Paste user ID"
@@ -472,8 +614,7 @@ export function AuditLogsPageClient(): JSX.Element {
                 }
 
                 setSelectedUserId(nextUserId);
-                setUserCursor(null);
-                setUserItems([]);
+                resetUserActivity();
               }}
               variant="secondary"
             >
@@ -502,7 +643,11 @@ export function AuditLogsPageClient(): JSX.Element {
           ) : null}
 
           {selectedUserId ? (
-            <LogsList emptyMessage="No activity logs found for this user." items={userItems} />
+            <LogsList
+              emptyMessage="No activity logs found for this user."
+              items={userItems}
+              timezone={auditTimezone}
+            />
           ) : null}
 
           <div className="flex items-center justify-end">

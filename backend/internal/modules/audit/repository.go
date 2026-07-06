@@ -3,6 +3,7 @@ package audit
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -20,7 +21,31 @@ func NewRepository(db *gorm.DB) *Repository {
 }
 
 func (r *Repository) Create(tx *gorm.DB, log *AuditLog) error {
+	if log.CreatedAt.IsZero() {
+		log.CreatedAt = time.Now().UTC()
+	}
 	return tx.Create(log).Error
+}
+
+func (r *Repository) BusinessTimezone(businessID string) (string, error) {
+	var row struct {
+		Timezone string
+	}
+	err := r.db.
+		Table("company_settings").
+		Select("timezone").
+		Where("business_id = ? AND deleted_at IS NULL", businessID).
+		Take(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return defaultActivityLogTimezone, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(row.Timezone) == "" {
+		return defaultActivityLogTimezone, nil
+	}
+	return strings.TrimSpace(row.Timezone), nil
 }
 
 type ActivityInput struct {
@@ -67,6 +92,7 @@ func (r *Repository) CreateActivity(tx *gorm.DB, input ActivityInput) error {
 		EntityID:     input.EntityID,
 		Summary:      input.Summary,
 		Metadata:     metadata,
+		CreatedAt:    time.Now().UTC(),
 	}).Error
 }
 
@@ -84,20 +110,30 @@ func (r *Repository) ListByBusinessAndUser(businessID, userID string, limit int)
 	return logs, err
 }
 
-func (r *Repository) ListActivity(businessID, entityType, targetUserID, cursor string, limit int) ([]AuditLog, string, error) {
+func (r *Repository) ListActivity(filter *ActivityLogFilter) ([]AuditLog, string, error) {
+	if filter == nil {
+		filter = &ActivityLogFilter{}
+	}
+	limit := filter.Limit
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
 
-	query := r.db.Where("business_id = ?", businessID)
-	if entityType != "" {
-		query = query.Where("entity_type = ?", entityType)
+	query := r.db.Where("business_id = ?", filter.BusinessID)
+	if filter.EntityType != "" {
+		query = query.Where("entity_type = ?", filter.EntityType)
 	}
-	if targetUserID != "" {
-		query = query.Where("actor_user_id = ? OR user_id = ? OR target_user_id = ? OR entity_id = ?", targetUserID, targetUserID, targetUserID, targetUserID)
+	if filter.TargetUserID != "" {
+		query = query.Where("actor_user_id = ? OR user_id = ? OR target_user_id = ? OR entity_id = ?", filter.TargetUserID, filter.TargetUserID, filter.TargetUserID, filter.TargetUserID)
 	}
-	if cursor != "" {
-		createdAt, id, err := decodeCursor(cursor)
+	if filter.StartUTC != nil {
+		query = query.Where("created_at >= ?", *filter.StartUTC)
+	}
+	if filter.EndUTC != nil {
+		query = query.Where("created_at < ?", *filter.EndUTC)
+	}
+	if filter.Cursor != "" {
+		createdAt, id, err := decodeCursor(filter.Cursor)
 		if err == nil {
 			query = query.Where("(created_at < ? OR (created_at = ? AND id < ?))", createdAt, createdAt, id)
 		}

@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"strconv"
 	"strings"
 	"time"
 
@@ -862,7 +861,7 @@ func (s *Service) AssignUserBranch(currentUser *utils.AuthContext, userID string
 	return &response, nil
 }
 
-func (s *Service) GetUserActivity(currentUser *utils.AuthContext, userID, cursor, limitValue string) (*audit.ActivityLogListResponse, error) {
+func (s *Service) GetUserActivity(currentUser *utils.AuthContext, userID string, query audit.ActivityLogQuery) (*audit.ActivityLogListResponse, error) {
 	if _, err := s.repo.FindByIDAndBusinessIDUnscoped(userID, currentUser.BusinessID); err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, apperrors.NotFound("user not found")
@@ -870,16 +869,17 @@ func (s *Service) GetUserActivity(currentUser *utils.AuthContext, userID, cursor
 		return nil, apperrors.Internal("failed to fetch user")
 	}
 
-	limit := 50
-	if limitValue != "" {
-		parsed, err := strconv.Atoi(limitValue)
-		if err != nil {
-			return nil, apperrors.BadRequest("invalid limit", nil)
-		}
-		limit = parsed
+	limit, err := audit.NormalizeActivityLogLimit(query.LimitValue)
+	if err != nil {
+		return nil, err
 	}
+	query.TargetUserID = userID
 
-	logs, nextCursorValue, err := s.auditRepo.ListActivity(currentUser.BusinessID, "", userID, cursor, limit)
+	filter, err := s.auditRepo.ResolveActivityLogFilter(currentUser.BusinessID, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	logs, nextCursorValue, err := s.auditRepo.ListActivity(filter)
 	if err != nil {
 		return nil, apperrors.Internal("failed to load user activity")
 	}

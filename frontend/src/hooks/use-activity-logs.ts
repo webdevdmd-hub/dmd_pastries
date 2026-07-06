@@ -3,15 +3,9 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getActivityLogs, getUserActivityLogs } from "@/lib/api/activity-logs";
-import type { ActivityEntityType } from "@/types/activity-log";
+import type { ActivityLogFilters } from "@/types/activity-log";
 
 const activityLogsQueryKey = "activity-logs";
-
-type ActivityLogFilters = {
-  entityType?: ActivityEntityType;
-  limit?: number;
-  cursor?: string | null;
-};
 
 export function useActivityLogs(filters: ActivityLogFilters = {}, enabled = true) {
   return useQuery({
@@ -23,7 +17,7 @@ export function useActivityLogs(filters: ActivityLogFilters = {}, enabled = true
 
 export function useUserActivityLogs(
   userId: string | null,
-  filters: Pick<ActivityLogFilters, "limit" | "cursor"> = {},
+  filters: Omit<ActivityLogFilters, "entityType"> = {},
   enabled = true,
 ) {
   return useQuery({

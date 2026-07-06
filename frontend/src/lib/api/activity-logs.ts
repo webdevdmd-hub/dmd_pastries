@@ -1,8 +1,8 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
   ActivityChange,
-  ActivityEntityType,
   ActivityLog,
+  ActivityLogFilters,
   ActivityLogsResponse,
   ActivityMetadataPrimitive,
   ActivityMetadataValue,
@@ -34,12 +34,6 @@ type BackendActivityLog = {
 type BackendActivityLogsResponse = {
   items?: unknown;
   next_cursor?: string | null;
-};
-
-type ActivityLogFilters = {
-  entityType?: ActivityEntityType;
-  limit?: number;
-  cursor?: string | null;
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -222,6 +216,18 @@ function buildActivityLogSearchParams(filters: ActivityLogFilters): string {
     params.set("cursor", filters.cursor);
   }
 
+  if (filters.dateFrom) {
+    params.set("date_from", filters.dateFrom);
+  }
+
+  if (filters.dateTo) {
+    params.set("date_to", filters.dateTo);
+  }
+
+  if (filters.timezone) {
+    params.set("timezone", filters.timezone);
+  }
+
   const query = params.toString();
   return query ? `?${query}` : "";
 }
@@ -242,7 +248,7 @@ export async function getActivityLogs(
 
 export async function getUserActivityLogs(
   userId: string,
-  filters: Pick<ActivityLogFilters, "limit" | "cursor"> = {},
+  filters: Omit<ActivityLogFilters, "entityType"> = {},
 ): Promise<ActivityLogsResponse> {
   const response = await apiRequest<ActivityLogsResponse>(
     `/api/v1/users/${userId}/activity${buildActivityLogSearchParams(filters)}`,

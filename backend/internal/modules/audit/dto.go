@@ -35,6 +35,16 @@ type ActivityLogListResponse struct {
 	NextCursor *string               `json:"next_cursor"`
 }
 
+type ActivityLogQuery struct {
+	EntityType   string
+	TargetUserID string
+	Cursor       string
+	LimitValue   string
+	DateFrom     string
+	DateTo       string
+	Timezone     string
+}
+
 type ActivityUserDisplay struct {
 	ID       string
 	FullName string

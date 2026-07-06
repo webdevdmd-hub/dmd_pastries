@@ -3,6 +3,7 @@ package users
 import (
 	"github.com/gin-gonic/gin"
 
+	"pastries-pos/internal/modules/audit"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/response"
 	"pastries-pos/internal/shared/utils"
@@ -131,7 +132,13 @@ func (h *Handler) GetUser(c *gin.Context) {
 
 func (h *Handler) GetUserActivity(c *gin.Context) {
 	currentUser := utils.MustAuthContext(c)
-	activity, err := h.service.GetUserActivity(currentUser, c.Param("id"), c.Query("cursor"), c.Query("limit"))
+	activity, err := h.service.GetUserActivity(currentUser, c.Param("id"), audit.ActivityLogQuery{
+		Cursor:     c.Query("cursor"),
+		LimitValue: c.Query("limit"),
+		DateFrom:   c.Query("date_from"),
+		DateTo:     c.Query("date_to"),
+		Timezone:   c.Query("timezone"),
+	})
 	if err != nil {
 		handleError(c, err)
 		return

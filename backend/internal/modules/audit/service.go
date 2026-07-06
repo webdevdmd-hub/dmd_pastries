@@ -1,8 +1,6 @@
 package audit
 
 import (
-	"strconv"
-
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
@@ -15,17 +13,16 @@ func NewService(repo *Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) ListActivityLogs(currentUser *utils.AuthContext, entityType, cursor, limitValue string) (*ActivityLogListResponse, error) {
-	limit := 50
-	if limitValue != "" {
-		parsed, err := strconv.Atoi(limitValue)
-		if err != nil {
-			return nil, apperrors.BadRequest("invalid limit", nil)
-		}
-		limit = parsed
+func (s *Service) ListActivityLogs(currentUser *utils.AuthContext, query ActivityLogQuery) (*ActivityLogListResponse, error) {
+	limit, err := NormalizeActivityLogLimit(query.LimitValue)
+	if err != nil {
+		return nil, err
 	}
-
-	logs, nextCursorValue, err := s.repo.ListActivity(currentUser.BusinessID, entityType, "", cursor, limit)
+	filter, err := s.repo.ResolveActivityLogFilter(currentUser.BusinessID, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	logs, nextCursorValue, err := s.repo.ListActivity(filter)
 	if err != nil {
 		return nil, apperrors.Internal("failed to list activity logs")
 	}

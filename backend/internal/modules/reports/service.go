@@ -607,6 +607,7 @@ func (s *Service) ExportCSV(currentUser *utils.AuthContext, reportType string, v
 		"report_label": option.Label,
 		"date_from":    filter.DateFrom.Format("2006-01-02"),
 		"date_to":      filter.DateTo.Format("2006-01-02"),
+		"timezone":     filter.Timezone,
 		"branch_scope": branchScopeLabel(filter),
 		"row_count":    len(rows),
 	}, ipAddress, userAgent)

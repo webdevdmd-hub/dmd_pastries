@@ -20,9 +20,14 @@ func (h *Handler) ListActivityLogs(c *gin.Context) {
 	currentUser := utils.MustAuthContext(c)
 	resp, err := h.service.ListActivityLogs(
 		currentUser,
-		c.Query("entity_type"),
-		c.Query("cursor"),
-		c.Query("limit"),
+		ActivityLogQuery{
+			EntityType: c.Query("entity_type"),
+			Cursor:     c.Query("cursor"),
+			LimitValue: c.Query("limit"),
+			DateFrom:   c.Query("date_from"),
+			DateTo:     c.Query("date_to"),
+			Timezone:   c.Query("timezone"),
+		},
 	)
 	if err != nil {
 		handleError(c, err)

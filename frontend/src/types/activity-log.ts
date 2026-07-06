@@ -43,3 +43,12 @@ export type ActivityLogsResponse = {
   items: ActivityLog[];
   nextCursor: string | null;
 };
+
+export type ActivityLogFilters = {
+  entityType?: ActivityEntityType;
+  limit?: number;
+  cursor?: string | null;
+  dateFrom?: string;
+  dateTo?: string;
+  timezone?: string;
+};
