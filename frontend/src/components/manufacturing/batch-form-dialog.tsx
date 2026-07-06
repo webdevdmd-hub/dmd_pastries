@@ -2,6 +2,7 @@
 
 import type { JSX } from "react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,14 @@ import {
 } from "@/components/ui/select";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useProductionPreview } from "@/hooks/use-manufacturing";
-import { ApiError } from "@/lib/api/client";
+import {
+  EMPTY_BOM_PRODUCTION_MESSAGE,
+  PREVIEW_OUT_OF_SYNC_MESSAGE,
+  PREVIEW_REQUIRED_MESSAGE,
+  productionFailureMessage,
+  type ProductionFeedback,
+  recipeHasKnownEmptyBom,
+} from "@/lib/manufacturing/production-errors";
 import { createBatchSchema, createProductionSchema } from "@/lib/validators/manufacturing.schema";
 import type {
   CreateBatchPayload,
@@ -38,32 +46,25 @@ import type {
 } from "@/types/manufacturing";
 import { ITEM_STRUCTURE_LABELS, PRODUCT_TYPE_LABELS } from "@/types/product";
 
-const EMPTY_COMPONENT_RECIPE_MESSAGE =
-  "This recipe has no ingredients/components. Add BOM lines in Recipe Builder before producing.";
-const PREVIEW_OUT_OF_SYNC_MESSAGE =
-  "Recipe preview and production validation are out of sync. Refresh the recipe or reopen the dialog.";
-
 function quantitiesMatch(left: number, right: number): boolean {
   return Math.abs(left - right) < 0.0001;
 }
 
-function productionErrorMessage(error: unknown, previewHadLines: boolean): string {
-  if (previewHadLines && error instanceof ApiError) {
-    const reason = error.errorDetails?.reason;
-    if (
-      reason === "recipe_has_no_components" ||
-      reason === "recipe_has_no_component_quantity" ||
-      reason === "recipe_components_not_consumable"
-    ) {
-      return PREVIEW_OUT_OF_SYNC_MESSAGE;
-    }
-  }
-
-  return error instanceof Error ? error.message : "Production could not be posted.";
-}
-
 function countLabel(value: number | null): string {
   return value === null ? "Unknown" : value.toLocaleString();
+}
+
+function feedbackClassName(feedback: ProductionFeedback): string {
+  if (feedback.tone === "success") {
+    return "border-green-200 bg-green-50 text-green-800";
+  }
+  if (feedback.tone === "warning") {
+    return "border-amber-200 bg-amber-50 text-amber-800";
+  }
+  if (feedback.tone === "info") {
+    return "border-blue-200 bg-blue-50 text-blue-800";
+  }
+  return "border-red-200 bg-red-50 text-red-800";
 }
 
 function formatQuantity(value: number, unit = ""): string {
@@ -186,7 +187,7 @@ export function BatchFormDialog({
   const [plannedQuantity, setPlannedQuantity] = useState(1);
   const [productionDate, setProductionDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<ProductionFeedback | null>(null);
   const selectableBranches = branches.filter(
     (branch) =>
       branch.id === batch?.branchId ||
@@ -208,15 +209,48 @@ export function BatchFormDialog({
         new Date().toISOString().slice(0, 10),
     );
     setNotes(batch?.notes ?? "");
-    setError(null);
+    setFeedback(null);
 
     if (batch?.productId) {
       onProductChange(batch.productId);
     }
   }, [batch, branchScope.effectiveBranchId, onProductChange, open]);
 
+  const clearFeedback = (): void => {
+    setFeedback(null);
+  };
+
+  const showFeedback = (nextFeedback: ProductionFeedback, notify = true): void => {
+    setFeedback(nextFeedback);
+
+    if (!notify) {
+      return;
+    }
+
+    if (nextFeedback.tone === "success") {
+      toast.success(nextFeedback.message);
+      return;
+    }
+
+    if (nextFeedback.tone === "warning") {
+      toast.warning(nextFeedback.message);
+      return;
+    }
+
+    toast.error(nextFeedback.message);
+  };
+
+  const showError = (message: string, title = "Production needs attention"): void => {
+    showFeedback({
+      message,
+      title,
+      tone: "error",
+    });
+  };
+
   const handleProductChange = (nextProductId: string): void => {
     const normalizedProductId = nextProductId === "none" ? "" : nextProductId;
+    clearFeedback();
     setProductId(normalizedProductId);
     setRecipeId("");
     if (normalizedProductId) {
@@ -230,7 +264,7 @@ export function BatchFormDialog({
 
   const recipeHasKnownMissingComponents = (
     recipe: ManufacturingRecipeOption | undefined,
-  ): boolean => recipe?.componentCount === 0;
+  ): boolean => recipeHasKnownEmptyBom(recipe);
 
   const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
   const selectedRecipeIsKnownInactive = recipeIsKnownInactive(selectedRecipe);
@@ -250,26 +284,18 @@ export function BatchFormDialog({
   const productionPreview = productionPreviewQuery.data;
   const previewHasNoComponentLines = productionPreview?.components.length === 0;
   const previewHadComponentLines = productionPreview !== undefined && !previewHasNoComponentLines;
-  const previewHasShortage = productionPreview?.hasShortage ?? false;
-  const previewHasZeroCostWarning = productionPreview?.hasZeroCostWarning ?? false;
   const previewMatchesForm =
     productionPreview?.recipeId === recipeId &&
     quantitiesMatch(productionPreview.quantityProduced, plannedQuantity);
-  const previewBlocksProduction =
-    productionPreviewQuery.isLoading ||
-    productionPreviewQuery.isFetching ||
-    productionPreviewQuery.isError ||
-    !previewMatchesForm ||
-    previewHasShortage ||
-    previewHasZeroCostWarning ||
-    previewHasNoComponentLines;
 
   const validateFreshPreview = async (): Promise<boolean> => {
     const previewResult = await productionPreviewQuery.refetch();
 
     if (!previewResult.data) {
-      setError(
-        "Production preview is required before producing. Wait for stock validation to finish.",
+      showError(
+        previewResult.error
+          ? productionFailureMessage(previewResult.error)
+          : PREVIEW_REQUIRED_MESSAGE,
       );
       return false;
     }
@@ -278,26 +304,26 @@ export function BatchFormDialog({
       previewResult.data.recipeId !== recipeId ||
       !quantitiesMatch(previewResult.data.quantityProduced, plannedQuantity)
     ) {
-      setError(PREVIEW_OUT_OF_SYNC_MESSAGE);
+      showError(PREVIEW_OUT_OF_SYNC_MESSAGE);
       return false;
     }
 
     const latestPreviewHasNoComponentLines = previewResult.data.components.length === 0;
 
     if (latestPreviewHasNoComponentLines) {
-      setError(EMPTY_COMPONENT_RECIPE_MESSAGE);
+      showError(EMPTY_BOM_PRODUCTION_MESSAGE);
       return false;
     }
 
     if (previewResult.data.hasShortage) {
-      setError(
+      showError(
         "Production cannot be posted because required component or packaging stock is not available.",
       );
       return false;
     }
 
     if (previewResult.data.hasZeroCostWarning) {
-      setError(
+      showError(
         previewResult.data.warnings[0] ??
           "Production cannot be posted until the recipe has valued component or packaging stock.",
       );
@@ -308,13 +334,6 @@ export function BatchFormDialog({
   };
 
   const submitPlanned = async (): Promise<void> => {
-    const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
-
-    if (recipeIsKnownInactive(selectedRecipe)) {
-      setError("Only an active recipe can be used to create production.");
-      return;
-    }
-
     const result = createBatchSchema.safeParse({
       branchId,
       notes,
@@ -325,7 +344,14 @@ export function BatchFormDialog({
     });
 
     if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Please check the production form.");
+      showError(result.error.issues[0]?.message ?? "Please check the production form.");
+      return;
+    }
+
+    const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
+
+    if (recipeIsKnownInactive(selectedRecipe)) {
+      showError("Only an active recipe can be used to create production.");
       return;
     }
 
@@ -338,26 +364,11 @@ export function BatchFormDialog({
   };
 
   const submitProduction = async (): Promise<void> => {
+    if (isSubmitting) {
+      return;
+    }
+
     const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
-
-    if (recipeIsKnownInactive(selectedRecipe)) {
-      setError("Only an active recipe can be used to create production.");
-      return;
-    }
-
-    if (recipeHasKnownMissingComponents(selectedRecipe)) {
-      setError(EMPTY_COMPONENT_RECIPE_MESSAGE);
-      return;
-    }
-
-    if (!previewMatchesForm) {
-      setError(PREVIEW_OUT_OF_SYNC_MESSAGE);
-      return;
-    }
-
-    if (!(await validateFreshPreview())) {
-      return;
-    }
 
     const result = createProductionSchema.safeParse({
       branchId,
@@ -370,42 +381,61 @@ export function BatchFormDialog({
     });
 
     if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Please check the production form.");
+      showError(result.error.issues[0]?.message ?? "Please check the production form.");
       return;
     }
-
-    try {
-      await onProduceNow(result.data);
-    } catch (error) {
-      setError(productionErrorMessage(error, previewHadComponentLines));
-    }
-  };
-
-  const submitPlannedProduction = async (): Promise<void> => {
-    if (!batch) {
-      return;
-    }
-
-    const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
 
     if (recipeIsKnownInactive(selectedRecipe)) {
-      setError("Only an active recipe can be used to create production.");
+      showError("Only an active recipe can be used to create production.");
       return;
     }
 
     if (recipeHasKnownMissingComponents(selectedRecipe)) {
-      setError(EMPTY_COMPONENT_RECIPE_MESSAGE);
+      showError(EMPTY_BOM_PRODUCTION_MESSAGE);
+      return;
+    }
+
+    if (productionPreviewQuery.isLoading || productionPreviewQuery.isFetching) {
+      showError("Production preview is still checking stock availability. Try again in a moment.");
+      return;
+    }
+
+    if (productionPreviewQuery.isError) {
+      showError(productionFailureMessage(productionPreviewQuery.error));
       return;
     }
 
     if (!previewMatchesForm) {
-      setError(PREVIEW_OUT_OF_SYNC_MESSAGE);
+      showError(productionPreview ? PREVIEW_OUT_OF_SYNC_MESSAGE : PREVIEW_REQUIRED_MESSAGE);
       return;
     }
 
     if (!(await validateFreshPreview())) {
       return;
     }
+
+    try {
+      await onProduceNow(result.data);
+    } catch (error) {
+      showError(
+        productionFailureMessage(error, {
+          previewHadConsumableLines: previewHadComponentLines,
+        }),
+        "Production failed",
+      );
+    }
+  };
+
+  const submitPlannedProduction = async (): Promise<void> => {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!batch) {
+      return;
+    }
+
+    const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
 
     const result = createBatchSchema.safeParse({
       branchId,
@@ -417,7 +447,36 @@ export function BatchFormDialog({
     });
 
     if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Please check the production form.");
+      showError(result.error.issues[0]?.message ?? "Please check the production form.");
+      return;
+    }
+
+    if (recipeIsKnownInactive(selectedRecipe)) {
+      showError("Only an active recipe can be used to create production.");
+      return;
+    }
+
+    if (recipeHasKnownMissingComponents(selectedRecipe)) {
+      showError(EMPTY_BOM_PRODUCTION_MESSAGE);
+      return;
+    }
+
+    if (productionPreviewQuery.isLoading || productionPreviewQuery.isFetching) {
+      showError("Production preview is still checking stock availability. Try again in a moment.");
+      return;
+    }
+
+    if (productionPreviewQuery.isError) {
+      showError(productionFailureMessage(productionPreviewQuery.error));
+      return;
+    }
+
+    if (!previewMatchesForm) {
+      showError(productionPreview ? PREVIEW_OUT_OF_SYNC_MESSAGE : PREVIEW_REQUIRED_MESSAGE);
+      return;
+    }
+
+    if (!(await validateFreshPreview())) {
       return;
     }
 
@@ -427,12 +486,16 @@ export function BatchFormDialog({
         quantityProduced: result.data.plannedQuantity,
       });
     } catch (error) {
-      setError(productionErrorMessage(error, previewHadComponentLines));
+      showError(
+        productionFailureMessage(error, {
+          previewHadConsumableLines: previewHadComponentLines,
+        }),
+        "Production failed",
+      );
     }
   };
   const isCreateDisabled = isSubmitting || selectedRecipeIsKnownInactive;
-  const isProduceDisabled =
-    isCreateDisabled || selectedRecipeHasKnownMissingComponents || previewBlocksProduction;
+  const isProduceDisabled = isSubmitting;
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
@@ -451,7 +514,10 @@ export function BatchFormDialog({
               <label className="text-sm font-medium text-neutral-950">Branch</label>
               <Select
                 value={branchId || "none"}
-                onValueChange={(value) => setBranchId(value === "none" ? "" : value)}
+                onValueChange={(value) => {
+                  clearFeedback();
+                  setBranchId(value === "none" ? "" : value);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Branch" />
@@ -471,7 +537,10 @@ export function BatchFormDialog({
               <label className="text-sm font-medium text-neutral-950">Production date</label>
               <Input
                 aria-label="Production date"
-                onChange={(event) => setProductionDate(event.target.value)}
+                onChange={(event) => {
+                  clearFeedback();
+                  setProductionDate(event.target.value);
+                }}
                 type="date"
                 value={productionDate}
               />
@@ -499,7 +568,10 @@ export function BatchFormDialog({
               <label className="text-sm font-medium text-neutral-950">Active recipe</label>
               <Select
                 value={recipeId || "none"}
-                onValueChange={(value) => setRecipeId(value === "none" ? "" : value)}
+                onValueChange={(value) => {
+                  clearFeedback();
+                  setRecipeId(value === "none" ? "" : value);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Recipe" />
@@ -566,7 +638,7 @@ export function BatchFormDialog({
                 {selectedRecipeHasKnownMissingComponents ? (
                   <Alert className="mt-4 border-amber-300 bg-amber-50 text-amber-950">
                     <AlertTitle>Missing BOM lines</AlertTitle>
-                    <AlertDescription>{EMPTY_COMPONENT_RECIPE_MESSAGE}</AlertDescription>
+                    <AlertDescription>{EMPTY_BOM_PRODUCTION_MESSAGE}</AlertDescription>
                   </Alert>
                 ) : null}
                 {productionPreviewQuery.isLoading ? (
@@ -619,7 +691,7 @@ export function BatchFormDialog({
                     {previewHasNoComponentLines ? (
                       <Alert className="border-amber-300 bg-amber-50 text-amber-950">
                         <AlertTitle>Missing BOM lines</AlertTitle>
-                        <AlertDescription>{EMPTY_COMPONENT_RECIPE_MESSAGE}</AlertDescription>
+                        <AlertDescription>{EMPTY_BOM_PRODUCTION_MESSAGE}</AlertDescription>
                       </Alert>
                     ) : null}
 
@@ -662,7 +734,10 @@ export function BatchFormDialog({
               <Input
                 aria-label="Quantity to produce"
                 min="0"
-                onChange={(event) => setPlannedQuantity(Number(event.target.value))}
+                onChange={(event) => {
+                  clearFeedback();
+                  setPlannedQuantity(Number(event.target.value));
+                }}
                 placeholder="Quantity to produce"
                 type="number"
                 value={plannedQuantity}
@@ -673,14 +748,25 @@ export function BatchFormDialog({
               <label className="text-sm font-medium text-neutral-950">Notes</label>
               <Input
                 aria-label="Notes"
-                onChange={(event) => setNotes(event.target.value)}
+                onChange={(event) => {
+                  clearFeedback();
+                  setNotes(event.target.value);
+                }}
                 placeholder="Optional production notes..."
                 value={notes}
               />
             </div>
           </div>
-          {error ? <p className="mt-4 text-sm font-semibold text-red-700">{error}</p> : null}
         </div>
+
+        {feedback ? (
+          <div className="shrink-0 px-8 pb-4">
+            <Alert className={feedbackClassName(feedback)}>
+              <AlertTitle>{feedback.title}</AlertTitle>
+              <AlertDescription>{feedback.message}</AlertDescription>
+            </Alert>
+          </div>
+        ) : null}
 
         <DialogFooter className="shrink-0 border-t border-neutral-300 bg-neutral-50 px-8 py-5">
           <Button onClick={onClose} type="button" variant="outline">

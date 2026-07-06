@@ -50,6 +50,7 @@ import {
 } from "@/hooks/use-manufacturing";
 import { usePermission } from "@/hooks/use-permission";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { productionFailureMessage } from "@/lib/manufacturing/production-errors";
 import type {
   BatchFilters,
   CreateBatchPayload,
@@ -71,38 +72,6 @@ const defaultFilters: BatchFilters = {
 
 function formatMetric(value: number): string {
   return new Intl.NumberFormat("en-AE", { maximumFractionDigits: 2 }).format(value);
-}
-
-function manufacturingErrorMessage(error: unknown): string {
-  const message = getErrorMessage(error);
-  const normalizedMessage = message.toLowerCase();
-
-  if (
-    normalizedMessage.includes("no components to consume") ||
-    normalizedMessage.includes("no component quantity to consume") ||
-    normalizedMessage.includes("recipe has no components") ||
-    normalizedMessage.includes("no ingredients or packaging") ||
-    normalizedMessage.includes("no bom") ||
-    normalizedMessage.includes("bom lines") ||
-    (normalizedMessage.includes("recipe") &&
-      normalizedMessage.includes("ingredient") &&
-      normalizedMessage.includes("packaging"))
-  ) {
-    return "This recipe has no ingredients/components. Add BOM lines in Recipe Builder before producing.";
-  }
-
-  if (
-    (normalizedMessage.includes("zero") ||
-      normalizedMessage.includes("no value") ||
-      normalizedMessage.includes("unit cost") ||
-      normalizedMessage.includes("stock value") ||
-      normalizedMessage.includes("inventory value")) &&
-    (normalizedMessage.includes("cost") || normalizedMessage.includes("value"))
-  ) {
-    return `${message} Add opening stock or receive purchase stock with a value before producing.`;
-  }
-
-  return message;
 }
 
 export function BatchesPageClient(): JSX.Element {
@@ -185,18 +154,14 @@ export function BatchesPageClient(): JSX.Element {
       toast.success("Planned production saved.");
       setFormOpen(false);
     } catch (error) {
-      toast.error(manufacturingErrorMessage(error));
+      toast.error(productionFailureMessage(error));
     }
   };
 
   const handleProduceNow = async (payload: CreateProductionPayload): Promise<void> => {
-    try {
-      await createProductionMutation.mutateAsync(payload);
-      toast.success("Production completed.");
-      setFormOpen(false);
-    } catch (error) {
-      toast.error(manufacturingErrorMessage(error));
-    }
+    await createProductionMutation.mutateAsync(payload);
+    toast.success("Production completed.");
+    setFormOpen(false);
   };
 
   const handleUpdate = async (id: string, payload: UpdateBatchPayload): Promise<void> => {
@@ -206,7 +171,7 @@ export function BatchesPageClient(): JSX.Element {
       setEditingBatch(null);
       setFormOpen(false);
     } catch (error) {
-      toast.error(manufacturingErrorMessage(error));
+      toast.error(productionFailureMessage(error));
     }
   };
 
@@ -215,16 +180,11 @@ export function BatchesPageClient(): JSX.Element {
     updatePayload: UpdateBatchPayload,
     producePayload: ProducePayload,
   ): Promise<void> => {
-    try {
-      await updateBatchMutation.mutateAsync({ id, payload: updatePayload });
-      await produceBatchMutation.mutateAsync({ id, payload: producePayload });
-      toast.success("Planned production produced.");
-      setEditingBatch(null);
-      setFormOpen(false);
-    } catch (error) {
-      toast.error(manufacturingErrorMessage(error));
-      throw error;
-    }
+    await updateBatchMutation.mutateAsync({ id, payload: updatePayload });
+    await produceBatchMutation.mutateAsync({ id, payload: producePayload });
+    toast.success("Planned production produced.");
+    setEditingBatch(null);
+    setFormOpen(false);
   };
 
   const handleProducePlannedFromRow = async (batch: ProductionBatch): Promise<void> => {
@@ -238,7 +198,7 @@ export function BatchesPageClient(): JSX.Element {
       });
       toast.success("Planned production produced.");
     } catch (error) {
-      toast.error(manufacturingErrorMessage(error));
+      toast.error(productionFailureMessage(error));
     }
   };
 
@@ -252,7 +212,7 @@ export function BatchesPageClient(): JSX.Element {
       toast.success("Planned production deleted.");
       setDeleteBatchTarget(null);
     } catch (error) {
-      toast.error(manufacturingErrorMessage(error));
+      toast.error(getErrorMessage(error));
     }
   };
 

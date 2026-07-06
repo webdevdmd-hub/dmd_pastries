@@ -1392,10 +1392,10 @@ func (s *Service) validateProductionHasValuedInputs(tx *gorm.DB, businessID, bra
 		return apperrors.BadRequest("production cannot be posted because the recipe has no component quantity to consume. Add at least one component with quantity greater than zero. Packaging is optional.", map[string]interface{}{"reason": "recipe_has_no_component_quantity", "recipe_id": recipeID, "branch_id": branchID, "component_count": componentCount, "packaging_count": packagingCount})
 	}
 	if len(stockShortages) > 0 {
-		return apperrors.BadRequest("production cannot be posted because required component or packaging stock is not available", map[string]interface{}{"shortages": stockShortages})
+		return apperrors.BadRequest("production cannot be posted because required component or packaging stock is not available", map[string]interface{}{"reason": "stock_shortage", "shortages": stockShortages})
 	}
 	if len(zeroCostLines) > 0 {
-		return apperrors.BadRequest("Production cannot be posted because consumed components have zero inventory value. Add opening stock value or purchase stock before manufacturing.", map[string]interface{}{"zero_cost_items": zeroCostLines})
+		return apperrors.BadRequest("Production cannot be posted because consumed components have zero inventory value. Add opening stock value or purchase stock before manufacturing.", map[string]interface{}{"reason": "zero_cost_inputs", "zero_cost_items": zeroCostLines})
 	}
 	return nil
 }
