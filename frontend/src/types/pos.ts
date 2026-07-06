@@ -202,4 +202,5 @@ export type CheckoutResponse = {
     accountingJournalEntryId: string | null;
   };
   receipt: SaleReceipt;
+  receiptWarning: string | null;
 };

@@ -52,6 +52,10 @@ import {
 import { getErrorMessage } from "@/lib/api/client";
 import { lookupPOSProduct } from "@/lib/api/pos";
 import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
+import {
+  type CheckoutFeedback,
+  resolveCheckoutBlocker,
+} from "@/lib/pos/checkout-feedback";
 import { getProductCategoryIconForMetadata } from "@/lib/product-category-icons";
 import { checkoutSchema } from "@/lib/validators/pos.schema";
 import type { ProductCategory } from "@/types/master-data";
@@ -129,6 +133,7 @@ export function POSWorkspace(): JSX.Element {
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [salesChannelId, setSalesChannelId] = useState("");
   const [externalOrderNumber, setExternalOrderNumber] = useState("");
+  const [checkoutFeedback, setCheckoutFeedback] = useState<CheckoutFeedback | null>(null);
   const [variantProduct, setVariantProduct] = useState<POSProduct | null>(null);
   const debouncedSearch = useDebouncedValue(search, 250);
   const branchId = branchScope.effectiveBranchId ?? "";
@@ -265,28 +270,26 @@ export function POSWorkspace(): JSX.Element {
     }
   };
 
+  const showCheckoutFeedback = (feedback: CheckoutFeedback): void => {
+    setCheckoutFeedback(feedback);
+    if (feedback.tone === "success") {
+      toast.success(feedback.message);
+      return;
+    }
+    if (feedback.tone === "warning") {
+      toast.warning(feedback.message);
+      return;
+    }
+    toast.error(feedback.message);
+  };
+
   const submitCheckout = async (): Promise<void> => {
-    if (!branchId) {
-      toast.error("No active branch is selected. Switch to an active branch before checkout.");
+    if (checkoutMutation.isPending) {
       return;
     }
 
-    const paymentMissingReference = cart.payments.find((payment) => {
-      const method = paymentMethods.find((entry) => entry.id === payment.paymentMethodId);
-      return method?.requiresReference === true && !payment.referenceNumber?.trim();
-    });
-
-    if (paymentMissingReference) {
-      toast.error(`Reference number is required for ${paymentMissingReference.paymentMethodName}.`);
-      setCheckoutOpen(true);
-      return;
-    }
-
-    if (
-      selectedSalesChannel?.requiresExternalOrderNumber === true &&
-      externalOrderNumber.trim().length === 0
-    ) {
-      toast.error(`External order number is required for ${selectedSalesChannel.channelName}.`);
+    if (checkoutBlocker) {
+      showCheckoutFeedback(checkoutBlocker.feedback);
       setCheckoutOpen(true);
       return;
     }
@@ -314,7 +317,11 @@ export function POSWorkspace(): JSX.Element {
     const parsed = checkoutSchema.safeParse(payload);
 
     if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Checkout validation failed.");
+      showCheckoutFeedback({
+        message: parsed.error.issues[0]?.message ?? "Checkout validation failed.",
+        title: "Checkout needs attention",
+        tone: "error",
+      });
       return;
     }
 
@@ -331,14 +338,23 @@ export function POSWorkspace(): JSX.Element {
           receiptItemSnapshot,
         ),
       );
+      setCheckoutFeedback(null);
       setCheckoutOpen(false);
       setReceiptOpen(true);
       setExternalOrderNumber("");
       cart.clearCart();
-      toast.success("Sale completed");
+      if (checkedOut.receiptWarning) {
+        toast.warning(checkedOut.receiptWarning);
+      } else {
+        toast.success("Sale completed");
+      }
       barcodeInputRef.current?.focus();
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      showCheckoutFeedback({
+        message: getErrorMessage(error),
+        title: "Checkout failed",
+        tone: "error",
+      });
     }
   };
 
@@ -423,8 +439,17 @@ export function POSWorkspace(): JSX.Element {
       ),
     [referenceDataQuery.data?.salesChannels],
   );
-  const selectedSalesChannel =
-    salesChannels.find((channel) => channel.id === salesChannelId) ?? null;
+  const checkoutBlocker = resolveCheckoutBlocker({
+    branchId,
+    externalOrderNumber,
+    itemCount: cart.items.length,
+    paymentMethods,
+    paymentMethodsError: paymentMethodsQuery.error,
+    payments: cart.payments,
+    salesChannelId,
+    salesChannels,
+    totals: cart.totals,
+  });
   const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
   const receiptLayout = useMemo(
     () => selectReceiptLayout(referenceDataQuery.data?.receiptLayouts ?? [], branchId),
@@ -482,6 +507,23 @@ export function POSWorkspace(): JSX.Element {
     }
   }, [categoryId, categoryIds]);
 
+  useEffect(() => {
+    if (checkoutOpen) {
+      setCheckoutFeedback(null);
+    }
+  }, [checkoutOpen]);
+
+  const clearCheckoutFeedback = (): void => {
+    setCheckoutFeedback(null);
+  };
+
+  const handleCheckoutOpenChange = (open: boolean): void => {
+    if (open) {
+      clearCheckoutFeedback();
+    }
+    setCheckoutOpen(open);
+  };
+
   const cartPanel = (
     <POSCartPanel
       canSell={canSell}
@@ -490,20 +532,42 @@ export function POSWorkspace(): JSX.Element {
       externalOrderNumber={externalOrderNumber}
       isCheckingOut={checkoutMutation.isPending}
       items={cart.items}
-      onCheckout={() => setCheckoutOpen(true)}
-      onChargesChange={cart.setCharges}
+      onCheckout={() => handleCheckoutOpenChange(true)}
+      onChargesChange={(charges) => {
+        clearCheckoutFeedback();
+        cart.setCharges(charges);
+      }}
       onClear={() => {
         if (window.confirm("Clear current POS cart?")) {
+          clearCheckoutFeedback();
           cart.clearCart();
         }
       }}
-      onCustomerChange={setCustomerId}
-      onExternalOrderNumberChange={setExternalOrderNumber}
+      onCustomerChange={(value) => {
+        clearCheckoutFeedback();
+        setCustomerId(value);
+      }}
+      onExternalOrderNumberChange={(value) => {
+        clearCheckoutFeedback();
+        setExternalOrderNumber(value);
+      }}
       onHoldSale={() => setHoldOpen(true)}
-      onLineDiscountChange={cart.applyLineDiscount}
-      onQuantityChange={cart.updateQuantity}
-      onRemoveItem={cart.removeItem}
-      onSalesChannelChange={setSalesChannelId}
+      onLineDiscountChange={(cartItemId, discountType, discountValue) => {
+        clearCheckoutFeedback();
+        cart.applyLineDiscount(cartItemId, discountType, discountValue);
+      }}
+      onQuantityChange={(cartItemId, quantity) => {
+        clearCheckoutFeedback();
+        cart.updateQuantity(cartItemId, quantity);
+      }}
+      onRemoveItem={(cartItemId) => {
+        clearCheckoutFeedback();
+        cart.removeItem(cartItemId);
+      }}
+      onSalesChannelChange={(value) => {
+        clearCheckoutFeedback();
+        setSalesChannelId(value);
+      }}
       salesChannelId={salesChannelId}
       salesChannels={salesChannels}
       taxRates={chargeTaxRates}
@@ -722,16 +786,26 @@ export function POSWorkspace(): JSX.Element {
       </Dialog>
 
       <POSCheckoutDialog
-        externalOrderNumber={externalOrderNumber}
         charges={cart.charges}
+        confirmButtonLabel={checkoutBlocker?.buttonLabel ?? "Confirm sale"}
+        feedback={checkoutFeedback}
         isSubmitting={checkoutMutation.isPending}
         onConfirm={() => {
           void submitCheckout();
         }}
-        onOpenChange={setCheckoutOpen}
-        onChargesChange={cart.setCharges}
-        onPaymentsChange={cart.setPayments}
-        onSaleDiscountChange={cart.setSaleDiscount}
+        onOpenChange={handleCheckoutOpenChange}
+        onChargesChange={(charges) => {
+          clearCheckoutFeedback();
+          cart.setCharges(charges);
+        }}
+        onPaymentsChange={(payments) => {
+          clearCheckoutFeedback();
+          cart.setPayments(payments);
+        }}
+        onSaleDiscountChange={(discountType, discountValue) => {
+          clearCheckoutFeedback();
+          cart.setSaleDiscount(discountType, discountValue);
+        }}
         open={checkoutOpen}
         paymentMethodsError={paymentMethodsQuery.error}
         paymentMethodsLoading={paymentMethodsQuery.isLoading}
@@ -739,8 +813,6 @@ export function POSWorkspace(): JSX.Element {
         payments={cart.payments}
         saleDiscountType={cart.saleDiscountType}
         saleDiscountValue={cart.saleDiscountValue}
-        salesChannelId={salesChannelId}
-        salesChannels={salesChannels}
         taxRates={chargeTaxRates}
         totals={cart.totals}
       />

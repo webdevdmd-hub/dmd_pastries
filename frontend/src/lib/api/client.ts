@@ -125,6 +125,11 @@ function normalizeErrors(value: unknown): FieldErrorMap | undefined {
   }
 
   const entries = Object.entries(value).reduce<FieldErrorMap>((accumulator, [key, item]) => {
+    if (typeof item === "string" && item.length > 0) {
+      accumulator[key] = [item];
+      return accumulator;
+    }
+
     if (Array.isArray(item)) {
       const messages = item.filter((entry): entry is string => typeof entry === "string");
 
@@ -152,7 +157,10 @@ function normalizeBackendError(value: unknown): {
   const errors = normalizeErrors(value);
 
   if (errors) {
-    return { errors };
+    return {
+      errors,
+      messageSuffix: Object.values(errors).flat().join(", "),
+    };
   }
 
   if (Array.isArray(value)) {
@@ -179,13 +187,15 @@ function normalizeApiResponse(value: unknown): ApiResponse<unknown> {
   const success = value.success;
   const message = typeof value.message === "string" ? value.message : "Request completed.";
   const backendError = normalizeBackendError("error" in value ? value.error : undefined);
+  const backendErrors = normalizeBackendError("errors" in value ? value.errors : undefined);
 
   if (success === false || ("error" in value && value.error !== undefined)) {
-    const errors = normalizeErrors(value.errors) ?? backendError.errors;
+    const errors = backendError.errors ?? backendErrors.errors;
     const errorDetails = isObject(value.errors) ? value.errors : undefined;
+    const messageSuffix = backendError.messageSuffix ?? backendErrors.messageSuffix;
     const resolvedMessage =
-      backendError.messageSuffix && backendError.messageSuffix !== message
-        ? `${message}: ${backendError.messageSuffix}`
+      messageSuffix && messageSuffix !== message
+        ? `${message}: ${messageSuffix}`
         : message;
 
     return {

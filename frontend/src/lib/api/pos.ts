@@ -243,6 +243,7 @@ type BackendReceipt = {
   sold_at?: string;
   items?: unknown;
   subtotal?: number;
+  discount?: number;
   discount_amount?: number;
   tax_amount?: number;
   charge_amount?: number;
@@ -257,6 +258,23 @@ type BackendReceipt = {
 };
 
 type BackendCheckoutResponse = {
+  id?: string;
+  sale_number?: string;
+  branch_name?: string;
+  cashier_name?: string;
+  sold_at?: string;
+  subtotal_amount?: number;
+  discount_amount?: number;
+  tax_amount?: number;
+  charge_amount?: number;
+  charge_tax_amount?: number;
+  total_amount?: number;
+  paid_amount?: number;
+  change_amount?: number;
+  accounting_journal_entry_id?: string | null;
+  items?: unknown;
+  payments?: unknown;
+  charges?: unknown;
   sale?: {
     id?: string;
     sale_number?: string;
@@ -910,7 +928,10 @@ function parsePayment(value: unknown): PaymentInput {
 
   return {
     paymentMethodId: requiredString(value.payment_method_id),
-    paymentMethodName: requiredString(value.payment_method_name, "Payment"),
+    paymentMethodName: requiredString(
+      value.payment_method_name ?? value.payment_method_name_snapshot,
+      "Payment",
+    ),
     amount: requiredNumber(value.amount),
     referenceNumber: optionalString(value.reference_number),
   };
@@ -978,7 +999,7 @@ function parseReceipt(value: unknown): SaleReceipt {
       };
     }),
     subtotal: requiredNumber(receipt.subtotal),
-    discountAmount: requiredNumber(receipt.discount_amount),
+    discountAmount: requiredNumber(receipt.discount_amount ?? receipt.discount),
     taxAmount: requiredNumber(receipt.tax_amount),
     chargeAmount: requiredNumber(receipt.charge_amount),
     chargeTaxAmount: requiredNumber(receipt.charge_tax_amount),
@@ -991,21 +1012,82 @@ function parseReceipt(value: unknown): SaleReceipt {
   };
 }
 
+function parseFallbackReceipt(response: BackendCheckoutResponse): SaleReceipt {
+  const items = Array.isArray(response.items) ? response.items : [];
+  const payments = Array.isArray(response.payments) ? response.payments : [];
+  const total = requiredNumber(response.total_amount);
+  const paidAmount = requiredNumber(response.paid_amount);
+
+  return {
+    businessName: "Business",
+    branchName: requiredString(response.branch_name, "Branch"),
+    saleId: requiredString(response.id),
+    saleNumber: requiredString(response.sale_number, "Sale"),
+    accountingJournalEntryId: optionalString(response.accounting_journal_entry_id),
+    cashierName: requiredString(response.cashier_name, "Cashier"),
+    soldAt: requiredString(response.sold_at, new Date().toISOString()),
+    items: items.map((line): SaleReceipt["items"][number] => {
+      if (!isObject(line)) {
+        return { name: "Item", quantity: 1, unitPrice: 0, lineTotal: 0 };
+      }
+
+      const receiptLine = line as BackendReceiptLine;
+      return {
+        name: getReceiptLineName(receiptLine),
+        quantity: requiredNumber(receiptLine.quantity, 1),
+        unitPrice: requiredNumber(receiptLine.unit_price),
+        lineTotal: requiredNumber(receiptLine.line_total),
+      };
+    }),
+    subtotal: requiredNumber(response.subtotal_amount),
+    discountAmount: requiredNumber(response.discount_amount),
+    taxAmount: requiredNumber(response.tax_amount),
+    chargeAmount: requiredNumber(response.charge_amount),
+    chargeTaxAmount: requiredNumber(response.charge_tax_amount),
+    charges: parseDocumentCharges(response.charges),
+    total,
+    payments: payments.map(parsePayment),
+    paidAmount,
+    changeAmount: requiredNumber(response.change_amount),
+    balanceDue: Math.max(total - paidAmount, 0),
+  };
+}
+
 function parseCheckoutResponse(value: unknown): CheckoutResponse {
   if (!isObject(value)) {
     throw new Error("Backend checkout payload is invalid.");
   }
 
   const response = value as BackendCheckoutResponse;
-  const receipt = parseReceipt(response.receipt);
+  const hasReceiptPayload = isObject(response.receipt);
+  const parsedReceipt = hasReceiptPayload
+    ? parseReceipt(response.receipt)
+    : parseFallbackReceipt(response);
+  const saleId = requiredString(response.sale?.id ?? response.id, parsedReceipt.saleId);
+  const saleNumber = requiredString(
+    response.sale?.sale_number ?? response.sale_number,
+    parsedReceipt.saleNumber,
+  );
+  const accountingJournalEntryId = optionalString(
+    response.sale?.accounting_journal_entry_id ?? response.accounting_journal_entry_id,
+  );
+  const receipt = {
+    ...parsedReceipt,
+    saleId,
+    saleNumber,
+    accountingJournalEntryId: parsedReceipt.accountingJournalEntryId ?? accountingJournalEntryId,
+  };
 
   return {
     sale: {
-      id: requiredString(response.sale?.id, receipt.saleId),
-      saleNumber: requiredString(response.sale?.sale_number, receipt.saleNumber),
-      accountingJournalEntryId: optionalString(response.sale?.accounting_journal_entry_id),
+      id: saleId,
+      saleNumber,
+      accountingJournalEntryId,
     },
     receipt,
+    receiptWarning: hasReceiptPayload
+      ? null
+      : "Sale completed, but the receipt details were incomplete. Review the sale from Sales if the receipt needs to be reprinted.",
   };
 }
 

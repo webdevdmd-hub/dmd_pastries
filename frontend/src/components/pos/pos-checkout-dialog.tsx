@@ -14,12 +14,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type { CheckoutFeedback } from "@/lib/pos/checkout-feedback";
 import type { DocumentChargeDraft } from "@/types/document-charges";
 import type { CartDiscountType, CartTotals, PaymentInput } from "@/types/pos";
-import type { PaymentMethod, SalesChannel, TaxRate } from "@/types/settings";
+import type { PaymentMethod, TaxRate } from "@/types/settings";
 
 type POSCheckoutDialogProps = {
   charges: DocumentChargeDraft[];
+  confirmButtonLabel: string;
+  feedback: CheckoutFeedback | null;
   isSubmitting: boolean;
   onChargesChange: (charges: DocumentChargeDraft[]) => void;
   onConfirm: () => void;
@@ -27,15 +30,12 @@ type POSCheckoutDialogProps = {
   onPaymentsChange: (payments: PaymentInput[]) => void;
   onSaleDiscountChange: (type: CartDiscountType | null, value: number | null) => void;
   open: boolean;
-  externalOrderNumber: string;
   paymentMethodsError: Error | null;
   paymentMethodsLoading: boolean;
   paymentMethods: PaymentMethod[];
   payments: PaymentInput[];
   saleDiscountType: CartDiscountType | null;
   saleDiscountValue: number | null;
-  salesChannelId: string;
-  salesChannels: SalesChannel[];
   taxRates: TaxRate[];
   totals: CartTotals;
 };
@@ -47,8 +47,23 @@ function formatMoney(value: number): string {
   }).format(value);
 }
 
+function feedbackClassName(feedback: CheckoutFeedback): string {
+  if (feedback.tone === "success") {
+    return "border-green-200 bg-green-50 text-green-800";
+  }
+  if (feedback.tone === "warning") {
+    return "border-amber-200 bg-amber-50 text-amber-800";
+  }
+  if (feedback.tone === "info") {
+    return "border-blue-200 bg-blue-50 text-blue-800";
+  }
+  return "border-red-200 bg-red-50 text-red-800";
+}
+
 export function POSCheckoutDialog({
   charges,
+  confirmButtonLabel,
+  feedback,
   isSubmitting,
   onChargesChange,
   onConfirm,
@@ -56,45 +71,16 @@ export function POSCheckoutDialog({
   onPaymentsChange,
   onSaleDiscountChange,
   open,
-  externalOrderNumber,
   paymentMethodsError,
   paymentMethodsLoading,
   paymentMethods,
   payments,
   saleDiscountType,
   saleDiscountValue,
-  salesChannelId,
-  salesChannels,
   taxRates,
   totals,
 }: POSCheckoutDialogProps): JSX.Element {
-  const selectedChannel = salesChannels.find((channel) => channel.id === salesChannelId) ?? null;
-  const selectablePaymentMethodIds = new Set(
-    paymentMethods
-      .filter(
-        (method) =>
-          method.status === "active" && method.showInPos && method.defaultPaymentAccountId,
-      )
-      .map((method) => method.id),
-  );
-  const hasUnavailableSelectedPayment = payments.some(
-    (payment) => !selectablePaymentMethodIds.has(payment.paymentMethodId),
-  );
-  const hasMissingRequiredReference = payments.some((payment) => {
-    const method = paymentMethods.find((entry) => entry.id === payment.paymentMethodId);
-    return method?.requiresReference === true && !payment.referenceNumber?.trim();
-  });
-  const hasMissingExternalOrderNumber =
-    selectedChannel?.requiresExternalOrderNumber === true &&
-    externalOrderNumber.trim().length === 0;
-  const cannotConfirm =
-    isSubmitting ||
-    paymentMethodsLoading ||
-    paymentMethodsError !== null ||
-    payments.length === 0 ||
-    hasUnavailableSelectedPayment ||
-    hasMissingRequiredReference ||
-    hasMissingExternalOrderNumber;
+  const cannotConfirm = isSubmitting || paymentMethodsLoading;
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
@@ -178,6 +164,16 @@ export function POSCheckoutDialog({
           </div>
         </div>
 
+        {feedback ? (
+          <div
+            className={`rounded-md border px-3 py-2 text-sm font-semibold ${feedbackClassName(feedback)}`}
+            role={feedback.tone === "error" ? "alert" : "status"}
+          >
+            <p className="font-black">{feedback.title}</p>
+            <p className="mt-1 leading-5">{feedback.message}</p>
+          </div>
+        ) : null}
+
         <DialogFooter>
           <Button
             className="rounded-md border-[#d4d4d8] bg-white text-[#09090b] hover:bg-[#f4f4f5]"
@@ -197,15 +193,7 @@ export function POSCheckoutDialog({
               ? "Processing..."
               : paymentMethodsLoading
                 ? "Loading methods..."
-                : paymentMethodsError
-                  ? "Payment methods unavailable"
-                  : hasUnavailableSelectedPayment
-                    ? "Select valid payment"
-                    : hasMissingExternalOrderNumber
-                      ? "Order number required"
-                      : hasMissingRequiredReference
-                        ? "Reference required"
-                        : "Confirm sale"}
+                : confirmButtonLabel}
           </Button>
         </DialogFooter>
       </DialogContent>
