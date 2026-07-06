@@ -14,6 +14,7 @@ import type {
   AccountingReconciliationItem,
   AccountingReconciliationResponse,
   AccountingSettings,
+  AccountingSetupReadinessResponse,
   AccountMapping,
   AccountMappingsResponse,
   AccountTransfer,
@@ -840,11 +841,48 @@ function parseBackfillReadinessIssue(value: unknown): AccountingBackfillReadines
 
   return {
     severity: stringValue(value.severity, "warning"),
-    code: stringValue(value.code),
+    code: stringValue(value.check_key, stringValue(value.code)),
     message: stringValue(value.message, "Readiness issue"),
     target: stringValue(value.target),
-    details: stringValue(value.details),
+    details: parseReadinessIssueDetails(value.details),
   };
+}
+
+function parseReadinessIssueDetails(value: unknown): AccountingBackfillReadinessIssue["details"] {
+  if (!isObject(value)) {
+    return {};
+  }
+
+  return Object.entries(value).reduce<AccountingBackfillReadinessIssue["details"]>(
+    (details, [key, item]) => {
+      if (
+        typeof item === "string" ||
+        typeof item === "number" ||
+        typeof item === "boolean" ||
+        item === null
+      ) {
+        details[key] = item;
+      } else if (Array.isArray(item)) {
+        details[key] = item
+          .filter((entry): entry is string | number | boolean | null => {
+            return (
+              typeof entry === "string" ||
+              typeof entry === "number" ||
+              typeof entry === "boolean" ||
+              entry === null
+            );
+          })
+          .join(", ");
+      }
+
+      return details;
+    },
+    {},
+  );
+}
+
+function readinessIssueBlocks(issue: AccountingBackfillReadinessIssue): boolean {
+  return issue.severity === "error" || issue.severity === "blocking";
 }
 
 function parseBackfillReadinessTarget(value: unknown): AccountingBackfillReadinessTarget {
@@ -894,10 +932,26 @@ function parseBackfillReadinessResponse(value: unknown): AccountingBackfillReadi
   return {
     ready: booleanValue(
       value.ready,
-      issues.every((issue) => issue.severity !== "blocking"),
+      issues.every((issue) => !readinessIssueBlocks(issue)),
     ),
     issues,
     targets: parseBackfillReadinessTargets(value.targets ?? value.target_counts),
+  };
+}
+
+function parseAccountingSetupReadinessResponse(
+  value: unknown,
+): AccountingSetupReadinessResponse {
+  if (!isObject(value)) {
+    throw new Error("Backend accounting setup readiness payload is invalid.");
+  }
+
+  const issues = Array.isArray(value.issues) ? value.issues.map(parseBackfillReadinessIssue) : [];
+
+  return {
+    ready: booleanValue(value.ready, issues.every((issue) => !readinessIssueBlocks(issue))),
+    issues,
+    checkedAt: stringValue(value.checked_at),
   };
 }
 
@@ -1426,6 +1480,18 @@ export async function getAccountingBackfillReadiness(
     {
       authMode: "appwrite",
       parse: parseBackfillReadinessResponse,
+    },
+  );
+
+  return response.data;
+}
+
+export async function getAccountingSetupReadiness(): Promise<AccountingSetupReadinessResponse> {
+  const response = await apiRequest<AccountingSetupReadinessResponse>(
+    "/api/v1/accounting/setup-readiness",
+    {
+      authMode: "appwrite",
+      parse: parseAccountingSetupReadinessResponse,
     },
   );
 

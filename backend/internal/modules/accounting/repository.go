@@ -1248,19 +1248,51 @@ func (r *Repository) ListMissingRequiredAccountMappings(tx *gorm.DB, businessID 
 	return missing, nil
 }
 
+type paymentReadinessAccount struct {
+	AccountID          string
+	AccountName        string
+	AccountStatus      string
+	AccountBranchID    *string
+	ChartAccountID     *string
+	ChartAccountCode   string
+	ChartAccountName   string
+	ChartAccountStatus string
+	Source             string
+}
+
+func (account paymentReadinessAccount) activeForBranch(branchID string) bool {
+	if account.AccountID == "" || account.AccountStatus != "active" {
+		return false
+	}
+	if account.AccountBranchID != nil && strings.TrimSpace(*account.AccountBranchID) != "" && *account.AccountBranchID != branchID {
+		return false
+	}
+	return true
+}
+
+func (account paymentReadinessAccount) hasActiveLedger() bool {
+	return account.ChartAccountID != nil &&
+		strings.TrimSpace(*account.ChartAccountID) != "" &&
+		account.ChartAccountStatus == "active"
+}
+
 func (r *Repository) ListPaymentMethodReadinessIssues(tx *gorm.DB, businessID string) ([]BackfillReadinessIssue, error) {
-	var rows []struct {
-		ID               string
-		MethodName       string
-		MethodType       string
-		DefaultAccountID *string
-		PaymentAccount   string
-		AccountStatus    string
-		ChartAccountID   *string
-		ShowInPOS        bool
-		ShowInBakery     bool
-		ShowInPurchasing bool
-		ShowInExpenses   bool
+	var methods []struct {
+		ID                        string
+		MethodName                string
+		MethodType                string
+		DefaultAccountID          *string
+		DefaultPaymentAccount     string
+		DefaultAccountStatus      string
+		DefaultAccountBranchID    *string
+		DefaultChartAccountID     *string
+		DefaultChartAccountCode   string
+		DefaultChartAccountName   string
+		DefaultChartAccountStatus string
+		ShowInPOS                 bool
+		ShowInBakery              bool
+		ShowInPurchasing          bool
+		ShowInExpenses            bool
 	}
 	err := tx.Table("payment_methods pm").
 		Select(`
@@ -1268,51 +1300,162 @@ func (r *Repository) ListPaymentMethodReadinessIssues(tx *gorm.DB, businessID st
 			pm.method_name,
 			pm.method_type,
 			pm.default_payment_account_id,
-			COALESCE(pa.account_name, '') AS payment_account,
-			COALESCE(pa.status, '') AS account_status,
-			pa.chart_account_id,
+			COALESCE(pa.account_name, '') AS default_payment_account,
+			COALESCE(pa.status, '') AS default_account_status,
+			pa.branch_id AS default_account_branch_id,
+			pa.chart_account_id AS default_chart_account_id,
+			COALESCE(coa.account_code, '') AS default_chart_account_code,
+			COALESCE(coa.account_name, '') AS default_chart_account_name,
+			COALESCE(coa.status, '') AS default_chart_account_status,
 			pm.show_in_pos,
 			pm.show_in_bakery_orders AS show_in_bakery,
 			pm.show_in_purchasing,
 			pm.show_in_expenses
 		`).
 		Joins("LEFT JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = pm.business_id AND pa.deleted_at IS NULL").
+		Joins("LEFT JOIN chart_of_accounts coa ON coa.id = pa.chart_account_id AND coa.business_id = pa.business_id AND coa.deleted_at IS NULL").
 		Where("pm.business_id = ? AND pm.status = 'active' AND pm.deleted_at IS NULL", businessID).
-		Scan(&rows).Error
+		Scan(&methods).Error
 	if err != nil {
 		return nil, err
 	}
+	var branches []struct {
+		ID         string
+		BranchName string
+	}
+	if err := tx.Table("branches").
+		Select("id, branch_name").
+		Where("business_id = ? AND status = 'active' AND deleted_at IS NULL", businessID).
+		Order("branch_name ASC").
+		Scan(&branches).Error; err != nil {
+		return nil, err
+	}
+	var mappings []struct {
+		MethodID           string
+		BranchID           string
+		AccountID          string
+		AccountName        string
+		AccountStatus      string
+		AccountBranchID    *string
+		ChartAccountID     *string
+		ChartAccountCode   string
+		ChartAccountName   string
+		ChartAccountStatus string
+	}
+	if err := tx.Table("payment_method_account_mappings pmam").
+		Select(`
+			pmam.payment_method_id AS method_id,
+			pmam.branch_id,
+			COALESCE(pa.id::text, '') AS account_id,
+			COALESCE(pa.account_name, '') AS account_name,
+			COALESCE(pa.status, '') AS account_status,
+			pa.branch_id AS account_branch_id,
+			pa.chart_account_id,
+			COALESCE(coa.account_code, '') AS chart_account_code,
+			COALESCE(coa.account_name, '') AS chart_account_name,
+			COALESCE(coa.status, '') AS chart_account_status
+		`).
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = pmam.payment_account_id AND pa.business_id = pmam.business_id AND pa.deleted_at IS NULL").
+		Joins("LEFT JOIN chart_of_accounts coa ON coa.id = pa.chart_account_id AND coa.business_id = pa.business_id AND coa.deleted_at IS NULL").
+		Where("pmam.business_id = ? AND pmam.status = 'active' AND pmam.deleted_at IS NULL", businessID).
+		Scan(&mappings).Error; err != nil {
+		return nil, err
+	}
+	mappingsByMethodBranch := make(map[string]paymentReadinessAccount, len(mappings))
+	for _, mapping := range mappings {
+		mappingsByMethodBranch[mapping.MethodID+"|"+mapping.BranchID] = paymentReadinessAccount{
+			AccountID:          mapping.AccountID,
+			AccountName:        mapping.AccountName,
+			AccountStatus:      mapping.AccountStatus,
+			AccountBranchID:    mapping.AccountBranchID,
+			ChartAccountID:     mapping.ChartAccountID,
+			ChartAccountCode:   mapping.ChartAccountCode,
+			ChartAccountName:   mapping.ChartAccountName,
+			ChartAccountStatus: mapping.ChartAccountStatus,
+			Source:             "branch_mapping",
+		}
+	}
 	issues := make([]BackfillReadinessIssue, 0)
-	for _, row := range rows {
-		usedByPosting := row.ShowInPOS || row.ShowInBakery || row.ShowInPurchasing || row.ShowInExpenses
+	for _, method := range methods {
+		usedByPosting := method.ShowInPOS || method.ShowInBakery || method.ShowInPurchasing || method.ShowInExpenses
 		if !usedByPosting {
 			continue
 		}
-		if row.DefaultAccountID == nil || strings.TrimSpace(*row.DefaultAccountID) == "" {
-			issues = append(issues, BackfillReadinessIssue{
-				Severity: "error",
-				CheckKey: "payment_method_account_missing",
-				Message:  "Active payment method used by operational posting has no default payment account.",
-				Details:  map[string]interface{}{"payment_method_id": row.ID, "method_name": row.MethodName, "method_type": row.MethodType},
-			})
-			continue
+		defaultAccount := paymentReadinessAccount{
+			Source:             "default_payment_account",
+			AccountName:        method.DefaultPaymentAccount,
+			AccountStatus:      method.DefaultAccountStatus,
+			AccountBranchID:    method.DefaultAccountBranchID,
+			ChartAccountID:     method.DefaultChartAccountID,
+			ChartAccountCode:   method.DefaultChartAccountCode,
+			ChartAccountName:   method.DefaultChartAccountName,
+			ChartAccountStatus: method.DefaultChartAccountStatus,
 		}
-		if row.AccountStatus != "active" {
-			issues = append(issues, BackfillReadinessIssue{
-				Severity: "error",
-				CheckKey: "payment_account_inactive",
-				Message:  "Payment method is linked to an inactive or missing payment account.",
-				Details:  map[string]interface{}{"payment_method_id": row.ID, "method_name": row.MethodName, "payment_account_id": *row.DefaultAccountID, "payment_account_name": row.PaymentAccount},
-			})
-			continue
+		if method.DefaultAccountID != nil {
+			defaultAccount.AccountID = strings.TrimSpace(*method.DefaultAccountID)
 		}
-		if row.ChartAccountID == nil || strings.TrimSpace(*row.ChartAccountID) == "" {
-			issues = append(issues, BackfillReadinessIssue{
-				Severity: "error",
-				CheckKey: "payment_account_chart_account_missing",
-				Message:  "Linked payment account has no Chart of Accounts ledger.",
-				Details:  map[string]interface{}{"payment_method_id": row.ID, "method_name": row.MethodName, "payment_account_id": *row.DefaultAccountID, "payment_account_name": row.PaymentAccount},
-			})
+		for _, branch := range branches {
+			account, ok := mappingsByMethodBranch[method.ID+"|"+branch.ID]
+			if !ok {
+				account = defaultAccount
+			}
+			details := map[string]interface{}{
+				"payment_method_id": method.ID,
+				"method_name":       method.MethodName,
+				"method_type":       method.MethodType,
+				"branch_id":         branch.ID,
+				"branch_name":       branch.BranchName,
+				"source":            account.Source,
+			}
+			if account.AccountID != "" {
+				details["payment_account_id"] = account.AccountID
+			}
+			if account.AccountName != "" {
+				details["payment_account_name"] = account.AccountName
+			}
+			if account.AccountBranchID != nil && strings.TrimSpace(*account.AccountBranchID) != "" {
+				details["payment_account_branch_id"] = *account.AccountBranchID
+			}
+			if account.ChartAccountID != nil && strings.TrimSpace(*account.ChartAccountID) != "" {
+				details["chart_account_id"] = *account.ChartAccountID
+				details["chart_account_code"] = account.ChartAccountCode
+				details["chart_account_name"] = account.ChartAccountName
+			}
+			if account.AccountID == "" {
+				issues = append(issues, BackfillReadinessIssue{
+					Severity: "error",
+					CheckKey: "payment_method_account_missing",
+					Message:  "Active payment method used by operational posting has no effective payment account for this branch.",
+					Details:  details,
+				})
+				continue
+			}
+			if account.AccountStatus != "active" {
+				issues = append(issues, BackfillReadinessIssue{
+					Severity: "error",
+					CheckKey: "payment_account_inactive",
+					Message:  "Payment method is linked to an inactive or missing payment account for this branch.",
+					Details:  details,
+				})
+				continue
+			}
+			if account.AccountBranchID != nil && strings.TrimSpace(*account.AccountBranchID) != "" && *account.AccountBranchID != branch.ID {
+				issues = append(issues, BackfillReadinessIssue{
+					Severity: "error",
+					CheckKey: "payment_account_branch_mismatch",
+					Message:  "Payment method resolves to a payment account from another branch.",
+					Details:  details,
+				})
+				continue
+			}
+			if !account.hasActiveLedger() {
+				issues = append(issues, BackfillReadinessIssue{
+					Severity: "error",
+					CheckKey: "payment_account_chart_account_missing",
+					Message:  "Linked payment account has no active Chart of Accounts ledger.",
+					Details:  details,
+				})
+			}
 		}
 	}
 	return issues, nil

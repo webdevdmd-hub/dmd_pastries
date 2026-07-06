@@ -18,6 +18,7 @@ import {
   getAccountingReconciliationInventory,
   getAccountingReconciliationPaymentAccounts,
   getAccountingSettings,
+  getAccountingSetupReadiness,
   getAccountMappings,
   getAccountTransferById,
   getAccountTransfers,
@@ -57,6 +58,7 @@ import type {
   AccountingReconciliationFilters,
   AccountingReconciliationResponse,
   AccountingSettings,
+  AccountingSetupReadinessResponse,
   AccountMappingsResponse,
   AccountTransfer,
   AccountTransferPayload,
@@ -296,6 +298,14 @@ export function useAccountingBackfillReadiness(filters: AccountingBackfillFilter
   return useQuery<AccountingBackfillReadinessResponse>({
     queryKey: [accountingQueryKey, "backfill", "readiness", filters],
     queryFn: async () => getAccountingBackfillReadiness(filters),
+    enabled,
+  });
+}
+
+export function useAccountingSetupReadiness(enabled = true) {
+  return useQuery<AccountingSetupReadinessResponse>({
+    queryKey: [accountingQueryKey, "setup-readiness"],
+    queryFn: async () => getAccountingSetupReadiness(),
     enabled,
   });
 }

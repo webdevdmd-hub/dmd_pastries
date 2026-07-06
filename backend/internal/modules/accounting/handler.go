@@ -114,6 +114,15 @@ func (h *Handler) GetBackfillReadiness(c *gin.Context) {
 	response.Success(c, 200, "accounting backfill readiness fetched successfully", result)
 }
 
+func (h *Handler) GetAccountingSetupReadiness(c *gin.Context) {
+	result, err := h.service.GetAccountingSetupReadiness(utils.MustAuthContext(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "accounting setup readiness fetched successfully", result)
+}
+
 func (h *Handler) CreateChartAccount(c *gin.Context) {
 	var req CreateChartAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

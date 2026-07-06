@@ -407,12 +407,14 @@ export type AccountingBackfillFilters = {
   targets: AccountingBackfillTarget[];
 };
 
+export type AccountingReadinessIssueDetails = Record<string, string | number | boolean | null>;
+
 export type AccountingBackfillReadinessIssue = {
   severity: string;
   code: string;
   message: string;
   target: string;
-  details: string;
+  details: AccountingReadinessIssueDetails;
 };
 
 export type AccountingBackfillReadinessTarget = {
@@ -426,6 +428,12 @@ export type AccountingBackfillReadinessResponse = {
   ready: boolean;
   issues: AccountingBackfillReadinessIssue[];
   targets: AccountingBackfillReadinessTarget[];
+};
+
+export type AccountingSetupReadinessResponse = {
+  ready: boolean;
+  issues: AccountingBackfillReadinessIssue[];
+  checkedAt: string;
 };
 
 export type AccountingBackfillPayload = AccountingBackfillFilters & {

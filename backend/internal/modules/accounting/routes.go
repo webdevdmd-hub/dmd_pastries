@@ -25,6 +25,8 @@ func RegisterRoutes(
 	group.POST("/account-mappings/seed-defaults", manage, handler.SeedAccountMappings)
 	group.PATCH("/account-mappings", manage, handler.UpdateAccountMappings)
 
+	group.GET("/setup-readiness", view, handler.GetAccountingSetupReadiness)
+
 	group.GET("/settings", view, handler.GetAccountingSettings)
 	group.PATCH("/settings", manage, handler.UpdateAccountingSettings)
 

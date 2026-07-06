@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, CheckCircle2, CreditCard, Landmark, Link2, Store } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
@@ -22,11 +23,16 @@ import {
 } from "@/components/ui/table";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
-import { usePaymentAccounts } from "@/hooks/use-accounting";
+import { useAccountingSetupReadiness, usePaymentAccounts } from "@/hooks/use-accounting";
 import { usePermission } from "@/hooks/use-permission";
 import { usePaymentMethods } from "@/hooks/use-settings-data";
 import { getErrorMessage } from "@/lib/api/client";
-import type { PaymentAccount, PaymentAccountsFilters } from "@/types/accounting";
+import type {
+  AccountingBackfillReadinessIssue,
+  AccountingSetupReadinessResponse,
+  PaymentAccount,
+  PaymentAccountsFilters,
+} from "@/types/accounting";
 import type { PaymentMethod } from "@/types/settings";
 
 type PaymentSetupTab = "overview" | "methods" | "accounts" | "branches";
@@ -53,27 +59,48 @@ const overviewAccountFilters: PaymentAccountsFilters = {
   status: "all",
 };
 
-function setupIssueCount(methods: PaymentMethod[], accounts: PaymentAccount[]): number {
-  const accountsById = new Map(accounts.map((account) => [account.id, account]));
-
-  return methods.filter((method) => {
-    if (method.status !== "active" || (!method.showInPos && !method.showInBakeryOrders)) {
-      return false;
-    }
-
-    const linkedAccount = method.defaultPaymentAccountId
-      ? accountsById.get(method.defaultPaymentAccountId)
-      : null;
-
-    return linkedAccount?.status !== "active";
-  }).length;
-}
-
 function money(value: number): string {
   return new Intl.NumberFormat("en-AE", {
     maximumFractionDigits: 2,
     minimumFractionDigits: 2,
   }).format(value);
+}
+
+function readinessIssueBlocks(severity: string): boolean {
+  return severity === "blocking" || severity === "error";
+}
+
+function formatStatus(value: string): string {
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatIssueDetails(issue: AccountingBackfillReadinessIssue): string {
+  const entries = Object.entries(issue.details);
+  if (entries.length === 0) {
+    return "";
+  }
+
+  return entries
+    .filter(([, value]) => value !== "" && value !== null)
+    .map(([key, value]) => `${formatStatus(key)}: ${String(value)}`)
+    .join(" | ");
+}
+
+function readinessAction(issue: AccountingBackfillReadinessIssue): {
+  href: string;
+  label: string;
+} {
+  if (issue.code.startsWith("account_mapping")) {
+    return { href: ROUTES.accountingAccountMappings, label: "Open Account Mappings" };
+  }
+  if (issue.code.startsWith("payment_account")) {
+    return { href: ROUTES.accountingPaymentAccounts, label: "Open Payment Accounts" };
+  }
+  return { href: `${ROUTES.settingsPaymentSetup}?tab=methods`, label: "Open Payment Methods" };
 }
 
 function OverviewCard({
@@ -130,27 +157,27 @@ function PaymentSetupOverview({
   accountsError,
   canViewAccounts,
   canViewMethods,
+  isSetupReadinessLoading,
   methods,
   methodsError,
+  setupReadiness,
+  setupReadinessError,
 }: {
   accounts: PaymentAccount[];
   accountsError: Error | null;
   canViewAccounts: boolean;
   canViewMethods: boolean;
+  isSetupReadinessLoading: boolean;
   methods: PaymentMethod[];
   methodsError: Error | null;
+  setupReadiness: AccountingSetupReadinessResponse | undefined;
+  setupReadinessError: Error | null;
 }): JSX.Element {
   const activeMethods = methods.filter((method) => method.status === "active");
   const activeAccounts = accounts.filter((account) => account.status === "active");
-  const issueCount = setupIssueCount(methods, accounts);
-  const accountsById = new Map(accounts.map((account) => [account.id, account]));
-  const blockedMethods = activeMethods.filter((method) => {
-    if (!method.showInPos && !method.showInBakeryOrders) return false;
-    const account = method.defaultPaymentAccountId
-      ? accountsById.get(method.defaultPaymentAccountId)
-      : null;
-    return account?.status !== "active";
-  });
+  const setupIssues = setupReadiness?.issues ?? [];
+  const blockingSetupIssues = setupIssues.filter((issue) => readinessIssueBlocks(issue.severity));
+  const setupIssueCount = canViewAccounts ? blockingSetupIssues.length : 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -171,8 +198,8 @@ function PaymentSetupOverview({
           detail="Checkout-visible methods missing a usable linked account."
           icon={<AlertTriangle className="h-5 w-5" />}
           label="Setup warnings"
-          tone={issueCount > 0 ? "warning" : "success"}
-          value={canViewMethods && canViewAccounts ? String(issueCount) : "-"}
+          tone={setupIssueCount > 0 ? "warning" : "success"}
+          value={canViewAccounts ? String(setupIssueCount) : "-"}
         />
         <OverviewCard
           detail="Business-wide and branch-specific account records."
@@ -195,6 +222,14 @@ function PaymentSetupOverview({
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Unable to load payment accounts</AlertTitle>
           <AlertDescription>{getErrorMessage(accountsError)}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {setupReadinessError ? (
+        <Alert className="border-red-200 bg-red-50 text-red-950">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Unable to load accounting setup readiness</AlertTitle>
+          <AlertDescription>{getErrorMessage(setupReadinessError)}</AlertDescription>
         </Alert>
       ) : null}
 
@@ -230,29 +265,49 @@ function PaymentSetupOverview({
         </CardContent>
       </Card>
 
-      {blockedMethods.length > 0 ? (
+      {!canViewAccounts ? (
+        <AccessNotice title="Accounting access is required to verify readiness" />
+      ) : isSetupReadinessLoading ? (
+        <Alert>
+          <AlertTitle>Checking payment and accounting setup</AlertTitle>
+          <AlertDescription>Loading the backend readiness check.</AlertDescription>
+        </Alert>
+      ) : blockingSetupIssues.length > 0 ? (
         <Card className="border-red-200">
           <CardHeader>
-            <CardTitle className="text-red-950">Checkout setup warnings</CardTitle>
+            <CardTitle className="text-red-950">Accounting setup issues</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {blockedMethods.map((method) => (
-              <div
-                className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-950"
-                key={method.id}
-              >
-                <span className="font-semibold">{method.methodName}</span> is visible in checkout
-                but does not have an active linked payment account.
-              </div>
-            ))}
+            {blockingSetupIssues.map((issue) => {
+              const action = readinessAction(issue);
+              const details = formatIssueDetails(issue);
+
+              return (
+                <div
+                  className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-950"
+                  key={`${issue.code}-${issue.message}-${details}`}
+                >
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="font-semibold">{issue.message}</p>
+                      {details ? <p className="mt-1 text-xs text-red-800">{details}</p> : null}
+                    </div>
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={action.href}>{action.label}</Link>
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
-      ) : canViewMethods && canViewAccounts ? (
+      ) : setupReadiness?.ready ? (
         <Alert className="border-emerald-200 bg-emerald-50 text-emerald-950">
           <CheckCircle2 className="h-4 w-4" />
           <AlertTitle>Payment setup is ready</AlertTitle>
           <AlertDescription>
-            Active checkout methods have usable linked payment accounts.
+            Payment methods, payment accounts, branch mappings, ledgers, and required account
+            mappings are ready for operational accounting.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -359,6 +414,7 @@ export function PaymentSetupPageClient({ initialTab }: PaymentSetupPageClientPro
   const canViewAny = canViewMethods || canViewAccounts;
   const methodsQuery = usePaymentMethods(canViewMethods);
   const accountsQuery = usePaymentAccounts(overviewAccountFilters, canViewAccounts);
+  const setupReadinessQuery = useAccountingSetupReadiness(canViewAccounts);
 
   const methods = methodsQuery.data ?? [];
   const accounts = accountsQuery.data?.items ?? [];
@@ -408,8 +464,11 @@ export function PaymentSetupPageClient({ initialTab }: PaymentSetupPageClientPro
           accountsError={accountsQuery.error}
           canViewAccounts={canViewAccounts}
           canViewMethods={canViewMethods}
+          isSetupReadinessLoading={setupReadinessQuery.isLoading}
           methods={methods}
           methodsError={methodsQuery.error}
+          setupReadiness={setupReadinessQuery.data}
+          setupReadinessError={setupReadinessQuery.error}
         />
       ) : null}
 

@@ -50,6 +50,7 @@ import { useBranches } from "@/hooks/use-branches";
 import { usePermission } from "@/hooks/use-permission";
 import type {
   AccountingBackfillPayload,
+  AccountingBackfillReadinessIssue,
   AccountingBackfillTarget,
   AccountingReconciliationResponse,
   ChartAccount,
@@ -116,7 +117,7 @@ function formatBackfillTarget(value: string): string {
 }
 
 function issueBadgeClass(severity: string): string {
-  if (severity === "blocking" || severity === "error") {
+  if (readinessIssueBlocks(severity)) {
     return "border-red-200 bg-red-50 text-red-700";
   }
 
@@ -125,6 +126,22 @@ function issueBadgeClass(severity: string): string {
   }
 
   return "";
+}
+
+function readinessIssueBlocks(severity: string): boolean {
+  return severity === "blocking" || severity === "error";
+}
+
+function formatReadinessIssueDetails(issue: AccountingBackfillReadinessIssue): string {
+  const detailEntries = Object.entries(issue.details);
+  if (detailEntries.length === 0) {
+    return formatBackfillTarget(issue.target);
+  }
+
+  return detailEntries
+    .filter(([, value]) => value !== "" && value !== null)
+    .map(([key, value]) => `${formatStatus(key)}: ${String(value)}`)
+    .join(" | ");
 }
 
 function canManageAccounting(hasAnyPermission: (permissions: string[]) => boolean): boolean {
@@ -772,8 +789,10 @@ export function AccountingBackfillPageClient(): JSX.Element {
   const readiness = readinessQuery.data;
   const branches = (branchesQuery.data ?? []).filter((branch) => branch.status === "active");
   const readinessLoaded = readinessQuery.isSuccess && readiness !== undefined;
-  const blockingIssues = readiness?.issues.filter((issue) => issue.severity === "blocking") ?? [];
-  const warningIssues = readiness?.issues.filter((issue) => issue.severity !== "blocking") ?? [];
+  const blockingIssues =
+    readiness?.issues.filter((issue) => readinessIssueBlocks(issue.severity)) ?? [];
+  const warningIssues =
+    readiness?.issues.filter((issue) => !readinessIssueBlocks(issue.severity)) ?? [];
   const candidateCount =
     readiness?.targets.reduce((sum, target) => sum + target.candidateCount, 0) ?? 0;
   const wouldPostCount =
@@ -981,13 +1000,13 @@ export function AccountingBackfillPageClient(): JSX.Element {
                   <p className="font-semibold">{issue.message}</p>
                   <Badge
                     className={issueBadgeClass(issue.severity)}
-                    variant={issue.severity === "blocking" ? "outline" : "secondary"}
+                    variant={readinessIssueBlocks(issue.severity) ? "outline" : "secondary"}
                   >
                     {formatStatus(issue.severity)}
                   </Badge>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {issue.details || formatBackfillTarget(issue.target)}
+                  {formatReadinessIssueDetails(issue)}
                 </p>
               </div>
             ))}

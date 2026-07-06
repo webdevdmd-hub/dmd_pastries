@@ -2236,25 +2236,10 @@ func (s *Service) GetBackfillReadiness(currentUser *utils.AuthContext, query Bac
 		return nil, err
 	}
 
-	issues := make([]BackfillReadinessIssue, 0)
-	missingMappings, err := s.repo.ListMissingRequiredAccountMappings(s.db, currentUser.BusinessID, backfillRequiredMappingKeys())
+	issues, err := s.accountingSetupReadinessIssues(currentUser.BusinessID)
 	if err != nil {
-		return nil, apperrors.Internal("failed to check account mappings")
+		return nil, err
 	}
-	if len(missingMappings) > 0 {
-		issues = append(issues, BackfillReadinessIssue{
-			Severity: "error",
-			CheckKey: "account_mappings_missing",
-			Message:  "Required account mappings are missing or linked to inactive chart accounts.",
-			Details:  map[string]interface{}{"mapping_keys": missingMappings},
-		})
-	}
-
-	paymentIssues, err := s.repo.ListPaymentMethodReadinessIssues(s.db, currentUser.BusinessID)
-	if err != nil {
-		return nil, apperrors.Internal("failed to check payment method setup")
-	}
-	issues = append(issues, paymentIssues...)
 
 	missingCostCount, err := s.repo.CountValueMovementsMissingCost(s.db, currentUser.BusinessID, req)
 	if err != nil {
@@ -2284,13 +2269,7 @@ func (s *Service) GetBackfillReadiness(currentUser *utils.AuthContext, query Bac
 		targets = append(targets, BackfillReadinessTarget{Target: target, CandidateCount: count})
 	}
 
-	ready := true
-	for _, issue := range issues {
-		if issue.Severity == "error" {
-			ready = false
-			break
-		}
-	}
+	ready := setupIssuesAreReady(issues)
 	_ = s.writeReportAudit(currentUser, "accounting.backfill_readiness_viewed", "backfill_readiness", query, ipAddress, userAgent)
 	return &BackfillReadinessResponse{
 		Ready:     ready,
@@ -2301,6 +2280,64 @@ func (s *Service) GetBackfillReadiness(currentUser *utils.AuthContext, query Bac
 		Issues:    issues,
 		CheckedAt: time.Now().UTC(),
 	}, nil
+}
+
+func (s *Service) GetAccountingSetupReadiness(currentUser *utils.AuthContext, ipAddress, userAgent string) (*AccountingSetupReadinessResponse, error) {
+	issues, err := s.accountingSetupReadinessIssues(currentUser.BusinessID)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.writeReportAudit(currentUser, "accounting.setup_readiness_viewed", "setup_readiness", nil, ipAddress, userAgent)
+	return &AccountingSetupReadinessResponse{
+		Ready:     setupIssuesAreReady(issues),
+		Issues:    issues,
+		CheckedAt: time.Now().UTC(),
+	}, nil
+}
+
+func (s *Service) accountingSetupReadinessIssues(businessID string) ([]BackfillReadinessIssue, error) {
+	issues := make([]BackfillReadinessIssue, 0)
+	missingMappings, err := s.repo.ListMissingRequiredAccountMappings(s.db, businessID, backfillRequiredMappingKeys())
+	if err != nil {
+		return nil, apperrors.Internal("failed to check account mappings")
+	}
+	for _, mappingKey := range missingMappings {
+		issues = append(issues, BackfillReadinessIssue{
+			Severity: "error",
+			CheckKey: "account_mapping_missing",
+			Message:  "Required account mapping is missing or linked to an inactive chart account.",
+			Details: map[string]interface{}{
+				"mapping_key": mappingKey,
+				"description": defaultAccountMappingDescription(mappingKey),
+			},
+		})
+	}
+
+	paymentIssues, err := s.repo.ListPaymentMethodReadinessIssues(s.db, businessID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to check payment method setup")
+	}
+	issues = append(issues, paymentIssues...)
+
+	return issues, nil
+}
+
+func setupIssuesAreReady(issues []BackfillReadinessIssue) bool {
+	for _, issue := range issues {
+		if readinessSeverityBlocks(issue.Severity) {
+			return false
+		}
+	}
+	return true
+}
+
+func readinessSeverityBlocks(severity string) bool {
+	switch strings.ToLower(strings.TrimSpace(severity)) {
+	case "error", "blocking":
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *Service) GetPurchasingPostingIntegrity(currentUser *utils.AuthContext, ipAddress, userAgent string) (*PurchasingPostingIntegrityResponse, error) {
@@ -4350,7 +4387,7 @@ func validAccountMappingKey(value string) bool {
 		"customer_advance", "vat_receivable", "vat_payable", "cogs", "sales_returns",
 		"purchase_returns", "wip_inventory", "wastage_expense", "opening_balance_equity",
 		"grni", "supplier_advance", "platform_commission_expense", "delivery_charge_income", "service_charge_income",
-		"packing_charge_income", "freight_inward", "charge_refund_account":
+		"packing_charge_income", "freight_inward", "charge_refund_account", "inventory_adjustment_gain", "inventory_adjustment_loss":
 		return true
 	default:
 		return false

@@ -581,6 +581,12 @@ type BackfillReadinessResponse struct {
 	CheckedAt time.Time                 `json:"checked_at"`
 }
 
+type AccountingSetupReadinessResponse struct {
+	Ready     bool                     `json:"ready"`
+	Issues    []BackfillReadinessIssue `json:"issues"`
+	CheckedAt time.Time                `json:"checked_at"`
+}
+
 type ReconciliationQuery struct {
 	BranchID string
 	AsOfDate string
