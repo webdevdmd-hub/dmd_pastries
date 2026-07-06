@@ -9,9 +9,13 @@ import type {
   ProductionDashboard,
   PurchasingDashboard,
 } from "@/types/dashboard";
+import type { ReportGroupBy } from "@/types/reports";
 
 export type DashboardRequestFilters = {
   branchId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  groupBy?: ReportGroupBy;
   scope?: "all_branches" | "current_branch";
   timezone?: string;
 };
@@ -71,6 +75,15 @@ function toSearchParams(filters?: DashboardRequestFilters): string {
   const params = new URLSearchParams();
   if (filters?.branchId) {
     params.set("branch_id", filters.branchId);
+  }
+  if (filters?.dateFrom) {
+    params.set("date_from", filters.dateFrom);
+  }
+  if (filters?.dateTo) {
+    params.set("date_to", filters.dateTo);
+  }
+  if (filters?.groupBy) {
+    params.set("group_by", filters.groupBy);
   }
   if (filters?.scope) {
     params.set("scope", filters.scope);

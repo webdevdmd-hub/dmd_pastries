@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"pastries-pos/internal/modules/reports"
 	reportshared "pastries-pos/internal/modules/reports/shared"
 )
 
@@ -29,24 +30,8 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) AdminDashboard(scope Scope) (*AdminDashboardResponse, error) {
-	sales, err := r.adminSales(scope)
-	if err != nil {
-		return nil, err
-	}
-	inventory, err := r.adminInventory(scope)
-	if err != nil {
-		return nil, err
-	}
-	orders, err := r.adminOrders(scope)
-	if err != nil {
-		return nil, err
-	}
-	manufacturing, err := r.adminManufacturing(scope)
-	if err != nil {
-		return nil, err
-	}
-	financial, err := r.adminFinancial(scope)
+func (r *Repository) AdminDashboard(scope Scope, summary *reports.DashboardSummaryResponse) (*AdminDashboardResponse, error) {
+	outOfStock, err := r.adminOutOfStock(scope)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +39,52 @@ func (r *Repository) AdminDashboard(scope Scope) (*AdminDashboardResponse, error
 	if err != nil {
 		return nil, err
 	}
-	return &AdminDashboardResponse{Sales: *sales, Inventory: *inventory, Orders: *orders, Manufacturing: *manufacturing, Financial: *financial, Customers: *customers}, nil
+	inProduction, err := r.adminInProductionOrders(scope)
+	if err != nil {
+		return nil, err
+	}
+	outstanding, err := reportshared.LedgerMappedBalance(r.db, dashboardMetricScope(scope), "accounts_receivable", "1100", scope.TodayDate)
+	if err != nil {
+		return nil, err
+	}
+	return adminDashboardFromReportSummary(summary, outOfStock, inProduction, outstanding, *customers), nil
+}
+
+func adminDashboardFromReportSummary(
+	summary *reports.DashboardSummaryResponse,
+	outOfStock int64,
+	inProduction int64,
+	outstanding float64,
+	customers AdminCustomersWidget,
+) *AdminDashboardResponse {
+	return &AdminDashboardResponse{
+		Sales: AdminSalesWidget{
+			TodaySales:        summary.Sales.TotalSales,
+			MonthlySales:      summary.Sales.TotalSales,
+			SalesCountToday:   summary.Sales.SalesCount,
+			AverageOrderValue: summary.Sales.AverageOrderValue,
+		},
+		Inventory: AdminInventoryWidget{
+			LowStockCount:      summary.Inventory.LowStockCount,
+			ExpiringItemsCount: summary.Inventory.ExpiringItemsCount,
+			OutOfStockCount:    outOfStock,
+		},
+		Orders: AdminOrdersWidget{
+			PendingOrders:      summary.Orders.PendingOrders,
+			InProductionOrders: inProduction,
+			ReadyOrders:        summary.Orders.ReadyOrders,
+		},
+		Manufacturing: AdminManufacturingWidget{
+			ActiveBatches:         summary.Manufacturing.ActiveBatches,
+			CompletedBatchesToday: summary.Manufacturing.CompletedBatches,
+		},
+		Financial: AdminFinancialWidget{
+			CollectedToday:     summary.Payments.CollectedAmount,
+			RefundTotalToday:   summary.Payments.RefundAmount,
+			OutstandingBalance: outstanding,
+		},
+		Customers: customers,
+	}
 }
 
 func (r *Repository) CashierDashboard(scope Scope, userID string) (*CashierDashboardResponse, error) {
@@ -323,6 +353,15 @@ func (r *Repository) adminInventory(scope Scope) (*AdminInventoryWidget, error) 
 	return &row, nil
 }
 
+func (r *Repository) adminOutOfStock(scope Scope) (int64, error) {
+	var total int64
+	query := "SELECT COUNT(*) FROM inventory_items WHERE business_id = ? AND deleted_at IS NULL AND available_quantity <= 0"
+	args := []interface{}{scope.BusinessID}
+	query, args = addScopedBranch(query, args, "branch_id", scope)
+	err := r.db.Raw(query, args...).Scan(&total).Error
+	return total, err
+}
+
 func (r *Repository) adminOrders(scope Scope) (*AdminOrdersWidget, error) {
 	var row AdminOrdersWidget
 	query := "SELECT COUNT(*) FILTER (WHERE order_status IN ('new','confirmed')) AS pending_orders, COUNT(*) FILTER (WHERE order_status = 'in_production') AS in_production_orders, COUNT(*) FILTER (WHERE order_status = 'ready') AS ready_orders FROM bakery_orders WHERE business_id = ? AND deleted_at IS NULL"
@@ -330,6 +369,15 @@ func (r *Repository) adminOrders(scope Scope) (*AdminOrdersWidget, error) {
 	query, args = addScopedBranch(query, args, "branch_id", scope)
 	err := r.db.Raw(query, args...).Scan(&row).Error
 	return &row, err
+}
+
+func (r *Repository) adminInProductionOrders(scope Scope) (int64, error) {
+	var total int64
+	query := "SELECT COUNT(*) FROM bakery_orders WHERE business_id = ? AND order_status = 'in_production' AND event_date >= ? AND event_date <= ? AND deleted_at IS NULL"
+	args := []interface{}{scope.BusinessID, scope.MonthDate, scope.TodayDate}
+	query, args = addScopedBranch(query, args, "branch_id", scope)
+	err := r.db.Raw(query, args...).Scan(&total).Error
+	return total, err
 }
 
 func (r *Repository) adminManufacturing(scope Scope) (*AdminManufacturingWidget, error) {

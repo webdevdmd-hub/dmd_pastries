@@ -12,7 +12,8 @@ import {
   UserRound,
 } from "lucide-react";
 import type { JSX } from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/dashboard/access-denied-card";
 import { DashboardChartCard } from "@/components/dashboard/dashboard-chart-card";
@@ -24,6 +25,7 @@ import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-heade
 import { DashboardRiskChart } from "@/components/dashboard/dashboard-risk-chart";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { DashboardTrendChart } from "@/components/dashboard/dashboard-trend-chart";
+import { ReportFilterBar, type ReportFilterDraft } from "@/components/reports/report-filter-bar";
 import { formatCurrency, formatNumber } from "@/components/reports/sales/sales-report-format";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -31,9 +33,19 @@ import { ROUTES } from "@/constants/routes";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useAdminDashboard } from "@/hooks/use-dashboard";
 import { usePermission } from "@/hooks/use-permission";
-import { useOrdersChart, usePaymentsChart, useSalesChart } from "@/hooks/use-reports";
+import {
+  useOrdersChart,
+  usePaymentsChart,
+  useReportBranches,
+  useSalesChart,
+} from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
-import type { DashboardRequestFilters } from "@/lib/api/dashboard";
+import {
+  createDefaultDashboardDraft,
+  resolveDashboardTimezone,
+  toDashboardReportFilters,
+} from "@/lib/reports/dashboard-filters";
+import { reportBaseFiltersSchema } from "@/lib/validators/reports.schema";
 import type { ReportFilters } from "@/types/reports";
 
 const actions = [
@@ -42,63 +54,6 @@ const actions = [
   { href: ROUTES.reports, icon: BarChart3, label: "View Reports" },
   { href: ROUTES.inventoryLowStock, icon: PackageSearch, label: "View Low Stock" },
 ] as const;
-
-function resolveTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Dubai";
-  } catch {
-    return "Asia/Dubai";
-  }
-}
-
-function branchFilterParams(
-  canAccessAllBranches: boolean,
-  effectiveBranchId: string | null,
-): Pick<ReportFilters, "branchId" | "scope"> {
-  if (canAccessAllBranches) {
-    return { branchId: "all", scope: "all_branches" };
-  }
-  if (effectiveBranchId) {
-    return { branchId: effectiveBranchId, scope: "current_branch" };
-  }
-  return { scope: "current_branch" };
-}
-
-function monthFilters(
-  canAccessAllBranches: boolean,
-  effectiveBranchId: string | null,
-  timezone: string,
-): ReportFilters {
-  const now = new Date();
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const toDateInputValue = (value: Date): string => {
-    const year = String(value.getFullYear());
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
-  };
-
-  return {
-    ...branchFilterParams(canAccessAllBranches, effectiveBranchId),
-    dateFrom: toDateInputValue(firstDay),
-    dateTo: toDateInputValue(lastDay),
-    groupBy: "day",
-    timezone,
-  };
-}
-
-function adminDashboardFilters(
-  canAccessAllBranches: boolean,
-  effectiveBranchId: string | null,
-  timezone: string,
-): DashboardRequestFilters {
-  return {
-    ...branchFilterParams(canAccessAllBranches, effectiveBranchId),
-    timezone,
-  };
-}
 
 function hasChartData(
   data: { datasets: { data: number[] }[]; labels: string[] } | undefined,
@@ -119,43 +74,56 @@ export function AdminDashboardClient(): JSX.Element {
     PERMISSIONS.reportsView,
   ]);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
-  const timezone = useMemo(resolveTimezone, []);
-  const dashboardFilters = useMemo(
-    () =>
-      adminDashboardFilters(
-        branchScope.canAccessAllBranches,
-        branchScope.effectiveBranchId,
-        timezone,
-      ),
-    [branchScope.canAccessAllBranches, branchScope.effectiveBranchId, timezone],
+  const timezone = useMemo(resolveDashboardTimezone, []);
+  const defaultDraft = useMemo(
+    () => createDefaultDashboardDraft(branchScope.effectiveBranchId ?? ""),
+    [branchScope.effectiveBranchId],
   );
-  const dashboardQuery = useAdminDashboard(dashboardFilters, canView && hasScope);
-  const reportFilters = useMemo(
-    () => monthFilters(branchScope.canAccessAllBranches, branchScope.effectiveBranchId, timezone),
-    [branchScope.canAccessAllBranches, branchScope.effectiveBranchId, timezone],
+  const [draftFilters, setDraftFilters] = useState<ReportFilterDraft>(defaultDraft);
+  const [appliedFilters, setAppliedFilters] = useState<ReportFilters>(() =>
+    toDashboardReportFilters(defaultDraft, timezone),
   );
-  const salesChartQuery = useSalesChart(reportFilters, canView && hasScope);
-  const paymentsChartQuery = usePaymentsChart(reportFilters, canView && hasScope);
-  const ordersChartQuery = useOrdersChart(reportFilters, canView && hasScope);
+  const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
+  const dashboardQuery = useAdminDashboard(appliedFilters, canView && hasScope);
+  const salesChartQuery = useSalesChart(appliedFilters, canView && hasScope);
+  const paymentsChartQuery = usePaymentsChart(appliedFilters, canView && hasScope);
+  const ordersChartQuery = useOrdersChart(appliedFilters, canView && hasScope);
 
   if (!canView) return <AccessDeniedCard />;
   if (!hasScope) return <NoBranchScopeCard />;
+
+  const handleApply = (): void => {
+    const parsed = reportBaseFiltersSchema.safeParse(
+      toDashboardReportFilters(draftFilters, timezone),
+    );
+
+    if (!parsed.success) {
+      toast.error(parsed.error.errors[0]?.message ?? "Dashboard filters are invalid.");
+      return;
+    }
+
+    setAppliedFilters(toDashboardReportFilters(draftFilters, timezone));
+  };
+
+  const handleReset = (): void => {
+    setAppliedFilters(toDashboardReportFilters(defaultDraft, timezone));
+  };
 
   const dashboard = dashboardQuery.data;
   const salesMetrics = [
     {
       icon: CircleDollarSign,
-      label: "Today Sales",
+      label: "Selected Sales",
       value: formatCurrency(dashboard?.sales.todaySales ?? 0),
     },
     {
       icon: CircleDollarSign,
-      label: "Monthly Sales",
-      value: formatCurrency(dashboard?.sales.monthlySales ?? 0),
+      label: "Selected Collections",
+      value: formatCurrency(dashboard?.financial.collectedToday ?? 0),
     },
     {
       icon: ReceiptText,
-      label: "Sales Count Today",
+      label: "Sales Count",
       value: formatNumber(dashboard?.sales.salesCountToday ?? 0),
     },
     {
@@ -197,19 +165,19 @@ export function AdminDashboardClient(): JSX.Element {
     },
     {
       icon: Boxes,
-      label: "Completed Today",
+      label: "Completed Batches",
       value: formatNumber(dashboard?.manufacturing.completedToday ?? 0),
     },
   ];
   const financeMetrics = [
     {
       icon: CircleDollarSign,
-      label: "Collected Today",
+      label: "Collected",
       value: formatCurrency(dashboard?.financial.collectedToday ?? 0),
     },
     {
       icon: CreditCard,
-      label: "Refunds Today",
+      label: "Refunds",
       value: formatCurrency(dashboard?.financial.refundsToday ?? 0),
     },
     {
@@ -224,7 +192,7 @@ export function AdminDashboardClient(): JSX.Element {
     },
     {
       icon: UserRound,
-      label: "New Customers Today",
+      label: "New Customers",
       value: formatNumber(dashboard?.customers.newCustomersToday ?? 0),
     },
   ];
@@ -234,7 +202,17 @@ export function AdminDashboardClient(): JSX.Element {
       <DashboardPageHeader
         eyebrow="Admin intelligence"
         title="Admin Dashboard"
-        description="Owner-level control surface for sales, inventory, bakery orders, production, finance, alerts, and activity."
+        description="Owner-level control surface using the same branch, date, and timezone reporting source as Reports Dashboard."
+      />
+      <ReportFilterBar
+        branches={branchesQuery.data ?? []}
+        canAccessAllBranches={branchScope.canAccessAllBranches}
+        currentBranchId={branchScope.effectiveBranchId}
+        defaultFilters={defaultDraft}
+        filters={draftFilters}
+        onApply={handleApply}
+        onChange={setDraftFilters}
+        onReset={handleReset}
       />
       {dashboardQuery.error ? (
         <DashboardErrorState

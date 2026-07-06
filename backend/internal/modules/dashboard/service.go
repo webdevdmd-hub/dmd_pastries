@@ -10,6 +10,8 @@ import (
 
 	"pastries-pos/internal/modules/audit"
 	dashboardcache "pastries-pos/internal/modules/dashboard/cache"
+	"pastries-pos/internal/modules/reports"
+	reportshared "pastries-pos/internal/modules/reports/shared"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
@@ -17,23 +19,29 @@ import (
 type Service struct {
 	db        *gorm.DB
 	repo      *Repository
+	reports   *reports.Repository
 	auditRepo *audit.Repository
 	cache     *dashboardcache.Service
 }
 
 func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository, cache *dashboardcache.Service) *Service {
-	return &Service{db: db, repo: repo, auditRepo: auditRepo, cache: cache}
+	return &Service{db: db, repo: repo, reports: reports.NewRepository(db), auditRepo: auditRepo, cache: cache}
 }
 
 func (s *Service) AdminDashboard(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*AdminDashboardResponse, error) {
 	if !isAdminVisible(currentUser) {
 		return nil, apperrors.Forbidden("admin dashboard access denied")
 	}
-	scope, err := resolveScope(currentUser, values)
+	filter, err := reportshared.Resolve(currentUser, reportshared.ParseQuery(values))
 	if err != nil {
 		return nil, err
 	}
-	result, err := s.repo.AdminDashboard(scope)
+	summary, err := s.reports.DashboardSummary(filter)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load admin dashboard")
+	}
+	scope := scopeFromReportFilter(filter)
+	result, err := s.repo.AdminDashboard(scope, summary)
 	if err != nil {
 		return nil, apperrors.Internal("failed to load admin dashboard")
 	}
@@ -123,6 +131,20 @@ func (s *Service) KPISummary(currentUser *utils.AuthContext, values url.Values) 
 		return nil, apperrors.Internal("failed to load KPI summary")
 	}
 	return result, nil
+}
+
+func scopeFromReportFilter(filter *reportshared.ResolvedFilter) Scope {
+	return Scope{
+		BusinessID:  filter.BusinessID,
+		BranchID:    filter.BranchID,
+		AllBranches: filter.AllBranches,
+		TodayStart:  filter.StartUTC,
+		TodayEnd:    filter.EndUTC,
+		MonthStart:  filter.StartUTC,
+		MonthEnd:    filter.EndUTC,
+		TodayDate:   filter.DateTo.Format("2006-01-02"),
+		MonthDate:   filter.DateFrom.Format("2006-01-02"),
+	}
 }
 
 func resolveScope(currentUser *utils.AuthContext, values url.Values) (Scope, error) {

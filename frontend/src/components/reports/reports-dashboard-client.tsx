@@ -14,7 +14,6 @@ import { ReportPageHeader } from "@/components/reports/report-page-header";
 import { SalesChart } from "@/components/reports/sales-chart";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PERMISSIONS } from "@/constants/permissions";
-import { resolveReportPresetRange } from "@/constants/report-presets";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { usePermission } from "@/hooks/use-permission";
 import {
@@ -24,39 +23,13 @@ import {
   useReportsDashboardSummary,
   useSalesReportChart,
 } from "@/hooks/use-reports";
+import {
+  createDefaultDashboardDraft,
+  resolveDashboardTimezone,
+  toDashboardReportFilters,
+} from "@/lib/reports/dashboard-filters";
 import { reportBaseFiltersSchema } from "@/lib/validators/reports.schema";
 import type { ReportChartData, ReportFilters } from "@/types/reports";
-
-function resolveTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Dubai";
-  } catch {
-    return "Asia/Dubai";
-  }
-}
-
-function createDefaultDraft(branchId: string): ReportFilterDraft {
-  return {
-    ...resolveReportPresetRange("this_month"),
-    branchId,
-    datePreset: "this_month",
-    groupBy: "day",
-  };
-}
-
-function toReportFilters(draft: ReportFilterDraft, timezone: string): ReportFilters {
-  return {
-    ...(draft.branchId === "all"
-      ? { branchId: "all", scope: "all_branches" as const }
-      : draft.branchId
-        ? { branchId: draft.branchId, scope: "current_branch" as const }
-        : { scope: "current_branch" as const }),
-    dateFrom: draft.dateFrom,
-    dateTo: draft.dateTo,
-    groupBy: draft.groupBy,
-    timezone,
-  };
-}
 
 function isChartEmpty(chart: ReportChartData | undefined): boolean {
   return (
@@ -69,17 +42,17 @@ function isChartEmpty(chart: ReportChartData | undefined): boolean {
 export function ReportsDashboardClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
-  const timezone = useMemo(resolveTimezone, []);
+  const timezone = useMemo(resolveDashboardTimezone, []);
   const canView = hasAnyPermission([PERMISSIONS.reportsView]);
   const hasReportBranchScope =
     branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const defaultDraft = useMemo(
-    () => createDefaultDraft(branchScope.effectiveBranchId ?? ""),
+    () => createDefaultDashboardDraft(branchScope.effectiveBranchId ?? ""),
     [branchScope.effectiveBranchId],
   );
   const [draftFilters, setDraftFilters] = useState<ReportFilterDraft>(defaultDraft);
   const [appliedFilters, setAppliedFilters] = useState<ReportFilters>(() =>
-    toReportFilters(defaultDraft, timezone),
+    toDashboardReportFilters(defaultDraft, timezone),
   );
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const summaryQuery = useReportsDashboardSummary(appliedFilters, canView && hasReportBranchScope);
@@ -99,18 +72,20 @@ export function ReportsDashboardClient(): JSX.Element {
   }
 
   const handleApply = (): void => {
-    const parsed = reportBaseFiltersSchema.safeParse(toReportFilters(draftFilters, timezone));
+    const parsed = reportBaseFiltersSchema.safeParse(
+      toDashboardReportFilters(draftFilters, timezone),
+    );
 
     if (!parsed.success) {
       toast.error(parsed.error.errors[0]?.message ?? "Report filters are invalid.");
       return;
     }
 
-    setAppliedFilters(toReportFilters(draftFilters, timezone));
+    setAppliedFilters(toDashboardReportFilters(draftFilters, timezone));
   };
 
   const handleReset = (): void => {
-    setAppliedFilters(toReportFilters(defaultDraft, timezone));
+    setAppliedFilters(toDashboardReportFilters(defaultDraft, timezone));
   };
 
   return (

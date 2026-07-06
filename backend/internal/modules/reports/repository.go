@@ -2162,20 +2162,23 @@ func (r *Repository) FinancialTrend(filter *shared.ResolvedFilter) ([]trendSerie
 }
 
 func (r *Repository) salesSummary(filter *shared.ResolvedFilter) (*SalesSummary, error) {
-	var row SalesSummary
-	query := "SELECT COALESCE(SUM(total_amount),0) AS total_sales, COUNT(*) AS sales_count, COALESCE(AVG(total_amount),0) AS average_order_value FROM sales WHERE business_id = ? AND sold_at >= ? AND sold_at < ? AND sale_status <> 'voided' AND deleted_at IS NULL"
+	var salesCount int64
+	query := "SELECT COUNT(*) FROM sales WHERE business_id = ? AND sold_at >= ? AND sold_at < ? AND sale_status <> 'voided' AND deleted_at IS NULL"
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
 	query, args = addBranchCondition(query, args, filter)
-	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
+	if err := r.db.Raw(query, args...).Scan(&salesCount).Error; err != nil {
 		return nil, err
 	}
-	refundTotal, err := r.salesRefundTotalForRange(filter, filter.StartUTC, filter.EndUTC)
+	ledger, err := r.ledgerFinancialTotals(filter, filter.StartUTC, filter.EndUTC)
 	if err != nil {
 		return nil, err
 	}
-	row.TotalSales = roundMoney(row.TotalSales - refundTotal)
-	if row.SalesCount > 0 {
-		row.AverageOrderValue = roundMoney(row.TotalSales / float64(row.SalesCount))
+	row := SalesSummary{
+		TotalSales: ledger.Revenue,
+		SalesCount: salesCount,
+	}
+	if salesCount > 0 {
+		row.AverageOrderValue = roundMoney(row.TotalSales / float64(salesCount))
 	}
 	return &row, nil
 }

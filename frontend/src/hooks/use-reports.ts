@@ -27,6 +27,7 @@ import type {
 } from "@/types/reports";
 
 const reportsQueryKey = "reports";
+const reportsRefreshMs = 60_000;
 
 export function useReportsDashboardSummary(filters: ReportFilters, enabled = true) {
   const branchQueryKey = useBranchQueryKey();
@@ -35,6 +36,7 @@ export function useReportsDashboardSummary(filters: ReportFilters, enabled = tru
     queryKey: [reportsQueryKey, branchQueryKey, "dashboard-summary", filters],
     queryFn: async () => getReportsDashboardSummary(filters),
     enabled,
+    refetchInterval: reportsRefreshMs,
   });
 }
 
@@ -47,6 +49,7 @@ export function useSalesReportChart(filters: ReportFilters, enabled = true) {
     queryKey: [reportsQueryKey, branchQueryKey, "chart", "sales", filters],
     queryFn: async () => getSalesChart(filters),
     enabled,
+    refetchInterval: reportsRefreshMs,
   });
 }
 
@@ -59,6 +62,7 @@ export function usePaymentsReportChart(filters: ReportFilters, enabled = true) {
     queryKey: [reportsQueryKey, branchQueryKey, "chart", "payments", filters],
     queryFn: async () => getPaymentsChart(filters),
     enabled,
+    refetchInterval: reportsRefreshMs,
   });
 }
 
@@ -71,6 +75,7 @@ export function useOrdersReportChart(filters: ReportFilters, enabled = true) {
     queryKey: [reportsQueryKey, branchQueryKey, "chart", "orders", filters],
     queryFn: async () => getOrdersChart(filters),
     enabled,
+    refetchInterval: reportsRefreshMs,
   });
 }
 
