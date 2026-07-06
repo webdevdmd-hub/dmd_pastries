@@ -37,7 +37,7 @@ export function PaymentsSummaryCards({ summary }: PaymentsSummaryCardsProps): JS
     {
       label: "Transactions Count",
       value: String(summary?.transactionsCount ?? 0),
-      detail: `Deposits ${formatMoney(summary?.depositCollected ?? 0)} / Balance ${formatMoney(summary?.balanceCollected ?? 0)} / Full ${formatMoney(summary?.fullCollected ?? 0)}`,
+      detail: `Deposit / Advance ${formatMoney(summary?.depositCollected ?? 0)} / Balance ${formatMoney(summary?.balanceCollected ?? 0)} / Final Settlement ${formatMoney(summary?.fullCollected ?? 0)}`,
       icon: ReceiptText,
     },
   ];

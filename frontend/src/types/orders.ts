@@ -15,6 +15,8 @@ export type OrderPaymentStatus = "unpaid" | "partial" | "paid" | "refunded";
 
 export type OrderItemSource = "catalog" | "custom";
 
+export type OrderPaymentType = "deposit" | "balance" | "full";
+
 export type BakeryOrder = {
   id: string;
   branchId: string;
@@ -80,7 +82,7 @@ export type BakeryOrderPayment = {
   paymentMethodId: string;
   paymentMethodName: string;
   amount: number;
-  paymentType: "deposit" | "balance" | "full";
+  paymentType: OrderPaymentType;
   referenceNumber: string | null;
   journalEntryId: string | null;
   paidAt: string;
@@ -172,7 +174,7 @@ export type UpdateOrderStatusPayload = {
 export type AddOrderPaymentPayload = {
   paymentMethodId: string;
   amount: number;
-  paymentType: "deposit" | "balance" | "full";
+  paymentType: OrderPaymentType;
   referenceNumber: string | null;
 };
 

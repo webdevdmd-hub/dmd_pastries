@@ -12,22 +12,11 @@ import { ROUTES } from "@/constants/routes";
 import { useAddOrderPayment, useOrderPayments } from "@/hooks/use-orders";
 import { usePaymentMethods } from "@/hooks/use-payments";
 import { getErrorMessage } from "@/lib/api/client";
+import { orderPaymentTypeLabel } from "@/lib/orders/payment-stage";
 import type { BakeryOrder } from "@/types/orders";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
-}
-
-function paymentTypeLabel(paymentType: "deposit" | "balance" | "full"): string {
-  if (paymentType === "deposit") {
-    return "Advance Payment";
-  }
-
-  if (paymentType === "full") {
-    return "Final Payment";
-  }
-
-  return "Balance Payment";
 }
 
 export function OrderPaymentSection({
@@ -59,7 +48,7 @@ export function OrderPaymentSection({
           <p className="text-sm text-brand-mocha">Deposits, balance payments, and full payments.</p>
         </div>
         <Button
-          disabled={!order || !canManage}
+          disabled={!order || !canManage || order.balanceAmount <= 0}
           onClick={() => setOpen(true)}
           type="button"
           variant="outline"
@@ -125,7 +114,7 @@ export function OrderPaymentSection({
           >
             <span className="flex items-center gap-2 text-brand-espresso">
               <CreditCard className="h-4 w-4" />
-              {paymentTypeLabel(payment.paymentType)}: {payment.paymentMethodName} -{" "}
+              {orderPaymentTypeLabel(payment.paymentType)}: {payment.paymentMethodName} -{" "}
               {formatCurrency(payment.amount)}
             </span>
             {payment.journalEntryId ? (
@@ -153,6 +142,7 @@ export function OrderPaymentSection({
         ) : null}
       </div>
       <OrderPaymentDialog
+        balanceAmount={order?.balanceAmount ?? 0}
         defaultPaymentMethodId={defaultPaymentMethod?.id ?? null}
         isSubmitting={addPaymentMutation.isPending}
         methods={usablePaymentMethods}
@@ -170,6 +160,7 @@ export function OrderPaymentSection({
           }
         }}
         open={open}
+        paidAmount={order?.paidAmount ?? 0}
       />
     </section>
   );

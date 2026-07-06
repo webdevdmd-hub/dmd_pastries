@@ -611,11 +611,16 @@ func (s *Service) AddPayment(currentUser *utils.AuthContext, orderID string, req
 		if method.RequiresReference && strings.TrimSpace(req.ReferenceNumber) == "" {
 			return apperrors.BadRequest("reference_number is required for this payment method", nil)
 		}
-		if req.Amount > order.BalanceAmount {
+		paymentAmount := roundMoney(req.Amount)
+		if paymentAmount <= 0 {
+			return apperrors.BadRequest("amount must be greater than zero", nil)
+		}
+		if paymentAmount > roundMoney(order.BalanceAmount) {
 			return apperrors.BadRequest("payment amount cannot exceed order balance", map[string]float64{"balance_amount": roundMoney(order.BalanceAmount)})
 		}
 		now := time.Now().UTC()
-		payment := &BakeryOrderPayment{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BakeryOrderID: orderID, PaymentMethodID: method.ID, PaymentMethodNameSnapshot: method.MethodName, Amount: roundMoney(req.Amount), ReferenceNumber: strings.TrimSpace(req.ReferenceNumber), PaymentType: req.PaymentType, PaidByUserID: currentUser.UserID, PaidAt: now}
+		paymentType := resolveBakeryOrderPaymentType(order.PaidAmount, order.BalanceAmount, paymentAmount)
+		payment := &BakeryOrderPayment{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BakeryOrderID: orderID, PaymentMethodID: method.ID, PaymentMethodNameSnapshot: method.MethodName, Amount: paymentAmount, ReferenceNumber: strings.TrimSpace(req.ReferenceNumber), PaymentType: paymentType, PaidByUserID: currentUser.UserID, PaidAt: now}
 		if err := s.repo.CreatePayment(tx, payment); err != nil {
 			return err
 		}
@@ -1457,6 +1462,19 @@ func paymentStatus(total, paid float64) string {
 		return "partial"
 	}
 	return "paid"
+}
+
+func resolveBakeryOrderPaymentType(paidAmount, balanceAmount, paymentAmount float64) string {
+	paidAmount = roundMoney(paidAmount)
+	balanceAmount = roundMoney(balanceAmount)
+	paymentAmount = roundMoney(paymentAmount)
+	if paymentAmount >= balanceAmount {
+		return "full"
+	}
+	if paidAmount <= 0 {
+		return "deposit"
+	}
+	return "balance"
 }
 
 func dateOnly(t time.Time) time.Time {

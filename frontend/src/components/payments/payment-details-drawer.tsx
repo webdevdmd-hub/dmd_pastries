@@ -13,6 +13,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { orderPaymentTypeLabel } from "@/lib/orders/payment-stage";
 import type { PaymentRefund, SalePayment } from "@/types/payment";
 
 type PaymentDetailsDrawerProps = {
@@ -108,7 +109,7 @@ export function PaymentDetailsDrawer({
               <DetailRow label="Branch" value={payment.branchName} />
               <DetailRow
                 label="Payment Type"
-                value={payment.paymentType ? payment.paymentType.replace("_", " ") : "Not set"}
+                value={orderPaymentTypeLabel(payment.paymentType)}
               />
               <DetailRow label="Reference" value={payment.referenceNumber ?? "No reference"} />
               <DetailRow

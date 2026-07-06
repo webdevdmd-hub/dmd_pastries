@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { orderPaymentTypeLabel, resolveOrderPaymentType } from "@/lib/orders/payment-stage";
 import {
   type OrderPaymentFormValues,
   type OrderPaymentInputValues,
@@ -31,19 +32,23 @@ import type { AddOrderPaymentPayload } from "@/types/orders";
 import type { PaymentMethod } from "@/types/settings";
 
 export function OrderPaymentDialog({
+  balanceAmount,
   defaultPaymentMethodId,
   isSubmitting,
   methods,
   onClose,
   onSubmit,
   open,
+  paidAmount,
 }: {
+  balanceAmount: number;
   defaultPaymentMethodId: string | null;
   isSubmitting: boolean;
   methods: PaymentMethod[];
   onClose: () => void;
   onSubmit: (payload: AddOrderPaymentPayload) => Promise<void>;
   open: boolean;
+  paidAmount: number;
 }): JSX.Element {
   const methodKey = methods.map((method) => method.id).join("|");
   const firstMethodId = methods[0]?.id ?? "";
@@ -55,16 +60,27 @@ export function OrderPaymentDialog({
     defaultPaymentMethodId && methodIds.has(defaultPaymentMethodId)
       ? defaultPaymentMethodId
       : firstMethodId;
+  const initialPaymentType = resolveOrderPaymentType({
+    balanceAmount,
+    paidAmount,
+    paymentAmount: 0,
+  });
   const form = useForm<OrderPaymentInputValues, unknown, OrderPaymentFormValues>({
     defaultValues: {
       amount: 0,
       paymentMethodId: resolvedDefaultPaymentMethodId,
-      paymentType: "deposit",
+      paymentType: initialPaymentType,
       referenceNumber: null,
     },
     resolver: zodResolver(orderPaymentSchema),
   });
   const selectedPaymentMethodId = form.watch("paymentMethodId");
+  const paymentAmount = form.watch("amount");
+  const paymentType = resolveOrderPaymentType({
+    balanceAmount,
+    paidAmount,
+    paymentAmount,
+  });
   const selectedMethod = methods.find((method) => method.id === selectedPaymentMethodId);
 
   useEffect(() => {
@@ -72,17 +88,17 @@ export function OrderPaymentDialog({
       return;
     }
 
-    const currentPaymentMethodId = form.getValues("paymentMethodId");
-    if (currentPaymentMethodId === resolvedDefaultPaymentMethodId) {
-      return;
-    }
-
     form.reset({
       ...form.getValues(),
       paymentMethodId: resolvedDefaultPaymentMethodId,
+      paymentType: resolveOrderPaymentType({
+        balanceAmount,
+        paidAmount,
+        paymentAmount: form.getValues("amount"),
+      }),
       referenceNumber: null,
     });
-  }, [form, methodIds, open, resolvedDefaultPaymentMethodId]);
+  }, [balanceAmount, form, open, paidAmount, resolvedDefaultPaymentMethodId]);
 
   return (
     <Dialog onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)} open={open}>
@@ -101,11 +117,20 @@ export function OrderPaymentDialog({
                 });
                 return;
               }
-              await onSubmit(values);
+              const resolvedPaymentType = resolveOrderPaymentType({
+                balanceAmount,
+                paidAmount,
+                paymentAmount: values.amount,
+              });
+              await onSubmit({ ...values, paymentType: resolvedPaymentType });
               form.reset({
                 amount: 0,
                 paymentMethodId: resolvedDefaultPaymentMethodId,
-                paymentType: "deposit",
+                paymentType: resolveOrderPaymentType({
+                  balanceAmount,
+                  paidAmount,
+                  paymentAmount: 0,
+                }),
                 referenceNumber: null,
               });
             })(event);
@@ -139,22 +164,10 @@ export function OrderPaymentDialog({
             <p className="text-xs text-red-700">{form.formState.errors.paymentMethodId?.message}</p>
           </div>
           <div className="grid gap-2">
-            <Label>Payment type</Label>
-            <Select
-              onValueChange={(value: AddOrderPaymentPayload["paymentType"]) =>
-                form.setValue("paymentType", value, { shouldValidate: true })
-              }
-              value={form.watch("paymentType")}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="deposit">Deposit</SelectItem>
-                <SelectItem value="balance">Balance</SelectItem>
-                <SelectItem value="full">Full</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>Payment stage</Label>
+            <div className="rounded-xl border border-brand-cappuccino/70 bg-brand-latte/70 px-3 py-2 text-sm font-semibold text-brand-espresso">
+              {orderPaymentTypeLabel(paymentType)}
+            </div>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="orderPaymentAmount">Amount</Label>

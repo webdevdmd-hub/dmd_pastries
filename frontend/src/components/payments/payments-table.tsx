@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { orderPaymentTypeLabel } from "@/lib/orders/payment-stage";
 import type { SalePayment } from "@/types/payment";
 
 type PaymentsTableProps = {
@@ -64,7 +65,7 @@ function sourceLabel(payment: SalePayment): string {
 }
 
 function paymentTypeLabel(payment: SalePayment): string {
-  return payment.paymentType ? payment.paymentType.replace("_", " ") : "-";
+  return orderPaymentTypeLabel(payment.paymentType);
 }
 
 export function PaymentsTable({
