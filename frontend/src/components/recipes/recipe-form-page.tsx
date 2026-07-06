@@ -104,6 +104,15 @@ const emptyValues: CreateRecipeInputValues = {
   recipeName: "",
 };
 
+function numberFieldValue(value: unknown): number | "" {
+  if (typeof value === "string" && value.trim().length === 0) {
+    return "";
+  }
+
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : "";
+}
+
 function toCreateRecipePayload(
   values: CreateRecipeFormValues,
   ingredients: RecipeIngredientPayload[],
@@ -798,7 +807,9 @@ export function RecipeFormPage({
                     min="0.01"
                     step="0.01"
                     type="number"
-                    {...form.register("batchYieldQuantity")}
+                    {...form.register("batchYieldQuantity", {
+                      setValueAs: numberFieldValue,
+                    })}
                   />
                 </label>
                 <label className="grid gap-2">
@@ -821,7 +832,9 @@ export function RecipeFormPage({
                     min="0"
                     step="1"
                     type="number"
-                    {...form.register("preparationTimeMinutes")}
+                    {...form.register("preparationTimeMinutes", {
+                      setValueAs: numberFieldValue,
+                    })}
                   />
                 </label>
               </CardContent>
