@@ -142,9 +142,6 @@ export function PurchaseSupplierPaymentAllocationDialog({
     (entry) => entry.amount > roundMoney(entry.invoice.balanceAmount),
   );
   const overAllocated = allocatedAmount > amountValue;
-  const selectedMethodMissingAccount = Boolean(
-    selectedMethod && !selectedMethod.defaultPaymentAccountId,
-  );
 
   useEffect(() => {
     if (!open) return;
@@ -217,8 +214,8 @@ export function PurchaseSupplierPaymentAllocationDialog({
       return;
     }
 
-    if (!selectedMethod?.defaultPaymentAccountId) {
-      setSubmitError("Select a payment method with a linked paid-through account.");
+    if (!selectedMethod) {
+      setSubmitError("Selected payment method is no longer available.");
       return;
     }
 
@@ -280,7 +277,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
         amount: amountValue,
         branchId,
         notes: notes.trim() ? notes.trim() : null,
-        paidThroughAccountId: selectedMethod.defaultPaymentAccountId,
+        paidThroughAccountId: selectedMethod.defaultPaymentAccountId ?? null,
         paymentDate: paymentDate || null,
         paymentMethodId,
         referenceNumber: referenceNumber.trim() ? referenceNumber.trim() : null,
@@ -429,14 +426,10 @@ export function PurchaseSupplierPaymentAllocationDialog({
               <p className="min-h-5 text-xs leading-5 text-brand-mocha">
                 {selectedMethod?.defaultPaymentAccountId
                   ? `Paid through: ${selectedMethod.defaultPaymentAccountName || "Linked account"}`
+                  : selectedMethod
+                    ? "Paid-through account will be resolved from branch payment setup."
                   : ""}
               </p>
-              {selectedMethodMissingAccount ? (
-                <p className="text-xs leading-5 text-red-700">
-                  This payment method has no paid-through account. Link one in Payment Setup before
-                  recording payment.
-                </p>
-              ) : null}
             </div>
 
             <div className="grid gap-2">
@@ -696,9 +689,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
             Cancel
           </Button>
           <Button
-            disabled={
-              isSubmitting || invoicesLoading || validatingBalances || selectedMethodMissingAccount
-            }
+            disabled={isSubmitting || invoicesLoading || validatingBalances}
             onClick={() => void submit()}
             type="button"
           >
