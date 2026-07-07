@@ -2,6 +2,7 @@
 
 import { Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -648,7 +649,16 @@ function ExpenseFormDialog({
   );
 }
 
-export function ExpensesPageClient(): JSX.Element {
+type ExpensesPageClientProps = {
+  initialCreateOpen?: boolean;
+  redirectOnCreateClose?: boolean;
+};
+
+export function ExpensesPageClient({
+  initialCreateOpen = false,
+  redirectOnCreateClose = false,
+}: ExpensesPageClientProps = {}): JSX.Element {
+  const router = useRouter();
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
   const { normalizeBranchId } = branchScope;
@@ -664,7 +674,7 @@ export function ExpensesPageClient(): JSX.Element {
     ...defaultFilters,
     branchId: branchScope.defaultBranchId,
   });
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(initialCreateOpen);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null);
   const expensesQuery = useExpenses(filters, canView && branchScope.hasBranchScope);
@@ -756,8 +766,19 @@ export function ExpensesPageClient(): JSX.Element {
     });
   }, [normalizeBranchId]);
 
+  useEffect(() => {
+    if (initialCreateOpen && canCreate) {
+      setEditingExpense(null);
+      setFormOpen(true);
+    }
+  }, [canCreate, initialCreateOpen]);
+
   if (!canView) {
     return <AccessDeniedCard message="You need `expenses.view` to view Expenses." />;
+  }
+
+  if (initialCreateOpen && !canCreate) {
+    return <AccessDeniedCard message="You need `expenses.create` to record expenses." />;
   }
 
   if (!branchScope.hasBranchScope) {
@@ -782,6 +803,9 @@ export function ExpensesPageClient(): JSX.Element {
       await createMutation.mutateAsync(payload);
       toast.success("Expense recorded.");
       setFormOpen(false);
+      if (redirectOnCreateClose) {
+        router.replace(ROUTES.expenses);
+      }
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -1075,6 +1099,9 @@ export function ExpensesPageClient(): JSX.Element {
         onClose={() => {
           setEditingExpense(null);
           setFormOpen(false);
+          if (redirectOnCreateClose) {
+            router.replace(ROUTES.expenses);
+          }
         }}
         onCreate={handleCreate}
         onRetryAccounts={retryAccountQueries}
