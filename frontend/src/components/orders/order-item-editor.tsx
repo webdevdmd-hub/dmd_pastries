@@ -27,6 +27,7 @@ type ProductOptionMeta = {
 
 const fieldLabelClassName =
   "text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-brand-mocha";
+const unitPlaceholderValue = "__unit_placeholder__";
 
 function parentProductValue(productId: string): string {
   return `product:${productId}`;
@@ -146,6 +147,8 @@ export function OrderItemEditor({
   const update = (patch: Partial<CreateOrderItemPayload>): void => {
     onChange({ ...item, ...patch });
   };
+  const unitSelectValue = item.unitId.length > 0 ? item.unitId : unitPlaceholderValue;
+  const unitPlaceholderLabel = isCustomItem ? "Select unit" : "Select product first";
   const renderProductOption = (
     option: SearchableComboboxOption,
     state: { selected: boolean },
@@ -210,6 +213,8 @@ export function OrderItemEditor({
                   productId: null,
                   productVariantId: null,
                   taxRateId: null,
+                  unitId: "",
+                  unitPrice: 0,
                 });
                 return;
               }
@@ -218,6 +223,9 @@ export function OrderItemEditor({
                 itemName: null,
                 productId: null,
                 productVariantId: null,
+                taxRateId: null,
+                unitId: "",
+                unitPrice: 0,
               });
             }}
             value={isCustomItem ? "custom" : "catalog"}
@@ -252,8 +260,8 @@ export function OrderItemEditor({
                   productId: selectedMeta?.productId ?? null,
                   productVariantId: null,
                   taxRateId: product?.taxRateStatus === "active" ? product.taxRateId : null,
-                  unitId: product?.unitId ?? item.unitId,
-                  unitPrice: product?.salePrice ?? item.unitPrice,
+                  unitId: product?.unitId ?? "",
+                  unitPrice: product?.salePrice ?? 0,
                 });
               }}
               options={productOptions}
@@ -316,12 +324,20 @@ export function OrderItemEditor({
       <div className="grid gap-3 md:grid-cols-12">
         <label className="grid min-w-0 gap-1.5 md:col-span-2">
           <span className={fieldLabelClassName}>Unit</span>
-          <Select onValueChange={(unitId) => update({ unitId })} value={item.unitId || "none"}>
+          <Select
+            disabled={!isCustomItem}
+            onValueChange={(unitId) => {
+              update({ unitId: unitId === unitPlaceholderValue ? "" : unitId });
+            }}
+            value={unitSelectValue}
+          >
             <SelectTrigger>
-              <SelectValue placeholder="Unit" />
+              <SelectValue placeholder={unitPlaceholderLabel} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">Unit</SelectItem>
+              <SelectItem disabled={!isCustomItem} value={unitPlaceholderValue}>
+                {unitPlaceholderLabel}
+              </SelectItem>
               {units.map((unit) => (
                 <SelectItem key={unit.id} value={unit.id}>
                   {unit.unitName} ({unit.symbol})

@@ -9,7 +9,7 @@ import type { Unit } from "@/types/master-data";
 import type { CreateOrderItemPayload } from "@/types/orders";
 import type { Product } from "@/types/product";
 
-function createEmptyItem(defaultUnitId: string): CreateOrderItemPayload {
+function createEmptyItem(): CreateOrderItemPayload {
   return {
     customizationsJson: null,
     designNotes: null,
@@ -21,7 +21,7 @@ function createEmptyItem(defaultUnitId: string): CreateOrderItemPayload {
     productVariantId: null,
     quantity: 1,
     taxRateId: null,
-    unitId: defaultUnitId,
+    unitId: "",
     unitPrice: 0,
     weight: null,
   };
@@ -38,8 +38,6 @@ export function OrderItemsSection({
   products: Product[];
   units: Unit[];
 }): JSX.Element {
-  const defaultUnitId = units[0]?.id ?? "";
-
   return (
     <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
       <div className="flex items-center justify-between gap-3">
@@ -50,7 +48,7 @@ export function OrderItemsSection({
           </p>
         </div>
         <Button
-          onClick={() => onChange([...items, createEmptyItem(defaultUnitId)])}
+          onClick={() => onChange([...items, createEmptyItem()])}
           type="button"
           variant="outline"
         >

@@ -29,6 +29,7 @@ type Service struct {
 }
 
 const selfPrivilegedFieldUpdateMessage = "You cannot modify your own role, status, or branch."
+const selfDestructiveActionMessage = "You cannot deactivate, suspend, or delete your own account."
 
 func NewService(
 	db *gorm.DB,
@@ -685,7 +686,7 @@ func (s *Service) UpdateUser(currentUser *utils.AuthContext, userID string, req 
 
 func (s *Service) DeleteUser(currentUser *utils.AuthContext, userID string, ipAddress, userAgent string) (*DeleteUserResponse, error) {
 	if currentUser.UserID == userID {
-		return nil, apperrors.BadRequest("you cannot delete your own user account", nil)
+		return nil, apperrors.Forbidden(selfDestructiveActionMessage)
 	}
 
 	user, err := s.repo.FindByIDAndBusinessID(userID, currentUser.BusinessID)
@@ -898,6 +899,9 @@ func (s *Service) GetUserActivity(currentUser *utils.AuthContext, userID string,
 
 func (s *Service) UpdateUserStatus(currentUser *utils.AuthContext, userID string, req UpdateUserStatusRequest, ipAddress, userAgent string) (*UserResponse, error) {
 	if currentUser.UserID == userID {
+		if req.Status == "inactive" || req.Status == "suspended" {
+			return nil, apperrors.Forbidden(selfDestructiveActionMessage)
+		}
 		return nil, apperrors.Forbidden(selfPrivilegedFieldUpdateMessage)
 	}
 	if !allowedUserStatus(req.Status) {

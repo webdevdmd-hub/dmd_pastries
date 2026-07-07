@@ -63,6 +63,13 @@ import type {
   UserStatus,
 } from "@/types/user";
 
+const selfDestructiveActionMessage =
+  "You cannot deactivate, suspend, or delete your own account.";
+
+function isDestructiveStatus(status: UserStatus): boolean {
+  return status === "inactive" || status === "suspended";
+}
+
 function buildRoleOptions(users: User[]): UserRoleOption[] {
   const map = new Map<string, string>();
 
@@ -414,6 +421,11 @@ export function UsersPageClient(): JSX.Element {
   };
 
   const requestStatusChange = (targetUser: User, nextStatus: UserStatus): void => {
+    if (targetUser.id === user?.id && isDestructiveStatus(nextStatus)) {
+      toast.error(selfDestructiveActionMessage);
+      return;
+    }
+
     setStatusDialogState({
       user: targetUser,
       nextStatus,
@@ -421,11 +433,24 @@ export function UsersPageClient(): JSX.Element {
   };
 
   const requestDeleteUser = (targetUser: User): void => {
+    if (targetUser.id === user?.id) {
+      toast.error(selfDestructiveActionMessage);
+      return;
+    }
+
     setDeleteDialogUser(targetUser);
   };
 
   const confirmStatusChange = async (): Promise<void> => {
     if (!statusDialogState) {
+      return;
+    }
+    if (
+      statusDialogState.user.id === user?.id &&
+      isDestructiveStatus(statusDialogState.nextStatus)
+    ) {
+      toast.error(selfDestructiveActionMessage);
+      setStatusDialogState(null);
       return;
     }
 
@@ -446,6 +471,11 @@ export function UsersPageClient(): JSX.Element {
 
   const confirmDeleteUser = async (): Promise<void> => {
     if (!deleteDialogUser) {
+      return;
+    }
+    if (deleteDialogUser.id === user?.id) {
+      toast.error(selfDestructiveActionMessage);
+      setDeleteDialogUser(null);
       return;
     }
 

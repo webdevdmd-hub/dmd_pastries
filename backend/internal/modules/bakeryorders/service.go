@@ -1011,6 +1011,9 @@ func (s *Service) buildOrderItem(tx *gorm.DB, businessID, branchID, orderID stri
 		if product.Status != "active" {
 			return nil, apperrors.BadRequest("product is not active", nil)
 		}
+		if !catalogItemUnitMatchesProduct(req.UnitID, product.UnitID) {
+			return nil, apperrors.BadRequest("unit_id must match the selected product unit", nil)
+		}
 		productID = &product.ID
 		productName = product.ProductName
 		itemName = product.ProductName
@@ -1065,6 +1068,10 @@ func (s *Service) buildOrderItem(tx *gorm.DB, businessID, branchID, orderID stri
 		return nil, err
 	}
 	return &BakeryOrderItem{ID: utils.NewUUID(), BusinessID: businessID, BakeryOrderID: orderID, ProductID: productID, ProductVariantID: productVariantID, ProductNameSnapshot: productName, ProductVariantNameSnapshot: variantName, ItemNameSnapshot: itemName, ItemSource: itemSource, Quantity: roundQuantity(req.Quantity), UnitID: req.UnitID, Weight: weight, Flavor: strings.TrimSpace(req.Flavor), DesignNotes: strings.TrimSpace(req.DesignNotes), MessageText: strings.TrimSpace(req.MessageText), CustomizationsJSON: customizations, UnitPrice: roundMoney(unitPrice), DiscountAmount: roundMoney(req.DiscountAmount), TaxRateID: taxRateID, TaxAmount: taxAmount, LineTotal: lineTotal}, nil
+}
+
+func catalogItemUnitMatchesProduct(requestedUnitID, productUnitID string) bool {
+	return strings.TrimSpace(requestedUnitID) == strings.TrimSpace(productUnitID)
 }
 
 func (s *Service) resolveSalesChannel(tx *gorm.DB, businessID string, requestedID *string, requestedExternalNumber string) (*salesChannelRow, string, error) {

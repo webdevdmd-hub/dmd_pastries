@@ -102,11 +102,38 @@ func TestAssignUserBranchRejectsSelfChangeBeforeRepository(t *testing.T) {
 	assertSelfPrivilegedFieldError(t, err)
 }
 
-func TestUpdateUserStatusRejectsSelfChangeBeforeRepository(t *testing.T) {
+func TestUpdateUserStatusRejectsSelfDeactivateBeforeRepository(t *testing.T) {
 	service := &Service{}
 	currentUser := &utils.AuthContext{UserID: "user-id", BusinessID: "business-id"}
 
 	_, err := service.UpdateUserStatus(currentUser, "user-id", UpdateUserStatusRequest{Status: "inactive"}, "", "")
+
+	assertSelfDestructiveActionError(t, err)
+}
+
+func TestUpdateUserStatusRejectsSelfSuspendBeforeRepository(t *testing.T) {
+	service := &Service{}
+	currentUser := &utils.AuthContext{UserID: "user-id", BusinessID: "business-id"}
+
+	_, err := service.UpdateUserStatus(currentUser, "user-id", UpdateUserStatusRequest{Status: "suspended"}, "", "")
+
+	assertSelfDestructiveActionError(t, err)
+}
+
+func TestDeleteUserRejectsSelfDeleteBeforeRepository(t *testing.T) {
+	service := &Service{}
+	currentUser := &utils.AuthContext{UserID: "user-id", BusinessID: "business-id"}
+
+	_, err := service.DeleteUser(currentUser, "user-id", "", "")
+
+	assertSelfDestructiveActionError(t, err)
+}
+
+func TestUpdateUserStatusRejectsOtherSelfChangeBeforeRepository(t *testing.T) {
+	service := &Service{}
+	currentUser := &utils.AuthContext{UserID: "user-id", BusinessID: "business-id"}
+
+	_, err := service.UpdateUserStatus(currentUser, "user-id", UpdateUserStatusRequest{Status: "active"}, "", "")
 
 	assertSelfPrivilegedFieldError(t, err)
 }
@@ -150,6 +177,21 @@ func assertSelfPrivilegedFieldError(t *testing.T, err error) {
 	}
 	if appErr.Message != selfPrivilegedFieldUpdateMessage {
 		t.Fatalf("expected message %q, got %q", selfPrivilegedFieldUpdateMessage, appErr.Message)
+	}
+}
+
+func assertSelfDestructiveActionError(t *testing.T, err error) {
+	t.Helper()
+
+	appErr, ok := err.(*apperrors.AppError)
+	if !ok {
+		t.Fatalf("expected AppError, got %T", err)
+	}
+	if appErr.StatusCode != 403 {
+		t.Fatalf("expected status 403, got %d", appErr.StatusCode)
+	}
+	if appErr.Message != selfDestructiveActionMessage {
+		t.Fatalf("expected message %q, got %q", selfDestructiveActionMessage, appErr.Message)
 	}
 }
 

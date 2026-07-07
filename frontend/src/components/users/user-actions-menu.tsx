@@ -35,7 +35,7 @@ export function UserActionsMenu({
   user,
 }: UserActionsMenuProps): JSX.Element {
   const isCurrentUser = currentUserId === user.id;
-  const canChangeStatus = canEdit && !isCurrentUser;
+  const canManageStatus = canEdit && !isCurrentUser;
   const canDeleteUser = canDelete && !isCurrentUser;
 
   return (
@@ -50,37 +50,36 @@ export function UserActionsMenu({
         {canEdit ? (
           <DropdownMenuItem onClick={() => onEdit(user)}>Edit user</DropdownMenuItem>
         ) : null}
-        {canEdit ? <DropdownMenuSeparator /> : null}
-        {canEdit ? (
+        {canManageStatus ? <DropdownMenuSeparator /> : null}
+        {canManageStatus ? (
           <DropdownMenuItem
-            disabled={!canChangeStatus || user.status === "active"}
+            disabled={user.status === "active"}
             onClick={() => onChangeStatus(user, "active")}
           >
             Activate user
           </DropdownMenuItem>
         ) : null}
-        {canEdit ? (
+        {canManageStatus ? (
           <DropdownMenuItem
-            disabled={!canChangeStatus || user.status === "inactive"}
+            disabled={user.status === "inactive"}
             onClick={() => onChangeStatus(user, "inactive")}
           >
             Deactivate user
           </DropdownMenuItem>
         ) : null}
-        {canEdit ? (
+        {canManageStatus ? (
           <DropdownMenuItem
-            disabled={!canChangeStatus || user.status === "suspended"}
+            disabled={user.status === "suspended"}
             onClick={() => onChangeStatus(user, "suspended")}
           >
             Suspend user
           </DropdownMenuItem>
         ) : null}
-        {canDelete ? (
+        {canDeleteUser ? (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
-              disabled={!canDeleteUser}
               onClick={() => onDelete(user)}
             >
               Delete user
