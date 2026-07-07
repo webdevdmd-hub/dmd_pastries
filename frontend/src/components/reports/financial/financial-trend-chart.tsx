@@ -10,6 +10,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { formatChartCurrency } from "@/components/reports/sales/sales-report-format";
 import type { FinancialTrendChart as FinancialTrendChartData } from "@/types/financial-reports";
 
 const colors = ["#3B2A22", "#B08968", "#7A553A", "#D6BFA6"];
@@ -29,8 +30,8 @@ export function FinancialTrendChart({ chart }: { chart: FinancialTrendChartData 
         <LineChart data={rows}>
           <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
           <XAxis dataKey="label" stroke="#7A553A" />
-          <YAxis stroke="#7A553A" />
-          <Tooltip />
+          <YAxis stroke="#7A553A" tickFormatter={formatChartCurrency} />
+          <Tooltip formatter={formatChartCurrency} />
           <Legend />
           {chart.datasets.map((dataset, index) => (
             <Line

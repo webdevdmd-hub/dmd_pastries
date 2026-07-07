@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import type { PieLabelRenderProps } from "recharts";
 import {
   Bar,
   BarChart,
@@ -12,7 +13,13 @@ import {
   YAxis,
 } from "recharts";
 
+import { formatChartCurrency } from "@/components/reports/sales/sales-report-format";
 import type { PaymentMethodReportRow } from "@/types/financial-reports";
+
+function formatPieLabel(props: PieLabelRenderProps): string {
+  const method = typeof props.name === "string" ? props.name : "Method";
+  return `${method}: ${formatChartCurrency(props.value)}`;
+}
 
 export function PaymentMethodChart({ rows }: { rows: PaymentMethodReportRow[] }): JSX.Element {
   const chartRows = rows.map((row) => ({
@@ -27,13 +34,13 @@ export function PaymentMethodChart({ rows }: { rows: PaymentMethodReportRow[] })
       <div className="h-72" aria-label="Payment method distribution pie chart">
         <ResponsiveContainer height="100%" width="100%">
           <PieChart>
-            <Tooltip />
+            <Tooltip formatter={formatChartCurrency} />
             <Pie
               data={chartRows}
               dataKey="net"
               fill="#B08968"
               innerRadius={60}
-              label
+              label={formatPieLabel}
               nameKey="method"
               outerRadius={100}
             />
@@ -45,8 +52,8 @@ export function PaymentMethodChart({ rows }: { rows: PaymentMethodReportRow[] })
           <BarChart data={chartRows}>
             <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
             <XAxis dataKey="method" stroke="#7A553A" />
-            <YAxis stroke="#7A553A" />
-            <Tooltip />
+            <YAxis stroke="#7A553A" tickFormatter={formatChartCurrency} />
+            <Tooltip formatter={formatChartCurrency} />
             <Legend />
             <Bar dataKey="collected" fill="#3B2A22" radius={8} />
             <Bar dataKey="refunded" fill="#B08968" radius={8} />
