@@ -98,14 +98,18 @@ func (s *Service) applyCostUpdate(tx *gorm.DB, input PricingCostSource, sourceKi
 			costForSuggestion = averageCost
 		}
 	}
-	suggested := suggestedSalePrice(costForSuggestion, target.PricingType, target.PricingPercent, target.MinimumSalePrice)
-	if suggested > 0 {
+	canSuggestSalePrice := pricingTargetPOSEligible(target)
+	suggested := 0.0
+	if canSuggestSalePrice {
+		suggested = suggestedSalePrice(costForSuggestion, target.PricingType, target.PricingPercent, target.MinimumSalePrice)
+	}
+	if canSuggestSalePrice && suggested > 0 {
 		costUpdate["suggested_sale_price"] = suggested
 	}
 	if err := s.repo.UpdatePricingTarget(tx, input.BusinessID, input.BranchID, input.ProductID, input.ProductVariantID, costUpdate); err != nil {
 		return err
 	}
-	if suggested <= 0 || math.Abs(suggested-target.SalePrice) < 0.0001 {
+	if !canSuggestSalePrice || suggested <= 0 || math.Abs(suggested-target.SalePrice) < 0.0001 {
 		return nil
 	}
 	if target.AutoPriceUpdateEnabled && !target.SalePriceLocked {
@@ -217,6 +221,16 @@ func (s *Service) ApplyPriceSuggestion(currentUser *utils.AuthContext, id string
 		if suggestion.Status != "pending" {
 			return apperrors.BadRequest("only pending price suggestions can be applied", nil)
 		}
+		eligible, err := s.repo.PricingTargetPOSEligible(tx, suggestion.BusinessID, suggestion.BranchID, suggestion.ProductID, suggestion.ProductVariantID)
+		if err != nil {
+			return apperrors.Internal("failed to validate product price eligibility")
+		}
+		if !eligible {
+			return apperrors.BadRequest("price suggestion is only available for active sellable POS products", map[string]interface{}{
+				"reason":     "product_not_pos_price_eligible",
+				"product_id": suggestion.ProductID,
+			})
+		}
 		price := suggestion.SuggestedSalePrice
 		if req.SalePrice != nil {
 			price = *req.SalePrice
@@ -297,4 +311,14 @@ func notFoundOrInternal(err error, message string) error {
 		return apperrors.NotFound(message)
 	}
 	return apperrors.Internal("failed to load product price suggestion")
+}
+
+func pricingTargetPOSEligible(target pricingTarget) bool {
+	if target.ProductStatus != "active" || !target.ProductIsSellable || !target.ProductIsPOSVisible {
+		return false
+	}
+	if target.ProductVariantID != nil && strings.TrimSpace(*target.ProductVariantID) != "" {
+		return target.VariantStatus == "active"
+	}
+	return true
 }

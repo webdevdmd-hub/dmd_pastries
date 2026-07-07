@@ -10,6 +10,10 @@ import (
 type pricingTarget struct {
 	ProductID              string
 	ProductVariantID       *string
+	ProductStatus          string
+	ProductIsSellable      bool
+	ProductIsPOSVisible    bool
+	VariantStatus          string
 	SalePrice              float64
 	CostPrice              *float64
 	CostUpdatePolicy       string
@@ -24,7 +28,9 @@ func (r *Repository) PricingTarget(tx *gorm.DB, businessID, branchID, productID 
 	if variantID != nil && strings.TrimSpace(*variantID) != "" {
 		var row pricingTarget
 		err := tx.Table("product_variants pv").
-			Select(`p.id AS product_id, pv.id AS product_variant_id, pv.sale_price, pv.cost_price,
+			Select(`p.id AS product_id, pv.id AS product_variant_id, p.status AS product_status,
+				p.is_sellable AS product_is_sellable, p.is_pos_visible AS product_is_pos_visible,
+				pv.status AS variant_status, pv.sale_price, pv.cost_price,
 				pv.cost_update_policy, pv.pricing_type, pv.pricing_percent, pv.minimum_sale_price,
 				pv.auto_price_update_enabled, pv.sale_price_locked`).
 			Joins("JOIN products p ON p.id = pv.product_id AND p.business_id = pv.business_id AND p.branch_id = ? AND p.deleted_at IS NULL", branchID).
@@ -34,7 +40,9 @@ func (r *Repository) PricingTarget(tx *gorm.DB, businessID, branchID, productID 
 	}
 	var row pricingTarget
 	err := tx.Table("products").
-		Select(`id AS product_id, sale_price, cost_price, cost_update_policy, pricing_type, pricing_percent,
+		Select(`id AS product_id, status AS product_status, is_sellable AS product_is_sellable,
+			is_pos_visible AS product_is_pos_visible, '' AS variant_status,
+			sale_price, cost_price, cost_update_policy, pricing_type, pricing_percent,
 			minimum_sale_price, auto_price_update_enabled, sale_price_locked`).
 		Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", productID, businessID, branchID).
 		Take(&row).Error
@@ -56,6 +64,32 @@ func (r *Repository) UpdatePricingTarget(tx *gorm.DB, businessID, branchID, prod
 		return nil
 	}
 	return r.Update(tx, productID, businessID, branchID, updates)
+}
+
+func posPriceEligibleProductJoin() string {
+	return `JOIN products p ON p.id = pps.product_id
+		AND p.business_id = pps.business_id
+		AND p.deleted_at IS NULL
+		AND p.status = 'active'
+		AND p.is_sellable = TRUE
+		AND p.is_pos_visible = TRUE`
+}
+
+func posPriceEligibleVariantCondition() string {
+	return `(pps.product_variant_id IS NULL OR pv.status = 'active')`
+}
+
+func (r *Repository) PricingTargetPOSEligible(tx *gorm.DB, businessID, branchID, productID string, variantID *string) (bool, error) {
+	db := tx.Table("products p").
+		Where("p.id = ? AND p.business_id = ? AND p.branch_id = ? AND p.status = ? AND p.is_sellable = ? AND p.is_pos_visible = ? AND p.deleted_at IS NULL", productID, businessID, branchID, "active", true, true)
+	if variantID != nil && strings.TrimSpace(*variantID) != "" {
+		db = db.Joins("JOIN product_variants pv ON pv.id = ? AND pv.product_id = p.id AND pv.business_id = p.business_id AND pv.status = ? AND pv.deleted_at IS NULL", *variantID, "active")
+	}
+	var count int64
+	if err := db.Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (r *Repository) InventoryAverageCost(tx *gorm.DB, businessID, inventoryItemID string) (float64, error) {
@@ -95,9 +129,10 @@ func (r *Repository) UpdatePriceSuggestion(tx *gorm.DB, id, businessID string, u
 
 func (r *Repository) ListPriceSuggestions(businessID, branchID string, query PriceSuggestionListQuery) ([]ProductPriceSuggestionResponse, int64, error) {
 	db := r.db.Table("product_price_suggestions pps").
-		Joins("JOIN products p ON p.id = pps.product_id AND p.business_id = pps.business_id AND p.deleted_at IS NULL").
+		Joins(posPriceEligibleProductJoin()).
 		Joins("LEFT JOIN product_variants pv ON pv.id = pps.product_variant_id AND pv.business_id = pps.business_id AND pv.deleted_at IS NULL").
-		Where("pps.business_id = ? AND pps.deleted_at IS NULL", businessID)
+		Where("pps.business_id = ? AND pps.deleted_at IS NULL", businessID).
+		Where(posPriceEligibleVariantCondition())
 	if branchID != "" {
 		db = db.Where("pps.branch_id = ?", branchID)
 	}
@@ -129,9 +164,10 @@ func (r *Repository) PriceSuggestionResponse(tx *gorm.DB, businessID, id string)
 			pps.current_cost, pps.previous_cost, pps.current_sale_price, pps.suggested_sale_price,
 			pps.pricing_type, pps.pricing_percent, pps.source_type, pps.source_id, pps.source_number,
 			pps.reason, pps.status, pps.applied_at, pps.dismissed_at, pps.created_at, pps.updated_at`).
-		Joins("JOIN products p ON p.id = pps.product_id AND p.business_id = pps.business_id AND p.deleted_at IS NULL").
+		Joins(posPriceEligibleProductJoin()).
 		Joins("LEFT JOIN product_variants pv ON pv.id = pps.product_variant_id AND pv.business_id = pps.business_id AND pv.deleted_at IS NULL").
 		Where("pps.id = ? AND pps.business_id = ? AND pps.deleted_at IS NULL", id, businessID).
+		Where(posPriceEligibleVariantCondition()).
 		Take(&row).Error
 	return row, err
 }

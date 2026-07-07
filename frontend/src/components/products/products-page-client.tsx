@@ -53,6 +53,7 @@ import {
   getHistoryDeleteConflictMessage,
   isHistoryDeleteConflict,
 } from "@/lib/api/delete-conflicts";
+import { isPosSelectableProduct } from "@/lib/selectors/eligibility";
 import type {
   CreateProductPayload,
   CreateProductVariantPayload,
@@ -79,6 +80,24 @@ const initialFilters: ProductListFilters = {
   sortBy: "created_at",
   sortOrder: "desc",
 };
+
+function createProductCountFilters(overrides: Partial<ProductListFilters>): ProductListFilters {
+  return {
+    ...initialFilters,
+    ...overrides,
+    page: 1,
+    limit: 1,
+  };
+}
+
+const catalogCountFilters = createProductCountFilters({});
+const activeCountFilters = createProductCountFilters({ status: "active" });
+const posReadyCountFilters = createProductCountFilters({
+  status: "active",
+  isPosVisible: "true",
+  isSellable: "true",
+});
+const archivedCountFilters = createProductCountFilters({ status: "archived" });
 
 function formatMoney(value: number): string {
   return `AED ${value.toLocaleString("en-US", {
@@ -150,6 +169,10 @@ export function ProductsPageClient(): JSX.Element {
     PERMISSIONS.productsVariantsManage,
   ]);
   const productsQuery = useProducts(filters, canViewProducts);
+  const catalogCountQuery = useProducts(catalogCountFilters, canViewProducts);
+  const activeCountQuery = useProducts(activeCountFilters, canViewProducts);
+  const posReadyCountQuery = useProducts(posReadyCountFilters, canViewProducts);
+  const archivedCountQuery = useProducts(archivedCountFilters, canViewProducts);
   const priceSuggestionsQuery = useProductPriceSuggestions(
     { status: "pending", limit: 8 },
     canViewProducts,
@@ -170,14 +193,21 @@ export function ProductsPageClient(): JSX.Element {
   const stats = useMemo(() => {
     const active = list.filter((product) => product.status === "active").length;
     const archived = list.filter((product) => product.status === "archived").length;
-    const posVisible = list.filter((product) => product.isPosVisible).length;
+    const posReady = list.filter(isPosSelectableProduct).length;
     return {
-      total: productsQuery.data?.total ?? list.length,
-      active,
-      archived,
-      posVisible,
+      total: catalogCountQuery.data?.total ?? productsQuery.data?.total ?? list.length,
+      active: activeCountQuery.data?.total ?? active,
+      archived: archivedCountQuery.data?.total ?? archived,
+      posReady: posReadyCountQuery.data?.total ?? posReady,
     };
-  }, [list, productsQuery.data?.total]);
+  }, [
+    activeCountQuery.data?.total,
+    archivedCountQuery.data?.total,
+    catalogCountQuery.data?.total,
+    list,
+    posReadyCountQuery.data?.total,
+    productsQuery.data?.total,
+  ]);
   const totalPages = Math.max(1, Math.ceil((productsQuery.data?.total ?? 0) / filters.limit));
   const priceSuggestions = priceSuggestionsQuery.data?.items ?? [];
 
@@ -329,7 +359,7 @@ export function ProductsPageClient(): JSX.Element {
         {[
           { icon: PackageCheck, label: "Catalog records", value: stats.total },
           { icon: ShieldAlert, label: "Active products", value: stats.active },
-          { icon: Eye, label: "Visible in POS", value: stats.posVisible },
+          { icon: Eye, label: "POS-ready", value: stats.posReady },
           { icon: Archive, label: "Archived", value: stats.archived },
         ].map((item) => (
           <Card key={item.label} className="overflow-hidden">
@@ -355,7 +385,7 @@ export function ProductsPageClient(): JSX.Element {
               <div>
                 <p className="text-sm font-semibold text-brand-espresso">Price suggestions</p>
                 <p className="text-xs text-brand-mocha">
-                  Review purchase, recipe, and production cost changes before updating POS prices.
+                  Review cost changes for active sellable POS products before updating prices.
                 </p>
               </div>
               <Button
