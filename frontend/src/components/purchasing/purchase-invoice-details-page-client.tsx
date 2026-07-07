@@ -35,6 +35,7 @@ import { usePermission } from "@/hooks/use-permission";
 import {
   useCancelPurchaseInvoice,
   useConvertPurchaseInvoiceToReceipt,
+  usePostPurchaseInvoice,
   usePurchaseInvoice,
   usePurchaseOrderDocumentChain,
   usePurchasingBranches,
@@ -67,17 +68,16 @@ export function PurchaseInvoiceDetailsPageClient({
   const router = useRouter();
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.purchasingView, PERMISSIONS.inventoryView]);
-  const canManage = hasAnyPermission([
-    PERMISSIONS.purchasingInvoicesEdit,
-    PERMISSIONS.purchasingInvoicesPost,
-  ]);
+  const canManage = hasAnyPermission([PERMISSIONS.purchasingInvoicesEdit]);
   const canEdit = hasAnyPermission([PERMISSIONS.purchasingInvoicesEdit]);
+  const canPost = hasAnyPermission([PERMISSIONS.purchasingInvoicesPost]);
   const canCancel = hasAnyPermission([PERMISSIONS.purchasingInvoicesCancel]);
   const canConvert = hasAnyPermission([
     PERMISSIONS.purchasingReceiptsCreate,
     PERMISSIONS.purchasingReceiveStock,
   ]);
   const [convertOpen, setConvertOpen] = useState(false);
+  const [postOpen, setPostOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [editOpen, setEditOpen] = useState(false);
@@ -108,6 +108,7 @@ export function PurchaseInvoiceDetailsPageClient({
     canView,
   );
   const convertMutation = useConvertPurchaseInvoiceToReceipt();
+  const postMutation = usePostPurchaseInvoice();
   const cancelMutation = useCancelPurchaseInvoice();
   const updateMutation = useUpdatePurchaseInvoice();
 
@@ -132,6 +133,7 @@ export function PurchaseInvoiceDetailsPageClient({
 
   const invoice = invoiceQuery.data;
   const canConvertInvoice = canConvert && invoice.status === "posted" && invoice.canReceiveStock;
+  const canPostInvoice = canPost && invoice.status === "draft";
   const canCancelInvoice = canCancel && invoice.status === "posted";
   const canEditInvoice = canEdit && invoice.status !== "cancelled";
   const billTitle = invoice.supplierBillNumber ?? invoice.invoiceNumber;
@@ -154,6 +156,20 @@ export function PurchaseInvoiceDetailsPageClient({
       toast.success("Bill converted to draft receive goods record.");
       setConvertOpen(false);
       router.push(`${ROUTES.purchasingReceipts}/${receipt.id}`);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  const handlePostBill = async (): Promise<void> => {
+    try {
+      await postMutation.mutateAsync(invoice.id);
+      toast.success("Bill posted.");
+      setPostOpen(false);
+      await invoiceQuery.refetch();
+      if (invoice.purchaseOrderId) {
+        await chainQuery.refetch();
+      }
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -219,6 +235,11 @@ export function PurchaseInvoiceDetailsPageClient({
           {canEditInvoice ? (
             <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
               Edit
+            </Button>
+          ) : null}
+          {canPostInvoice ? (
+            <Button onClick={() => setPostOpen(true)} type="button">
+              Post Bill
             </Button>
           ) : null}
           {canConvertInvoice ? (
@@ -473,6 +494,29 @@ export function PurchaseInvoiceDetailsPageClient({
               type="button"
             >
               Create receive goods
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={postOpen} onOpenChange={setPostOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Post Bill</DialogTitle>
+            <DialogDescription>
+              Posting confirms the supplier bill, creates the supplier payable, and posts the
+              purchase accounting journal.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setPostOpen(false)} type="button" variant="outline">
+              Cancel
+            </Button>
+            <Button
+              disabled={postMutation.isPending}
+              onClick={() => void handlePostBill()}
+              type="button"
+            >
+              Post Bill
             </Button>
           </DialogFooter>
         </DialogContent>

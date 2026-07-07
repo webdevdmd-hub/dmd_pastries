@@ -92,7 +92,6 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
   const canManage = hasAnyPermission([
     PERMISSIONS.purchasingInvoicesCreate,
     PERMISSIONS.purchasingInvoicesEdit,
-    PERMISSIONS.purchasingInvoicesPost,
     PERMISSIONS.purchasingInvoicesCancel,
     PERMISSIONS.purchasingReceiveStock,
   ]);
@@ -100,6 +99,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
     PERMISSIONS.purchasingReceiptsCreate,
     PERMISSIONS.purchasingReceiveStock,
   ]);
+  const canPost = hasAnyPermission([PERMISSIONS.purchasingInvoicesPost]);
   const [filters, setFilters] = useState<PurchasingFilters>({
     ...defaultFilters,
     branchId: branchScope.defaultBranchId,
@@ -327,6 +327,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
             <PurchaseInvoicesTable
               canConvertToReceipt={canConvertToReceipt}
               canManage={canManage}
+              canPost={canPost}
               invoices={invoices}
               loadingInvoiceId={loadingInvoiceDetailId}
               onCancel={(invoice) => {
@@ -387,7 +388,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {pendingAction?.type === "post" ? "Post bill" : "Cancel Bill"}
+              {pendingAction?.type === "post" ? "Post Bill" : "Cancel Bill"}
             </DialogTitle>
             <DialogDescription>
               {pendingAction?.type === "post"
@@ -426,7 +427,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
               onClick={() => void confirmAction()}
               type="button"
             >
-              {pendingAction?.type === "post" ? "Post bill" : "Cancel Bill"}
+              {pendingAction?.type === "post" ? "Post Bill" : "Cancel Bill"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -16,6 +16,7 @@ import type { PurchaseInvoice } from "@/types/purchasing";
 export function PurchaseInvoiceActionsMenu({
   canConvertToReceipt,
   canManage,
+  canPost,
   invoice,
   isLoading,
   onCancel,
@@ -27,6 +28,7 @@ export function PurchaseInvoiceActionsMenu({
 }: {
   canConvertToReceipt: boolean;
   canManage: boolean;
+  canPost: boolean;
   invoice: PurchaseInvoice;
   isLoading?: boolean;
   onCancel: (invoice: PurchaseInvoice) => void;
@@ -55,38 +57,48 @@ export function PurchaseInvoiceActionsMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={() => onView(invoice)}>View details</DropdownMenuItem>
-        {canManage ? (
+        {canManage || canPost ? (
           <>
-            <DropdownMenuItem
-              disabled={invoice.status === "cancelled"}
-              onSelect={() => onEdit(invoice)}
-            >
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={invoice.status !== "draft"}
-              onSelect={() => onPost(invoice)}
-            >
-              Post
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={invoice.status !== "posted" || !invoice.canReceiveStock}
-              onSelect={() => onReceive(invoice)}
-            >
-              Receive now
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={
-                !canConvertToReceipt || invoice.status !== "posted" || !invoice.canReceiveStock
-              }
-              onSelect={() => onConvertToReceipt(invoice)}
-            >
-              Convert to receipt
-            </DropdownMenuItem>
-            {invoice.status === "posted" ? (
+            {canManage ? (
+              <DropdownMenuItem
+                disabled={invoice.status === "cancelled"}
+                onSelect={() => onEdit(invoice)}
+              >
+                Edit
+              </DropdownMenuItem>
+            ) : null}
+            {canPost ? (
+              <DropdownMenuItem
+                disabled={invoice.status !== "draft"}
+                onSelect={() => onPost(invoice)}
+              >
+                Post Bill
+              </DropdownMenuItem>
+            ) : null}
+            {canManage ? (
               <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => onCancel(invoice)}>Cancel Bill</DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={invoice.status !== "posted" || !invoice.canReceiveStock}
+                  onSelect={() => onReceive(invoice)}
+                >
+                  Receive now
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={
+                    !canConvertToReceipt || invoice.status !== "posted" || !invoice.canReceiveStock
+                  }
+                  onSelect={() => onConvertToReceipt(invoice)}
+                >
+                  Convert to receipt
+                </DropdownMenuItem>
+                {invoice.status === "posted" ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => onCancel(invoice)}>
+                      Cancel Bill
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
               </>
             ) : null}
           </>

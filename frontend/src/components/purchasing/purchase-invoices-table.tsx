@@ -7,6 +7,7 @@ import type { JSX } from "react";
 import { PurchaseInvoiceActionsMenu } from "@/components/purchasing/purchase-invoice-actions-menu";
 import { PurchaseInvoiceStatusBadge } from "@/components/purchasing/purchase-invoice-status-badge";
 import { PurchasePaymentStatusBadge } from "@/components/purchasing/purchase-payment-status-badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -51,6 +52,7 @@ function nextStepForInvoice(invoice: PurchaseInvoice): string {
 export function PurchaseInvoicesTable({
   canConvertToReceipt,
   canManage,
+  canPost,
   invoices,
   loadingInvoiceId,
   onCancel,
@@ -61,6 +63,7 @@ export function PurchaseInvoicesTable({
 }: {
   canConvertToReceipt: boolean;
   canManage: boolean;
+  canPost: boolean;
   invoices: PurchaseInvoice[];
   loadingInvoiceId?: string | null;
   onCancel: (invoice: PurchaseInvoice) => void;
@@ -117,20 +120,33 @@ export function PurchaseInvoicesTable({
               </span>
             </TableCell>
             <TableCell>
-              <PurchaseInvoiceActionsMenu
-                canConvertToReceipt={canConvertToReceipt}
-                canManage={canManage}
-                invoice={invoice}
-                isLoading={loadingInvoiceId === invoice.id}
-                onCancel={onCancel}
-                onConvertToReceipt={onConvertToReceipt}
-                onEdit={onEdit}
-                onPost={onPost}
-                onReceive={onReceive}
-                onView={(selectedInvoice) =>
-                  router.push(`${ROUTES.purchasingInvoices}/${selectedInvoice.id}`)
-                }
-              />
+              <div className="flex items-center gap-2">
+                {canPost && invoice.status === "draft" ? (
+                  <Button
+                    disabled={loadingInvoiceId === invoice.id}
+                    onClick={() => onPost(invoice)}
+                    size="sm"
+                    type="button"
+                  >
+                    Post Bill
+                  </Button>
+                ) : null}
+                <PurchaseInvoiceActionsMenu
+                  canConvertToReceipt={canConvertToReceipt}
+                  canManage={canManage}
+                  canPost={canPost}
+                  invoice={invoice}
+                  isLoading={loadingInvoiceId === invoice.id}
+                  onCancel={onCancel}
+                  onConvertToReceipt={onConvertToReceipt}
+                  onEdit={onEdit}
+                  onPost={onPost}
+                  onReceive={onReceive}
+                  onView={(selectedInvoice) =>
+                    router.push(`${ROUTES.purchasingInvoices}/${selectedInvoice.id}`)
+                  }
+                />
+              </div>
             </TableCell>
           </TableRow>
         ))}
