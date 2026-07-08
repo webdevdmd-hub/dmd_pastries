@@ -380,6 +380,9 @@ func applyProductFilters(db *gorm.DB, query ProductListQuery) *gorm.DB {
 	if query.IsSellable != nil {
 		db = db.Where("is_sellable = ?", *query.IsSellable)
 	}
+	if query.IsPurchasable != nil {
+		db = db.Where("is_purchasable = ?", *query.IsPurchasable)
+	}
 	if query.IsStockTracked != nil {
 		db = db.Where("is_stock_tracked = ?", *query.IsStockTracked)
 	}

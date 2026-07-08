@@ -3366,6 +3366,9 @@ func (s *Service) prepareItemIdentity(tx *gorm.DB, businessID, branchID, itemTyp
 	if product.UnitID != unitID {
 		return preparedItem{}, apperrors.BadRequest("unit conversion is not available yet; product unit must match purchase unit", nil)
 	}
+	if !product.IsPurchasable {
+		return preparedItem{}, apperrors.BadRequest("product is not enabled for purchasing", map[string]interface{}{"product_id": product.ID, "product_name": product.ProductName})
+	}
 	prepared.ProductID = &productID
 	prepared.ItemName = product.ProductName
 	return prepared, nil

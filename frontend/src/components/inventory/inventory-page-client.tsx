@@ -149,6 +149,7 @@ export function InventoryPageClient(): JSX.Element {
       status: "active",
       isPosVisible: "all",
       isSellable: "all",
+      isPurchasable: "all",
       page: 1,
       limit: 200,
       sortBy: "product_name",

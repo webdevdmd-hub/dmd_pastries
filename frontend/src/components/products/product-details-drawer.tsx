@@ -124,6 +124,9 @@ export function ProductDetailsDrawer({
               <Badge variant="outline">Sellable: {product.isSellable ? "Yes" : "No"}</Badge>
               <Badge variant="outline">POS: {product.isPosVisible ? "Visible" : "Hidden"}</Badge>
               <Badge variant="outline">
+                Purchasable: {product.isPurchasable ? "Yes" : "No"}
+              </Badge>
+              <Badge variant="outline">
                 Stock: {product.isStockTracked ? "Tracked" : "Not tracked"}
               </Badge>
               <Badge variant="outline">

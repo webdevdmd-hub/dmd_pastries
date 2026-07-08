@@ -199,6 +199,7 @@ func parseListQuery(c *gin.Context) ProductListQuery {
 		Status:         c.Query("status"),
 		IsPOSVisible:   parseBoolPointer(c.Query("is_pos_visible")),
 		IsSellable:     parseBoolPointer(c.Query("is_sellable")),
+		IsPurchasable:  parseBoolPointer(c.Query("is_purchasable")),
 		IsStockTracked: parseBoolPointer(c.Query("is_stock_tracked")),
 		Page:           page,
 		Limit:          limit,

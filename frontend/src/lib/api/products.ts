@@ -112,6 +112,7 @@ type BackendProduct = {
   image_file_id?: unknown;
   is_sellable?: unknown;
   is_pos_visible?: unknown;
+  is_purchasable?: unknown;
   is_stock_tracked?: unknown;
   is_expiry_tracked?: unknown;
   is_custom_order_available?: unknown;
@@ -173,6 +174,7 @@ type BackendProductPayload = {
   image_file_id?: string | null;
   is_sellable?: boolean;
   is_pos_visible?: boolean;
+  is_purchasable?: boolean;
   is_stock_tracked?: boolean;
   is_expiry_tracked?: boolean;
   is_custom_order_available?: boolean;
@@ -466,6 +468,7 @@ function parseProduct(value: unknown): Product {
     imageFileId: nullableString(product.image_file_id) ?? nullableString(product.image_url),
     isSellable: optionalBoolean(product.is_sellable, false),
     isPosVisible: requiredBoolean(product.is_pos_visible, "POS visible"),
+    isPurchasable: optionalBoolean(product.is_purchasable, false),
     isStockTracked: requiredBoolean(product.is_stock_tracked, "Stock tracked"),
     isExpiryTracked: requiredBoolean(product.is_expiry_tracked, "Expiry tracked"),
     isCustomOrderAvailable: requiredBoolean(
@@ -769,6 +772,7 @@ function toBackendProductPayload(
     ...(payload.imageFileId !== undefined ? { image_file_id: payload.imageFileId } : {}),
     ...(payload.isSellable !== undefined ? { is_sellable: payload.isSellable } : {}),
     ...(payload.isPosVisible !== undefined ? { is_pos_visible: payload.isPosVisible } : {}),
+    ...(payload.isPurchasable !== undefined ? { is_purchasable: payload.isPurchasable } : {}),
     ...(payload.isStockTracked !== undefined ? { is_stock_tracked: payload.isStockTracked } : {}),
     ...(payload.isExpiryTracked !== undefined
       ? { is_expiry_tracked: payload.isExpiryTracked }
@@ -832,6 +836,9 @@ function buildProductsPath(filters: ProductListFilters): string {
   }
   if (filters.isSellable !== "all") {
     params.set("is_sellable", filters.isSellable);
+  }
+  if (filters.isPurchasable !== "all") {
+    params.set("is_purchasable", filters.isPurchasable);
   }
   params.set("page", String(filters.page));
   params.set("limit", String(filters.limit));

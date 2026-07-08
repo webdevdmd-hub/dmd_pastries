@@ -32,7 +32,7 @@ export function ProductFilters({
   onFiltersChange,
 }: ProductFiltersProps): JSX.Element {
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
       <div className="md:col-span-2 xl:col-span-2">
         <Label htmlFor="products-search">Search</Label>
         <div className="relative mt-1">
@@ -169,6 +169,28 @@ export function ProductFilters({
             })
           }
           value={filters.isPosVisible}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder="All" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="true">Yes</SelectItem>
+            <SelectItem value="false">No</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label>Purchasable</Label>
+        <Select
+          onValueChange={(value) =>
+            onFiltersChange({
+              ...filters,
+              page: 1,
+              isPurchasable: value as ProductListFilters["isPurchasable"],
+            })
+          }
+          value={filters.isPurchasable}
         >
           <SelectTrigger className="mt-1">
             <SelectValue placeholder="All" />

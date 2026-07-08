@@ -86,6 +86,20 @@ function ProductCapabilityBadges({ product }: { product: Product }): JSX.Element
         )}
         {product.isSellable ? "Sellable" : "Not sellable"}
       </Badge>
+      <Badge
+        className={
+          product.isPurchasable
+            ? "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-50"
+            : "border-brand-cappuccino bg-brand-latte text-brand-mocha hover:bg-brand-latte"
+        }
+      >
+        {product.isPurchasable ? (
+          <CheckCircle2 className="h-3.5 w-3.5" />
+        ) : (
+          <EyeOff className="h-3.5 w-3.5" />
+        )}
+        {product.isPurchasable ? "Purchasable" : "Not purchasable"}
+      </Badge>
       {product.isStockTracked ? <Badge variant="outline">Stock</Badge> : null}
       {product.isExpiryTracked ? <Badge variant="outline">Expiry</Badge> : null}
       {product.isCustomOrderAvailable ? <Badge variant="outline">Custom</Badge> : null}

@@ -29,6 +29,7 @@ const PACKAGING_PRODUCT_FILTERS: ProductListFilters = {
   status: "active",
   isPosVisible: "all",
   isSellable: "all",
+  isPurchasable: "all",
   page: 1,
   limit: 100,
   sortBy: "product_name",

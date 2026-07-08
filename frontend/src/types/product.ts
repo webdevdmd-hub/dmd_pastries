@@ -115,6 +115,7 @@ export type Product = {
   imageFileId: string | null;
   isSellable: boolean;
   isPosVisible: boolean;
+  isPurchasable: boolean;
   isStockTracked: boolean;
   isExpiryTracked: boolean;
   isCustomOrderAvailable: boolean;
@@ -133,6 +134,7 @@ export type ProductListFilters = {
   status: ProductStatus | "all";
   isPosVisible: "all" | "true" | "false";
   isSellable: "all" | "true" | "false";
+  isPurchasable: "all" | "true" | "false";
   page: number;
   limit: number;
   sortBy: "created_at" | "updated_at" | "product_name" | "sale_price";
@@ -161,6 +163,7 @@ export type CreateProductPayload = {
   imageFileId: string | null;
   isSellable: boolean;
   isPosVisible: boolean;
+  isPurchasable: boolean;
   isStockTracked: boolean;
   isExpiryTracked: boolean;
   isCustomOrderAvailable: boolean;

@@ -281,7 +281,9 @@ export type PurchasingProductOption = {
   unitName: string;
   unitSymbol: string;
   costPrice: number | null;
+  isPurchasable: boolean;
   isStockTracked: boolean;
+  status: "active" | "inactive" | "archived";
   variants: PurchasingProductVariantOption[];
 };
 

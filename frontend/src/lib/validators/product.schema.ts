@@ -39,6 +39,7 @@ export const productSchema = z.object({
   imageFileId: z.string().trim().optional(),
   isSellable: z.boolean(),
   isPosVisible: z.boolean(),
+  isPurchasable: z.boolean(),
   isStockTracked: z.boolean(),
   isExpiryTracked: z.boolean(),
   isCustomOrderAvailable: z.boolean(),

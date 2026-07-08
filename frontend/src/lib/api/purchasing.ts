@@ -187,16 +187,6 @@ type BackendPurchaseReturnPayload = {
   supplier_reference_number?: string | null;
 };
 
-const PURCHASABLE_PRODUCT_TYPES: ProductType[] = [
-  "finished_product",
-  "ingredient",
-  "packaging",
-  "raw_material",
-  "semi_finished",
-  "consumable",
-  "equipment",
-];
-
 type PurchasingProductPage = {
   items: PurchasingProductOption[];
   page: number;
@@ -1006,10 +996,12 @@ function parseProduct(value: unknown): PurchasingProductOption {
     productCode: stringValue(value.product_code, stringValue(value.sku)),
     barcode: optionalString(value.barcode),
     costPrice: typeof value.cost_price === "number" ? value.cost_price : null,
+    isPurchasable: value.is_purchasable === true,
     isStockTracked: value.is_stock_tracked === true,
     itemStructure,
     productType,
     sku: optionalString(value.sku),
+    status: value.status === "inactive" || value.status === "archived" ? value.status : "active",
     unitId: stringValue(value.unit_id, stringValue(unit.id)),
     unitName: stringValue(value.unit_name, stringValue(unit.unit_name, "Unit")),
     unitSymbol: stringValue(value.unit_symbol, stringValue(unit.symbol)),
@@ -1975,6 +1967,7 @@ async function getProductPage(page: number): Promise<PurchasingProductPage> {
       sort_by: "product_name",
       sort_order: "asc",
       status: "active",
+      is_purchasable: "true",
     })}`,
     {
       authMode: "appwrite",
@@ -2003,10 +1996,8 @@ export async function getProducts(): Promise<PurchasingProductOption[]> {
   const products = await getAllProductPages();
   const productsById = new Map<string, PurchasingProductOption>();
 
-  products.forEach((product) => {
-    if (PURCHASABLE_PRODUCT_TYPES.includes(product.productType)) {
-      productsById.set(product.id, product);
-    }
+  products.filter((product) => product.isPurchasable && product.status === "active").forEach((product) => {
+    productsById.set(product.id, product);
   });
 
   return Array.from(productsById.values()).sort((first, second) => {

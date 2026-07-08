@@ -14,16 +14,6 @@ export type SelectorContext =
   | "branch_scope"
   | "user_assignment";
 
-const PURCHASABLE_PRODUCT_TYPES = new Set<ProductType>([
-  "finished_product",
-  "ingredient",
-  "packaging",
-  "raw_material",
-  "semi_finished",
-  "consumable",
-  "equipment",
-]);
-
 const RECIPE_COMPONENT_PRODUCT_TYPES = new Set<ProductType>([
   "ingredient",
   "packaging",
@@ -40,7 +30,7 @@ export type RecipeComponentCandidate = {
 };
 
 export type PurchasableProductCandidate = {
-  productType: ProductType;
+  isPurchasable: boolean;
   status?: string;
 };
 
@@ -70,10 +60,7 @@ export function isBakeryOrderProduct(product: Product): boolean {
 }
 
 export function isPurchasableProduct(product: Product | PurchasableProductCandidate): boolean {
-  return (
-    (product.status === undefined || product.status === "active") &&
-    PURCHASABLE_PRODUCT_TYPES.has(product.productType)
-  );
+  return (product.status === undefined || product.status === "active") && product.isPurchasable;
 }
 
 export function isRecipeComponentProduct(

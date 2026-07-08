@@ -90,6 +90,10 @@ func (s *Service) CreateProduct(currentUser *utils.AuthContext, req CreateProduc
 	if req.IsPOSVisible != nil {
 		isPOSVisible = *req.IsPOSVisible
 	}
+	isPurchasable := defaultPurchasableForProductType(req.ProductType)
+	if req.IsPurchasable != nil {
+		isPurchasable = *req.IsPurchasable
+	}
 	product := &Product{
 		ID:                     utils.NewUUID(),
 		BusinessID:             currentUser.BusinessID,
@@ -116,6 +120,7 @@ func (s *Service) CreateProduct(currentUser *utils.AuthContext, req CreateProduc
 		ImageFileID:            strings.TrimSpace(req.ImageFileID),
 		IsSellable:             isSellable,
 		IsPOSVisible:           isPOSVisible,
+		IsPurchasable:          isPurchasable,
 		IsStockTracked:         req.IsStockTracked,
 		IsExpiryTracked:        req.IsExpiryTracked,
 		IsCustomOrderAvailable: req.IsCustomOrderAvailable,
@@ -142,6 +147,7 @@ func (s *Service) CreateProduct(currentUser *utils.AuthContext, req CreateProduc
 		"product_type":   product.ProductType,
 		"is_sellable":    product.IsSellable,
 		"is_pos_visible": product.IsPOSVisible,
+		"is_purchasable": product.IsPurchasable,
 		"status":         product.Status,
 	}, nil)); err != nil {
 		tx.Rollback()
@@ -252,6 +258,9 @@ func (s *Service) UpdateProduct(currentUser *utils.AuthContext, id string, req U
 	if req.IsPOSVisible != nil {
 		updates["is_pos_visible"] = *req.IsPOSVisible
 	}
+	if req.IsPurchasable != nil {
+		updates["is_purchasable"] = *req.IsPurchasable
+	}
 	if req.IsStockTracked != nil {
 		updates["is_stock_tracked"] = *req.IsStockTracked
 	}
@@ -301,6 +310,7 @@ func (s *Service) UpdateProductStatus(currentUser *utils.AuthContext, id string,
 	if req.Status != "active" {
 		updates["is_pos_visible"] = false
 		updates["is_sellable"] = false
+		updates["is_purchasable"] = false
 	}
 	changes := productChanges(*product, updates)
 	if err := s.updateWithAudit(currentUser, "product.status_updated", id, "Product status updated.", ipAddress, userAgent, audit.RecordMetadata(product.ProductName, map[string]interface{}{
@@ -342,6 +352,7 @@ func (s *Service) DeleteProduct(currentUser *utils.AuthContext, id string, ipAdd
 		"status":         "archived",
 		"is_pos_visible": false,
 		"is_sellable":    false,
+		"is_purchasable": false,
 		"updated_by":     currentUser.UserID,
 		"updated_at":     time.Now().UTC(),
 		"deleted_at":     gorm.DeletedAt{Time: time.Now().UTC(), Valid: true},
@@ -665,6 +676,8 @@ func productChanges(existing Product, updates map[string]interface{}) []audit.Au
 			audit.AddChange(&changes, field, "Sellable", existing.IsSellable, next)
 		case "is_pos_visible":
 			audit.AddChange(&changes, field, "POS visible", existing.IsPOSVisible, next)
+		case "is_purchasable":
+			audit.AddChange(&changes, field, "Purchasable", existing.IsPurchasable, next)
 		case "is_stock_tracked":
 			audit.AddChange(&changes, field, "Stock tracked", existing.IsStockTracked, next)
 		case "is_expiry_tracked":
@@ -707,6 +720,15 @@ func validateProductType(value string) error {
 func defaultSellableForProductType(value string) bool {
 	switch strings.TrimSpace(value) {
 	case "finished_product", "service", "ready_to_sell", "made_to_order", "retail":
+		return true
+	default:
+		return false
+	}
+}
+
+func defaultPurchasableForProductType(value string) bool {
+	switch strings.TrimSpace(value) {
+	case "ingredient", "packaging", "raw_material", "semi_finished", "consumable", "equipment":
 		return true
 	default:
 		return false
@@ -857,6 +879,7 @@ func toProductResponse(product Product, category ProductCategoryInfo, unit Produ
 		ImageFileID:            product.ImageFileID,
 		IsSellable:             product.IsSellable,
 		IsPOSVisible:           product.IsPOSVisible,
+		IsPurchasable:          product.IsPurchasable,
 		IsStockTracked:         product.IsStockTracked,
 		IsExpiryTracked:        product.IsExpiryTracked,
 		IsCustomOrderAvailable: product.IsCustomOrderAvailable,

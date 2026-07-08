@@ -75,6 +75,7 @@ const initialFilters: ProductListFilters = {
   status: "all",
   isPosVisible: "all",
   isSellable: "all",
+  isPurchasable: "all",
   page: 1,
   limit: 20,
   sortBy: "created_at",
@@ -126,10 +127,17 @@ function getProductStatusFilter(value: string | null): ProductListFilters["statu
   return value === "active" || value === "inactive" || value === "archived" ? value : "all";
 }
 
+function getBooleanFilter(value: string | null): "all" | "true" | "false" {
+  return value === "true" || value === "false" ? value : "all";
+}
+
 function getProductFiltersFromSearchParams(searchParams: ProductSearchParams): ProductListFilters {
   return {
     ...initialFilters,
     itemStructure: getItemStructureFilter(searchParams.get("item_structure")),
+    isPurchasable: getBooleanFilter(searchParams.get("is_purchasable")),
+    isPosVisible: getBooleanFilter(searchParams.get("is_pos_visible")),
+    isSellable: getBooleanFilter(searchParams.get("is_sellable")),
     productType: getProductTypeFilter(searchParams.get("product_type")),
     search: searchParams.get("search") ?? "",
     status: getProductStatusFilter(searchParams.get("status")),

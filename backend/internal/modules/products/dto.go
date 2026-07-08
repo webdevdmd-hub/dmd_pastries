@@ -25,6 +25,7 @@ type CreateProductRequest struct {
 	ImageFileID            string   `json:"image_file_id"`
 	IsSellable             *bool    `json:"is_sellable"`
 	IsPOSVisible           *bool    `json:"is_pos_visible"`
+	IsPurchasable          *bool    `json:"is_purchasable"`
 	IsStockTracked         bool     `json:"is_stock_tracked"`
 	IsExpiryTracked        bool     `json:"is_expiry_tracked"`
 	IsCustomOrderAvailable bool     `json:"is_custom_order_available"`
@@ -53,6 +54,7 @@ type UpdateProductRequest struct {
 	ImageFileID            string   `json:"image_file_id"`
 	IsSellable             *bool    `json:"is_sellable"`
 	IsPOSVisible           *bool    `json:"is_pos_visible"`
+	IsPurchasable          *bool    `json:"is_purchasable"`
 	IsStockTracked         *bool    `json:"is_stock_tracked"`
 	IsExpiryTracked        *bool    `json:"is_expiry_tracked"`
 	IsCustomOrderAvailable *bool    `json:"is_custom_order_available"`
@@ -72,6 +74,7 @@ type ProductListQuery struct {
 	Status         string
 	IsPOSVisible   *bool
 	IsSellable     *bool
+	IsPurchasable  *bool
 	IsStockTracked *bool
 	Page           int
 	Limit          int
@@ -123,6 +126,7 @@ type ProductResponse struct {
 	ImageFileID            string               `json:"image_file_id"`
 	IsSellable             bool                 `json:"is_sellable"`
 	IsPOSVisible           bool                 `json:"is_pos_visible"`
+	IsPurchasable          bool                 `json:"is_purchasable"`
 	IsStockTracked         bool                 `json:"is_stock_tracked"`
 	IsExpiryTracked        bool                 `json:"is_expiry_tracked"`
 	IsCustomOrderAvailable bool                 `json:"is_custom_order_available"`
