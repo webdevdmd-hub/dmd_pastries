@@ -82,6 +82,20 @@ function stringField(value: Record<string, unknown>, key: string): string {
   return typeof field === "string" ? field : "";
 }
 
+function isUuidLike(value: string): boolean {
+  const trimmed = value.trim();
+  return (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      trimmed,
+    ) || /^[0-9a-f]{32}$/i.test(trimmed)
+  );
+}
+
+function businessReferenceField(value: Record<string, unknown>, key: string): string {
+  const reference = stringField(value, key).trim();
+  return reference && !isUuidLike(reference) ? reference : "";
+}
+
 function listSource(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
   if (!isObject(value)) return [];
@@ -331,7 +345,7 @@ function parseActivity(value: unknown): DashboardActivity {
     entityType: stringField(row, "entity_type"),
     moduleLabel: stringField(row, "module_label"),
     recordLabel: stringField(row, "record_label"),
-    referenceNumber: stringField(row, "reference_number"),
+    referenceNumber: businessReferenceField(row, "reference_number"),
     title: stringField(row, "title"),
   };
 }

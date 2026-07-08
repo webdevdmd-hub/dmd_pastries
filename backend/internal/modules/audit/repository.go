@@ -247,14 +247,14 @@ func (r *Repository) resolveRecordLabel(businessID string, log AuditLog) string 
 func (r *Repository) BusinessRecordReference(businessID string, log AuditLog) string {
 	metadata := activityMetadata(log)
 	if reference := metadataBusinessReference(metadata); reference != "" {
-		return reference
+		return businessReference(reference)
 	}
 
 	entityID := firstNonEmpty(log.EntityID, log.ReferenceID)
-	if entityID == "" {
+	if entityID == "" || r.db == nil {
 		return ""
 	}
-	return r.lookupBusinessReference(businessID, normalizeAuditKey(firstNonEmpty(log.EntityType, log.ModuleName)), entityID)
+	return businessReference(r.lookupBusinessReference(businessID, normalizeAuditKey(firstNonEmpty(log.EntityType, log.ModuleName)), entityID))
 }
 
 func activityMetadata(log AuditLog) map[string]interface{} {
@@ -266,6 +266,7 @@ func activityMetadata(log AuditLog) map[string]interface{} {
 }
 
 func (r *Repository) lookupRecordLabel(businessID, entityType, entityID string) string {
+	entityType = canonicalBusinessReferenceEntityType(entityType)
 	switch entityType {
 	case "user", "users":
 		var row struct{ FullName, Email string }
@@ -411,15 +412,15 @@ func (r *Repository) lookupRecordLabel(businessID, entityType, entityID string) 
 			Where("po.business_id = ? AND po.id = ?", businessID, entityID).
 			Scan(&row).Error
 		return joinLabel(row.PurchaseOrderNumber, row.SupplierName)
-	case "purchase_invoice", "purchase_invoices":
+	case "purchase_invoice", "purchase_invoices", "supplier_bill", "supplier_bills", "purchase_bill", "purchase_bills", "bill", "bills":
 		var row struct{ InvoiceNumber, SupplierBillNumber string }
 		_ = r.db.Unscoped().Table("purchase_invoices").Select("invoice_number, supplier_bill_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
 		return firstNonEmpty(row.InvoiceNumber, row.SupplierBillNumber)
-	case "purchase_receipt", "purchase_receipts":
+	case "purchase_receipt", "purchase_receipts", "goods_receipt", "goods_receipts", "grn", "grns":
 		var row struct{ ReceiptNumber string }
 		_ = r.db.Unscoped().Table("purchase_receipts").Select("receipt_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
 		return row.ReceiptNumber
-	case "purchase_return", "purchase_returns":
+	case "purchase_return", "purchase_returns", "vendor_credit", "vendor_credits":
 		var row struct{ ReturnNumber string }
 		_ = r.db.Unscoped().Table("purchase_returns").Select("return_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
 		return row.ReturnNumber
@@ -447,7 +448,7 @@ func (r *Repository) lookupRecordLabel(businessID, entityType, entityID string) 
 		var row struct{ RecipeName, RecipeCode string }
 		_ = r.db.Unscoped().Table("recipes").Select("recipe_name, recipe_code").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
 		return joinLabel(row.RecipeName, row.RecipeCode)
-	case "manufacturing", "production_batch", "production_batches":
+	case "manufacturing", "manufacturing_batch", "manufacturing_batches", "production", "productions", "production_batch", "production_batches":
 		var row struct{ ProductionBatchNumber string }
 		_ = r.db.Unscoped().Table("production_batches").Select("production_batch_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
 		return row.ProductionBatchNumber
@@ -480,6 +481,7 @@ func (r *Repository) lookupBusinessReference(businessID, entityType, entityID st
 	if r == nil || r.db == nil {
 		return ""
 	}
+	entityType = canonicalBusinessReferenceEntityType(entityType)
 	switch entityType {
 	case "stock_movement", "stock_movements":
 		var row struct{ ReferenceNumber string }
@@ -533,15 +535,15 @@ func (r *Repository) lookupBusinessReference(businessID, entityType, entityID st
 		var row struct{ PurchaseOrderNumber string }
 		_ = r.db.Unscoped().Table("purchase_orders").Select("purchase_order_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
 		return row.PurchaseOrderNumber
-	case "purchase_invoice", "purchase_invoices":
+	case "purchase_invoice", "purchase_invoices", "supplier_bill", "supplier_bills", "purchase_bill", "purchase_bills", "bill", "bills":
 		var row struct{ InvoiceNumber, SupplierBillNumber string }
 		_ = r.db.Unscoped().Table("purchase_invoices").Select("invoice_number, supplier_bill_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
 		return firstNonEmpty(row.InvoiceNumber, row.SupplierBillNumber)
-	case "purchase_receipt", "purchase_receipts":
+	case "purchase_receipt", "purchase_receipts", "goods_receipt", "goods_receipts", "grn", "grns":
 		var row struct{ ReceiptNumber string }
 		_ = r.db.Unscoped().Table("purchase_receipts").Select("receipt_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
 		return row.ReceiptNumber
-	case "purchase_return", "purchase_returns":
+	case "purchase_return", "purchase_returns", "vendor_credit", "vendor_credits":
 		var row struct{ ReturnNumber string }
 		_ = r.db.Unscoped().Table("purchase_returns").Select("return_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
 		return row.ReturnNumber
@@ -549,7 +551,7 @@ func (r *Repository) lookupBusinessReference(businessID, entityType, entityID st
 		var row struct{ ReferenceNumber string }
 		_ = r.db.Unscoped().Table("supplier_payments").Select("reference_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
 		return row.ReferenceNumber
-	case "manufacturing", "production_batch", "production_batches":
+	case "manufacturing", "manufacturing_batch", "manufacturing_batches", "production", "productions", "production_batch", "production_batches":
 		var row struct{ ProductionBatchNumber string }
 		_ = r.db.Unscoped().Table("production_batches").Select("production_batch_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
 		return row.ProductionBatchNumber
@@ -568,6 +570,30 @@ func (r *Repository) lookupBusinessReference(businessID, entityType, entityID st
 	default:
 		return ""
 	}
+}
+
+func canonicalBusinessReferenceEntityType(entityType string) string {
+	normalized := normalizeAuditKey(entityType)
+	switch normalized {
+	case "supplier_bill", "supplier_bills", "purchase_bill", "purchase_bills", "bill", "bills":
+		return "purchase_invoice"
+	case "goods_receipt", "goods_receipts", "grn", "grns":
+		return "purchase_receipt"
+	case "vendor_credit", "vendor_credits":
+		return "purchase_return"
+	case "manufacturing_batch", "manufacturing_batches", "production", "productions":
+		return "production_batch"
+	default:
+		return normalized
+	}
+}
+
+func businessReference(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || isAuditUUIDLike(value) {
+		return ""
+	}
+	return value
 }
 
 func joinLabel(primary, secondary string) string {

@@ -156,7 +156,7 @@ func moduleLabel(entityType string) string {
 		return "Bakery Orders"
 	case "expense", "expenses":
 		return "Expenses"
-	case "purchase_order", "purchase_orders", "purchase_invoice", "purchase_invoices", "purchase_receipt", "purchase_receipts", "purchase_return", "purchase_returns", "supplier_payment", "supplier_payments", "purchasing":
+	case "purchase_order", "purchase_orders", "purchase_invoice", "purchase_invoices", "supplier_bill", "supplier_bills", "purchase_bill", "purchase_bills", "bill", "bills", "purchase_receipt", "purchase_receipts", "goods_receipt", "goods_receipts", "grn", "grns", "purchase_return", "purchase_returns", "vendor_credit", "vendor_credits", "supplier_payment", "supplier_payments", "purchasing":
 		return "Purchasing"
 	case "supplier", "suppliers":
 		return "Suppliers"
@@ -164,7 +164,7 @@ func moduleLabel(entityType string) string {
 		return "Customers"
 	case "recipe", "recipes":
 		return "Recipes"
-	case "manufacturing", "production_batch", "production_batches":
+	case "manufacturing", "manufacturing_batch", "manufacturing_batches", "production", "productions", "production_batch", "production_batches":
 		return "Manufacturing"
 	case "chart_account", "chart_accounts", "payment_account", "payment_accounts", "journal_entry", "journal_entries", "account_transfer", "account_transfers", "platform_settlement", "platform_settlements", "accounting":
 		return "Accounting"
@@ -336,7 +336,9 @@ func metadataRecordLabel(metadata map[string]interface{}) string {
 		"tax_rate_name", "tax_name", "payment_method_name", "method_name",
 		"sale_number", "order_number", "expense_number", "transfer_number",
 		"reference_number", "supplier_name", "customer_name", "recipe_name",
-		"batch_number", "production_batch_number", "invoice_number", "receipt_number",
+		"document_number", "batch_number", "production_batch_number", "manufacturing_batch_number",
+		"invoice_number", "purchase_invoice_number", "supplier_bill_number", "bill_number",
+		"receipt_number", "purchase_receipt_number", "goods_receipt_number",
 		"return_number", "product_code", "sku",
 	}
 	for _, key := range keys {
@@ -351,17 +353,20 @@ func metadataRecordLabel(metadata map[string]interface{}) string {
 
 func metadataBusinessReference(metadata map[string]interface{}) string {
 	keys := []string{
-		"record_label", "record_number", "reference_number",
+		"record_label", "record_number", "document_number", "reference_number",
 		"sale_number", "refund_number", "payment_refund_number",
 		"order_number", "expense_number", "transfer_number", "settlement_number",
-		"entry_number", "journal_entry_number", "invoice_number", "receipt_number",
-		"return_number", "sales_return_number", "purchase_order_number",
-		"batch_number", "production_batch_number", "source_number",
+		"entry_number", "journal_entry_number", "invoice_number", "purchase_invoice_number",
+		"supplier_bill_number", "bill_number", "receipt_number", "purchase_receipt_number",
+		"goods_receipt_number", "return_number", "sales_return_number", "purchase_order_number",
+		"batch_number", "production_batch_number", "manufacturing_batch_number", "source_number",
 	}
 	for _, key := range keys {
 		if value, ok := metadata[key]; ok {
 			if reference := metadataString(value); reference != "" {
-				return reference
+				if !isAuditUUIDLike(reference) {
+					return reference
+				}
 			}
 		}
 	}
@@ -382,6 +387,40 @@ func shortAuditID(value string) string {
 		return value
 	}
 	return value[:8]
+}
+
+func isAuditUUIDLike(value string) bool {
+	value = strings.TrimSpace(value)
+	if len(value) == 36 {
+		for index, char := range value {
+			switch index {
+			case 8, 13, 18, 23:
+				if char != '-' {
+					return false
+				}
+			default:
+				if !isHexRune(char) {
+					return false
+				}
+			}
+		}
+		return true
+	}
+	if len(value) == 32 {
+		for _, char := range value {
+			if !isHexRune(char) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func isHexRune(char rune) bool {
+	return (char >= '0' && char <= '9') ||
+		(char >= 'a' && char <= 'f') ||
+		(char >= 'A' && char <= 'F')
 }
 
 func normalizeAuditKey(value string) string {

@@ -3922,6 +3922,7 @@ func (s *Service) receiptResponse(businessID string, receipt PurchaseReceipt, in
 
 func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {
 	entityType := purchasingAuditEntityType(eventType)
+	metadata := s.purchasingAuditMetadata(tx, currentUser.BusinessID, entityType, entityID)
 	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{
 		BusinessID:  currentUser.BusinessID,
 		ActorUserID: currentUser.UserID,
@@ -3929,12 +3930,51 @@ func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, 
 		EntityType:  entityType,
 		EntityID:    entityID,
 		Summary:     summary,
-		Metadata: audit.Metadata(map[string]interface{}{
-			"source_module": "purchasing",
-		}, nil),
-		IPAddress: ipAddress,
-		UserAgent: userAgent,
+		Metadata:    audit.Metadata(metadata, nil),
+		IPAddress:   ipAddress,
+		UserAgent:   userAgent,
 	})
+}
+
+func (s *Service) purchasingAuditMetadata(tx *gorm.DB, businessID, entityType, entityID string) map[string]interface{} {
+	metadata := map[string]interface{}{"source_module": "purchasing"}
+	if tx == nil || strings.TrimSpace(entityID) == "" {
+		return metadata
+	}
+
+	switch entityType {
+	case "purchase_order":
+		var row struct{ PurchaseOrderNumber string }
+		_ = tx.Unscoped().Table("purchase_orders").Select("purchase_order_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		metadata["purchase_order_number"] = row.PurchaseOrderNumber
+		metadata["document_number"] = row.PurchaseOrderNumber
+	case "purchase_invoice":
+		var row struct{ InvoiceNumber, SupplierBillNumber string }
+		_ = tx.Unscoped().Table("purchase_invoices").Select("invoice_number, supplier_bill_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		metadata["invoice_number"] = row.InvoiceNumber
+		metadata["purchase_invoice_number"] = row.InvoiceNumber
+		metadata["supplier_bill_number"] = row.SupplierBillNumber
+		metadata["bill_number"] = first(row.InvoiceNumber, row.SupplierBillNumber)
+		metadata["document_number"] = first(row.InvoiceNumber, row.SupplierBillNumber)
+	case "purchase_receipt":
+		var row struct{ ReceiptNumber string }
+		_ = tx.Unscoped().Table("purchase_receipts").Select("receipt_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		metadata["receipt_number"] = row.ReceiptNumber
+		metadata["purchase_receipt_number"] = row.ReceiptNumber
+		metadata["goods_receipt_number"] = row.ReceiptNumber
+		metadata["document_number"] = row.ReceiptNumber
+	case "purchase_return":
+		var row struct{ ReturnNumber string }
+		_ = tx.Unscoped().Table("purchase_returns").Select("return_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		metadata["return_number"] = row.ReturnNumber
+		metadata["document_number"] = row.ReturnNumber
+	case "supplier_payment":
+		var row struct{ ReferenceNumber string }
+		_ = tx.Unscoped().Table("supplier_payments").Select("reference_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		metadata["reference_number"] = row.ReferenceNumber
+		metadata["document_number"] = row.ReferenceNumber
+	}
+	return metadata
 }
 
 func purchasingAuditEntityType(eventType string) string {

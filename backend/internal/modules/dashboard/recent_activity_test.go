@@ -52,3 +52,23 @@ func TestActivityFeedItemLeavesReferenceEmptyWhenNoBusinessReferenceExists(t *te
 		t.Fatalf("ReferenceNumber = %q, want empty string", item.ReferenceNumber)
 	}
 }
+
+func TestActivityFeedItemSuppressesUUIDReference(t *testing.T) {
+	response := audit.ActivityLogResponse{
+		EventType:     "purchase_invoice.created",
+		EntityType:    "purchase_invoice",
+		EntityID:      "7d38a397-c8e8-4bc3-b0d3-b3d49a6ca99c",
+		ModuleLabel:   "Purchasing",
+		ActionLabel:   "Created Supplier Bill",
+		RecordLabel:   "Supplier bill created.",
+		Summary:       "Supplier bill created.",
+		ActorUserName: "Aisha",
+		CreatedAt:     time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC),
+	}
+
+	item := activityFeedItemFromAuditResponse(response, "7d38a397-c8e8-4bc3-b0d3-b3d49a6ca99c")
+
+	if item.ReferenceNumber != "" {
+		t.Fatalf("ReferenceNumber = %q, want empty string", item.ReferenceNumber)
+	}
+}

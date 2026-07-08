@@ -135,13 +135,52 @@ func activityFeedItemFromAuditResponse(response audit.ActivityLogResponse, refer
 		ActivityType:    response.EventType,
 		Title:           title,
 		Description:     description,
-		ReferenceNumber: strings.TrimSpace(referenceNumber),
+		ReferenceNumber: dashboardBusinessReference(referenceNumber),
 		RecordLabel:     response.RecordLabel,
 		EntityType:      response.EntityType,
 		ModuleLabel:     response.ModuleLabel,
 		CreatedBy:       firstNonEmpty(response.ActorUserName, "System"),
 		CreatedAt:       response.CreatedAt.Format(time.RFC3339),
 	}
+}
+
+func dashboardBusinessReference(value string) string {
+	reference := strings.TrimSpace(value)
+	if isDashboardUUIDLike(reference) {
+		return ""
+	}
+	return reference
+}
+
+func isDashboardUUIDLike(value string) bool {
+	if len(value) == 36 {
+		for index, char := range value {
+			switch index {
+			case 8, 13, 18, 23:
+				if char != '-' {
+					return false
+				}
+			default:
+				if !isDashboardHexRune(char) {
+					return false
+				}
+			}
+		}
+		return true
+	}
+	if len(value) != 32 {
+		return false
+	}
+	for _, char := range value {
+		if !isDashboardHexRune(char) {
+			return false
+		}
+	}
+	return true
+}
+
+func isDashboardHexRune(char rune) bool {
+	return (char >= '0' && char <= '9') || (char >= 'a' && char <= 'f') || (char >= 'A' && char <= 'F')
 }
 
 func (s *Service) Alerts(currentUser *utils.AuthContext, values url.Values) (*AlertsResponse, error) {

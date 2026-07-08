@@ -1419,6 +1419,7 @@ func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, 
 	if strings.HasPrefix(eventType, "production_batch.") || strings.HasPrefix(eventType, "production.") {
 		entityType = "production_batch"
 	}
+	metadata := s.manufacturingAuditMetadata(tx, currentUser.BusinessID, entityType, entityID)
 	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{
 		BusinessID:  currentUser.BusinessID,
 		ActorUserID: currentUser.UserID,
@@ -1426,12 +1427,23 @@ func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, 
 		EntityType:  entityType,
 		EntityID:    entityID,
 		Summary:     summary,
-		Metadata: audit.Metadata(map[string]interface{}{
-			"source_module": "manufacturing",
-		}, nil),
-		IPAddress: ipAddress,
-		UserAgent: userAgent,
+		Metadata:    audit.Metadata(metadata, nil),
+		IPAddress:   ipAddress,
+		UserAgent:   userAgent,
 	})
+}
+
+func (s *Service) manufacturingAuditMetadata(tx *gorm.DB, businessID, entityType, entityID string) map[string]interface{} {
+	metadata := map[string]interface{}{"source_module": "manufacturing"}
+	if tx == nil || entityType != "production_batch" || strings.TrimSpace(entityID) == "" {
+		return metadata
+	}
+	var row struct{ ProductionBatchNumber string }
+	_ = tx.Unscoped().Table("production_batches").Select("production_batch_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+	metadata["production_batch_number"] = row.ProductionBatchNumber
+	metadata["manufacturing_batch_number"] = row.ProductionBatchNumber
+	metadata["document_number"] = row.ProductionBatchNumber
+	return metadata
 }
 
 func normalizeQuery(query *BatchListQuery) {
