@@ -76,6 +76,40 @@ func TestBusinessRecordReferenceSkipsUUIDMetadataReferences(t *testing.T) {
 	}
 }
 
+func TestBusinessRecordReferenceIgnoresRecordLabelAsDocumentReference(t *testing.T) {
+	metadata, err := json.Marshal(map[string]interface{}{
+		"record_label":    "Purchase invoice created",
+		"document_number": "BILL-000006",
+	})
+	if err != nil {
+		t.Fatalf("marshal metadata: %v", err)
+	}
+
+	log := AuditLog{
+		BusinessID:  "business-id",
+		EntityType:  "purchase_invoice",
+		EntityID:    "7d38a397-c8e8-4bc3-b0d3-b3d49a6ca99c",
+		ReferenceID: "7d38a397-c8e8-4bc3-b0d3-b3d49a6ca99c",
+		Metadata:    string(metadata),
+		Summary:     "Created purchase invoice.",
+	}
+
+	if got := (&Repository{}).BusinessRecordReference("business-id", log); got != "BILL-000006" {
+		t.Fatalf("BusinessRecordReference() = %q, want BILL-000006", got)
+	}
+}
+
+func TestMetadataRecordLabelSkipsUUIDCandidates(t *testing.T) {
+	metadata := map[string]interface{}{
+		"record_label":          "7d38a397-c8e8-4bc3-b0d3-b3d49a6ca99c",
+		"purchase_order_number": "PO-000045",
+	}
+
+	if got := metadataRecordLabel(metadata); got != "PO-000045" {
+		t.Fatalf("metadataRecordLabel() = %q, want PO-000045", got)
+	}
+}
+
 func TestBusinessRecordReferenceDoesNotReturnUUIDMetadataReference(t *testing.T) {
 	metadata, err := json.Marshal(map[string]interface{}{
 		"document_number": "7d38a397-c8e8-4bc3-b0d3-b3d49a6ca99c",

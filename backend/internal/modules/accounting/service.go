@@ -4529,7 +4529,8 @@ func (s *Service) withTransaction(fn func(tx *gorm.DB) error) error {
 
 func (s *Service) writeAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {
 	entityType := accountingAuditEntityType(eventType)
-	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: entityType, EntityID: entityID, Summary: summary, Metadata: audit.Metadata(map[string]interface{}{"source_module": "accounting"}, nil), IPAddress: ipAddress, UserAgent: userAgent}); err != nil {
+	metadata := s.accountingAuditMetadata(tx, currentUser.BusinessID, entityType, entityID)
+	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: entityType, EntityID: entityID, Summary: summary, Metadata: audit.Metadata(metadata, nil), IPAddress: ipAddress, UserAgent: userAgent}); err != nil {
 		return apperrors.Internal("failed to create activity log")
 	}
 	return nil
@@ -4555,10 +4556,49 @@ func accountingAuditEntityType(eventType string) string {
 }
 
 func (s *Service) writeEntityAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityType, entityID, summary, ipAddress, userAgent string) error {
-	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: entityType, EntityID: entityID, Summary: summary, Metadata: audit.Metadata(map[string]interface{}{"source_module": "accounting"}, nil), IPAddress: ipAddress, UserAgent: userAgent}); err != nil {
+	metadata := s.accountingAuditMetadata(tx, currentUser.BusinessID, entityType, entityID)
+	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: entityType, EntityID: entityID, Summary: summary, Metadata: audit.Metadata(metadata, nil), IPAddress: ipAddress, UserAgent: userAgent}); err != nil {
 		return apperrors.Internal("failed to create activity log")
 	}
 	return nil
+}
+
+func (s *Service) accountingAuditMetadata(tx *gorm.DB, businessID, entityType, entityID string) map[string]interface{} {
+	metadata := map[string]interface{}{"source_module": "accounting"}
+	if tx == nil || strings.TrimSpace(entityID) == "" {
+		return metadata
+	}
+	switch accountingAuditEntityType(entityType) {
+	case "journal_entry":
+		var row struct{ EntryNumber, ReferenceNumber string }
+		_ = tx.Unscoped().Table("journal_entries").Select("entry_number, reference_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		metadata["entry_number"] = row.EntryNumber
+		metadata["journal_entry_number"] = row.EntryNumber
+		metadata["reference_number"] = row.ReferenceNumber
+		metadata["document_number"] = auditFirstNonEmpty(row.EntryNumber, row.ReferenceNumber)
+	case "account_transfer":
+		var row struct{ TransferNumber, ReferenceNumber string }
+		_ = tx.Unscoped().Table("account_transfers").Select("transfer_number, reference_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		metadata["transfer_number"] = row.TransferNumber
+		metadata["reference_number"] = row.ReferenceNumber
+		metadata["document_number"] = auditFirstNonEmpty(row.TransferNumber, row.ReferenceNumber)
+	case "platform_settlement":
+		var row struct{ SettlementNumber, ReferenceNumber string }
+		_ = tx.Unscoped().Table("platform_settlements").Select("settlement_number, reference_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		metadata["settlement_number"] = row.SettlementNumber
+		metadata["reference_number"] = row.ReferenceNumber
+		metadata["document_number"] = auditFirstNonEmpty(row.SettlementNumber, row.ReferenceNumber)
+	}
+	return metadata
+}
+
+func auditFirstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func (s *Service) writeReportAudit(currentUser *utils.AuthContext, eventType, reportName string, filters interface{}, ipAddress, userAgent string) error {

@@ -967,6 +967,7 @@ func (s *Service) writeAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventT
 	if s.auditRepo == nil || currentUser == nil {
 		return nil
 	}
+	metadata := s.salesReturnAuditMetadata(tx, currentUser.BusinessID, entityID)
 	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{
 		BusinessID:  currentUser.BusinessID,
 		ActorUserID: currentUser.UserID,
@@ -974,10 +975,25 @@ func (s *Service) writeAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventT
 		EntityType:  "sales_return",
 		EntityID:    entityID,
 		Summary:     summary,
-		Metadata: audit.Metadata(map[string]interface{}{
-			"source_module": "sales_returns",
-		}, nil),
-		IPAddress: ipAddress,
-		UserAgent: userAgent,
+		Metadata:    audit.Metadata(metadata, nil),
+		IPAddress:   ipAddress,
+		UserAgent:   userAgent,
 	})
+}
+
+func (s *Service) salesReturnAuditMetadata(tx *gorm.DB, businessID, entityID string) map[string]interface{} {
+	metadata := map[string]interface{}{"source_module": "sales_returns"}
+	if tx == nil || strings.TrimSpace(entityID) == "" {
+		return metadata
+	}
+	var row struct {
+		ReturnNumber          string
+		RefundReferenceNumber string
+	}
+	_ = tx.Unscoped().Table("sales_returns").Select("return_number, refund_reference_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+	metadata["return_number"] = row.ReturnNumber
+	metadata["sales_return_number"] = row.ReturnNumber
+	metadata["document_number"] = row.ReturnNumber
+	metadata["reference_number"] = row.RefundReferenceNumber
+	return metadata
 }

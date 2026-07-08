@@ -709,7 +709,7 @@ func (s *Service) CreateOpeningStock(currentUser *utils.AuthContext, req Opening
 				return err
 			}
 		}
-		if err := s.audit(tx, currentUser, "inventory.opening_stock_created", item.ID, "Opening stock created", ipAddress, userAgent); err != nil {
+		if err := s.auditStockMovement(tx, currentUser, "inventory.opening_stock_created", movement.ID, "Opening stock created", ipAddress, userAgent); err != nil {
 			return err
 		}
 		loaded, err := s.repo.LoadInventoryResponse(currentUser.BusinessID, *item)
@@ -780,7 +780,7 @@ func (s *Service) AdjustStock(currentUser *utils.AuthContext, id string, req Adj
 		}
 		item.CurrentQuantity = movement.AfterQuantity
 		item.AvailableQuantity = movement.AfterQuantity - item.ReservedQuantity
-		if err := s.audit(tx, currentUser, "inventory.adjusted", item.ID, "Inventory adjusted", ipAddress, userAgent); err != nil {
+		if err := s.auditStockMovement(tx, currentUser, "inventory.adjusted", movement.ID, "Inventory adjusted", ipAddress, userAgent); err != nil {
 			return err
 		}
 		loaded, err := s.repo.LoadInventoryResponse(currentUser.BusinessID, *item)
@@ -1461,18 +1461,17 @@ func (s *Service) applyLocationMovement(tx *gorm.DB, item *InventoryItem, stockL
 }
 
 func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {
+	entityType := inventoryAuditEntityType(eventType)
 	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{
 		BusinessID:  currentUser.BusinessID,
 		ActorUserID: currentUser.UserID,
 		EventType:   eventType,
-		EntityType:  inventoryAuditEntityType(eventType),
+		EntityType:  entityType,
 		EntityID:    entityID,
 		Summary:     summary,
-		Metadata: audit.Metadata(map[string]interface{}{
-			"source_module": "inventory",
-		}, nil),
-		IPAddress: ipAddress,
-		UserAgent: userAgent,
+		Metadata:    audit.Metadata(s.inventoryAuditMetadata(tx, currentUser.BusinessID, entityType, entityID), nil),
+		IPAddress:   ipAddress,
+		UserAgent:   userAgent,
 	})
 }
 
@@ -1484,12 +1483,49 @@ func (s *Service) auditStockMovement(tx *gorm.DB, currentUser *utils.AuthContext
 		EntityType:  "stock_movement",
 		EntityID:    entityID,
 		Summary:     summary,
-		Metadata: audit.Metadata(map[string]interface{}{
-			"source_module": "inventory",
-		}, nil),
-		IPAddress: ipAddress,
-		UserAgent: userAgent,
+		Metadata:    audit.Metadata(s.inventoryAuditMetadata(tx, currentUser.BusinessID, "stock_movement", entityID), nil),
+		IPAddress:   ipAddress,
+		UserAgent:   userAgent,
 	})
+}
+
+func (s *Service) inventoryAuditMetadata(tx *gorm.DB, businessID, entityType, entityID string) map[string]interface{} {
+	metadata := map[string]interface{}{"source_module": "inventory"}
+	if tx == nil || strings.TrimSpace(entityID) == "" {
+		return metadata
+	}
+	switch entityType {
+	case "stock_transfer":
+		var row struct{ TransferNumber string }
+		_ = tx.Unscoped().Table("stock_transfers").Select("transfer_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		metadata["transfer_number"] = row.TransferNumber
+		metadata["document_number"] = row.TransferNumber
+	case "stock_movement":
+		var row struct{ ReferenceNumber string }
+		_ = tx.Unscoped().Table("stock_movements").Select("reference_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		if !auditUUIDLike(row.ReferenceNumber) {
+			metadata["reference_number"] = row.ReferenceNumber
+			metadata["document_number"] = row.ReferenceNumber
+		}
+	}
+	return metadata
+}
+
+func auditUUIDLike(value string) bool {
+	value = strings.TrimSpace(value)
+	if len(value) == 36 {
+		_, err := uuid.Parse(value)
+		return err == nil
+	}
+	if len(value) != 32 {
+		return false
+	}
+	for _, char := range value {
+		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f') || (char >= 'A' && char <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
 
 func inventoryAuditEntityType(eventType string) string {

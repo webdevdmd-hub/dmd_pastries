@@ -339,11 +339,16 @@ func metadataRecordLabel(metadata map[string]interface{}) string {
 		"document_number", "batch_number", "production_batch_number", "manufacturing_batch_number",
 		"invoice_number", "purchase_invoice_number", "supplier_bill_number", "bill_number",
 		"receipt_number", "purchase_receipt_number", "goods_receipt_number",
-		"return_number", "product_code", "sku",
+		"return_number", "purchase_order_number", "sales_return_number", "refund_number",
+		"entry_number", "journal_entry_number", "settlement_number",
+		"product_code", "sku",
 	}
 	for _, key := range keys {
 		if value, ok := metadata[key]; ok {
 			if label := metadataString(value); label != "" {
+				if isAuditUUIDLike(label) {
+					continue
+				}
 				return label
 			}
 		}
@@ -353,7 +358,7 @@ func metadataRecordLabel(metadata map[string]interface{}) string {
 
 func metadataBusinessReference(metadata map[string]interface{}) string {
 	keys := []string{
-		"record_label", "record_number", "document_number", "reference_number",
+		"record_number", "document_number", "reference_number",
 		"sale_number", "refund_number", "payment_refund_number",
 		"order_number", "expense_number", "transfer_number", "settlement_number",
 		"entry_number", "journal_entry_number", "invoice_number", "purchase_invoice_number",

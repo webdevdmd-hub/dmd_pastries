@@ -639,6 +639,12 @@ func (s *Service) AddPayment(currentUser *utils.AuthContext, orderID string, req
 		if err := s.repo.UpdateOrder(tx, orderID, currentUser.BusinessID, map[string]interface{}{"paid_amount": paid, "balance_amount": balance, "payment_status": paymentStatus(order.TotalAmount, paid), "updated_by_user_id": currentUser.UserID, "updated_at": now}); err != nil {
 			return err
 		}
+		metadata := s.bakeryOrderAuditMetadata(tx, currentUser.BusinessID, "bakery_order_payment", payment.ID)
+		metadata["payment_method_name"] = payment.PaymentMethodNameSnapshot
+		metadata["reference_number"] = payment.ReferenceNumber
+		metadata["payment_type"] = payment.PaymentType
+		metadata["amount"] = payment.Amount
+		metadata["bakery_order_id"] = orderID
 		return s.auditRepo.CreateActivity(tx, audit.ActivityInput{
 			BusinessID:  currentUser.BusinessID,
 			ActorUserID: currentUser.UserID,
@@ -646,16 +652,9 @@ func (s *Service) AddPayment(currentUser *utils.AuthContext, orderID string, req
 			EntityType:  "bakery_order_payment",
 			EntityID:    payment.ID,
 			Summary:     "Bakery order payment added",
-			Metadata: audit.Metadata(map[string]interface{}{
-				"source_module":       "bakery_orders",
-				"bakery_order_id":     orderID,
-				"payment_method_name": payment.PaymentMethodNameSnapshot,
-				"reference_number":    payment.ReferenceNumber,
-				"payment_type":        payment.PaymentType,
-				"amount":              payment.Amount,
-			}, nil),
-			IPAddress: ipAddress,
-			UserAgent: userAgent,
+			Metadata:    audit.Metadata(metadata, nil),
+			IPAddress:   ipAddress,
+			UserAgent:   userAgent,
 		})
 	})
 	if err != nil {
@@ -1326,11 +1325,47 @@ func (s *Service) itemResponses(businessID string, items []BakeryOrderItem) []Ba
 }
 
 func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {
-	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: "bakery_order", EntityID: entityID, Summary: summary, Metadata: audit.Metadata(map[string]interface{}{"source_module": "bakery_orders"}, nil), IPAddress: ipAddress, UserAgent: userAgent})
+	metadata := s.bakeryOrderAuditMetadata(tx, currentUser.BusinessID, "bakery_order", entityID)
+	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: "bakery_order", EntityID: entityID, Summary: summary, Metadata: audit.Metadata(metadata, nil), IPAddress: ipAddress, UserAgent: userAgent})
 }
 
 func (s *Service) auditEntity(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityType, entityID, summary, ipAddress, userAgent string) error {
-	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: entityType, EntityID: entityID, Summary: summary, Metadata: audit.Metadata(map[string]interface{}{"source_module": "bakery_orders"}, nil), IPAddress: ipAddress, UserAgent: userAgent})
+	metadata := s.bakeryOrderAuditMetadata(tx, currentUser.BusinessID, entityType, entityID)
+	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: entityType, EntityID: entityID, Summary: summary, Metadata: audit.Metadata(metadata, nil), IPAddress: ipAddress, UserAgent: userAgent})
+}
+
+func (s *Service) bakeryOrderAuditMetadata(tx *gorm.DB, businessID, entityType, entityID string) map[string]interface{} {
+	metadata := map[string]interface{}{"source_module": "bakery_orders"}
+	if tx == nil || strings.TrimSpace(entityID) == "" {
+		return metadata
+	}
+	switch entityType {
+	case "bakery_order":
+		var row struct{ OrderNumber, ExternalOrderNumber string }
+		_ = tx.Unscoped().Table("bakery_orders").Select("order_number, external_order_number").Where("business_id = ? AND id = ?", businessID, entityID).Scan(&row).Error
+		metadata["order_number"] = auditFirstNonEmpty(row.OrderNumber, row.ExternalOrderNumber)
+		metadata["document_number"] = auditFirstNonEmpty(row.OrderNumber, row.ExternalOrderNumber)
+	case "bakery_order_payment":
+		var row struct{ ReferenceNumber, OrderNumber string }
+		_ = tx.Unscoped().Table("bakery_order_payments AS bop").
+			Select("bop.reference_number, COALESCE(bo.order_number, '') AS order_number").
+			Joins("LEFT JOIN bakery_orders bo ON bo.id = bop.bakery_order_id AND bo.business_id = bop.business_id").
+			Where("bop.business_id = ? AND bop.id = ?", businessID, entityID).
+			Scan(&row).Error
+		metadata["reference_number"] = row.ReferenceNumber
+		metadata["order_number"] = row.OrderNumber
+		metadata["document_number"] = auditFirstNonEmpty(row.OrderNumber, row.ReferenceNumber)
+	}
+	return metadata
+}
+
+func auditFirstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func orderTotals(items []BakeryOrderItem) (float64, float64, float64, float64) {

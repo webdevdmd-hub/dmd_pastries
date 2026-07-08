@@ -44,10 +44,18 @@ export function DashboardRecentActivity({
                 className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-4"
                 key={`${activity.activityType}-${activity.referenceNumber}-${activity.createdAt}-${String(index)}`}
               >
-                <p className="font-semibold text-brand-espresso">{activity.title || "Activity"}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-brand-espresso">
+                    {activity.title || "Activity"}
+                  </p>
+                  {activity.referenceNumber ? (
+                    <span className="rounded-full border border-brand-cinnamon/30 bg-white px-2 py-0.5 text-xs font-semibold text-brand-espresso">
+                      {activity.referenceNumber}
+                    </span>
+                  ) : null}
+                </div>
                 <p className="mt-1 text-sm leading-6 text-brand-mocha">{activity.description}</p>
                 <p className="mt-2 text-xs uppercase tracking-[0.18em] text-brand-mocha">
-                  {activity.referenceNumber || "No business reference"} -{" "}
                   {activity.createdBy || "System"} - {formatDate(activity.createdAt)}
                 </p>
               </article>

@@ -580,8 +580,14 @@ func (s *Service) GetReceipt(currentUser *utils.AuthContext, saleID string, ipAd
 		EntityType:  "sale",
 		EntityID:    sale.ID,
 		Summary:     "Sale receipt viewed.",
-		IPAddress:   ipAddress,
-		UserAgent:   userAgent,
+		Metadata: audit.Metadata(map[string]interface{}{
+			"source_module":    "pos",
+			"sale_number":      sale.SaleNumber,
+			"document_number":  sale.SaleNumber,
+			"reference_number": sale.ExternalOrderNumber,
+		}, nil),
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
 	})
 	return receipt, nil
 }
@@ -1398,6 +1404,7 @@ func paymentStatus(paidAmount, totalAmount float64) string {
 }
 
 func (s *Service) writeAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, saleID, summary, ipAddress, userAgent string) error {
+	metadata := s.posAuditMetadata(tx, currentUser.BusinessID, saleID)
 	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{
 		BusinessID:  currentUser.BusinessID,
 		ActorUserID: currentUser.UserID,
@@ -1405,15 +1412,35 @@ func (s *Service) writeAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventT
 		EntityType:  "sale",
 		EntityID:    saleID,
 		Summary:     summary,
-		Metadata: audit.Metadata(map[string]interface{}{
-			"source_module": "pos",
-		}, nil),
-		IPAddress: ipAddress,
-		UserAgent: userAgent,
+		Metadata:    audit.Metadata(metadata, nil),
+		IPAddress:   ipAddress,
+		UserAgent:   userAgent,
 	}); err != nil {
 		return apperrors.Internal("failed to create activity log")
 	}
 	return nil
+}
+
+func (s *Service) posAuditMetadata(tx *gorm.DB, businessID, saleID string) map[string]interface{} {
+	metadata := map[string]interface{}{"source_module": "pos"}
+	if tx == nil || strings.TrimSpace(saleID) == "" {
+		return metadata
+	}
+	var row struct{ SaleNumber, ExternalOrderNumber string }
+	_ = tx.Unscoped().Table("sales").Select("sale_number, external_order_number").Where("business_id = ? AND id = ?", businessID, saleID).Scan(&row).Error
+	metadata["sale_number"] = row.SaleNumber
+	metadata["document_number"] = auditFirstNonEmpty(row.SaleNumber, row.ExternalOrderNumber)
+	metadata["reference_number"] = row.ExternalOrderNumber
+	return metadata
+}
+
+func auditFirstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func toPOSProduct(row ProductRow) POSProductResponse {
