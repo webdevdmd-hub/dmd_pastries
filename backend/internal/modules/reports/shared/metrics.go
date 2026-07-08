@@ -14,6 +14,16 @@ var (
 	RefundJournalSources     = []string{"sales_return", "pos_sale_refund"}
 )
 
+const stockMovementsMissingJournalsQuery = `
+				SELECT COUNT(*)
+				FROM stock_movements sm
+				WHERE sm.business_id = ?
+				  AND sm.created_at >= ?
+				  AND sm.created_at < ?
+				  AND sm.movement_type IN ('opening_stock','adjustment_in','adjustment_out','wastage','purchase_return_out','purchase_bill_cancel_out')
+				  AND COALESCE(sm.total_cost, 0) <> 0
+				  AND sm.accounting_journal_entry_id IS NULL`
+
 type MetricScope struct {
 	BusinessID  string
 	BranchID    string
@@ -299,17 +309,8 @@ func JournalConsistencyWarnings(db *gorm.DB, scope MetricScope, startUTC, endUTC
 			sourceType: "stock_movement",
 			message:    "Valued stock movements are missing posted accounting journals.",
 			branchCol:  "sm.branch_id",
-			query: `
-				SELECT COUNT(*)
-				FROM stock_movements sm
-				WHERE sm.business_id = ?
-				  AND sm.deleted_at IS NULL
-				  AND sm.created_at >= ?
-				  AND sm.created_at < ?
-				  AND sm.movement_type IN ('opening_stock','adjustment_in','adjustment_out','wastage','purchase_return_out','purchase_bill_cancel_out')
-				  AND COALESCE(sm.total_cost, 0) <> 0
-				  AND sm.accounting_journal_entry_id IS NULL`,
-			args: []interface{}{scope.BusinessID, startUTC, endUTC},
+			query:      stockMovementsMissingJournalsQuery,
+			args:       []interface{}{scope.BusinessID, startUTC, endUTC},
 		},
 	}
 
