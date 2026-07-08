@@ -57,8 +57,14 @@ export function useCashierDashboard(enabled = true) {
   return useDashboardQuery<CashierDashboard>("cashier", getCashierDashboard, enabled);
 }
 
-export function useProductionDashboard(enabled = true) {
-  return useDashboardQuery<ProductionDashboard>("production", getProductionDashboard, enabled);
+export function useProductionDashboard(filters?: DashboardRequestFilters, enabled = true) {
+  return useDashboardQuery<ProductionDashboard>(
+    "production",
+    async () => getProductionDashboard(filters),
+    enabled,
+    dashboardRefreshMs,
+    filters,
+  );
 }
 
 export function usePurchasingDashboard(enabled = true) {

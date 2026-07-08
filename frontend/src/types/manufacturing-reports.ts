@@ -11,8 +11,10 @@ export type ManufacturingReportFilters = {
   page?: number;
   productId?: string;
   recipeId?: string;
+  scope?: "all_branches" | "current_branch";
   sortBy?: string;
   sortOrder?: ManufacturingReportSortOrder;
+  timezone?: string;
 };
 
 export type ManufacturingSummary = {

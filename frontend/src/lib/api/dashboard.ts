@@ -64,6 +64,14 @@ function numberField(value: Record<string, unknown>, key: string): number {
   return typeof field === "number" ? field : 0;
 }
 
+function numberFieldAny(value: Record<string, unknown>, keys: string[]): number {
+  for (const key of keys) {
+    const field = value[key];
+    if (typeof field === "number") return field;
+  }
+  return 0;
+}
+
 function booleanField(value: Record<string, unknown>, key: string): boolean {
   const field = value[key];
   return typeof field === "boolean" ? field : false;
@@ -134,7 +142,10 @@ function parseAdminDashboard(value: unknown): AdminDashboard {
     },
     manufacturing: {
       activeBatches: numberField(manufacturing, "active_batches"),
-      completedToday: numberField(manufacturing, "completed_today"),
+      completedToday: numberFieldAny(manufacturing, [
+        "completed_batches_today",
+        "completed_today",
+      ]),
     },
     orders: {
       inProduction: numberField(orders, "in_production"),
@@ -196,7 +207,7 @@ function parseProductionDashboard(value: unknown): ProductionDashboard {
       ordersWaitingProduction: numberField(orders, "orders_waiting_production"),
     },
     wastage: {
-      wastageToday: numberField(wastage, "wastage_today"),
+      wastageToday: numberFieldAny(wastage, ["today_wastage_quantity", "wastage_today"]),
     },
   };
 }
@@ -355,8 +366,13 @@ export async function getCashierDashboard(): Promise<CashierDashboard> {
   return getDashboard("/api/v1/dashboard/cashier", parseCashierDashboard);
 }
 
-export async function getProductionDashboard(): Promise<ProductionDashboard> {
-  return getDashboard("/api/v1/dashboard/production", parseProductionDashboard);
+export async function getProductionDashboard(
+  filters?: DashboardRequestFilters,
+): Promise<ProductionDashboard> {
+  return getDashboard(
+    `/api/v1/dashboard/production${toSearchParams(filters)}`,
+    parseProductionDashboard,
+  );
 }
 
 export async function getPurchasingDashboard(): Promise<PurchasingDashboard> {

@@ -135,6 +135,8 @@ function toSearchParams(filters: ManufacturingReportFilters): string {
     ["date_from", filters.dateFrom],
     ["date_to", filters.dateTo],
     ["group_by", filters.groupBy],
+    ["scope", filters.scope],
+    ["timezone", filters.timezone],
     ["page", filters.page],
     ["limit", filters.limit],
     ["sort_by", filters.sortBy],

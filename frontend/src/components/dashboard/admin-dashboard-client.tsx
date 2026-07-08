@@ -32,6 +32,7 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useAdminDashboard } from "@/hooks/use-dashboard";
+import { useManufacturingTrend } from "@/hooks/use-manufacturing-reports";
 import { usePermission } from "@/hooks/use-permission";
 import {
   useOrdersChart,
@@ -46,6 +47,7 @@ import {
   toDashboardReportFilters,
 } from "@/lib/reports/dashboard-filters";
 import { reportBaseFiltersSchema } from "@/lib/validators/reports.schema";
+import type { ManufacturingReportFilters } from "@/types/manufacturing-reports";
 import type { ReportFilters } from "@/types/reports";
 
 const actions = [
@@ -61,6 +63,25 @@ function hasChartData(
   return Boolean(
     data && data.labels.length > 0 && data.datasets.some((dataset) => dataset.data.length > 0),
   );
+}
+
+function dashboardGroupByToManufacturingGroupBy(
+  groupBy: ReportFilters["groupBy"],
+): ManufacturingReportFilters["groupBy"] {
+  return groupBy === "week" || groupBy === "month" ? groupBy : "day";
+}
+
+function toManufacturingTrendFilters(filters: ReportFilters): ManufacturingReportFilters {
+  const trendFilters: ManufacturingReportFilters = {
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+  };
+  const groupBy = dashboardGroupByToManufacturingGroupBy(filters.groupBy);
+  if (filters.branchId) trendFilters.branchId = filters.branchId;
+  if (groupBy) trendFilters.groupBy = groupBy;
+  if (filters.scope) trendFilters.scope = filters.scope;
+  if (filters.timezone) trendFilters.timezone = filters.timezone;
+  return trendFilters;
 }
 
 export function AdminDashboardClient(): JSX.Element {
@@ -88,6 +109,14 @@ export function AdminDashboardClient(): JSX.Element {
   const salesChartQuery = useSalesChart(appliedFilters, canView && hasScope);
   const paymentsChartQuery = usePaymentsChart(appliedFilters, canView && hasScope);
   const ordersChartQuery = useOrdersChart(appliedFilters, canView && hasScope);
+  const manufacturingTrendFilters = useMemo(
+    () => toManufacturingTrendFilters(appliedFilters),
+    [appliedFilters],
+  );
+  const manufacturingTrendQuery = useManufacturingTrend(
+    manufacturingTrendFilters,
+    canView && hasScope,
+  );
 
   if (!canView) return <AccessDeniedCard />;
   if (!hasScope) return <NoBranchScopeCard />;
@@ -296,6 +325,19 @@ export function AdminDashboardClient(): JSX.Element {
             >
               {ordersChartQuery.data ? (
                 <DashboardTrendChart chart={ordersChartQuery.data} type="bar" />
+              ) : null}
+            </DashboardChartCard>
+
+            <DashboardChartCard
+              description="Produced quantity and wastage trend from manufacturing batches."
+              error={manufacturingTrendQuery.error}
+              hasData={hasChartData(manufacturingTrendQuery.data)}
+              isLoading={manufacturingTrendQuery.isLoading}
+              onRetry={() => void manufacturingTrendQuery.refetch()}
+              title="Production Trend"
+            >
+              {manufacturingTrendQuery.data ? (
+                <DashboardTrendChart chart={manufacturingTrendQuery.data} type="bar" />
               ) : null}
             </DashboardChartCard>
 

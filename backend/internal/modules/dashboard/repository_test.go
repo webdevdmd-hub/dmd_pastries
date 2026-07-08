@@ -1,9 +1,13 @@
 package dashboard
 
 import (
+	"net/url"
 	"testing"
+	"time"
 
 	"pastries-pos/internal/modules/reports"
+	reportshared "pastries-pos/internal/modules/reports/shared"
+	"pastries-pos/internal/shared/utils"
 )
 
 func TestAdminDashboardUsesReportsSummaryForComparableMetrics(t *testing.T) {
@@ -62,5 +66,38 @@ func TestAdminDashboardUsesReportsSummaryForComparableMetrics(t *testing.T) {
 	}
 	if admin.Manufacturing.ActiveBatches != summary.Manufacturing.ActiveBatches || admin.Manufacturing.CompletedBatchesToday != summary.Manufacturing.CompletedBatches {
 		t.Fatalf("admin manufacturing counts must match reports summary: got %#v want %#v", admin.Manufacturing, summary.Manufacturing)
+	}
+}
+
+func TestScopeFromReportFilterUsesBusinessLocalDayBoundaries(t *testing.T) {
+	branchID := "11111111-1111-1111-1111-111111111111"
+	currentUser := &utils.AuthContext{
+		BusinessID:           "22222222-2222-2222-2222-222222222222",
+		CanAccessAllBranches: true,
+		CurrentBranchID:      &branchID,
+		AllowedBranchIDs:     []string{branchID},
+	}
+	filter, err := reportshared.Resolve(currentUser, reportshared.ParseQuery(url.Values{
+		"date_from": []string{"2026-06-25"},
+		"date_to":   []string{"2026-06-25"},
+		"scope":     []string{"all_branches"},
+		"timezone":  []string{"Asia/Dubai"},
+	}))
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
+	}
+
+	scope := scopeFromReportFilter(filter)
+
+	if !scope.AllBranches {
+		t.Fatal("expected all-branch dashboard scope")
+	}
+	if scope.TodayDate != "2026-06-25" {
+		t.Fatalf("TodayDate = %q, want 2026-06-25", scope.TodayDate)
+	}
+	wantStart := time.Date(2026, 6, 24, 20, 0, 0, 0, time.UTC)
+	wantEnd := time.Date(2026, 6, 25, 20, 0, 0, 0, time.UTC)
+	if !scope.TodayStart.Equal(wantStart) || !scope.TodayEnd.Equal(wantEnd) {
+		t.Fatalf("UTC bounds = %s..%s, want %s..%s", scope.TodayStart, scope.TodayEnd, wantStart, wantEnd)
 	}
 }

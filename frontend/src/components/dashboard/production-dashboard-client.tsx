@@ -19,6 +19,8 @@ import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useProductionDashboard } from "@/hooks/use-dashboard";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
+import type { DashboardRequestFilters } from "@/lib/api/dashboard";
+import { resolveDashboardTimezone } from "@/lib/reports/dashboard-filters";
 
 const actions = [
   { href: ROUTES.manufacturingBatches, icon: Boxes, label: "Create Production" },
@@ -36,7 +38,15 @@ export function ProductionDashboardClient(): JSX.Element {
     PERMISSIONS.recipesView,
   ]);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
-  const dashboardQuery = useProductionDashboard(canView && hasScope);
+  const timezone = resolveDashboardTimezone();
+  const dashboardFilters: DashboardRequestFilters = branchScope.canAccessAllBranches
+    ? { scope: "all_branches", timezone }
+    : {
+        branchId: branchScope.effectiveBranchId ?? "",
+        scope: "current_branch",
+        timezone,
+      };
+  const dashboardQuery = useProductionDashboard(dashboardFilters, canView && hasScope);
 
   if (!canView) return <AccessDeniedCard />;
   if (!hasScope) return <NoBranchScopeCard />;
