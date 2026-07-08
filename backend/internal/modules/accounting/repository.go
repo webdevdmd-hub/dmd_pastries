@@ -898,13 +898,14 @@ func (r *Repository) ListPOSSalePaymentsForAccounting(tx *gorm.DB, businessID, s
 			sp.payment_status,
 			sp.payment_method_name_snapshot,
 			sp.payment_method_type_snapshot,
-			pm.default_payment_account_id,
+			COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AS default_payment_account_id,
 			pa.branch_id AS payment_account_branch_id,
 			COALESCE(pa.account_name, '') AS payment_account_name,
 			COALESCE(pa.chart_account_id::text, '') AS chart_account_id
 		`).
 		Joins("JOIN payment_methods pm ON pm.id = sp.payment_method_id AND pm.business_id = sp.business_id AND pm.deleted_at IS NULL").
-		Joins("LEFT JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = sp.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_method_account_mappings pmam ON pmam.payment_method_id = pm.id AND pmam.business_id = sp.business_id AND pmam.branch_id = sp.branch_id AND pmam.status = 'active' AND pmam.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AND pa.business_id = sp.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL AND (pa.branch_id IS NULL OR pa.branch_id = sp.branch_id)").
 		Where("sp.business_id = ? AND sp.sale_id = ? AND sp.deleted_at IS NULL AND sp.payment_status = ?", businessID, saleID, "completed").
 		Order("sp.paid_at ASC, sp.created_at ASC").
 		Scan(&rows).Error

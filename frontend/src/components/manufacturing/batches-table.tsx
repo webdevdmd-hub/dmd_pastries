@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ROUTES } from "@/constants/routes";
+import { canProduceBatch } from "@/lib/manufacturing/batch-status";
 import { formatRecipeVersionLabel } from "@/lib/manufacturing/recipe-version-display";
 import type { ProductionBatch } from "@/types/manufacturing";
 
@@ -44,6 +45,7 @@ export function BatchesTable({
   canEdit,
   canProduce,
   canRecordWastage,
+  producingBatchId = null,
   onDelete,
   onEdit,
   onProduce,
@@ -54,6 +56,7 @@ export function BatchesTable({
   canEdit: boolean;
   canProduce: boolean;
   canRecordWastage: boolean;
+  producingBatchId?: string | null;
   onDelete: (batch: ProductionBatch) => void;
   onEdit: (batch: ProductionBatch) => void;
   onProduce: (batch: ProductionBatch) => void;
@@ -141,14 +144,15 @@ export function BatchesTable({
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
-                  {canProduce && batch.status === "draft" ? (
+                  {canProduce && canProduceBatch(batch) ? (
                     <Button
                       className="h-8 border-neutral-300 px-3 text-xs"
+                      disabled={producingBatchId === batch.id}
                       onClick={() => onProduce(batch)}
                       type="button"
                       variant="outline"
                     >
-                      Produce planned
+                      {producingBatchId === batch.id ? "Producing..." : "Produce planned"}
                     </Button>
                   ) : null}
                   <BatchActionsMenu
@@ -157,6 +161,7 @@ export function BatchesTable({
                     canEdit={canEdit}
                     canProduce={canProduce}
                     canRecordWastage={canRecordWastage}
+                    isProducing={producingBatchId === batch.id}
                     onDelete={onDelete}
                     onEdit={onEdit}
                     onProduce={onProduce}

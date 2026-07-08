@@ -32,7 +32,11 @@ import {
   type ProductionFeedback,
   recipeHasKnownEmptyBom,
 } from "@/lib/manufacturing/production-errors";
-import { createBatchSchema, createProductionSchema } from "@/lib/validators/manufacturing.schema";
+import {
+  createBatchSchema,
+  createProductionSchema,
+  produceSchema,
+} from "@/lib/validators/manufacturing.schema";
 import type {
   CreateBatchPayload,
   CreateProductionPayload,
@@ -169,11 +173,7 @@ export function BatchFormDialog({
   onClose: () => void;
   onCreatePlanned: (payload: CreateBatchPayload) => Promise<void>;
   onProductChange: (productId: string) => void;
-  onProducePlanned: (
-    id: string,
-    updatePayload: UpdateBatchPayload,
-    producePayload: ProducePayload,
-  ) => Promise<void>;
+  onProducePlanned: (id: string, producePayload: ProducePayload) => Promise<void>;
   onProduceNow: (payload: CreateProductionPayload) => Promise<void>;
   onUpdate: (id: string, payload: UpdateBatchPayload) => Promise<void>;
   open: boolean;
@@ -287,6 +287,11 @@ export function BatchFormDialog({
   const previewMatchesForm =
     productionPreview?.recipeId === recipeId &&
     quantitiesMatch(productionPreview.quantityProduced, plannedQuantity);
+  const shouldShowPreviewPanel =
+    selectedRecipe !== undefined ||
+    productionPreview !== undefined ||
+    productionPreviewQuery.isLoading ||
+    productionPreviewQuery.isError;
 
   const validateFreshPreview = async (): Promise<boolean> => {
     const previewResult = await productionPreviewQuery.refetch();
@@ -356,7 +361,10 @@ export function BatchFormDialog({
     }
 
     if (batch) {
-      await onUpdate(batch.id, result.data);
+      await onUpdate(batch.id, {
+        notes: result.data.notes,
+        productionDate: result.data.productionDate,
+      });
       return;
     }
 
@@ -437,7 +445,7 @@ export function BatchFormDialog({
 
     const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
 
-    const result = createBatchSchema.safeParse({
+    const productionResult = createBatchSchema.safeParse({
       branchId,
       notes,
       plannedQuantity,
@@ -445,9 +453,15 @@ export function BatchFormDialog({
       productionDate,
       recipeId,
     });
+    const produceResult = produceSchema.safeParse({ quantityProduced: plannedQuantity });
 
-    if (!result.success) {
-      showError(result.error.issues[0]?.message ?? "Please check the production form.");
+    if (!productionResult.success) {
+      showError(productionResult.error.issues[0]?.message ?? "Please check the production form.");
+      return;
+    }
+
+    if (!produceResult.success) {
+      showError(produceResult.error.issues[0]?.message ?? "Please check produced quantity.");
       return;
     }
 
@@ -481,9 +495,10 @@ export function BatchFormDialog({
     }
 
     try {
-      await onProducePlanned(batch.id, result.data, {
-        productionDate: result.data.productionDate,
-        quantityProduced: result.data.plannedQuantity,
+      await onProducePlanned(batch.id, {
+        notes: productionResult.data.notes,
+        productionDate: productionResult.data.productionDate,
+        quantityProduced: produceResult.data.quantityProduced,
       });
     } catch (error) {
       showError(
@@ -498,7 +513,10 @@ export function BatchFormDialog({
   const isProduceDisabled = isSubmitting;
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => (!nextOpen && !isSubmitting ? onClose() : undefined)}
+    >
       <DialogContent className="flex max-h-[92vh] max-w-4xl flex-col overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b border-neutral-300 px-8 py-6">
           <DialogTitle>{batch ? "Edit planned production" : "Create production"}</DialogTitle>
@@ -512,25 +530,31 @@ export function BatchFormDialog({
           <div className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-neutral-950">Branch</label>
-              <Select
-                value={branchId || "none"}
-                onValueChange={(value) => {
-                  clearFeedback();
-                  setBranchId(value === "none" ? "" : value);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Select branch</SelectItem>
-                  {selectableBranches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.branchName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {batch ? (
+                <div className="min-h-10 rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950">
+                  {batch.branchName}
+                </div>
+              ) : (
+                <Select
+                  value={branchId || "none"}
+                  onValueChange={(value) => {
+                    clearFeedback();
+                    setBranchId(value === "none" ? "" : value);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Select branch</SelectItem>
+                    {selectableBranches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.branchName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -548,51 +572,66 @@ export function BatchFormDialog({
 
             <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-medium text-neutral-950">Output product</label>
-              <Select value={productId || "none"} onValueChange={handleProductChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Product" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Select product</SelectItem>
-                  {products.map((product) => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.productName} / {PRODUCT_TYPE_LABELS[product.productType]} /{" "}
-                      {ITEM_STRUCTURE_LABELS[product.itemStructure]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {batch ? (
+                <div className="min-h-10 rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950">
+                  {batch.productVariantName
+                    ? `${batch.productName} / ${batch.productVariantName}`
+                    : batch.productName}
+                </div>
+              ) : (
+                <Select value={productId || "none"} onValueChange={handleProductChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Select product</SelectItem>
+                    {products.map((product) => (
+                      <SelectItem key={product.id} value={product.id}>
+                        {product.productName} / {PRODUCT_TYPE_LABELS[product.productType]} /{" "}
+                        {ITEM_STRUCTURE_LABELS[product.itemStructure]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-medium text-neutral-950">Active recipe</label>
-              <Select
-                value={recipeId || "none"}
-                onValueChange={(value) => {
-                  clearFeedback();
-                  setRecipeId(value === "none" ? "" : value);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Recipe" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Select recipe</SelectItem>
-                  {recipes.map((recipe) => (
-                    <SelectItem key={recipe.id} value={recipe.id}>
-                      {recipe.recipeName} v{recipe.versionNumber}
-                      {recipe.productVariantName ? ` / ${recipe.productVariantName}` : ""}
-                      {recipe.isActive === false ||
-                      (recipe.status !== null && recipe.status !== "active")
-                        ? " (inactive)"
-                        : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {batch ? (
+                <div className="min-h-10 rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950">
+                  {batch.recipeName}{" "}
+                  {batch.recipeVersionNumber ? <>v{batch.recipeVersionNumber}</> : null}
+                </div>
+              ) : (
+                <Select
+                  value={recipeId || "none"}
+                  onValueChange={(value) => {
+                    clearFeedback();
+                    setRecipeId(value === "none" ? "" : value);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Recipe" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Select recipe</SelectItem>
+                    {recipes.map((recipe) => (
+                      <SelectItem key={recipe.id} value={recipe.id}>
+                        {recipe.recipeName} v{recipe.versionNumber}
+                        {recipe.productVariantName ? ` / ${recipe.productVariantName}` : ""}
+                        {recipe.isActive === false ||
+                        (recipe.status !== null && recipe.status !== "active")
+                          ? " (inactive)"
+                          : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
-            {selectedRecipe ? (
+            {shouldShowPreviewPanel ? (
               <div className="rounded-2xl border border-neutral-300 bg-neutral-100 p-5 text-sm text-neutral-600 md:col-span-2">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -600,12 +639,19 @@ export function BatchFormDialog({
                     <p className="mt-3">
                       Output stock:{" "}
                       <span className="font-semibold text-neutral-950">
-                        {selectedRecipe.productVariantName ?? "Parent product"}
+                        {selectedRecipe?.productVariantName ??
+                          batch?.productVariantName ??
+                          "Parent product"}
                       </span>
                     </p>
                     <p>
-                      Recipe yield: {selectedRecipe.batchYieldQuantity}{" "}
-                      {selectedRecipe.batchYieldUnitName}
+                      Recipe yield:{" "}
+                      {selectedRecipe
+                        ? formatQuantity(
+                            selectedRecipe.batchYieldQuantity,
+                            selectedRecipe.batchYieldUnitName,
+                          )
+                        : `Current batch uses ${batch?.batchUnitName ?? "the saved yield unit"}`}
                     </p>
                     <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                       <div className="rounded-xl border border-neutral-300 bg-white px-3 py-2">
@@ -613,7 +659,7 @@ export function BatchFormDialog({
                         <strong className="ml-2 text-neutral-950">
                           {productionPreview
                             ? productionPreview.components.length.toLocaleString()
-                            : countLabel(selectedRecipe.componentCount)}
+                            : countLabel(selectedRecipe?.componentCount ?? null)}
                         </strong>
                       </div>
                       <div className="rounded-xl border border-neutral-300 bg-white px-3 py-2">
@@ -621,14 +667,16 @@ export function BatchFormDialog({
                         <strong className="ml-2 text-neutral-950">
                           {productionPreview
                             ? productionPreview.packaging.length.toLocaleString()
-                            : countLabel(selectedRecipe.packagingCount)}
+                            : countLabel(selectedRecipe?.packagingCount ?? null)}
                         </strong>
                       </div>
                     </div>
                   </div>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-neutral-600">
-                    v{selectedRecipe.versionNumber}
-                  </span>
+                  {(selectedRecipe?.versionNumber ?? batch?.recipeVersionNumber) ? (
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-neutral-600">
+                      v{selectedRecipe?.versionNumber ?? batch?.recipeVersionNumber}
+                    </span>
+                  ) : null}
                 </div>
                 {selectedRecipeIsKnownInactive ? (
                   <p className="mt-3 font-semibold text-red-700">
@@ -654,8 +702,7 @@ export function BatchFormDialog({
                   <Alert className="mt-4 border-red-300 bg-red-50 text-red-950">
                     <AlertTitle>Cannot validate production stock</AlertTitle>
                     <AlertDescription>
-                      Production is disabled until the backend preview can confirm required stock,
-                      shortages, and cost.
+                      {productionFailureMessage(productionPreviewQuery.error)}
                     </AlertDescription>
                   </Alert>
                 ) : null}
@@ -730,7 +777,9 @@ export function BatchFormDialog({
             ) : null}
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-neutral-950">Quantity to produce</label>
+              <label className="text-sm font-medium text-neutral-950">
+                {batch ? "Quantity to produce now" : "Quantity to produce"}
+              </label>
               <Input
                 aria-label="Quantity to produce"
                 min="0"
@@ -769,7 +818,7 @@ export function BatchFormDialog({
         ) : null}
 
         <DialogFooter className="shrink-0 border-t border-neutral-300 bg-neutral-50 px-8 py-5">
-          <Button onClick={onClose} type="button" variant="outline">
+          <Button disabled={isSubmitting} onClick={onClose} type="button" variant="outline">
             Cancel
           </Button>
           {!batch ? (
@@ -788,7 +837,7 @@ export function BatchFormDialog({
               type="button"
               variant="outline"
             >
-              Save planned production
+              Save date and notes
             </Button>
           )}
           {batch && canProducePlanned ? (
@@ -798,7 +847,7 @@ export function BatchFormDialog({
               onClick={() => void submitPlannedProduction()}
               type="button"
             >
-              Produce planned
+              {isSubmitting ? "Producing..." : "Produce planned"}
             </Button>
           ) : null}
           {!batch ? (

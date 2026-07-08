@@ -1,11 +1,12 @@
 import type { JSX } from "react";
 
+import { isBatchPlannedStatus } from "@/lib/manufacturing/batch-status";
 import type { ProductionBatch } from "@/types/manufacturing";
 
 export function BatchTimeline({ batch }: { batch: ProductionBatch }): JSX.Element {
   const steps = [
     { done: true, label: "Planned" },
-    { done: batch.status !== "draft", label: "Production Posted" },
+    { done: !isBatchPlannedStatus(batch.status), label: "Production Posted" },
     {
       done: batch.producedQuantity > 0 || batch.status === "completed",
       label: "Output Produced",

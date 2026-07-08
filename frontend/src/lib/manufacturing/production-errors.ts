@@ -21,10 +21,7 @@ function detailString(details: Record<string, unknown> | undefined, key: string)
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
-function detailStringList(
-  details: Record<string, unknown> | undefined,
-  key: string,
-): string[] {
+function detailStringList(details: Record<string, unknown> | undefined, key: string): string[] {
   const value = details?.[key];
 
   if (!Array.isArray(value)) {
@@ -64,9 +61,7 @@ function shortageSummary(details: Record<string, unknown> | undefined): string |
   return `${parts.join(", ")}${suffix}`;
 }
 
-export function recipeHasKnownEmptyBom(
-  recipe: ManufacturingRecipeOption | undefined,
-): boolean {
+export function recipeHasKnownEmptyBom(recipe: ManufacturingRecipeOption | undefined): boolean {
   return recipe?.componentCount === 0;
 }
 
@@ -78,10 +73,7 @@ export function productionFailureMessage(
     const details = error.errorDetails;
     const reason = detailString(details, "reason");
 
-    if (
-      reason === "recipe_has_no_components" ||
-      reason === "recipe_has_no_component_quantity"
-    ) {
+    if (reason === "recipe_has_no_components" || reason === "recipe_has_no_component_quantity") {
       return options.previewHadConsumableLines
         ? PREVIEW_OUT_OF_SYNC_MESSAGE
         : EMPTY_BOM_PRODUCTION_MESSAGE;
@@ -89,6 +81,20 @@ export function productionFailureMessage(
 
     if (reason === "recipe_components_not_consumable") {
       return "This recipe has BOM lines, but they cannot be consumed for manufacturing. Link each component to a stock-tracked product, ingredient, or inventory item before producing.";
+    }
+
+    if (
+      reason === "recipe_component_inventory_missing" ||
+      reason === "recipe_component_not_consumable"
+    ) {
+      return "This recipe has a component that cannot be consumed for manufacturing. Link the recipe line to an active stock-tracked inventory item in the production branch before producing.";
+    }
+
+    if (
+      reason === "recipe_packaging_inventory_missing" ||
+      reason === "recipe_packaging_not_consumable"
+    ) {
+      return "This recipe has a packaging line that cannot be consumed for manufacturing. Link the packaging line to active stock in the production branch before producing.";
     }
 
     if (reason === "stock_shortage") {
@@ -128,6 +134,29 @@ export function productionFailureMessage(
     normalizedMessage.includes("stock shortage")
   ) {
     return "Production cannot be posted because required component or packaging stock is not available.";
+  }
+
+  if (normalizedMessage.includes("production output already exists")) {
+    return "This production batch already has an output record. Refresh the batch before trying again.";
+  }
+
+  if (
+    normalizedMessage.includes("only draft, planned, or in_progress batches can be produced") ||
+    normalizedMessage.includes("only draft, planned, or in_progress batches can be completed")
+  ) {
+    return "Only planned, draft, or in-progress batches can be produced.";
+  }
+
+  if (normalizedMessage.includes("unit conversion is not available yet")) {
+    return `${message} Update the recipe or inventory item so the units match before producing.`;
+  }
+
+  if (
+    normalizedMessage.includes("accounting") ||
+    normalizedMessage.includes("journal") ||
+    normalizedMessage.includes("ledger")
+  ) {
+    return `${message} Check accounting setup and journal mappings before producing.`;
   }
 
   if (

@@ -6,6 +6,7 @@ import type { JSX } from "react";
 import { BatchStatusBadge } from "@/components/manufacturing/batch-status-badge";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/routes";
+import { canProduceBatch, isBatchPlannedStatus } from "@/lib/manufacturing/batch-status";
 import { formatRecipeVersionLabel } from "@/lib/manufacturing/recipe-version-display";
 import type { ProductionBatch } from "@/types/manufacturing";
 
@@ -17,15 +18,22 @@ function batchOutputLabel(batch: ProductionBatch): string {
 
 export function BatchHeader({
   batch,
+  canProduce = false,
   canRecordWastage = false,
+  isProducing = false,
+  onProduce,
   onRecordWastage,
 }: {
   batch: ProductionBatch;
+  canProduce?: boolean;
   canRecordWastage?: boolean;
+  isProducing?: boolean;
+  onProduce?: () => void;
   onRecordWastage?: () => void;
 }): JSX.Element {
   const canShowWastageAction =
-    canRecordWastage && batch.status !== "draft" && batch.status !== "cancelled";
+    canRecordWastage && !isBatchPlannedStatus(batch.status) && batch.status !== "cancelled";
+  const canShowProduceAction = canProduce && canProduceBatch(batch);
 
   return (
     <div className="flex flex-col gap-5 border-b border-neutral-300 pb-6 lg:flex-row lg:items-end lg:justify-between">
@@ -58,15 +66,27 @@ export function BatchHeader({
           </p>
         </div>
       </div>
-      {canShowWastageAction ? (
-        <Button
-          className="bg-black text-white hover:bg-neutral-800"
-          onClick={onRecordWastage}
-          type="button"
-        >
-          Record Wastage
-        </Button>
-      ) : null}
+      <div className="flex flex-wrap gap-2">
+        {canShowProduceAction ? (
+          <Button
+            className="bg-black text-white hover:bg-neutral-800"
+            disabled={isProducing}
+            onClick={onProduce}
+            type="button"
+          >
+            {isProducing ? "Producing..." : "Produce planned"}
+          </Button>
+        ) : null}
+        {canShowWastageAction ? (
+          <Button
+            className="bg-black text-white hover:bg-neutral-800"
+            onClick={onRecordWastage}
+            type="button"
+          >
+            Record Wastage
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }

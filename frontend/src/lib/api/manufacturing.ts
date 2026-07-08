@@ -57,6 +57,7 @@ type BackendConsumePayload = {
 type BackendProducePayload = {
   quantity_produced: number;
   production_date?: string;
+  notes?: string | null;
 };
 
 type BackendWastagePayload = {
@@ -139,6 +140,7 @@ function firstOptionalNumber(...values: unknown[]): number | null {
 function isBatchStatus(value: unknown): value is BatchStatus {
   return (
     value === "draft" ||
+    value === "planned" ||
     value === "in_progress" ||
     value === "partially_completed" ||
     value === "completed" ||
@@ -537,6 +539,9 @@ function producePayload(payload: ProducePayload): BackendProducePayload {
 
   if (payload.productionDate !== undefined) {
     nextPayload.production_date = payload.productionDate;
+  }
+  if (payload.notes !== undefined) {
+    nextPayload.notes = requestString(payload.notes);
   }
 
   return nextPayload;

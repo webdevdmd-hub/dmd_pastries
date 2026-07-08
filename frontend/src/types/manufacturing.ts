@@ -3,6 +3,7 @@ import type { ItemStructure, ProductType } from "@/types/product";
 
 export type BatchStatus =
   | "draft"
+  | "planned"
   | "in_progress"
   | "partially_completed"
   | "completed"
@@ -257,6 +258,7 @@ export type ConsumePayload = {
 export type ProducePayload = {
   quantityProduced: number;
   productionDate?: string;
+  notes?: string | null;
 };
 
 export type WastagePayload = {

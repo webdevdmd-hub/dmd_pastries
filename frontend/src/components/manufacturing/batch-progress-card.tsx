@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 
+import { isBatchPlannedStatus } from "@/lib/manufacturing/batch-status";
 import type { ProductionBatch } from "@/types/manufacturing";
 
 export function BatchProgressCard({ batch }: { batch: ProductionBatch }): JSX.Element {
@@ -18,7 +19,7 @@ export function BatchProgressCard({ batch }: { batch: ProductionBatch }): JSX.El
         <p className="font-mono text-xl font-semibold text-neutral-950">{progress.toFixed(0)}%</p>
       </div>
       <div className="mt-5 space-y-5">
-        {batch.status === "draft" ? (
+        {isBatchPlannedStatus(batch.status) ? (
           <div className="rounded-xl border border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-700">
             <p className="font-semibold text-neutral-950">Planned production</p>
             <p className="mt-1">

@@ -56,7 +56,15 @@ export const batchFiltersSchema = z.object({
   dateTo: z.string(),
   productId: z.string(),
   search: z.string(),
-  status: z.enum(["all", "draft", "in_progress", "partially_completed", "completed", "cancelled"]),
+  status: z.enum([
+    "all",
+    "draft",
+    "planned",
+    "in_progress",
+    "partially_completed",
+    "completed",
+    "cancelled",
+  ]),
 });
 
 export type CreateBatchFormValues = z.infer<typeof createBatchSchema>;

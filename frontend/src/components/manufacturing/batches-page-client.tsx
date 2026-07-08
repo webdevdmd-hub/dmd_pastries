@@ -50,6 +50,7 @@ import {
 } from "@/hooks/use-manufacturing";
 import { usePermission } from "@/hooks/use-permission";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { canProduceBatch } from "@/lib/manufacturing/batch-status";
 import { productionFailureMessage } from "@/lib/manufacturing/production-errors";
 import type {
   BatchFilters,
@@ -93,6 +94,7 @@ export function BatchesPageClient(): JSX.Element {
   const [deleteBatchTarget, setDeleteBatchTarget] = useState<ProductionBatch | null>(null);
   const [wastageBatch, setWastageBatch] = useState<ProductionBatch | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [producingBatchId, setProducingBatchId] = useState<string | null>(null);
   const batchesQuery = useBatches(filters, canView && branchScope.hasBranchScope);
   const productsQuery = useManufacturingProducts(canView);
   const branchesQuery = useManufacturingBranches(canView);
@@ -177,10 +179,8 @@ export function BatchesPageClient(): JSX.Element {
 
   const handleProducePlanned = async (
     id: string,
-    updatePayload: UpdateBatchPayload,
     producePayload: ProducePayload,
   ): Promise<void> => {
-    await updateBatchMutation.mutateAsync({ id, payload: updatePayload });
     await produceBatchMutation.mutateAsync({ id, payload: producePayload });
     toast.success("Planned production produced.");
     setEditingBatch(null);
@@ -188,17 +188,30 @@ export function BatchesPageClient(): JSX.Element {
   };
 
   const handleProducePlannedFromRow = async (batch: ProductionBatch): Promise<void> => {
+    if (produceBatchMutation.isPending || producingBatchId !== null) {
+      return;
+    }
+
+    if (!canProduceBatch(batch)) {
+      toast.error("Only planned, draft, or in-progress batches without output can be produced.");
+      return;
+    }
+
+    setProducingBatchId(batch.id);
     try {
       await produceBatchMutation.mutateAsync({
         id: batch.id,
         payload: {
           ...(batch.productionDate ? { productionDate: batch.productionDate.slice(0, 10) } : {}),
+          ...(batch.notes ? { notes: batch.notes } : {}),
           quantityProduced: batch.plannedQuantity,
         },
       });
       toast.success("Planned production produced.");
     } catch (error) {
       toast.error(productionFailureMessage(error));
+    } finally {
+      setProducingBatchId(null);
     }
   };
 
@@ -371,7 +384,8 @@ export function BatchesPageClient(): JSX.Element {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="draft">Planned</SelectItem>
+              <SelectItem value="draft">Draft planned</SelectItem>
+              <SelectItem value="planned">Planned</SelectItem>
               <SelectItem value="in_progress">In progress</SelectItem>
               <SelectItem value="partially_completed">Partially completed</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
@@ -443,6 +457,7 @@ export function BatchesPageClient(): JSX.Element {
                 void handleProducePlannedFromRow(batch);
               }}
               onWastage={setWastageBatch}
+              producingBatchId={producingBatchId}
             />
           </CardContent>
         </Card>

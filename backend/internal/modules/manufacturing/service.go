@@ -417,7 +417,7 @@ func (s *Service) ProduceBatch(currentUser *utils.AuthContext, id string, req Pr
 			return apperrors.Forbidden("branch access denied")
 		}
 		if !batchCanProduce(batch.Status) {
-			return apperrors.BadRequest("only draft, planned, or in_progress batches can be produced", nil)
+			return apperrors.BadRequest("only draft, planned, or in_progress batches can be produced", productionBatchIssueDetails("invalid_batch_status", batch))
 		}
 		producedQuantity := req.QuantityValue()
 		if producedQuantity <= 0 {
@@ -576,7 +576,7 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 		return apperrors.Forbidden("branch access denied")
 	}
 	if !batchCanProduce(batch.Status) {
-		return apperrors.BadRequest("only draft, planned, or in_progress batches can be completed", nil)
+		return apperrors.BadRequest("only draft, planned, or in_progress batches can be completed", productionBatchIssueDetails("invalid_batch_status", batch))
 	}
 	producedQuantity := req.ProducedQuantity
 	if producedQuantity <= 0 {
@@ -619,7 +619,7 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	if output, err := s.repo.Output(id, currentUser.BusinessID); err != nil {
 		return err
 	} else if output != nil {
-		return apperrors.BadRequest("production output already exists for this batch", nil)
+		return apperrors.BadRequest("production output already exists for this batch", productionBatchIssueDetails("duplicate_output", batch))
 	}
 	if err := s.validateProductionHasValuedInputs(tx, currentUser.BusinessID, batch.BranchID, batch.RecipeID, ingredients, packaging); err != nil {
 		return err
@@ -627,7 +627,7 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	consumedCost := 0.0
 	for _, line := range ingredients {
 		if line.ActualQuantity <= 0 {
-			return apperrors.BadRequest("all component actual quantities must be greater than zero", map[string]string{"line_id": line.ID})
+			return apperrors.BadRequest("all component actual quantities must be greater than zero", productionLineIssueDetails("invalid_component_quantity", batch, line.ID, line.ItemNameSnapshot))
 		}
 		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: line.InventoryItemID, MovementType: "production_out", Quantity: line.ActualQuantity, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production component consumed", CreatedByUserID: currentUser.UserID})
 		if err != nil {
@@ -653,14 +653,14 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 			if line.IsOptional {
 				continue
 			}
-			return apperrors.BadRequest("required packaging actual quantities must be greater than zero", map[string]string{"line_id": line.ID})
+			return apperrors.BadRequest("required packaging actual quantities must be greater than zero", productionLineIssueDetails("invalid_packaging_quantity", batch, line.ID, line.PackagingNameSnapshot))
 		}
 		inventoryItem, err := s.resolveProductionPackagingInventoryItem(tx, currentUser.BusinessID, batch.BranchID, line)
 		if err != nil {
 			return err
 		}
 		if inventoryItem.UnitID != line.UnitID {
-			return apperrors.BadRequest("unit conversion is not available yet; packaging unit must match inventory unit", nil)
+			return apperrors.BadRequest("unit conversion is not available yet; packaging unit must match inventory unit", productionLineIssueDetails("packaging_unit_mismatch", batch, line.ID, line.PackagingNameSnapshot))
 		}
 		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: inventoryItem.ID, MovementType: "production_out", Quantity: line.ActualQuantity, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production packaging consumed", CreatedByUserID: currentUser.UserID})
 		if err != nil {
@@ -906,7 +906,7 @@ func (s *Service) buildIngredientLines(tx *gorm.DB, businessID, batchID, branchI
 			return nil, recipeIngredientConsumptionError(err, branchID, recipeLine)
 		}
 		if item.UnitID != recipeLine.UnitID {
-			return nil, apperrors.BadRequest("unit conversion is not available yet; recipe ingredient unit must match inventory unit", nil)
+			return nil, apperrors.BadRequest("unit conversion is not available yet; recipe ingredient unit must match inventory unit", map[string]interface{}{"reason": "recipe_ingredient_unit_mismatch", "recipe_line_id": recipeLine.ID, "branch_id": branchID, "inventory_item_id": item.ID})
 		}
 		planned := roundQuantity(recipeLine.QuantityRequired * ratio)
 		actual := planned
@@ -943,7 +943,7 @@ func (s *Service) resolveRecipeIngredientInventoryItem(tx *gorm.DB, businessID, 
 		return nil, notFound(err, "ingredient not found")
 	}
 	if ingredient.UnitID != recipeLine.UnitID {
-		return nil, apperrors.BadRequest("unit conversion is not available yet; recipe ingredient unit must match ingredient unit", nil)
+		return nil, apperrors.BadRequest("unit conversion is not available yet; recipe ingredient unit must match ingredient unit", map[string]interface{}{"reason": "recipe_ingredient_unit_mismatch", "recipe_line_id": recipeLine.ID, "branch_id": branchID, "ingredient_id": *recipeLine.IngredientID})
 	}
 	item, err := s.inventoryRepo.FindExistingItem(tx, businessID, branchID, "ingredient", recipeLine.IngredientID)
 	if err == nil {
@@ -984,7 +984,7 @@ func (s *Service) buildPackagingLines(tx *gorm.DB, businessID, batchID, branchID
 			return nil, recipePackagingConsumptionError(err, branchID, recipeLine)
 		}
 		if item.UnitID != recipeLine.UnitID {
-			return nil, apperrors.BadRequest("unit conversion is not available yet; recipe packaging unit must match inventory unit", nil)
+			return nil, apperrors.BadRequest("unit conversion is not available yet; recipe packaging unit must match inventory unit", map[string]interface{}{"reason": "recipe_packaging_unit_mismatch", "recipe_line_id": recipeLine.ID, "branch_id": branchID, "inventory_item_id": item.ID})
 		}
 		planned := roundQuantity(recipeLine.QuantityRequired * ratio)
 		actual := planned
@@ -1045,7 +1045,7 @@ func (s *Service) findOrCreateProductInventoryItem(tx *gorm.DB, businessID, bran
 	item, err := s.inventoryRepo.FindExistingItem(tx, businessID, branchID, itemType, &itemID, productVariantID)
 	if err == nil {
 		if item.UnitID != unitID {
-			return nil, apperrors.BadRequest("unit conversion is not available yet; output unit must match product inventory unit", nil)
+			return nil, apperrors.BadRequest("unit conversion is not available yet; output unit must match product inventory unit", map[string]interface{}{"reason": "output_unit_mismatch", "product_id": productID, "branch_id": branchID, "inventory_item_id": item.ID})
 		}
 		return item, nil
 	}
@@ -1355,7 +1355,7 @@ func (s *Service) validateProductionHasValuedInputs(tx *gorm.DB, businessID, bra
 			return notFound(err, "component inventory item not found")
 		}
 		if item.BranchID != branchID || item.Status != "active" {
-			return apperrors.BadRequest("component inventory item must be active and belong to the production branch", map[string]interface{}{"line_id": line.ID, "item_name": line.ItemNameSnapshot})
+			return apperrors.BadRequest("component inventory item must be active and belong to the production branch", map[string]interface{}{"reason": "component_inventory_invalid", "line_id": line.ID, "item_name": line.ItemNameSnapshot, "branch_id": branchID, "inventory_item_id": line.InventoryItemID})
 		}
 		if item.AvailableQuantity < requiredQuantity {
 			stockShortages = append(stockShortages, map[string]interface{}{"line_id": line.ID, "item_name": line.ItemNameSnapshot, "required_quantity": requiredQuantity, "available_quantity": item.AvailableQuantity})
@@ -1378,7 +1378,7 @@ func (s *Service) validateProductionHasValuedInputs(tx *gorm.DB, businessID, bra
 			return notFound(err, "packaging inventory item not found")
 		}
 		if item.BranchID != branchID || item.Status != "active" {
-			return apperrors.BadRequest("packaging inventory item must be active and belong to the production branch", map[string]interface{}{"line_id": line.ID, "item_name": line.PackagingNameSnapshot})
+			return apperrors.BadRequest("packaging inventory item must be active and belong to the production branch", map[string]interface{}{"reason": "packaging_inventory_invalid", "line_id": line.ID, "item_name": line.PackagingNameSnapshot, "branch_id": branchID, "inventory_item_id": *line.InventoryItemID})
 		}
 		if item.AvailableQuantity < line.ActualQuantity {
 			stockShortages = append(stockShortages, map[string]interface{}{"line_id": line.ID, "item_name": line.PackagingNameSnapshot, "required_quantity": line.ActualQuantity, "available_quantity": item.AvailableQuantity})
@@ -1481,6 +1481,24 @@ func batchCanEditConsumption(status string) bool {
 
 func batchCanProduce(status string) bool {
 	return status == "draft" || status == "planned" || status == "in_progress"
+}
+
+func productionBatchIssueDetails(reason string, batch *ProductionBatch) map[string]interface{} {
+	return map[string]interface{}{
+		"reason":       reason,
+		"batch_id":     batch.ID,
+		"batch_number": batch.ProductionBatchNumber,
+		"branch_id":    batch.BranchID,
+		"recipe_id":    batch.RecipeID,
+		"status":       batch.Status,
+	}
+}
+
+func productionLineIssueDetails(reason string, batch *ProductionBatch, lineID, itemName string) map[string]interface{} {
+	details := productionBatchIssueDetails(reason, batch)
+	details["line_id"] = lineID
+	details["item_name"] = itemName
+	return details
 }
 
 func validStatus(value string) bool {

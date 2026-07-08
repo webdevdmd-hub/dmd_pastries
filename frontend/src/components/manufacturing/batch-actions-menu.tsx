@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { canProduceBatch, isBatchPlannedStatus } from "@/lib/manufacturing/batch-status";
 import type { ProductionBatch } from "@/types/manufacturing";
 
 export function BatchActionsMenu({
@@ -18,6 +19,7 @@ export function BatchActionsMenu({
   canEdit,
   canProduce,
   canRecordWastage,
+  isProducing = false,
   onDelete,
   onEdit,
   onProduce,
@@ -29,15 +31,16 @@ export function BatchActionsMenu({
   canEdit: boolean;
   canProduce: boolean;
   canRecordWastage: boolean;
+  isProducing?: boolean;
   onDelete: (batch: ProductionBatch) => void;
   onEdit: (batch: ProductionBatch) => void;
   onProduce: (batch: ProductionBatch) => void;
   onView: (batch: ProductionBatch) => void;
   onWastage: (batch: ProductionBatch) => void;
 }): JSX.Element {
-  const isPlanned = batch.status === "draft";
-  const canAddWastage =
-    canRecordWastage && batch.status !== "draft" && batch.status !== "cancelled";
+  const isPlanned = isBatchPlannedStatus(batch.status);
+  const isProduceEligible = canProduceBatch(batch);
+  const canAddWastage = canRecordWastage && !isPlanned && batch.status !== "cancelled";
 
   return (
     <DropdownMenu>
@@ -59,10 +62,10 @@ export function BatchActionsMenu({
             Edit planned
           </DropdownMenuItem>
         ) : null}
-        {canProduce && isPlanned ? (
-          <DropdownMenuItem onSelect={() => onProduce(batch)}>
+        {canProduce && isProduceEligible ? (
+          <DropdownMenuItem disabled={isProducing} onSelect={() => onProduce(batch)}>
             <Play className="h-4 w-4" />
-            Produce planned
+            {isProducing ? "Producing..." : "Produce planned"}
           </DropdownMenuItem>
         ) : null}
         {canDelete && isPlanned ? (

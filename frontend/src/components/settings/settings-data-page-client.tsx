@@ -119,7 +119,7 @@ const paymentMethodDefaultValues: PaymentMethodSchema = {
   isDefault: false,
   allowSplitPayment: false,
   requiresReference: false,
-  showInPos: true,
+  showInPos: false,
   showInBakeryOrders: true,
   showInPurchasing: false,
   showInExpenses: false,
@@ -895,7 +895,9 @@ function PaymentMethodsTable({
                 <TableCell>
                   {method.defaultPaymentAccountName ? (
                     method.defaultPaymentAccountName
-                  ) : method.showInPos || method.showInBakeryOrders ? (
+                  ) : method.showInPos ? (
+                    <span className="text-red-700">Needs payment account</span>
+                  ) : method.showInBakeryOrders ? (
                     <span className="text-red-700">Setup required</span>
                   ) : (
                     "-"
@@ -1031,15 +1033,22 @@ function PaymentMethodDialog({
   const watchShowInPos = form.watch("showInPos");
   const watchShowInBakeryOrders = form.watch("showInBakeryOrders");
   const watchPaymentAccountId = form.watch("defaultPaymentAccountId");
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       form.reset(toPaymentMethodForm(method));
+      setSubmitError(null);
     }
   }, [form, method, open]);
 
   const handleSubmit = form.handleSubmit(async (values) => {
-    await onSubmit(toPaymentMethodPayload(values));
+    setSubmitError(null);
+    try {
+      await onSubmit(toPaymentMethodPayload(values));
+    } catch (error) {
+      setSubmitError(getErrorMessage(error));
+    }
   });
 
   return (
@@ -1188,9 +1197,17 @@ function PaymentMethodDialog({
                 <ShieldAlert className="h-4 w-4" />
                 <AlertTitle>Payment account required for checkout</AlertTitle>
                 <AlertDescription>
-                  POS and Bakery Order payments need a default payment account before this method
-                  can be used for checkout.
+                  POS and Bakery Order payments need an active linked payment account before this
+                  method can be used. If branch-specific mappings are not configured for every
+                  checkout branch, saving POS visibility will be rejected.
                 </AlertDescription>
+              </Alert>
+            ) : null}
+            {submitError ? (
+              <Alert className="md:col-span-2 border-red-200 bg-red-50 text-red-950">
+                <ShieldAlert className="h-4 w-4" />
+                <AlertTitle>Payment method needs attention</AlertTitle>
+                <AlertDescription>{submitError}</AlertDescription>
               </Alert>
             ) : null}
 
@@ -1372,7 +1389,9 @@ export function SettingsDataPageClient({
       setPaymentMethodDialogOpen(false);
       setSelectedPaymentMethod(null);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      const message = getErrorMessage(error);
+      toast.error(message);
+      throw new Error(message);
     }
   };
 

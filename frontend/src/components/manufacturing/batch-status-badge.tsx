@@ -9,6 +9,7 @@ const labels: Record<BatchStatus, string> = {
   draft: "Planned",
   in_progress: "In progress",
   partially_completed: "Partially completed",
+  planned: "Planned",
 };
 
 export function BatchStatusBadge({ status }: { status: BatchStatus }): JSX.Element {

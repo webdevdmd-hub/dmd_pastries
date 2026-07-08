@@ -206,6 +206,9 @@ func (s *Service) CreatePaymentMethod(currentUser *utils.AuthContext, req Create
 		DefaultPaymentAccountID:   defaultPaymentAccountID,
 		Status:                    "active",
 	}
+	if err := s.validatePaymentMethodPOSReadiness(currentUser.BusinessID, method.ID, method.ShowInPOS, method.Status, method.DefaultPaymentAccountID); err != nil {
+		return nil, err
+	}
 
 	tx := s.db.Begin()
 	if tx.Error != nil {
@@ -307,6 +310,22 @@ func (s *Service) UpdatePaymentMethod(currentUser *utils.AuthContext, id string,
 			updates["default_payment_account_id"] = *defaultPaymentAccountID
 		}
 	}
+	effectiveShowInPOS := existing.ShowInPOS
+	if req.ShowInPOS != nil {
+		effectiveShowInPOS = *req.ShowInPOS
+	}
+	effectiveStatus := existing.Status
+	effectiveDefaultPaymentAccountID := existing.DefaultPaymentAccountID
+	if req.DefaultPaymentAccountID != nil {
+		if updates["default_payment_account_id"] == nil {
+			effectiveDefaultPaymentAccountID = nil
+		} else if value, ok := updates["default_payment_account_id"].(string); ok {
+			effectiveDefaultPaymentAccountID = &value
+		}
+	}
+	if err := s.validatePaymentMethodPOSReadiness(currentUser.BusinessID, id, effectiveShowInPOS, effectiveStatus, effectiveDefaultPaymentAccountID); err != nil {
+		return nil, err
+	}
 	if len(updates) == 0 {
 		return s.GetPaymentMethod(currentUser, id)
 	}
@@ -351,6 +370,11 @@ func (s *Service) UpdatePaymentMethodStatus(currentUser *utils.AuthContext, id s
 			return nil, apperrors.NotFound("payment method not found")
 		}
 		return nil, apperrors.Internal("failed to fetch payment method")
+	}
+	if req.Status == "active" {
+		if err := s.validatePaymentMethodPOSReadiness(currentUser.BusinessID, id, existing.ShowInPOS, req.Status, existing.DefaultPaymentAccountID); err != nil {
+			return nil, err
+		}
 	}
 	tx := s.db.Begin()
 	if tx.Error != nil {
@@ -1474,6 +1498,23 @@ func (s *Service) normalizePaymentMethodPaymentAccount(businessID string, accoun
 		return nil, apperrors.BadRequest("default_payment_account_id is invalid or inactive", nil)
 	}
 	return normalized, nil
+}
+
+func (s *Service) validatePaymentMethodPOSReadiness(businessID, methodID string, showInPOS bool, status string, defaultPaymentAccountID *string) error {
+	if !showInPOS || status != "active" {
+		return nil
+	}
+	ready, err := s.repo.PaymentMethodHasPOSAccountCoverage(businessID, methodID, defaultPaymentAccountID)
+	if err != nil {
+		return apperrors.Internal("failed to validate POS payment method setup")
+	}
+	if ready {
+		return nil
+	}
+	return apperrors.BadRequest("show_in_pos requires an active linked payment account for every checkout branch", map[string]interface{}{
+		"show_in_pos": true,
+		"reason":      "payment_method_account_missing",
+	})
 }
 
 func normalizeOptionalStringPtr(input *string) *string {

@@ -72,7 +72,7 @@ func (r *Repository) ListPOSProducts(businessID, branchID string, query POSProdu
 
 func (r *Repository) ListPOSPaymentMethods(businessID, branchID string) ([]POSPaymentMethodResponse, error) {
 	var rows []POSPaymentMethodResponse
-	err := r.db.Table("payment_methods pm").
+	err := r.withCheckoutReadyPaymentAccount(r.db.Table("payment_methods pm"), branchID).
 		Select(`
 			pm.id,
 			pm.business_id,
@@ -94,15 +94,29 @@ func (r *Repository) ListPOSPaymentMethods(businessID, branchID string) ([]POSPa
 			pm.created_at::text AS created_at,
 			pm.updated_at::text AS updated_at
 		`).
-		Joins("LEFT JOIN payment_method_account_mappings pmam ON pmam.payment_method_id = pm.id AND pmam.business_id = pm.business_id AND pmam.branch_id = ? AND pmam.status = ? AND pmam.deleted_at IS NULL", branchID, "active").
-		Joins("JOIN payment_accounts pa ON pa.id = COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AND pa.business_id = pm.business_id AND pa.status = ? AND pa.deleted_at IS NULL", "active").
 		Joins("LEFT JOIN branches account_branch ON account_branch.id = pa.branch_id AND account_branch.business_id = pm.business_id AND account_branch.deleted_at IS NULL").
 		Joins("LEFT JOIN branches checkout_branch ON checkout_branch.id = ? AND checkout_branch.business_id = pm.business_id AND checkout_branch.deleted_at IS NULL", branchID).
-		Where("pm.business_id = ? AND pm.status = ? AND pm.show_in_pos = ? AND COALESCE(pmam.payment_account_id, pm.default_payment_account_id) IS NOT NULL AND pm.deleted_at IS NULL", businessID, "active", true).
-		Where("(pa.branch_id IS NULL OR pa.branch_id = ?)", branchID).
+		Where("pm.business_id = ? AND pm.status = ? AND pm.show_in_pos = ? AND pm.deleted_at IS NULL", businessID, "active", true).
 		Order("pm.is_default DESC, pm.method_name ASC").
 		Scan(&rows).Error
 	return rows, err
+}
+
+func (r *Repository) POSPaymentMethodHasReadyAccount(tx *gorm.DB, businessID, branchID, paymentMethodID string) (bool, error) {
+	var count int64
+	err := r.withCheckoutReadyPaymentAccount(tx.Table("payment_methods pm"), branchID).
+		Where("pm.id = ? AND pm.business_id = ? AND pm.status = ? AND pm.show_in_pos = ? AND pm.deleted_at IS NULL", paymentMethodID, businessID, "active", true).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *Repository) withCheckoutReadyPaymentAccount(db *gorm.DB, branchID string) *gorm.DB {
+	return db.
+		Joins("LEFT JOIN payment_method_account_mappings pmam ON pmam.payment_method_id = pm.id AND pmam.business_id = pm.business_id AND pmam.branch_id = ? AND pmam.status = ? AND pmam.deleted_at IS NULL", branchID, "active").
+		Joins("JOIN payment_accounts pa ON pa.id = COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AND pa.business_id = pm.business_id AND pa.status = ? AND pa.deleted_at IS NULL", "active").
+		Joins("JOIN chart_of_accounts coa ON coa.id = pa.chart_account_id AND coa.business_id = pa.business_id AND coa.status = ? AND coa.deleted_at IS NULL", "active").
+		Where("COALESCE(pmam.payment_account_id, pm.default_payment_account_id) IS NOT NULL").
+		Where("(pa.branch_id IS NULL OR pa.branch_id = ?)", branchID)
 }
 
 func (r *Repository) ListPOSProductCategories(businessID, branchID string) ([]POSProductCategoryOption, error) {

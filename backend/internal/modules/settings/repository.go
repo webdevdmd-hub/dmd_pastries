@@ -384,6 +384,26 @@ func (r *Repository) PaymentAccountName(businessID string, accountID *string) st
 	return name
 }
 
+func (r *Repository) PaymentMethodHasPOSAccountCoverage(businessID, methodID string, defaultPaymentAccountID *string) (bool, error) {
+	fallback := ""
+	if defaultPaymentAccountID != nil && *defaultPaymentAccountID != "" {
+		fallback = *defaultPaymentAccountID
+	}
+
+	var missingCount int64
+	err := r.db.Table("branches b").
+		Joins("LEFT JOIN payment_method_account_mappings pmam ON pmam.business_id = b.business_id AND pmam.branch_id = b.id AND pmam.payment_method_id = ? AND pmam.status = ? AND pmam.deleted_at IS NULL", methodID, "active").
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = COALESCE(pmam.payment_account_id, NULLIF(?, '')::uuid) AND pa.business_id = b.business_id AND pa.status = ? AND pa.deleted_at IS NULL", fallback, "active").
+		Joins("LEFT JOIN chart_of_accounts coa ON coa.id = pa.chart_account_id AND coa.business_id = pa.business_id AND coa.status = ? AND coa.deleted_at IS NULL", "active").
+		Where("b.business_id = ? AND b.status = ? AND b.deleted_at IS NULL", businessID, "active").
+		Where("pa.id IS NULL OR (pa.branch_id IS NOT NULL AND pa.branch_id <> b.id) OR coa.id IS NULL").
+		Count(&missingCount).Error
+	if err != nil {
+		return false, err
+	}
+	return missingCount == 0, nil
+}
+
 func (r *Repository) CreateReceiptLayout(tx *gorm.DB, layout *ReceiptLayout) error {
 	return tx.Create(layout).Error
 }

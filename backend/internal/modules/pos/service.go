@@ -1191,6 +1191,16 @@ func (s *Service) buildPayments(tx *gorm.DB, businessID, branchID, paidByUserID 
 		if !method.ShowInPOS {
 			return nil, 0, 0, apperrors.BadRequest("payment method is not enabled for POS", nil)
 		}
+		ready, err := s.repo.POSPaymentMethodHasReadyAccount(tx, businessID, branchID, method.ID)
+		if err != nil {
+			return nil, 0, 0, apperrors.Internal("failed to validate payment method account")
+		}
+		if !ready {
+			return nil, 0, 0, apperrors.BadRequest(
+				"payment method is not linked to an active payment account for this branch",
+				map[string]interface{}{"payment_method": method.MethodName},
+			)
+		}
 		if method.RequiresReference && strings.TrimSpace(reqPayment.ReferenceNumber) == "" {
 			return nil, 0, 0, apperrors.BadRequest("reference_number is required for this payment method", nil)
 		}
