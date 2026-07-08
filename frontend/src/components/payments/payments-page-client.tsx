@@ -4,7 +4,7 @@ import { ArrowRight, ListChecks, Plus, ReceiptText, RotateCcw, WalletCards } fro
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/payments/access-denied-card";
@@ -43,6 +43,7 @@ import { useSaleReceipt } from "@/hooks/use-reports";
 import { useReceiptLayouts } from "@/hooks/use-settings-data";
 import { useUsers } from "@/hooks/use-users";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { resolveDashboardTimezone } from "@/lib/reports/dashboard-filters";
 import type {
   AddPaymentPayload,
   PaymentFilters,
@@ -131,10 +132,12 @@ export function PaymentsPageClient(): JSX.Element {
   const canViewUsers = hasPermission(PERMISSIONS.usersView);
   const canSelectRefundApprover =
     hasAnyPermission([PERMISSIONS.paymentsRefund]) || user?.roles.some(isOwnerOrAdminRole) === true;
+  const timezone = useMemo(resolveDashboardTimezone, []);
   const summaryParams: PaymentSummaryParams = {
     branchId: filters.branchId,
     dateFrom: filters.dateFrom,
     dateTo: filters.dateTo,
+    timezone,
   };
   const paymentsQuery = usePayments(filters, canView && branchScope.hasBranchScope);
   const summaryQuery = useDailyPaymentSummary(

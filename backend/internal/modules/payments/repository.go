@@ -499,9 +499,9 @@ func (r *Repository) operationalPaymentSummary(businessID, dateFrom, dateTo, bra
 		refundArgs = append(refundArgs, dateFrom)
 	}
 	if dateTo != "" {
-		paymentWhere += " AND paid_at <= ?"
-		bakeryWhere += " AND bop.paid_at <= ?"
-		refundWhere += " AND refunded_at <= ?"
+		paymentWhere += " AND paid_at < ?"
+		bakeryWhere += " AND bop.paid_at < ?"
+		refundWhere += " AND refunded_at < ?"
 		paymentArgs = append(paymentArgs, dateTo)
 		bakeryArgs = append(bakeryArgs, dateTo)
 		refundArgs = append(refundArgs, dateTo)

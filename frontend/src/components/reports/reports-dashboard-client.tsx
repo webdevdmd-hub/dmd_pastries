@@ -8,6 +8,7 @@ import { AccessDeniedCard } from "@/components/reports/access-denied-card";
 import { OrdersChart } from "@/components/reports/orders-chart";
 import { PaymentsChart } from "@/components/reports/payments-chart";
 import { ReportChartCard } from "@/components/reports/report-chart-card";
+import { ReportErrorState } from "@/components/reports/report-error-state";
 import { ReportFilterBar, type ReportFilterDraft } from "@/components/reports/report-filter-bar";
 import { ReportKpiGrid } from "@/components/reports/report-kpi-grid";
 import { ReportPageHeader } from "@/components/reports/report-page-header";
@@ -23,6 +24,7 @@ import {
   useReportsDashboardSummary,
   useSalesReportChart,
 } from "@/hooks/use-reports";
+import { getErrorMessage } from "@/lib/api/client";
 import {
   createDefaultDashboardDraft,
   resolveDashboardTimezone,
@@ -104,7 +106,17 @@ export function ReportsDashboardClient(): JSX.Element {
         onChange={setDraftFilters}
         onReset={handleReset}
       />
-      <ReportKpiGrid summary={summaryQuery.data} />
+      {summaryQuery.error ? (
+        <ReportErrorState
+          description={getErrorMessage(summaryQuery.error)}
+          onRetry={() => {
+            void summaryQuery.refetch();
+          }}
+        />
+      ) : null}
+      {!summaryQuery.error ? (
+        <ReportKpiGrid isLoading={summaryQuery.isLoading} summary={summaryQuery.data} />
+      ) : null}
       <div className="grid gap-6 xl:grid-cols-3">
         <ReportChartCard
           caption="Sales performance by selected period."

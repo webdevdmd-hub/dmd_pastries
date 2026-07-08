@@ -122,6 +122,7 @@ export type PaymentSummaryParams = {
   date?: string | null;
   dateFrom?: string | null;
   dateTo?: string | null;
+  timezone?: string | null;
 };
 
 export type PaymentConsistencyWarning = {

@@ -321,8 +321,8 @@ func (s *Service) GetRefund(currentUser *utils.AuthContext, id string) (*Payment
 	return refund, nil
 }
 
-func (s *Service) DailySummary(currentUser *utils.AuthContext, date, dateFrom, dateTo, branchID, ipAddress, userAgent string) (*DailySummaryResponse, error) {
-	summaryRange, err := resolvePaymentSummaryRange(date, dateFrom, dateTo)
+func (s *Service) DailySummary(currentUser *utils.AuthContext, date, dateFrom, dateTo, timezone, branchID, ipAddress, userAgent string) (*DailySummaryResponse, error) {
+	summaryRange, err := resolvePaymentSummaryRange(date, dateFrom, dateTo, timezone)
 	if err != nil {
 		return nil, err
 	}
@@ -343,11 +343,14 @@ func (s *Service) DailySummary(currentUser *utils.AuthContext, date, dateFrom, d
 	return result, nil
 }
 
-func (s *Service) MethodSummary(currentUser *utils.AuthContext, dateFrom, dateTo, branchID, ipAddress, userAgent string) ([]PaymentSummaryByMethod, error) {
+func (s *Service) MethodSummary(currentUser *utils.AuthContext, dateFrom, dateTo, timezone, branchID, ipAddress, userAgent string) ([]PaymentSummaryByMethod, error) {
 	if err := validateDateRange(dateFrom, dateTo); err != nil {
 		return nil, err
 	}
-	dateFrom, dateTo = normalizePaymentDateBounds(dateFrom, dateTo)
+	dateFrom, dateTo, err := normalizePaymentSummaryDateBounds(dateFrom, dateTo, timezone)
+	if err != nil {
+		return nil, err
+	}
 	resolvedBranchID, allBranches, err := currentUser.ResolveBranchScope(branchID, "")
 	if err != nil {
 		return nil, err
@@ -539,37 +542,108 @@ func validateDateRange(dateFrom, dateTo string) error {
 	return nil
 }
 
-func resolvePaymentSummaryRange(date, dateFrom, dateTo string) (paymentSummaryRange, error) {
+func resolvePaymentSummaryRange(date, dateFrom, dateTo, timezone string) (paymentSummaryRange, error) {
 	date = strings.TrimSpace(date)
 	dateFrom = strings.TrimSpace(dateFrom)
 	dateTo = strings.TrimSpace(dateTo)
+	location, err := resolvePaymentSummaryTimezone(timezone)
+	if err != nil {
+		return paymentSummaryRange{}, err
+	}
 	if date != "" && dateFrom == "" && dateTo == "" {
-		parsedDate, err := time.Parse("2006-01-02", date)
+		startUTC, endUTC, err := paymentLocalDayBounds(date, location)
 		if err != nil {
 			return paymentSummaryRange{}, apperrors.BadRequest("date must be YYYY-MM-DD", nil)
 		}
-		end := parsedDate.AddDate(0, 0, 1)
 		return paymentSummaryRange{
 			DateLabel:       date,
-			DateFrom:        date,
-			DateTo:          endOfDayBound(date),
-			WarningStartUTC: &parsedDate,
-			WarningEndUTC:   &end,
+			DateFrom:        formatPaymentBoundary(startUTC),
+			DateTo:          formatPaymentBoundary(endUTC),
+			WarningStartUTC: &startUTC,
+			WarningEndUTC:   &endUTC,
 		}, nil
 	}
 	if err := validateDateRange(dateFrom, dateTo); err != nil {
 		return paymentSummaryRange{}, err
 	}
-	normalizedFrom, normalizedTo := normalizePaymentDateBounds(dateFrom, dateTo)
+	normalizedFrom, normalizedTo, err := normalizePaymentSummaryDateBounds(dateFrom, dateTo, timezone)
+	if err != nil {
+		return paymentSummaryRange{}, err
+	}
 	summaryRange := paymentSummaryRange{DateFrom: normalizedFrom, DateTo: normalizedTo}
 	if dateFrom != "" && dateTo != "" {
-		start, _ := time.Parse("2006-01-02", dateFrom)
-		endDate, _ := time.Parse("2006-01-02", dateTo)
-		end := endDate.AddDate(0, 0, 1)
+		start, end, err := paymentLocalRangeBounds(dateFrom, dateTo, location)
+		if err != nil {
+			return paymentSummaryRange{}, err
+		}
 		summaryRange.WarningStartUTC = &start
 		summaryRange.WarningEndUTC = &end
 	}
 	return summaryRange, nil
+}
+
+func normalizePaymentSummaryDateBounds(dateFrom, dateTo, timezone string) (string, string, error) {
+	dateFrom = strings.TrimSpace(dateFrom)
+	dateTo = strings.TrimSpace(dateTo)
+	location, err := resolvePaymentSummaryTimezone(timezone)
+	if err != nil {
+		return "", "", err
+	}
+	var normalizedFrom string
+	var normalizedTo string
+	if dateFrom != "" {
+		startUTC, _, err := paymentLocalDayBounds(dateFrom, location)
+		if err != nil {
+			return "", "", apperrors.BadRequest("date_from must be YYYY-MM-DD", nil)
+		}
+		normalizedFrom = formatPaymentBoundary(startUTC)
+	}
+	if dateTo != "" {
+		_, endUTC, err := paymentLocalDayBounds(dateTo, location)
+		if err != nil {
+			return "", "", apperrors.BadRequest("date_to must be YYYY-MM-DD", nil)
+		}
+		normalizedTo = formatPaymentBoundary(endUTC)
+	}
+	return normalizedFrom, normalizedTo, nil
+}
+
+func resolvePaymentSummaryTimezone(timezone string) (*time.Location, error) {
+	timezone = strings.TrimSpace(timezone)
+	if timezone == "" {
+		timezone = "Asia/Dubai"
+	}
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		return nil, apperrors.BadRequest("invalid timezone", map[string]string{"timezone": timezone})
+	}
+	return location, nil
+}
+
+func paymentLocalRangeBounds(dateFrom, dateTo string, location *time.Location) (time.Time, time.Time, error) {
+	startUTC, _, err := paymentLocalDayBounds(dateFrom, location)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	_, endUTC, err := paymentLocalDayBounds(dateTo, location)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	return startUTC, endUTC, nil
+}
+
+func paymentLocalDayBounds(date string, location *time.Location) (time.Time, time.Time, error) {
+	parsedDate, err := time.ParseInLocation("2006-01-02", date, location)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	startLocal := time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), 0, 0, 0, 0, location)
+	endLocal := startLocal.AddDate(0, 0, 1)
+	return startLocal.UTC(), endLocal.UTC(), nil
+}
+
+func formatPaymentBoundary(value time.Time) string {
+	return value.UTC().Format(time.RFC3339Nano)
 }
 
 func normalizePaymentDateBounds(dateFrom, dateTo string) (string, string) {

@@ -55,6 +55,7 @@ type ledgerFinancialTotals struct {
 const (
 	journalSourceOfTruth          = "journal_entries"
 	operationalSalesSourceOfTruth = "sales_and_completed_payment_refunds"
+	operationalReportsSource      = "operational_report_transactions"
 	financialTransactionsSource   = "financial_transactions"
 )
 
@@ -93,7 +94,7 @@ func (r *Repository) DashboardSummary(filter *shared.ResolvedFilter) (*Dashboard
 		Manufacturing:       *manufacturing,
 		Orders:              *orders,
 		Payments:            *payments,
-		SourceOfTruth:       journalSourceOfTruth,
+		SourceOfTruth:       operationalReportsSource,
 		ConsistencyWarnings: warnings,
 	}, nil
 }
@@ -2309,11 +2310,20 @@ func (r *Repository) ordersSummary(filter *shared.ResolvedFilter) (*OrdersSummar
 }
 
 func (r *Repository) paymentsSummary(filter *shared.ResolvedFilter) (*PaymentsSummary, error) {
-	ledger, err := r.ledgerFinancialTotals(filter, filter.StartUTC, filter.EndUTC)
-	if err != nil {
+	var collected financialCollectedSummaryRow
+	query, args := financialCollectedSummarySQL(filter)
+	if err := r.db.Raw(query, args...).Scan(&collected).Error; err != nil {
 		return nil, err
 	}
-	return &PaymentsSummary{CollectedAmount: ledger.Collected, RefundAmount: ledger.Refunded}, nil
+	var refunded financialRefundSummaryRow
+	query, args = financialRefundSummarySQL(filter)
+	if err := r.db.Raw(query, args...).Scan(&refunded).Error; err != nil {
+		return nil, err
+	}
+	return &PaymentsSummary{
+		CollectedAmount: roundMoney(collected.TotalCollected),
+		RefundAmount:    roundMoney(refunded.TotalRefunded),
+	}, nil
 }
 
 func (r *Repository) salesExportRows(filter *shared.ResolvedFilter) ([]string, [][]string, error) {

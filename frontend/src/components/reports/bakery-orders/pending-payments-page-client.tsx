@@ -41,6 +41,8 @@ export function PendingPaymentsPageClient(): JSX.Element {
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = usePendingPaymentsReport(filters, canView && hasScope);
+  const report = reportQuery.data;
+  const orders = report?.orders ?? [];
   if (!canView) return <AccessDeniedCard />;
   if (!hasScope) return <NoBranchScopeCard />;
   const applyFilters = (): void => {
@@ -63,22 +65,26 @@ export function PendingPaymentsPageClient(): JSX.Element {
         onChange={setDraft}
         onReset={() => setFilters(toBakeryOrdersReportFilters(initialDraft))}
       />
-      <PendingPaymentsSummaryCard rows={reportQuery.data ?? []} />
+      {!reportQuery.error ? (
+        <PendingPaymentsSummaryCard totalPendingBalance={report?.totalPendingBalance ?? 0} />
+      ) : null}
       {reportQuery.error ? (
         <BakeryOrdersReportErrorState
           description={getErrorMessage(reportQuery.error)}
           onRetry={() => void reportQuery.refetch()}
         />
       ) : null}
-      <Card className="bg-white/85 shadow-soft">
-        <CardContent className="p-5">
-          {reportQuery.data && reportQuery.data.length > 0 ? (
-            <PendingPaymentsTable rows={reportQuery.data} />
-          ) : (
-            <BakeryOrdersReportEmptyState message="No pending payments found." />
-          )}
-        </CardContent>
-      </Card>
+      {!reportQuery.error ? (
+        <Card className="bg-white/85 shadow-soft">
+          <CardContent className="p-5">
+            {orders.length > 0 ? (
+              <PendingPaymentsTable rows={orders} />
+            ) : (
+              <BakeryOrdersReportEmptyState message="No pending payments found." />
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

@@ -18,7 +18,7 @@ import type {
   BakeryOrdersTrendChart,
   DeliveryVsPickupReport,
   OrderStatusRow,
-  PendingPaymentRow,
+  PendingPaymentsReport,
   ProductionScheduleRow,
   UpcomingOrderRow,
 } from "@/types/bakery-orders-reports";
@@ -76,7 +76,7 @@ export function useProductionScheduleReport(filters: BakeryOrdersReportFilters, 
 }
 
 export function usePendingPaymentsReport(filters: BakeryOrdersReportFilters, enabled = true) {
-  return useBakeryOrdersReportQuery<PendingPaymentRow[]>(
+  return useBakeryOrdersReportQuery<PendingPaymentsReport>(
     "pending-payments",
     filters,
     async () => getPendingPaymentsReport(filters),

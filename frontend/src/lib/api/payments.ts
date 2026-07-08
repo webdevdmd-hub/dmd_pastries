@@ -408,6 +408,7 @@ function toPaymentSummaryQueryParams(
     date: params.date,
     date_from: params.dateFrom,
     date_to: params.dateTo,
+    timezone: params.timezone,
   };
 }
 

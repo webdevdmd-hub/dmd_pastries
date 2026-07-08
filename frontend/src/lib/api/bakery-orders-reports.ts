@@ -6,6 +6,7 @@ import type {
   DeliveryVsPickupReport,
   OrderStatusRow,
   PendingPaymentRow,
+  PendingPaymentsReport,
   ProductionScheduleRow,
   UpcomingOrderRow,
 } from "@/types/bakery-orders-reports";
@@ -65,6 +66,11 @@ type BackendPendingPaymentRow = {
   paid_amount?: number;
   payment_status?: string;
   total_amount?: number;
+};
+
+type BackendPendingPaymentsReport = {
+  orders?: unknown;
+  total_pending_balance?: number;
 };
 
 type BackendDeliveryVsPickupReport = {
@@ -196,6 +202,16 @@ function parsePendingPaymentRow(value: unknown): PendingPaymentRow {
   };
 }
 
+function parsePendingPaymentsReport(value: unknown): PendingPaymentsReport {
+  const row = isObject(value) ? (value as BackendPendingPaymentsReport) : {};
+  const orders = Array.isArray(row.orders) ? row.orders.map(parsePendingPaymentRow) : [];
+
+  return {
+    orders,
+    totalPendingBalance: numberOrZero(row.total_pending_balance),
+  };
+}
+
 function parseDeliveryVsPickup(value: unknown): DeliveryVsPickupReport {
   const row = isObject(value) ? (value as BackendDeliveryVsPickupReport) : {};
   return {
@@ -273,9 +289,11 @@ export async function getProductionScheduleReport(
 
 export async function getPendingPaymentsReport(
   filters: BakeryOrdersReportFilters,
-): Promise<PendingPaymentRow[]> {
-  return getReport("/api/v1/reports/bakery-orders/pending-payments", filters, (value) =>
-    parseList(value, parsePendingPaymentRow),
+): Promise<PendingPaymentsReport> {
+  return getReport(
+    "/api/v1/reports/bakery-orders/pending-payments",
+    filters,
+    parsePendingPaymentsReport,
   );
 }
 

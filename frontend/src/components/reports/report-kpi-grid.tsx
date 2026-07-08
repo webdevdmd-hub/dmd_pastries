@@ -9,6 +9,7 @@ import {
 import type { JSX } from "react";
 
 import { ReportKpiCard } from "@/components/reports/report-kpi-card";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { ReportsDashboardSummary } from "@/types/reports";
 
 function currency(value: number): string {
@@ -24,10 +25,22 @@ function number(value: number): string {
 }
 
 export function ReportKpiGrid({
+  isLoading = false,
   summary,
 }: {
+  isLoading?: boolean;
   summary: ReportsDashboardSummary | undefined;
 }): JSX.Element {
+  if (isLoading && !summary) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        {Array.from({ length: 10 }).map((_, index) => (
+          <Skeleton className="h-32 rounded-2xl" key={index} />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
       <ReportKpiCard

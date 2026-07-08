@@ -139,6 +139,32 @@ func TestFinancialSummarySQLUsesOperationalFinancialSources(t *testing.T) {
 	}
 }
 
+func TestDashboardPaymentsSummaryUsesOperationalFinancialSources(t *testing.T) {
+	source, err := os.ReadFile("repository.go")
+	if err != nil {
+		t.Fatalf("read reports repository source: %v", err)
+	}
+	repositorySource := string(source)
+	start := strings.Index(repositorySource, "func (r *Repository) paymentsSummary")
+	if start < 0 {
+		t.Fatal("paymentsSummary function not found")
+	}
+	end := strings.Index(repositorySource[start:], "func (r *Repository) salesExportRows")
+	if end < 0 {
+		t.Fatal("paymentsSummary end marker not found")
+	}
+	body := repositorySource[start : start+end]
+
+	for _, expected := range []string{"financialCollectedSummarySQL", "financialRefundSummarySQL"} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("dashboard payment summary must use %s: %s", expected, body)
+		}
+	}
+	if strings.Contains(body, "ledgerFinancialTotals") {
+		t.Fatalf("dashboard payment summary must not use ledger totals: %s", body)
+	}
+}
+
 func TestFinancialSummarySalesReturnSourceAffectsRefundsOnly(t *testing.T) {
 	filter := testBakeryOrdersReportFilter()
 	filter.SourceType = "sales_return"

@@ -3,15 +3,17 @@ import type { JSX } from "react";
 
 import { ReportKpiCard } from "@/components/reports/report-kpi-card";
 import { formatCurrency } from "@/components/reports/sales/sales-report-format";
-import type { PendingPaymentRow } from "@/types/bakery-orders-reports";
 
-export function PendingPaymentsSummaryCard({ rows }: { rows: PendingPaymentRow[] }): JSX.Element {
-  const total = rows.reduce((sum, row) => sum + row.balanceAmount, 0);
+export function PendingPaymentsSummaryCard({
+  totalPendingBalance,
+}: {
+  totalPendingBalance: number;
+}): JSX.Element {
   return (
     <ReportKpiCard
       icon={CircleDollarSign}
       label="Total Pending Balance"
-      value={formatCurrency(total)}
+      value={formatCurrency(totalPendingBalance)}
     />
   );
 }

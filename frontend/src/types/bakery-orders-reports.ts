@@ -71,6 +71,11 @@ export type PendingPaymentRow = {
   totalAmount: number;
 };
 
+export type PendingPaymentsReport = {
+  orders: PendingPaymentRow[];
+  totalPendingBalance: number;
+};
+
 export type DeliveryVsPickupReport = {
   deliveryOrders: {
     count: number;

@@ -108,7 +108,7 @@ func (h *Handler) GetRefund(c *gin.Context) {
 }
 
 func (h *Handler) DailySummary(c *gin.Context) {
-	result, err := h.service.DailySummary(utils.MustAuthContext(c), c.Query("date"), c.Query("date_from"), c.Query("date_to"), c.Query("branch_id"), c.ClientIP(), c.Request.UserAgent())
+	result, err := h.service.DailySummary(utils.MustAuthContext(c), c.Query("date"), c.Query("date_from"), c.Query("date_to"), c.Query("timezone"), c.Query("branch_id"), c.ClientIP(), c.Request.UserAgent())
 	if err != nil {
 		handleError(c, err)
 		return
@@ -117,7 +117,7 @@ func (h *Handler) DailySummary(c *gin.Context) {
 }
 
 func (h *Handler) MethodSummary(c *gin.Context) {
-	result, err := h.service.MethodSummary(utils.MustAuthContext(c), c.Query("date_from"), c.Query("date_to"), c.Query("branch_id"), c.ClientIP(), c.Request.UserAgent())
+	result, err := h.service.MethodSummary(utils.MustAuthContext(c), c.Query("date_from"), c.Query("date_to"), c.Query("timezone"), c.Query("branch_id"), c.ClientIP(), c.Request.UserAgent())
 	if err != nil {
 		handleError(c, err)
 		return

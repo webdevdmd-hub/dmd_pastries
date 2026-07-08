@@ -57,7 +57,7 @@ func TestDailySummaryFromOperationalUsesMethodSummaryTotals(t *testing.T) {
 }
 
 func TestResolvePaymentSummaryRangeDefaultsToAllTime(t *testing.T) {
-	summaryRange, err := resolvePaymentSummaryRange("", "", "")
+	summaryRange, err := resolvePaymentSummaryRange("", "", "", "")
 	if err != nil {
 		t.Fatalf("resolvePaymentSummaryRange returned error: %v", err)
 	}
@@ -70,18 +70,18 @@ func TestResolvePaymentSummaryRangeDefaultsToAllTime(t *testing.T) {
 }
 
 func TestResolvePaymentSummaryRangeDateShortcutUsesSingleDay(t *testing.T) {
-	summaryRange, err := resolvePaymentSummaryRange("2026-07-06", "", "")
+	summaryRange, err := resolvePaymentSummaryRange("2026-07-06", "", "", "Asia/Dubai")
 	if err != nil {
 		t.Fatalf("resolvePaymentSummaryRange returned error: %v", err)
 	}
 	if summaryRange.DateLabel != "2026-07-06" {
 		t.Fatalf("date label = %q, want 2026-07-06", summaryRange.DateLabel)
 	}
-	if summaryRange.DateFrom != "2026-07-06" {
-		t.Fatalf("date_from = %q, want 2026-07-06", summaryRange.DateFrom)
+	if summaryRange.DateFrom != "2026-07-05T20:00:00Z" {
+		t.Fatalf("date_from = %q, want Dubai local start in UTC", summaryRange.DateFrom)
 	}
-	if summaryRange.DateTo != "2026-07-06 23:59:59.999999" {
-		t.Fatalf("date_to = %q, want end-of-day bound", summaryRange.DateTo)
+	if summaryRange.DateTo != "2026-07-06T20:00:00Z" {
+		t.Fatalf("date_to = %q, want next Dubai local day start in UTC", summaryRange.DateTo)
 	}
 	if summaryRange.WarningStartUTC == nil || summaryRange.WarningEndUTC == nil {
 		t.Fatalf("date shortcut should request bounded journal warnings")
@@ -89,18 +89,25 @@ func TestResolvePaymentSummaryRangeDateShortcutUsesSingleDay(t *testing.T) {
 }
 
 func TestResolvePaymentSummaryRangeRangeNormalizesDateToEndOfDay(t *testing.T) {
-	summaryRange, err := resolvePaymentSummaryRange("", "2026-07-01", "2026-07-06")
+	summaryRange, err := resolvePaymentSummaryRange("", "2026-07-01", "2026-07-06", "Asia/Dubai")
 	if err != nil {
 		t.Fatalf("resolvePaymentSummaryRange returned error: %v", err)
 	}
-	if summaryRange.DateFrom != "2026-07-01" {
-		t.Fatalf("date_from = %q, want 2026-07-01", summaryRange.DateFrom)
+	if summaryRange.DateFrom != "2026-06-30T20:00:00Z" {
+		t.Fatalf("date_from = %q, want Dubai local range start in UTC", summaryRange.DateFrom)
 	}
-	if summaryRange.DateTo != "2026-07-06 23:59:59.999999" {
-		t.Fatalf("date_to = %q, want end-of-day bound", summaryRange.DateTo)
+	if summaryRange.DateTo != "2026-07-06T20:00:00Z" {
+		t.Fatalf("date_to = %q, want Dubai local range end in UTC", summaryRange.DateTo)
 	}
 	if summaryRange.WarningStartUTC == nil || summaryRange.WarningEndUTC == nil {
 		t.Fatalf("closed range should request bounded journal warnings")
+	}
+}
+
+func TestResolvePaymentSummaryRangeRejectsInvalidTimezone(t *testing.T) {
+	_, err := resolvePaymentSummaryRange("2026-07-06", "", "", "Not/AZone")
+	if err == nil {
+		t.Fatal("expected invalid timezone error")
 	}
 }
 
