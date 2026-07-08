@@ -1,4 +1,5 @@
 export type ApiMonitorStatus =
+  | "expected_validation"
   | "failed"
   | "healthy"
   | "not_tested"
@@ -7,16 +8,20 @@ export type ApiMonitorStatus =
   | "unauthorized";
 
 export type ApiProbeMode = "live_only" | "safe_probe";
+export type ApiProbeCategory = "authenticated" | "parameter_required" | "public" | "unsupported";
 
 export type ApiMonitorSource = "live" | "safe_probe";
 
 export type ApiRouteCatalogItem = {
   apiName: string;
+  expectedValidationMessages: string[];
   handler: string;
   method: string;
   module: string;
   path: string;
+  probeCategory: ApiProbeCategory;
   probeMode: ApiProbeMode;
+  probePath: string | null;
 };
 
 export type ApiMonitorEvent = {
@@ -42,6 +47,7 @@ export type ApiMonitorRecordInput = {
   method: string;
   responseTimeMs: number;
   source: ApiMonitorSource;
+  status?: ApiMonitorStatus;
   statusCode: number;
   success: boolean;
 };

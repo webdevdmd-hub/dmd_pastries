@@ -3,11 +3,29 @@ package systemhealth
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"pastries-pos/internal/shared/response"
 )
+
+const (
+	probeCategoryAuthenticated     = "authenticated"
+	probeCategoryParameterRequired = "parameter_required"
+	probeCategoryPublic            = "public"
+	probeCategoryUnsupported       = "unsupported"
+
+	probeModeLiveOnly  = "live_only"
+	probeModeSafeProbe = "safe_probe"
+)
+
+type routeProbeMetadata struct {
+	category                   string
+	expectedValidationMessages []string
+	mode                       string
+	path                       string
+}
 
 type Handler struct {
 	router *gin.Engine
@@ -20,15 +38,20 @@ func NewHandler(router *gin.Engine) *Handler {
 func (h *Handler) ListApiRoutes(c *gin.Context) {
 	routes := h.router.Routes()
 	apiRoutes := make([]ApiRouteResponse, 0, len(routes))
+	now := time.Now().UTC()
 
 	for _, route := range routes {
+		probe := probeMetadataForRoute(route.Method, route.Path, now)
 		apiRoutes = append(apiRoutes, ApiRouteResponse{
-			ApiName:   buildApiName(route.Method, route.Path),
-			Handler:   route.Handler,
-			Method:    route.Method,
-			Module:    moduleForPath(route.Path),
-			Path:      route.Path,
-			ProbeMode: probeModeForRoute(route.Method, route.Path),
+			ApiName:                    buildApiName(route.Method, route.Path),
+			ExpectedValidationMessages: probe.expectedValidationMessages,
+			Handler:                    route.Handler,
+			Method:                     route.Method,
+			Module:                     moduleForPath(route.Path),
+			Path:                       route.Path,
+			ProbeCategory:              probe.category,
+			ProbeMode:                  probe.mode,
+			ProbePath:                  probe.path,
 		})
 	}
 
@@ -48,19 +71,77 @@ func (h *Handler) ListApiRoutes(c *gin.Context) {
 }
 
 func probeModeForRoute(method string, path string) string {
+	return probeMetadataForRoute(method, path, time.Now().UTC()).mode
+}
+
+func probeMetadataForRoute(method string, path string, now time.Time) routeProbeMetadata {
+	if path == "/health" && method == "GET" {
+		return routeProbeMetadata{category: probeCategoryPublic, mode: probeModeSafeProbe}
+	}
+
 	if method != "GET" {
-		return "live_only"
+		return routeProbeMetadata{category: probeCategoryUnsupported, mode: probeModeLiveOnly}
 	}
 
 	if strings.Contains(path, ":") || strings.Contains(path, "*") {
-		return "live_only"
+		return routeProbeMetadata{category: probeCategoryUnsupported, mode: probeModeLiveOnly}
 	}
 
 	if strings.Contains(path, "/export/") {
-		return "live_only"
+		return routeProbeMetadata{category: probeCategoryUnsupported, mode: probeModeLiveOnly}
 	}
 
-	return "safe_probe"
+	if messages, ok := expectedValidationProbeMessages(path); ok {
+		return routeProbeMetadata{
+			category:                   probeCategoryParameterRequired,
+			expectedValidationMessages: messages,
+			mode:                       probeModeSafeProbe,
+		}
+	}
+
+	if probePath, ok := safeParameterizedProbePath(path, now); ok {
+		return routeProbeMetadata{
+			category: probeCategoryParameterRequired,
+			mode:     probeModeSafeProbe,
+			path:     probePath,
+		}
+	}
+
+	return routeProbeMetadata{category: probeCategoryAuthenticated, mode: probeModeSafeProbe}
+}
+
+func expectedValidationProbeMessages(path string) ([]string, bool) {
+	switch path {
+	case "/api/v1/customers/lookup":
+		return []string{"phone, email, or search is required"}, true
+	case "/api/v1/products/lookup", "/api/v1/pos/products/lookup":
+		return []string{"barcode, sku, or product_code is required"}, true
+	default:
+		return nil, false
+	}
+}
+
+func safeParameterizedProbePath(path string, now time.Time) (string, bool) {
+	today := now.Format("2006-01-02")
+	dateRange := "?date_from=" + today + "&date_to=" + today + "&page=1&limit=1"
+	asOfDate := "?as_of_date=" + today + "&page=1&limit=1"
+
+	switch path {
+	case "/api/v1/accounting/reports/general-ledger",
+		"/api/v1/accounting/reports/trial-balance",
+		"/api/v1/accounting/reports/profit-loss":
+		return path + dateRange, true
+	case "/api/v1/accounting/reports/balance-sheet",
+		"/api/v1/accounting/reconciliation/health-check",
+		"/api/v1/accounting/reconciliation/inventory/details",
+		"/api/v1/accounting/reconciliation/inventory",
+		"/api/v1/accounting/reconciliation/ap",
+		"/api/v1/accounting/reconciliation/ar",
+		"/api/v1/accounting/reconciliation/payment-accounts":
+		return path + asOfDate, true
+	default:
+		return "", false
+	}
 }
 
 func moduleForPath(path string) string {

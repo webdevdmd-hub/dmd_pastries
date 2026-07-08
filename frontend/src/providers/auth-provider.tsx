@@ -96,6 +96,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
   const [user, setUser] = useState<SafeUserProfile | null>(null);
   const profileRefreshPromiseRef = useRef<Promise<SafeUserProfile> | null>(null);
   const authOperationPromiseRef = useRef<Promise<SafeUserProfile> | null>(null);
+  const sessionExpirationPromiseRef = useRef<Promise<void> | null>(null);
 
   const refreshCurrentProfile = useCallback(async (): Promise<SafeUserProfile> => {
     if (profileRefreshPromiseRef.current) {
@@ -202,7 +203,26 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
 
   useEffect(() => {
     return onSessionExpired(() => {
-      void logoutFromAppwrite().finally(() => {
+      if (sessionExpirationPromiseRef.current) {
+        return;
+      }
+
+      const sessionExpirationPromise = (async () => {
+        const [session, account] = await Promise.all([
+          getCurrentAppwriteSession(),
+          getCurrentAppwriteAccount(),
+        ]);
+
+        if (session || account) {
+          return;
+        }
+
+        try {
+          await logoutFromAppwrite();
+        } catch {
+          // Session is already invalid; continue with local state cleanup.
+        }
+
         setUser(null);
         setStatus("unauthenticated");
 
@@ -213,7 +233,13 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
         ) {
           window.location.replace(ROUTES.login);
         }
+      })().finally(() => {
+        if (sessionExpirationPromiseRef.current === sessionExpirationPromise) {
+          sessionExpirationPromiseRef.current = null;
+        }
       });
+
+      sessionExpirationPromiseRef.current = sessionExpirationPromise;
     });
   }, []);
 

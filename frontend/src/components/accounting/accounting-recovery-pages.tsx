@@ -759,8 +759,7 @@ export function AccountingReconciliationPageClient(): JSX.Element {
 
 export function AccountingBackfillPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.accountingView]);
-  const canManage = hasAnyPermission([PERMISSIONS.accountingJournalEntriesManage]);
+  const canManage = canManageAccounting(hasAnyPermission);
   const canLoadBranches = hasAnyPermission([PERMISSIONS.branchesView, PERMISSIONS.branchesSwitch]);
   const [dateFrom, setDateFrom] = useState(`${String(new Date().getFullYear())}-01-01`);
   const [dateTo, setDateTo] = useState(todayString());
@@ -780,10 +779,10 @@ export function AccountingBackfillPageClient(): JSX.Element {
     }),
     [branchId, dateFrom, dateTo, limit, selectedTargets],
   );
-  const branchesQuery = useBranches(canView && canLoadBranches);
+  const branchesQuery = useBranches(canManage && canLoadBranches);
   const readinessQuery = useAccountingBackfillReadiness(
     filters,
-    canView && selectedTargets.length > 0,
+    canManage && selectedTargets.length > 0,
   );
   const runBackfill = useRunAccountingBackfill();
   const readiness = readinessQuery.data;
@@ -836,10 +835,8 @@ export function AccountingBackfillPageClient(): JSX.Element {
     });
   }
 
-  if (!canView) {
-    return (
-      <AccountingAccessDeniedCard message="You need `accounting.view` to open Journal Backfill." />
-    );
+  if (!canManage) {
+    return <AccountingAccessDeniedCard message="You do not have permission to access this page." />;
   }
 
   return (

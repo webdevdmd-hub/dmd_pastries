@@ -57,6 +57,7 @@ type StatusFilter = ApiMonitorStatus | "all";
 type ModuleRouteGroup = [string, RouteStatusRow[]];
 
 const statusLabels: Record<ApiMonitorStatus, string> = {
+  expected_validation: "Expected Validation",
   failed: "Failed",
   healthy: "Healthy",
   not_tested: "Not Tested",
@@ -66,6 +67,7 @@ const statusLabels: Record<ApiMonitorStatus, string> = {
 };
 
 const statusClasses: Record<ApiMonitorStatus, string> = {
+  expected_validation: "border-sky-200 bg-sky-50 text-sky-800",
   failed: "border-red-200 bg-red-50 text-red-800",
   healthy: "border-emerald-200 bg-emerald-50 text-emerald-800",
   not_tested: "border-brand-cappuccino bg-brand-latte text-brand-mocha",

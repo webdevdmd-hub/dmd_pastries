@@ -218,6 +218,8 @@ export function setApiMonitorCatalog(routes: ApiRouteCatalogItem[]): void {
 
 export function recordApiMonitorEvent(input: ApiMonitorRecordInput): ApiMonitorEvent {
   const route = findRoute(input.method, input.endpoint);
+  const status =
+    input.status ?? classifyApiMonitorStatus(input.statusCode, input.responseTimeMs, input.success);
   const event: ApiMonitorEvent = {
     apiName: route?.apiName ?? apiNameForEndpoint(input.method, input.endpoint),
     checkedAt: input.checkedAt ?? new Date().toISOString(),
@@ -229,7 +231,7 @@ export function recordApiMonitorEvent(input: ApiMonitorRecordInput): ApiMonitorE
     responseTimeMs: Math.max(0, Math.round(input.responseTimeMs)),
     routePath: route?.path ?? null,
     source: input.source,
-    status: classifyApiMonitorStatus(input.statusCode, input.responseTimeMs, input.success),
+    status,
     statusCode: input.statusCode,
     success: input.success,
   };

@@ -3,7 +3,7 @@ import { createAppwriteJwt } from "@/lib/appwrite/auth";
 import { notifySessionExpired } from "@/lib/auth/session-events";
 import { getPublicEnvValue } from "@/lib/public-env";
 import type { ApiFailure, ApiResponse, ApiSuccess, FieldErrorMap } from "@/types/api";
-import type { ApiProbeResult } from "@/types/api-monitor";
+import type { ApiMonitorStatus, ApiProbeResult } from "@/types/api-monitor";
 
 type RequestMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 type AuthMode = "none" | "appwrite";
@@ -75,6 +75,7 @@ function recordApiRequestEvent({
   method,
   responseTimeMs,
   source,
+  status,
   statusCode,
   success,
 }: {
@@ -83,6 +84,7 @@ function recordApiRequestEvent({
   method: RequestMethod;
   responseTimeMs: number;
   source: "live" | "safe_probe";
+  status?: ApiMonitorStatus;
   statusCode: number;
   success: boolean;
 }): ApiProbeResult {
@@ -94,7 +96,7 @@ function recordApiRequestEvent({
       errorMessage: errorMessage ?? null,
       method,
       responseTimeMs: roundedResponseTime,
-      status: classifyApiMonitorStatus(statusCode, roundedResponseTime, success),
+      status: status ?? classifyApiMonitorStatus(statusCode, roundedResponseTime, success),
       statusCode,
       success,
     };
@@ -106,6 +108,7 @@ function recordApiRequestEvent({
     method,
     responseTimeMs,
     source,
+    ...(status ? { status } : {}),
     statusCode,
     success,
   });
@@ -511,7 +514,11 @@ export async function apiBlobRequest<TBody = undefined>(
   };
 }
 
-export async function apiProbeRequest(path: string, signal?: AbortSignal): Promise<ApiProbeResult> {
+export async function apiProbeRequest(
+  path: string,
+  signal?: AbortSignal,
+  options?: { expectedValidationMessages?: string[] },
+): Promise<ApiProbeResult> {
   const method: RequestMethod = "GET";
   const url = `${getApiBaseUrl()}${path}`;
   const startedAt = nowMs();
@@ -542,6 +549,8 @@ export async function apiProbeRequest(path: string, signal?: AbortSignal): Promi
       ...(signal ? { signal } : {}),
     });
     let errorMessage: string | null = null;
+    let status: ApiMonitorStatus | undefined;
+    let success = response.ok;
 
     if (!response.ok) {
       const responseText = await response.text();
@@ -556,6 +565,14 @@ export async function apiProbeRequest(path: string, signal?: AbortSignal): Promi
           errorMessage = responseText.slice(0, 240);
         }
       }
+
+      if (
+        response.status === 400 &&
+        options?.expectedValidationMessages?.includes(errorMessage)
+      ) {
+        status = "expected_validation";
+        success = true;
+      }
     }
 
     return recordApiRequestEvent({
@@ -564,8 +581,9 @@ export async function apiProbeRequest(path: string, signal?: AbortSignal): Promi
       method,
       responseTimeMs: nowMs() - startedAt,
       source: "safe_probe",
+      ...(status ? { status } : {}),
       statusCode: response.status,
-      success: response.ok,
+      success,
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
