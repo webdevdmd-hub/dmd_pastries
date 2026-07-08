@@ -160,7 +160,10 @@ type BackendInventoryAccountingReconciliationRow = {
   last_transaction_type?: string;
   operational_inventory_value?: number;
   operational_quantity?: number;
+  pending_accounting_count?: number;
+  pending_accounting_value?: number;
   possible_reason?: string;
+  possible_reason_key?: string;
   product_id?: string | null;
   product_variant_id?: string | null;
   status?: string;
@@ -443,6 +446,30 @@ function parseInventoryAccountingReconciliationStatus(
   return value === "matched" ? "matched" : "mismatch";
 }
 
+function parseInventoryAccountingReconciliationReasonKey(
+  value: unknown,
+): InventoryAccountingReconciliationRow["possibleReasonKey"] {
+  switch (value) {
+    case "matched":
+    case "missing_cost":
+    case "linked_unposted_journal":
+    case "linked_journal_missing_inventory_line":
+    case "purchase_return_missing_journal":
+    case "pos_cogs_missing_journal":
+    case "manufacturing_missing_journal":
+    case "adjustment_missing_journal":
+    case "pending_bill_posting":
+    case "missing_journal":
+    case "transfer_location_value_mismatch":
+    case "operational_stock_ledger_mismatch":
+    case "stock_ledger_accounting_mismatch":
+    case "inventory_accounting_mismatch":
+      return value;
+    default:
+      return "inventory_accounting_mismatch";
+  }
+}
+
 function parseInventoryAccountingReconciliationRow(
   value: unknown,
 ): InventoryAccountingReconciliationRow {
@@ -463,7 +490,10 @@ function parseInventoryAccountingReconciliationRow(
     lastTransactionType: stringOrEmpty(row.last_transaction_type),
     operationalInventoryValue: numberOrZero(row.operational_inventory_value),
     operationalQuantity: numberOrZero(row.operational_quantity),
+    pendingAccountingCount: numberOrZero(row.pending_accounting_count),
+    pendingAccountingValue: numberOrZero(row.pending_accounting_value),
     possibleReason: stringOrEmpty(row.possible_reason),
+    possibleReasonKey: parseInventoryAccountingReconciliationReasonKey(row.possible_reason_key),
     productId: stringOrNull(row.product_id),
     productVariantId: stringOrNull(row.product_variant_id),
     status: parseInventoryAccountingReconciliationStatus(row.status),

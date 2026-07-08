@@ -47,6 +47,14 @@ function formatLabel(value: string): string {
 }
 
 function statusBadge(row: InventoryAccountingReconciliationRow): JSX.Element {
+  if (row.possibleReasonKey === "pending_bill_posting") {
+    return (
+      <Badge className="border-amber-200 bg-amber-50 text-amber-800">
+        Pending Bill Posting
+      </Badge>
+    );
+  }
+
   if (row.status === "matched") {
     return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">Matched</Badge>;
   }
@@ -117,6 +125,11 @@ export function InventoryAccountingReconciliationTable({
                 <p className="min-w-64 text-sm text-muted-foreground">
                   {row.possibleReason || "-"}
                 </p>
+                {row.possibleReasonKey === "pending_bill_posting" ? (
+                  <p className="mt-1 text-xs text-brand-mocha">
+                    Pending value: {formatMoney(row.pendingAccountingValue)}
+                  </p>
+                ) : null}
               </TableCell>
             </TableRow>
           ))}

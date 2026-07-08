@@ -13,6 +13,11 @@ export type PurchaseInvoiceStatus = "draft" | "posted" | "cancelled";
 export type PurchasePaymentStatus = "unpaid" | "partial" | "paid" | "overdue";
 
 export type PurchaseReceiptStatus = "draft" | "posted" | "cancelled";
+export type PurchaseReceiptAccountingStatus =
+  | "pending_bill_posting"
+  | "accounted_at_bill_posting"
+  | "pending_accounting_journal"
+  | "not_applicable";
 
 export type PurchaseLineType = "product" | "account";
 
@@ -210,6 +215,11 @@ export type PurchaseReceipt = {
   receiptNumber: string;
   receivedDate: string;
   status: PurchaseReceiptStatus;
+  accountingStatus: PurchaseReceiptAccountingStatus;
+  accountingStatusLabel: string;
+  accountingStatusDetail: string;
+  linkedBillStatus: PurchaseInvoiceStatus | null;
+  linkedBillJournalEntryId: string | null;
   receivedByUserName: string;
   notes: string | null;
   createdAt: string;

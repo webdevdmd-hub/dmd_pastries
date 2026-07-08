@@ -21,6 +21,82 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
+type pendingAccountingSummary struct {
+	Count int64
+	Value float64
+}
+
+func (r *Repository) pendingAccountingSummaries(businessID string, itemIDs []string) (map[string]pendingAccountingSummary, error) {
+	result := map[string]pendingAccountingSummary{}
+	cleanIDs := make([]string, 0, len(itemIDs))
+	seen := map[string]struct{}{}
+	for _, id := range itemIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		cleanIDs = append(cleanIDs, id)
+	}
+	if len(cleanIDs) == 0 {
+		return result, nil
+	}
+
+	var rows []struct {
+		InventoryItemID string
+		Count           int64
+		Value           float64
+	}
+	err := r.db.Table("stock_movements sm").
+		Select("sm.inventory_item_id, COUNT(*) AS count, COALESCE(SUM(sm.total_cost), 0) AS value").
+		Joins("JOIN purchase_receipts pr ON pr.id = sm.reference_id AND pr.business_id = sm.business_id AND pr.deleted_at IS NULL").
+		Where(`
+			sm.business_id = ?
+			AND sm.inventory_item_id IN ?
+			AND sm.movement_type = ?
+			AND sm.reference_type = ?
+			AND sm.accounting_journal_entry_id IS NULL
+			AND NOT EXISTS (
+				SELECT 1
+				FROM purchase_invoices pi
+				WHERE pi.business_id = sm.business_id
+				  AND pi.deleted_at IS NULL
+				  AND pi.status = 'posted'
+				  AND pi.journal_entry_id IS NOT NULL
+				  AND (
+					(pr.purchase_invoice_id IS NOT NULL AND pi.id = pr.purchase_invoice_id)
+					OR (pr.purchase_invoice_id IS NULL AND pr.purchase_order_id IS NOT NULL AND pi.purchase_order_id = pr.purchase_order_id)
+				  )
+			)
+		`, businessID, cleanIDs, "purchase_in", "purchase_receipt").
+		Group("sm.inventory_item_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.InventoryItemID] = pendingAccountingSummary{Count: row.Count, Value: row.Value}
+	}
+	return result, nil
+}
+
+func applyPendingAccountingSummary(response *InventoryItemResponse, summary pendingAccountingSummary) {
+	response.PendingAccountingCount = summary.Count
+	response.PendingAccountingValue = roundMoney(summary.Value)
+	if summary.Count > 0 || roundMoney(summary.Value) > 0 {
+		response.AccountingStatus = "pending_bill_posting"
+		response.AccountingStatusLabel = "Pending Bill Posting"
+		response.AccountingStatusDetail = "Stock is in operational inventory. Accounting inventory updates when the supplier bill is posted."
+		return
+	}
+	response.AccountingStatus = "current"
+	response.AccountingStatusLabel = "Accounting current"
+	response.AccountingStatusDetail = "No pending goods-receipt value is waiting for bill posting."
+}
+
 func (r *Repository) CreateInventoryItem(tx *gorm.DB, item *InventoryItem) error {
 	return tx.Create(item).Error
 }
@@ -757,17 +833,39 @@ func (r *Repository) ValidateUnit(businessID, unitID string) error {
 
 func (r *Repository) LoadInventoryResponses(businessID string, items []InventoryItem) ([]InventoryItemResponse, error) {
 	responses := make([]InventoryItemResponse, 0, len(items))
+	itemIDs := make([]string, 0, len(items))
 	for _, item := range items {
-		response, err := r.LoadInventoryResponse(businessID, item)
+		itemIDs = append(itemIDs, item.ID)
+	}
+	accountingSummaries, err := r.pendingAccountingSummaries(businessID, itemIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		response, err := r.loadInventoryResponseBase(businessID, item)
 		if err != nil {
 			return nil, err
 		}
+		applyPendingAccountingSummary(&response, accountingSummaries[item.ID])
 		responses = append(responses, response)
 	}
 	return responses, nil
 }
 
 func (r *Repository) LoadInventoryResponse(businessID string, item InventoryItem) (InventoryItemResponse, error) {
+	response, err := r.loadInventoryResponseBase(businessID, item)
+	if err != nil {
+		return InventoryItemResponse{}, err
+	}
+	accountingSummaries, err := r.pendingAccountingSummaries(businessID, []string{item.ID})
+	if err != nil {
+		return InventoryItemResponse{}, err
+	}
+	applyPendingAccountingSummary(&response, accountingSummaries[item.ID])
+	return response, nil
+}
+
+func (r *Repository) loadInventoryResponseBase(businessID string, item InventoryItem) (InventoryItemResponse, error) {
 	var branchName string
 	_ = r.db.Table("branches").Select("branch_name").Where("id = ? AND business_id = ?", item.BranchID, businessID).Scan(&branchName).Error
 
@@ -822,8 +920,20 @@ func (r *Repository) ListInventoryWithUninitializedResponses(businessID string, 
 		return nil, 0, err
 	}
 	responses := make([]InventoryItemResponse, 0, len(rows))
+	itemIDs := make([]string, 0, len(rows))
 	for _, row := range rows {
-		responses = append(responses, r.inventoryCatalogRowResponse(row))
+		if strings.TrimSpace(row.ID) != "" {
+			itemIDs = append(itemIDs, row.ID)
+		}
+	}
+	accountingSummaries, err := r.pendingAccountingSummaries(businessID, itemIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, row := range rows {
+		response := r.inventoryCatalogRowResponse(row)
+		applyPendingAccountingSummary(&response, accountingSummaries[row.ID])
+		responses = append(responses, response)
 	}
 	return responses, total, nil
 }

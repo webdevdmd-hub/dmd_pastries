@@ -666,6 +666,9 @@ type InventoryReconciliationDetailItem struct {
 	LastTransactionReference  string     `json:"last_transaction_reference"`
 	LastTransactionAt         *time.Time `json:"last_transaction_at"`
 	PossibleReason            string     `json:"possible_reason"`
+	PossibleReasonKey         string     `json:"possible_reason_key"`
+	PendingAccountingCount    int64      `json:"pending_accounting_count"`
+	PendingAccountingValue    float64    `json:"pending_accounting_value"`
 	Status                    string     `json:"status"`
 }
 
@@ -706,6 +709,7 @@ type inventoryReconciliationDetailRow struct {
 	LinkedUnpostedCount        int64
 	LinkedNoInventoryLineCount int64
 	GRNOnlyCount               int64
+	GRNOnlyValue               float64
 	PurchaseReturnMissingCount int64
 	POSCOGSMissingCount        int64
 	ManufacturingMissingCount  int64

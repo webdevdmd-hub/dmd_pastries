@@ -16,6 +16,7 @@ import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state
 import { PurchaseInvoiceStatusBadge } from "@/components/purchasing/purchase-invoice-status-badge";
 import { PurchaseOrderStatusBadge } from "@/components/purchasing/purchase-order-status-badge";
 import { PurchasePaymentStatusBadge } from "@/components/purchasing/purchase-payment-status-badge";
+import { PurchaseReceiptAccountingBadge } from "@/components/purchasing/purchase-receipt-accounting-badge";
 import { PurchaseReceiptStatusBadge } from "@/components/purchasing/purchase-receipt-status-badge";
 import { PurchaseReturnStatusBadge } from "@/components/purchasing/purchase-return-status-badge";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
@@ -227,7 +228,13 @@ export function PurchaseDocumentChain({
                   stage="Receive goods"
                   title={receipt.receiptNumber}
                 >
-                  <PurchaseReceiptStatusBadge status={receipt.status} />
+                  <div className="flex flex-wrap gap-2">
+                    <PurchaseReceiptStatusBadge status={receipt.status} />
+                    <PurchaseReceiptAccountingBadge receipt={receipt} />
+                  </div>
+                  {receipt.accountingStatus === "pending_bill_posting" ? (
+                    <p className="mt-2 text-xs text-brand-mocha">{receipt.accountingStatusDetail}</p>
+                  ) : null}
                 </ChainCard>
               ))
             ) : (

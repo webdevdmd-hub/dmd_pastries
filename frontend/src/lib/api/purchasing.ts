@@ -317,6 +317,15 @@ function isReceiptStatus(value: unknown): value is PurchaseReceiptStatus {
   return value === "draft" || value === "posted" || value === "cancelled";
 }
 
+function isReceiptAccountingStatus(value: unknown): value is PurchaseReceipt["accountingStatus"] {
+  return (
+    value === "pending_bill_posting" ||
+    value === "accounted_at_bill_posting" ||
+    value === "pending_accounting_journal" ||
+    value === "not_applicable"
+  );
+}
+
 function isInvoiceReceiveStatus(
   value: unknown,
 ): value is "not_received" | "partially_received" | "received" {
@@ -567,6 +576,13 @@ function parseReceipt(value: unknown): PurchaseReceipt {
     receiptNumber: stringValue(value.receipt_number, "Receipt"),
     receivedDate: stringValue(value.received_date),
     status: isReceiptStatus(value.status) ? value.status : "draft",
+    accountingStatus: isReceiptAccountingStatus(value.accounting_status)
+      ? value.accounting_status
+      : "not_applicable",
+    accountingStatusLabel: stringValue(value.accounting_status_label),
+    accountingStatusDetail: stringValue(value.accounting_status_detail),
+    linkedBillStatus: isInvoiceStatus(value.linked_bill_status) ? value.linked_bill_status : null,
+    linkedBillJournalEntryId: optionalString(value.linked_bill_journal_entry_id),
     receivedByUserName: stringValue(value.received_by_user_name, "User"),
     notes: optionalString(value.notes),
     createdAt: stringValue(value.created_at),
@@ -861,6 +877,13 @@ function parseDocumentChainReceipt(value: unknown): PurchaseReceipt {
     receivedByUserName: "User",
     receivedDate: stringValue(value.date, stringValue(value.received_date)),
     status: isReceiptStatus(value.status) ? value.status : "draft",
+    accountingStatus: isReceiptAccountingStatus(value.accounting_status)
+      ? value.accounting_status
+      : "not_applicable",
+    accountingStatusLabel: stringValue(value.accounting_status_label),
+    accountingStatusDetail: stringValue(value.accounting_status_detail),
+    linkedBillStatus: isInvoiceStatus(value.linked_bill_status) ? value.linked_bill_status : null,
+    linkedBillJournalEntryId: optionalString(value.linked_bill_journal_entry_id),
     supplierId: "",
     supplierName: "",
     updatedAt: "",

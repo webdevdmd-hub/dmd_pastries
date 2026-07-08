@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 
+import { PurchaseReceiptAccountingBadge } from "@/components/purchasing/purchase-receipt-accounting-badge";
 import { PurchaseReceiptActionsMenu } from "@/components/purchasing/purchase-receipt-actions-menu";
 import { PurchaseReceiptStatusBadge } from "@/components/purchasing/purchase-receipt-status-badge";
 import {
@@ -29,6 +30,12 @@ function nextStepForReceipt(receipt: PurchaseReceipt): string {
   }
 
   if (receipt.status === "posted") {
+    if (receipt.accountingStatus === "pending_bill_posting") {
+      return receipt.accountingStatusDetail;
+    }
+    if (receipt.accountingStatus === "pending_accounting_journal") {
+      return receipt.accountingStatusDetail;
+    }
     return "Return items if needed";
   }
 
@@ -77,6 +84,7 @@ export function PurchaseReceiptsTable({
           <TableHead>Linked PO</TableHead>
           <TableHead>Linked Invoice</TableHead>
           <TableHead>Status</TableHead>
+          <TableHead>Accounting</TableHead>
           <TableHead>Received By</TableHead>
           <TableHead>Next Step</TableHead>
           <TableHead>Actions</TableHead>
@@ -100,6 +108,16 @@ export function PurchaseReceiptsTable({
             <TableCell>{linkedPurchaseInvoiceLabel(receipt)}</TableCell>
             <TableCell>
               <PurchaseReceiptStatusBadge status={receipt.status} />
+            </TableCell>
+            <TableCell>
+              <div className="space-y-1">
+                <PurchaseReceiptAccountingBadge receipt={receipt} />
+                {receipt.accountingStatus === "pending_bill_posting" ? (
+                  <p className="max-w-56 text-xs text-brand-mocha">
+                    {receipt.accountingStatusDetail}
+                  </p>
+                ) : null}
+              </div>
             </TableCell>
             <TableCell>{receipt.receivedByUserName}</TableCell>
             <TableCell>

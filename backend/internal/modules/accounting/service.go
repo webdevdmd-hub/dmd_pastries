@@ -3740,9 +3740,12 @@ func inventoryReconciliationDetailFromRow(row inventoryReconciliationDetailRow) 
 		LastTransactionType:       row.LastTransactionType,
 		LastTransactionReference:  row.LastTransactionReference,
 		LastTransactionAt:         row.LastTransactionAt,
+		PendingAccountingCount:    row.GRNOnlyCount,
+		PendingAccountingValue:    roundMoney(row.GRNOnlyValue),
 		Status:                    status,
 	}
 	item.PossibleReason = inventoryReconciliationReason(row, item)
+	item.PossibleReasonKey = inventoryReconciliationReasonKey(row, item)
 	return item
 }
 
@@ -3772,7 +3775,7 @@ func inventoryReconciliationReason(row inventoryReconciliationDetailRow, item In
 		return "Opening stock, adjustment, or wastage stock movement is missing accounting posting."
 	}
 	if row.GRNOnlyCount > 0 {
-		return "Goods receipt stock exists operationally but bill-only accounting has not linked item-level inventory value yet."
+		return "Pending Bill Posting: stock is in operational inventory. Accounting inventory updates when the supplier bill is posted."
 	}
 	if row.MissingJournalCount > 0 {
 		return "A value-affecting stock movement is missing accounting_journal_entry_id."
@@ -3787,6 +3790,49 @@ func inventoryReconciliationReason(row inventoryReconciliationDetailRow, item In
 		return "Stock movement valuation differs from linked posted accounting journals."
 	}
 	return "Inventory valuation differs from accounting value; review the last related transaction and unassigned Inventory / Stock journals."
+}
+
+func inventoryReconciliationReasonKey(row inventoryReconciliationDetailRow, item InventoryReconciliationDetailItem) string {
+	if item.Status == "matched" {
+		return "matched"
+	}
+	if row.MissingCostCount > 0 {
+		return "missing_cost"
+	}
+	if row.LinkedUnpostedCount > 0 {
+		return "linked_unposted_journal"
+	}
+	if row.LinkedNoInventoryLineCount > 0 {
+		return "linked_journal_missing_inventory_line"
+	}
+	if row.PurchaseReturnMissingCount > 0 {
+		return "purchase_return_missing_journal"
+	}
+	if row.POSCOGSMissingCount > 0 {
+		return "pos_cogs_missing_journal"
+	}
+	if row.ManufacturingMissingCount > 0 {
+		return "manufacturing_missing_journal"
+	}
+	if row.AdjustmentMissingCount > 0 {
+		return "adjustment_missing_journal"
+	}
+	if row.GRNOnlyCount > 0 {
+		return "pending_bill_posting"
+	}
+	if row.MissingJournalCount > 0 {
+		return "missing_journal"
+	}
+	if row.TransferMovementCount > 0 && absMoney(roundMoney(item.OperationalInventoryValue-item.InventoryLedgerValue)) > 0.01 {
+		return "transfer_location_value_mismatch"
+	}
+	if absMoney(roundMoney(item.OperationalInventoryValue-item.InventoryLedgerValue)) > 0.01 {
+		return "operational_stock_ledger_mismatch"
+	}
+	if absMoney(roundMoney(item.InventoryLedgerValue-item.AccountingInventoryValue)) > 0.01 {
+		return "stock_ledger_accounting_mismatch"
+	}
+	return "inventory_accounting_mismatch"
 }
 
 func sortInventoryReconciliationDetails(items []InventoryReconciliationDetailItem, sortBy, sortOrder string) {

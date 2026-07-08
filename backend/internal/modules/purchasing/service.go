@@ -891,13 +891,18 @@ func (s *Service) GetDocumentChain(currentUser *utils.AuthContext, purchaseOrder
 		invoiceID := invoice.ID
 		response.PurchaseInvoices = append(response.PurchaseInvoices, PurchaseDocumentChainItem{ID: invoice.ID, DocumentNumber: invoice.InvoiceNumber, DocumentType: "purchase_invoice", Status: invoice.Status, Date: invoice.InvoiceDate, TotalAmount: roundMoney(invoice.TotalAmount), PurchaseOrderID: invoice.PurchaseOrderID, PurchaseInvoiceID: &invoiceID, PreviousID: invoice.PurchaseOrderID})
 	}
+	accountingStates, err := s.receiptAccountingStates(currentUser.BusinessID, receipts)
+	if err != nil {
+		return nil, err
+	}
 	for _, receipt := range receipts {
 		receiptID := receipt.ID
 		previousID := receipt.PurchaseInvoiceID
 		if previousID == nil {
 			previousID = receipt.PurchaseOrderID
 		}
-		response.PurchaseReceipts = append(response.PurchaseReceipts, PurchaseDocumentChainItem{ID: receipt.ID, DocumentNumber: receipt.ReceiptNumber, DocumentType: "purchase_receipt", Status: receipt.Status, Date: receipt.ReceivedDate, TotalAmount: 0, PurchaseOrderID: receipt.PurchaseOrderID, PurchaseInvoiceID: receipt.PurchaseInvoiceID, PurchaseReceiptID: &receiptID, PreviousID: previousID})
+		accountingState := accountingStates[receipt.ID]
+		response.PurchaseReceipts = append(response.PurchaseReceipts, PurchaseDocumentChainItem{ID: receipt.ID, DocumentNumber: receipt.ReceiptNumber, DocumentType: "purchase_receipt", Status: receipt.Status, Date: receipt.ReceivedDate, TotalAmount: 0, PurchaseOrderID: receipt.PurchaseOrderID, PurchaseInvoiceID: receipt.PurchaseInvoiceID, PurchaseReceiptID: &receiptID, PreviousID: previousID, AccountingStatus: accountingState.Status, AccountingStatusLabel: accountingState.Label, AccountingStatusDetail: accountingState.Detail, LinkedBillStatus: accountingState.LinkedBillStatus, LinkedBillJournalEntryID: accountingState.LinkedBillJournalEntryID})
 	}
 	for _, purchaseReturn := range returns {
 		returnID := purchaseReturn.ID
@@ -2049,9 +2054,13 @@ func (s *Service) ListReceipts(currentUser *utils.AuthContext, query ListQuery) 
 	if err != nil {
 		return nil, apperrors.Internal("failed to list purchase receipts")
 	}
+	accountingStates, err := s.receiptAccountingStates(currentUser.BusinessID, receipts)
+	if err != nil {
+		return nil, err
+	}
 	items := make([]PurchaseReceiptResponse, 0, len(receipts))
 	for _, receipt := range receipts {
-		items = append(items, s.receiptResponse(currentUser.BusinessID, receipt, false))
+		items = append(items, s.receiptResponse(currentUser.BusinessID, receipt, false, accountingStates[receipt.ID]))
 	}
 	return &PaginatedResponse[PurchaseReceiptResponse]{Items: items, Pagination: PaginationResponse{Page: query.Page, Limit: query.Limit, Total: total, TotalPages: totalPages(total, query.Limit)}}, nil
 }
@@ -2064,7 +2073,11 @@ func (s *Service) GetReceipt(currentUser *utils.AuthContext, id string) (*Purcha
 	if !currentUser.CanAccessBranch(receipt.BranchID) {
 		return nil, apperrors.Forbidden("branch access denied")
 	}
-	dto := s.receiptResponse(currentUser.BusinessID, *receipt, true)
+	accountingState, err := s.receiptAccountingState(currentUser.BusinessID, *receipt)
+	if err != nil {
+		return nil, err
+	}
+	dto := s.receiptResponse(currentUser.BusinessID, *receipt, true, accountingState)
 	return &dto, nil
 }
 
@@ -2675,8 +2688,9 @@ func (s *Service) SupplierHistory(currentUser *utils.AuthContext, supplierID str
 			}
 		}
 	}
+	accountingStates, _ := s.receiptAccountingStates(currentUser.BusinessID, receipts)
 	for _, receipt := range receipts {
-		response.Receipts = append(response.Receipts, s.receiptResponse(currentUser.BusinessID, receipt, false))
+		response.Receipts = append(response.Receipts, s.receiptResponse(currentUser.BusinessID, receipt, false, accountingStates[receipt.ID]))
 	}
 	for _, purchaseReturn := range returns {
 		response.Returns = append(response.Returns, s.purchaseReturnResponse(currentUser.BusinessID, purchaseReturn, false))
@@ -3907,9 +3921,163 @@ func (s *Service) purchaseReturnNumber(businessID string, returnID *string) *str
 	return nil
 }
 
-func (s *Service) receiptResponse(businessID string, receipt PurchaseReceipt, includeItems bool) PurchaseReceiptResponse {
+type receiptAccountingState struct {
+	Status                   string
+	Label                    string
+	Detail                   string
+	LinkedBillStatus         *string
+	LinkedBillJournalEntryID *string
+}
+
+type receiptAccountingInvoiceRow struct {
+	ID              string
+	PurchaseOrderID *string
+	Status          string
+	JournalEntryID  *string
+}
+
+func (s *Service) receiptAccountingStates(businessID string, receipts []PurchaseReceipt) (map[string]receiptAccountingState, error) {
+	states := make(map[string]receiptAccountingState, len(receipts))
+	if len(receipts) == 0 {
+		return states, nil
+	}
+	invoiceIDs := make([]string, 0, len(receipts))
+	orderIDs := make([]string, 0, len(receipts))
+	for _, receipt := range receipts {
+		states[receipt.ID] = defaultReceiptAccountingState(receipt)
+		if receipt.Status != "posted" {
+			continue
+		}
+		if receipt.PurchaseInvoiceID != nil && strings.TrimSpace(*receipt.PurchaseInvoiceID) != "" {
+			invoiceIDs = append(invoiceIDs, strings.TrimSpace(*receipt.PurchaseInvoiceID))
+		}
+		if receipt.PurchaseOrderID != nil && strings.TrimSpace(*receipt.PurchaseOrderID) != "" {
+			orderIDs = append(orderIDs, strings.TrimSpace(*receipt.PurchaseOrderID))
+		}
+	}
+	if len(invoiceIDs) == 0 && len(orderIDs) == 0 {
+		return states, nil
+	}
+
+	var invoices []receiptAccountingInvoiceRow
+	query := s.db.Table("purchase_invoices").
+		Select("id, purchase_order_id, status, journal_entry_id").
+		Where("business_id = ? AND deleted_at IS NULL", businessID)
+	if len(invoiceIDs) > 0 && len(orderIDs) > 0 {
+		query = query.Where("id IN ? OR purchase_order_id IN ?", invoiceIDs, orderIDs)
+	} else if len(invoiceIDs) > 0 {
+		query = query.Where("id IN ?", invoiceIDs)
+	} else {
+		query = query.Where("purchase_order_id IN ?", orderIDs)
+	}
+	if err := query.Order("invoice_date DESC, created_at DESC").Scan(&invoices).Error; err != nil {
+		return nil, apperrors.Internal("failed to load receipt accounting state")
+	}
+
+	byID := make(map[string]receiptAccountingInvoiceRow, len(invoices))
+	byOrderID := map[string][]receiptAccountingInvoiceRow{}
+	for _, invoice := range invoices {
+		byID[invoice.ID] = invoice
+		if invoice.PurchaseOrderID != nil && strings.TrimSpace(*invoice.PurchaseOrderID) != "" {
+			orderID := strings.TrimSpace(*invoice.PurchaseOrderID)
+			byOrderID[orderID] = append(byOrderID[orderID], invoice)
+		}
+	}
+
+	for _, receipt := range receipts {
+		if receipt.Status != "posted" {
+			continue
+		}
+		var invoice *receiptAccountingInvoiceRow
+		if receipt.PurchaseInvoiceID != nil && strings.TrimSpace(*receipt.PurchaseInvoiceID) != "" {
+			if row, ok := byID[strings.TrimSpace(*receipt.PurchaseInvoiceID)]; ok {
+				invoice = &row
+			}
+		}
+		if invoice == nil && receipt.PurchaseOrderID != nil && strings.TrimSpace(*receipt.PurchaseOrderID) != "" {
+			invoice = preferredReceiptAccountingInvoice(byOrderID[strings.TrimSpace(*receipt.PurchaseOrderID)])
+		}
+		states[receipt.ID] = receiptAccountingStateFromInvoice(receipt, invoice)
+	}
+
+	return states, nil
+}
+
+func (s *Service) receiptAccountingState(businessID string, receipt PurchaseReceipt) (receiptAccountingState, error) {
+	states, err := s.receiptAccountingStates(businessID, []PurchaseReceipt{receipt})
+	if err != nil {
+		return receiptAccountingState{}, err
+	}
+	return states[receipt.ID], nil
+}
+
+func preferredReceiptAccountingInvoice(invoices []receiptAccountingInvoiceRow) *receiptAccountingInvoiceRow {
+	for _, invoice := range invoices {
+		if invoice.Status == "posted" && invoice.JournalEntryID != nil && strings.TrimSpace(*invoice.JournalEntryID) != "" {
+			row := invoice
+			return &row
+		}
+	}
+	for _, invoice := range invoices {
+		if invoice.Status == "posted" {
+			row := invoice
+			return &row
+		}
+	}
+	if len(invoices) == 0 {
+		return nil
+	}
+	row := invoices[0]
+	return &row
+}
+
+func defaultReceiptAccountingState(receipt PurchaseReceipt) receiptAccountingState {
+	return receiptAccountingStateFromInvoice(receipt, nil)
+}
+
+func receiptAccountingStateFromInvoice(receipt PurchaseReceipt, invoice *receiptAccountingInvoiceRow) receiptAccountingState {
+	if receipt.Status != "posted" {
+		return receiptAccountingState{
+			Status: "not_applicable",
+			Label:  "Not applicable",
+			Detail: "Draft or cancelled receipts do not affect accounting.",
+		}
+	}
+	if invoice == nil {
+		return receiptAccountingState{
+			Status: "pending_bill_posting",
+			Label:  "Pending Bill Posting",
+			Detail: "Stock is in operational inventory. Accounting inventory updates when the supplier bill is posted.",
+		}
+	}
+	if invoice.Status == "posted" && invoice.JournalEntryID != nil && strings.TrimSpace(*invoice.JournalEntryID) != "" {
+		return receiptAccountingState{
+			Status:                   "accounted_at_bill_posting",
+			Label:                    "Accounted at Bill Posting",
+			Detail:                   "Supplier bill is posted and accounting inventory has been updated.",
+			LinkedBillStatus:         &invoice.Status,
+			LinkedBillJournalEntryID: invoice.JournalEntryID,
+		}
+	}
+	if invoice.Status == "posted" {
+		return receiptAccountingState{
+			Status:           "pending_accounting_journal",
+			Label:            "Pending Accounting Journal",
+			Detail:           "Supplier bill is posted but its accounting journal is not available yet.",
+			LinkedBillStatus: &invoice.Status,
+		}
+	}
+	return receiptAccountingState{
+		Status:           "pending_bill_posting",
+		Label:            "Pending Bill Posting",
+		Detail:           "Stock is in operational inventory. Accounting inventory updates when the supplier bill is posted.",
+		LinkedBillStatus: &invoice.Status,
+	}
+}
+
+func (s *Service) receiptResponse(businessID string, receipt PurchaseReceipt, includeItems bool, accountingState receiptAccountingState) PurchaseReceiptResponse {
 	branchName, supplierName := s.repo.NameLookups(businessID, receipt.BranchID, receipt.SupplierID)
-	response := PurchaseReceiptResponse{ID: receipt.ID, BusinessID: receipt.BusinessID, BranchID: receipt.BranchID, BranchName: branchName, SupplierID: receipt.SupplierID, SupplierName: supplierName, PurchaseOrderID: receipt.PurchaseOrderID, PurchaseOrderNumber: first(receipt.PurchaseOrderNumber, s.purchaseOrderNumber(businessID, receipt.PurchaseOrderID)), PurchaseInvoiceID: receipt.PurchaseInvoiceID, PurchaseInvoiceNumber: first(receipt.PurchaseInvoiceNumber, s.purchaseInvoiceNumber(businessID, receipt.PurchaseInvoiceID)), ReceiptNumber: receipt.ReceiptNumber, ReceivedDate: receipt.ReceivedDate, Status: receipt.Status, ChargeAmount: roundMoney(receipt.ChargeAmount), ChargeTaxAmount: roundMoney(receipt.ChargeTaxAmount), JournalEntryID: receipt.JournalEntryID, ReceivedByUserID: receipt.ReceivedByUserID, Notes: receipt.Notes, CreatedAt: receipt.CreatedAt, UpdatedAt: receipt.UpdatedAt}
+	response := PurchaseReceiptResponse{ID: receipt.ID, BusinessID: receipt.BusinessID, BranchID: receipt.BranchID, BranchName: branchName, SupplierID: receipt.SupplierID, SupplierName: supplierName, PurchaseOrderID: receipt.PurchaseOrderID, PurchaseOrderNumber: first(receipt.PurchaseOrderNumber, s.purchaseOrderNumber(businessID, receipt.PurchaseOrderID)), PurchaseInvoiceID: receipt.PurchaseInvoiceID, PurchaseInvoiceNumber: first(receipt.PurchaseInvoiceNumber, s.purchaseInvoiceNumber(businessID, receipt.PurchaseInvoiceID)), ReceiptNumber: receipt.ReceiptNumber, ReceivedDate: receipt.ReceivedDate, Status: receipt.Status, ChargeAmount: roundMoney(receipt.ChargeAmount), ChargeTaxAmount: roundMoney(receipt.ChargeTaxAmount), JournalEntryID: receipt.JournalEntryID, AccountingStatus: accountingState.Status, AccountingStatusLabel: accountingState.Label, AccountingStatusDetail: accountingState.Detail, LinkedBillStatus: accountingState.LinkedBillStatus, LinkedBillJournalEntryID: accountingState.LinkedBillJournalEntryID, ReceivedByUserID: receipt.ReceivedByUserID, Notes: receipt.Notes, CreatedAt: receipt.CreatedAt, UpdatedAt: receipt.UpdatedAt}
 	if includeItems {
 		items, _ := s.repo.ReceiptItems(receipt.ID, businessID)
 		for _, item := range items {

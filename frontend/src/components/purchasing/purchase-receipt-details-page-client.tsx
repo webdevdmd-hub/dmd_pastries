@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseDocumentChain } from "@/components/purchasing/purchase-document-chain";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
+import { PurchaseReceiptAccountingBadge } from "@/components/purchasing/purchase-receipt-accounting-badge";
 import { PurchaseReceiptStatusBadge } from "@/components/purchasing/purchase-receipt-status-badge";
 import { PurchaseReturnDialog } from "@/components/purchasing/purchase-return-dialog";
 import { PurchaseReturnStatusBadge } from "@/components/purchasing/purchase-return-status-badge";
@@ -128,6 +129,7 @@ export function PurchaseReceiptDetailsPageClient({
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <h1 className="font-display text-4xl text-brand-espresso">{receipt.receiptNumber}</h1>
           <PurchaseReceiptStatusBadge status={receipt.status} />
+          <PurchaseReceiptAccountingBadge receipt={receipt} />
           {canPostReceipt ? (
             <Button
               disabled={postMutation.isPending}
@@ -173,6 +175,18 @@ export function PurchaseReceiptDetailsPageClient({
           </CardContent>
         </Card>
       </div>
+      <Card className="bg-white/85">
+        <CardContent className="flex flex-col gap-2 p-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm text-brand-mocha">Accounting status</p>
+            <p className="text-lg font-semibold text-brand-espresso">
+              {receipt.accountingStatusLabel}
+            </p>
+            <p className="mt-1 text-sm text-brand-mocha">{receipt.accountingStatusDetail}</p>
+          </div>
+          <PurchaseReceiptAccountingBadge receipt={receipt} />
+        </CardContent>
+      </Card>
       <PurchasingItemLines lines={receipt.items} title="Received items" />
       {receipt.purchaseOrderId ? (
         <PurchaseDocumentChain

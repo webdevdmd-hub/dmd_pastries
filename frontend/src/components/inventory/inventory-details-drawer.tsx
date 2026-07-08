@@ -8,6 +8,7 @@ import { ExpiryBatchesSection } from "@/components/inventory/expiry-batches-sect
 import { InventoryStatusBadge } from "@/components/inventory/inventory-status-badge";
 import { StockLevelBadge } from "@/components/inventory/stock-level-badge";
 import { StockMovementsTable } from "@/components/inventory/stock-movements-table";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -122,6 +123,14 @@ export function InventoryDetailsDrawer({
                   <p>
                     Value: <span className="font-bold">{formatMoney(item.inventoryValue)}</span>
                   </p>
+                  {item.accountingStatus === "pending_bill_posting" ? (
+                    <div className="space-y-1 pt-1">
+                      <Badge className="border-amber-200 bg-amber-50 text-amber-800">
+                        {item.accountingStatusLabel || "Pending Bill Posting"}
+                      </Badge>
+                      <p className="text-xs text-brand-mocha">{item.accountingStatusDetail}</p>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>

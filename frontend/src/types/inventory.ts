@@ -62,6 +62,11 @@ export type InventoryItem = {
   reorderLevel: number;
   averageCost: number;
   inventoryValue: number;
+  pendingAccountingCount: number;
+  pendingAccountingValue: number;
+  accountingStatus: "current" | "pending_bill_posting";
+  accountingStatusLabel: string;
+  accountingStatusDetail: string;
   unitId: string;
   unitName: string;
   unitSymbol: string;

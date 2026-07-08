@@ -127,7 +127,9 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
   const handleReceive = async (payload: ReceivePurchasePayload): Promise<void> => {
     try {
       await receiveMutation.mutateAsync(payload);
-      toast.success("Stock received and inventory updated successfully.");
+      toast.success(
+        "Stock received into operational inventory. Accounting inventory updates when the supplier bill is posted.",
+      );
       setReceiveOpen(false);
     } catch (error) {
       toast.error(getErrorMessage(error));

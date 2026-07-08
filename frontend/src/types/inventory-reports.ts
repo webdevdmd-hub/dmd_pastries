@@ -145,6 +145,21 @@ export type InventoryAuditRow = {
 };
 
 export type InventoryAccountingReconciliationStatus = "matched" | "mismatch";
+export type InventoryAccountingReconciliationReasonKey =
+  | "matched"
+  | "missing_cost"
+  | "linked_unposted_journal"
+  | "linked_journal_missing_inventory_line"
+  | "purchase_return_missing_journal"
+  | "pos_cogs_missing_journal"
+  | "manufacturing_missing_journal"
+  | "adjustment_missing_journal"
+  | "pending_bill_posting"
+  | "missing_journal"
+  | "transfer_location_value_mismatch"
+  | "operational_stock_ledger_mismatch"
+  | "stock_ledger_accounting_mismatch"
+  | "inventory_accounting_mismatch";
 
 export type InventoryAccountingReconciliationRow = {
   accountingInventoryValue: number;
@@ -161,7 +176,10 @@ export type InventoryAccountingReconciliationRow = {
   lastTransactionType: string;
   operationalInventoryValue: number;
   operationalQuantity: number;
+  pendingAccountingCount: number;
+  pendingAccountingValue: number;
   possibleReason: string;
+  possibleReasonKey: InventoryAccountingReconciliationReasonKey;
   productId: string | null;
   productVariantId: string | null;
   status: InventoryAccountingReconciliationStatus;

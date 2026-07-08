@@ -2471,6 +2471,7 @@ func (r *Repository) ListInventoryReconciliationDetailRows(businessID, inventory
 				COUNT(*) FILTER (WHERE accounting_journal_entry_id IS NOT NULL AND COALESCE(journal_status, '') NOT IN ('posted', 'reversed')) AS linked_unposted_count,
 				COUNT(*) FILTER (WHERE accounting_journal_entry_id IS NOT NULL AND journal_status IN ('posted', 'reversed') AND NOT has_inventory_line) AS linked_no_inventory_line_count,
 				COUNT(*) FILTER (WHERE movement_type = 'purchase_in' AND reference_type = 'purchase_receipt' AND accounting_journal_entry_id IS NULL) AS grn_only_count,
+				COALESCE(SUM(CASE WHEN movement_type = 'purchase_in' AND reference_type = 'purchase_receipt' AND accounting_journal_entry_id IS NULL THEN signed_cost ELSE 0 END), 0) AS grn_only_value,
 				COUNT(*) FILTER (WHERE movement_type = 'purchase_return_out' AND accounting_journal_entry_id IS NULL) AS purchase_return_missing_count,
 				COUNT(*) FILTER (WHERE movement_type = 'sale_out' AND reference_type = 'sale' AND accounting_journal_entry_id IS NULL) AS pos_cogs_missing_count,
 				COUNT(*) FILTER (WHERE movement_type IN ('production_in','production_out') AND accounting_journal_entry_id IS NULL) AS manufacturing_missing_count,

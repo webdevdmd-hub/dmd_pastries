@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { InventoryStatusBadge } from "@/components/inventory/inventory-status-badge";
 import { StockLevelBadge } from "@/components/inventory/stock-level-badge";
 import { ReorderLevelHeader } from "@/components/shared/reorder-level-help";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -136,7 +137,16 @@ export function InventoryTable({
               <TableCell>{formatQuantity(item.reservedQuantity)}</TableCell>
               <TableCell className="font-bold">{formatQuantity(item.availableQuantity)}</TableCell>
               <TableCell>{formatMoney(item.averageCost)}</TableCell>
-              <TableCell className="font-semibold">{formatMoney(item.inventoryValue)}</TableCell>
+              <TableCell>
+                <div className="space-y-1">
+                  <p className="font-semibold">{formatMoney(item.inventoryValue)}</p>
+                  {item.accountingStatus === "pending_bill_posting" ? (
+                    <Badge className="border-amber-200 bg-amber-50 text-amber-800">
+                      {item.accountingStatusLabel || "Pending Bill Posting"}
+                    </Badge>
+                  ) : null}
+                </div>
+              </TableCell>
               <TableCell>{formatQuantity(item.reorderLevel)}</TableCell>
               <TableCell>{item.unitSymbol || item.unitName}</TableCell>
               <TableCell>

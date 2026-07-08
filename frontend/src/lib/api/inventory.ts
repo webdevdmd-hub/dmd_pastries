@@ -219,6 +219,12 @@ function parseInventoryItem(value: unknown): InventoryItem {
     inventoryValue: numberValue(
       value.inventory_value ?? value.total_value ?? value.stock_value ?? value.current_value,
     ),
+    pendingAccountingCount: numberValue(value.pending_accounting_count),
+    pendingAccountingValue: numberValue(value.pending_accounting_value),
+    accountingStatus:
+      value.accounting_status === "pending_bill_posting" ? "pending_bill_posting" : "current",
+    accountingStatusLabel: stringValue(value.accounting_status_label),
+    accountingStatusDetail: stringValue(value.accounting_status_detail),
     unitId: stringValue(value.unit_id, stringValue(unit.id)),
     unitName: stringValue(value.unit_name, stringValue(unit.unit_name, "Unit")),
     unitSymbol: stringValue(value.unit_symbol, stringValue(unit.symbol)),
