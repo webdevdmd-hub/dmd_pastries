@@ -291,6 +291,67 @@ func TestBakeryOrdersProductionScheduleSQLIncludesCompletedAndProductionExplanat
 	}
 }
 
+func TestBakeryOrdersPendingPaymentsSQLUsesBalanceSource(t *testing.T) {
+	query, args := bakeryOrdersPendingPaymentsBaseQuery(testBakeryOrdersReportFilter(), false)
+
+	for _, expected := range []string{
+		"bo.balance_amount > 0",
+		"bo.total_amount > bo.paid_amount",
+		"bo.order_status NOT IN ?",
+	} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("expected pending payments query to contain %q: %s", expected, query)
+		}
+	}
+	if strings.Contains(query, "bo.payment_status IN ('unpaid','partial')") {
+		t.Fatalf("pending payments query must not depend on hard-coded payment statuses: %s", query)
+	}
+	if strings.Contains(query, "bo.event_date >=") || strings.Contains(query, "bo.event_date <=") {
+		t.Fatalf("unbounded pending payments query should not add date predicates: %s", query)
+	}
+	statuses, ok := args[1].([]string)
+	if !ok {
+		t.Fatalf("expected terminal status exclusion at args[1], got %T", args[1])
+	}
+	if !reflect.DeepEqual(statuses, []string{"cancelled", "refunded", "closed"}) {
+		t.Fatalf("unexpected terminal statuses: %#v", statuses)
+	}
+}
+
+func TestBakeryOrdersPendingPaymentsSQLAppliesOptionalFilters(t *testing.T) {
+	filter := testBakeryOrdersReportFilter()
+	filter.AllBranches = false
+	filter.BranchID = "branch-id"
+	filter.PaymentStatus = "unpaid"
+	filter.OrderStatus = "confirmed"
+
+	query, args := bakeryOrdersPendingPaymentsBaseQuery(filter, true)
+
+	for _, expected := range []string{
+		"bo.event_date >= ?",
+		"bo.event_date <= ?",
+		"bo.branch_id = ?",
+		"bo.order_status = ?",
+		"bo.payment_status = ?",
+	} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("expected pending payments query to contain %q: %s", expected, query)
+		}
+	}
+	expectedArgs := []interface{}{
+		"business-id",
+		[]string{"cancelled", "refunded", "closed"},
+		"2026-07-01",
+		"2026-07-31",
+		"branch-id",
+		"confirmed",
+		"unpaid",
+	}
+	if !reflect.DeepEqual(args, expectedArgs) {
+		t.Fatalf("unexpected pending payments args: %#v", args)
+	}
+}
+
 func TestInventorySummarySQLUsesOperationalInventoryValue(t *testing.T) {
 	query, _ := inventorySummarySQL(testBakeryOrdersReportFilter())
 

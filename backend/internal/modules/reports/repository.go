@@ -346,7 +346,7 @@ func (r *Repository) ExportRows(reportType string, filter *shared.ResolvedFilter
 		items, err := r.BakeryOrdersProductionSchedule(filter)
 		return csvFromItems(items, err, bakeryProductionScheduleExportColumns())
 	case "bakery_orders_pending_payments":
-		report, err := r.BakeryOrdersPendingPayments(filter)
+		report, err := r.BakeryOrdersPendingPayments(filter, true)
 		items := []BakeryOrderPendingPaymentItem{}
 		if report != nil {
 			items = report.Orders
@@ -1902,8 +1902,9 @@ func bakeryOrdersProductionScheduleSQL(filter *shared.ResolvedFilter) (string, [
 	return query, args
 }
 
-func (r *Repository) BakeryOrdersPendingPayments(filter *shared.ResolvedFilter) (*BakeryOrderPendingPaymentsResponse, error) {
+func (r *Repository) BakeryOrdersPendingPayments(filter *shared.ResolvedFilter, includeDateRange bool) (*BakeryOrderPendingPaymentsResponse, error) {
 	items := []BakeryOrderPendingPaymentItem{}
+	baseQuery, baseArgs := bakeryOrdersPendingPaymentsBaseQuery(filter, includeDateRange)
 	query := `
 		SELECT bo.order_number,
 			COALESCE(bo.customer_name_snapshot,'') AS customer_name,
@@ -1912,24 +1913,37 @@ func (r *Repository) BakeryOrdersPendingPayments(filter *shared.ResolvedFilter) 
 			bo.balance_amount,
 			bo.payment_status,
 			bo.event_date::text AS event_date
-		FROM bakery_orders bo
-		WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.deleted_at IS NULL
-			AND bo.payment_status IN ('unpaid','partial')`
-	args := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
-	query, args = addBakeryOrderFilters(query, args, filter)
+		FROM bakery_orders bo ` + baseQuery
+	args := append([]interface{}{}, baseArgs...)
 	query += " ORDER BY bo.event_date ASC, bo.balance_amount DESC LIMIT ? OFFSET ?"
 	args = append(args, filter.Limit, (filter.Page-1)*filter.Limit)
 	if err := r.db.Raw(query, args...).Scan(&items).Error; err != nil {
 		return nil, err
 	}
 	var totalPending float64
-	summaryQuery := "SELECT COALESCE(SUM(bo.balance_amount),0) FROM bakery_orders bo WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.deleted_at IS NULL AND bo.payment_status IN ('unpaid','partial')"
-	summaryArgs := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
-	summaryQuery, summaryArgs = addBakeryOrderFilters(summaryQuery, summaryArgs, filter)
+	summaryQuery := "SELECT COALESCE(SUM(bo.balance_amount),0) FROM bakery_orders bo " + baseQuery
+	summaryArgs := append([]interface{}{}, baseArgs...)
 	if err := r.db.Raw(summaryQuery, summaryArgs...).Scan(&totalPending).Error; err != nil {
 		return nil, err
 	}
 	return &BakeryOrderPendingPaymentsResponse{TotalPendingBalance: totalPending, Orders: items}, nil
+}
+
+func bakeryOrdersPendingPaymentsBaseQuery(filter *shared.ResolvedFilter, includeDateRange bool) (string, []interface{}) {
+	query := `WHERE bo.business_id = ?
+		AND bo.deleted_at IS NULL
+		AND bo.balance_amount > 0
+		AND bo.total_amount > bo.paid_amount
+		AND bo.order_status NOT IN ?`
+	args := []interface{}{
+		filter.BusinessID,
+		[]string{"cancelled", "refunded", "closed"},
+	}
+	if includeDateRange {
+		query += " AND bo.event_date >= ? AND bo.event_date <= ?"
+		args = append(args, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02"))
+	}
+	return addBakeryOrderFilters(query, args, filter)
 }
 
 func (r *Repository) BakeryOrdersDeliveryVsPickup(filter *shared.ResolvedFilter) (*BakeryOrderDeliveryVsPickupResponse, error) {

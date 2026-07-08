@@ -40,6 +40,13 @@ const defaultOrderStatusOptions: BakeryOrdersReportStatusOption[] = [
   { label: "Cancelled", value: "cancelled" },
 ];
 
+const defaultPaymentStatusOptions: BakeryOrdersReportStatusOption[] = [
+  { label: "All payments", value: allValue },
+  { label: "Unpaid", value: "unpaid" },
+  { label: "Partial", value: "partial" },
+  { label: "Paid", value: "paid" },
+];
+
 export type BakeryOrdersReportFilterDraft = {
   branchId: string;
   customerId: string;
@@ -78,6 +85,7 @@ export function BakeryOrdersReportFilterBar({
   onReset,
   orderStatusAllLabel = "All statuses",
   orderStatusOptions = defaultOrderStatusOptions,
+  paymentStatusOptions = defaultPaymentStatusOptions,
 }: {
   branches: Branch[];
   canAccessAllBranches: boolean;
@@ -89,6 +97,7 @@ export function BakeryOrdersReportFilterBar({
   onReset: () => void;
   orderStatusAllLabel?: string;
   orderStatusOptions?: BakeryOrdersReportStatusOption[];
+  paymentStatusOptions?: BakeryOrdersReportStatusOption[];
 }): JSX.Element {
   const setPreset = (datePreset: ReportDatePreset): void => {
     if (datePreset === "custom") {
@@ -194,10 +203,11 @@ export function BakeryOrdersReportFilterBar({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All payments</SelectItem>
-              <SelectItem value="unpaid">Unpaid</SelectItem>
-              <SelectItem value="partial">Partial</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
+              {paymentStatusOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

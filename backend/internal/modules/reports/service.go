@@ -429,11 +429,13 @@ func (s *Service) BakeryOrdersProductionSchedule(currentUser *utils.AuthContext,
 }
 
 func (s *Service) BakeryOrdersPendingPayments(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*BakeryOrderPendingPaymentsResponse, error) {
-	filter, err := shared.Resolve(currentUser, shared.ParseQuery(values))
+	baseFilter := shared.ParseQuery(values)
+	includeDateRange := baseFilter.DateFrom != "" || baseFilter.DateTo != ""
+	filter, err := shared.Resolve(currentUser, baseFilter)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.BakeryOrdersPendingPayments(filter)
+	return s.repo.BakeryOrdersPendingPayments(filter, includeDateRange)
 }
 
 func (s *Service) BakeryOrdersDeliveryVsPickup(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*BakeryOrderDeliveryVsPickupResponse, error) {
