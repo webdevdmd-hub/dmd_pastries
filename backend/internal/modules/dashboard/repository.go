@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"math"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -32,22 +33,59 @@ func NewRepository(db *gorm.DB) *Repository {
 
 func (r *Repository) AdminDashboard(scope Scope, summary *reports.DashboardSummaryResponse) (*AdminDashboardResponse, error) {
 	outOfStock, err := r.adminOutOfStock(scope)
+	warnings := make([]DashboardLoadWarning, 0)
 	if err != nil {
-		return nil, err
+		warnings = append(warnings, dashboardLoadWarning(
+			"out_of_stock_count",
+			"Out-of-stock count could not be loaded.",
+			"out_of_stock_count_failed",
+			err,
+		))
+		outOfStock = 0
 	}
 	customers, err := r.adminCustomers(scope)
 	if err != nil {
-		return nil, err
+		warnings = append(warnings, dashboardLoadWarning(
+			"customer_count",
+			"New customer count could not be loaded.",
+			"customer_count_failed",
+			err,
+		))
+		customers = &AdminCustomersWidget{}
 	}
 	inProduction, err := r.adminInProductionOrders(scope)
 	if err != nil {
-		return nil, err
+		warnings = append(warnings, dashboardLoadWarning(
+			"in_production_orders",
+			"In-production order count could not be loaded.",
+			"in_production_orders_failed",
+			err,
+		))
+		inProduction = 0
 	}
 	outstanding, err := reportshared.LedgerMappedBalance(r.db, dashboardMetricScope(scope), "accounts_receivable", "1100", scope.TodayDate)
 	if err != nil {
-		return nil, err
+		warnings = append(warnings, dashboardLoadWarning(
+			"outstanding_balance",
+			"Outstanding balance could not be loaded.",
+			"outstanding_balance_failed",
+			err,
+		))
+		outstanding = 0
 	}
-	return adminDashboardFromReportSummary(summary, outOfStock, inProduction, outstanding, *customers), nil
+	return adminDashboardFromReportSummary(summary, outOfStock, inProduction, outstanding, *customers, warnings), nil
+}
+
+func dashboardLoadWarning(segment, message, reason string, err error) DashboardLoadWarning {
+	warning := DashboardLoadWarning{
+		Segment: segment,
+		Message: message,
+		Reason:  reason,
+	}
+	if err != nil && strings.TrimSpace(err.Error()) != "" {
+		warning.Message = message + " " + err.Error()
+	}
+	return warning
 }
 
 func adminDashboardFromReportSummary(
@@ -56,6 +94,7 @@ func adminDashboardFromReportSummary(
 	inProduction int64,
 	outstanding float64,
 	customers AdminCustomersWidget,
+	warnings []DashboardLoadWarning,
 ) *AdminDashboardResponse {
 	return &AdminDashboardResponse{
 		Sales: AdminSalesWidget{
@@ -83,7 +122,8 @@ func adminDashboardFromReportSummary(
 			RefundTotalToday:   summary.Payments.RefundAmount,
 			OutstandingBalance: outstanding,
 		},
-		Customers: customers,
+		Customers:    customers,
+		LoadWarnings: warnings,
 	}
 }
 

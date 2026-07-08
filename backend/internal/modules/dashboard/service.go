@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -38,15 +39,37 @@ func (s *Service) AdminDashboard(currentUser *utils.AuthContext, values url.Valu
 	}
 	summary, err := s.reports.DashboardSummary(filter)
 	if err != nil {
-		return nil, apperrors.Internal("failed to load admin dashboard")
+		return nil, adminDashboardLoadError("dashboard_summary", "dashboard_summary_failed", filter, err)
 	}
 	scope := scopeFromReportFilter(filter)
 	result, err := s.repo.AdminDashboard(scope, summary)
 	if err != nil {
-		return nil, apperrors.Internal("failed to load admin dashboard")
+		return nil, adminDashboardLoadError("admin_widgets", "admin_widgets_failed", filter, err)
 	}
 	_ = s.writeAudit(currentUser, "dashboard.admin_viewed", "admin", scope, ipAddress, userAgent)
 	return result, nil
+}
+
+func adminDashboardLoadError(segment, reason string, filter *reportshared.ResolvedFilter, err error) *apperrors.AppError {
+	details := map[string]interface{}{
+		"reason":  reason,
+		"segment": segment,
+		"route":   "/api/v1/dashboard/admin",
+	}
+	if filter != nil {
+		scope := "current_branch"
+		if filter.AllBranches {
+			scope = "all_branches"
+		}
+		details["scope"] = scope
+		details["branch_id"] = filter.BranchID
+		details["date_from"] = filter.DateFrom.Format("2006-01-02")
+		details["date_to"] = filter.DateTo.Format("2006-01-02")
+	}
+	if err != nil {
+		details["error"] = err.Error()
+	}
+	return apperrors.New(http.StatusInternalServerError, "failed to load admin dashboard", details)
 }
 
 func (s *Service) CashierDashboard(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*CashierDashboardResponse, error) {

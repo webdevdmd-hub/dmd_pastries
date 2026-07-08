@@ -1,6 +1,8 @@
 package dashboard
 
 import (
+	"errors"
+	"net/http"
 	"net/url"
 	"testing"
 	"time"
@@ -41,6 +43,7 @@ func TestAdminDashboardUsesReportsSummaryForComparableMetrics(t *testing.T) {
 		9,
 		300.50,
 		AdminCustomersWidget{NewCustomersToday: 10},
+		nil,
 	)
 
 	if admin.Sales.TodaySales != summary.Sales.TotalSales {
@@ -67,6 +70,71 @@ func TestAdminDashboardUsesReportsSummaryForComparableMetrics(t *testing.T) {
 	if admin.Manufacturing.ActiveBatches != summary.Manufacturing.ActiveBatches || admin.Manufacturing.CompletedBatchesToday != summary.Manufacturing.CompletedBatches {
 		t.Fatalf("admin manufacturing counts must match reports summary: got %#v want %#v", admin.Manufacturing, summary.Manufacturing)
 	}
+}
+
+func TestAdminDashboardFromReportSummaryPreservesLoadWarnings(t *testing.T) {
+	summary := &reports.DashboardSummaryResponse{}
+	warnings := []DashboardLoadWarning{
+		{
+			Segment: "outstanding_balance",
+			Message: "Outstanding balance could not be loaded.",
+			Reason:  "outstanding_balance_failed",
+		},
+	}
+
+	admin := adminDashboardFromReportSummary(
+		summary,
+		0,
+		0,
+		0,
+		AdminCustomersWidget{},
+		warnings,
+	)
+
+	if len(admin.LoadWarnings) != 1 {
+		t.Fatalf("LoadWarnings length = %d, want 1", len(admin.LoadWarnings))
+	}
+	if admin.LoadWarnings[0].Segment != "outstanding_balance" || admin.LoadWarnings[0].Reason != "outstanding_balance_failed" {
+		t.Fatalf("unexpected warning: %#v", admin.LoadWarnings[0])
+	}
+}
+
+func TestAdminDashboardLoadErrorIncludesSegmentAndFilterDetails(t *testing.T) {
+	filter := &reportshared.ResolvedFilter{
+		BranchID:    "11111111-1111-1111-1111-111111111111",
+		AllBranches: false,
+		DateFrom:    time.Date(2026, 7, 8, 0, 0, 0, 0, time.UTC),
+		DateTo:      time.Date(2026, 7, 8, 23, 59, 59, 0, time.UTC),
+	}
+
+	err := adminDashboardLoadError(
+		"dashboard_summary",
+		"dashboard_summary_failed",
+		filter,
+		errors.New("summary query failed"),
+	)
+
+	if err.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("StatusCode = %d, want %d", err.StatusCode, http.StatusInternalServerError)
+	}
+	details, ok := err.Details.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Details type = %T, want map[string]interface{}", err.Details)
+	}
+	assertDetail := func(key string, want interface{}) {
+		t.Helper()
+		if details[key] != want {
+			t.Fatalf("details[%q] = %#v, want %#v", key, details[key], want)
+		}
+	}
+	assertDetail("segment", "dashboard_summary")
+	assertDetail("reason", "dashboard_summary_failed")
+	assertDetail("route", "/api/v1/dashboard/admin")
+	assertDetail("scope", "current_branch")
+	assertDetail("branch_id", "11111111-1111-1111-1111-111111111111")
+	assertDetail("date_from", "2026-07-08")
+	assertDetail("date_to", "2026-07-08")
+	assertDetail("error", "summary query failed")
 }
 
 func TestScopeFromReportFilterUsesBusinessLocalDayBoundaries(t *testing.T) {

@@ -7,6 +7,13 @@ type AdminDashboardResponse struct {
 	Manufacturing AdminManufacturingWidget `json:"manufacturing"`
 	Financial     AdminFinancialWidget     `json:"financial"`
 	Customers     AdminCustomersWidget     `json:"customers"`
+	LoadWarnings  []DashboardLoadWarning   `json:"load_warnings,omitempty"`
+}
+
+type DashboardLoadWarning struct {
+	Segment string `json:"segment"`
+	Message string `json:"message"`
+	Reason  string `json:"reason"`
 }
 
 type AdminSalesWidget struct {

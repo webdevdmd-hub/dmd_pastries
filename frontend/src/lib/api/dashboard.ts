@@ -4,6 +4,7 @@ import type {
   CashierDashboard,
   DashboardActivity,
   DashboardAlert,
+  DashboardLoadWarning,
   DashboardSeverity,
   KpiSummary,
   ProductionDashboard,
@@ -133,6 +134,29 @@ function parseSeverity(value: string): DashboardSeverity {
   return "info";
 }
 
+function parseDashboardLoadWarning(value: unknown): DashboardLoadWarning | null {
+  const row = isObject(value) ? value : {};
+  const segment = stringField(row, "segment").trim();
+  const reason = stringField(row, "reason").trim();
+  const message = stringField(row, "message").trim();
+
+  if (!segment && !reason && !message) return null;
+
+  return {
+    message: message || "A dashboard widget could not be loaded.",
+    reason: reason || "dashboard_widget_failed",
+    segment: segment || "dashboard_widget",
+  };
+}
+
+function parseDashboardLoadWarnings(value: unknown): DashboardLoadWarning[] {
+  if (!isObject(value) || !Array.isArray(value.load_warnings)) return [];
+  return value.load_warnings.flatMap((item) => {
+    const warning = parseDashboardLoadWarning(item);
+    return warning ? [warning] : [];
+  });
+}
+
 function parseAdminDashboard(value: unknown): AdminDashboard {
   const sales = objectValue(value, "sales");
   const inventory = objectValue(value, "inventory");
@@ -152,7 +176,7 @@ function parseAdminDashboard(value: unknown): AdminDashboard {
     inventory: {
       expiringItems: numberField(inventory, "expiring_items_count"),
       lowStockCount: numberField(inventory, "low_stock_count"),
-      outOfStock: numberField(inventory, "out_of_stock"),
+      outOfStock: numberFieldAny(inventory, ["out_of_stock_count", "out_of_stock"]),
     },
     manufacturing: {
       activeBatches: numberField(manufacturing, "active_batches"),
@@ -162,7 +186,7 @@ function parseAdminDashboard(value: unknown): AdminDashboard {
       ]),
     },
     orders: {
-      inProduction: numberField(orders, "in_production"),
+      inProduction: numberFieldAny(orders, ["in_production_orders", "in_production"]),
       pendingOrders: numberField(orders, "pending_orders"),
       readyOrders: numberField(orders, "ready_orders"),
     },
@@ -172,6 +196,7 @@ function parseAdminDashboard(value: unknown): AdminDashboard {
       salesCountToday: numberField(sales, "sales_count_today"),
       todaySales: numberField(sales, "today_sales"),
     },
+    loadWarnings: parseDashboardLoadWarnings(value),
   };
 }
 

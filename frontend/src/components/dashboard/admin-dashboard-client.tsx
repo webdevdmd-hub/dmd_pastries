@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlertTriangle,
   BarChart3,
   Boxes,
   CircleDollarSign,
@@ -28,6 +29,7 @@ import { DashboardTrendChart } from "@/components/dashboard/dashboard-trend-char
 import { ReportFilterBar, type ReportFilterDraft } from "@/components/reports/report-filter-bar";
 import { formatCurrency, formatNumber } from "@/components/reports/sales/sales-report-format";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
+import { Button } from "@/components/ui/button";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useBranchScope } from "@/hooks/use-branch-scope";
@@ -40,13 +42,14 @@ import {
   useReportBranches,
   useSalesChart,
 } from "@/hooks/use-reports";
-import { getErrorMessage } from "@/lib/api/client";
+import { ApiError, getErrorMessage } from "@/lib/api/client";
 import {
   createDefaultDashboardDraft,
   resolveDashboardTimezone,
   toDashboardReportFilters,
 } from "@/lib/reports/dashboard-filters";
 import { reportBaseFiltersSchema } from "@/lib/validators/reports.schema";
+import type { DashboardLoadWarning } from "@/types/dashboard";
 import type { ManufacturingReportFilters } from "@/types/manufacturing-reports";
 import type { ReportFilters } from "@/types/reports";
 
@@ -82,6 +85,65 @@ function toManufacturingTrendFilters(filters: ReportFilters): ManufacturingRepor
   if (filters.scope) trendFilters.scope = filters.scope;
   if (filters.timezone) trendFilters.timezone = filters.timezone;
   return trendFilters;
+}
+
+function detailString(details: Record<string, unknown>, key: string): string {
+  const value = details[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function adminDashboardErrorDescription(error: unknown): string {
+  const message = getErrorMessage(error);
+  if (!(error instanceof ApiError) || !error.errorDetails) return message;
+
+  const details = error.errorDetails;
+  const parts = [
+    detailString(details, "segment") ? `Segment: ${detailString(details, "segment")}` : "",
+    detailString(details, "reason") ? `Reason: ${detailString(details, "reason")}` : "",
+    detailString(details, "scope") ? `Scope: ${detailString(details, "scope")}` : "",
+    detailString(details, "branch_id") ? `Branch: ${detailString(details, "branch_id")}` : "",
+    detailString(details, "date_from") && detailString(details, "date_to")
+      ? `Dates: ${detailString(details, "date_from")} to ${detailString(details, "date_to")}`
+      : "",
+    detailString(details, "error") ? `Backend: ${detailString(details, "error")}` : "",
+  ].filter(Boolean);
+
+  return parts.length > 0 ? `${message} (${parts.join("; ")})` : message;
+}
+
+function DashboardLoadWarningsBanner({
+  isRetrying,
+  onRetry,
+  warnings,
+}: {
+  isRetrying: boolean;
+  onRetry: () => void;
+  warnings: DashboardLoadWarning[];
+}): JSX.Element | null {
+  if (warnings.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+          <div>
+            <p className="font-semibold">Dashboard loaded with limited widget data.</p>
+            <ul className="mt-1 space-y-1 text-sm">
+              {warnings.map((warning) => (
+                <li key={`${warning.segment}-${warning.reason}`}>
+                  <span className="font-medium">{warning.segment}:</span> {warning.message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <Button type="button" variant="outline" onClick={onRetry} disabled={isRetrying}>
+          Retry
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export function AdminDashboardClient(): JSX.Element {
@@ -245,13 +307,18 @@ export function AdminDashboardClient(): JSX.Element {
       />
       {dashboardQuery.error ? (
         <DashboardErrorState
-          description={getErrorMessage(dashboardQuery.error)}
+          description={adminDashboardErrorDescription(dashboardQuery.error)}
           onRetry={() => void dashboardQuery.refetch()}
         />
-      ) : null}
-      {dashboardQuery.isLoading ? (
+      ) : dashboardQuery.isLoading ? (
         <DashboardSkeleton />
-      ) : (
+      ) : dashboard ? (
+        <>
+          <DashboardLoadWarningsBanner
+            isRetrying={dashboardQuery.isFetching}
+            onRetry={() => void dashboardQuery.refetch()}
+            warnings={dashboard.loadWarnings}
+          />
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(22rem,0.8fr)]">
           <div className="space-y-6">
             <section className="overflow-hidden rounded-[2rem] border border-brand-cappuccino/70 bg-[radial-gradient(circle_at_top_left,_rgba(176,137,104,0.28),_transparent_34%),linear-gradient(135deg,_rgba(255,255,255,0.95),_rgba(243,233,215,0.92))] p-6 shadow-soft">
@@ -379,7 +446,8 @@ export function AdminDashboardClient(): JSX.Element {
           </div>
           <DashboardInsightRail actions={[...actions]} canLoad={true} />
         </div>
-      )}
+        </>
+      ) : null}
     </div>
   );
 }

@@ -29,6 +29,12 @@ export type KpiSummary = {
   todaySales: number;
 };
 
+export type DashboardLoadWarning = {
+  message: string;
+  reason: string;
+  segment: string;
+};
+
 export type AdminDashboard = {
   customers: {
     newCustomersToday: number;
@@ -58,6 +64,7 @@ export type AdminDashboard = {
     salesCountToday: number;
     todaySales: number;
   };
+  loadWarnings: DashboardLoadWarning[];
 };
 
 export type CashierDashboard = {
