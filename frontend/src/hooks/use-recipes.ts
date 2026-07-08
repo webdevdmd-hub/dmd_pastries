@@ -91,17 +91,21 @@ export function useRecipeLookup(search: string, enabled = true) {
   });
 }
 
-export function useRecipeByProduct(productId: string | null, enabled = true) {
+export function useRecipeByProduct(
+  productId: string | null,
+  productVariantId: string | null = null,
+  enabled = true,
+) {
   const branchQueryKey = useBranchQueryKey();
 
   return useQuery<Recipe>({
-    queryKey: [recipeQueryKey, branchQueryKey, "product", productId],
+    queryKey: [recipeQueryKey, branchQueryKey, "product", productId, productVariantId],
     queryFn: async () => {
       if (!productId) {
         throw new Error("Product ID is required.");
       }
 
-      return getRecipeByProduct(productId);
+      return getRecipeByProduct(productId, productVariantId);
     },
     enabled: enabled && productId !== null,
   });

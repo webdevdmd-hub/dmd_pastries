@@ -762,11 +762,17 @@ export async function createRecipeVersion(
   return response.data;
 }
 
-export async function getRecipeByProduct(productId: string): Promise<Recipe> {
-  const response = await apiRequest<Recipe>(`/api/v1/recipes/product/${productId}`, {
-    authMode: "appwrite",
-    parse: parseRecipe,
-  });
+export async function getRecipeByProduct(
+  productId: string,
+  productVariantId: string | null = null,
+): Promise<Recipe> {
+  const response = await apiRequest<Recipe>(
+    `/api/v1/recipes/product/${productId}${queryString({ product_variant_id: productVariantId })}`,
+    {
+      authMode: "appwrite",
+      parse: parseRecipe,
+    },
+  );
 
   return response.data;
 }

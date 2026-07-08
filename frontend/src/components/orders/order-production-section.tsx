@@ -2,7 +2,7 @@
 
 import { CalendarPlus, Factory } from "lucide-react";
 import type { JSX } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
@@ -18,9 +18,10 @@ import {
 } from "@/components/ui/select";
 import { useBatches } from "@/hooks/use-manufacturing";
 import { useAssignProduction, useCreateOrderItemProduction } from "@/hooks/use-orders";
-import { useRecipeLookup } from "@/hooks/use-recipes";
+import { useRecipeByProduct, useRecipeIngredients, useRecipeLookup } from "@/hooks/use-recipes";
 import { getErrorMessage } from "@/lib/api/client";
 import type { BakeryOrder } from "@/types/orders";
+import type { Recipe } from "@/types/recipes";
 
 type ProductionItemForm = {
   itemId: string;
@@ -31,8 +32,19 @@ type ProductionItemForm = {
   recipeSearch: string;
 };
 
+const NO_VALID_RECIPE_MESSAGE =
+  "No valid recipe found for this product. Please create or select a recipe before creating production.";
+
 function dateInputValue(value: string): string {
   return value.length >= 10 ? value.slice(0, 10) : "";
+}
+
+function isActiveRecipe(recipe: Recipe | undefined): recipe is Recipe {
+  return recipe !== undefined && recipe.isActive && recipe.status === "active";
+}
+
+function recipeMatchesSelectedItem(recipe: Recipe, item: BakeryOrder["items"][number]): boolean {
+  return recipe.productId === item.productId && recipe.productVariantId === item.productVariantId;
 }
 
 export function OrderProductionSection({
@@ -59,18 +71,99 @@ export function OrderProductionSection({
   const createProductionMutation = useCreateOrderItemProduction();
   const recipesQuery = useRecipeLookup(productionForm.recipeSearch, order !== null && canManage);
   const selectedItem = order?.items.find((item) => item.id === productionForm.itemId) ?? null;
+  const selectedItemProductId =
+    selectedItem && selectedItem.itemSource !== "custom" ? selectedItem.productId : null;
+  const productRecipeQuery = useRecipeByProduct(
+    selectedItemProductId,
+    selectedItem?.productVariantId ?? null,
+    order !== null && canManage && selectedItemProductId !== null,
+  );
+  const productRecipe = isActiveRecipe(productRecipeQuery.data) ? productRecipeQuery.data : null;
+  const selectedLookupRecipe = (recipesQuery.data ?? []).find(
+    (recipe) => recipe.id === productionForm.recipeId,
+  );
+  const selectedRecipe =
+    productRecipe?.id === productionForm.recipeId ? productRecipe : selectedLookupRecipe;
+  const selectedRecipeId =
+    selectedItem !== null && productionForm.recipeId.trim().length > 0
+      ? productionForm.recipeId
+      : null;
+  const recipeIngredientsQuery = useRecipeIngredients(selectedRecipeId, selectedRecipeId !== null);
+  const selectedRecipeHasBom =
+    recipeIngredientsQuery.data !== undefined && recipeIngredientsQuery.data.length > 0;
+  const hasSelectedValidRecipe =
+    selectedItem !== null &&
+    productionForm.recipeId.trim().length > 0 &&
+    isActiveRecipe(selectedRecipe) &&
+    selectedRecipeHasBom &&
+    (selectedItem.itemSource === "custom" || recipeMatchesSelectedItem(selectedRecipe, selectedItem));
+  const catalogItemMissingProduct =
+    selectedItem !== null && selectedItem.itemSource !== "custom" && selectedItem.productId === null;
+  const productRecipeUnavailable =
+    selectedItem !== null &&
+    selectedItem.itemSource !== "custom" &&
+    !catalogItemMissingProduct &&
+    !productRecipeQuery.isLoading &&
+    productRecipe === null;
+  const customItemMissingRecipe =
+    selectedItem !== null &&
+    selectedItem.itemSource === "custom" &&
+    productionForm.recipeId.trim().length === 0;
+  const selectedRecipeMissingBom =
+    selectedRecipeId !== null && !recipeIngredientsQuery.isLoading && !selectedRecipeHasBom;
+  const recipeValidationMessage =
+    selectedItem !== null &&
+    (catalogItemMissingProduct ||
+      customItemMissingRecipe ||
+      productRecipeUnavailable ||
+      selectedRecipeMissingBom ||
+      (productionForm.recipeId.trim().length > 0 && !hasSelectedValidRecipe))
+      ? NO_VALID_RECIPE_MESSAGE
+      : null;
+  const plannedQuantity = Number(productionForm.plannedQuantity);
+  const hasValidPlannedQuantity =
+    productionForm.plannedQuantity.trim().length > 0 &&
+    Number.isFinite(plannedQuantity) &&
+    plannedQuantity > 0;
+  const hasValidProductionDate = productionForm.productionDate.trim().length > 0;
+  const createProductionDisabled =
+    !canManage ||
+    selectedItem === null ||
+    productRecipeQuery.isLoading ||
+    recipeIngredientsQuery.isLoading ||
+    !hasSelectedValidRecipe ||
+    !hasValidPlannedQuantity ||
+    !hasValidProductionDate ||
+    createProductionMutation.isPending;
   const recipeOptions = useMemo<SearchableComboboxOption[]>(
-    () =>
-      (recipesQuery.data ?? []).map((recipe) => ({
+    () => {
+      const recipes = productRecipe
+        ? [
+            productRecipe,
+            ...(recipesQuery.data ?? []).filter((recipe) => recipe.id !== productRecipe.id),
+          ]
+        : (recipesQuery.data ?? []);
+
+      return recipes.map((recipe) => ({
         value: recipe.id,
         label: recipe.recipeName,
         description: [recipe.recipeCode, recipe.productName, recipe.productVariantName]
           .filter((part): part is string => typeof part === "string" && part.length > 0)
           .join(" - "),
         keywords: [recipe.recipeName, recipe.recipeCode, recipe.productName],
-      })),
-    [recipesQuery.data],
+      }));
+    },
+    [productRecipe, recipesQuery.data],
   );
+
+  useEffect(() => {
+    if (!selectedItem || selectedItem.itemSource === "custom") {
+      return;
+    }
+    if (productRecipe && productionForm.recipeId !== productRecipe.id) {
+      setProductionForm((current) => ({ ...current, recipeId: productRecipe.id }));
+    }
+  }, [productRecipe, productionForm.recipeId, selectedItem]);
 
   return (
     <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
@@ -162,7 +255,7 @@ export function OrderProductionSection({
               </label>
               <SearchableCombobox
                 disabled={!canManage || !productionForm.itemId}
-                emptyMessage="No recipes found."
+                emptyMessage={NO_VALID_RECIPE_MESSAGE}
                 isLoading={recipesQuery.isLoading}
                 onSearchChange={(recipeSearch) =>
                   setProductionForm((current) => ({ ...current, recipeSearch }))
@@ -176,6 +269,9 @@ export function OrderProductionSection({
                 searchValue={productionForm.recipeSearch}
                 value={productionForm.recipeId}
               />
+              {recipeValidationMessage ? (
+                <p className="text-sm text-red-700">{recipeValidationMessage}</p>
+              ) : null}
             </div>
             <div className="space-y-1">
               <label className="text-sm font-medium text-brand-espresso">Planned quantity</label>
@@ -221,18 +317,16 @@ export function OrderProductionSection({
           </div>
           <Button
             className="mt-4"
-            disabled={!canManage || !productionForm.itemId || createProductionMutation.isPending}
+            disabled={createProductionDisabled}
             onClick={() => {
               void (async () => {
                 if (!selectedItem) {
                   return;
                 }
-                if (selectedItem.itemSource === "custom" && !productionForm.recipeId) {
-                  toast.error("Select a recipe before creating production for a custom item.");
+                if (!hasSelectedValidRecipe) {
+                  toast.error(NO_VALID_RECIPE_MESSAGE);
                   return;
                 }
-
-                const plannedQuantity = Number(productionForm.plannedQuantity);
 
                 try {
                   await createProductionMutation.mutateAsync({
@@ -240,7 +334,7 @@ export function OrderProductionSection({
                     orderId: order.id,
                     payload: {
                       notes: productionForm.notes,
-                      plannedQuantity: Number.isFinite(plannedQuantity) ? plannedQuantity : null,
+                      plannedQuantity,
                       productionDate: productionForm.productionDate,
                       recipeId: productionForm.recipeId,
                     },

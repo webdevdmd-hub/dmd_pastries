@@ -26,6 +26,8 @@ type Service struct {
 	pricingService    *products.Service
 }
 
+const noValidProductionRecipeMessage = "No valid recipe found for this product. Please create or select a recipe before creating production."
+
 func NewService(db *gorm.DB, repo *Repository, inventoryRepo *inventory.Repository, inventoryService *inventory.Service, auditRepo *audit.Repository, accountingService ...*accounting.Service) *Service {
 	service := &Service{db: db, repo: repo, inventoryRepo: inventoryRepo, inventoryService: inventoryService, auditRepo: auditRepo}
 	if len(accountingService) > 0 {
@@ -878,6 +880,9 @@ func (s *Service) buildBatch(tx *gorm.DB, currentUser *utils.AuthContext, req Cr
 	if err != nil {
 		return nil, nil, nil, notFound(err, "active recipe not found")
 	}
+	if err := s.validateRecipeCanCreateProduction(tx, currentUser.BusinessID, req.BranchID, recipe.ID); err != nil {
+		return nil, nil, nil, err
+	}
 	ratio := req.PlannedQuantity / recipe.BatchYieldQuantity
 	batchID := utils.NewUUID()
 	ingredients, err := s.buildIngredientLines(tx, currentUser.BusinessID, batchID, req.BranchID, recipe.ID, ratio)
@@ -892,6 +897,27 @@ func (s *Service) buildBatch(tx *gorm.DB, currentUser *utils.AuthContext, req Cr
 	total := roundMoney(ingredientCost + packagingCost)
 	batch := &ProductionBatch{ID: batchID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, RecipeID: recipe.ID, ProductID: recipe.ProductID, ProductVariantID: recipe.ProductVariantID, PlannedQuantity: req.PlannedQuantity, ProducedQuantity: 0, YieldUnitID: recipe.BatchYieldUnitID, Status: "draft", ProductionDate: productionDate, IngredientCost: ingredientCost, PackagingCost: packagingCost, TotalProductionCost: total, CostPerUnit: roundQuantity(total / req.PlannedQuantity), Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}
 	return batch, ingredients, packaging, nil
+}
+
+func (s *Service) validateRecipeCanCreateProduction(tx *gorm.DB, businessID, branchID, recipeID string) error {
+	componentCount, packagingCount, err := s.repo.RecipeBOMCounts(tx, businessID, branchID, recipeID)
+	if err != nil {
+		return err
+	}
+	return recipeProductionBOMValidationError(branchID, recipeID, componentCount, packagingCount)
+}
+
+func recipeProductionBOMValidationError(branchID, recipeID string, componentCount, packagingCount int64) error {
+	if componentCount == 0 {
+		return apperrors.BadRequest(noValidProductionRecipeMessage, map[string]interface{}{
+			"reason":          "recipe_has_no_components",
+			"recipe_id":       recipeID,
+			"branch_id":       branchID,
+			"component_count": componentCount,
+			"packaging_count": packagingCount,
+		})
+	}
+	return nil
 }
 
 func (s *Service) buildIngredientLines(tx *gorm.DB, businessID, batchID, branchID, recipeID string, ratio float64) ([]ProductionIngredientConsumption, error) {

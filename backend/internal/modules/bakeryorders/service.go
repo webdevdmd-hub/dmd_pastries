@@ -26,6 +26,8 @@ type Service struct {
 	accountingService    *accounting.Service
 }
 
+const noValidProductionRecipeMessage = "No valid recipe found for this product. Please create or select a recipe before creating production."
+
 func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository, manufacturingService *manufacturing.Service, accountingService ...*accounting.Service) *Service {
 	service := &Service{db: db, repo: repo, auditRepo: auditRepo}
 	service.manufacturingService = manufacturingService
@@ -1108,45 +1110,63 @@ func (s *Service) resolveProductionRecipe(tx *gorm.DB, businessID, branchID stri
 	recipeID := strings.TrimSpace(requestedRecipeID)
 	if item.ItemSource == "custom" {
 		if recipeID == "" {
-			return nil, apperrors.BadRequest("recipe_id is required for custom bakery order items", nil)
+			return nil, productionRecipeValidationError("recipe_required_for_custom_item", item, recipeID)
 		}
-		return s.activeRecipeByID(tx, businessID, branchID, recipeID)
+		return s.activeRecipeByIDForItem(tx, businessID, branchID, item, recipeID)
 	}
 	if item.ProductID == nil {
-		return nil, apperrors.BadRequest("catalog bakery order item is missing product_id", nil)
+		return nil, productionRecipeValidationError("item_missing_product", item, recipeID)
 	}
 	if recipeID == "" {
 		recipe, err := s.repo.ActiveRecipeForItem(tx, businessID, branchID, *item.ProductID, item.ProductVariantID)
 		if err != nil {
-			return nil, notFound(err, "active recipe not found for bakery order item")
+			return nil, productionRecipeValidationError("active_recipe_not_found", item, recipeID)
 		}
 		return recipe, nil
 	}
-	recipe, err := s.activeRecipeByID(tx, businessID, branchID, recipeID)
+	recipe, err := s.activeRecipeByIDForItem(tx, businessID, branchID, item, recipeID)
 	if err != nil {
 		return nil, err
 	}
 	if recipe.ProductID != *item.ProductID {
-		return nil, apperrors.BadRequest("recipe product does not match bakery order item product", nil)
+		return nil, productionRecipeValidationError("recipe_product_mismatch", item, recipeID)
 	}
 	if !sameOptionalID(recipe.ProductVariantID, item.ProductVariantID) {
-		return nil, apperrors.BadRequest("recipe variant does not match bakery order item variant", nil)
+		return nil, productionRecipeValidationError("recipe_variant_mismatch", item, recipeID)
 	}
 	return recipe, nil
 }
 
-func (s *Service) activeRecipeByID(tx *gorm.DB, businessID, branchID, recipeID string) (*recipeProductionRow, error) {
+func (s *Service) activeRecipeByIDForItem(tx *gorm.DB, businessID, branchID string, item *BakeryOrderItem, recipeID string) (*recipeProductionRow, error) {
 	if err := validateUUID(recipeID, "recipe_id"); err != nil {
 		return nil, err
 	}
 	recipe, err := s.repo.RecipeForProduction(tx, businessID, branchID, recipeID)
 	if err != nil {
-		return nil, notFound(err, "active recipe not found")
+		return nil, productionRecipeValidationError("active_recipe_not_found", item, recipeID)
 	}
 	if !recipe.IsActive || recipe.Status != "active" {
-		return nil, apperrors.BadRequest("recipe must be active before creating production", nil)
+		return nil, productionRecipeValidationError("recipe_not_active", item, recipeID)
 	}
 	return recipe, nil
+}
+
+func productionRecipeValidationError(reason string, item *BakeryOrderItem, recipeID string) error {
+	details := map[string]interface{}{"reason": reason}
+	if recipeID = strings.TrimSpace(recipeID); recipeID != "" {
+		details["recipe_id"] = recipeID
+	}
+	if item != nil {
+		details["item_id"] = item.ID
+		details["item_source"] = item.ItemSource
+		if item.ProductID != nil {
+			details["product_id"] = *item.ProductID
+		}
+		if item.ProductVariantID != nil {
+			details["product_variant_id"] = *item.ProductVariantID
+		}
+	}
+	return apperrors.BadRequest(noValidProductionRecipeMessage, details)
 }
 
 func (s *Service) validCustomer(tx *gorm.DB, businessID, branchID, customerID string) (*customerRow, error) {

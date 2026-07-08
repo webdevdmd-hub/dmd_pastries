@@ -1,6 +1,11 @@
 package manufacturing
 
-import "testing"
+import (
+	"net/http"
+	"testing"
+
+	apperrors "pastries-pos/internal/shared/errors"
+)
 
 func TestBatchCanProduceIncludesBackendPlannedStatus(t *testing.T) {
 	cases := []struct {
@@ -47,5 +52,41 @@ func TestProductionIssueDetailsIncludeBusinessReference(t *testing.T) {
 		if got := details[key]; got != want {
 			t.Fatalf("details[%q] = %v, want %v", key, got, want)
 		}
+	}
+}
+
+func TestRecipeProductionBOMValidationErrorRequiresComponents(t *testing.T) {
+	err := recipeProductionBOMValidationError("branch-id", "recipe-id", 0, 2)
+
+	appErr, ok := err.(*apperrors.AppError)
+	if !ok {
+		t.Fatalf("expected AppError, got %T", err)
+	}
+	if appErr.StatusCode != http.StatusBadRequest {
+		t.Fatalf("StatusCode = %d, want %d", appErr.StatusCode, http.StatusBadRequest)
+	}
+	if appErr.Message != noValidProductionRecipeMessage {
+		t.Fatalf("Message = %q, want %q", appErr.Message, noValidProductionRecipeMessage)
+	}
+	details, ok := appErr.Details.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Details = %T, want map[string]interface{}", appErr.Details)
+	}
+	for key, want := range map[string]interface{}{
+		"reason":          "recipe_has_no_components",
+		"recipe_id":       "recipe-id",
+		"branch_id":       "branch-id",
+		"component_count": int64(0),
+		"packaging_count": int64(2),
+	} {
+		if got := details[key]; got != want {
+			t.Fatalf("details[%q] = %v, want %v", key, got, want)
+		}
+	}
+}
+
+func TestRecipeProductionBOMValidationErrorAllowsComponentLines(t *testing.T) {
+	if err := recipeProductionBOMValidationError("branch-id", "recipe-id", 1, 0); err != nil {
+		t.Fatalf("expected component recipe to pass, got %v", err)
 	}
 }
