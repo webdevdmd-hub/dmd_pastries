@@ -185,6 +185,7 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 		return nil, err
 	}
 	req.BranchID = branchID
+	req.CheckoutReference = strings.TrimSpace(req.CheckoutReference)
 	if err := validateCheckoutRequest(req); err != nil {
 		return nil, err
 	}
@@ -194,6 +195,21 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 		return nil, apperrors.Internal("failed to start transaction")
 	}
 	defer rollbackIfOpen(tx)
+
+	if err := s.repo.LockCheckoutReference(tx, currentUser.BusinessID, req.CheckoutReference); err != nil {
+		return nil, apperrors.Internal("failed to lock checkout reference")
+	}
+	if existingSale, err := s.repo.FindSaleByCheckoutReference(tx, currentUser.BusinessID, req.CheckoutReference); err == nil {
+		if !currentUser.CanAccessBranch(existingSale.BranchID) {
+			return nil, apperrors.Forbidden("branch access denied")
+		}
+		existingSaleID := existingSale.ID
+		_ = tx.Rollback().Error
+		tx = nil
+		return s.loadCheckoutSaleResponse(currentUser.BusinessID, existingSaleID)
+	} else if err != gorm.ErrRecordNotFound {
+		return nil, apperrors.Internal("failed to check checkout reference")
+	}
 
 	if ok, err := s.repo.BranchExists(tx, currentUser.BusinessID, req.BranchID); err != nil {
 		return nil, apperrors.Internal("failed to validate branch")
@@ -248,6 +264,7 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 		SalesChannelID:           &salesChannel.ID,
 		SalesChannelNameSnapshot: salesChannel.ChannelName,
 		ExternalOrderNumber:      externalOrderNumber,
+		CheckoutReference:        req.CheckoutReference,
 		SaleNumber:               saleNumber,
 		SubtotalAmount:           calculation.SubtotalAmount,
 		DiscountType:             cleanStringPointer(req.SaleDiscountType),
@@ -274,6 +291,17 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 	}
 
 	if err := s.repo.CreateSale(tx, sale, calculation.Items, payments); err != nil {
+		if isCheckoutReferenceConflict(err) {
+			_ = tx.Rollback().Error
+			tx = nil
+			existingSale, findErr := s.repo.FindSaleByCheckoutReference(s.db, currentUser.BusinessID, req.CheckoutReference)
+			if findErr == nil {
+				if !currentUser.CanAccessBranch(existingSale.BranchID) {
+					return nil, apperrors.Forbidden("branch access denied")
+				}
+				return s.loadCheckoutSaleResponse(currentUser.BusinessID, existingSale.ID)
+			}
+		}
 		return nil, apperrors.Internal("failed to create sale")
 	}
 	if len(calculation.Charges) > 0 {
@@ -302,13 +330,19 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 	}
 	tx = nil
 
-	response, err := s.repo.LoadSaleDetails(currentUser.BusinessID, sale.ID)
+	return s.loadCheckoutSaleResponse(currentUser.BusinessID, sale.ID)
+}
+
+func (s *Service) loadCheckoutSaleResponse(businessID, saleID string) (*SaleResponse, error) {
+	response, err := s.repo.LoadSaleDetails(businessID, saleID)
 	if err != nil {
 		return nil, apperrors.Internal("failed to load sale")
 	}
-	receipt, err := s.repo.LoadReceipt(*sale)
+	sale, err := s.repo.FindSaleByID(s.db, businessID, saleID)
 	if err == nil {
-		response.Receipt = receipt
+		if receipt, receiptErr := s.repo.LoadReceipt(*sale); receiptErr == nil {
+			response.Receipt = receipt
+		}
 	}
 	return response, nil
 }
@@ -556,6 +590,24 @@ func (s *Service) GetSale(currentUser *utils.AuthContext, saleID string) (*SaleR
 		return nil, apperrors.Forbidden("branch access denied")
 	}
 	return response, nil
+}
+
+func (s *Service) GetCheckoutStatus(currentUser *utils.AuthContext, checkoutReference string) (*SaleResponse, error) {
+	checkoutReference = strings.TrimSpace(checkoutReference)
+	if _, err := uuid.Parse(checkoutReference); err != nil {
+		return nil, apperrors.BadRequest("checkout_reference must be a valid UUID", nil)
+	}
+	sale, err := s.repo.FindSaleByCheckoutReference(s.db, currentUser.BusinessID, checkoutReference)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.NotFound("checkout not found")
+		}
+		return nil, apperrors.Internal("failed to load checkout status")
+	}
+	if !currentUser.CanAccessBranch(sale.BranchID) {
+		return nil, apperrors.Forbidden("branch access denied")
+	}
+	return s.loadCheckoutSaleResponse(currentUser.BusinessID, sale.ID)
 }
 
 func (s *Service) GetReceipt(currentUser *utils.AuthContext, saleID string, ipAddress, userAgent string) (*ReceiptReadyResponse, error) {
@@ -1274,6 +1326,9 @@ func validateCheckoutRequest(req CheckoutRequest) error {
 	if strings.TrimSpace(req.BranchID) == "" {
 		return apperrors.BadRequest("branch_id is required", nil)
 	}
+	if _, err := uuid.Parse(strings.TrimSpace(req.CheckoutReference)); err != nil {
+		return apperrors.BadRequest("checkout_reference must be a valid UUID", nil)
+	}
 	if len(req.Items) == 0 {
 		return apperrors.BadRequest("items are required", nil)
 	}
@@ -1292,6 +1347,15 @@ func validateCheckoutRequest(req CheckoutRequest) error {
 		}
 	}
 	return nil
+}
+
+func isCheckoutReferenceConflict(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "idx_sales_business_checkout_reference") ||
+		strings.Contains(message, "checkout_reference") && strings.Contains(message, "duplicate")
 }
 
 func validateHoldSaleRequest(req HoldSaleRequest) error {

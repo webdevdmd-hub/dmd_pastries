@@ -10,6 +10,7 @@ import (
 type CheckoutRequest struct {
 	BranchID            string                   `json:"branch_id" binding:"required,uuid"`
 	CustomerID          *string                  `json:"customer_id" binding:"omitempty,uuid"`
+	CheckoutReference   string                   `json:"checkout_reference"`
 	SalesChannelID      *string                  `json:"sales_channel_id" binding:"omitempty,uuid"`
 	ExternalOrderNumber string                   `json:"external_order_number"`
 	Items               []CheckoutItemRequest    `json:"items" binding:"required"`
@@ -289,6 +290,7 @@ type SaleResponse struct {
 	SalesChannelID           *string                  `json:"sales_channel_id"`
 	SalesChannelNameSnapshot string                   `json:"sales_channel_name_snapshot"`
 	ExternalOrderNumber      string                   `json:"external_order_number"`
+	CheckoutReference        string                   `json:"checkout_reference"`
 	SaleNumber               string                   `json:"sale_number"`
 	SubtotalAmount           float64                  `json:"subtotal_amount"`
 	DiscountType             *string                  `json:"discount_type"`

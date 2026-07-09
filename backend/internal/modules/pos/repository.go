@@ -375,6 +375,11 @@ func (r *Repository) GenerateSaleNumber(tx *gorm.DB, businessID string, soldAt t
 	return fmt.Sprintf("%s%06d", prefix, count+1), nil
 }
 
+func (r *Repository) LockCheckoutReference(tx *gorm.DB, businessID, checkoutReference string) error {
+	lockKey := businessID + ":" + checkoutReference + ":pos_checkout"
+	return tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error
+}
+
 func (r *Repository) GenerateHoldNumber(tx *gorm.DB, businessID string, heldAt time.Time) (string, error) {
 	datePart := heldAt.Format("20060102")
 	lockKey := businessID + ":" + datePart + ":held_sales"
@@ -470,6 +475,15 @@ func (r *Repository) FindSaleByID(tx *gorm.DB, businessID, saleID string) (*Sale
 	return &sale, nil
 }
 
+func (r *Repository) FindSaleByCheckoutReference(tx *gorm.DB, businessID, checkoutReference string) (*Sale, error) {
+	var sale Sale
+	err := tx.Where("business_id = ? AND checkout_reference = ? AND deleted_at IS NULL", businessID, checkoutReference).Take(&sale).Error
+	if err != nil {
+		return nil, err
+	}
+	return &sale, nil
+}
+
 func (r *Repository) LoadSaleDetails(businessID, saleID string) (*SaleResponse, error) {
 	sale, err := r.FindSaleByID(r.db, businessID, saleID)
 	if err != nil {
@@ -494,6 +508,7 @@ func (r *Repository) toSaleResponse(sale Sale, includeChildren bool) (*SaleRespo
 		SalesChannelID:           sale.SalesChannelID,
 		SalesChannelNameSnapshot: sale.SalesChannelNameSnapshot,
 		ExternalOrderNumber:      sale.ExternalOrderNumber,
+		CheckoutReference:        sale.CheckoutReference,
 		SaleNumber:               sale.SaleNumber,
 		SubtotalAmount:           sale.SubtotalAmount,
 		DiscountType:             sale.DiscountType,

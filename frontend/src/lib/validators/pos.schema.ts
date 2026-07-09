@@ -25,6 +25,7 @@ export const paymentSchema = z.object({
 
 export const checkoutSchema = z.object({
   branchId: z.string().min(1, "Branch is required."),
+  checkoutReference: z.string().uuid("Checkout reference is invalid."),
   customerId: z.string().nullable(),
   items: z.array(cartItemSchema).min(1, "Cart must not be empty."),
   saleDiscountType: z.enum(["fixed", "percentage"]).nullable(),

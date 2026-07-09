@@ -25,6 +25,7 @@ func RegisterRoutes(
 	group.POST("/held-sales/:id/resume", posSell, handler.ResumeHeldSale)
 	group.DELETE("/held-sales/:id", posSell, handler.CancelHeldSale)
 	group.POST("/checkout", posSell, handler.Checkout)
+	group.GET("/checkout-status/:checkout_reference", posSell, handler.GetCheckoutStatus)
 	group.GET("/sales", posView, handler.ListSales)
 	group.GET("/sales/:id", posView, handler.GetSale)
 	group.GET("/sales/:id/receipt", posView, handler.GetReceipt)

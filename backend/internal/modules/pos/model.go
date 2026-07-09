@@ -15,6 +15,7 @@ type Sale struct {
 	SalesChannelID           *string        `gorm:"type:uuid;index" json:"sales_channel_id"`
 	SalesChannelNameSnapshot string         `gorm:"size:150;not null;default:''" json:"sales_channel_name_snapshot"`
 	ExternalOrderNumber      string         `gorm:"size:150;not null;default:''" json:"external_order_number"`
+	CheckoutReference        string         `gorm:"size:80;not null;default:'';index" json:"checkout_reference"`
 	SaleNumber               string         `gorm:"size:100;not null" json:"sale_number"`
 	SubtotalAmount           float64        `gorm:"not null;default:0" json:"subtotal_amount"`
 	DiscountType             *string        `gorm:"size:50" json:"discount_type"`

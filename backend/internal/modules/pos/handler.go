@@ -74,6 +74,16 @@ func (h *Handler) Checkout(c *gin.Context) {
 	response.Success(c, 201, "sale completed successfully", result)
 }
 
+func (h *Handler) GetCheckoutStatus(c *gin.Context) {
+	currentUser := utils.MustAuthContext(c)
+	result, err := h.service.GetCheckoutStatus(currentUser, c.Param("checkout_reference"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "checkout status fetched successfully", result)
+}
+
 func (h *Handler) CreateHeldSale(c *gin.Context) {
 	var req HoldSaleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

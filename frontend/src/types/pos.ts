@@ -107,6 +107,7 @@ export type CartTotals = {
 
 export type CheckoutPayload = {
   branchId: string;
+  checkoutReference: string;
   customerId: string | null;
   items: {
     productId: string;
@@ -200,6 +201,7 @@ export type CheckoutResponse = {
     id: string;
     saleNumber: string;
     accountingJournalEntryId: string | null;
+    checkoutReference: string;
   };
   receipt: SaleReceipt;
   receiptWarning: string | null;

@@ -201,6 +201,7 @@ type BackendPOSReferenceData = {
 
 type BackendCheckoutPayload = {
   branch_id: string;
+  checkout_reference: string;
   customer_id: string | null;
   items: {
     product_id: string;
@@ -260,6 +261,7 @@ type BackendReceipt = {
 type BackendCheckoutResponse = {
   id?: string;
   sale_number?: string;
+  checkout_reference?: string;
   branch_name?: string;
   cashier_name?: string;
   sold_at?: string;
@@ -278,6 +280,7 @@ type BackendCheckoutResponse = {
   sale?: {
     id?: string;
     sale_number?: string;
+    checkout_reference?: string;
     accounting_journal_entry_id?: string | null;
   };
   receipt?: unknown;
@@ -898,6 +901,7 @@ function toQueryString(params: Record<string, string | number | boolean | null>)
 function toBackendCheckoutPayload(payload: CheckoutPayload): BackendCheckoutPayload {
   return {
     branch_id: payload.branchId,
+    checkout_reference: payload.checkoutReference,
     customer_id: payload.customerId,
     items: payload.items.map((item) => ({
       product_id: item.productId,
@@ -1053,29 +1057,60 @@ function parseFallbackReceipt(response: BackendCheckoutResponse): SaleReceipt {
   };
 }
 
+function parseCheckoutReceipt(response: BackendCheckoutResponse): {
+  receipt: SaleReceipt;
+  receiptWarning: string | null;
+} {
+  if (isObject(response.receipt)) {
+    try {
+      return {
+        receipt: parseReceipt(response.receipt),
+        receiptWarning: null,
+      };
+    } catch {
+      return {
+        receipt: parseFallbackReceipt(response),
+        receiptWarning:
+          "Sale completed, but the receipt details were incomplete. Review the sale from Sales if the receipt needs to be reprinted.",
+      };
+    }
+  }
+
+  return {
+    receipt: parseFallbackReceipt(response),
+    receiptWarning:
+      "Sale completed, but the receipt details were incomplete. Review the sale from Sales if the receipt needs to be reprinted.",
+  };
+}
+
 function parseCheckoutResponse(value: unknown): CheckoutResponse {
   if (!isObject(value)) {
     throw new Error("Backend checkout payload is invalid.");
   }
 
   const response = value as BackendCheckoutResponse;
-  const hasReceiptPayload = isObject(response.receipt);
-  const parsedReceipt = hasReceiptPayload
-    ? parseReceipt(response.receipt)
-    : parseFallbackReceipt(response);
-  const saleId = requiredString(response.sale?.id ?? response.id, parsedReceipt.saleId);
+  const saleId = requiredString(response.sale?.id ?? response.id);
+
+  if (!saleId) {
+    throw new Error("Backend checkout payload is missing the sale id.");
+  }
+
+  const parsed = parseCheckoutReceipt(response);
   const saleNumber = requiredString(
     response.sale?.sale_number ?? response.sale_number,
-    parsedReceipt.saleNumber,
+    parsed.receipt.saleNumber,
+  );
+  const checkoutReference = requiredString(
+    response.sale?.checkout_reference ?? response.checkout_reference,
   );
   const accountingJournalEntryId = optionalString(
     response.sale?.accounting_journal_entry_id ?? response.accounting_journal_entry_id,
   );
   const receipt = {
-    ...parsedReceipt,
+    ...parsed.receipt,
     saleId,
     saleNumber,
-    accountingJournalEntryId: parsedReceipt.accountingJournalEntryId ?? accountingJournalEntryId,
+    accountingJournalEntryId: parsed.receipt.accountingJournalEntryId ?? accountingJournalEntryId,
   };
 
   return {
@@ -1083,11 +1118,10 @@ function parseCheckoutResponse(value: unknown): CheckoutResponse {
       id: saleId,
       saleNumber,
       accountingJournalEntryId,
+      checkoutReference,
     },
     receipt,
-    receiptWarning: hasReceiptPayload
-      ? null
-      : "Sale completed, but the receipt details were incomplete. Review the sale from Sales if the receipt needs to be reprinted.",
+    receiptWarning: parsed.receiptWarning,
   };
 }
 
@@ -1301,6 +1335,28 @@ export async function checkoutPOS(payload: CheckoutPayload): Promise<CheckoutRes
   );
 
   return response.data;
+}
+
+export async function getPOSCheckoutStatus(
+  checkoutReference: string,
+): Promise<CheckoutResponse | null> {
+  try {
+    const response = await apiRequest<CheckoutResponse>(
+      `/api/v1/pos/checkout-status/${encodeURIComponent(checkoutReference)}`,
+      {
+        authMode: "appwrite",
+        parse: parseCheckoutResponse,
+      },
+    );
+
+    return response.data;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 export async function holdSalePOS(payload: HoldSalePayload): Promise<HeldSale> {

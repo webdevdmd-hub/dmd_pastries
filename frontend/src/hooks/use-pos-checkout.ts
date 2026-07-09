@@ -8,6 +8,7 @@ import {
   checkoutPOS,
   getHeldSaleById,
   getHeldSales,
+  getPOSCheckoutStatus,
   holdSalePOS,
   resumeHeldSale,
 } from "@/lib/api/pos";
@@ -31,6 +32,19 @@ export function usePOSCheckout() {
     mutationFn: async (payload) => checkoutPOS(payload),
     onSuccess: async () => {
       await invalidatePosTransactionData(queryClient);
+    },
+  });
+}
+
+export function useVerifyPOSCheckout() {
+  const queryClient = useQueryClient();
+
+  return useMutation<CheckoutResponse | null, Error, string>({
+    mutationFn: getPOSCheckoutStatus,
+    onSuccess: async (checkout) => {
+      if (checkout) {
+        await invalidatePosTransactionData(queryClient);
+      }
     },
   });
 }

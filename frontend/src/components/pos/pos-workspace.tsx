@@ -43,6 +43,7 @@ import {
   useHoldSale,
   usePOSCheckout,
   useResumeHeldSale,
+  useVerifyPOSCheckout,
 } from "@/hooks/use-pos-checkout";
 import {
   usePOSPaymentMethods,
@@ -59,7 +60,13 @@ import {
 import { getProductCategoryIconForMetadata } from "@/lib/product-category-icons";
 import { checkoutSchema } from "@/lib/validators/pos.schema";
 import type { ProductCategory } from "@/types/master-data";
-import type { CartItem, POSProduct, POSProductVariant, SaleReceipt } from "@/types/pos";
+import type {
+  CartItem,
+  CheckoutResponse,
+  POSProduct,
+  POSProductVariant,
+  SaleReceipt,
+} from "@/types/pos";
 import type { ReceiptLayout } from "@/types/settings";
 
 const POS_SHOW_PRICES_STORAGE_KEY = "pos.showPrices";
@@ -134,6 +141,7 @@ export function POSWorkspace(): JSX.Element {
   const [salesChannelId, setSalesChannelId] = useState("");
   const [externalOrderNumber, setExternalOrderNumber] = useState("");
   const [checkoutFeedback, setCheckoutFeedback] = useState<CheckoutFeedback | null>(null);
+  const [checkoutReference, setCheckoutReference] = useState<string | null>(null);
   const [variantProduct, setVariantProduct] = useState<POSProduct | null>(null);
   const debouncedSearch = useDebouncedValue(search, 250);
   const branchId = branchScope.effectiveBranchId ?? "";
@@ -159,6 +167,7 @@ export function POSWorkspace(): JSX.Element {
     branchScope.hasBranchScope,
   );
   const checkoutMutation = usePOSCheckout();
+  const verifyCheckoutMutation = useVerifyPOSCheckout();
   const heldSalesQuery = useHeldSales(holdOpen);
   const holdSaleMutation = useHoldSale();
   const resumeHeldSaleMutation = useResumeHeldSale();
@@ -229,6 +238,7 @@ export function POSWorkspace(): JSX.Element {
       if ((event.ctrlKey || event.metaKey) && event.key === "Backspace") {
         event.preventDefault();
         if (cart.items.length > 0 && window.confirm("Clear current POS cart?")) {
+          setCheckoutReference(null);
           cart.clearCart();
         }
       }
@@ -283,8 +293,45 @@ export function POSWorkspace(): JSX.Element {
     toast.error(feedback.message);
   };
 
+  const getOrCreateCheckoutReference = (): string => {
+    if (checkoutReference) {
+      return checkoutReference;
+    }
+
+    const reference = crypto.randomUUID();
+    setCheckoutReference(reference);
+    return reference;
+  };
+
+  const completeCheckout = (
+    checkedOut: CheckoutResponse,
+    receiptItemSnapshot: CartItem[],
+  ): void => {
+    setReceipt(
+      withCartItemNames(
+        {
+          ...checkedOut.receipt,
+          accountingJournalEntryId: checkedOut.sale.accountingJournalEntryId,
+        },
+        receiptItemSnapshot,
+      ),
+    );
+    setCheckoutFeedback(null);
+    setCheckoutOpen(false);
+    setReceiptOpen(true);
+    setExternalOrderNumber("");
+    setCheckoutReference(null);
+    cart.clearCart();
+    if (checkedOut.receiptWarning) {
+      toast.warning(checkedOut.receiptWarning);
+    } else {
+      toast.success("Sale completed");
+    }
+    barcodeInputRef.current?.focus();
+  };
+
   const submitCheckout = async (): Promise<void> => {
-    if (checkoutMutation.isPending) {
+    if (checkoutMutation.isPending || verifyCheckoutMutation.isPending) {
       return;
     }
 
@@ -294,8 +341,10 @@ export function POSWorkspace(): JSX.Element {
       return;
     }
 
+    const activeCheckoutReference = getOrCreateCheckoutReference();
     const payload = {
       branchId,
+      checkoutReference: activeCheckoutReference,
       customerId,
       items: cart.items.map((item) => ({
         productId: item.productId,
@@ -329,32 +378,38 @@ export function POSWorkspace(): JSX.Element {
 
     try {
       const checkedOut = await checkoutMutation.mutateAsync(payload);
-      setReceipt(
-        withCartItemNames(
-          {
-            ...checkedOut.receipt,
-            accountingJournalEntryId: checkedOut.sale.accountingJournalEntryId,
-          },
-          receiptItemSnapshot,
-        ),
-      );
-      setCheckoutFeedback(null);
-      setCheckoutOpen(false);
-      setReceiptOpen(true);
-      setExternalOrderNumber("");
-      cart.clearCart();
-      if (checkedOut.receiptWarning) {
-        toast.warning(checkedOut.receiptWarning);
-      } else {
-        toast.success("Sale completed");
-      }
-      barcodeInputRef.current?.focus();
+      completeCheckout(checkedOut, receiptItemSnapshot);
     } catch (error) {
-      showCheckoutFeedback({
-        message: getErrorMessage(error),
-        title: "Checkout failed",
-        tone: "error",
-      });
+      try {
+        const verifiedCheckout = await verifyCheckoutMutation.mutateAsync(activeCheckoutReference);
+
+        if (verifiedCheckout) {
+          completeCheckout(verifiedCheckout, receiptItemSnapshot);
+          return;
+        }
+
+        showCheckoutFeedback({
+          message: getErrorMessage(error),
+          title: "Checkout failed",
+          tone: "error",
+        });
+      } catch (verificationError) {
+        showCheckoutFeedback({
+          message: `The checkout result could not be verified. Retry will use the same checkout reference to prevent a duplicate sale. ${getErrorMessage(
+            verificationError,
+          )}`,
+          title: "Checkout status unknown",
+          tone: "warning",
+        });
+      }
+    }
+  };
+
+  const isCheckoutProcessing = checkoutMutation.isPending || verifyCheckoutMutation.isPending;
+
+  const resetCheckoutReference = (): void => {
+    if (!isCheckoutProcessing) {
+      setCheckoutReference(null);
     }
   };
 
@@ -382,6 +437,7 @@ export function POSWorkspace(): JSX.Element {
         totals: cart.totals,
         notes,
       });
+      resetCheckoutReference();
       cart.clearCart();
       setCustomerId(null);
       toast.success("Sale held successfully.");
@@ -530,7 +586,7 @@ export function POSWorkspace(): JSX.Element {
       charges={cart.charges}
       customerId={customerId}
       externalOrderNumber={externalOrderNumber}
-      isCheckingOut={checkoutMutation.isPending}
+      isCheckingOut={isCheckoutProcessing}
       items={cart.items}
       onCheckout={() => handleCheckoutOpenChange(true)}
       onChargesChange={(charges) => {
@@ -540,6 +596,7 @@ export function POSWorkspace(): JSX.Element {
       onClear={() => {
         if (window.confirm("Clear current POS cart?")) {
           clearCheckoutFeedback();
+          resetCheckoutReference();
           cart.clearCart();
         }
       }}
@@ -789,7 +846,7 @@ export function POSWorkspace(): JSX.Element {
         charges={cart.charges}
         confirmButtonLabel={checkoutBlocker?.buttonLabel ?? "Confirm sale"}
         feedback={checkoutFeedback}
-        isSubmitting={checkoutMutation.isPending}
+        isSubmitting={isCheckoutProcessing}
         onConfirm={() => {
           void submitCheckout();
         }}
