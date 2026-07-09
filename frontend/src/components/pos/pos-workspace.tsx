@@ -63,11 +63,12 @@ import type { ProductCategory } from "@/types/master-data";
 import type {
   CartItem,
   CheckoutResponse,
+  PaymentInput,
   POSProduct,
   POSProductVariant,
   SaleReceipt,
 } from "@/types/pos";
-import type { ReceiptLayout } from "@/types/settings";
+import type { PaymentMethod, ReceiptLayout, SalesChannel } from "@/types/settings";
 
 const POS_SHOW_PRICES_STORAGE_KEY = "pos.showPrices";
 
@@ -120,6 +121,37 @@ function selectReceiptLayout(layouts: ReceiptLayout[], branchId: string): Receip
   );
 }
 
+function getUsableDefaultPaymentMethod(
+  salesChannel: SalesChannel | null,
+  paymentMethods: PaymentMethod[],
+): PaymentMethod | null {
+  if (!salesChannel?.defaultPaymentMethodId) {
+    return null;
+  }
+
+  const paymentMethod =
+    paymentMethods.find((method) => method.id === salesChannel.defaultPaymentMethodId) ?? null;
+
+  if (
+    paymentMethod?.status !== "active" ||
+    !paymentMethod.showInPos ||
+    !paymentMethod.defaultPaymentAccountId
+  ) {
+    return null;
+  }
+
+  return paymentMethod;
+}
+
+function createAutoSelectedPayment(method: PaymentMethod, amount: number): PaymentInput {
+  return {
+    paymentMethodId: method.id,
+    paymentMethodName: method.methodName,
+    amount,
+    referenceNumber: null,
+  };
+}
+
 export function POSWorkspace(): JSX.Element {
   const { user } = useAuth();
   const branchScope = useBranchScope();
@@ -139,6 +171,11 @@ export function POSWorkspace(): JSX.Element {
   const [categoryId, setCategoryId] = useState("all");
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [salesChannelId, setSalesChannelId] = useState("");
+  const [autoSelectedPaymentMethodId, setAutoSelectedPaymentMethodId] = useState<string | null>(
+    null,
+  );
+  const [paymentAutoSelectionSuppressedChannelId, setPaymentAutoSelectionSuppressedChannelId] =
+    useState<string | null>(null);
   const [externalOrderNumber, setExternalOrderNumber] = useState("");
   const [checkoutFeedback, setCheckoutFeedback] = useState<CheckoutFeedback | null>(null);
   const [checkoutReference, setCheckoutReference] = useState<string | null>(null);
@@ -173,6 +210,9 @@ export function POSWorkspace(): JSX.Element {
   const resumeHeldSaleMutation = useResumeHeldSale();
   const cancelHeldSaleMutation = useCancelHeldSale();
   const cart = usePOSCart();
+  const cartPayments = cart.payments;
+  const cartTotal = cart.totals.total;
+  const setCartPayments = cart.setPayments;
 
   useEffect(() => {
     if (!branchScope.hasBranchScope) {
@@ -239,6 +279,8 @@ export function POSWorkspace(): JSX.Element {
         event.preventDefault();
         if (cart.items.length > 0 && window.confirm("Clear current POS cart?")) {
           setCheckoutReference(null);
+          setAutoSelectedPaymentMethodId(null);
+          setPaymentAutoSelectionSuppressedChannelId(null);
           cart.clearCart();
         }
       }
@@ -321,6 +363,8 @@ export function POSWorkspace(): JSX.Element {
     setReceiptOpen(true);
     setExternalOrderNumber("");
     setCheckoutReference(null);
+    setAutoSelectedPaymentMethodId(null);
+    setPaymentAutoSelectionSuppressedChannelId(null);
     cart.clearCart();
     if (checkedOut.receiptWarning) {
       toast.warning(checkedOut.receiptWarning);
@@ -438,6 +482,8 @@ export function POSWorkspace(): JSX.Element {
         notes,
       });
       resetCheckoutReference();
+      setAutoSelectedPaymentMethodId(null);
+      setPaymentAutoSelectionSuppressedChannelId(null);
       cart.clearCart();
       setCustomerId(null);
       toast.success("Sale held successfully.");
@@ -460,6 +506,8 @@ export function POSWorkspace(): JSX.Element {
         resumed.saleDiscountValue,
         resumed.charges,
       );
+      setAutoSelectedPaymentMethodId(null);
+      setPaymentAutoSelectionSuppressedChannelId(null);
       setCustomerId(resumed.customerId);
       setHoldOpen(false);
       toast.success("Held sale resumed.");
@@ -486,7 +534,10 @@ export function POSWorkspace(): JSX.Element {
     () => referenceDataQuery.data?.productCategories ?? [],
     [referenceDataQuery.data?.productCategories],
   );
-  const paymentMethods = paymentMethodsQuery.data ?? [];
+  const paymentMethods = useMemo(
+    () => paymentMethodsQuery.data ?? [],
+    [paymentMethodsQuery.data],
+  );
   const chargeTaxRates = referenceDataQuery.data?.taxRates ?? [];
   const salesChannels = useMemo(
     () =>
@@ -495,6 +546,67 @@ export function POSWorkspace(): JSX.Element {
       ),
     [referenceDataQuery.data?.salesChannels],
   );
+  const selectedSalesChannel = useMemo(
+    () => salesChannels.find((channel) => channel.id === salesChannelId) ?? null,
+    [salesChannelId, salesChannels],
+  );
+  const salesChannelDefaultPaymentMethod = useMemo(
+    () => getUsableDefaultPaymentMethod(selectedSalesChannel, paymentMethods),
+    [paymentMethods, selectedSalesChannel],
+  );
+
+  useEffect(() => {
+    if (paymentAutoSelectionSuppressedChannelId === salesChannelId) {
+      return;
+    }
+
+    const currentPayment = cartPayments[0] ?? null;
+    const currentPaymentWasAutoSelected =
+      autoSelectedPaymentMethodId !== null &&
+      cartPayments.length === 1 &&
+      currentPayment?.paymentMethodId === autoSelectedPaymentMethodId;
+    const canApplyChannelDefault = cartPayments.length === 0 || currentPaymentWasAutoSelected;
+
+    if (!canApplyChannelDefault) {
+      return;
+    }
+
+    if (!salesChannelDefaultPaymentMethod || cartTotal <= 0) {
+      if (currentPaymentWasAutoSelected) {
+        setCartPayments([]);
+      }
+      if (autoSelectedPaymentMethodId !== null) {
+        setAutoSelectedPaymentMethodId(null);
+      }
+      return;
+    }
+
+    const nextPayment = createAutoSelectedPayment(
+      salesChannelDefaultPaymentMethod,
+      cartTotal,
+    );
+    const currentPaymentAlreadyMatches =
+      currentPayment?.paymentMethodId === nextPayment.paymentMethodId &&
+      currentPayment.paymentMethodName === nextPayment.paymentMethodName &&
+      currentPayment.amount === nextPayment.amount &&
+      currentPayment.referenceNumber === nextPayment.referenceNumber;
+
+    if (!currentPaymentAlreadyMatches) {
+      setCartPayments([nextPayment]);
+    }
+    if (autoSelectedPaymentMethodId !== nextPayment.paymentMethodId) {
+      setAutoSelectedPaymentMethodId(nextPayment.paymentMethodId);
+    }
+  }, [
+    autoSelectedPaymentMethodId,
+    cartPayments,
+    cartTotal,
+    paymentAutoSelectionSuppressedChannelId,
+    salesChannelDefaultPaymentMethod,
+    salesChannelId,
+    setCartPayments,
+  ]);
+
   const checkoutBlocker = resolveCheckoutBlocker({
     branchId,
     externalOrderNumber,
@@ -597,6 +709,8 @@ export function POSWorkspace(): JSX.Element {
         if (window.confirm("Clear current POS cart?")) {
           clearCheckoutFeedback();
           resetCheckoutReference();
+          setAutoSelectedPaymentMethodId(null);
+          setPaymentAutoSelectionSuppressedChannelId(null);
           cart.clearCart();
         }
       }}
@@ -623,6 +737,7 @@ export function POSWorkspace(): JSX.Element {
       }}
       onSalesChannelChange={(value) => {
         clearCheckoutFeedback();
+        setPaymentAutoSelectionSuppressedChannelId(null);
         setSalesChannelId(value);
       }}
       salesChannelId={salesChannelId}
@@ -857,6 +972,8 @@ export function POSWorkspace(): JSX.Element {
         }}
         onPaymentsChange={(payments) => {
           clearCheckoutFeedback();
+          setAutoSelectedPaymentMethodId(null);
+          setPaymentAutoSelectionSuppressedChannelId(salesChannelId);
           cart.setPayments(payments);
         }}
         onSaleDiscountChange={(discountType, discountValue) => {
