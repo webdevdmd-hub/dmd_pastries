@@ -11,7 +11,6 @@ import { PaymentAccountsPageClient } from "@/components/accounting/settlement-pa
 import { SettingsDataPageClient } from "@/components/settings/settings-data-page-client";
 import { PageHeader } from "@/components/shared/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -64,13 +63,6 @@ const overviewAccountFilters: PaymentAccountsFilters = {
   status: "all",
 };
 
-function money(value: number): string {
-  return new Intl.NumberFormat("en-AE", {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-  }).format(value);
-}
-
 function readinessIssueBlocks(severity: string): boolean {
   return severity === "blocking" || severity === "error";
 }
@@ -96,15 +88,27 @@ function formatStatus(value: string): string {
 }
 
 function formatIssueDetails(issue: AccountingBackfillReadinessIssue): string {
-  const entries = Object.entries(issue.details);
+  const detailLabels: [string, string][] = [
+    ["method_name", "Payment method"],
+    ["branch_name", "Branch"],
+    ["payment_account_name", "Linked account"],
+    ["payment_account_status", "Account status"],
+    ["source", "Source"],
+    ["chart_account_code", "Ledger code"],
+    ["chart_account_name", "Ledger"],
+    ["chart_account_status", "Ledger status"],
+    ["mapping_key", "Mapping"],
+    ["description", "Action"],
+  ];
+  const entries = detailLabels
+    .map(([key, label]) => [label, issue.details[key]] as const)
+    .filter(([, value]) => value !== "" && value !== null && value !== undefined);
+
   if (entries.length === 0) {
     return "";
   }
 
-  return entries
-    .filter(([, value]) => value !== "" && value !== null)
-    .map(([key, value]) => `${formatStatus(key)}: ${String(value)}`)
-    .join(" | ");
+  return entries.map(([label, value]) => `${label}: ${String(value)}`).join(" | ");
 }
 
 function readinessAction(issue: AccountingBackfillReadinessIssue): {
@@ -363,23 +367,18 @@ function PaymentSetupOverview({
 }
 
 function BranchMappingView({
-  accounts,
   canViewAccounts,
   canViewMethods,
-  methods,
   setupReadiness,
 }: {
-  accounts: PaymentAccount[];
   canViewAccounts: boolean;
   canViewMethods: boolean;
-  methods: PaymentMethod[];
   setupReadiness: AccountingSetupReadinessResponse | undefined;
 }): JSX.Element {
   if (!canViewMethods) {
     return <AccessNotice title="Payment method access is required" />;
   }
 
-  const accountsById = new Map(accounts.map((account) => [account.id, account]));
   const branchPaymentIssues = (setupReadiness?.issues ?? []).filter(
     (issue) => readinessIssueBlocks(issue.severity) && isPaymentCoverageIssue(issue),
   );
@@ -457,68 +456,16 @@ function BranchMappingView({
             branch.
           </AlertDescription>
         </Alert>
+      ) : canViewAccounts && setupReadiness ? (
+        <Alert>
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertTitle>No branch payment mapping issues</AlertTitle>
+          <AlertDescription>
+            Backend readiness did not report any blocking branch payment account issues. Review
+            non-payment accounting setup issues from the Overview tab.
+          </AlertDescription>
+        </Alert>
       ) : null}
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle>Default payment account fallback</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Payment Method</TableHead>
-                <TableHead>Branch</TableHead>
-                <TableHead>Linked Account</TableHead>
-                <TableHead>Account Branch</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {methods.map((method) => {
-                const linkedAccount = method.defaultPaymentAccountId
-                  ? accountsById.get(method.defaultPaymentAccountId)
-                  : null;
-                const ready = method.status === "active" && linkedAccount?.status === "active";
-
-                return (
-                  <TableRow key={method.id}>
-                    <TableCell>
-                      <div className="font-medium text-brand-espresso">{method.methodName}</div>
-                      <div className="text-xs text-brand-mocha">{method.methodType}</div>
-                    </TableCell>
-                    <TableCell>{method.branchName ?? "Business-wide"}</TableCell>
-                    <TableCell>
-                      {linkedAccount ? (
-                        <>
-                          <div>{linkedAccount.accountName}</div>
-                          <div className="text-xs text-brand-mocha">
-                            {money(linkedAccount.currentBalance)} {linkedAccount.balanceLabel}
-                          </div>
-                        </>
-                      ) : (
-                        <span className="text-red-700">No linked account</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{linkedAccount?.branchName ?? "Business-wide"}</TableCell>
-                    <TableCell>
-                      <Badge variant={ready ? "secondary" : "default"}>
-                        {ready ? "Ready" : "Needs setup"}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {methods.length === 0 ? (
-                <TableRow>
-                  <TableCell className="py-12 text-center text-brand-mocha" colSpan={5}>
-                    No payment methods found.
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
     </div>
   );
 }
@@ -645,10 +592,8 @@ export function PaymentSetupPageClient({ initialTab }: PaymentSetupPageClientPro
 
       {activeTab === "branches" ? (
         <BranchMappingView
-          accounts={accounts}
           canViewAccounts={canViewAccounts}
           canViewMethods={canViewMethods}
-          methods={methods}
           setupReadiness={setupReadinessQuery.data}
         />
       ) : null}

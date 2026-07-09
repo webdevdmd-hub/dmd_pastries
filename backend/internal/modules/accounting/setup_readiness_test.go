@@ -83,3 +83,125 @@ func TestPaymentReadinessAccountBranchAvailability(t *testing.T) {
 		})
 	}
 }
+
+func TestPaymentReadinessIssueClassifiesEffectiveAccountState(t *testing.T) {
+	branchID := "branch-a"
+	otherBranchID := "branch-b"
+	chartAccountID := "chart-account-id"
+
+	cases := []struct {
+		name             string
+		account          paymentReadinessAccount
+		hasBranchMapping bool
+		wantCode         string
+	}{
+		{
+			name: "valid branch mapping",
+			account: paymentReadinessAccount{
+				AccountID:          "payment-account-id",
+				AccountName:        "Main Cash",
+				AccountStatus:      "active",
+				AccountBranchID:    &branchID,
+				ChartAccountID:     &chartAccountID,
+				ChartAccountStatus: "active",
+				Source:             "branch_mapping",
+			},
+			hasBranchMapping: true,
+			wantCode:         "",
+		},
+		{
+			name: "valid default fallback",
+			account: paymentReadinessAccount{
+				AccountID:          "payment-account-id",
+				AccountName:        "Business Cash",
+				AccountStatus:      "active",
+				ChartAccountID:     &chartAccountID,
+				ChartAccountStatus: "active",
+				Source:             "default_payment_account",
+			},
+			hasBranchMapping: false,
+			wantCode:         "",
+		},
+		{
+			name: "missing branch mapping and default account",
+			account: paymentReadinessAccount{
+				Source: "default_payment_account",
+			},
+			hasBranchMapping: false,
+			wantCode:         "payment_method_branch_mapping_missing",
+		},
+		{
+			name: "branch mapping points to missing account",
+			account: paymentReadinessAccount{
+				Source: "branch_mapping",
+			},
+			hasBranchMapping: true,
+			wantCode:         "payment_account_missing",
+		},
+		{
+			name: "inactive account",
+			account: paymentReadinessAccount{
+				AccountID:          "payment-account-id",
+				AccountName:        "Inactive Cash",
+				AccountStatus:      "inactive",
+				ChartAccountID:     &chartAccountID,
+				ChartAccountStatus: "active",
+				Source:             "branch_mapping",
+			},
+			hasBranchMapping: true,
+			wantCode:         "payment_account_inactive",
+		},
+		{
+			name: "wrong branch account",
+			account: paymentReadinessAccount{
+				AccountID:          "payment-account-id",
+				AccountName:        "Other Branch Cash",
+				AccountStatus:      "active",
+				AccountBranchID:    &otherBranchID,
+				ChartAccountID:     &chartAccountID,
+				ChartAccountStatus: "active",
+				Source:             "branch_mapping",
+			},
+			hasBranchMapping: true,
+			wantCode:         "payment_account_branch_mismatch",
+		},
+		{
+			name: "missing active ledger",
+			account: paymentReadinessAccount{
+				AccountID:     "payment-account-id",
+				AccountName:   "No Ledger Cash",
+				AccountStatus: "active",
+				Source:        "branch_mapping",
+			},
+			hasBranchMapping: true,
+			wantCode:         "payment_account_chart_account_missing",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			issue := paymentReadinessIssue("method-id", "Cash", "cash", branchID, "Main", tt.account, tt.hasBranchMapping)
+			if tt.wantCode == "" {
+				if issue != nil {
+					t.Fatalf("paymentReadinessIssue() = %#v, want nil", issue)
+				}
+				return
+			}
+			if issue == nil {
+				t.Fatalf("paymentReadinessIssue() = nil, want %s", tt.wantCode)
+			}
+			if issue.CheckKey != tt.wantCode {
+				t.Fatalf("CheckKey = %q, want %q", issue.CheckKey, tt.wantCode)
+			}
+			if issue.Details["method_name"] != "Cash" {
+				t.Fatalf("method_name detail = %#v, want Cash", issue.Details["method_name"])
+			}
+			if issue.Details["branch_name"] != "Main" {
+				t.Fatalf("branch_name detail = %#v, want Main", issue.Details["branch_name"])
+			}
+			if issue.Details["has_branch_mapping"] != tt.hasBranchMapping {
+				t.Fatalf("has_branch_mapping detail = %#v, want %v", issue.Details["has_branch_mapping"], tt.hasBranchMapping)
+			}
+		})
+	}
+}

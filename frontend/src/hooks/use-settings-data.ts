@@ -378,6 +378,61 @@ function invalidateReceiptLayouts(
   return invalidateAccountingSetupData(queryClient);
 }
 
+function sameReceiptLayoutDefaultScope(first: ReceiptLayout, second: ReceiptLayout): boolean {
+  return (
+    first.branchId === second.branchId &&
+    first.receiptType === second.receiptType &&
+    first.printerType === second.printerType &&
+    first.counterId === second.counterId
+  );
+}
+
+function sortReceiptLayouts(layouts: ReceiptLayout[]): ReceiptLayout[] {
+  return [...layouts].sort((first, second) => {
+    if (first.isDefault !== second.isDefault) {
+      return first.isDefault ? -1 : 1;
+    }
+
+    return first.layoutName.localeCompare(second.layoutName, undefined, {
+      sensitivity: "base",
+    });
+  });
+}
+
+function upsertReceiptLayoutCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  layout: ReceiptLayout,
+): void {
+  queryClient.setQueryData<ReceiptLayout[]>(
+    [settingsDataQueryKey, "receipt-layouts"],
+    (currentLayouts) => {
+      const existingLayouts = currentLayouts ?? [];
+      const hasLayout = existingLayouts.some((existing) => existing.id === layout.id);
+      const nextLayouts = existingLayouts.map((existing) => {
+        if (existing.id === layout.id) {
+          return layout;
+        }
+        if (layout.isDefault && sameReceiptLayoutDefaultScope(existing, layout)) {
+          return { ...existing, isDefault: false };
+        }
+        return existing;
+      });
+
+      return sortReceiptLayouts(hasLayout ? nextLayouts : [...nextLayouts, layout]);
+    },
+  );
+}
+
+function removeReceiptLayoutFromCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  id: string,
+): void {
+  queryClient.setQueryData<ReceiptLayout[]>(
+    [settingsDataQueryKey, "receipt-layouts"],
+    (currentLayouts) => currentLayouts?.filter((layout) => layout.id !== id) ?? [],
+  );
+}
+
 export function useReceiptLayouts(enabled = true) {
   return useQuery({
     queryKey: [settingsDataQueryKey, "receipt-layouts"],
@@ -405,7 +460,8 @@ export function useCreateReceiptLayout() {
 
   return useMutation<ReceiptLayout, Error, ReceiptLayoutPayload>({
     mutationFn: async (payload) => createReceiptLayout(payload),
-    onSuccess: async () => {
+    onSuccess: async (layout) => {
+      upsertReceiptLayoutCache(queryClient, layout);
       await invalidateReceiptLayouts(queryClient);
     },
   });
@@ -428,6 +484,7 @@ export function useUpdateReceiptLayout() {
         [settingsDataQueryKey, "receipt-layouts", "detail", layout.id],
         layout,
       );
+      upsertReceiptLayoutCache(queryClient, layout);
       await invalidateReceiptLayouts(queryClient);
     },
   });
@@ -438,7 +495,8 @@ export function useDeleteReceiptLayout() {
 
   return useMutation<void, Error, string>({
     mutationFn: async (id) => deleteReceiptLayout(id),
-    onSuccess: async () => {
+    onSuccess: async (_unused, id) => {
+      removeReceiptLayoutFromCache(queryClient, id);
       await invalidateReceiptLayouts(queryClient);
     },
   });
@@ -454,6 +512,7 @@ export function useSetDefaultReceiptLayout() {
         [settingsDataQueryKey, "receipt-layouts", "detail", layout.id],
         layout,
       );
+      upsertReceiptLayoutCache(queryClient, layout);
       await invalidateReceiptLayouts(queryClient);
     },
   });

@@ -1111,11 +1111,10 @@ func (s *Service) UpdateReceiptLayout(currentUser *utils.AuthContext, id string,
 			updates["is_default"] = false
 		}
 	}
-	if req.LayoutConfig != nil {
-		if len(*req.LayoutConfig) == 0 || !json.Valid(*req.LayoutConfig) {
-			return nil, apperrors.BadRequest("layout_config must be valid JSON", nil)
-		}
-		updates["layout_config"] = string(*req.LayoutConfig)
+	if layoutConfig, ok, err := receiptLayoutConfigUpdateValue(req.LayoutConfig); err != nil {
+		return nil, err
+	} else if ok {
+		updates["layout_config"] = layoutConfig
 	}
 	targetDefault := layout.IsDefault
 	if req.IsDefault != nil {
@@ -1161,6 +1160,16 @@ func (s *Service) UpdateReceiptLayout(currentUser *utils.AuthContext, id string,
 		return nil, apperrors.Internal("failed to commit receipt layout update")
 	}
 	return s.GetReceiptLayout(currentUser, id)
+}
+
+func receiptLayoutConfigUpdateValue(value *json.RawMessage) (string, bool, error) {
+	if value == nil {
+		return "", false, nil
+	}
+	if len(*value) == 0 || !json.Valid(*value) {
+		return "", false, apperrors.BadRequest("layout_config must be valid JSON", nil)
+	}
+	return string(*value), true, nil
 }
 
 func (s *Service) DeleteReceiptLayout(currentUser *utils.AuthContext, id string, ipAddress, userAgent string) error {
