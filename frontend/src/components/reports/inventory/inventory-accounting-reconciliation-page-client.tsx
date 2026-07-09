@@ -4,7 +4,10 @@ import type { JSX } from "react";
 import { useMemo, useState } from "react";
 
 import { AccessDeniedCard } from "@/components/reports/inventory/access-denied-card";
-import { InventoryAccountingReconciliationTable } from "@/components/reports/inventory/inventory-accounting-reconciliation-table";
+import {
+  InventoryAccountingReconciliationTable,
+  InventoryAccountingUnassignedLinesTable,
+} from "@/components/reports/inventory/inventory-accounting-reconciliation-table";
 import { InventoryReportEmptyState } from "@/components/reports/inventory/inventory-report-empty-state";
 import { InventoryReportErrorState } from "@/components/reports/inventory/inventory-report-error-state";
 import {
@@ -104,6 +107,7 @@ export function InventoryAccountingReconciliationPageClient(): JSX.Element {
   const report = reportQuery.data;
   const page = report?.pagination.page ?? filters.page ?? 1;
   const totalPages = report?.pagination.totalPages ?? 1;
+  const unassignedLines = report?.unassignedAccountingLines ?? [];
 
   if (!canView) return <AccessDeniedCard />;
   if (!hasScope) return <NoBranchScopeCard />;
@@ -158,6 +162,22 @@ export function InventoryAccountingReconciliationPageClient(): JSX.Element {
           value={String(report?.mismatchCount ?? 0)}
         />
       </div>
+      {unassignedLines.length > 0 ? (
+        <Card className="border-red-100 bg-white/85 shadow-soft">
+          <CardContent className="space-y-4 p-5">
+            <div>
+              <h2 className="text-lg font-semibold text-brand-espresso">
+                Unassigned Inventory / Stock GL Lines
+              </h2>
+              <p className="text-sm text-brand-mocha">
+                {String(report?.unassignedAccountingLineCount ?? unassignedLines.length)} posted journal
+                lines affect Inventory / Stock but are not linked to stock movements.
+              </p>
+            </div>
+            <InventoryAccountingUnassignedLinesTable lines={unassignedLines} />
+          </CardContent>
+        </Card>
+      ) : null}
       {reportQuery.error ? (
         <InventoryReportErrorState
           description={getErrorMessage(reportQuery.error)}

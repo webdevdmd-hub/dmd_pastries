@@ -673,18 +673,37 @@ type InventoryReconciliationDetailItem struct {
 	Status                    string     `json:"status"`
 }
 
+type InventoryReconciliationUnassignedLine struct {
+	JournalEntryID     string    `json:"journal_entry_id"`
+	JournalEntryNumber string    `json:"journal_entry_number"`
+	JournalEntryDate   time.Time `json:"journal_entry_date"`
+	BranchID           *string   `json:"branch_id"`
+	BranchName         string    `json:"branch_name"`
+	SourceType         string    `json:"source_type"`
+	SourceID           *string   `json:"source_id"`
+	ReferenceNumber    string    `json:"reference_number"`
+	Narration          string    `json:"narration"`
+	LineDescription    string    `json:"line_description"`
+	DebitAmount        float64   `json:"debit_amount"`
+	CreditAmount       float64   `json:"credit_amount"`
+	SignedAmount       float64   `json:"signed_inventory_amount"`
+	ReasonLabel        string    `json:"reason_label"`
+}
+
 type InventoryReconciliationDetailsResponse struct {
-	AsOfDate                       string                              `json:"as_of_date"`
-	BranchID                       string                              `json:"branch_id,omitempty"`
-	TotalOperationalValue          float64                             `json:"total_operational_value"`
-	TotalInventoryLedgerValue      float64                             `json:"total_inventory_ledger_value"`
-	TotalAccountingInventoryValue  float64                             `json:"total_accounting_inventory_value"`
-	GeneralLedgerInventoryBalance  float64                             `json:"general_ledger_inventory_balance"`
-	UnassignedAccountingDifference float64                             `json:"unassigned_accounting_difference"`
-	MatchedCount                   int64                               `json:"matched_count"`
-	MismatchCount                  int64                               `json:"mismatch_count"`
-	Items                          []InventoryReconciliationDetailItem `json:"items"`
-	Pagination                     PaginationResponse                  `json:"pagination"`
+	AsOfDate                       string                                  `json:"as_of_date"`
+	BranchID                       string                                  `json:"branch_id,omitempty"`
+	TotalOperationalValue          float64                                 `json:"total_operational_value"`
+	TotalInventoryLedgerValue      float64                                 `json:"total_inventory_ledger_value"`
+	TotalAccountingInventoryValue  float64                                 `json:"total_accounting_inventory_value"`
+	GeneralLedgerInventoryBalance  float64                                 `json:"general_ledger_inventory_balance"`
+	UnassignedAccountingDifference float64                                 `json:"unassigned_accounting_difference"`
+	UnassignedAccountingLineCount  int64                                   `json:"unassigned_accounting_line_count"`
+	UnassignedAccountingLines      []InventoryReconciliationUnassignedLine `json:"unassigned_accounting_lines"`
+	MatchedCount                   int64                                   `json:"matched_count"`
+	MismatchCount                  int64                                   `json:"mismatch_count"`
+	Items                          []InventoryReconciliationDetailItem     `json:"items"`
+	Pagination                     PaginationResponse                      `json:"pagination"`
 }
 
 type inventoryReconciliationDetailRow struct {

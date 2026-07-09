@@ -9,7 +9,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { InventoryAccountingReconciliationRow } from "@/types/inventory-reports";
+import type {
+  InventoryAccountingReconciliationRow,
+  InventoryAccountingUnassignedLine,
+} from "@/types/inventory-reports";
 
 function formatMoney(value: number): string {
   return new Intl.NumberFormat("en-AE", {
@@ -44,6 +47,10 @@ function formatLabel(value: string): string {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function displayText(value: string, fallback = "-"): string {
+  return value.trim() !== "" ? value : fallback;
 }
 
 function statusBadge(row: InventoryAccountingReconciliationRow): JSX.Element {
@@ -130,6 +137,80 @@ export function InventoryAccountingReconciliationTable({
                     Pending value: {formatMoney(row.pendingAccountingValue)}
                   </p>
                 ) : null}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+export function InventoryAccountingUnassignedLinesTable({
+  lines,
+}: {
+  lines: InventoryAccountingUnassignedLine[];
+}): JSX.Element {
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Reason</TableHead>
+            <TableHead>Journal</TableHead>
+            <TableHead>Source</TableHead>
+            <TableHead>Branch</TableHead>
+            <TableHead>Debit</TableHead>
+            <TableHead>Credit</TableHead>
+            <TableHead>Signed amount</TableHead>
+            <TableHead>Description</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {lines.map((line, index) => (
+            <TableRow key={`${line.journalEntryId}-${String(index)}`}>
+              <TableCell>
+                <p className="min-w-60 text-sm text-muted-foreground">
+                  {displayText(
+                    line.reasonLabel,
+                    "Inventory / Stock journal line is not linked to stock movements.",
+                  )}
+                </p>
+              </TableCell>
+              <TableCell>
+                <div className="min-w-44">
+                  <p className="font-semibold text-brand-espresso">
+                    {displayText(line.journalEntryNumber, displayText(line.journalEntryId))}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDateTime(line.journalEntryDate)}
+                  </p>
+                  <p className="text-xs text-brand-mocha">{displayText(line.referenceNumber)}</p>
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="min-w-40">
+                  <p className="font-medium">{displayText(formatLabel(line.sourceType), "Manual")}</p>
+                  <p className="text-xs text-brand-mocha">{line.sourceId ?? "-"}</p>
+                </div>
+              </TableCell>
+              <TableCell>{displayText(line.branchName, "All branches")}</TableCell>
+              <TableCell>{formatMoney(line.debitAmount)}</TableCell>
+              <TableCell>{formatMoney(line.creditAmount)}</TableCell>
+              <TableCell
+                className={
+                  Math.abs(line.signedInventoryAmount) > 0.01
+                    ? "font-semibold text-red-700"
+                    : "text-muted-foreground"
+                }
+              >
+                {formatMoney(line.signedInventoryAmount)}
+              </TableCell>
+              <TableCell>
+                <div className="min-w-64">
+                  <p className="text-sm text-brand-espresso">{displayText(line.lineDescription)}</p>
+                  <p className="text-xs text-muted-foreground">{displayText(line.narration)}</p>
+                </div>
               </TableCell>
             </TableRow>
           ))}

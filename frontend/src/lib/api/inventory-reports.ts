@@ -5,6 +5,7 @@ import type {
   InventoryAccountingReconciliationReport,
   InventoryAccountingReconciliationRow,
   InventoryAccountingReconciliationStatus,
+  InventoryAccountingUnassignedLine,
   InventoryAuditRow,
   InventoryMovementReportRow,
   InventoryReportFilters,
@@ -171,6 +172,23 @@ type BackendInventoryAccountingReconciliationRow = {
   stock_location_name?: string;
 };
 
+type BackendInventoryAccountingUnassignedLine = {
+  branch_id?: string | null;
+  branch_name?: string;
+  credit_amount?: number;
+  debit_amount?: number;
+  journal_entry_date?: string;
+  journal_entry_id?: string;
+  journal_entry_number?: string;
+  line_description?: string;
+  narration?: string;
+  reason_label?: string;
+  reference_number?: string;
+  signed_inventory_amount?: number;
+  source_id?: string | null;
+  source_type?: string;
+};
+
 type BackendInventoryAccountingReconciliationReport = {
   as_of_date?: string;
   branch_id?: string;
@@ -182,6 +200,8 @@ type BackendInventoryAccountingReconciliationReport = {
   total_accounting_inventory_value?: number;
   total_inventory_ledger_value?: number;
   total_operational_value?: number;
+  unassigned_accounting_line_count?: number;
+  unassigned_accounting_lines?: unknown;
   unassigned_accounting_difference?: number;
 };
 
@@ -502,6 +522,29 @@ function parseInventoryAccountingReconciliationRow(
   };
 }
 
+function parseInventoryAccountingUnassignedLine(
+  value: unknown,
+): InventoryAccountingUnassignedLine {
+  const row = isObject(value) ? (value as BackendInventoryAccountingUnassignedLine) : {};
+
+  return {
+    branchId: stringOrNull(row.branch_id),
+    branchName: stringOrEmpty(row.branch_name),
+    creditAmount: numberOrZero(row.credit_amount),
+    debitAmount: numberOrZero(row.debit_amount),
+    journalEntryDate: stringOrEmpty(row.journal_entry_date),
+    journalEntryId: stringOrEmpty(row.journal_entry_id),
+    journalEntryNumber: stringOrEmpty(row.journal_entry_number),
+    lineDescription: stringOrEmpty(row.line_description),
+    narration: stringOrEmpty(row.narration),
+    reasonLabel: stringOrEmpty(row.reason_label),
+    referenceNumber: stringOrEmpty(row.reference_number),
+    signedInventoryAmount: numberOrZero(row.signed_inventory_amount),
+    sourceId: stringOrNull(row.source_id),
+    sourceType: stringOrEmpty(row.source_type),
+  };
+}
+
 function parseInventoryAccountingReconciliationReport(
   value: unknown,
 ): InventoryAccountingReconciliationReport {
@@ -518,6 +561,11 @@ function parseInventoryAccountingReconciliationReport(
     totalAccountingInventoryValue: numberOrZero(report.total_accounting_inventory_value),
     totalInventoryLedgerValue: numberOrZero(report.total_inventory_ledger_value),
     totalOperationalValue: numberOrZero(report.total_operational_value),
+    unassignedAccountingLineCount: numberOrZero(report.unassigned_accounting_line_count),
+    unassignedAccountingLines: parseList(
+      report.unassigned_accounting_lines,
+      parseInventoryAccountingUnassignedLine,
+    ),
     unassignedAccountingDifference: numberOrZero(report.unassigned_accounting_difference),
   };
 }

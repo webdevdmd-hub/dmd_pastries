@@ -187,6 +187,23 @@ export type InventoryAccountingReconciliationRow = {
   stockLocationName: string;
 };
 
+export type InventoryAccountingUnassignedLine = {
+  branchId: string | null;
+  branchName: string;
+  creditAmount: number;
+  debitAmount: number;
+  journalEntryDate: string;
+  journalEntryId: string;
+  journalEntryNumber: string;
+  lineDescription: string;
+  narration: string;
+  reasonLabel: string;
+  referenceNumber: string;
+  signedInventoryAmount: number;
+  sourceId: string | null;
+  sourceType: string;
+};
+
 export type InventoryAccountingReconciliationReport = {
   asOfDate: string;
   branchId: string;
@@ -198,6 +215,8 @@ export type InventoryAccountingReconciliationReport = {
   totalAccountingInventoryValue: number;
   totalInventoryLedgerValue: number;
   totalOperationalValue: number;
+  unassignedAccountingLineCount: number;
+  unassignedAccountingLines: InventoryAccountingUnassignedLine[];
   unassignedAccountingDifference: number;
 };
 

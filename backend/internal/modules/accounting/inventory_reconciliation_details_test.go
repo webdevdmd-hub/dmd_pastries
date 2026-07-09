@@ -65,3 +65,45 @@ func TestInventoryReconciliationDetailFromRowPOSCOGSMissingLink(t *testing.T) {
 		t.Fatalf("expected COGS reason, got %q", item.PossibleReason)
 	}
 }
+
+func TestUnassignedInventoryJournalLinesSQLExcludesStockMovementLinkedJournals(t *testing.T) {
+	required := []string{
+		"FROM journal_entry_lines jel",
+		"JOIN journal_entries je",
+		"jel.account_id = ?",
+		"je.status IN ('posted', 'reversed')",
+		"je.entry_date <= ?",
+		"NOT EXISTS",
+		"FROM stock_movements sm",
+		"sm.accounting_journal_entry_id = jel.journal_entry_id",
+	}
+	for _, fragment := range required {
+		if !strings.Contains(unassignedInventoryJournalLinesSQL, fragment) {
+			t.Fatalf("unassigned inventory journal SQL missing %q: %s", fragment, unassignedInventoryJournalLinesSQL)
+		}
+	}
+}
+
+func TestInventoryUnassignedJournalReasonLabels(t *testing.T) {
+	cases := []struct {
+		sourceType string
+		contains   string
+	}{
+		{sourceType: "manual", contains: "Manual or imported"},
+		{sourceType: "purchase_invoice", contains: "Purchase bill journal"},
+		{sourceType: "purchase_invoice_cancel", contains: "Purchase bill cancellation"},
+		{sourceType: "purchase_return", contains: "Vendor Credit journal"},
+		{sourceType: "manufacturing_batch", contains: "Manufacturing journal"},
+		{sourceType: "pos_sale_cogs", contains: "POS COGS journal"},
+		{sourceType: "unknown_source", contains: "Inventory / Stock journal line"},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.sourceType, func(t *testing.T) {
+			reason := inventoryUnassignedJournalReason(tt.sourceType)
+			if !strings.Contains(reason, tt.contains) {
+				t.Fatalf("reason for %q = %q, want to contain %q", tt.sourceType, reason, tt.contains)
+			}
+		})
+	}
+}

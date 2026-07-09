@@ -2575,6 +2575,95 @@ func (r *Repository) ListInventoryReconciliationDetailRows(businessID, inventory
 	return rows, err
 }
 
+func (r *Repository) ListUnassignedInventoryJournalLines(businessID, inventoryAccountID, normalBalance string, query InventoryReconciliationDetailsQuery) ([]InventoryReconciliationUnassignedLine, error) {
+	branchFilter := ""
+	args := []interface{}{strings.TrimSpace(normalBalance), businessID, inventoryAccountID, query.AsOfDate}
+	if strings.TrimSpace(query.BranchID) != "" {
+		branchFilter = "AND je.branch_id = ?"
+		args = append(args, strings.TrimSpace(query.BranchID))
+	}
+
+	var rows []InventoryReconciliationUnassignedLine
+	sql := strings.Replace(unassignedInventoryJournalLinesSQL, "{{branch_filter}}", branchFilter, 1)
+	err := r.db.Raw(sql, args...).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		rows[i].DebitAmount = roundMoney(rows[i].DebitAmount)
+		rows[i].CreditAmount = roundMoney(rows[i].CreditAmount)
+		rows[i].SignedAmount = roundMoney(rows[i].SignedAmount)
+		rows[i].ReasonLabel = inventoryUnassignedJournalReason(rows[i].SourceType)
+	}
+	return rows, nil
+}
+
+const unassignedInventoryJournalLinesSQL = `
+	SELECT
+		je.id AS journal_entry_id,
+		je.entry_number AS journal_entry_number,
+		je.entry_date AS journal_entry_date,
+		je.branch_id,
+		COALESCE(b.branch_name, '') AS branch_name,
+		COALESCE(je.source_type, '') AS source_type,
+		je.source_id,
+		COALESCE(je.reference_number, '') AS reference_number,
+		COALESCE(je.narration, '') AS narration,
+		COALESCE(jel.description, '') AS line_description,
+		COALESCE(jel.debit_amount, 0) AS debit_amount,
+		COALESCE(jel.credit_amount, 0) AS credit_amount,
+		COALESCE(
+			CASE WHEN ? = 'credit'
+				THEN jel.credit_amount - jel.debit_amount
+				ELSE jel.debit_amount - jel.credit_amount
+			END,
+			0
+		) AS signed_amount
+	FROM journal_entry_lines jel
+	JOIN journal_entries je ON je.id = jel.journal_entry_id
+		AND je.business_id = jel.business_id
+		AND je.deleted_at IS NULL
+	LEFT JOIN branches b ON b.id = je.branch_id
+		AND b.business_id = je.business_id
+		AND b.deleted_at IS NULL
+	WHERE jel.business_id = ?
+	  AND jel.account_id = ?
+	  AND jel.deleted_at IS NULL
+	  AND je.status IN ('posted', 'reversed')
+	  AND je.entry_date <= ?
+	  {{branch_filter}}
+	  AND NOT EXISTS (
+	    SELECT 1
+	    FROM stock_movements sm
+	    WHERE sm.business_id = jel.business_id
+	      AND sm.accounting_journal_entry_id = jel.journal_entry_id
+	  )
+	ORDER BY je.entry_date DESC, je.entry_number DESC, jel.line_number ASC
+`
+
+func inventoryUnassignedJournalReason(sourceType string) string {
+	switch strings.TrimSpace(sourceType) {
+	case "", "manual":
+		return "Manual or imported journal posted directly to Inventory / Stock."
+	case "purchase_invoice", "purchase_invoice_edit":
+		return "Purchase bill journal affects Inventory / Stock but is not linked to stock movements."
+	case "purchase_invoice_cancel":
+		return "Purchase bill cancellation journal affects Inventory / Stock but is not linked to stock movements."
+	case "purchase_return":
+		return "Vendor Credit journal affects Inventory / Stock but is not linked to stock movements."
+	case "purchase_return_reversal":
+		return "Vendor Credit reversal journal affects Inventory / Stock but is not linked to stock movements."
+	case "manufacturing_batch":
+		return "Manufacturing journal affects Inventory / Stock but is not linked to stock movements."
+	case "pos_sale_cogs":
+		return "POS COGS journal affects Inventory / Stock but is not linked to stock movements."
+	case "inventory_opening_stock", "inventory_adjustment", "inventory_wastage":
+		return "Inventory adjustment journal affects Inventory / Stock but is not linked to stock movements."
+	default:
+		return "Inventory / Stock journal line is not linked to an operational stock movement."
+	}
+}
+
 func (r *Repository) SumAccountsPayableOperational(businessID, branchID string) (float64, error) {
 	var total float64
 	db := r.db.Table("purchase_invoices").

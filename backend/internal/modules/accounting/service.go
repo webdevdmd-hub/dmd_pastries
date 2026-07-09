@@ -2841,6 +2841,10 @@ func (s *Service) GetInventoryReconciliationDetails(currentUser *utils.AuthConte
 	if err != nil {
 		return nil, apperrors.Internal("failed to calculate inventory ledger balance")
 	}
+	unassignedLines, err := s.repo.ListUnassignedInventoryJournalLines(currentUser.BusinessID, inventoryAccount.ID, inventoryAccount.NormalBalance, query)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load unassigned inventory journal lines")
+	}
 
 	_ = s.writeReportAudit(currentUser, "accounting.reconciliation_inventory_details_viewed", "reconciliation_inventory_details", query, ipAddress, userAgent)
 	return &InventoryReconciliationDetailsResponse{
@@ -2851,6 +2855,8 @@ func (s *Service) GetInventoryReconciliationDetails(currentUser *utils.AuthConte
 		TotalAccountingInventoryValue:  roundMoney(totalAccounting),
 		GeneralLedgerInventoryBalance:  roundMoney(glBalance),
 		UnassignedAccountingDifference: roundMoney(glBalance - totalAccounting),
+		UnassignedAccountingLineCount:  int64(len(unassignedLines)),
+		UnassignedAccountingLines:      unassignedLines,
 		MatchedCount:                   allMatchedCount,
 		MismatchCount:                  allMismatchCount,
 		Items:                          pagedItems,
