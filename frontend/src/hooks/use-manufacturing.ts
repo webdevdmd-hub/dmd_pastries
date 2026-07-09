@@ -165,13 +165,25 @@ export function useManufacturingProducts(enabled = true) {
   });
 }
 
-export function useManufacturingRecipeByProduct(productId: string, enabled = true) {
+export function useManufacturingRecipeByProduct(
+  params: { branchId?: string; productId: string },
+  enabled = true,
+) {
   const branchQueryKey = useBranchQueryKey();
 
   return useQuery<ManufacturingRecipeOption[]>({
-    queryKey: [manufacturingQueryKey, branchQueryKey, "recipe-by-product", productId],
-    queryFn: async () => getManufacturingRecipeByProduct(productId),
-    enabled: enabled && productId.trim().length > 0,
+    queryKey: [
+      manufacturingQueryKey,
+      branchQueryKey,
+      "recipe-by-product",
+      params.branchId ?? "",
+      params.productId,
+    ],
+    queryFn: async () => getManufacturingRecipeByProduct(params),
+    enabled:
+      enabled &&
+      params.productId.trim().length > 0 &&
+      (params.branchId === undefined || params.branchId.trim().length > 0),
   });
 }
 

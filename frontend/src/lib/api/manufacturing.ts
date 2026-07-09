@@ -816,11 +816,15 @@ export async function getManufacturingProducts(): Promise<ManufacturingProductOp
   );
 }
 
-export async function getManufacturingRecipeByProduct(
-  productId: string,
-): Promise<ManufacturingRecipeOption[]> {
+export async function getManufacturingRecipeByProduct({
+  branchId,
+  productId,
+}: {
+  branchId?: string;
+  productId: string;
+}): Promise<ManufacturingRecipeOption[]> {
   const response = await apiRequest<ManufacturingRecipeOption[]>(
-    `/api/v1/recipes/product/${productId}`,
+    `/api/v1/recipes/product/${productId}${toQueryString({ branch_id: branchId })}`,
     {
       authMode: "appwrite",
       parse: (data) => {

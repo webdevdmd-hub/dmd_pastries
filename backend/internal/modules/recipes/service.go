@@ -494,8 +494,8 @@ func (s *Service) CreateVersion(currentUser *utils.AuthContext, recipeID string,
 	return nil, apperrors.Internal("failed to load recipe version")
 }
 
-func (s *Service) ActiveByProduct(currentUser *utils.AuthContext, productID, productVariantID string) (*RecipeResponse, error) {
-	branchID, err := currentUser.ResolveOperationalBranch("")
+func (s *Service) ActiveByProduct(currentUser *utils.AuthContext, productID, productVariantID, requestedBranchID string) (*RecipeResponse, error) {
+	branchID, err := currentUser.ResolveOperationalBranch(strings.TrimSpace(requestedBranchID))
 	if err != nil {
 		return nil, err
 	}

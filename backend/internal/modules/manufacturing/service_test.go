@@ -90,3 +90,69 @@ func TestRecipeProductionBOMValidationErrorAllowsComponentLines(t *testing.T) {
 		t.Fatalf("expected component recipe to pass, got %v", err)
 	}
 }
+
+func TestRecipeIngredientConsumptionErrorPreservesStructuredReason(t *testing.T) {
+	err := apperrors.BadRequest("unit conversion is not available yet; recipe ingredient unit must match inventory unit", map[string]interface{}{
+		"reason":            "recipe_ingredient_unit_mismatch",
+		"recipe_line_id":    "line-id",
+		"branch_id":         "branch-id",
+		"inventory_item_id": "inventory-id",
+	})
+
+	wrapped := recipeIngredientConsumptionError(err, "branch-id", recipeIngredientInfo{
+		ID:               "line-id",
+		ItemNameSnapshot: "Flour",
+	})
+
+	appErr, ok := wrapped.(*apperrors.AppError)
+	if !ok {
+		t.Fatalf("expected AppError, got %T", wrapped)
+	}
+	details, ok := appErr.Details.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Details = %T, want map[string]interface{}", appErr.Details)
+	}
+	for key, want := range map[string]interface{}{
+		"reason":            "recipe_ingredient_unit_mismatch",
+		"recipe_line_id":    "line-id",
+		"branch_id":         "branch-id",
+		"inventory_item_id": "inventory-id",
+	} {
+		if got := details[key]; got != want {
+			t.Fatalf("details[%q] = %v, want %v", key, got, want)
+		}
+	}
+}
+
+func TestRecipePackagingConsumptionErrorPreservesStructuredReason(t *testing.T) {
+	err := apperrors.BadRequest("unit conversion is not available yet; recipe packaging unit must match inventory unit", map[string]interface{}{
+		"reason":            "recipe_packaging_unit_mismatch",
+		"recipe_line_id":    "line-id",
+		"branch_id":         "branch-id",
+		"inventory_item_id": "inventory-id",
+	})
+
+	wrapped := recipePackagingConsumptionError(err, "branch-id", recipePackagingInfo{
+		ID:                    "line-id",
+		PackagingNameSnapshot: "Box",
+	})
+
+	appErr, ok := wrapped.(*apperrors.AppError)
+	if !ok {
+		t.Fatalf("expected AppError, got %T", wrapped)
+	}
+	details, ok := appErr.Details.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Details = %T, want map[string]interface{}", appErr.Details)
+	}
+	for key, want := range map[string]interface{}{
+		"reason":            "recipe_packaging_unit_mismatch",
+		"recipe_line_id":    "line-id",
+		"branch_id":         "branch-id",
+		"inventory_item_id": "inventory-id",
+	} {
+		if got := details[key]; got != want {
+			t.Fatalf("details[%q] = %v, want %v", key, got, want)
+		}
+	}
+}

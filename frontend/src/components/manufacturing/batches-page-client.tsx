@@ -44,7 +44,6 @@ import {
   useManufacturingBranches,
   useManufacturingInventory,
   useManufacturingProducts,
-  useManufacturingRecipeByProduct,
   useProduceBatch,
   useUpdateBatch,
 } from "@/hooks/use-manufacturing";
@@ -89,7 +88,6 @@ export function BatchesPageClient(): JSX.Element {
     ...defaultFilters,
     branchId: branchScope.defaultBranchId,
   });
-  const [selectedProductId, setSelectedProductId] = useState("");
   const [editingBatch, setEditingBatch] = useState<ProductionBatch | null>(null);
   const [deleteBatchTarget, setDeleteBatchTarget] = useState<ProductionBatch | null>(null);
   const [wastageBatch, setWastageBatch] = useState<ProductionBatch | null>(null);
@@ -98,7 +96,6 @@ export function BatchesPageClient(): JSX.Element {
   const batchesQuery = useBatches(filters, canView && branchScope.hasBranchScope);
   const productsQuery = useManufacturingProducts(canView);
   const branchesQuery = useManufacturingBranches(canView);
-  const recipesQuery = useManufacturingRecipeByProduct(selectedProductId, canView);
   const inventoryQuery = useManufacturingInventory(canView && canRecordWastage);
   const createPlannedMutation = useCreateBatch();
   const createProductionMutation = useCreateProduction();
@@ -136,13 +133,11 @@ export function BatchesPageClient(): JSX.Element {
 
   const openCreate = (): void => {
     setEditingBatch(null);
-    setSelectedProductId("");
     setFormOpen(true);
   };
 
   const openEdit = (batch: ProductionBatch): void => {
     setEditingBatch(batch);
-    setSelectedProductId(batch.productId);
     setFormOpen(true);
   };
 
@@ -478,13 +473,11 @@ export function BatchesPageClient(): JSX.Element {
           setFormOpen(false);
         }}
         onCreatePlanned={handleCreatePlanned}
-        onProductChange={setSelectedProductId}
         onProducePlanned={handleProducePlanned}
         onProduceNow={handleProduceNow}
         onUpdate={handleUpdate}
         open={formOpen}
         products={productsQuery.data ?? []}
-        recipes={recipesQuery.data ?? []}
       />
 
       <BatchWastageDialog

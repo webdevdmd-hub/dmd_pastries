@@ -97,6 +97,22 @@ export function productionFailureMessage(
       return "This recipe has a packaging line that cannot be consumed for manufacturing. Link the packaging line to active stock in the production branch before producing.";
     }
 
+    if (reason === "component_inventory_invalid") {
+      return "This recipe has a component linked to inactive stock or stock from another branch. Link the component to active inventory in the production branch before producing.";
+    }
+
+    if (reason === "packaging_inventory_invalid") {
+      return "This recipe has packaging linked to inactive stock or stock from another branch. Link the packaging to active inventory in the production branch before producing.";
+    }
+
+    if (
+      reason === "recipe_ingredient_unit_mismatch" ||
+      reason === "recipe_packaging_unit_mismatch" ||
+      reason === "output_unit_mismatch"
+    ) {
+      return `${error.message} Update the recipe or inventory item so the units match before producing.`;
+    }
+
     if (reason === "stock_shortage") {
       const summary = shortageSummary(details);
       return summary

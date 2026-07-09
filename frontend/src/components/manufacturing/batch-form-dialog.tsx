@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useBranchScope } from "@/hooks/use-branch-scope";
-import { useProductionPreview } from "@/hooks/use-manufacturing";
+import { useManufacturingRecipeByProduct, useProductionPreview } from "@/hooks/use-manufacturing";
 import {
   EMPTY_BOM_PRODUCTION_MESSAGE,
   PREVIEW_OUT_OF_SYNC_MESSAGE,
@@ -158,13 +158,11 @@ export function BatchFormDialog({
   isSubmitting,
   onClose,
   onCreatePlanned,
-  onProductChange,
   onProducePlanned,
   onProduceNow,
   onUpdate,
   open,
   products,
-  recipes,
 }: {
   batch: ProductionBatch | null;
   branches: ManufacturingBranchOption[];
@@ -172,13 +170,11 @@ export function BatchFormDialog({
   isSubmitting: boolean;
   onClose: () => void;
   onCreatePlanned: (payload: CreateBatchPayload) => Promise<void>;
-  onProductChange: (productId: string) => void;
   onProducePlanned: (id: string, producePayload: ProducePayload) => Promise<void>;
   onProduceNow: (payload: CreateProductionPayload) => Promise<void>;
   onUpdate: (id: string, payload: UpdateBatchPayload) => Promise<void>;
   open: boolean;
   products: ManufacturingProductOption[];
-  recipes: ManufacturingRecipeOption[];
 }): JSX.Element {
   const branchScope = useBranchScope();
   const [branchId, setBranchId] = useState("");
@@ -211,10 +207,7 @@ export function BatchFormDialog({
     setNotes(batch?.notes ?? "");
     setFeedback(null);
 
-    if (batch?.productId) {
-      onProductChange(batch.productId);
-    }
-  }, [batch, branchScope.effectiveBranchId, onProductChange, open]);
+  }, [batch, branchScope.effectiveBranchId, open]);
 
   const clearFeedback = (): void => {
     setFeedback(null);
@@ -253,9 +246,6 @@ export function BatchFormDialog({
     clearFeedback();
     setProductId(normalizedProductId);
     setRecipeId("");
-    if (normalizedProductId) {
-      onProductChange(normalizedProductId);
-    }
   };
 
   const recipeIsKnownInactive = (recipe: ManufacturingRecipeOption | undefined): boolean =>
@@ -266,6 +256,11 @@ export function BatchFormDialog({
     recipe: ManufacturingRecipeOption | undefined,
   ): boolean => recipeHasKnownEmptyBom(recipe);
 
+  const recipesQuery = useManufacturingRecipeByProduct(
+    { branchId, productId },
+    open && branchId.trim().length > 0 && productId.trim().length > 0,
+  );
+  const recipes = recipesQuery.data ?? [];
   const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
   const selectedRecipeIsKnownInactive = recipeIsKnownInactive(selectedRecipe);
   const selectedRecipeHasKnownMissingComponents = recipeHasKnownMissingComponents(selectedRecipe);
@@ -540,6 +535,7 @@ export function BatchFormDialog({
                   onValueChange={(value) => {
                     clearFeedback();
                     setBranchId(value === "none" ? "" : value);
+                    setRecipeId("");
                   }}
                 >
                   <SelectTrigger>
@@ -616,6 +612,11 @@ export function BatchFormDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Select recipe</SelectItem>
+                    {recipesQuery.isLoading || recipesQuery.isFetching ? (
+                      <SelectItem disabled value="loading">
+                        Loading recipes...
+                      </SelectItem>
+                    ) : null}
                     {recipes.map((recipe) => (
                       <SelectItem key={recipe.id} value={recipe.id}>
                         {recipe.recipeName} v{recipe.versionNumber}

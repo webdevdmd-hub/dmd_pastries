@@ -1114,6 +1114,7 @@ func recipeIngredientConsumptionError(err error, branchID string, line recipeIng
 	}
 	var appErr *apperrors.AppError
 	if errors.As(err, &appErr) {
+		mergeAppErrorDetails(details, appErr.Details)
 		return apperrors.New(appErr.StatusCode, appErr.Message, details)
 	}
 	return err
@@ -1134,9 +1135,24 @@ func recipePackagingConsumptionError(err error, branchID string, line recipePack
 	}
 	var appErr *apperrors.AppError
 	if errors.As(err, &appErr) {
+		mergeAppErrorDetails(details, appErr.Details)
 		return apperrors.New(appErr.StatusCode, appErr.Message, details)
 	}
 	return err
+}
+
+func mergeAppErrorDetails(target map[string]interface{}, source interface{}) {
+	if sourceDetails, ok := source.(map[string]interface{}); ok {
+		for key, value := range sourceDetails {
+			target[key] = value
+		}
+		return
+	}
+	if sourceDetails, ok := source.(map[string]string); ok {
+		for key, value := range sourceDetails {
+			target[key] = value
+		}
+	}
 }
 
 func (s *Service) resolveProductionPackagingInventoryItem(tx *gorm.DB, businessID, branchID string, line ProductionPackagingConsumption) (*inventory.InventoryItem, error) {
@@ -1146,12 +1162,12 @@ func (s *Service) resolveProductionPackagingInventoryItem(tx *gorm.DB, businessI
 			return nil, notFound(err, "packaging inventory item not found")
 		}
 		if item.BranchID != branchID {
-			return nil, apperrors.BadRequest("packaging inventory item branch does not match production batch branch", nil)
+			return nil, apperrors.BadRequest("packaging inventory item branch does not match production batch branch", map[string]interface{}{"reason": "packaging_inventory_invalid", "line_id": line.ID, "item_name": line.PackagingNameSnapshot, "branch_id": branchID, "inventory_item_id": *line.InventoryItemID})
 		}
 		return item, nil
 	}
 	if line.PackagingItemID == nil {
-		return nil, apperrors.BadRequest("production packaging line must have inventory_item_id", map[string]string{"line_id": line.ID})
+		return nil, apperrors.BadRequest("production packaging line must have inventory_item_id", map[string]interface{}{"reason": "recipe_packaging_not_consumable", "line_id": line.ID, "item_name": line.PackagingNameSnapshot, "branch_id": branchID})
 	}
 	item, err := s.inventoryRepo.FindExistingItem(tx, businessID, branchID, "packaging", line.PackagingItemID)
 	if err != nil {
