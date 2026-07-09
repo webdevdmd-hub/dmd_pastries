@@ -31,6 +31,49 @@ func TestBackfillTargetsExcludePurchaseReceipts(t *testing.T) {
 	}
 }
 
+func TestBackfillReadinessUsesSelectedTargets(t *testing.T) {
+	targets := backfillReadinessTargets(BackfillReadinessQuery{
+		Targets: []string{"purchase_invoices", "payment_refunds"},
+	})
+	if len(targets) != 2 || targets[0] != "purchase_invoices" || targets[1] != "payment_refunds" {
+		t.Fatalf("readiness targets = %#v, want selected purchase_invoices/payment_refunds", targets)
+	}
+
+	service := &Service{}
+	req := normalizeBackfillRequest(BackfillJournalsRequest{Targets: targets, DryRun: true})
+	if err := service.validateBackfillRequest(&utils.AuthContext{}, req); err != nil {
+		t.Fatalf("selected readiness targets should pass dry-run validation: %v", err)
+	}
+}
+
+func TestBackfillReadinessFallsBackToDefaultTargets(t *testing.T) {
+	targets := backfillReadinessTargets(BackfillReadinessQuery{})
+	if len(targets) != len(defaultBackfillTargets()) {
+		t.Fatalf("readiness default target count = %d, want %d", len(targets), len(defaultBackfillTargets()))
+	}
+	for index, target := range defaultBackfillTargets() {
+		if targets[index] != target {
+			t.Fatalf("readiness default target %d = %q, want %q", index, targets[index], target)
+		}
+	}
+}
+
+func TestBackfillReadinessRejectsInvalidSelectedTarget(t *testing.T) {
+	service := &Service{}
+	targets := backfillReadinessTargets(BackfillReadinessQuery{
+		Targets: []string{"purchase_receipts"},
+	})
+	req := normalizeBackfillRequest(BackfillJournalsRequest{Targets: targets, DryRun: true})
+	err := service.validateBackfillRequest(&utils.AuthContext{}, req)
+	if err == nil {
+		t.Fatal("purchase_receipts should fail readiness validation")
+	}
+	appErr, ok := err.(*apperrors.AppError)
+	if !ok || appErr.Message != "invalid backfill target" {
+		t.Fatalf("readiness validation error = %#v, want invalid backfill target", err)
+	}
+}
+
 func TestStockMovementBackfillExcludesPurchaseIn(t *testing.T) {
 	_, _, _, _, _, _, _, _, _, extraCondition := backfillTargetQuery("stock_movements")
 	if extraCondition == "" {

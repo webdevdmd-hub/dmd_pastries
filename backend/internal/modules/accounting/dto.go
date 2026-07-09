@@ -557,6 +557,7 @@ type BackfillReadinessQuery struct {
 	BranchID string
 	DateFrom string
 	DateTo   string
+	Targets  []string
 }
 
 type BackfillReadinessIssue struct {

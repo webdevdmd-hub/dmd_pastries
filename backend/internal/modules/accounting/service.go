@@ -2224,7 +2224,7 @@ func (s *Service) BackfillJournals(currentUser *utils.AuthContext, req BackfillJ
 
 func (s *Service) GetBackfillReadiness(currentUser *utils.AuthContext, query BackfillReadinessQuery, ipAddress, userAgent string) (*BackfillReadinessResponse, error) {
 	req := normalizeBackfillRequest(BackfillJournalsRequest{
-		Targets:  defaultBackfillTargets(),
+		Targets:  backfillReadinessTargets(query),
 		BranchID: query.BranchID,
 		DateFrom: query.DateFrom,
 		DateTo:   query.DateTo,
@@ -3979,6 +3979,13 @@ func defaultBackfillTargets() []string {
 		"purchase_returns",
 		"expenses",
 	}
+}
+
+func backfillReadinessTargets(query BackfillReadinessQuery) []string {
+	if len(query.Targets) > 0 {
+		return query.Targets
+	}
+	return defaultBackfillTargets()
 }
 
 func validBackfillTarget(value string) bool {

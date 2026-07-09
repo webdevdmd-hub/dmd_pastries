@@ -719,6 +719,7 @@ func parseBackfillReadinessQuery(c *gin.Context) BackfillReadinessQuery {
 		BranchID: c.Query("branch_id"),
 		DateFrom: c.Query("date_from"),
 		DateTo:   c.Query("date_to"),
+		Targets:  c.QueryArray("targets"),
 	}
 }
 

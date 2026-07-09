@@ -1,6 +1,7 @@
 package reports
 
 import (
+	"net/url"
 	"os"
 	"reflect"
 	"strings"
@@ -8,6 +9,8 @@ import (
 	"time"
 
 	"pastries-pos/internal/modules/reports/shared"
+	apperrors "pastries-pos/internal/shared/errors"
+	"pastries-pos/internal/shared/utils"
 )
 
 func testBakeryOrdersReportFilter() *shared.ResolvedFilter {
@@ -207,6 +210,115 @@ func TestFinancialPurchaseTotalSummarySQLAppliesBranchAndSource(t *testing.T) {
 	query, args = financialPurchaseTotalSummarySQL(filter)
 	if !strings.Contains(query, "SELECT 0::numeric") || len(args) != 0 {
 		t.Fatalf("non-purchase source should zero purchase totals, query=%s args=%#v", query, args)
+	}
+}
+
+func TestFinancialPurchaseTotalsSQLAppliesBranch(t *testing.T) {
+	filter := testBakeryOrdersReportFilter()
+	filter.AllBranches = false
+	filter.BranchID = "branch-id"
+
+	query, args := financialPurchaseTotalsSQL(filter)
+	for _, expected := range []string{
+		"COALESCE(SUM(total_amount),0) AS total_purchase_amount",
+		"COALESCE(SUM(paid_amount),0) AS paid_purchase_amount",
+		"COALESCE(SUM(balance_amount),0) AS unpaid_purchase_amount",
+		"status = 'posted'",
+		"AND branch_id = ?",
+	} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("expected purchase totals query to contain %q: %s", expected, query)
+		}
+	}
+	if !reflect.DeepEqual(args, []interface{}{"business-id", "2026-07-01", "2026-07-31", "branch-id"}) {
+		t.Fatalf("unexpected purchase totals args: %#v", args)
+	}
+
+	supplierQuery, supplierArgs := financialPurchaseTotalsBySupplierSQL(filter)
+	for _, expected := range []string{
+		"FROM purchase_invoices pi JOIN suppliers s",
+		"pi.status = 'posted'",
+		"AND pi.branch_id = ?",
+		"GROUP BY pi.supplier_id, s.supplier_name",
+	} {
+		if !strings.Contains(supplierQuery, expected) {
+			t.Fatalf("expected supplier totals query to contain %q: %s", expected, supplierQuery)
+		}
+	}
+	if !reflect.DeepEqual(supplierArgs, []interface{}{"business-id", "2026-07-01", "2026-07-31", "branch-id"}) {
+		t.Fatalf("unexpected supplier totals args: %#v", supplierArgs)
+	}
+}
+
+func TestFinancialPurchaseTotalsNonPurchaseSourceReturnsZeroWithoutDB(t *testing.T) {
+	filter := testBakeryOrdersReportFilter()
+	filter.SourceType = "pos_sale"
+
+	report, err := (&Repository{}).FinancialPurchaseTotals(filter)
+	if err != nil {
+		t.Fatalf("non-purchase source should not query the database: %v", err)
+	}
+	if report.TotalPurchaseAmount != 0 || report.PaidPurchaseAmount != 0 || report.UnpaidPurchaseAmount != 0 || report.InvoiceCount != 0 {
+		t.Fatalf("non-purchase source should return zero totals: %#v", report)
+	}
+	if report.BySupplier == nil || len(report.BySupplier) != 0 {
+		t.Fatalf("non-purchase source should return an empty supplier slice: %#v", report.BySupplier)
+	}
+}
+
+func TestEmptyPurchaseTotalsReportInitializesSupplierSlice(t *testing.T) {
+	report := emptyPurchaseTotalsReport()
+	if report.BySupplier == nil {
+		t.Fatal("empty purchase totals response must initialize by_supplier as an empty array")
+	}
+	if len(report.BySupplier) != 0 {
+		t.Fatalf("expected no supplier rows: %#v", report.BySupplier)
+	}
+}
+
+func TestFinancialPurchaseTotalsServiceWrapsRepositoryErrors(t *testing.T) {
+	service := &Service{repo: &Repository{}}
+	currentBranchID := "branch-id"
+	currentUser := &utils.AuthContext{
+		BusinessID:       "business-id",
+		CurrentBranchID:  &currentBranchID,
+		AllowedBranchIDs: []string{currentBranchID},
+	}
+	values := url.Values{
+		"date_from": []string{"2026-07-01"},
+		"date_to":   []string{"2026-07-31"},
+	}
+
+	_, err := service.FinancialPurchaseTotals(currentUser, values, "", "")
+	appErr, ok := err.(*apperrors.AppError)
+	if !ok {
+		t.Fatalf("expected app error, got %T: %v", err, err)
+	}
+	if appErr.StatusCode != 500 || appErr.Message != "failed to generate purchase totals report" {
+		t.Fatalf("unexpected wrapped error: %#v", appErr)
+	}
+}
+
+func TestFinancialPurchaseTotalsServicePreservesFilterValidationErrors(t *testing.T) {
+	service := &Service{repo: &Repository{}}
+	currentBranchID := "branch-id"
+	currentUser := &utils.AuthContext{
+		BusinessID:       "business-id",
+		CurrentBranchID:  &currentBranchID,
+		AllowedBranchIDs: []string{currentBranchID},
+	}
+	values := url.Values{
+		"date_from": []string{"07-01-2026"},
+		"date_to":   []string{"2026-07-31"},
+	}
+
+	_, err := service.FinancialPurchaseTotals(currentUser, values, "", "")
+	appErr, ok := err.(*apperrors.AppError)
+	if !ok {
+		t.Fatalf("expected app error, got %T: %v", err, err)
+	}
+	if appErr.StatusCode != 400 || appErr.Message != "date_from must use YYYY-MM-DD" {
+		t.Fatalf("unexpected validation error: %#v", appErr)
 	}
 }
 

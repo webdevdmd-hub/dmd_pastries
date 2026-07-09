@@ -541,7 +541,11 @@ func (s *Service) FinancialPurchaseTotals(currentUser *utils.AuthContext, values
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.FinancialPurchaseTotals(filter)
+	result, err := s.repo.FinancialPurchaseTotals(filter)
+	if err != nil {
+		return nil, apperrors.Internal("failed to generate purchase totals report")
+	}
+	return result, nil
 }
 
 func (s *Service) FinancialReconciliation(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*PaginatedResponse[ReconciliationReportItem], error) {

@@ -59,10 +59,10 @@ import type {
 const backfillTargets: AccountingBackfillTarget[] = [
   "pos_sales",
   "bakery_order_payments",
+  "payment_refunds",
   "bakery_orders",
   "purchase_invoices",
   "supplier_payments",
-  "purchase_receipts",
   "stock_movements",
   "manufacturing_batches",
   "sales_returns",
