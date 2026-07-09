@@ -15,6 +15,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
+import { getProductPosVisibilityLabel } from "@/lib/selectors/eligibility";
 import {
   ITEM_STRUCTURE_LABELS,
   type Product,
@@ -122,7 +123,7 @@ export function ProductDetailsDrawer({
             <Separator />
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline">Sellable: {product.isSellable ? "Yes" : "No"}</Badge>
-              <Badge variant="outline">POS: {product.isPosVisible ? "Visible" : "Hidden"}</Badge>
+              <Badge variant="outline">POS: {getProductPosVisibilityLabel(product)}</Badge>
               <Badge variant="outline">
                 Purchasable: {product.isPurchasable ? "Yes" : "No"}
               </Badge>
@@ -186,6 +187,7 @@ export function ProductDetailsDrawer({
               onAdd={onAddVariant}
               onDelete={onDeleteVariant}
               onEdit={onEditVariant}
+              product={product}
               variants={variants}
             />
           </div>

@@ -14,13 +14,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { ProductVariant } from "@/types/product";
+import {
+  getProductVariantPosVisibilityLabel,
+  isPosSelectableProductVariant,
+} from "@/lib/selectors/eligibility";
+import type { Product, ProductVariant } from "@/types/product";
 
 type ProductVariantsSectionProps = {
   canManage: boolean;
   onAdd: () => void;
   onDelete: (variant: ProductVariant) => void;
   onEdit: (variant: ProductVariant) => void;
+  product: Product;
   variants: ProductVariant[];
 };
 
@@ -29,6 +34,7 @@ export function ProductVariantsSection({
   onAdd,
   onDelete,
   onEdit,
+  product,
   variants,
 }: ProductVariantsSectionProps): JSX.Element {
   return (
@@ -69,6 +75,7 @@ export function ProductVariantsSection({
                   <TableHead>Barcode</TableHead>
                   <TableHead>Sale price</TableHead>
                   <TableHead>Cost price</TableHead>
+                  <TableHead>POS</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -84,6 +91,17 @@ export function ProductVariantsSection({
                     <TableCell>AED {variant.salePrice.toFixed(2)}</TableCell>
                     <TableCell>
                       {variant.costPrice === null ? "-" : `AED ${variant.costPrice.toFixed(2)}`}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={
+                          isPosSelectableProductVariant(product, variant)
+                            ? "text-sm font-medium text-emerald-700"
+                            : "text-sm text-brand-mocha"
+                        }
+                      >
+                        {getProductVariantPosVisibilityLabel(product, variant)}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <ProductStatusBadge status={variant.status} />

@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
+import { getProductPosVisibilityLabel, isPosSelectableProduct } from "@/lib/selectors/eligibility";
 import type { Product, ProductStatus } from "@/types/product";
 
 type ProductsTableProps = {
@@ -56,21 +57,24 @@ function formatDate(value: string): string {
 }
 
 function ProductCapabilityBadges({ product }: { product: Product }): JSX.Element {
+  const isPOSVisible = isPosSelectableProduct(product);
+  const posLabel = getProductPosVisibilityLabel(product);
+
   return (
     <div className="flex flex-wrap gap-1.5">
       <Badge
         className={
-          product.isPosVisible
+          isPOSVisible
             ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-50"
             : "border-brand-cappuccino bg-brand-latte text-brand-mocha hover:bg-brand-latte"
         }
       >
-        {product.isPosVisible ? (
+        {isPOSVisible ? (
           <CheckCircle2 className="h-3.5 w-3.5" />
         ) : (
           <EyeOff className="h-3.5 w-3.5" />
         )}
-        POS {product.isPosVisible ? "Visible" : "Hidden"}
+        {posLabel}
       </Badge>
       <Badge
         className={

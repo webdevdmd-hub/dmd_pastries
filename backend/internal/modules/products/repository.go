@@ -300,7 +300,7 @@ func (r *Repository) FindVariantLookup(businessID, branchID, field, value string
 	if err := r.db.Table("product_variants").
 		Select("id, product_id, variant_name, sku, barcode, sale_price, cost_price, cost_update_policy, pricing_type, pricing_percent, minimum_sale_price, suggested_sale_price, auto_price_update_enabled, sale_price_locked, last_purchase_cost, last_purchase_date, last_production_cost, last_production_date, average_inventory_cost, image_file_id, sort_order, status").
 		Where("business_id = ? AND status = ? AND deleted_at IS NULL", businessID, "active").
-		Where("product_id IN (SELECT id FROM products WHERE business_id = ? AND branch_id = ? AND deleted_at IS NULL)", businessID, branchID).
+		Where(variantLookupEligibleProductSubquery(), businessID, branchID, "active", true, true).
 		Where(field+" = ?", value).
 		Take(&row).Error; err != nil {
 		return nil, "", err
@@ -328,6 +328,10 @@ func (r *Repository) FindVariantLookup(businessID, branchID, field, value string
 		SortOrder:              row.SortOrder,
 		Status:                 row.Status,
 	}, row.ProductID, nil
+}
+
+func variantLookupEligibleProductSubquery() string {
+	return "product_id IN (SELECT id FROM products WHERE business_id = ? AND branch_id = ? AND status = ? AND is_pos_visible = ? AND is_sellable = ? AND deleted_at IS NULL)"
 }
 
 func (r *Repository) exists(column, businessID, branchID, value, excludeID string) (bool, error) {

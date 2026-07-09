@@ -17,6 +17,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check:no-any": "node scripts/check-no-any.mjs",
+    "test:product-pos-labels": "node scripts/check-product-pos-labels.mjs",
     "test:product-unit-payload": "node scripts/check-product-unit-payload.mjs",
     "test:recipe-cost-preview": "node scripts/check-recipe-cost-preview.mjs",
     "test:sales-return-refund-preview": "node scripts/check-sales-return-refund-preview.mjs",

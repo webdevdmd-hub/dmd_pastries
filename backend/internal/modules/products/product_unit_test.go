@@ -2,6 +2,7 @@ package products
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -106,5 +107,24 @@ func TestProductUnitRequestBindingsRequireUUIDs(t *testing.T) {
 	}
 	if got := updateField.Tag.Get("binding"); got != "omitempty,uuid" {
 		t.Fatalf("UpdateProductRequest.UnitID binding = %q, want omitempty,uuid", got)
+	}
+}
+
+func TestVariantLookupRequiresEligiblePOSParentProduct(t *testing.T) {
+	query := variantLookupEligibleProductSubquery()
+	requiredFragments := []string{
+		"product_id IN",
+		"business_id = ?",
+		"branch_id = ?",
+		"status = ?",
+		"is_pos_visible = ?",
+		"is_sellable = ?",
+		"deleted_at IS NULL",
+	}
+
+	for _, fragment := range requiredFragments {
+		if !strings.Contains(query, fragment) {
+			t.Fatalf("variant lookup parent product query missing %q in %q", fragment, query)
+		}
 	}
 }

@@ -1,6 +1,6 @@
 import type { ChartAccount, PaymentAccount } from "@/types/accounting";
 import type { Branch } from "@/types/branch";
-import type { Product, ProductType } from "@/types/product";
+import type { Product, ProductType, ProductVariant } from "@/types/product";
 import type { PaymentMethod, TaxRate } from "@/types/settings";
 
 export type SelectorContext =
@@ -53,6 +53,64 @@ export function isSellableProduct(product: Product): boolean {
 
 export function isPosSelectableProduct(product: Product): boolean {
   return isSellableProduct(product) && product.isPosVisible;
+}
+
+export type ProductPosVisibilityLabel =
+  | "Hidden from POS"
+  | "Inventory Only"
+  | "Not Sellable"
+  | "Packaging Item"
+  | "POS Visible"
+  | "Recipe Component";
+
+export function getProductPosVisibilityLabel(product: Product): ProductPosVisibilityLabel {
+  if (isPosSelectableProduct(product)) {
+    return "POS Visible";
+  }
+
+  if (product.productType === "packaging") {
+    return "Packaging Item";
+  }
+
+  if (
+    product.productType === "ingredient" ||
+    product.productType === "raw_material" ||
+    product.productType === "semi_finished"
+  ) {
+    return "Recipe Component";
+  }
+
+  if (!product.isSellable) {
+    return "Not Sellable";
+  }
+
+  if (product.isPurchasable || product.isStockTracked) {
+    return "Inventory Only";
+  }
+
+  return "Hidden from POS";
+}
+
+export function isPosSelectableProductVariant(
+  product: Product,
+  variant: ProductVariant,
+): boolean {
+  return isPosSelectableProduct(product) && variant.status === "active";
+}
+
+export function getProductVariantPosVisibilityLabel(
+  product: Product,
+  variant: ProductVariant,
+): ProductPosVisibilityLabel {
+  if (isPosSelectableProductVariant(product, variant)) {
+    return "POS Visible";
+  }
+
+  if (isPosSelectableProduct(product)) {
+    return "Hidden from POS";
+  }
+
+  return getProductPosVisibilityLabel(product);
 }
 
 export function isBakeryOrderProduct(product: Product): boolean {
