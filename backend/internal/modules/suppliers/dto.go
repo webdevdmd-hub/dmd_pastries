@@ -191,7 +191,10 @@ type PaginationResponse struct {
 type SupplierStatsResponse struct {
 	SupplierID          string  `json:"supplier_id"`
 	TotalPurchaseOrders int64   `json:"total_purchase_orders"`
+	TotalBills          int64   `json:"total_bills"`
 	TotalPurchaseAmount float64 `json:"total_purchase_amount"`
+	TotalPaidAmount     float64 `json:"total_paid_amount"`
 	LastPurchaseDate    *string `json:"last_purchase_date"`
+	OutstandingBalance  float64 `json:"outstanding_balance"`
 	OutstandingPayables float64 `json:"outstanding_payables"`
 }

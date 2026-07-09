@@ -1,6 +1,13 @@
 "use client";
 
-import { CalendarClock, ClipboardList, WalletCards } from "lucide-react";
+import {
+  CalendarClock,
+  ClipboardList,
+  FileText,
+  ReceiptText,
+  Scale,
+  WalletCards,
+} from "lucide-react";
 import type { JSX } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,9 +35,24 @@ export function SupplierStatsCards({ stats }: SupplierStatsCardsProps): JSX.Elem
       icon: ClipboardList,
     },
     {
+      label: "Bills",
+      value: String(stats?.totalBills ?? 0),
+      icon: ReceiptText,
+    },
+    {
       label: "Purchase Amount",
       value: formatCurrency(stats?.totalPurchaseAmount ?? 0),
       icon: WalletCards,
+    },
+    {
+      label: "Paid",
+      value: formatCurrency(stats?.totalPaidAmount ?? 0),
+      icon: FileText,
+    },
+    {
+      label: "Outstanding",
+      value: formatCurrency(stats?.outstandingBalance ?? 0),
+      icon: Scale,
     },
     {
       label: "Last Purchase",
@@ -40,7 +62,7 @@ export function SupplierStatsCards({ stats }: SupplierStatsCardsProps): JSX.Elem
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {cards.map((card) => {
         const Icon = card.icon;
 

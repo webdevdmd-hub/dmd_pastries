@@ -183,8 +183,12 @@ function parseStats(value: unknown): SupplierStats {
 
   return {
     totalPurchaseOrders: numberValue(value.total_purchase_orders),
+    totalBills: numberValue(value.total_bills),
     totalPurchaseAmount: numberValue(value.total_purchase_amount),
+    totalPaidAmount: numberValue(value.total_paid_amount),
     lastPurchaseDate: optionalString(value.last_purchase_date),
+    outstandingBalance: numberValue(value.outstanding_balance),
+    outstandingPayables: numberValue(value.outstanding_payables),
   };
 }
 

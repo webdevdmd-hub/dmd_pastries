@@ -51,8 +51,12 @@ export type SupplierNote = {
 
 export type SupplierStats = {
   totalPurchaseOrders: number;
+  totalBills: number;
   totalPurchaseAmount: number;
+  totalPaidAmount: number;
   lastPurchaseDate: string | null;
+  outstandingBalance: number;
+  outstandingPayables: number;
 };
 
 export type SupplierStatementTransactionType = "bill" | "payment_made" | "vendor_credit";

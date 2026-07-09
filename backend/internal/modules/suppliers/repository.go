@@ -36,6 +36,17 @@ type supplierStatementRow struct {
 	PaymentID         *string
 }
 
+type supplierStatsRow struct {
+	SupplierID           string
+	TotalPurchaseOrders  int64
+	TotalBills           int64
+	TotalPurchaseAmount  float64
+	SupplierPaymentsPaid float64
+	InvoicePaymentsPaid  float64
+	VendorCredits        float64
+	LastPurchaseDate     *time.Time
+}
+
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
@@ -204,8 +215,105 @@ func (r *Repository) DeleteNote(tx *gorm.DB, businessID, branchID, supplierID, n
 	return nil
 }
 
-func (r *Repository) Stats(businessID, supplierID string) (*SupplierStatsResponse, error) {
-	return &SupplierStatsResponse{SupplierID: supplierID, TotalPurchaseOrders: 0, TotalPurchaseAmount: 0, LastPurchaseDate: nil, OutstandingPayables: 0}, nil
+func (r *Repository) Stats(businessID, branchID, supplierID string) (*SupplierStatsResponse, error) {
+	var row supplierStatsRow
+	err := r.db.Raw(supplierStatsSQL(), supplierStatsArgs(businessID, branchID, supplierID)...).Scan(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	return supplierStatsResponse(row), nil
+}
+
+func supplierStatsSQL() string {
+	return `
+		SELECT
+			? AS supplier_id,
+			(
+				SELECT COUNT(*)
+				FROM purchase_orders po
+				WHERE po.business_id = ? AND po.branch_id = ? AND po.supplier_id = ?
+					AND po.status <> 'cancelled' AND po.deleted_at IS NULL
+			) AS total_purchase_orders,
+			(
+				SELECT COUNT(*)
+				FROM purchase_invoices pi
+				WHERE pi.business_id = ? AND pi.branch_id = ? AND pi.supplier_id = ?
+					AND pi.status = 'posted' AND pi.deleted_at IS NULL
+			) AS total_bills,
+			(
+				SELECT COALESCE(SUM(pi.total_amount), 0)
+				FROM purchase_invoices pi
+				WHERE pi.business_id = ? AND pi.branch_id = ? AND pi.supplier_id = ?
+					AND pi.status = 'posted' AND pi.deleted_at IS NULL
+			) AS total_purchase_amount,
+			(
+				SELECT COALESCE(SUM(sp.amount), 0)
+				FROM supplier_payments sp
+				WHERE sp.business_id = ? AND sp.branch_id = ? AND sp.supplier_id = ?
+					AND sp.status = 'completed' AND sp.deleted_at IS NULL
+			) AS supplier_payments_paid,
+			(
+				SELECT COALESCE(SUM(pip.amount), 0)
+				FROM purchase_invoice_payments pip
+				WHERE pip.business_id = ? AND pip.branch_id = ? AND pip.supplier_id = ?
+					AND pip.payment_status = 'completed' AND pip.supplier_payment_id IS NULL
+					AND pip.deleted_at IS NULL
+			) AS invoice_payments_paid,
+			(
+				SELECT COALESCE(SUM(pr.return_total), 0)
+				FROM purchase_returns pr
+				WHERE pr.business_id = ? AND pr.branch_id = ? AND pr.supplier_id = ?
+					AND pr.status = 'posted' AND pr.deleted_at IS NULL
+			) AS vendor_credits,
+			GREATEST(
+				(
+					SELECT MAX(po.order_date)
+					FROM purchase_orders po
+					WHERE po.business_id = ? AND po.branch_id = ? AND po.supplier_id = ?
+						AND po.status <> 'cancelled' AND po.deleted_at IS NULL
+				),
+				(
+					SELECT MAX(pi.invoice_date)
+					FROM purchase_invoices pi
+					WHERE pi.business_id = ? AND pi.branch_id = ? AND pi.supplier_id = ?
+						AND pi.status = 'posted' AND pi.deleted_at IS NULL
+				),
+				(
+					SELECT MAX(pr.received_date)
+					FROM purchase_receipts pr
+					WHERE pr.business_id = ? AND pr.branch_id = ? AND pr.supplier_id = ?
+						AND pr.status = 'posted' AND pr.deleted_at IS NULL
+				)
+			) AS last_purchase_date
+	`
+}
+
+func supplierStatsArgs(businessID, branchID, supplierID string) []interface{} {
+	args := []interface{}{supplierID}
+	for i := 0; i < 9; i++ {
+		args = append(args, businessID, branchID, supplierID)
+	}
+	return args
+}
+
+func supplierStatsResponse(row supplierStatsRow) *SupplierStatsResponse {
+	totalPaid := roundSupplierMoney(row.SupplierPaymentsPaid + row.InvoicePaymentsPaid)
+	outstanding := roundSupplierMoney(row.TotalPurchaseAmount - totalPaid - row.VendorCredits)
+	var lastPurchaseDate *string
+	if row.LastPurchaseDate != nil {
+		formatted := row.LastPurchaseDate.Format("2006-01-02")
+		lastPurchaseDate = &formatted
+	}
+	return &SupplierStatsResponse{
+		SupplierID:          row.SupplierID,
+		TotalPurchaseOrders: row.TotalPurchaseOrders,
+		TotalBills:          row.TotalBills,
+		TotalPurchaseAmount: roundSupplierMoney(row.TotalPurchaseAmount),
+		TotalPaidAmount:     totalPaid,
+		LastPurchaseDate:    lastPurchaseDate,
+		OutstandingBalance:  outstanding,
+		OutstandingPayables: outstanding,
+	}
 }
 
 func (r *Repository) StatementRows(businessID, branchID, supplierID string) ([]supplierStatementRow, error) {

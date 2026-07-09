@@ -351,10 +351,11 @@ func (s *Service) Stats(currentUser *utils.AuthContext, supplierID string) (*Sup
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.repo.FindByID(supplierID, currentUser.BusinessID, branchID); err != nil {
+	supplier, err := s.repo.FindByID(supplierID, currentUser.BusinessID, branchID)
+	if err != nil {
 		return nil, mapSupplierNotFound(err, "supplier not found")
 	}
-	return s.repo.Stats(currentUser.BusinessID, supplierID)
+	return s.repo.Stats(currentUser.BusinessID, supplier.BranchID, supplier.ID)
 }
 
 func (s *Service) Statement(currentUser *utils.AuthContext, supplierID string, query SupplierStatementQuery) (*SupplierStatementResponse, error) {
