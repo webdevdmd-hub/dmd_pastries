@@ -22,7 +22,7 @@ import {
   RecipePackagingSection,
 } from "@/components/recipes/recipe-packaging-section";
 import { RecipeVersionDialog } from "@/components/recipes/recipe-version-dialog";
-import { RecipeYieldCard } from "@/components/recipes/recipe-yield-card";
+import { RecipeYieldCard, type RecipeYieldPreview } from "@/components/recipes/recipe-yield-card";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import { Button } from "@/components/ui/button";
@@ -111,6 +111,15 @@ function numberFieldValue(value: unknown): number | "" {
 
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? numericValue : "";
+}
+
+function nullablePreviewNumber(value: unknown): number | null {
+  if (value === "" || value === null || value === undefined) {
+    return null;
+  }
+
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
 }
 
 function toCreateRecipePayload(
@@ -333,9 +342,12 @@ export function RecipeFormPage({
   const recipe = recipeQuery.data ?? null;
   const selectedProductId = form.watch("productId");
   const batchYieldQuantity = form.watch("batchYieldQuantity");
+  const batchYieldUnitId = form.watch("batchYieldUnitId");
   const outputVariantMode = form.watch("outputVariantMode");
+  const preparationTimeMinutes = form.watch("preparationTimeMinutes");
   const selectedVariantId = form.watch("productVariantId") ?? "";
   const selectedProduct = data.products.find((product) => product.id === selectedProductId) ?? null;
+  const selectedYieldUnit = data.units.find((unit) => unit.id === batchYieldUnitId) ?? null;
   const selectedProductVariants = useMemo(() => selectedProduct?.variants ?? [], [selectedProduct]);
   const ingredientComponentProducts = useMemo(
     () =>
@@ -432,6 +444,11 @@ export function RecipeFormPage({
       (recipeId !== null && packagingPreviewDraft.lineId === null))
       ? 1
       : 0);
+  const liveYieldPreview: RecipeYieldPreview = {
+    batchYieldQuantity: numberFieldValue(batchYieldQuantity),
+    batchYieldUnitName: selectedYieldUnit?.unitName ?? recipe?.batchYieldUnitName ?? null,
+    preparationTimeMinutes: nullablePreviewNumber(preparationTimeMinutes),
+  };
   const productOptions = useMemo<SearchableComboboxOption[]>(
     () =>
       data.products.map((product) => ({
@@ -821,7 +838,7 @@ export function RecipeFormPage({
                     options={unitOptions}
                     placeholder="Select unit"
                     searchPlaceholder="Search unit..."
-                    value={form.watch("batchYieldUnitId")}
+                    value={batchYieldUnitId}
                   />
                 </label>
                 <label className="grid gap-2">
@@ -907,7 +924,7 @@ export function RecipeFormPage({
                 livePreview={liveCostPreview}
                 recipeId={recipeId}
               />
-              <RecipeYieldCard recipe={recipe} />
+              <RecipeYieldCard preview={liveYieldPreview} />
             </div>
           </div>
         </div>
