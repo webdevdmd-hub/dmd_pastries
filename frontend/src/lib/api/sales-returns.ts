@@ -107,7 +107,9 @@ function parseReturnableItem(value: unknown): ReturnableSaleItem {
     nullableString(value.variant_name);
   const saleItemId = stringValue(value.sale_item_id, stringValue(value.id));
   const soldQuantity = numberValue(value.sold_quantity ?? value.quantity);
-  const returnedQuantity = numberValue(value.returned_quantity);
+  const returnedQuantity = numberValue(
+    value.returned_quantity ?? value.already_returned_quantity,
+  );
   const returnableQuantity = numberValue(
     value.returnable_quantity ?? value.remaining_quantity,
     Math.max(soldQuantity - returnedQuantity, 0),
@@ -124,6 +126,14 @@ function parseReturnableItem(value: unknown): ReturnableSaleItem {
     returnedQuantity,
     returnableQuantity,
     unitPrice: numberValue(value.unit_price),
+    discountAmount: numberValue(value.discount_amount),
+    taxRateId: nullableString(value.tax_rate_id),
+    taxRateName: nullableString(value.tax_rate_name_snapshot ?? value.tax_rate_name),
+    taxRatePercentage: numberValue(
+      value.tax_rate_percentage_snapshot ?? value.tax_rate_percentage,
+    ),
+    taxAmount: numberValue(value.tax_amount),
+    lineSubtotal: numberValue(value.line_subtotal),
     lineTotal: numberValue(value.line_total),
   };
 }

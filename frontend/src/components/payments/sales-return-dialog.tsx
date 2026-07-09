@@ -37,6 +37,7 @@ import {
   useReturnableSaleItems,
 } from "@/hooks/use-sales-returns";
 import { getErrorMessage } from "@/lib/api/client";
+import { calculateSalesReturnRefundPreview } from "@/lib/sales-returns/refund-preview";
 import type { StockLocation } from "@/types/inventory";
 import type {
   RefundMode,
@@ -113,12 +114,10 @@ export function SalesReturnDialog({
   const selectedPaymentMethod =
     activePaymentMethods.find((method) => method.id === refundPaymentMethodId) ?? null;
   const selectedLines = lines.filter((line) => line.quantity > 0);
-  const estimatedRefundAmount = selectedLines.reduce((total, line) => {
-    const item = (returnableItemsQuery.data ?? []).find(
-      (returnableItem) => returnableItem.saleItemId === line.saleItemId,
-    );
-    return total + line.quantity * (item?.unitPrice ?? 0);
-  }, 0);
+  const estimatedRefundPreview = calculateSalesReturnRefundPreview(
+    returnableItemsQuery.data ?? [],
+    selectedLines,
+  );
   const requiresStockLocation = selectedLines.some((line) => line.restockAction === "restock");
 
   useEffect(() => {
@@ -384,8 +383,30 @@ export function SalesReturnDialog({
                       Estimated refund
                     </p>
                     <p className="mt-1 text-2xl font-black text-brand-espresso">
-                      {formatMoney(refundMode === "refund" ? estimatedRefundAmount : 0)}
+                      {formatMoney(
+                        refundMode === "refund" ? estimatedRefundPreview.finalRefundAmount : 0,
+                      )}
                     </p>
+                    <div className="mt-3 space-y-1 text-sm text-brand-mocha">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Item refund amount</span>
+                        <span className="font-semibold text-brand-espresso">
+                          {formatMoney(
+                            refundMode === "refund"
+                              ? estimatedRefundPreview.itemRefundAmount
+                              : 0,
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Refundable VAT</span>
+                        <span className="font-semibold text-brand-espresso">
+                          {formatMoney(
+                            refundMode === "refund" ? estimatedRefundPreview.refundableVat : 0,
+                          )}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

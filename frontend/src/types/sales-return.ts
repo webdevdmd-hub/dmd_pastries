@@ -15,6 +15,12 @@ export type ReturnableSaleItem = {
   returnedQuantity: number;
   returnableQuantity: number;
   unitPrice: number;
+  discountAmount: number;
+  taxRateId: string | null;
+  taxRateName: string | null;
+  taxRatePercentage: number;
+  taxAmount: number;
+  lineSubtotal: number;
   lineTotal: number;
 };
 
