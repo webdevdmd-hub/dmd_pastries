@@ -1,15 +1,9 @@
-import type { JSX } from "react";
-import {
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+"use client";
 
+import type { JSX } from "react";
+import { CartesianGrid, Legend, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
+
+import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
 import { formatChartCurrency } from "@/components/reports/sales/sales-report-format";
 import type { FinancialTrendChart as FinancialTrendChartData } from "@/types/financial-reports";
 
@@ -25,9 +19,12 @@ export function FinancialTrendChart({ chart }: { chart: FinancialTrendChartData 
   });
 
   return (
-    <div className="h-80" aria-label="Financial collected refunded and net trend chart">
-      <ResponsiveContainer height="100%" width="100%">
-        <LineChart data={rows}>
+    <ResponsiveChartFrame
+      ariaLabel="Financial collected refunded and net trend chart"
+      className="h-80"
+    >
+      {({ height, width }) => (
+        <LineChart data={rows} height={height} width={width}>
           <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
           <XAxis dataKey="label" stroke="#7A553A" />
           <YAxis stroke="#7A553A" tickFormatter={formatChartCurrency} />
@@ -43,7 +40,7 @@ export function FinancialTrendChart({ chart }: { chart: FinancialTrendChartData 
             />
           ))}
         </LineChart>
-      </ResponsiveContainer>
-    </div>
+      )}
+    </ResponsiveChartFrame>
   );
 }

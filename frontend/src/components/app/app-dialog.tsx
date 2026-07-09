@@ -33,7 +33,13 @@ export function AppDialog({
       <DialogContent className="max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          {description ? <DialogDescription>{description}</DialogDescription> : null}
+          {description ? (
+            <DialogDescription>{description}</DialogDescription>
+          ) : (
+            <DialogDescription className="sr-only">
+              Complete the fields and actions in this dialog.
+            </DialogDescription>
+          )}
         </DialogHeader>
         {children}
         {footer ? <DialogFooter>{footer}</DialogFooter> : null}

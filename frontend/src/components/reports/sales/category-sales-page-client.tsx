@@ -2,10 +2,11 @@
 
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 
 import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
 import { AccessDeniedCard } from "@/components/reports/sales/access-denied-card";
 import { CategorySalesTable } from "@/components/reports/sales/category-sales-table";
 import { SalesReportEmptyState } from "@/components/reports/sales/sales-report-empty-state";
@@ -99,13 +100,15 @@ export function CategorySalesPageClient(): JSX.Element {
           <CardContent className="p-5">
             {rows.length > 0 ? (
               <div className="space-y-6">
-                <div className="h-72" aria-label="Category net sales chart">
-                  <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveChartFrame ariaLabel="Category net sales chart" className="h-72">
+                  {({ height, width }) => (
                     <BarChart
                       data={rows.map((row) => ({
                         name: row.categoryName,
                         value: row.netSales,
                       }))}
+                      height={height}
+                      width={width}
                     >
                       <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
                       <XAxis dataKey="name" stroke="#7A553A" />
@@ -113,8 +116,8 @@ export function CategorySalesPageClient(): JSX.Element {
                       <Tooltip />
                       <Bar dataKey="value" fill="#B08968" radius={8} />
                     </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                  )}
+                </ResponsiveChartFrame>
                 <CategorySalesTable rows={rows} />
               </div>
             ) : (

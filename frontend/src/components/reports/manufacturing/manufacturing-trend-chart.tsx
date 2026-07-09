@@ -1,15 +1,9 @@
-import type { JSX } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+"use client";
 
+import type { JSX } from "react";
+import { Bar, BarChart, CartesianGrid, Legend, Tooltip, XAxis, YAxis } from "recharts";
+
+import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
 import type { ManufacturingTrendChart as ManufacturingTrendChartData } from "@/types/manufacturing-reports";
 
 export function ManufacturingTrendChart({
@@ -26,9 +20,12 @@ export function ManufacturingTrendChart({
   });
 
   return (
-    <div className="h-80" aria-label="Produced quantity versus wastage quantity trend chart">
-      <ResponsiveContainer height="100%" width="100%">
-        <BarChart data={rows}>
+    <ResponsiveChartFrame
+      ariaLabel="Produced quantity versus wastage quantity trend chart"
+      className="h-80"
+    >
+      {({ height, width }) => (
+        <BarChart data={rows} height={height} width={width}>
           <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
           <XAxis dataKey="label" stroke="#7A553A" />
           <YAxis stroke="#7A553A" />
@@ -43,7 +40,7 @@ export function ManufacturingTrendChart({
             />
           ))}
         </BarChart>
-      </ResponsiveContainer>
-    </div>
+      )}
+    </ResponsiveChartFrame>
   );
 }

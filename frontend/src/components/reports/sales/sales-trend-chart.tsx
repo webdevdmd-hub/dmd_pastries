@@ -6,12 +6,12 @@ import {
   Legend,
   Line,
   LineChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 
+import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
 import type { SalesTrendChart as SalesTrendChartData } from "@/types/sales-reports";
 
 type TrendPoint = {
@@ -33,9 +33,17 @@ function toTrendPoints(chart: SalesTrendChartData): TrendPoint[] {
 
 export function SalesTrendChart({ chart }: { chart: SalesTrendChartData }): JSX.Element {
   return (
-    <div className="h-80" aria-label="Sales trend chart showing net sales and sales count">
-      <ResponsiveContainer height="100%" width="100%">
-        <LineChart data={toTrendPoints(chart)} margin={{ bottom: 12, left: 0, right: 12, top: 12 }}>
+    <ResponsiveChartFrame
+      ariaLabel="Sales trend chart showing net sales and sales count"
+      className="h-80"
+    >
+      {({ height, width }) => (
+        <LineChart
+          data={toTrendPoints(chart)}
+          height={height}
+          margin={{ bottom: 12, left: 0, right: 12, top: 12 }}
+          width={width}
+        >
           <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
           <XAxis dataKey="label" stroke="#7A553A" tick={{ fill: "#7A553A", fontSize: 12 }} />
           <YAxis stroke="#7A553A" tick={{ fill: "#7A553A", fontSize: 12 }} />
@@ -63,7 +71,7 @@ export function SalesTrendChart({ chart }: { chart: SalesTrendChartData }): JSX.
             type="monotone"
           />
         </LineChart>
-      </ResponsiveContainer>
-    </div>
+      )}
+    </ResponsiveChartFrame>
   );
 }

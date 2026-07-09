@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -59,6 +60,9 @@ export function OrderQuickCustomerDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create customer</DialogTitle>
+          <DialogDescription>
+            Add a customer name and optional contact details for this order.
+          </DialogDescription>
         </DialogHeader>
         <form
           className="grid gap-4"

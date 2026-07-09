@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -168,6 +169,9 @@ export function CustomerTagsSection({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create customer tag</DialogTitle>
+            <DialogDescription>
+              Create a reusable tag and assign it to this customer.
+            </DialogDescription>
           </DialogHeader>
           <label className="grid gap-2">
             <Label htmlFor="customer-tag-name">Tag name</Label>

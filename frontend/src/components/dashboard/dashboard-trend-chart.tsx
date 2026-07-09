@@ -8,12 +8,12 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 
+import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
 import type { ReportChartData } from "@/types/reports";
 
 type ChartPoint = {
@@ -45,9 +45,14 @@ export function DashboardTrendChart({
 
   if (type === "bar") {
     return (
-      <div className="h-72" aria-label="Dashboard bar chart">
-        <ResponsiveContainer height="100%" width="100%">
-          <BarChart data={data} margin={{ bottom: 8, left: 0, right: 8, top: 8 }}>
+      <ResponsiveChartFrame ariaLabel="Dashboard bar chart" className="h-72">
+        {({ height, width }) => (
+          <BarChart
+            data={data}
+            height={height}
+            margin={{ bottom: 8, left: 0, right: 8, top: 8 }}
+            width={width}
+          >
             <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
             <XAxis dataKey="label" stroke="#7A553A" tick={{ fill: "#7A553A", fontSize: 12 }} />
             <YAxis stroke="#7A553A" tick={{ fill: "#7A553A", fontSize: 12 }} />
@@ -70,15 +75,20 @@ export function DashboardTrendChart({
               />
             ))}
           </BarChart>
-        </ResponsiveContainer>
-      </div>
+        )}
+      </ResponsiveChartFrame>
     );
   }
 
   return (
-    <div className="h-72" aria-label="Dashboard trend chart">
-      <ResponsiveContainer height="100%" width="100%">
-        <AreaChart data={data} margin={{ bottom: 8, left: 0, right: 8, top: 8 }}>
+    <ResponsiveChartFrame ariaLabel="Dashboard trend chart" className="h-72">
+      {({ height, width }) => (
+        <AreaChart
+          data={data}
+          height={height}
+          margin={{ bottom: 8, left: 0, right: 8, top: 8 }}
+          width={width}
+        >
           <defs>
             <linearGradient id="dashboardTrendFill" x1="0" x2="0" y1="0" y2="1">
               <stop offset="5%" stopColor="#B08968" stopOpacity={0.45} />
@@ -110,7 +120,7 @@ export function DashboardTrendChart({
             />
           ))}
         </AreaChart>
-      </ResponsiveContainer>
-    </div>
+      )}
+    </ResponsiveChartFrame>
   );
 }

@@ -32,7 +32,13 @@ export function AppSheet({
       <SheetContent className="overflow-y-auto" side={side}>
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
-          {description ? <SheetDescription>{description}</SheetDescription> : null}
+          {description ? (
+            <SheetDescription>{description}</SheetDescription>
+          ) : (
+            <SheetDescription className="sr-only">
+              Review the details and actions in this panel.
+            </SheetDescription>
+          )}
         </SheetHeader>
         <div className="mt-6">{children}</div>
       </SheetContent>

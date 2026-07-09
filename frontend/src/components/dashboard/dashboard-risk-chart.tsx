@@ -1,7 +1,9 @@
 "use client";
 
 import type { JSX } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
+
+import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
 
 export type DashboardRiskItem = {
   label: string;
@@ -10,12 +12,14 @@ export type DashboardRiskItem = {
 
 export function DashboardRiskChart({ items }: { items: DashboardRiskItem[] }): JSX.Element {
   return (
-    <div className="h-48" aria-label="Dashboard risk chart">
-      <ResponsiveContainer height="100%" width="100%">
+    <ResponsiveChartFrame ariaLabel="Dashboard risk chart" className="h-48">
+      {({ height, width }) => (
         <BarChart
           data={items}
+          height={height}
           layout="vertical"
           margin={{ bottom: 4, left: 10, right: 18, top: 4 }}
+          width={width}
         >
           <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
           <XAxis stroke="#7A553A" tick={{ fill: "#7A553A", fontSize: 12 }} type="number" />
@@ -36,7 +40,7 @@ export function DashboardRiskChart({ items }: { items: DashboardRiskItem[] }): J
           />
           <Bar dataKey="value" fill="#B08968" radius={[0, 10, 10, 0]} />
         </BarChart>
-      </ResponsiveContainer>
-    </div>
+      )}
+    </ResponsiveChartFrame>
   );
 }

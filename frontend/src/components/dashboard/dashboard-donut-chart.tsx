@@ -1,8 +1,9 @@
 "use client";
 
 import type { JSX } from "react";
-import { Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { Pie, PieChart, Tooltip } from "recharts";
 
+import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
 import type { ReportChartData } from "@/types/reports";
 
 type DonutPoint = {
@@ -28,9 +29,9 @@ export function DashboardDonutChart({ chart }: { chart: ReportChartData }): JSX.
 
   return (
     <div className="grid gap-4 md:grid-cols-[1fr_0.8fr]">
-      <div className="h-72" aria-label="Dashboard donut chart">
-        <ResponsiveContainer height="100%" width="100%">
-          <PieChart>
+      <ResponsiveChartFrame ariaLabel="Dashboard donut chart" className="h-72">
+        {({ height, width }) => (
+          <PieChart height={height} width={width}>
             <Tooltip
               contentStyle={{
                 backgroundColor: "#3B2A22",
@@ -48,8 +49,8 @@ export function DashboardDonutChart({ chart }: { chart: ReportChartData }): JSX.
               paddingAngle={4}
             />
           </PieChart>
-        </ResponsiveContainer>
-      </div>
+        )}
+      </ResponsiveChartFrame>
       <div className="flex flex-col justify-center gap-2">
         {data.slice(0, 6).map((point, index) => (
           <div

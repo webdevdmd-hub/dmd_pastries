@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -165,6 +166,9 @@ export function POSReceiptDialog({
                 : "Default template"}
             </span>
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Review, print, or download the completed sale receipt.
+          </DialogDescription>
         </DialogHeader>
         {receipt ? (
           <div

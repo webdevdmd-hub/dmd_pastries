@@ -1,15 +1,9 @@
-import type { JSX } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+"use client";
 
+import type { JSX } from "react";
+import { Bar, BarChart, CartesianGrid, Legend, Tooltip, XAxis, YAxis } from "recharts";
+
+import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
 import type { InventoryTrendChart as InventoryTrendChartData } from "@/types/inventory-reports";
 
 export function InventoryTrendChart({ chart }: { chart: InventoryTrendChartData }): JSX.Element {
@@ -23,9 +17,12 @@ export function InventoryTrendChart({ chart }: { chart: InventoryTrendChartData 
   });
 
   return (
-    <div className="h-80" aria-label="Inventory stock in and stock out trend chart">
-      <ResponsiveContainer height="100%" width="100%">
-        <BarChart data={rows}>
+    <ResponsiveChartFrame
+      ariaLabel="Inventory stock in and stock out trend chart"
+      className="h-80"
+    >
+      {({ height, width }) => (
+        <BarChart data={rows} height={height} width={width}>
           <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
           <XAxis dataKey="label" stroke="#7A553A" />
           <YAxis stroke="#7A553A" />
@@ -40,7 +37,7 @@ export function InventoryTrendChart({ chart }: { chart: InventoryTrendChartData 
             />
           ))}
         </BarChart>
-      </ResponsiveContainer>
-    </div>
+      )}
+    </ResponsiveChartFrame>
   );
 }

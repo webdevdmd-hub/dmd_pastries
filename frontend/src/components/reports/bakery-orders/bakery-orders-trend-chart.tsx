@@ -1,15 +1,9 @@
-import type { JSX } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+"use client";
 
+import type { JSX } from "react";
+import { Bar, BarChart, CartesianGrid, Legend, Tooltip, XAxis, YAxis } from "recharts";
+
+import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
 import type { BakeryOrdersTrendChart as BakeryOrdersTrendChartData } from "@/types/bakery-orders-reports";
 
 export function BakeryOrdersTrendChart({
@@ -25,9 +19,9 @@ export function BakeryOrdersTrendChart({
     return row;
   });
   return (
-    <div className="h-80" aria-label="Bakery orders and revenue trend chart">
-      <ResponsiveContainer height="100%" width="100%">
-        <BarChart data={rows}>
+    <ResponsiveChartFrame ariaLabel="Bakery orders and revenue trend chart" className="h-80">
+      {({ height, width }) => (
+        <BarChart data={rows} height={height} width={width}>
           <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
           <XAxis dataKey="label" stroke="#7A553A" />
           <YAxis stroke="#7A553A" />
@@ -42,7 +36,7 @@ export function BakeryOrdersTrendChart({
             />
           ))}
         </BarChart>
-      </ResponsiveContainer>
-    </div>
+      )}
+    </ResponsiveChartFrame>
   );
 }

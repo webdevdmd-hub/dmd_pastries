@@ -2,10 +2,11 @@
 
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 
 import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
 import { AccessDeniedCard } from "@/components/reports/sales/access-denied-card";
 import { BranchSalesTable } from "@/components/reports/sales/branch-sales-table";
 import { SalesReportEmptyState } from "@/components/reports/sales/sales-report-empty-state";
@@ -111,13 +112,18 @@ export function BranchSalesPageClient(): JSX.Element {
           <CardContent className="space-y-6 p-5">
             {rows.length > 0 ? (
               <>
-                <div className="h-72" aria-label="Branch net sales comparison chart">
-                  <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveChartFrame
+                  ariaLabel="Branch net sales comparison chart"
+                  className="h-72"
+                >
+                  {({ height, width }) => (
                     <BarChart
                       data={rows.map((row) => ({
                         name: row.branchName,
                         value: row.netSales,
                       }))}
+                      height={height}
+                      width={width}
                     >
                       <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
                       <XAxis dataKey="name" stroke="#7A553A" />
@@ -125,8 +131,8 @@ export function BranchSalesPageClient(): JSX.Element {
                       <Tooltip />
                       <Bar dataKey="value" fill="#7A553A" radius={8} />
                     </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                  )}
+                </ResponsiveChartFrame>
                 <BranchSalesTable rows={rows} />
               </>
             ) : (

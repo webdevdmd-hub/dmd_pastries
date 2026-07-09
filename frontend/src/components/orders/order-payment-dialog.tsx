@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -105,6 +106,9 @@ export function OrderPaymentDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add order payment</DialogTitle>
+          <DialogDescription>
+            Record an additional payment against the remaining order balance.
+          </DialogDescription>
         </DialogHeader>
         <form
           className="grid gap-4"
