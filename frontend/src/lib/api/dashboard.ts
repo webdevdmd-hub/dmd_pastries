@@ -378,8 +378,15 @@ function parseActivity(value: unknown): DashboardActivity {
 function parseKpiSummary(value: unknown): KpiSummary {
   const row = isObject(value) ? value : {};
   return {
+    averageOrderValue: numberField(row, "average_order_value"),
     activeBatches: numberField(row, "active_batches"),
+    completedBatches: numberField(row, "completed_batches"),
+    expiringItems: numberField(row, "expiring_items"),
     lowStockCount: numberField(row, "low_stock_count"),
+    pendingOrders: numberField(row, "pending_orders"),
+    readyOrders: numberField(row, "ready_orders"),
+    refundsToday: numberField(row, "refunds_today"),
+    salesCountToday: numberField(row, "sales_count_today"),
     todayCollected: numberField(row, "today_collected"),
     todayOrders: numberField(row, "today_orders"),
     todaySales: numberField(row, "today_sales"),
@@ -430,6 +437,6 @@ export async function getDashboardAlerts(
   return getDashboard(`/api/v1/dashboard/alerts${toSearchParams(filters)}`, parseDashboardAlerts);
 }
 
-export async function getKpiSummary(): Promise<KpiSummary> {
-  return getDashboard("/api/v1/dashboard/kpi-summary", parseKpiSummary);
+export async function getKpiSummary(filters?: DashboardRequestFilters): Promise<KpiSummary> {
+  return getDashboard(`/api/v1/dashboard/kpi-summary${toSearchParams(filters)}`, parseKpiSummary);
 }

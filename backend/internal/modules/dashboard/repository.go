@@ -127,6 +127,26 @@ func adminDashboardFromReportSummary(
 	}
 }
 
+func kpiSummaryFromReportSummary(summary *reports.DashboardSummaryResponse) *KPISummaryResponse {
+	if summary == nil {
+		return &KPISummaryResponse{}
+	}
+	return &KPISummaryResponse{
+		TodaySales:        summary.Sales.TotalSales,
+		TodayOrders:       summary.Orders.PendingOrders + summary.Orders.ReadyOrders,
+		TodayCollected:    summary.Payments.CollectedAmount,
+		RefundsToday:      summary.Payments.RefundAmount,
+		SalesCountToday:   summary.Sales.SalesCount,
+		AverageOrderValue: summary.Sales.AverageOrderValue,
+		PendingOrders:     summary.Orders.PendingOrders,
+		ReadyOrders:       summary.Orders.ReadyOrders,
+		LowStockCount:     summary.Inventory.LowStockCount,
+		ExpiringItems:     summary.Inventory.ExpiringItemsCount,
+		ActiveBatches:     summary.Manufacturing.ActiveBatches,
+		CompletedBatches:  summary.Manufacturing.CompletedBatches,
+	}
+}
+
 func (r *Repository) CashierDashboard(scope Scope, userID string) (*CashierDashboardResponse, error) {
 	sales := CashierSalesWidget{}
 	query := "SELECT COALESCE(SUM(total_amount),0) AS today_sales, COUNT(*) AS sales_count FROM sales WHERE business_id = ? AND cashier_user_id = ? AND sold_at >= ? AND sold_at < ? AND sale_status <> 'voided' AND deleted_at IS NULL"

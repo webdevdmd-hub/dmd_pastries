@@ -127,11 +127,18 @@ type PurchasingSuppliersWidget struct {
 }
 
 type KPISummaryResponse struct {
-	TodaySales     float64 `json:"today_sales"`
-	TodayOrders    int64   `json:"today_orders"`
-	TodayCollected float64 `json:"today_collected"`
-	LowStockCount  int64   `json:"low_stock_count"`
-	ActiveBatches  int64   `json:"active_batches"`
+	TodaySales        float64 `json:"today_sales"`
+	TodayOrders       int64   `json:"today_orders"`
+	TodayCollected    float64 `json:"today_collected"`
+	RefundsToday      float64 `json:"refunds_today"`
+	SalesCountToday   int64   `json:"sales_count_today"`
+	AverageOrderValue float64 `json:"average_order_value"`
+	PendingOrders     int64   `json:"pending_orders"`
+	ReadyOrders       int64   `json:"ready_orders"`
+	LowStockCount     int64   `json:"low_stock_count"`
+	ExpiringItems     int64   `json:"expiring_items"`
+	ActiveBatches     int64   `json:"active_batches"`
+	CompletedBatches  int64   `json:"completed_batches"`
 }
 
 type ActivityFeedItem struct {

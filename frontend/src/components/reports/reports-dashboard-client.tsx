@@ -1,7 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/reports/access-denied-card";
@@ -49,21 +49,26 @@ export function ReportsDashboardClient(): JSX.Element {
   const hasReportBranchScope =
     branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const defaultDraft = useMemo(
-    () => createDefaultDashboardDraft(branchScope.effectiveBranchId ?? ""),
-    [branchScope.effectiveBranchId],
+    () => createDefaultDashboardDraft(branchScope.defaultBranchId),
+    [branchScope.defaultBranchId],
   );
   const [draftFilters, setDraftFilters] = useState<ReportFilterDraft>(defaultDraft);
   const [appliedFilters, setAppliedFilters] = useState<ReportFilters>(() =>
     toDashboardReportFilters(defaultDraft, timezone),
   );
+  useEffect(() => {
+    setDraftFilters(defaultDraft);
+    setAppliedFilters(toDashboardReportFilters(defaultDraft, timezone));
+  }, [defaultDraft, timezone]);
+  const canLoadReportsDashboard = canView && hasReportBranchScope;
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
-  const summaryQuery = useReportsDashboardSummary(appliedFilters, canView && hasReportBranchScope);
-  const salesChartQuery = useSalesReportChart(appliedFilters, canView && hasReportBranchScope);
+  const summaryQuery = useReportsDashboardSummary(appliedFilters, canLoadReportsDashboard);
+  const salesChartQuery = useSalesReportChart(appliedFilters, canLoadReportsDashboard);
   const paymentsChartQuery = usePaymentsReportChart(
     appliedFilters,
-    canView && hasReportBranchScope,
+    canLoadReportsDashboard,
   );
-  const ordersChartQuery = useOrdersReportChart(appliedFilters, canView && hasReportBranchScope);
+  const ordersChartQuery = useOrdersReportChart(appliedFilters, canLoadReportsDashboard);
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -87,6 +92,7 @@ export function ReportsDashboardClient(): JSX.Element {
   };
 
   const handleReset = (): void => {
+    setDraftFilters(defaultDraft);
     setAppliedFilters(toDashboardReportFilters(defaultDraft, timezone));
   };
 

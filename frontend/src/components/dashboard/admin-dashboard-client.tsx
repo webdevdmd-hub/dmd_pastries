@@ -13,7 +13,7 @@ import {
   UserRound,
 } from "lucide-react";
 import type { JSX } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/dashboard/access-denied-card";
@@ -159,25 +159,30 @@ export function AdminDashboardClient(): JSX.Element {
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const timezone = useMemo(resolveDashboardTimezone, []);
   const defaultDraft = useMemo(
-    () => createDefaultDashboardDraft(branchScope.effectiveBranchId ?? ""),
-    [branchScope.effectiveBranchId],
+    () => createDefaultDashboardDraft(branchScope.defaultBranchId),
+    [branchScope.defaultBranchId],
   );
   const [draftFilters, setDraftFilters] = useState<ReportFilterDraft>(defaultDraft);
   const [appliedFilters, setAppliedFilters] = useState<ReportFilters>(() =>
     toDashboardReportFilters(defaultDraft, timezone),
   );
+  useEffect(() => {
+    setDraftFilters(defaultDraft);
+    setAppliedFilters(toDashboardReportFilters(defaultDraft, timezone));
+  }, [defaultDraft, timezone]);
+  const canLoadDashboard = canView && hasScope;
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
-  const dashboardQuery = useAdminDashboard(appliedFilters, canView && hasScope);
-  const salesChartQuery = useSalesChart(appliedFilters, canView && hasScope);
-  const paymentsChartQuery = usePaymentsChart(appliedFilters, canView && hasScope);
-  const ordersChartQuery = useOrdersChart(appliedFilters, canView && hasScope);
+  const dashboardQuery = useAdminDashboard(appliedFilters, canLoadDashboard);
+  const salesChartQuery = useSalesChart(appliedFilters, canLoadDashboard);
+  const paymentsChartQuery = usePaymentsChart(appliedFilters, canLoadDashboard);
+  const ordersChartQuery = useOrdersChart(appliedFilters, canLoadDashboard);
   const manufacturingTrendFilters = useMemo(
     () => toManufacturingTrendFilters(appliedFilters),
     [appliedFilters],
   );
   const manufacturingTrendQuery = useManufacturingTrend(
     manufacturingTrendFilters,
-    canView && hasScope,
+    canLoadDashboard,
   );
 
   if (!canView) return <AccessDeniedCard />;
@@ -197,6 +202,7 @@ export function AdminDashboardClient(): JSX.Element {
   };
 
   const handleReset = (): void => {
+    setDraftFilters(defaultDraft);
     setAppliedFilters(toDashboardReportFilters(defaultDraft, timezone));
   };
 

@@ -93,6 +93,12 @@ export function useDashboardAlerts(
   );
 }
 
-export function useKpiSummary(enabled = true) {
-  return useDashboardQuery<KpiSummary>("kpi-summary", getKpiSummary, enabled);
+export function useKpiSummary(filters?: DashboardRequestFilters, enabled = true) {
+  return useDashboardQuery<KpiSummary>(
+    "kpi-summary",
+    async () => getKpiSummary(filters),
+    enabled,
+    dashboardRefreshMs,
+    filters,
+  );
 }

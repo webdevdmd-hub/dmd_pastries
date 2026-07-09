@@ -19,12 +19,15 @@ import { usePermission } from "@/hooks/use-permission";
 import { useExportReportCsv, useReportBranches, useReportExportOptions } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
 import type { ExportReportSchema } from "@/lib/validators/reports.schema";
-import type { ReportBaseFilters } from "@/types/reports";
+import type { ExportReportDownload, ReportBaseFilters } from "@/types/reports";
 
 type ExportDownloadState = {
   filename: string;
   url: string;
 };
+
+const downloadStartErrorMessage =
+  "The CSV file was generated, but the browser could not start the download. Please try again or check browser download permissions.";
 
 function resolveTimezone(): string {
   try {
@@ -34,13 +37,67 @@ function resolveTimezone(): string {
   }
 }
 
-function triggerDownload(url: string, filename: string): void {
+function clickDownloadAnchor(url: string, filename: string): void {
+  const body = document.querySelector("body");
+
+  if (!body) {
+    throw new Error(downloadStartErrorMessage);
+  }
+
   const anchor = document.createElement("a");
+  if (typeof anchor.click !== "function") {
+    throw new Error(downloadStartErrorMessage);
+  }
+
   anchor.href = url;
   anchor.download = filename;
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
+
+  try {
+    body.append(anchor);
+    anchor.click();
+  } catch {
+    throw new Error(downloadStartErrorMessage);
+  } finally {
+    anchor.remove();
+  }
+}
+
+function announceDownloadTriggered(download: ExportReportDownload): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent("reports:csv-download-triggered", {
+      detail: {
+        filename: download.filename,
+        mimeType: download.contentType,
+        size: download.blob.size,
+      },
+    }),
+  );
+}
+
+function triggerCsvDownload(download: ExportReportDownload): ExportDownloadState {
+  if (typeof URL === "undefined" || typeof URL.createObjectURL !== "function") {
+    throw new Error(downloadStartErrorMessage);
+  }
+
+  const url = URL.createObjectURL(download.blob);
+
+  try {
+    clickDownloadAnchor(url, download.filename);
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+
+  announceDownloadTriggered(download);
+
+  return {
+    filename: download.filename,
+    url,
+  };
 }
 
 export function ReportsExportClient(): JSX.Element {
@@ -142,10 +199,9 @@ export function ReportsExportClient(): JSX.Element {
         filters,
         reportType: values.reportType,
       });
-      const url = URL.createObjectURL(blob.blob);
+      const download = triggerCsvDownload(blob);
 
-      setLatestDownload({ filename: blob.filename, url });
-      triggerDownload(url, blob.filename);
+      setLatestDownload(download);
       toast.success(`${selectedExportOption?.label ?? "Report"} CSV export started: ${blob.filename}`);
     } catch (error) {
       const message = getErrorMessage(error);
@@ -211,7 +267,14 @@ export function ReportsExportClient(): JSX.Element {
         open={dialogOpen}
         onDownloadAgain={() => {
           if (latestDownload) {
-            triggerDownload(latestDownload.url, latestDownload.filename);
+            try {
+              clickDownloadAnchor(latestDownload.url, latestDownload.filename);
+            } catch (error) {
+              const message = getErrorMessage(error);
+
+              setExportError(message);
+              toast.error(message);
+            }
           }
         }}
         onInputChange={clearExportStatus}

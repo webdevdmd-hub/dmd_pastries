@@ -219,15 +219,15 @@ func (s *Service) Alerts(currentUser *utils.AuthContext, values url.Values) (*Al
 }
 
 func (s *Service) KPISummary(currentUser *utils.AuthContext, values url.Values) (*KPISummaryResponse, error) {
-	scope, err := resolveScope(currentUser, values)
+	filter, err := reportshared.Resolve(currentUser, reportshared.ParseQuery(values))
 	if err != nil {
 		return nil, err
 	}
-	result, err := s.repo.KPISummary(scope)
+	summary, err := s.reports.DashboardSummary(filter)
 	if err != nil {
 		return nil, apperrors.Internal("failed to load KPI summary")
 	}
-	return result, nil
+	return kpiSummaryFromReportSummary(summary), nil
 }
 
 func scopeFromReportFilter(filter *reportshared.ResolvedFilter) Scope {

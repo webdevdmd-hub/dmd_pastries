@@ -22,8 +22,15 @@ export type DashboardActivity = {
 };
 
 export type KpiSummary = {
+  averageOrderValue: number;
   activeBatches: number;
+  completedBatches: number;
+  expiringItems: number;
   lowStockCount: number;
+  pendingOrders: number;
+  readyOrders: number;
+  refundsToday: number;
+  salesCountToday: number;
   todayCollected: number;
   todayOrders: number;
   todaySales: number;

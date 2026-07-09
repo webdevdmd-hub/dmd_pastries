@@ -99,6 +99,67 @@ func TestAdminDashboardFromReportSummaryPreservesLoadWarnings(t *testing.T) {
 	}
 }
 
+func TestKPISummaryUsesReportsSummaryForComparableMetrics(t *testing.T) {
+	summary := &reports.DashboardSummaryResponse{
+		Sales: reports.SalesSummary{
+			TotalSales:        222.75,
+			SalesCount:        3,
+			AverageOrderValue: 74.25,
+		},
+		Inventory: reports.InventorySummary{
+			LowStockCount:      4,
+			ExpiringItemsCount: 5,
+		},
+		Manufacturing: reports.ManufacturingSummary{
+			ActiveBatches:    6,
+			CompletedBatches: 7,
+		},
+		Orders: reports.OrdersSummary{
+			PendingOrders: 8,
+			ReadyOrders:   9,
+		},
+		Payments: reports.PaymentsSummary{
+			CollectedAmount: 111.25,
+			RefundAmount:    10.50,
+		},
+	}
+
+	kpi := kpiSummaryFromReportSummary(summary)
+
+	if kpi.TodaySales != summary.Sales.TotalSales {
+		t.Fatalf("KPI sales must match reports summary sales: got %.2f want %.2f", kpi.TodaySales, summary.Sales.TotalSales)
+	}
+	if kpi.TodayCollected != summary.Payments.CollectedAmount {
+		t.Fatalf("KPI collections must match reports summary: got %.2f want %.2f", kpi.TodayCollected, summary.Payments.CollectedAmount)
+	}
+	if kpi.RefundsToday != summary.Payments.RefundAmount {
+		t.Fatalf("KPI refunds must match reports summary: got %.2f want %.2f", kpi.RefundsToday, summary.Payments.RefundAmount)
+	}
+	if kpi.SalesCountToday != summary.Sales.SalesCount {
+		t.Fatalf("KPI sales count must match reports summary: got %d want %d", kpi.SalesCountToday, summary.Sales.SalesCount)
+	}
+	if kpi.AverageOrderValue != summary.Sales.AverageOrderValue {
+		t.Fatalf("KPI average order must match reports summary: got %.2f want %.2f", kpi.AverageOrderValue, summary.Sales.AverageOrderValue)
+	}
+	if kpi.TodayOrders != summary.Orders.PendingOrders+summary.Orders.ReadyOrders {
+		t.Fatalf("KPI today orders = %d, want pending + ready orders", kpi.TodayOrders)
+	}
+	if kpi.LowStockCount != summary.Inventory.LowStockCount || kpi.ExpiringItems != summary.Inventory.ExpiringItemsCount {
+		t.Fatalf("KPI inventory must match reports summary: got %#v want %#v", kpi, summary.Inventory)
+	}
+	if kpi.ActiveBatches != summary.Manufacturing.ActiveBatches || kpi.CompletedBatches != summary.Manufacturing.CompletedBatches {
+		t.Fatalf("KPI manufacturing must match reports summary: got %#v want %#v", kpi, summary.Manufacturing)
+	}
+}
+
+func TestKPISummaryFromNilReportsSummaryReturnsZeroValues(t *testing.T) {
+	kpi := kpiSummaryFromReportSummary(nil)
+
+	if *kpi != (KPISummaryResponse{}) {
+		t.Fatalf("nil reports summary KPI = %#v, want zero-value response", kpi)
+	}
+}
+
 func TestAdminDashboardLoadErrorIncludesSegmentAndFilterDetails(t *testing.T) {
 	filter := &reportshared.ResolvedFilter{
 		BranchID:    "11111111-1111-1111-1111-111111111111",
