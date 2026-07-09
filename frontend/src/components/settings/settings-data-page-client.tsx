@@ -103,15 +103,17 @@ function StatusBadge({ status }: { status: "active" | "inactive" }): JSX.Element
   return <Badge variant={status === "active" ? "secondary" : "default"}>{status}</Badge>;
 }
 
-const taxRateDefaultValues: TaxRateSchema = {
-  taxName: "",
-  taxType: "VAT",
-  ratePercentage: 0,
-  isInclusive: false,
-  country: "AE",
-  region: "",
-  isDefault: false,
-};
+function blankTaxRateDefaults(): TaxRateSchema {
+  return {
+    taxName: "",
+    taxType: "VAT",
+    ratePercentage: 0,
+    isInclusive: false,
+    country: "AE",
+    region: "",
+    isDefault: false,
+  };
+}
 
 const paymentMethodDefaultValues: PaymentMethodSchema = {
   methodName: "",
@@ -559,7 +561,7 @@ function CompanySettingsDialog({
 
 function toTaxRateForm(taxRate: TaxRate | null): TaxRateSchema {
   if (!taxRate) {
-    return taxRateDefaultValues;
+    return blankTaxRateDefaults();
   }
 
   return {
@@ -600,7 +602,7 @@ function TaxRateDialog({
 }): JSX.Element {
   const form = useForm<TaxRateSchema>({
     resolver: zodResolver(taxRateSchema),
-    defaultValues: taxRateDefaultValues,
+    defaultValues: blankTaxRateDefaults(),
   });
 
   useEffect(() => {
@@ -710,7 +712,10 @@ function TaxRateDialog({
               render={({ field }) => (
                 <FormItem className="flex items-center gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/70 p-4">
                   <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
                   </FormControl>
                   <div>
                     <FormLabel>Tax inclusive</FormLabel>
@@ -725,7 +730,10 @@ function TaxRateDialog({
               render={({ field }) => (
                 <FormItem className="flex items-center gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/70 p-4">
                   <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
                   </FormControl>
                   <div>
                     <FormLabel>Default tax rate</FormLabel>
