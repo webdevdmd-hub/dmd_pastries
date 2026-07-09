@@ -149,6 +149,9 @@ type BackendPlatformSettlementPayload = {
   settlement_date: string;
 };
 
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -159,6 +162,10 @@ function stringValue(value: unknown, fallback = ""): string {
 
 function optionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function isUuid(value: string): boolean {
+  return uuidPattern.test(value);
 }
 
 function booleanValue(value: unknown, fallback = false): boolean {
@@ -1819,9 +1826,14 @@ export async function createPlatformSettlement(
 export async function getGeneralLedgerReport(
   filters: GeneralLedgerFilters,
 ): Promise<GeneralLedgerResponse> {
+  const accountId = filters.accountId.trim();
+  if (accountId.length > 0 && !isUuid(accountId)) {
+    throw new Error("General Ledger account filter must be a chart account ID.");
+  }
+
   const response = await apiRequest<GeneralLedgerResponse>(
     `/api/v1/accounting/reports/general-ledger${toQueryString({
-      account_id: filters.accountId,
+      account_id: accountId,
       branch_id: filters.branchId,
       date_from: filters.dateFrom,
       date_to: filters.dateTo,

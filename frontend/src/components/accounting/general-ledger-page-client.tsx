@@ -32,13 +32,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PERMISSIONS } from "@/constants/permissions";
-import { useChartAccounts, useGeneralLedgerReport } from "@/hooks/use-accounting";
+import {
+  useAllChartAccounts,
+  useChartAccount,
+  useGeneralLedgerReport,
+} from "@/hooks/use-accounting";
 import { useBranches } from "@/hooks/use-branches";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 import type { GeneralLedgerFilters } from "@/types/accounting";
 
 const allValue = "all";
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function dateInputValue(date: Date): string {
   const year = date.getFullYear();
@@ -83,17 +89,22 @@ function updateFilters(
   }));
 }
 
+function isUuid(value: string): boolean {
+  return uuidPattern.test(value);
+}
+
 export function GeneralLedgerPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.accountingView]);
   const canLoadBranches = hasAnyPermission([PERMISSIONS.branchesView, PERMISSIONS.branchesSwitch]);
   const [filters, setFilters] = useState<GeneralLedgerFilters>(defaultLedgerFilters);
-  const ledgerQuery = useGeneralLedgerReport(filters, canView);
-  const accountsQuery = useChartAccounts(
+  const hasInvalidAccountId = filters.accountId.length > 0 && !isUuid(filters.accountId);
+  const ledgerQuery = useGeneralLedgerReport(filters, canView && !hasInvalidAccountId);
+  const accountsQuery = useAllChartAccounts(
     {
       accountGroup: "",
       accountType: "all",
-      limit: 500,
+      limit: 100,
       page: 1,
       parentAccountId: "",
       search: "",
@@ -104,7 +115,15 @@ export function GeneralLedgerPageClient(): JSX.Element {
     canView,
   );
   const branchesQuery = useBranches(canView && canLoadBranches);
-  const accounts = useMemo(() => accountsQuery.data?.items ?? [], [accountsQuery.data?.items]);
+  const accounts = useMemo(() => accountsQuery.data ?? [], [accountsQuery.data]);
+  const selectedAccountMissingFromList =
+    filters.accountId.length > 0 &&
+    !hasInvalidAccountId &&
+    !accounts.some((account) => account.id === filters.accountId);
+  const selectedAccountQuery = useChartAccount(
+    filters.accountId || null,
+    canView && selectedAccountMissingFromList,
+  );
   const branches = useMemo(
     () => (branchesQuery.data ?? []).filter((branch) => branch.status === "active"),
     [branchesQuery.data],
@@ -118,6 +137,20 @@ export function GeneralLedgerPageClient(): JSX.Element {
       return null;
     }
 
+    const fallbackAccount = selectedAccountQuery.data;
+    if (fallbackAccount?.id === filters.accountId) {
+      return {
+        description: `${fallbackAccount.accountType.replace(/_/g, " ")} - loaded from account lookup`,
+        keywords: [
+          fallbackAccount.accountCode,
+          fallbackAccount.accountName,
+          fallbackAccount.accountType,
+        ],
+        label: `${fallbackAccount.accountCode} - ${fallbackAccount.accountName}`,
+        value: fallbackAccount.id,
+      };
+    }
+
     const reportAccount = ledger?.account;
     if (reportAccount?.accountId !== filters.accountId) {
       return null;
@@ -129,7 +162,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
       label: `${reportAccount.accountCode} - ${reportAccount.accountName}`,
       value: reportAccount.accountId,
     };
-  }, [accounts, filters.accountId, ledger?.account]);
+  }, [accounts, filters.accountId, ledger?.account, selectedAccountQuery.data]);
   const accountOptions = useMemo<SearchableSelectOption[]>(
     () => [
       {
@@ -251,14 +284,35 @@ export function GeneralLedgerPageClient(): JSX.Element {
         </div>
       </div>
 
-      {ledgerQuery.isLoading ? (
+      {hasInvalidAccountId ? (
+        <Card className="border-red-200 bg-red-50/70">
+          <CardContent className="flex min-h-64 flex-col items-center justify-center gap-4 text-center">
+            <h2 className="text-2xl font-semibold text-brand-espresso">
+              Unable to load General Ledger
+            </h2>
+            <p className="max-w-xl text-sm text-brand-mocha">
+              Select a chart account from the list. General Ledger account filters must use a chart
+              account ID, not an account code or name.
+            </p>
+            <Button
+              onClick={() => updateFilters(setFilters, { accountId: "" })}
+              type="button"
+              variant="outline"
+            >
+              Clear account filter
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {!hasInvalidAccountId && ledgerQuery.isLoading ? (
         <div className="grid gap-3">
           <Skeleton className="h-24 rounded-2xl" />
           <Skeleton className="h-72 rounded-3xl" />
         </div>
       ) : null}
 
-      {!ledgerQuery.isLoading && ledgerQuery.error ? (
+      {!hasInvalidAccountId && !ledgerQuery.isLoading && ledgerQuery.error ? (
         <Card className="border-red-200 bg-red-50/70">
           <CardContent className="flex min-h-64 flex-col items-center justify-center gap-4 text-center">
             <h2 className="text-2xl font-semibold text-brand-espresso">
@@ -274,7 +328,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
         </Card>
       ) : null}
 
-      {!ledgerQuery.isLoading && !ledgerQuery.error && ledger ? (
+      {!hasInvalidAccountId && !ledgerQuery.isLoading && !ledgerQuery.error && ledger ? (
         <>
           <div className={`grid gap-3 ${showRunningBalance ? "md:grid-cols-4" : "md:grid-cols-2"}`}>
             {showRunningBalance ? (
