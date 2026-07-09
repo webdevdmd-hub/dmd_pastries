@@ -34,6 +34,7 @@ import { usePermission } from "@/hooks/use-permission";
 import { useProductReferenceData, useProducts } from "@/hooks/use-products";
 import { useSalesChannels } from "@/hooks/use-settings-data";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { toDateOnlyInputValue, todayDateOnly } from "@/lib/utils/date-only";
 import { createOrderSchema } from "@/lib/validators/orders.schema";
 import type { Branch } from "@/types/branch";
 import type { DocumentChargeDraft } from "@/types/document-charges";
@@ -44,10 +45,6 @@ import type {
   CreateOrderPayload,
   OrderType,
 } from "@/types/orders";
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function isPermissionDenied(error: unknown): boolean {
   return error instanceof ApiError && error.status === 403;
@@ -230,7 +227,7 @@ export function OrderFormPage({
   const [salesChannelId, setSalesChannelId] = useState("");
   const [externalOrderNumber, setExternalOrderNumber] = useState("");
   const [orderType, setOrderType] = useState<OrderType>("pickup");
-  const [eventDate, setEventDate] = useState(today());
+  const [eventDate, setEventDate] = useState(todayDateOnly());
   const [pickupTime, setPickupTime] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
@@ -257,7 +254,7 @@ export function OrderFormPage({
     setSalesChannelId(order.salesChannelId ?? "");
     setExternalOrderNumber(order.externalOrderNumber ?? "");
     setOrderType(order.orderType);
-    setEventDate(order.eventDate.slice(0, 10));
+    setEventDate(toDateOnlyInputValue(order.eventDate));
     setPickupTime(order.pickupTime ?? "");
     setDeliveryTime(order.deliveryTime ?? "");
     setDeliveryAddress(order.deliveryAddress ?? "");

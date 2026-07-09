@@ -1,3 +1,5 @@
+import { formatDateOnly } from "@/lib/utils/date-only";
+
 const currencyFormatter = new Intl.NumberFormat("en-AE", {
   currency: "AED",
   maximumFractionDigits: 2,
@@ -39,11 +41,5 @@ export function formatPercent(value: number): string {
 }
 
 export function formatDate(value: string): string {
-  if (!value) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("en-AE", {
-    dateStyle: "medium",
-  }).format(new Date(value));
+  return formatDateOnly(value);
 }

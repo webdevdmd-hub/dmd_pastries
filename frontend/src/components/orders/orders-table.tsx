@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDateOnly } from "@/lib/utils/date-only";
 import type { BakeryOrder, OrderStatus } from "@/types/orders";
 
 function formatMoney(value: number): string {
@@ -17,11 +18,7 @@ function formatMoney(value: number): string {
 }
 
 function formatDate(value: string): string {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(new Date(value));
+  return formatDateOnly(value, "Not set");
 }
 
 export function OrdersTable({

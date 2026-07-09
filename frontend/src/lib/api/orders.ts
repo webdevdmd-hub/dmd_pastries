@@ -4,6 +4,7 @@ import {
   parseDocumentCharges,
   toBackendDocumentChargePayload,
 } from "@/lib/api/document-charges";
+import { toDateOnlyInputValue } from "@/lib/utils/date-only";
 import type {
   AddOrderPackagingPayload,
   AddOrderPaymentPayload,
@@ -279,7 +280,7 @@ function parseOrder(value: unknown): BakeryOrder {
     externalOrderNumber: optionalString(value.external_order_number),
     orderType: isOrderType(value.order_type) ? value.order_type : "pickup",
     orderDate: stringValue(value.order_date),
-    eventDate: stringValue(value.event_date),
+    eventDate: toDateOnlyInputValue(stringValue(value.event_date)),
     pickupTime: optionalString(value.pickup_time),
     deliveryTime: optionalString(value.delivery_time),
     deliveryAddress: optionalString(value.delivery_address),
@@ -502,7 +503,9 @@ function orderPayload(payload: CreateOrderPayload | UpdateOrderPayload): Backend
       ? { external_order_number: requestString(payload.externalOrderNumber) }
       : {}),
     ...(payload.orderType !== undefined ? { order_type: payload.orderType } : {}),
-    ...(payload.eventDate !== undefined ? { event_date: payload.eventDate } : {}),
+    ...(payload.eventDate !== undefined
+      ? { event_date: toDateOnlyInputValue(payload.eventDate) }
+      : {}),
     ...(payload.pickupTime !== undefined ? { pickup_time: requestString(payload.pickupTime) } : {}),
     ...(payload.deliveryTime !== undefined
       ? { delivery_time: requestString(payload.deliveryTime) }

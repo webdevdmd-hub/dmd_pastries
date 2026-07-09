@@ -20,6 +20,7 @@ import { useBatches } from "@/hooks/use-manufacturing";
 import { useAssignProduction, useCreateOrderItemProduction } from "@/hooks/use-orders";
 import { useRecipeByProduct, useRecipeIngredients, useRecipeLookup } from "@/hooks/use-recipes";
 import { getErrorMessage } from "@/lib/api/client";
+import { toDateOnlyInputValue } from "@/lib/utils/date-only";
 import type { BakeryOrder } from "@/types/orders";
 import type { Recipe } from "@/types/recipes";
 
@@ -34,10 +35,6 @@ type ProductionItemForm = {
 
 const NO_VALID_RECIPE_MESSAGE =
   "No valid recipe found for this product. Please create or select a recipe before creating production.";
-
-function dateInputValue(value: string): string {
-  return value.length >= 10 ? value.slice(0, 10) : "";
-}
 
 function isActiveRecipe(recipe: Recipe | undefined): recipe is Recipe {
   return recipe !== undefined && recipe.isActive && recipe.status === "active";
@@ -59,7 +56,7 @@ export function OrderProductionSection({
     itemId: "",
     notes: "",
     plannedQuantity: "",
-    productionDate: order ? dateInputValue(order.eventDate) : "",
+    productionDate: order ? toDateOnlyInputValue(order.eventDate) : "",
     recipeId: "",
     recipeSearch: "",
   });
@@ -230,7 +227,7 @@ export function OrderProductionSection({
                       ? `Bakery order ${order.orderNumber} item ${item.itemNameSnapshot}`
                       : current.notes,
                     plannedQuantity: item ? String(item.quantity) : current.plannedQuantity,
-                    productionDate: dateInputValue(order.eventDate),
+                    productionDate: toDateOnlyInputValue(order.eventDate),
                     recipeId: "",
                     recipeSearch: "",
                   }));
@@ -344,7 +341,7 @@ export function OrderProductionSection({
                     itemId: "",
                     notes: "",
                     plannedQuantity: "",
-                    productionDate: dateInputValue(order.eventDate),
+                    productionDate: toDateOnlyInputValue(order.eventDate),
                     recipeId: "",
                     recipeSearch: "",
                   });

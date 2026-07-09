@@ -6,6 +6,7 @@ import { OrderActionsMenu } from "@/components/orders/order-actions-menu";
 import { OrderPaymentStatusBadge, OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { Card } from "@/components/ui/card";
 import { ROUTES } from "@/constants/routes";
+import { formatDateOnly } from "@/lib/utils/date-only";
 import type { BakeryOrder, OrderStatus } from "@/types/orders";
 
 function formatMoney(value: number): string {
@@ -13,11 +14,7 @@ function formatMoney(value: number): string {
 }
 
 function formatDate(value: string): string {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(new Date(value));
+  return formatDateOnly(value, "Not set");
 }
 
 function formatOrderType(value: string): string {

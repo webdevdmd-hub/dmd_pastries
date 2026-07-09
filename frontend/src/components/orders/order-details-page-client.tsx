@@ -20,6 +20,7 @@ import { ROUTES } from "@/constants/routes";
 import { useOrder, useUpdateOrderStatus } from "@/hooks/use-orders";
 import { usePermission } from "@/hooks/use-permission";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { formatDateOnly } from "@/lib/utils/date-only";
 import type { OrderStatus } from "@/types/orders";
 
 function formatCurrency(value: number): string {
@@ -102,7 +103,7 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
               </h2>
               <p className="text-brand-mocha">{order.customerPhoneSnapshot ?? "No phone number"}</p>
               <p className="mt-2 text-sm text-brand-mocha">
-                {order.orderType} - Event {new Date(order.eventDate).toLocaleDateString("en-AE")}
+                {order.orderType} - Event {formatDateOnly(order.eventDate, "Not set")}
               </p>
             </div>
             <div className="grid gap-2 text-right">
