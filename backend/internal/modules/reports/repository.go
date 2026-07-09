@@ -60,6 +60,14 @@ const (
 	financialTransactionsSource   = "financial_transactions"
 )
 
+func reportGrossSaleStatusCondition(alias string) string {
+	return alias + ".sale_status IN ('completed','partially_refunded','refunded')"
+}
+
+func reportActiveSaleStatusCondition(alias string) string {
+	return alias + ".sale_status IN ('completed','partially_refunded')"
+}
+
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
@@ -101,18 +109,15 @@ func (r *Repository) DashboardSummary(filter *shared.ResolvedFilter) (*Dashboard
 }
 
 func (r *Repository) SalesChart(filter *shared.ResolvedFilter) ([]shared.ChartPoint, error) {
-	rows := []timeSeriesRow{}
-	query, args := baseTimeSeriesQuery(
-		"sold_at",
-		"SUM(total_amount)",
-		"sales",
-		"sale_status <> 'voided' AND deleted_at IS NULL",
-		filter,
-	)
-	if err := r.db.Raw(query, args...).Scan(&rows).Error; err != nil {
+	rows, err := r.SalesTrend(filter)
+	if err != nil {
 		return nil, err
 	}
-	return toChartPoints(rows, filter.GroupBy), nil
+	points := make([]shared.ChartPoint, 0, len(rows))
+	for _, row := range rows {
+		points = append(points, shared.ChartPoint{Label: formatBucket(row.Bucket, filter.GroupBy), Value: row.NetSales})
+	}
+	return points, nil
 }
 
 func (r *Repository) PaymentsChart(filter *shared.ResolvedFilter) ([]shared.ChartPoint, error) {
@@ -683,14 +688,14 @@ func (r *Repository) DailySalesReport(filter *shared.ResolvedFilter) ([]DailySal
 		SELECT %s AS bucket,
 			COALESCE(SUM(s.subtotal_amount),0) AS gross_sales,
 			COALESCE(SUM(s.total_amount),0) AS net_sales,
-			COUNT(DISTINCT s.id) AS sales_count,
+			COUNT(DISTINCT s.id) FILTER (WHERE %s) AS sales_count,
 			COALESCE(SUM(si.quantity),0) AS items_sold,
 			COALESCE(SUM(s.discount_amount),0) + COALESCE(SUM(si.discount_amount),0) AS discount_total,
 			COALESCE(SUM(s.tax_amount),0) AS tax_total
 		FROM sales s
 		LEFT JOIN sale_items si ON si.sale_id = s.id
 		LEFT JOIN products p ON p.id = si.product_id
-		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.sale_status <> 'voided' AND s.deleted_at IS NULL`, dateTrunc(filter.GroupBy, "s.sold_at"))
+		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND %s AND s.deleted_at IS NULL`, dateTrunc(filter.GroupBy, "s.sold_at"), reportActiveSaleStatusCondition("s"), reportGrossSaleStatusCondition("s"))
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
 	query, args = addSalesFilters(query, args, filter)
 	query += " GROUP BY bucket ORDER BY bucket ASC"
@@ -734,7 +739,7 @@ func (r *Repository) SalesByProduct(filter *shared.ResolvedFilter) ([]ProductSal
 			FROM sale_items si
 			JOIN sales s ON s.id = si.sale_id
 			LEFT JOIN products p ON p.id = si.product_id
-			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.sale_status <> 'voided' AND s.deleted_at IS NULL`
+			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND ` + reportGrossSaleStatusCondition("s") + ` AND s.deleted_at IS NULL`
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
 	query, args = addSalesFilters(query, args, filter)
 	query += `
@@ -772,14 +777,14 @@ func (r *Repository) SalesByCategory(filter *shared.ResolvedFilter) ([]CategoryS
 		FROM (
 			SELECT pc.id::text AS category_id, pc.category_name,
 				COALESCE(SUM(si.quantity),0) AS quantity_sold,
-				COUNT(DISTINCT s.id) AS sales_count,
+				COUNT(DISTINCT s.id) FILTER (WHERE ` + reportActiveSaleStatusCondition("s") + `) AS sales_count,
 				COALESCE(SUM(si.line_subtotal),0) AS gross_sales,
 				COALESCE(SUM(si.line_total),0) AS net_sales
 			FROM sale_items si
 			JOIN sales s ON s.id = si.sale_id
 			JOIN products p ON p.id = si.product_id
 			JOIN product_categories pc ON pc.id = p.category_id
-			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.sale_status <> 'voided' AND s.deleted_at IS NULL`
+			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND ` + reportGrossSaleStatusCondition("s") + ` AND s.deleted_at IS NULL`
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
 	query, args = addSalesFilters(query, args, filter)
 	query += `
@@ -815,10 +820,10 @@ func (r *Repository) SalesByCashier(filter *shared.ResolvedFilter) ([]CashierSal
 			COALESCE(SUM(void_count),0) AS void_count
 		FROM (
 			SELECT s.cashier_user_id, u.full_name AS cashier_name,
-				COUNT(DISTINCT s.id) FILTER (WHERE s.sale_status <> 'voided') AS sales_count,
-				COALESCE(SUM(si.quantity) FILTER (WHERE s.sale_status <> 'voided'),0) AS items_sold,
-				COALESCE(SUM(s.subtotal_amount) FILTER (WHERE s.sale_status <> 'voided'),0) AS gross_sales,
-				COALESCE(SUM(s.total_amount) FILTER (WHERE s.sale_status <> 'voided'),0) AS net_sales,
+				COUNT(DISTINCT s.id) FILTER (WHERE ` + reportActiveSaleStatusCondition("s") + `) AS sales_count,
+				COALESCE(SUM(si.quantity) FILTER (WHERE ` + reportGrossSaleStatusCondition("s") + `),0) AS items_sold,
+				COALESCE(SUM(s.subtotal_amount) FILTER (WHERE ` + reportGrossSaleStatusCondition("s") + `),0) AS gross_sales,
+				COALESCE(SUM(s.total_amount) FILTER (WHERE ` + reportGrossSaleStatusCondition("s") + `),0) AS net_sales,
 				0 AS refund_count,
 				COUNT(DISTINCT s.id) FILTER (WHERE s.sale_status = 'voided') AS void_count
 			FROM sales s
@@ -863,7 +868,7 @@ func (r *Repository) SalesByBranch(filter *shared.ResolvedFilter) ([]BranchSales
 			COALESCE(SUM(tax_total),0) AS tax_total
 		FROM (
 			SELECT s.branch_id, b.branch_name,
-				COUNT(DISTINCT s.id) AS sales_count,
+				COUNT(DISTINCT s.id) FILTER (WHERE ` + reportActiveSaleStatusCondition("s") + `) AS sales_count,
 				COALESCE(SUM(si.quantity),0) AS items_sold,
 				COALESCE(SUM(s.subtotal_amount),0) AS gross_sales,
 				COALESCE(SUM(s.total_amount),0) AS net_sales,
@@ -872,7 +877,7 @@ func (r *Repository) SalesByBranch(filter *shared.ResolvedFilter) ([]BranchSales
 			JOIN branches b ON b.id = s.branch_id
 			LEFT JOIN sale_items si ON si.sale_id = s.id
 			LEFT JOIN products p ON p.id = si.product_id
-			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.sale_status <> 'voided' AND s.deleted_at IS NULL`
+			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND ` + reportGrossSaleStatusCondition("s") + ` AND s.deleted_at IS NULL`
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
 	query, args = addSalesFilters(query, args, filter)
 	query += `
@@ -912,7 +917,7 @@ func (r *Repository) DiscountReport(filter *shared.ResolvedFilter) (*DiscountRep
 		FROM sales s
 		LEFT JOIN sale_items si ON si.sale_id = s.id
 		LEFT JOIN products p ON p.id = si.product_id
-		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.sale_status <> 'voided' AND s.deleted_at IS NULL`
+		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND ` + reportGrossSaleStatusCondition("s") + ` AND s.deleted_at IS NULL`
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
 	query, args = addSalesFilters(query, args, filter)
 	if err := r.db.Raw(query, args...).Scan(&summary).Error; err != nil {
@@ -934,7 +939,7 @@ func (r *Repository) DiscountReport(filter *shared.ResolvedFilter) (*DiscountRep
 		JOIN users u ON u.id = s.cashier_user_id
 		LEFT JOIN sale_items si ON si.sale_id = s.id
 		LEFT JOIN products p ON p.id = si.product_id
-		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.sale_status <> 'voided' AND s.deleted_at IS NULL`
+		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND ` + reportGrossSaleStatusCondition("s") + ` AND s.deleted_at IS NULL`
 	itemArgs := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
 	itemQuery, itemArgs = addSalesFilters(itemQuery, itemArgs, filter)
 	itemQuery += " GROUP BY s.id, s.sale_number, u.full_name, s.discount_type, s.discount_amount, s.total_amount, s.sold_at HAVING (s.discount_amount + COALESCE(SUM(si.discount_amount),0)) > 0 ORDER BY s.sold_at DESC LIMIT ? OFFSET ?"
@@ -967,11 +972,11 @@ func (r *Repository) TaxReport(filter *shared.ResolvedFilter) ([]TaxReportItem, 
 				COALESCE(si.tax_rate_percentage_snapshot,0) AS tax_percentage,
 				COALESCE(SUM(si.line_subtotal - si.discount_amount),0) AS taxable_amount,
 				COALESCE(SUM(si.tax_amount),0) AS tax_collected,
-				COUNT(DISTINCT s.id) AS sales_count
+				COUNT(DISTINCT s.id) FILTER (WHERE ` + reportActiveSaleStatusCondition("s") + `) AS sales_count
 			FROM sale_items si
 			JOIN sales s ON s.id = si.sale_id
 			LEFT JOIN products p ON p.id = si.product_id
-			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.sale_status <> 'voided' AND s.deleted_at IS NULL`
+			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND ` + reportGrossSaleStatusCondition("s") + ` AND s.deleted_at IS NULL`
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
 	query, args = addSalesFilters(query, args, filter)
 	query += `
@@ -1014,7 +1019,7 @@ func (r *Repository) TopProducts(filter *shared.ResolvedFilter) ([]ProductSalesR
 			FROM sale_items si
 			JOIN sales s ON s.id = si.sale_id
 			LEFT JOIN products p ON p.id = si.product_id
-			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.sale_status <> 'voided' AND s.deleted_at IS NULL`
+			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND ` + reportGrossSaleStatusCondition("s") + ` AND s.deleted_at IS NULL`
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
 	query, args = addSalesFilters(query, args, filter)
 	query += `
@@ -1064,21 +1069,75 @@ func (r *Repository) SlowMovingProducts(filter *shared.ResolvedFilter) ([]SlowMo
 }
 
 func slowMovingProductsSQL(filter *shared.ResolvedFilter) (string, []interface{}) {
-	query := `
-		SELECT p.id AS product_id, p.product_name,
+	salesQuery := `
+		SELECT si.product_id,
 			COALESCE(SUM(si.quantity),0) AS quantity_sold,
 			COALESCE(SUM(si.line_total),0) AS net_sales,
 			MAX(s.sold_at) AS last_sold_at
+		FROM sale_items si
+		JOIN sales s ON s.id = si.sale_id
+		LEFT JOIN products sale_product ON sale_product.id = si.product_id
+		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND ` + reportGrossSaleStatusCondition("s") + ` AND s.deleted_at IS NULL`
+	salesArgs := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
+	if !filter.AllBranches {
+		salesQuery += " AND s.branch_id = ?"
+		salesArgs = append(salesArgs, filter.BranchID)
+	}
+	if filter.CashierUserID != "" {
+		salesQuery += " AND s.cashier_user_id = ?"
+		salesArgs = append(salesArgs, filter.CashierUserID)
+	}
+	if filter.PaymentStatus != "" {
+		salesQuery += " AND s.payment_status = ?"
+		salesArgs = append(salesArgs, filter.PaymentStatus)
+	}
+	if filter.SaleStatus != "" {
+		salesQuery += " AND s.sale_status = ?"
+		salesArgs = append(salesArgs, filter.SaleStatus)
+	}
+	if filter.ProductID != "" {
+		salesQuery += " AND si.product_id = ?"
+		salesArgs = append(salesArgs, filter.ProductID)
+	}
+	if filter.CategoryID != "" {
+		salesQuery += " AND sale_product.category_id = ?"
+		salesArgs = append(salesArgs, filter.CategoryID)
+	}
+	salesQuery += " GROUP BY si.product_id"
+
+	refundsQuery, refundArgs := salesRefundAllocationsSQL(filter, filter.StartUTC, filter.EndUTC)
+
+	query := `
+		SELECT p.id AS product_id, p.product_name,
+			COALESCE(sales.quantity_sold,0) - COALESCE(refunds.refund_quantity,0) AS quantity_sold,
+			COALESCE(sales.net_sales,0) - COALESCE(refunds.refund_amount,0) AS net_sales,
+			sales.last_sold_at AS last_sold_at
 		FROM products p
-		LEFT JOIN sale_items si ON si.product_id = p.id
-		LEFT JOIN sales s ON s.id = si.sale_id AND s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.sale_status <> 'voided' AND s.deleted_at IS NULL
+		LEFT JOIN (` + salesQuery + `) sales ON sales.product_id = p.id
+		LEFT JOIN (
+			SELECT product_id,
+				COALESCE(SUM(refund_quantity),0) AS refund_quantity,
+				COALESCE(SUM(refund_amount),0) AS refund_amount
+			FROM (` + refundsQuery + `) refund_allocations
+			GROUP BY product_id
+		) refunds ON refunds.product_id = p.id
 		WHERE p.business_id = ? AND p.status = 'active' AND p.is_sellable = TRUE AND p.is_pos_visible = TRUE AND p.deleted_at IS NULL`
-	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC, filter.BusinessID}
+	args := append([]interface{}{}, salesArgs...)
+	args = append(args, refundArgs...)
+	args = append(args, filter.BusinessID)
 	if !filter.AllBranches {
 		query += " AND p.branch_id = ?"
 		args = append(args, filter.BranchID)
 	}
-	query += " GROUP BY p.id, p.product_name ORDER BY quantity_sold ASC, net_sales ASC LIMIT ? OFFSET ?"
+	if filter.ProductID != "" {
+		query += " AND p.id = ?"
+		args = append(args, filter.ProductID)
+	}
+	if filter.CategoryID != "" {
+		query += " AND p.category_id = ?"
+		args = append(args, filter.CategoryID)
+	}
+	query += " ORDER BY quantity_sold ASC, net_sales ASC LIMIT ? OFFSET ?"
 	args = append(args, filter.Limit, (filter.Page-1)*filter.Limit)
 	return query, args
 }
@@ -1088,11 +1147,11 @@ func (r *Repository) SalesTrend(filter *shared.ResolvedFilter) ([]trendSeriesRow
 	query := fmt.Sprintf(`
 		SELECT %s AS bucket,
 			COALESCE(SUM(s.total_amount),0) AS net_sales,
-			COUNT(DISTINCT s.id)::numeric AS sales_count
+			COUNT(DISTINCT s.id) FILTER (WHERE %s)::numeric AS sales_count
 		FROM sales s
 		LEFT JOIN sale_items si ON si.sale_id = s.id
 		LEFT JOIN products p ON p.id = si.product_id
-		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.sale_status <> 'voided' AND s.deleted_at IS NULL`, dateTrunc(filter.GroupBy, "s.sold_at"))
+		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND %s AND s.deleted_at IS NULL`, dateTrunc(filter.GroupBy, "s.sold_at"), reportActiveSaleStatusCondition("s"), reportGrossSaleStatusCondition("s"))
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
 	query, args = addSalesFilters(query, args, filter)
 	query += " GROUP BY bucket ORDER BY bucket ASC"
@@ -2247,23 +2306,14 @@ func (r *Repository) FinancialTrend(filter *shared.ResolvedFilter) ([]trendSerie
 }
 
 func (r *Repository) salesSummary(filter *shared.ResolvedFilter) (*SalesSummary, error) {
-	var salesCount int64
-	query := "SELECT COUNT(*) FROM sales WHERE business_id = ? AND sold_at >= ? AND sold_at < ? AND sale_status <> 'voided' AND deleted_at IS NULL"
-	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	query, args = addBranchCondition(query, args, filter)
-	if err := r.db.Raw(query, args...).Scan(&salesCount).Error; err != nil {
-		return nil, err
-	}
-	ledger, err := r.ledgerFinancialTotals(filter, filter.StartUTC, filter.EndUTC)
+	report, err := r.salesReportSummaryForRange(filter, filter.StartUTC, filter.EndUTC)
 	if err != nil {
 		return nil, err
 	}
 	row := SalesSummary{
-		TotalSales: ledger.Revenue,
-		SalesCount: salesCount,
-	}
-	if salesCount > 0 {
-		row.AverageOrderValue = roundMoney(row.TotalSales / float64(salesCount))
+		TotalSales:        report.NetSales,
+		SalesCount:        report.SalesCount,
+		AverageOrderValue: report.AverageOrderValue,
 	}
 	return &row, nil
 }
@@ -2273,14 +2323,14 @@ func (r *Repository) salesReportSummaryForRange(filter *shared.ResolvedFilter, s
 	query := `
 		SELECT COALESCE(SUM(s.subtotal_amount),0) AS gross_sales,
 			COALESCE(SUM(s.total_amount),0) AS net_sales,
-			COUNT(DISTINCT s.id) AS sales_count,
+			COUNT(DISTINCT s.id) FILTER (WHERE ` + reportActiveSaleStatusCondition("s") + `) AS sales_count,
 			COALESCE(SUM(si.quantity),0) AS items_sold,
 			COALESCE(SUM(s.discount_amount),0) + COALESCE(SUM(si.discount_amount),0) AS discount_total,
 			COALESCE(SUM(s.tax_amount),0) AS tax_total
 		FROM sales s
 		LEFT JOIN sale_items si ON si.sale_id = s.id
 		LEFT JOIN products p ON p.id = si.product_id
-		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.sale_status <> 'voided' AND s.deleted_at IS NULL`
+		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND ` + reportGrossSaleStatusCondition("s") + ` AND s.deleted_at IS NULL`
 	args := []interface{}{filter.BusinessID, startUTC, endUTC}
 	query, args = addSalesFilters(query, args, filter)
 	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
@@ -3640,7 +3690,7 @@ func (r *Repository) countGroupedSales(filter *shared.ResolvedFilter, groupExpr 
 			FROM sale_items si
 			JOIN sales s ON s.id = si.sale_id
 			LEFT JOIN products p ON p.id = si.product_id
-			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.sale_status <> 'voided' AND s.deleted_at IS NULL`, groupExpr)
+			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND `+reportGrossSaleStatusCondition("s")+` AND s.deleted_at IS NULL`, groupExpr)
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
 	query, args = addSalesFilters(query, args, filter)
 	query += " GROUP BY " + groupExpr + ") report_count"

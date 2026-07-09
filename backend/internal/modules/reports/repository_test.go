@@ -566,6 +566,60 @@ func TestSalesRefundTotalsByBucketUsesRefundedAtBucket(t *testing.T) {
 	}
 }
 
+func TestSalesReportQueriesUseOperationalStatusSets(t *testing.T) {
+	source, err := os.ReadFile("repository.go")
+	if err != nil {
+		t.Fatalf("read reports repository source: %v", err)
+	}
+	repositorySource := string(source)
+	start := strings.Index(repositorySource, "func (r *Repository) SalesReportSummary")
+	end := strings.Index(repositorySource, "func (r *Repository) ReceiptRecords")
+	if start < 0 || end < 0 || end <= start {
+		t.Fatal("sales report query block markers not found")
+	}
+	body := repositorySource[start:end]
+
+	for _, expected := range []string{
+		"reportGrossSaleStatusCondition(\"s\")",
+		"reportActiveSaleStatusCondition(\"s\")",
+		"salesRefundAllocationsSQL",
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected sales report query block to contain %q: %s", expected, body)
+		}
+	}
+	if strings.Contains(body, "s.sale_status <> 'voided'") {
+		t.Fatalf("sales report query block must use explicit operational status sets: %s", body)
+	}
+}
+
+func TestDashboardSalesSummaryUsesSalesReportNetSales(t *testing.T) {
+	source, err := os.ReadFile("repository.go")
+	if err != nil {
+		t.Fatalf("read reports repository source: %v", err)
+	}
+	repositorySource := string(source)
+	start := strings.Index(repositorySource, "func (r *Repository) salesSummary")
+	end := strings.Index(repositorySource[start:], "func (r *Repository) salesReportSummaryForRange")
+	if start < 0 || end < 0 {
+		t.Fatal("dashboard sales summary function markers not found")
+	}
+	body := repositorySource[start : start+end]
+
+	for _, expected := range []string{
+		"salesReportSummaryForRange",
+		"TotalSales:        report.NetSales",
+		"AverageOrderValue: report.AverageOrderValue",
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected dashboard sales summary to contain %q: %s", expected, body)
+		}
+	}
+	if strings.Contains(body, "ledgerFinancialTotals") || strings.Contains(body, "sale_status <> 'voided'") {
+		t.Fatalf("dashboard sales summary should use the operational sales report source: %s", body)
+	}
+}
+
 func TestSlowMovingProductsSQLFiltersSellableVisibleActiveProducts(t *testing.T) {
 	query, args := slowMovingProductsSQL(testBakeryOrdersReportFilter())
 
@@ -574,12 +628,81 @@ func TestSlowMovingProductsSQLFiltersSellableVisibleActiveProducts(t *testing.T)
 		"p.is_sellable = TRUE",
 		"p.is_pos_visible = TRUE",
 		"p.deleted_at IS NULL",
+		"sales.quantity_sold",
+		"refunds.refund_quantity",
+		"sales.net_sales",
+		"refunds.refund_amount",
+		"FROM payment_refunds pr",
+		"pr.refunded_at >= ?",
 	} {
 		if !strings.Contains(query, expected) {
 			t.Fatalf("expected slow moving products query to contain %q: %s", expected, query)
 		}
 	}
-	if len(args) != 6 {
+	if len(args) != 12 {
 		t.Fatalf("unexpected slow moving products arg count: %#v", args)
+	}
+}
+
+func TestSlowMovingProductsSQLAppliesSalesAndRefundFilters(t *testing.T) {
+	filter := testBakeryOrdersReportFilter()
+	filter.AllBranches = false
+	filter.BranchID = "branch-id"
+	filter.CashierUserID = "cashier-id"
+	filter.PaymentStatus = "partially_refunded"
+	filter.SaleStatus = "partially_refunded"
+	filter.ProductID = "product-id"
+	filter.CategoryID = "category-id"
+
+	query, args := slowMovingProductsSQL(filter)
+
+	for _, expected := range []string{
+		"AND s.branch_id = ?",
+		"AND s.cashier_user_id = ?",
+		"AND s.payment_status = ?",
+		"AND s.sale_status = ?",
+		"AND si.product_id = ?",
+		"AND sale_product.category_id = ?",
+		"AND branch_id = ?",
+		"AND cashier_user_id = ?",
+		"AND payment_status = ?",
+		"AND sale_status = ?",
+		"AND product_id = ?",
+		"AND category_id = ?",
+		"AND p.branch_id = ?",
+		"AND p.id = ?",
+		"AND p.category_id = ?",
+	} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("expected filtered slow moving products query to contain %q: %s", expected, query)
+		}
+	}
+	if len(args) != 27 {
+		t.Fatalf("unexpected filtered slow moving products arg count: %#v", args)
+	}
+}
+
+func TestBakeryOrderReportExportOptionsRemainAvailable(t *testing.T) {
+	expected := map[string]bool{
+		"bakery_orders_upcoming":            false,
+		"bakery_orders_status":              false,
+		"bakery_orders_production_schedule": false,
+		"bakery_orders_pending_payments":    false,
+		"bakery_orders_delivery_vs_pickup":  false,
+	}
+
+	for _, option := range reportExportOptions() {
+		if _, ok := expected[option.ReportType]; ok {
+			if !option.Supported {
+				t.Fatalf("bakery order report export option should be supported: %#v", option)
+			}
+			expected[option.ReportType] = true
+		}
+	}
+
+	for reportType, seen := range expected {
+		if !seen {
+			t.Fatalf("missing bakery order report export option %q", reportType)
+		}
 	}
 }
