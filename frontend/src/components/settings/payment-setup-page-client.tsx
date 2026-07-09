@@ -461,7 +461,7 @@ function BranchMappingView({
           <CheckCircle2 className="h-4 w-4" />
           <AlertTitle>No branch payment mapping issues</AlertTitle>
           <AlertDescription>
-            Backend readiness did not report any blocking branch payment account issues. Review
+            Backend readiness reported no blocking branch payment account issues. Review
             non-payment accounting setup issues from the Overview tab.
           </AlertDescription>
         </Alert>

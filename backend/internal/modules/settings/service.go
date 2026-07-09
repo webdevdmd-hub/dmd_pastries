@@ -1022,8 +1022,11 @@ func (s *Service) CreateReceiptLayout(currentUser *utils.AuthContext, req Create
 	if status == "" {
 		status = "active"
 	}
-	if status != "active" && status != "inactive" {
-		return nil, apperrors.BadRequest("status must be active or inactive", nil)
+	if err := validateReceiptLayoutStatus(status); err != nil {
+		return nil, err
+	}
+	if err := validateReceiptLayoutDefaultState(req.IsDefault, status); err != nil {
+		return nil, err
 	}
 	layout := &ReceiptLayout{
 		ID:           utils.NewUUID(),
@@ -1106,6 +1109,9 @@ func (s *Service) UpdateReceiptLayout(currentUser *utils.AuthContext, id string,
 		updates["counter_id"] = targetCounterID
 	}
 	if req.Status != "" {
+		if err := validateReceiptLayoutStatus(req.Status); err != nil {
+			return nil, err
+		}
 		updates["status"] = req.Status
 		if req.Status == "inactive" {
 			updates["is_default"] = false
@@ -1117,9 +1123,19 @@ func (s *Service) UpdateReceiptLayout(currentUser *utils.AuthContext, id string,
 		updates["layout_config"] = layoutConfig
 	}
 	targetDefault := layout.IsDefault
+	if req.Status == "inactive" {
+		targetDefault = false
+	}
 	if req.IsDefault != nil {
 		targetDefault = *req.IsDefault
 		updates["is_default"] = targetDefault
+	}
+	targetStatus := layout.Status
+	if req.Status != "" {
+		targetStatus = req.Status
+	}
+	if err := validateReceiptLayoutDefaultState(targetDefault, targetStatus); err != nil {
+		return nil, err
 	}
 	if targetName != layout.LayoutName || !sameOptionalString(targetBranchID, layout.BranchID) {
 		exists, err := s.repo.ReceiptLayoutNameExists(currentUser.BusinessID, targetBranchID, targetName, id)
@@ -1170,6 +1186,20 @@ func receiptLayoutConfigUpdateValue(value *json.RawMessage) (string, bool, error
 		return "", false, apperrors.BadRequest("layout_config must be valid JSON", nil)
 	}
 	return string(*value), true, nil
+}
+
+func validateReceiptLayoutStatus(status string) error {
+	if status != "active" && status != "inactive" {
+		return apperrors.BadRequest("status must be active or inactive", nil)
+	}
+	return nil
+}
+
+func validateReceiptLayoutDefaultState(isDefault bool, status string) error {
+	if isDefault && status != "active" {
+		return apperrors.BadRequest("only active receipt layouts can be default", nil)
+	}
+	return nil
 }
 
 func (s *Service) DeleteReceiptLayout(currentUser *utils.AuthContext, id string, ipAddress, userAgent string) error {

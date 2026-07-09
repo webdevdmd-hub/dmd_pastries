@@ -138,6 +138,7 @@ function blankFormState(): ReceiptLayoutSchema {
   return {
     branchId: null,
     counterId: null,
+    isDefault: true,
     layoutConfig: defaultLayoutConfig,
     layoutName: "",
     printerType: null,
@@ -150,6 +151,7 @@ function toFormState(layout: ReceiptLayout): ReceiptLayoutSchema {
   return {
     branchId: layout.branchId,
     counterId: layout.counterId,
+    isDefault: layout.isDefault,
     layoutConfig: layout.layoutConfig,
     layoutName: layout.layoutName,
     printerType: layout.printerType,
@@ -375,6 +377,8 @@ function ReceiptLayoutDialog({
                   setFormState((current) => ({
                     ...current,
                     branchId: value === businessWideBranchValue ? null : value,
+                    isDefault:
+                      layout === null ? value === businessWideBranchValue : current.isDefault,
                   }))
                 }
                 value={formState.branchId ?? businessWideBranchValue}
@@ -398,6 +402,7 @@ function ReceiptLayoutDialog({
                 onValueChange={(value) =>
                   setFormState((current) => ({
                     ...current,
+                    isDefault: value === "inactive" ? false : current.isDefault,
                     status: value === "inactive" ? "inactive" : "active",
                   }))
                 }
@@ -426,6 +431,19 @@ function ReceiptLayoutDialog({
                 value={formState.printerType ?? ""}
               />
             </div>
+            <label className="flex items-center gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-3 text-sm font-medium text-brand-espresso">
+              <Checkbox
+                checked={formState.isDefault}
+                disabled={formState.status === "inactive"}
+                onCheckedChange={(checked) => {
+                  setFormState((current) => ({
+                    ...current,
+                    isDefault: checked === true,
+                  }));
+                }}
+              />
+              Set as default for this scope
+            </label>
             <div className="grid gap-2">
               <Label htmlFor="counterId">Counter ID</Label>
               <Input

@@ -217,6 +217,7 @@ export type ReceiptLayoutPayload = {
   receiptType: ReceiptLayoutType;
   printerType: string | null;
   counterId: string | null;
+  isDefault: boolean;
   status: RecordStatus;
   layoutConfig: ReceiptLayoutConfig;
 };

@@ -167,6 +167,7 @@ type BackendReceiptLayoutPayload = {
   receipt_type?: ReceiptLayoutType;
   printer_type?: string | null;
   counter_id?: string | null;
+  is_default?: boolean;
   status?: RecordStatus;
   layout_config?: ReceiptLayoutConfig;
 };
@@ -854,6 +855,7 @@ function toBackendReceiptLayoutPayload(
     ...(payload.receiptType !== undefined ? { receipt_type: payload.receiptType } : {}),
     ...(payload.printerType !== undefined ? { printer_type: payload.printerType } : {}),
     ...(payload.counterId !== undefined ? { counter_id: payload.counterId } : {}),
+    ...(payload.isDefault !== undefined ? { is_default: payload.isDefault } : {}),
     ...(payload.status !== undefined ? { status: payload.status } : {}),
     ...(payload.layoutConfig !== undefined ? { layout_config: payload.layoutConfig } : {}),
   };
