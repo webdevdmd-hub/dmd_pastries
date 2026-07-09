@@ -176,6 +176,11 @@ func (h *Handler) ListSupplierPayments(c *gin.Context) {
 	respond(c, "supplier payments fetched successfully", result, err)
 }
 
+func (h *Handler) ListPaymentMethods(c *gin.Context) {
+	result, err := h.service.ListPaymentMethods(utils.MustAuthContext(c), c.Query("branch_id"))
+	respond(c, "purchasing payment methods fetched successfully", result, err)
+}
+
 func (h *Handler) GetSupplierPayment(c *gin.Context) {
 	if !validParam(c, "id") {
 		return

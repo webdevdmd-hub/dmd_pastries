@@ -25,20 +25,19 @@ import {
 } from "@/components/ui/select";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useBranchScope } from "@/hooks/use-branch-scope";
-import { usePaymentMethods } from "@/hooks/use-payments";
 import { usePermission } from "@/hooks/use-permission";
 import {
   useCreateSupplierPayment,
   useDeleteSupplierPayment,
   usePurchaseInvoices,
   usePurchasingBranches,
+  usePurchasingPaymentMethods,
   usePurchasingSuppliers,
   useSupplierPayment,
   useSupplierPayments,
   useUpdateSupplierPayment,
 } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
-import { isPurchasingPaymentMethod } from "@/lib/selectors/eligibility";
 import type {
   CreateSupplierPaymentPayload,
   PurchaseInvoice,
@@ -114,7 +113,6 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   const paymentsQuery = useSupplierPayments(filters, canView && branchScope.hasBranchScope);
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const branchesQuery = usePurchasingBranches(canView);
-  const methodsQuery = usePaymentMethods(canView);
   const editingPaymentQuery = useSupplierPayment(
     editingPaymentId,
     canView && canManage && editingPaymentId !== null,
@@ -129,6 +127,19 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   );
   const manualBranchId =
     selectedPaymentBranchId || (filterBranchId === "all" ? "" : filterBranchId);
+  const paymentMethodBranchId =
+    manualDialogOpen && manualBranchId.length > 0
+      ? manualBranchId
+      : filterBranchId === "all"
+        ? ""
+        : filterBranchId;
+  const methodsQuery = usePurchasingPaymentMethods(
+    paymentMethodBranchId,
+    canView &&
+      branchScope.hasBranchScope &&
+      paymentMethodBranchId.length > 0 &&
+      (!manualDialogOpen || manualBranchId.length > 0),
+  );
   const payableInvoicesQuery = usePurchaseInvoices(
     {
       branchId: manualBranchId,
@@ -149,10 +160,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   const createPaymentMutation = useCreateSupplierPayment();
   const updatePaymentMutation = useUpdateSupplierPayment();
   const deletePaymentMutation = useDeleteSupplierPayment();
-  const purchasingPaymentMethods = useMemo(
-    () => (methodsQuery.data ?? []).filter(isPurchasingPaymentMethod),
-    [methodsQuery.data],
-  );
+  const purchasingPaymentMethods = methodsQuery.data ?? [];
   const isPermissionDenied =
     paymentsQuery.error instanceof ApiError && paymentsQuery.error.status === 403;
   const payableInvoices = useMemo(() => {

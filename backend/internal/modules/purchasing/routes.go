@@ -31,6 +31,7 @@ func RegisterRoutes(
 	group.GET("/invoices", view, handler.ListInvoices)
 	group.POST("/invoices", manage, handler.CreateInvoice)
 	group.GET("/payments", view, handler.ListInvoicePayments)
+	group.GET("/payment-methods", view, handler.ListPaymentMethods)
 	group.GET("/supplier-payments", view, handler.ListSupplierPayments)
 	group.POST("/supplier-payments", manage, handler.CreateSupplierPayment)
 	group.GET("/supplier-payments/:id", view, handler.GetSupplierPayment)

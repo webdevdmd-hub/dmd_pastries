@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ROUTES } from "@/constants/routes";
+import { formatDateOnly } from "@/lib/format/date";
 import type { PurchaseOrder, PurchaseOrderStatus } from "@/types/purchasing";
 
 function formatCurrency(value: number): string {
@@ -22,9 +23,7 @@ function formatCurrency(value: number): string {
 }
 
 function formatDate(value: string | null): string {
-  return value
-    ? new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(new Date(value))
-    : "Not set";
+  return formatDateOnly(value);
 }
 
 function nextStepForOrder(order: PurchaseOrder): string {

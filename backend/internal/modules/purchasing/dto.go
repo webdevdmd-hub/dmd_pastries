@@ -67,7 +67,7 @@ type CreatePurchaseOrderRequest struct {
 	BranchID             string                   `json:"branch_id" binding:"required"`
 	SupplierID           string                   `json:"supplier_id" binding:"required"`
 	OrderDate            string                   `json:"order_date" binding:"required"`
-	ExpectedDeliveryDate string                   `json:"expected_delivery_date"`
+	ExpectedDeliveryDate *string                  `json:"expected_delivery_date"`
 	Items                []PurchaseOrderItemInput `json:"items" binding:"required"`
 	Charges              []charges.ChargeInput    `json:"charges"`
 	Notes                string                   `json:"notes"`
@@ -77,7 +77,7 @@ type CreatePurchaseOrderRevisionRequest struct {
 	BranchID             string                   `json:"branch_id"`
 	SupplierID           string                   `json:"supplier_id"`
 	OrderDate            string                   `json:"order_date"`
-	ExpectedDeliveryDate string                   `json:"expected_delivery_date"`
+	ExpectedDeliveryDate *string                  `json:"expected_delivery_date"`
 	Items                []PurchaseOrderItemInput `json:"items"`
 	Charges              []charges.ChargeInput    `json:"charges"`
 	PaymentExcessAction  string                   `json:"payment_excess_action"`
@@ -88,7 +88,7 @@ type UpdatePurchaseOrderRequest struct {
 	BranchID             string                   `json:"branch_id"`
 	SupplierID           string                   `json:"supplier_id"`
 	OrderDate            string                   `json:"order_date"`
-	ExpectedDeliveryDate string                   `json:"expected_delivery_date"`
+	ExpectedDeliveryDate *string                  `json:"expected_delivery_date"`
 	Items                []PurchaseOrderItemInput `json:"items"`
 	Charges              []charges.ChargeInput    `json:"charges"`
 	Notes                string                   `json:"notes"`
@@ -471,6 +471,28 @@ type SupplierPaymentAllocationResponse struct {
 	Amount            float64   `json:"amount"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+type PurchasingPaymentMethodResponse struct {
+	ID                        string  `json:"id"`
+	BusinessID                string  `json:"business_id"`
+	MethodName                string  `json:"method_name"`
+	MethodType                string  `json:"method_type"`
+	IsDefault                 bool    `json:"is_default"`
+	Status                    string  `json:"status"`
+	ShowInPOS                 bool    `json:"show_in_pos"`
+	ShowInBakeryOrders        bool    `json:"show_in_bakery_orders"`
+	ShowInPurchasing          bool    `json:"show_in_purchasing"`
+	ShowInExpenses            bool    `json:"show_in_expenses"`
+	ShowInDashboardCollection bool    `json:"show_in_dashboard_collection"`
+	AllowSplitPayment         bool    `json:"allow_split_payment"`
+	RequiresReference         bool    `json:"requires_reference"`
+	DefaultPaymentAccountID   string  `json:"default_payment_account_id"`
+	DefaultPaymentAccountName string  `json:"default_payment_account_name"`
+	BranchID                  *string `json:"branch_id"`
+	BranchName                string  `json:"branch_name"`
+	CreatedAt                 string  `json:"created_at"`
+	UpdatedAt                 string  `json:"updated_at"`
 }
 
 type PurchasingDocumentChainResponse struct {

@@ -66,7 +66,7 @@ func (s *Service) ListOrders(currentUser *utils.AuthContext, query ListQuery) (*
 func (s *Service) CreateOrder(currentUser *utils.AuthContext, req CreatePurchaseOrderRequest, ipAddress, userAgent string) (*PurchaseOrderResponse, error) {
 	var orderID string
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		order, items, chargeRows, err := s.buildOrder(tx, currentUser, "", req.BranchID, req.SupplierID, req.OrderDate, req.ExpectedDeliveryDate, req.Items, req.Charges, req.Notes)
+		order, items, chargeRows, err := s.buildOrder(tx, currentUser, "", req.BranchID, req.SupplierID, req.OrderDate, optionalStringValue(req.ExpectedDeliveryDate), req.Items, req.Charges, req.Notes)
 		if err != nil {
 			return err
 		}
@@ -132,10 +132,7 @@ func (s *Service) UpdateOrder(currentUser *utils.AuthContext, id string, req Upd
 		if strings.TrimSpace(req.OrderDate) != "" {
 			orderDate = req.OrderDate
 		}
-		expectedDate := optionalDateString(existing.ExpectedDeliveryDate)
-		if strings.TrimSpace(req.ExpectedDeliveryDate) != "" {
-			expectedDate = req.ExpectedDeliveryDate
-		}
+		expectedDate := optionalPatchDateString(existing.ExpectedDeliveryDate, req.ExpectedDeliveryDate)
 		var items []PurchaseOrderItem
 		if req.Items != nil {
 			built, totals, err := s.buildOrderItems(tx, currentUser.BusinessID, branchID, id, req.Items)
@@ -201,10 +198,7 @@ func (s *Service) updatePartiallyReceivedOrder(tx *gorm.DB, currentUser *utils.A
 		return apperrors.BadRequest("partially received purchase orders cannot change order_date", nil)
 	}
 
-	expectedDate := optionalDateString(existing.ExpectedDeliveryDate)
-	if strings.TrimSpace(req.ExpectedDeliveryDate) != "" {
-		expectedDate = req.ExpectedDeliveryDate
-	}
+	expectedDate := optionalPatchDateString(existing.ExpectedDeliveryDate, req.ExpectedDeliveryDate)
 	parsedExpected, err := parseOptionalDate(expectedDate, "expected_delivery_date")
 	if err != nil {
 		return err
@@ -466,10 +460,7 @@ func (s *Service) applyDirectOrderRevisionUpdate(tx *gorm.DB, currentUser *utils
 	if strings.TrimSpace(req.OrderDate) != "" {
 		orderDate = req.OrderDate
 	}
-	expectedDate := optionalDateString(existing.ExpectedDeliveryDate)
-	if strings.TrimSpace(req.ExpectedDeliveryDate) != "" {
-		expectedDate = req.ExpectedDeliveryDate
-	}
+	expectedDate := optionalPatchDateString(existing.ExpectedDeliveryDate, req.ExpectedDeliveryDate)
 	var items []PurchaseOrderItem
 	if req.Items != nil {
 		built, totals, err := s.buildOrderItems(tx, currentUser.BusinessID, branchID, existing.ID, req.Items)
@@ -683,7 +674,7 @@ func (s *Service) DuplicateOrder(currentUser *utils.AuthContext, id, ipAddress, 
 		BranchID:             source.BranchID,
 		SupplierID:           source.SupplierID,
 		OrderDate:            time.Now().UTC().Format("2006-01-02"),
-		ExpectedDeliveryDate: optionalDateString(source.ExpectedDeliveryDate),
+		ExpectedDeliveryDate: stringPtr(optionalDateString(source.ExpectedDeliveryDate)),
 		Items:                inputs,
 		Charges:              chargeInputs,
 		Notes:                source.Notes,
@@ -1047,6 +1038,21 @@ func (s *Service) ListSupplierPayments(currentUser *utils.AuthContext, query Pay
 		roundSupplierPaymentResponse(&payments[i])
 	}
 	return &PaginatedResponse[SupplierPaymentResponse]{Items: payments, Pagination: PaginationResponse{Page: query.Page, Limit: query.Limit, Total: total, TotalPages: totalPages(total, query.Limit)}}, nil
+}
+
+func (s *Service) ListPaymentMethods(currentUser *utils.AuthContext, branchID string) ([]PurchasingPaymentMethodResponse, error) {
+	resolvedBranchID, err := currentUser.ResolveOperationalBranch(branchID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.ValidateBranch(s.db, currentUser.BusinessID, resolvedBranchID); err != nil {
+		return nil, notFound(err, "branch not found")
+	}
+	methods, err := s.repo.ListPurchasingPaymentMethods(currentUser.BusinessID, resolvedBranchID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to list purchasing payment methods")
+	}
+	return methods, nil
 }
 
 func (s *Service) GetSupplierPayment(currentUser *utils.AuthContext, id string) (*SupplierPaymentResponse, error) {
@@ -4463,6 +4469,24 @@ func deref(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+func stringPtr(value string) *string {
+	return &value
+}
+
+func optionalStringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func optionalPatchDateString(existing *time.Time, patch *string) string {
+	if patch == nil {
+		return optionalDateString(existing)
+	}
+	return strings.TrimSpace(*patch)
 }
 
 func optionalDateString(value *time.Time) string {

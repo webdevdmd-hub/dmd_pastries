@@ -74,6 +74,7 @@ export function PurchaseSupplierPaymentDialog({
     resolver: zodResolver(supplierPaymentSchema),
   });
   const selectedMethod = methods.find((method) => method.id === form.watch("paymentMethodId"));
+  const hasPaymentMethods = methods.length > 0;
   const watchedPaymentAmount = form.watch("amount");
   const paymentAmount =
     typeof watchedPaymentAmount === "number" ? watchedPaymentAmount : Number(watchedPaymentAmount);
@@ -92,7 +93,24 @@ export function PurchaseSupplierPaymentDialog({
     }
   }, [balanceAmount, form, open]);
 
+  useEffect(() => {
+    const selectedMethodId = form.getValues("paymentMethodId");
+    if (!selectedMethodId) return;
+    if (methods.some((method) => method.id === selectedMethodId)) return;
+
+    form.setValue("paymentMethodId", "");
+  }, [form, methods]);
+
   const submitForm = async (values: SupplierPaymentFormValues): Promise<void> => {
+    if (!hasPaymentMethods) {
+      form.setError("root", {
+        message:
+          "No active purchasing payment method is linked to a payment account for this branch. Update Payment Setup before saving payment.",
+        type: "validate",
+      });
+      return;
+    }
+
     if (values.amount > balanceAmount) {
       form.setError("amount", {
         message: `Payment cannot exceed the balance amount.`,
@@ -188,23 +206,40 @@ export function PurchaseSupplierPaymentDialog({
               control={form.control}
               name="paymentMethodId"
               render={({ field }) => (
-                <Select disabled={disabled} onValueChange={field.onChange} value={field.value}>
+                <Select
+                  disabled={disabled || !hasPaymentMethods}
+                  onValueChange={field.onChange}
+                  value={field.value}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
                   <SelectContent>
-                    {methods
-                      .filter((method) => method.status === "active")
-                      .map((method) => (
+                    {hasPaymentMethods ? (
+                      methods.map((method) => (
                         <SelectItem key={method.id} value={method.id}>
                           {method.methodName}
                         </SelectItem>
-                      ))}
+                      ))
+                    ) : (
+                      <SelectItem disabled value="no-ready-methods">
+                        No ready methods
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               )}
             />
-            <p className="text-xs text-red-700">{form.formState.errors.paymentMethodId?.message}</p>
+            {hasPaymentMethods ? (
+              <p className="text-xs text-red-700">
+                {form.formState.errors.paymentMethodId?.message}
+              </p>
+            ) : (
+              <p className="text-xs text-red-700">
+                Set up an active purchasing payment method with a linked payment account for this
+                branch.
+              </p>
+            )}
           </div>
 
           <div className="grid gap-2 md:grid-cols-2">
@@ -269,7 +304,10 @@ export function PurchaseSupplierPaymentDialog({
             <Button onClick={onClose} type="button" variant="outline">
               Cancel
             </Button>
-            <Button disabled={disabled || isSubmitting || balanceAmount <= 0} type="submit">
+            <Button
+              disabled={disabled || isSubmitting || balanceAmount <= 0 || !hasPaymentMethods}
+              type="submit"
+            >
               {isSubmitting ? "Recording..." : "Record payment"}
             </Button>
           </DialogFooter>

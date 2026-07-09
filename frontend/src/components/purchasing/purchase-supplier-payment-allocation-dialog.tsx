@@ -88,6 +88,10 @@ function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+function moneyInputValue(value: number): string {
+  return roundMoney(value).toFixed(2);
+}
+
 function invoiceLabel(invoice: PurchaseInvoice): string {
   return invoice.supplierBillNumber ?? invoice.invoiceNumber;
 }
@@ -124,6 +128,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
   const [validatingBalances, setValidatingBalances] = useState(false);
 
   const selectedMethod = methods.find((method) => method.id === paymentMethodId) ?? null;
+  const hasPaymentMethods = methods.length > 0;
   const isEditing = mode === "edit";
   const amountValue = roundMoney(parseAmount(amount));
   const allocationEntries = useMemo(
@@ -173,6 +178,30 @@ export function PurchaseSupplierPaymentAllocationDialog({
     setRowErrors({});
   }, [selectedSupplierId]);
 
+  useEffect(() => {
+    if (!paymentMethodId) return;
+    if (methods.some((method) => method.id === paymentMethodId)) return;
+
+    setPaymentMethodId("");
+  }, [methods, paymentMethodId]);
+
+  const allocatedTotalFrom = (nextAllocations: Record<string, string>): number =>
+    roundMoney(
+      invoices.reduce(
+        (total, invoice) => total + roundMoney(parseAmount(nextAllocations[invoice.id] ?? "0")),
+        0,
+      ),
+    );
+
+  const raiseAmountToAllocatedTotal = (nextAllocations: Record<string, string>): void => {
+    const nextAllocatedAmount = allocatedTotalFrom(nextAllocations);
+    setAmount((currentAmount) =>
+      roundMoney(parseAmount(currentAmount)) < nextAllocatedAmount
+        ? moneyInputValue(nextAllocatedAmount)
+        : currentAmount,
+    );
+  };
+
   const updateAllocation = (invoiceId: string, nextAmount: string): void => {
     setSubmitError(null);
     setRowErrors((current) => {
@@ -181,18 +210,28 @@ export function PurchaseSupplierPaymentAllocationDialog({
       void _removed;
       return next;
     });
-    setAllocations((current) => ({ ...current, [invoiceId]: nextAmount }));
+    setAllocations((current) => {
+      const nextAllocations = { ...current, [invoiceId]: nextAmount };
+      raiseAmountToAllocatedTotal(nextAllocations);
+      return nextAllocations;
+    });
   };
 
   const payInFull = (invoice: PurchaseInvoice): void => {
-    const currentAmount = roundMoney(parseAmount(allocations[invoice.id] ?? "0"));
-    const remainingBeforeRow = roundMoney(amountValue - (allocatedAmount - currentAmount));
-    const cappedAmount =
-      amountValue > 0
-        ? Math.max(0, Math.min(invoice.balanceAmount, remainingBeforeRow))
-        : invoice.balanceAmount;
+    const nextAllocations = {
+      ...allocations,
+      [invoice.id]: moneyInputValue(invoice.balanceAmount),
+    };
 
-    updateAllocation(invoice.id, String(roundMoney(cappedAmount)));
+    setSubmitError(null);
+    setRowErrors((current) => {
+      if (!(invoice.id in current)) return current;
+      const { [invoice.id]: _removed, ...next } = current;
+      void _removed;
+      return next;
+    });
+    setAllocations(nextAllocations);
+    setAmount(moneyInputValue(allocatedTotalFrom(nextAllocations)));
   };
 
   const submit = async (): Promise<void> => {
@@ -206,6 +245,13 @@ export function PurchaseSupplierPaymentAllocationDialog({
 
     if (!branchId) {
       setSubmitError("Select a branch before saving payment.");
+      return;
+    }
+
+    if (!hasPaymentMethods) {
+      setSubmitError(
+        "No active purchasing payment method is linked to a payment account for this branch. Update Payment Setup before saving payment.",
+      );
       return;
     }
 
@@ -406,6 +452,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
             <div className="grid gap-2">
               <Label>Payment method *</Label>
               <Select
+                disabled={!hasPaymentMethods}
                 onValueChange={(nextPaymentMethodId) => {
                   setSubmitError(null);
                   setPaymentMethodId(nextPaymentMethodId);
@@ -416,16 +463,24 @@ export function PurchaseSupplierPaymentAllocationDialog({
                   <SelectValue placeholder="Select payment method" />
                 </SelectTrigger>
                 <SelectContent>
-                  {methods.map((method) => (
-                    <SelectItem key={method.id} value={method.id}>
-                      {method.methodName}
+                  {hasPaymentMethods ? (
+                    methods.map((method) => (
+                      <SelectItem key={method.id} value={method.id}>
+                        {method.methodName}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem disabled value="no-ready-methods">
+                      No ready methods
                     </SelectItem>
-                  ))}
+                  )}
                 </SelectContent>
               </Select>
               <p className="min-h-5 text-xs leading-5 text-brand-mocha">
                 {selectedMethod?.defaultPaymentAccountId
                   ? `Paid through: ${selectedMethod.defaultPaymentAccountName || "Linked account"}`
+                  : !hasPaymentMethods
+                    ? "Set up an active purchasing payment method with a linked payment account for this branch."
                   : selectedMethod
                     ? "Paid-through account will be resolved from branch payment setup."
                   : ""}
@@ -689,7 +744,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
             Cancel
           </Button>
           <Button
-            disabled={isSubmitting || invoicesLoading || validatingBalances}
+            disabled={isSubmitting || invoicesLoading || validatingBalances || !hasPaymentMethods}
             onClick={() => void submit()}
             type="button"
           >

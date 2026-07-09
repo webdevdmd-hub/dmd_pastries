@@ -1225,6 +1225,47 @@ func (r *Repository) PaymentMethod(tx *gorm.DB, businessID, methodID string) (*P
 	return &method, err
 }
 
+func (r *Repository) ListPurchasingPaymentMethods(businessID, branchID string) ([]PurchasingPaymentMethodResponse, error) {
+	var rows []PurchasingPaymentMethodResponse
+	err := r.withPurchasingReadyPaymentAccount(r.db.Table("payment_methods pm"), branchID).
+		Select(`
+			pm.id,
+			pm.business_id,
+			pm.method_name,
+			pm.method_type,
+			pm.is_default,
+			pm.status,
+			pm.show_in_pos,
+			pm.show_in_bakery_orders,
+			pm.show_in_purchasing,
+			pm.show_in_expenses,
+			pm.show_in_dashboard_collection,
+			pm.allow_split_payment,
+			pm.requires_reference,
+			pa.id::text AS default_payment_account_id,
+			pa.account_name AS default_payment_account_name,
+			pa.branch_id,
+			COALESCE(account_branch.branch_name, payment_branch.branch_name, '') AS branch_name,
+			pm.created_at::text AS created_at,
+			pm.updated_at::text AS updated_at
+		`).
+		Joins("LEFT JOIN branches account_branch ON account_branch.id = pa.branch_id AND account_branch.business_id = pm.business_id AND account_branch.deleted_at IS NULL").
+		Joins("LEFT JOIN branches payment_branch ON payment_branch.id = ? AND payment_branch.business_id = pm.business_id AND payment_branch.deleted_at IS NULL", branchID).
+		Where("pm.business_id = ? AND pm.status = ? AND pm.show_in_purchasing = ? AND pm.deleted_at IS NULL", businessID, "active", true).
+		Order("pm.is_default DESC, pm.method_name ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) withPurchasingReadyPaymentAccount(db *gorm.DB, branchID string) *gorm.DB {
+	return db.
+		Joins("LEFT JOIN payment_method_account_mappings pmam ON pmam.payment_method_id = pm.id AND pmam.business_id = pm.business_id AND pmam.branch_id = ? AND pmam.status = ? AND pmam.deleted_at IS NULL", branchID, "active").
+		Joins("JOIN payment_accounts pa ON pa.id = COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AND pa.business_id = pm.business_id AND pa.status = ? AND pa.deleted_at IS NULL", "active").
+		Joins("JOIN chart_of_accounts coa ON coa.id = pa.chart_account_id AND coa.business_id = pa.business_id AND coa.status = ? AND coa.deleted_at IS NULL", "active").
+		Where("COALESCE(pmam.payment_account_id, pm.default_payment_account_id) IS NOT NULL").
+		Where("(pa.branch_id IS NULL OR pa.branch_id = ?)", branchID)
+}
+
 func (r *Repository) PaymentMethodMappedAccount(tx *gorm.DB, businessID, branchID, methodID string) (*PaymentAccountInfo, error) {
 	var account PaymentAccountInfo
 	err := tx.Table("payment_method_account_mappings pmam").

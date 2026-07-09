@@ -34,6 +34,7 @@ import {
   getPurchaseReceipts,
   getPurchaseReturnById,
   getPurchaseReturns,
+  getPurchasingPaymentMethods,
   getPurchasingSummary,
   getSupplierInvoicePayments,
   getSupplierPaymentById,
@@ -93,6 +94,7 @@ import type {
   UpdatePurchaseReturnPayload,
   UpdateSupplierPaymentPayload,
 } from "@/types/purchasing";
+import type { PaymentMethod } from "@/types/settings";
 
 const purchasingQueryKey = "purchasing";
 
@@ -264,6 +266,16 @@ export function useSupplierPayments(filters: SupplierPaymentFilters, enabled = t
   return useQuery<SupplierPayment[]>({
     queryKey: [purchasingQueryKey, branchQueryKey, "supplier-payments", filters],
     queryFn: async () => getSupplierPayments(filters),
+    enabled,
+  });
+}
+
+export function usePurchasingPaymentMethods(branchId: string | null, enabled = true) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<PaymentMethod[]>({
+    queryKey: [purchasingQueryKey, branchQueryKey, "payment-methods", branchId ?? "current"],
+    queryFn: async () => getPurchasingPaymentMethods(branchId),
     enabled,
   });
 }

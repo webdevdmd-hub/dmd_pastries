@@ -53,6 +53,7 @@ import type {
   UpdatePurchaseReturnPayload,
   UpdateSupplierPaymentPayload,
 } from "@/types/purchasing";
+import type { PaymentMethod } from "@/types/settings";
 
 type BackendLinePayload = {
   id?: string | undefined;
@@ -203,6 +204,10 @@ function stringValue(value: unknown, fallback = ""): string {
 
 function optionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function optionalBoolean(value: unknown, fallback = false): boolean {
+  return typeof value === "boolean" ? value : fallback;
 }
 
 function numberValue(value: unknown, fallback = 0): number {
@@ -461,6 +466,34 @@ function parseOrder(value: unknown): PurchaseOrder {
     createdAt: stringValue(value.created_at),
     updatedAt: stringValue(value.updated_at),
     items: Array.isArray(value.items) ? value.items.map(parseOrderItem) : [],
+  };
+}
+
+function parsePurchasingPaymentMethod(value: unknown): PaymentMethod {
+  if (!isObject(value)) {
+    throw new Error("Backend purchasing payment method payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.id),
+    businessId: stringValue(value.business_id),
+    methodName: stringValue(value.method_name, "Payment method"),
+    methodType: stringValue(value.method_type, "other"),
+    isDefault: optionalBoolean(value.is_default),
+    allowSplitPayment: optionalBoolean(value.allow_split_payment, true),
+    requiresReference: optionalBoolean(value.requires_reference),
+    showInPos: optionalBoolean(value.show_in_pos),
+    showInBakeryOrders: optionalBoolean(value.show_in_bakery_orders),
+    showInPurchasing: optionalBoolean(value.show_in_purchasing, true),
+    showInExpenses: optionalBoolean(value.show_in_expenses),
+    showInDashboardCollection: optionalBoolean(value.show_in_dashboard_collection),
+    defaultPaymentAccountId: optionalString(value.default_payment_account_id),
+    defaultPaymentAccountName: stringValue(value.default_payment_account_name),
+    branchId: optionalString(value.branch_id),
+    branchName: optionalString(value.branch_name),
+    status: value.status === "inactive" ? "inactive" : "active",
+    createdAt: stringValue(value.created_at),
+    updatedAt: stringValue(value.updated_at),
   };
 }
 
@@ -1688,6 +1721,18 @@ export async function getSupplierPayments(
     {
       authMode: "appwrite",
       parse: (data) => parseList(data, parseSupplierPayment),
+    },
+  );
+
+  return response.data;
+}
+
+export async function getPurchasingPaymentMethods(branchId: string | null): Promise<PaymentMethod[]> {
+  const response = await apiRequest<PaymentMethod[]>(
+    `/api/v1/purchasing/payment-methods${toQueryString({ branch_id: branchId })}`,
+    {
+      authMode: "appwrite",
+      parse: (data) => parseList(data, parsePurchasingPaymentMethod),
     },
   );
 

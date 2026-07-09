@@ -10,11 +10,13 @@ import { PurchaseSupplierPaymentDialog } from "@/components/purchasing/purchase-
 import { PurchaseSupplierPaymentsTable } from "@/components/purchasing/purchase-supplier-payments-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { usePaymentMethods } from "@/hooks/use-payments";
-import { useAddSupplierInvoicePayment, useSupplierInvoicePayments } from "@/hooks/use-purchasing";
+import {
+  useAddSupplierInvoicePayment,
+  usePurchasingPaymentMethods,
+  useSupplierInvoicePayments,
+} from "@/hooks/use-purchasing";
 import { getErrorMessage } from "@/lib/api/client";
 import { supplierPaymentErrorMessage } from "@/lib/purchasing/supplier-payment-errors";
-import { isPurchasingPaymentMethod } from "@/lib/selectors/eligibility";
 import type { AddSupplierPaymentPayload, PurchaseInvoice } from "@/types/purchasing";
 
 function formatCurrency(value: number): string {
@@ -30,10 +32,10 @@ export function PurchaseInvoicePaymentsSection({
 }): JSX.Element {
   const [dialogOpen, setDialogOpen] = useState(false);
   const paymentsQuery = useSupplierInvoicePayments(invoice.id, true);
-  const methodsQuery = usePaymentMethods(canManage);
+  const methodsQuery = usePurchasingPaymentMethods(invoice.branchId, canManage);
   const addPaymentMutation = useAddSupplierInvoicePayment();
   const canAddPayment = canManage && invoice.status === "posted" && invoice.balanceAmount > 0;
-  const purchasingPaymentMethods = (methodsQuery.data ?? []).filter(isPurchasingPaymentMethod);
+  const purchasingPaymentMethods = methodsQuery.data ?? [];
 
   const handleAddPayment = async (payload: AddSupplierPaymentPayload): Promise<void> => {
     try {

@@ -40,6 +40,7 @@ import {
   useUpdatePurchaseOrderStatus,
 } from "@/hooks/use-purchasing";
 import { getErrorMessage } from "@/lib/api/client";
+import { formatDateOnly } from "@/lib/format/date";
 import { purchaseOrderToBillInitialValues } from "@/lib/purchasing/purchase-order-bill-draft";
 import { cn } from "@/lib/utils/cn";
 import type {
@@ -56,9 +57,7 @@ function formatCurrency(value: number): string {
 }
 
 function formatDate(value: string | null): string {
-  return value
-    ? new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(new Date(value))
-    : "Not set";
+  return formatDateOnly(value);
 }
 
 function WorkflowStep({
