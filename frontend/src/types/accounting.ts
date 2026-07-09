@@ -501,6 +501,11 @@ export type PaymentAccountsResponse = {
   total: number;
 };
 
+export type SeedPaymentAccountsResponse = {
+  createdPaymentAccounts: number;
+  linkedPaymentMethods: number;
+};
+
 export type PaymentAccountPayload = {
   accountName: string;
   accountType: PaymentAccountType;

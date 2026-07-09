@@ -55,6 +55,7 @@ import type {
   ProfitLossItem,
   ProfitLossResponse,
   ProfitLossSection,
+  SeedPaymentAccountsResponse,
   TrialBalanceFilters,
   TrialBalanceItem,
   TrialBalanceResponse,
@@ -149,8 +150,7 @@ type BackendPlatformSettlementPayload = {
   settlement_date: string;
 };
 
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -352,16 +352,24 @@ function parsePaymentAccount(value: unknown): PaymentAccount {
     chartAccountCode: stringValue(value.chart_account_code),
     chartAccountName: stringValue(value.chart_account_name, "Chart account"),
     chartAccountType: isAccountType(value.chart_account_type) ? value.chart_account_type : "asset",
-    chartAccountAllowManualPosting: booleanValue(
-      value.chart_account_allow_manual_posting,
-      true,
-    ),
+    chartAccountAllowManualPosting: booleanValue(value.chart_account_allow_manual_posting, true),
     description: stringValue(value.description),
     currentBalance: numberValue(value.current_balance, 0),
     balanceLabel: stringValue(value.balance_label),
     status: isAccountStatus(value.status) ? value.status : "active",
     createdAt: stringValue(value.created_at),
     updatedAt: stringValue(value.updated_at),
+  };
+}
+
+function parseSeedPaymentAccountsResponse(value: unknown): SeedPaymentAccountsResponse {
+  if (!isObject(value)) {
+    throw new Error("Backend seed payment accounts payload is invalid.");
+  }
+
+  return {
+    createdPaymentAccounts: numberValue(value.created_payment_accounts, 0),
+    linkedPaymentMethods: numberValue(value.linked_payment_methods, 0),
   };
 }
 
@@ -946,9 +954,7 @@ function parseBackfillReadinessResponse(value: unknown): AccountingBackfillReadi
   };
 }
 
-function parseAccountingSetupReadinessResponse(
-  value: unknown,
-): AccountingSetupReadinessResponse {
+function parseAccountingSetupReadinessResponse(value: unknown): AccountingSetupReadinessResponse {
   if (!isObject(value)) {
     throw new Error("Backend accounting setup readiness payload is invalid.");
   }
@@ -956,7 +962,10 @@ function parseAccountingSetupReadinessResponse(
   const issues = Array.isArray(value.issues) ? value.issues.map(parseBackfillReadinessIssue) : [];
 
   return {
-    ready: booleanValue(value.ready, issues.every((issue) => !readinessIssueBlocks(issue))),
+    ready: booleanValue(
+      value.ready,
+      issues.every((issue) => !readinessIssueBlocks(issue)),
+    ),
     issues,
     checkedAt: stringValue(value.checked_at),
   };
@@ -1667,6 +1676,19 @@ export async function createPaymentAccount(
       body: paymentAccountPayload(payload),
       method: "POST",
       parse: parsePaymentAccount,
+    },
+  );
+
+  return response.data;
+}
+
+export async function seedDefaultPaymentAccounts(): Promise<SeedPaymentAccountsResponse> {
+  const response = await apiRequest<SeedPaymentAccountsResponse>(
+    "/api/v1/accounting/payment-accounts/seed-defaults",
+    {
+      authMode: "appwrite",
+      method: "POST",
+      parse: parseSeedPaymentAccountsResponse,
     },
   );
 

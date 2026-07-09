@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { PaymentAccountsPageClient } from "@/components/accounting/settlement-pages";
 import { SettingsDataPageClient } from "@/components/settings/settings-data-page-client";
@@ -23,7 +24,11 @@ import {
 } from "@/components/ui/table";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
-import { useAccountingSetupReadiness, usePaymentAccounts } from "@/hooks/use-accounting";
+import {
+  useAccountingSetupReadiness,
+  usePaymentAccounts,
+  useSeedDefaultPaymentAccounts,
+} from "@/hooks/use-accounting";
 import { usePermission } from "@/hooks/use-permission";
 import { usePaymentMethods } from "@/hooks/use-settings-data";
 import { getErrorMessage } from "@/lib/api/client";
@@ -68,6 +73,18 @@ function money(value: number): string {
 
 function readinessIssueBlocks(severity: string): boolean {
   return severity === "blocking" || severity === "error";
+}
+
+function isPaymentCoverageIssue(issue: AccountingBackfillReadinessIssue): boolean {
+  return issue.code.startsWith("payment_method") || issue.code.startsWith("payment_account");
+}
+
+function issueDetail(issue: AccountingBackfillReadinessIssue, key: string): string {
+  const value = issue.details[key];
+  if (value === null || value === undefined) {
+    return "";
+  }
+  return String(value);
 }
 
 function formatStatus(value: string): string {
@@ -157,9 +174,13 @@ function PaymentSetupOverview({
   accountsError,
   canViewAccounts,
   canViewMethods,
+  canManageAccounts,
   isSetupReadinessLoading,
+  isSeedingPaymentAccounts,
   methods,
   methodsError,
+  onSeedPaymentAccounts,
+  seedPaymentAccountsError,
   setupReadiness,
   setupReadinessError,
 }: {
@@ -167,9 +188,13 @@ function PaymentSetupOverview({
   accountsError: Error | null;
   canViewAccounts: boolean;
   canViewMethods: boolean;
+  canManageAccounts: boolean;
   isSetupReadinessLoading: boolean;
+  isSeedingPaymentAccounts: boolean;
   methods: PaymentMethod[];
   methodsError: Error | null;
+  onSeedPaymentAccounts: () => void;
+  seedPaymentAccountsError: Error | null;
   setupReadiness: AccountingSetupReadinessResponse | undefined;
   setupReadinessError: Error | null;
 }): JSX.Element {
@@ -177,6 +202,7 @@ function PaymentSetupOverview({
   const activeAccounts = accounts.filter((account) => account.status === "active");
   const setupIssues = setupReadiness?.issues ?? [];
   const blockingSetupIssues = setupIssues.filter((issue) => readinessIssueBlocks(issue.severity));
+  const blockingPaymentCoverageIssues = blockingSetupIssues.filter(isPaymentCoverageIssue);
   const setupIssueCount = canViewAccounts ? blockingSetupIssues.length : 0;
 
   return (
@@ -233,6 +259,14 @@ function PaymentSetupOverview({
         </Alert>
       ) : null}
 
+      {seedPaymentAccountsError ? (
+        <Alert className="border-red-200 bg-red-50 text-red-950">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Unable to set up default payment accounts</AlertTitle>
+          <AlertDescription>{getErrorMessage(seedPaymentAccountsError)}</AlertDescription>
+        </Alert>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -275,7 +309,20 @@ function PaymentSetupOverview({
       ) : blockingSetupIssues.length > 0 ? (
         <Card className="border-red-200">
           <CardHeader>
-            <CardTitle className="text-red-950">Accounting setup issues</CardTitle>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <CardTitle className="text-red-950">Accounting setup issues</CardTitle>
+              {canManageAccounts && blockingPaymentCoverageIssues.length > 0 ? (
+                <Button
+                  disabled={isSeedingPaymentAccounts}
+                  onClick={onSeedPaymentAccounts}
+                  type="button"
+                >
+                  {isSeedingPaymentAccounts
+                    ? "Setting up accounts..."
+                    : "Set up default payment accounts"}
+                </Button>
+              ) : null}
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {blockingSetupIssues.map((issue) => {
@@ -320,24 +367,101 @@ function BranchMappingView({
   canViewAccounts,
   canViewMethods,
   methods,
+  setupReadiness,
 }: {
   accounts: PaymentAccount[];
   canViewAccounts: boolean;
   canViewMethods: boolean;
   methods: PaymentMethod[];
+  setupReadiness: AccountingSetupReadinessResponse | undefined;
 }): JSX.Element {
   if (!canViewMethods) {
     return <AccessNotice title="Payment method access is required" />;
   }
 
   const accountsById = new Map(accounts.map((account) => [account.id, account]));
+  const branchPaymentIssues = (setupReadiness?.issues ?? []).filter(
+    (issue) => readinessIssueBlocks(issue.severity) && isPaymentCoverageIssue(issue),
+  );
 
   return (
     <div className="flex flex-col gap-6">
       {!canViewAccounts ? (
         <AccessNotice title="Accounting access is required to verify linked accounts" />
       ) : null}
+      {canViewAccounts && branchPaymentIssues.length > 0 ? (
+        <Card className="border-red-200">
+          <CardHeader>
+            <CardTitle className="text-red-950">Branch checkout mapping issues</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Payment Method</TableHead>
+                  <TableHead>Branch</TableHead>
+                  <TableHead>Effective Account</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Issue</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {branchPaymentIssues.map((issue) => {
+                  const methodName = issueDetail(issue, "method_name") || "Payment method";
+                  const branchName = issueDetail(issue, "branch_name") || "Branch";
+                  const accountName = issueDetail(issue, "payment_account_name");
+                  const source = issueDetail(issue, "source");
+
+                  return (
+                    <TableRow
+                      key={`${issue.code}-${issueDetail(issue, "payment_method_id")}-${issueDetail(
+                        issue,
+                        "branch_id",
+                      )}-${accountName}`}
+                    >
+                      <TableCell>
+                        <div className="font-medium text-brand-espresso">{methodName}</div>
+                        <div className="text-xs text-brand-mocha">
+                          {issueDetail(issue, "method_type")}
+                        </div>
+                      </TableCell>
+                      <TableCell>{branchName}</TableCell>
+                      <TableCell>
+                        {accountName ? (
+                          <>
+                            <div>{accountName}</div>
+                            <div className="text-xs text-brand-mocha">
+                              {issueDetail(issue, "chart_account_code")}{" "}
+                              {issueDetail(issue, "chart_account_name")}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-red-700">No effective account</span>
+                        )}
+                      </TableCell>
+                      <TableCell>{source ? formatStatus(source) : "-"}</TableCell>
+                      <TableCell className="text-red-700">{issue.message}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : canViewAccounts && setupReadiness?.ready ? (
+        <Alert className="border-emerald-200 bg-emerald-50 text-emerald-950">
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertTitle>Branch checkout mappings are ready</AlertTitle>
+          <AlertDescription>
+            Active operational payment methods resolve to active payment accounts for every active
+            branch.
+          </AlertDescription>
+        </Alert>
+      ) : null}
       <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>Default payment account fallback</CardTitle>
+        </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -411,10 +535,12 @@ export function PaymentSetupPageClient({ initialTab }: PaymentSetupPageClientPro
     PERMISSIONS.accountingView,
     PERMISSIONS.accountingAccountsManage,
   ]);
+  const canManageAccounts = hasAnyPermission([PERMISSIONS.accountingAccountsManage]);
   const canViewAny = canViewMethods || canViewAccounts;
   const methodsQuery = usePaymentMethods(canViewMethods);
   const accountsQuery = usePaymentAccounts(overviewAccountFilters, canViewAccounts);
   const setupReadinessQuery = useAccountingSetupReadiness(canViewAccounts);
+  const seedPaymentAccountsMutation = useSeedDefaultPaymentAccounts();
 
   const methods = methodsQuery.data ?? [];
   const accounts = accountsQuery.data?.items ?? [];
@@ -423,6 +549,29 @@ export function PaymentSetupPageClient({ initialTab }: PaymentSetupPageClientPro
   const selectTab = (tab: PaymentSetupTab): void => {
     setActiveTab(tab);
     router.replace(`${ROUTES.settingsPaymentSetup}?tab=${tab}`, { scroll: false });
+  };
+
+  const handleSeedPaymentAccounts = async (): Promise<void> => {
+    try {
+      const result = await seedPaymentAccountsMutation.mutateAsync();
+      await Promise.all([
+        methodsQuery.refetch(),
+        accountsQuery.refetch(),
+        setupReadinessQuery.refetch(),
+      ]);
+      toast.success("Default payment accounts are ready.", {
+        description: [
+          String(result.createdPaymentAccounts),
+          " created, ",
+          String(result.linkedPaymentMethods),
+          " linked.",
+        ].join(""),
+      });
+    } catch (error) {
+      toast.error("Unable to set up default payment accounts.", {
+        description: getErrorMessage(error),
+      });
+    }
   };
 
   if (!canViewAny) {
@@ -464,9 +613,15 @@ export function PaymentSetupPageClient({ initialTab }: PaymentSetupPageClientPro
           accountsError={accountsQuery.error}
           canViewAccounts={canViewAccounts}
           canViewMethods={canViewMethods}
+          canManageAccounts={canManageAccounts}
           isSetupReadinessLoading={setupReadinessQuery.isLoading}
+          isSeedingPaymentAccounts={seedPaymentAccountsMutation.isPending}
           methods={methods}
           methodsError={methodsQuery.error}
+          onSeedPaymentAccounts={() => {
+            void handleSeedPaymentAccounts();
+          }}
+          seedPaymentAccountsError={seedPaymentAccountsMutation.error}
           setupReadiness={setupReadinessQuery.data}
           setupReadinessError={setupReadinessQuery.error}
         />
@@ -494,6 +649,7 @@ export function PaymentSetupPageClient({ initialTab }: PaymentSetupPageClientPro
           canViewAccounts={canViewAccounts}
           canViewMethods={canViewMethods}
           methods={methods}
+          setupReadiness={setupReadinessQuery.data}
         />
       ) : null}
     </div>

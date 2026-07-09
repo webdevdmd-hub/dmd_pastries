@@ -256,6 +256,11 @@ func (s *Service) RegisterOwner(req RegisterOwnerRequest, ipAddress, userAgent s
 		return nil, apperrors.Internal("failed to seed chart of accounts")
 	}
 
+	if _, err := accounting.SeedDefaultPaymentAccountsForBusiness(tx, businessID, userID, nil); err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("failed to seed default payment accounts")
+	}
+
 	subscription := &subscriptions.Subscription{
 		ID:          utils.NewUUID(),
 		BusinessID:  businessID,

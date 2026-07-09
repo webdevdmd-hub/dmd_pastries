@@ -41,6 +41,7 @@ import {
   runAccountingBackfill,
   seedDefaultAccountMappings,
   seedDefaultChartAccounts,
+  seedDefaultPaymentAccounts,
   updateAccountingSettings,
   updateAccountMappings,
   updateChartAccount,
@@ -88,6 +89,7 @@ import type {
   PlatformSettlementsResponse,
   ProfitLossFilters,
   ProfitLossResponse,
+  SeedPaymentAccountsResponse,
   TrialBalanceFilters,
   TrialBalanceResponse,
   UpdateAccountingSettingsPayload,
@@ -465,6 +467,17 @@ export function useCreatePaymentAccount() {
 
   return useMutation<PaymentAccount, Error, PaymentAccountPayload>({
     mutationFn: async (payload) => createPaymentAccount(payload),
+    onSuccess: async () => {
+      await invalidateAccounting(queryClient);
+    },
+  });
+}
+
+export function useSeedDefaultPaymentAccounts() {
+  const queryClient = useQueryClient();
+
+  return useMutation<SeedPaymentAccountsResponse>({
+    mutationFn: async () => seedDefaultPaymentAccounts(),
     onSuccess: async () => {
       await invalidateAccounting(queryClient);
     },
