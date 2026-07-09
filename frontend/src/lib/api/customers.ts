@@ -12,6 +12,8 @@ import type {
   CustomerStats,
   CustomerStatus,
   CustomerTag,
+  CustomerTransaction,
+  CustomerTransactionSource,
   QuickCreateCustomerPayload,
   UpdateCustomerPayload,
   UpdateCustomerStatusPayload,
@@ -53,6 +55,17 @@ function optionalString(value: unknown): string | null {
 
 function numberValue(value: unknown, fallback = 0): number {
   return typeof value === "number" ? value : fallback;
+}
+
+function isCustomerTransactionSource(value: unknown): value is CustomerTransactionSource {
+  return (
+    value === "pos_sale" ||
+    value === "bakery_order" ||
+    value === "pos_payment" ||
+    value === "bakery_payment" ||
+    value === "refund" ||
+    value === "sale_refund"
+  );
 }
 
 function isCustomerStatus(value: unknown): value is CustomerStatus {
@@ -125,6 +138,8 @@ function parseCustomer(value: unknown): Customer {
     throw new Error("Backend customer payload is invalid.");
   }
 
+  const stats = isObject(value.stats) ? value.stats : {};
+
   return {
     id: stringValue(value.id),
     businessId: stringValue(value.business_id),
@@ -148,10 +163,18 @@ function parseCustomer(value: unknown): Customer {
     createdAt: stringValue(value.created_at),
     updatedAt: stringValue(value.updated_at),
     totalSalesAmount:
-      typeof value.total_sales_amount === "number" ? value.total_sales_amount : null,
+      typeof value.total_sales_amount === "number"
+        ? value.total_sales_amount
+        : typeof stats.total_sales_amount === "number"
+          ? stats.total_sales_amount
+          : null,
     totalOrdersCount:
-      typeof value.total_orders_count === "number" ? value.total_orders_count : null,
-    lastPurchaseAt: optionalString(value.last_purchase_at),
+      typeof value.total_orders_count === "number"
+        ? value.total_orders_count
+        : typeof stats.total_orders_count === "number"
+          ? stats.total_orders_count
+          : null,
+    lastPurchaseAt: optionalString(value.last_purchase_at ?? stats.last_purchase_at),
   };
 }
 
@@ -179,13 +202,46 @@ function parseStats(value: unknown): CustomerStats {
 
   return {
     totalSalesAmount: numberValue(value.total_sales_amount),
+    posSalesAmount: numberValue(value.pos_sales_amount),
+    posSalesCount: numberValue(value.pos_sales_count),
+    bakeryOrdersAmount: numberValue(value.bakery_orders_amount),
+    bakeryOrdersCount: numberValue(value.bakery_orders_count),
     totalPaidAmount: numberValue(value.total_paid_amount),
     totalRefundedAmount: numberValue(value.total_refunded_amount),
     netSpent: numberValue(value.net_spent),
     totalOrdersCount: numberValue(value.total_orders_count),
     lastPurchaseAt: optionalString(value.last_purchase_at),
+    lastOrderAt: optionalString(value.last_order_at),
     outstandingBalance: numberValue(value.outstanding_balance),
+    pendingPayments: numberValue(value.pending_payments),
+    recentTransactions: parseTransactions(value.recent_transactions),
   };
+}
+
+function parseTransaction(value: unknown): CustomerTransaction {
+  if (!isObject(value)) {
+    throw new Error("Backend customer transaction payload is invalid.");
+  }
+
+  return {
+    id: stringValue(value.id),
+    sourceType: isCustomerTransactionSource(value.source_type) ? value.source_type : "pos_sale",
+    sourceId: stringValue(value.source_id),
+    sourceNumber: stringValue(value.source_number),
+    description: stringValue(value.description),
+    amount: numberValue(value.amount),
+    status: stringValue(value.status),
+    paymentStatus: stringValue(value.payment_status),
+    occurredAt: stringValue(value.occurred_at),
+  };
+}
+
+function parseTransactions(value: unknown): CustomerTransaction[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map(parseTransaction);
 }
 
 function toQueryString(params: Record<string, string | number | null | undefined>): string {

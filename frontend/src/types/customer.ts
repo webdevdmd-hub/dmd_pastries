@@ -51,12 +51,39 @@ export type CustomerNote = {
 
 export type CustomerStats = {
   totalSalesAmount: number;
+  posSalesAmount: number;
+  posSalesCount: number;
+  bakeryOrdersAmount: number;
+  bakeryOrdersCount: number;
   totalPaidAmount: number;
   totalRefundedAmount: number;
   netSpent: number;
   totalOrdersCount: number;
   lastPurchaseAt: string | null;
+  lastOrderAt: string | null;
   outstandingBalance: number;
+  pendingPayments: number;
+  recentTransactions: CustomerTransaction[];
+};
+
+export type CustomerTransactionSource =
+  | "pos_sale"
+  | "bakery_order"
+  | "pos_payment"
+  | "bakery_payment"
+  | "refund"
+  | "sale_refund";
+
+export type CustomerTransaction = {
+  id: string;
+  sourceType: CustomerTransactionSource;
+  sourceId: string;
+  sourceNumber: string;
+  description: string;
+  amount: number;
+  status: string;
+  paymentStatus: string;
+  occurredAt: string;
 };
 
 export type CreateCustomerPayload = {

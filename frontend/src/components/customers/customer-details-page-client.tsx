@@ -9,13 +9,13 @@ import { AccessDeniedCard } from "@/components/customers/access-denied-card";
 import { CustomerFormDialog } from "@/components/customers/customer-form-dialog";
 import { CustomerNotesSection } from "@/components/customers/customer-notes-section";
 import { CustomerProfileCard } from "@/components/customers/customer-profile-card";
+import { CustomerRecentTransactionsTable } from "@/components/customers/customer-recent-transactions-table";
 import { CustomerStatsCards } from "@/components/customers/customer-stats-cards";
 import { CustomerStatusBadge } from "@/components/customers/customer-status-badge";
 import { CustomerTagsSection } from "@/components/customers/customer-tags-section";
 import { CustomersErrorState } from "@/components/customers/customers-error-state";
 import { CustomersTableSkeleton } from "@/components/customers/customers-table-skeleton";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useCustomer, useCustomerStats, useUpdateCustomer } from "@/hooks/use-customers";
@@ -104,16 +104,7 @@ export function CustomerDetailsPageClient({ customerId }: { customerId: string }
 
       <CustomerNotesSection canManage={canManage} customerId={customer.id} />
 
-      <Card className="bg-white/80">
-        <CardHeader>
-          <CardTitle>Purchase history</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-brand-mocha">
-            Purchase history will be connected from POS sales as the sales timeline API matures.
-          </p>
-        </CardContent>
-      </Card>
+      <CustomerRecentTransactionsTable transactions={statsQuery.data?.recentTransactions ?? []} />
 
       <CustomerFormDialog
         customer={customer}

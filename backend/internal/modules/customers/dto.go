@@ -135,6 +135,7 @@ type CustomerResponse struct {
 type CustomerBasicStats struct {
 	TotalOrdersCount int64      `json:"total_orders_count"`
 	LastPurchaseAt   *time.Time `json:"last_purchase_at"`
+	TotalSalesAmount float64    `json:"total_sales_amount"`
 	NetSpent         float64    `json:"net_spent"`
 }
 
@@ -157,12 +158,31 @@ type CustomerNoteResponse struct {
 }
 
 type CustomerStatsResponse struct {
-	CustomerID          string     `json:"customer_id"`
-	TotalSalesAmount    float64    `json:"total_sales_amount"`
-	TotalPaidAmount     float64    `json:"total_paid_amount"`
-	TotalRefundedAmount float64    `json:"total_refunded_amount"`
-	NetSpent            float64    `json:"net_spent"`
-	TotalOrdersCount    int64      `json:"total_orders_count"`
-	LastPurchaseAt      *time.Time `json:"last_purchase_at"`
-	OutstandingBalance  float64    `json:"outstanding_balance"`
+	CustomerID          string                        `json:"customer_id"`
+	TotalSalesAmount    float64                       `json:"total_sales_amount"`
+	POSSalesAmount      float64                       `json:"pos_sales_amount"`
+	POSSalesCount       int64                         `json:"pos_sales_count"`
+	BakeryOrdersAmount  float64                       `json:"bakery_orders_amount"`
+	BakeryOrdersCount   int64                         `json:"bakery_orders_count"`
+	TotalPaidAmount     float64                       `json:"total_paid_amount"`
+	TotalRefundedAmount float64                       `json:"total_refunded_amount"`
+	NetSpent            float64                       `json:"net_spent"`
+	TotalOrdersCount    int64                         `json:"total_orders_count"`
+	LastPurchaseAt      *time.Time                    `json:"last_purchase_at"`
+	LastOrderAt         *time.Time                    `json:"last_order_at"`
+	OutstandingBalance  float64                       `json:"outstanding_balance"`
+	PendingPayments     int64                         `json:"pending_payments"`
+	RecentTransactions  []CustomerTransactionResponse `json:"recent_transactions"`
+}
+
+type CustomerTransactionResponse struct {
+	ID            string    `json:"id"`
+	SourceType    string    `json:"source_type"`
+	SourceID      string    `json:"source_id"`
+	SourceNumber  string    `json:"source_number"`
+	Description   string    `json:"description"`
+	Amount        float64   `json:"amount"`
+	Status        string    `json:"status"`
+	PaymentStatus string    `json:"payment_status"`
+	OccurredAt    time.Time `json:"occurred_at"`
 }
