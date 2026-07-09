@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -276,6 +276,16 @@ export function ProductFormDialog({
   };
 
   const onSubmit = async (values: ProductSchema): Promise<void> => {
+    const selectedUnitId = values.unitId.trim();
+    const unitIsValid = referenceData.units.some((unit) => unit.id === selectedUnitId);
+    if (!selectedUnitId || !unitIsValid) {
+      form.setError("unitId", {
+        message: selectedUnitId ? "Select a valid unit." : "Unit is required.",
+        type: "manual",
+      });
+      return;
+    }
+
     const categoryIsCompatible = compatibleCategories.some(
       (category) => category.id === values.categoryId,
     );
@@ -305,7 +315,7 @@ export function ProductFormDialog({
     const payload: CreateProductPayload = {
       productName: values.productName,
       categoryId: values.categoryId,
-      unitId: values.unitId,
+      unitId: selectedUnitId,
       taxRateId: values.taxRateId?.trim() ? values.taxRateId : null,
       productType: values.productType,
       itemStructure: values.itemStructure,
@@ -447,21 +457,34 @@ export function ProductFormDialog({
                 </div>
                 <div className="flex flex-col gap-1">
                   <Label>Unit</Label>
-                  <Select
-                    onValueChange={(value) => form.setValue("unitId", value)}
-                    value={form.watch("unitId")}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {referenceData.units.map((unit) => (
-                        <SelectItem key={unit.id} value={unit.id}>
-                          {unit.unitName} ({unit.symbol})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Controller
+                    control={form.control}
+                    name="unitId"
+                    render={({ field }) => (
+                      <Select
+                        onValueChange={(value) => {
+                          form.setValue(field.name, value, {
+                            shouldDirty: true,
+                            shouldTouch: true,
+                            shouldValidate: true,
+                          });
+                          form.clearErrors(field.name);
+                        }}
+                        value={field.value}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {referenceData.units.map((unit) => (
+                            <SelectItem key={unit.id} value={unit.id}>
+                              {unit.unitName} ({unit.symbol})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                   <FieldError message={form.formState.errors.unitId?.message} />
                 </div>
               </div>

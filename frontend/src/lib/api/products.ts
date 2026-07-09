@@ -739,7 +739,7 @@ async function getTaxRateReferences(): Promise<TaxRate[]> {
   return response.data.filter((taxRate) => taxRate.id.length > 0 && taxRate.status === "active");
 }
 
-function toBackendProductPayload(
+export function toBackendProductPayload(
   payload: CreateProductPayload | UpdateProductPayload,
 ): BackendProductPayload {
   return {
