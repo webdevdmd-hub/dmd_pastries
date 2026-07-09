@@ -215,6 +215,86 @@ func TestValidatePurchaseReturnPostedJournalRejectsInvalidLinkedJournal(t *testi
 	}
 }
 
+func TestValidateBakeryOrderRevenuePostedJournalAcceptsMatchingPostedJournal(t *testing.T) {
+	orderID := "bakery-order-id"
+	entry := &JournalEntry{
+		ID:         "journal-id",
+		SourceType: "bakery_order_revenue",
+		SourceID:   &orderID,
+		Status:     "posted",
+	}
+
+	if err := validateBakeryOrderRevenuePostedJournal(entry, orderID); err != nil {
+		t.Fatalf("expected matching posted bakery order revenue journal to be accepted: %v", err)
+	}
+}
+
+func TestValidateBakeryOrderRevenuePostedJournalRejectsInvalidLinkedJournal(t *testing.T) {
+	orderID := "bakery-order-id"
+	otherSourceID := "other-id"
+	cases := []struct {
+		name  string
+		entry *JournalEntry
+	}{
+		{
+			name:  "missing entry",
+			entry: nil,
+		},
+		{
+			name: "wrong source type",
+			entry: &JournalEntry{
+				ID:         "journal-id",
+				SourceType: "bakery_order_payment",
+				SourceID:   &orderID,
+				Status:     "posted",
+			},
+		},
+		{
+			name: "wrong source id",
+			entry: &JournalEntry{
+				ID:         "journal-id",
+				SourceType: "bakery_order_revenue",
+				SourceID:   &otherSourceID,
+				Status:     "posted",
+			},
+		},
+		{
+			name: "unposted journal",
+			entry: &JournalEntry{
+				ID:         "journal-id",
+				SourceType: "bakery_order_revenue",
+				SourceID:   &orderID,
+				Status:     "draft",
+			},
+		},
+		{
+			name: "reversed journal",
+			entry: &JournalEntry{
+				ID:         "journal-id",
+				SourceType: "bakery_order_revenue",
+				SourceID:   &orderID,
+				Status:     "reversed",
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateBakeryOrderRevenuePostedJournal(tt.entry, orderID)
+			if err == nil {
+				t.Fatal("expected invalid linked journal to be rejected")
+			}
+			appErr, ok := err.(*apperrors.AppError)
+			if !ok {
+				t.Fatalf("expected AppError, got %T", err)
+			}
+			if appErr.StatusCode != http.StatusConflict {
+				t.Fatalf("status = %d, want %d", appErr.StatusCode, http.StatusConflict)
+			}
+		})
+	}
+}
+
 func TestJournalEntryFiltersAcceptAllOrigin(t *testing.T) {
 	if err := validateJournalEntryFilters(JournalEntryListQuery{JournalOrigin: "all"}); err != nil {
 		t.Fatalf("journal_origin=all should be accepted: %v", err)

@@ -1263,15 +1263,39 @@ func (s *Service) PostBakeryOrderRevenueJournal(tx *gorm.DB, currentUser *utils.
 	if err != nil {
 		return "", apperrors.Internal("failed to load bakery order for accounting")
 	}
-	if order.AccountingJournalEntryID != nil && *order.AccountingJournalEntryID != "" {
-		return *order.AccountingJournalEntryID, nil
-	}
 	if order.OrderStatus != "completed" {
 		return "", nil
 	}
 	totalAmount := roundMoney(order.TotalAmount)
 	if totalAmount <= 0 {
 		return "", nil
+	}
+	if order.AccountingJournalEntryID != nil && strings.TrimSpace(*order.AccountingJournalEntryID) != "" {
+		journalID := strings.TrimSpace(*order.AccountingJournalEntryID)
+		entry, err := s.repo.FindJournalEntryForUpdate(tx, currentUser.BusinessID, journalID)
+		if err != nil {
+			return "", apperrors.Conflict("linked bakery order revenue journal is missing or invalid; run bakery order journal backfill before posting accounting", map[string]interface{}{"bakery_order_id": order.ID, "journal_entry_id": journalID})
+		}
+		if err := validateBakeryOrderRevenuePostedJournal(entry, order.ID); err != nil {
+			return "", err
+		}
+		if err := s.repo.UpdateBakeryOrderAccountingJournalID(tx, currentUser.BusinessID, order.ID, journalID); err != nil {
+			return "", apperrors.Internal("failed to update bakery order accounting journal")
+		}
+		return journalID, nil
+	}
+	existing, err := s.repo.FindPostedJournalBySource(tx, currentUser.BusinessID, "bakery_order_revenue", order.ID)
+	if err == nil && existing.ID != "" {
+		if err := validateBakeryOrderRevenuePostedJournal(existing, order.ID); err != nil {
+			return "", err
+		}
+		if err := s.repo.UpdateBakeryOrderAccountingJournalID(tx, currentUser.BusinessID, order.ID, existing.ID); err != nil {
+			return "", apperrors.Internal("failed to update bakery order accounting journal")
+		}
+		return existing.ID, nil
+	}
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return "", apperrors.Internal("failed to validate existing bakery order revenue journal")
 	}
 	customerAdvance, err := s.requiredMappedAccount(tx, currentUser.BusinessID, "customer_advance", "2200", "Customer Advance")
 	if err != nil {
@@ -1326,6 +1350,26 @@ func (s *Service) PostBakeryOrderRevenueJournal(tx *gorm.DB, currentUser *utils.
 		return "", apperrors.Internal("failed to update bakery order accounting journal")
 	}
 	return journalID, nil
+}
+
+func validateBakeryOrderRevenuePostedJournal(entry *JournalEntry, orderID string) error {
+	if entry == nil || strings.TrimSpace(entry.ID) == "" {
+		return apperrors.Conflict("linked bakery order revenue journal is missing or invalid; run bakery order journal backfill before posting accounting", map[string]interface{}{"bakery_order_id": strings.TrimSpace(orderID)})
+	}
+	sourceID := ""
+	if entry.SourceID != nil {
+		sourceID = strings.TrimSpace(*entry.SourceID)
+	}
+	if strings.TrimSpace(entry.SourceType) != "bakery_order_revenue" || sourceID != strings.TrimSpace(orderID) || strings.TrimSpace(entry.Status) != "posted" {
+		return apperrors.Conflict("linked bakery order revenue journal is not a posted Bakery Order revenue journal", map[string]interface{}{
+			"bakery_order_id":  strings.TrimSpace(orderID),
+			"journal_entry_id": entry.ID,
+			"source_type":      entry.SourceType,
+			"source_id":        sourceID,
+			"status":           entry.Status,
+		})
+	}
+	return nil
 }
 
 func (s *Service) PostSalesReturnJournal(tx *gorm.DB, currentUser *utils.AuthContext, salesReturnID string) (string, error) {

@@ -152,23 +152,8 @@ func JournalConsistencyWarnings(db *gorm.DB, scope MetricScope, startUTC, endUTC
 			sourceType: "bakery_order_revenue",
 			message:    "Bakery orders are missing posted revenue journals.",
 			branchCol:  "bo.branch_id",
-			query: `
-				SELECT COUNT(*)
-				FROM bakery_orders bo
-				WHERE bo.business_id = ?
-				  AND bo.deleted_at IS NULL
-				  AND bo.order_status NOT IN ('cancelled')
-				  AND bo.event_date >= ?
-				  AND bo.event_date <= ?
-				  AND NOT EXISTS (
-				    SELECT 1 FROM journal_entries je
-				    WHERE je.business_id = bo.business_id
-				      AND je.source_type = 'bakery_order_revenue'
-				      AND je.source_id = bo.id
-				      AND je.status IN ('posted', 'reversed')
-				      AND je.deleted_at IS NULL
-				  )`,
-			args: []interface{}{scope.BusinessID, dateFrom, dateTo},
+			query:      bakeryOrderRevenueMissingJournalsQuery,
+			args:       []interface{}{scope.BusinessID, dateFrom, dateTo},
 		},
 		{
 			code:       "bakery_payments_missing_journals",
@@ -270,16 +255,8 @@ func JournalConsistencyWarnings(db *gorm.DB, scope MetricScope, startUTC, endUTC
 			sourceType: "purchase_return",
 			message:    "Posted Vendor Credits are missing posted accounting journals.",
 			branchCol:  "prt.branch_id",
-			query: `
-				SELECT COUNT(*)
-				FROM purchase_returns prt
-				WHERE prt.business_id = ?
-				  AND prt.deleted_at IS NULL
-				  AND prt.status = 'posted'
-				  AND prt.return_date >= ?
-				  AND prt.return_date <= ?
-				  AND prt.journal_entry_id IS NULL`,
-			args: []interface{}{scope.BusinessID, dateFrom, dateTo},
+			query:      vendorCreditsMissingJournalsQuery,
+			args:       []interface{}{scope.BusinessID, dateFrom, dateTo},
 		},
 		{
 			code:       "manufacturing_batches_missing_journals",
@@ -332,6 +309,56 @@ func JournalConsistencyWarnings(db *gorm.DB, scope MetricScope, startUTC, endUTC
 	}
 	return warnings, nil
 }
+
+const bakeryOrderRevenueMissingJournalsQuery = `
+	SELECT COUNT(*)
+	FROM bakery_orders bo
+	WHERE bo.business_id = ?
+	  AND bo.deleted_at IS NULL
+	  AND bo.order_status = 'completed'
+	  AND bo.event_date >= ?
+	  AND bo.event_date <= ?
+	  AND (
+	    bo.accounting_journal_entry_id IS NULL
+	    OR NOT EXISTS (
+	      SELECT 1 FROM journal_entries je
+	      WHERE je.id = bo.accounting_journal_entry_id
+	        AND je.business_id = bo.business_id
+	        AND je.source_type = 'bakery_order_revenue'
+	        AND je.source_id = bo.id
+	        AND je.status = 'posted'
+	        AND je.deleted_at IS NULL
+	    )
+	  )`
+
+const vendorCreditsMissingJournalsQuery = `
+	SELECT COUNT(*)
+	FROM purchase_returns prt
+	WHERE prt.business_id = ?
+	  AND prt.deleted_at IS NULL
+	  AND prt.status = 'posted'
+	  AND prt.return_date >= ?
+	  AND prt.return_date <= ?
+	  AND (
+	    prt.journal_entry_id IS NULL
+	    OR NOT EXISTS (
+	      SELECT 1 FROM journal_entries je
+	      WHERE je.id = prt.journal_entry_id
+	        AND je.business_id = prt.business_id
+	        AND je.source_type = 'purchase_return'
+	        AND je.source_id = prt.id
+	        AND je.status = 'posted'
+	        AND je.deleted_at IS NULL
+	    )
+	    OR EXISTS (
+	      SELECT 1 FROM stock_movements sm
+	      WHERE sm.business_id = prt.business_id
+	        AND sm.reference_type = 'purchase_return'
+	        AND sm.reference_id = prt.id
+	        AND sm.movement_type = 'purchase_return_out'
+	        AND sm.accounting_journal_entry_id IS DISTINCT FROM prt.journal_entry_id
+	    )
+	  )`
 
 func LedgerIncomeAmount(db *gorm.DB, scope MetricScope, dateFrom, dateTo string, sourceTypes []string, positiveCreditsOnly bool) (float64, error) {
 	branchClause, args := ledgerBranchClause(scope)
