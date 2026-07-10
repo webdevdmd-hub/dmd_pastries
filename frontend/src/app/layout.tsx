@@ -20,7 +20,7 @@ const fontDisplay = Cormorant_Garamond({
 
 export const metadata: Metadata = {
   title: "Pastries POS",
-  description: "Premium bakery POS SaaS frontend foundation.",
+  description: "Production-based POS and ERP for bakery operations.",
 };
 
 export default function RootLayout({
