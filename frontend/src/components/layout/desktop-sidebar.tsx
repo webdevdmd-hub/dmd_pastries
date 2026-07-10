@@ -30,7 +30,7 @@ export function DesktopSidebar(): JSX.Element {
         {!collapsed ? (
           <div className="min-w-0">
             <p className="truncate text-xl font-semibold tracking-tight text-brand-espresso">
-              COCKPIT
+              KCHEF
             </p>
             <p className="mt-1 text-[0.68rem] uppercase tracking-[0.28em] text-workspace-sidebar-muted">
               Operations OS

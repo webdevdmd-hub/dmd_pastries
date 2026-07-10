@@ -21,24 +21,24 @@ export function DashboardRiskChart({ items }: { items: DashboardRiskItem[] }): J
           margin={{ bottom: 4, left: 10, right: 18, top: 4 }}
           width={width}
         >
-          <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
-          <XAxis stroke="#7A553A" tick={{ fill: "#7A553A", fontSize: 12 }} type="number" />
+          <CartesianGrid stroke="#E4E4E7" strokeDasharray="3 3" />
+          <XAxis stroke="#71717A" tick={{ fill: "#52525B", fontSize: 12 }} type="number" />
           <YAxis
             dataKey="label"
-            stroke="#7A553A"
-            tick={{ fill: "#7A553A", fontSize: 12 }}
+            stroke="#71717A"
+            tick={{ fill: "#52525B", fontSize: 12 }}
             type="category"
             width={90}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#3B2A22",
-              border: "1px solid #B08968",
-              borderRadius: "14px",
-              color: "#F3E9D7",
+              backgroundColor: "#FFFFFF",
+              border: "1px solid #D4D4D8",
+              borderRadius: "6px",
+              color: "#171918",
             }}
           />
-          <Bar dataKey="value" fill="#B08968" radius={[0, 10, 10, 0]} />
+          <Bar dataKey="value" fill="#171918" radius={[0, 4, 4, 0]} />
         </BarChart>
       )}
     </ResponsiveChartFrame>

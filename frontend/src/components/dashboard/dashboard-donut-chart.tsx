@@ -12,13 +12,13 @@ type DonutPoint = {
   value: number;
 };
 
-const colors = ["#B08968", "#7A553A", "#D6BFA6", "#3B2A22", "#F3E9D7"];
+const colors = ["#171918", "#45B894", "#F2735B", "#71717A", "#D4D4D8"];
 
 function toDonutPoints(chart: ReportChartData): DonutPoint[] {
   const dataset = chart.datasets[0];
 
   return chart.labels.map((label, index) => ({
-    fill: colors[index % colors.length] ?? "#B08968",
+    fill: colors[index % colors.length] ?? "#171918",
     label,
     value: dataset?.data[index] ?? 0,
   }));
@@ -34,10 +34,10 @@ export function DashboardDonutChart({ chart }: { chart: ReportChartData }): JSX.
           <PieChart height={height} width={width}>
             <Tooltip
               contentStyle={{
-                backgroundColor: "#3B2A22",
-                border: "1px solid #B08968",
-                borderRadius: "14px",
-                color: "#F3E9D7",
+                backgroundColor: "#FFFFFF",
+                border: "1px solid #D4D4D8",
+                borderRadius: "6px",
+                color: "#171918",
               }}
             />
             <Pie
@@ -54,7 +54,7 @@ export function DashboardDonutChart({ chart }: { chart: ReportChartData }): JSX.
       <div className="flex flex-col justify-center gap-2">
         {data.slice(0, 6).map((point, index) => (
           <div
-            className="flex items-center justify-between gap-3 rounded-2xl bg-brand-latte/70 px-3 py-2 text-sm"
+            className="flex items-center justify-between gap-3 border-b border-zinc-100 px-3 py-2 text-sm last:border-b-0"
             key={point.label}
           >
             <span className="flex items-center gap-2 text-brand-mocha">

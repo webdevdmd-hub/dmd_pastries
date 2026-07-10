@@ -35,7 +35,7 @@ export function MobileSidebar(): JSX.Element {
       >
         <SheetHeader>
           <SheetTitle className="text-left text-xl font-semibold leading-none text-brand-espresso">
-            COCKPIT
+            KCHEF
           </SheetTitle>
           <SheetDescription className="text-left text-xs uppercase tracking-[0.22em] text-workspace-muted">
             Operations OS

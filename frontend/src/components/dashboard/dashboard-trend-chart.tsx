@@ -32,7 +32,7 @@ function toChartPoints(chart: ReportChartData): ChartPoint[] {
   });
 }
 
-const colors = ["#B08968", "#7A553A", "#D6BFA6"];
+const colors = ["#171918", "#45B894", "#F2735B"];
 
 export function DashboardTrendChart({
   chart,
@@ -53,22 +53,22 @@ export function DashboardTrendChart({
             margin={{ bottom: 8, left: 0, right: 8, top: 8 }}
             width={width}
           >
-            <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
-            <XAxis dataKey="label" stroke="#7A553A" tick={{ fill: "#7A553A", fontSize: 12 }} />
-            <YAxis stroke="#7A553A" tick={{ fill: "#7A553A", fontSize: 12 }} />
+            <CartesianGrid stroke="#E4E4E7" strokeDasharray="3 3" />
+            <XAxis dataKey="label" stroke="#71717A" tick={{ fill: "#52525B", fontSize: 12 }} />
+            <YAxis stroke="#71717A" tick={{ fill: "#52525B", fontSize: 12 }} />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#3B2A22",
-                border: "1px solid #B08968",
-                borderRadius: "14px",
-                color: "#F3E9D7",
+                backgroundColor: "#FFFFFF",
+                border: "1px solid #D4D4D8",
+                borderRadius: "6px",
+                color: "#171918",
               }}
             />
             <Legend />
             {chart.datasets.slice(0, 3).map((dataset, index) => (
               <Bar
                 dataKey={`value${String(index)}`}
-                fill={colors[index] ?? "#B08968"}
+                fill={colors[index] ?? "#171918"}
                 key={dataset.label}
                 name={dataset.label}
                 radius={[10, 10, 0, 0]}
@@ -91,19 +91,19 @@ export function DashboardTrendChart({
         >
           <defs>
             <linearGradient id="dashboardTrendFill" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="5%" stopColor="#B08968" stopOpacity={0.45} />
-              <stop offset="95%" stopColor="#B08968" stopOpacity={0.04} />
+              <stop offset="5%" stopColor="#171918" stopOpacity={0.22} />
+              <stop offset="95%" stopColor="#171918" stopOpacity={0.02} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
-          <XAxis dataKey="label" stroke="#7A553A" tick={{ fill: "#7A553A", fontSize: 12 }} />
-          <YAxis stroke="#7A553A" tick={{ fill: "#7A553A", fontSize: 12 }} />
+          <CartesianGrid stroke="#E4E4E7" strokeDasharray="3 3" />
+          <XAxis dataKey="label" stroke="#71717A" tick={{ fill: "#52525B", fontSize: 12 }} />
+          <YAxis stroke="#71717A" tick={{ fill: "#52525B", fontSize: 12 }} />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#3B2A22",
-              border: "1px solid #B08968",
-              borderRadius: "14px",
-              color: "#F3E9D7",
+              backgroundColor: "#FFFFFF",
+              border: "1px solid #D4D4D8",
+              borderRadius: "6px",
+              color: "#171918",
             }}
           />
           <Legend />
@@ -114,7 +114,7 @@ export function DashboardTrendChart({
               fillOpacity={index === 0 ? 1 : 0.15}
               key={dataset.label}
               name={dataset.label}
-              stroke={colors[index] ?? "#B08968"}
+              stroke={colors[index] ?? "#171918"}
               strokeWidth={3}
               type="monotone"
             />

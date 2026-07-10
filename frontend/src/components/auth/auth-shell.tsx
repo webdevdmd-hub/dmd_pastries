@@ -104,7 +104,7 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
                   <Croissant className="h-5 w-5 text-brand-latte" />
                 </div>
                 <div>
-                  <p className="font-display text-xl leading-none text-brand-latte">COCKPIT</p>
+                  <p className="font-display text-xl leading-none text-brand-latte">KCHEF</p>
                   <p className="text-[0.65rem] uppercase tracking-[0.26em] text-brand-cappuccino/80">
                     Secure operations OS
                   </p>
@@ -207,7 +207,7 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
                   <Croissant className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="font-display text-2xl text-brand-latte">COCKPIT</p>
+                  <p className="font-display text-2xl text-brand-latte">KCHEF</p>
                   <p className="text-xs text-brand-cappuccino">Secure operations OS</p>
                 </div>
               </Link>

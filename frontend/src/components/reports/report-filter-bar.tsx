@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { reportGroupByOptions, resolveReportPresetRange } from "@/constants/report-presets";
+import { cn } from "@/lib/utils/cn";
 import type { Branch } from "@/types/branch";
 import type { ReportDatePreset, ReportGroupBy } from "@/types/reports";
 
@@ -33,6 +34,7 @@ type ReportFilterBarProps = {
   onApply: () => void;
   onChange: (filters: ReportFilterDraft) => void;
   onReset: () => void;
+  compact?: boolean;
 };
 
 export function ReportFilterBar({
@@ -44,6 +46,7 @@ export function ReportFilterBar({
   onApply,
   onChange,
   onReset,
+  compact = false,
 }: ReportFilterBarProps): JSX.Element {
   const setPreset = (preset: ReportDatePreset): void => {
     if (preset === "custom") {
@@ -56,8 +59,13 @@ export function ReportFilterBar({
   };
 
   return (
-    <Card className="bg-white/85 shadow-soft">
-      <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-6">
+    <Card className={cn("bg-white/85 shadow-soft", compact && "rounded-md shadow-none")}>
+      <CardContent
+        className={cn(
+          "grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-6",
+          compact && "gap-3 p-4 xl:grid-cols-[8.5rem_9.5rem_9.5rem_minmax(10rem,1fr)_8.5rem_auto]",
+        )}
+      >
         <ReportPresetSelector value={filters.datePreset} onChange={setPreset} />
         <ReportDateRangePicker
           dateFrom={filters.dateFrom}
@@ -90,7 +98,7 @@ export function ReportFilterBar({
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-end gap-2 xl:col-span-6">
+        <div className={cn("flex items-end gap-2 xl:col-span-6", compact && "xl:col-span-1")}>
           <Button type="button" onClick={onApply}>
             Apply
           </Button>
