@@ -26,6 +26,7 @@ import { ROUTES } from "@/constants/routes";
 import {
   useAccountingSetupReadiness,
   usePaymentAccounts,
+  useSeedDefaultAccountMappings,
   useSeedDefaultPaymentAccounts,
 } from "@/hooks/use-accounting";
 import { usePermission } from "@/hooks/use-permission";
@@ -69,6 +70,10 @@ function readinessIssueBlocks(severity: string): boolean {
 
 function isPaymentCoverageIssue(issue: AccountingBackfillReadinessIssue): boolean {
   return issue.code.startsWith("payment_method") || issue.code.startsWith("payment_account");
+}
+
+function isAccountMappingIssue(issue: AccountingBackfillReadinessIssue): boolean {
+  return issue.code.startsWith("account_mapping");
 }
 
 function issueDetail(issue: AccountingBackfillReadinessIssue, key: string): string {
@@ -181,10 +186,13 @@ function PaymentSetupOverview({
   canManageAccounts,
   isSetupReadinessLoading,
   isSeedingPaymentAccounts,
+  isSeedingAccountMappings,
   methods,
   methodsError,
   onSeedPaymentAccounts,
+  onSeedAccountMappings,
   seedPaymentAccountsError,
+  seedAccountMappingsError,
   setupReadiness,
   setupReadinessError,
 }: {
@@ -195,10 +203,13 @@ function PaymentSetupOverview({
   canManageAccounts: boolean;
   isSetupReadinessLoading: boolean;
   isSeedingPaymentAccounts: boolean;
+  isSeedingAccountMappings: boolean;
   methods: PaymentMethod[];
   methodsError: Error | null;
   onSeedPaymentAccounts: () => void;
+  onSeedAccountMappings: () => void;
   seedPaymentAccountsError: Error | null;
+  seedAccountMappingsError: Error | null;
   setupReadiness: AccountingSetupReadinessResponse | undefined;
   setupReadinessError: Error | null;
 }): JSX.Element {
@@ -207,6 +218,7 @@ function PaymentSetupOverview({
   const setupIssues = setupReadiness?.issues ?? [];
   const blockingSetupIssues = setupIssues.filter((issue) => readinessIssueBlocks(issue.severity));
   const blockingPaymentCoverageIssues = blockingSetupIssues.filter(isPaymentCoverageIssue);
+  const blockingAccountMappingIssues = blockingSetupIssues.filter(isAccountMappingIssue);
   const setupIssueCount = canViewAccounts ? blockingSetupIssues.length : 0;
 
   return (
@@ -271,6 +283,14 @@ function PaymentSetupOverview({
         </Alert>
       ) : null}
 
+      {seedAccountMappingsError ? (
+        <Alert className="border-red-200 bg-red-50 text-red-950">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Unable to set up default account mappings</AlertTitle>
+          <AlertDescription>{getErrorMessage(seedAccountMappingsError)}</AlertDescription>
+        </Alert>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -324,6 +344,17 @@ function PaymentSetupOverview({
                   {isSeedingPaymentAccounts
                     ? "Setting up accounts..."
                     : "Set up default payment accounts"}
+                </Button>
+              ) : null}
+              {canManageAccounts && blockingAccountMappingIssues.length > 0 ? (
+                <Button
+                  disabled={isSeedingAccountMappings}
+                  onClick={onSeedAccountMappings}
+                  type="button"
+                >
+                  {isSeedingAccountMappings
+                    ? "Setting up mappings..."
+                    : "Set up default account mappings"}
                 </Button>
               ) : null}
             </div>
@@ -488,6 +519,7 @@ export function PaymentSetupPageClient({ initialTab }: PaymentSetupPageClientPro
   const accountsQuery = usePaymentAccounts(overviewAccountFilters, canViewAccounts);
   const setupReadinessQuery = useAccountingSetupReadiness(canViewAccounts);
   const seedPaymentAccountsMutation = useSeedDefaultPaymentAccounts();
+  const seedAccountMappingsMutation = useSeedDefaultAccountMappings();
 
   const methods = methodsQuery.data ?? [];
   const accounts = accountsQuery.data?.items ?? [];
@@ -516,6 +548,18 @@ export function PaymentSetupPageClient({ initialTab }: PaymentSetupPageClientPro
       });
     } catch (error) {
       toast.error("Unable to set up default payment accounts.", {
+        description: getErrorMessage(error),
+      });
+    }
+  };
+
+  const handleSeedAccountMappings = async (): Promise<void> => {
+    try {
+      await seedAccountMappingsMutation.mutateAsync();
+      await setupReadinessQuery.refetch();
+      toast.success("Default account mappings are ready.");
+    } catch (error) {
+      toast.error("Unable to set up default account mappings.", {
         description: getErrorMessage(error),
       });
     }
@@ -563,12 +607,17 @@ export function PaymentSetupPageClient({ initialTab }: PaymentSetupPageClientPro
           canManageAccounts={canManageAccounts}
           isSetupReadinessLoading={setupReadinessQuery.isLoading}
           isSeedingPaymentAccounts={seedPaymentAccountsMutation.isPending}
+          isSeedingAccountMappings={seedAccountMappingsMutation.isPending}
           methods={methods}
           methodsError={methodsQuery.error}
           onSeedPaymentAccounts={() => {
             void handleSeedPaymentAccounts();
           }}
+          onSeedAccountMappings={() => {
+            void handleSeedAccountMappings();
+          }}
           seedPaymentAccountsError={seedPaymentAccountsMutation.error}
+          seedAccountMappingsError={seedAccountMappingsMutation.error}
           setupReadiness={setupReadinessQuery.data}
           setupReadinessError={setupReadinessQuery.error}
         />

@@ -221,3 +221,100 @@ SET default_payment_account_id = method_account.payment_account_id,
 FROM method_account
 WHERE pm.id = method_account.payment_method_id
   AND pm.default_payment_account_id IS NULL;
+
+INSERT INTO accounting_account_mappings (
+    id, business_id, mapping_key, chart_account_id, description, created_at, updated_at
+)
+SELECT gen_random_uuid(), b.id, seed.mapping_key, coa.id, seed.description, NOW(), NOW()
+FROM businesses b
+JOIN (
+    VALUES
+        ('accounts_receivable', '1100', 'Customer unpaid balances'),
+        ('accounts_payable', '2000', 'Supplier unpaid balances'),
+        ('supplier_advance', '1400', 'Unapplied supplier payments and vendor prepayments'),
+        ('inventory_stock', '1200', 'Inventory stock value'),
+        ('sales_income', '4000', 'POS sales income'),
+        ('bakery_income', '4010', 'Bakery order income'),
+        ('customer_advance', '2200', 'Customer deposits and advances'),
+        ('vat_receivable', '1300', 'Input VAT receivable'),
+        ('vat_payable', '2100', 'Output VAT payable'),
+        ('cogs', '5070', 'Cost of goods sold'),
+        ('sales_returns', '4040', 'Sales returns and allowances'),
+        ('purchase_returns', '5020', 'Purchase returns'),
+        ('wip_inventory', '1210', 'Manufacturing work in process'),
+        ('wastage_expense', '5080', 'Inventory and production wastage'),
+        ('inventory_adjustment_gain', '4100', 'Inventory adjustment gains'),
+        ('inventory_adjustment_loss', '5090', 'Inventory adjustment losses'),
+        ('opening_balance_equity', '3400', 'Opening stock/equity offset'),
+        ('grni', '2050', 'Goods received not invoiced'),
+        ('platform_commission_expense', '6240', 'Delivery platform commissions'),
+        ('delivery_charge_income', '4050', 'Customer delivery charge income'),
+        ('service_charge_income', '4060', 'Customer service charge income'),
+        ('packing_charge_income', '4070', 'Customer packing charge income'),
+        ('charge_refund_account', '4080', 'Refunded customer charges'),
+        ('freight_inward', '5030', 'Supplier freight and carriage inward')
+) AS seed(mapping_key, account_code, description) ON TRUE
+JOIN chart_of_accounts coa
+  ON coa.business_id = b.id
+ AND coa.account_code = seed.account_code
+ AND coa.status = 'active'
+ AND coa.deleted_at IS NULL
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM accounting_account_mappings aam
+    WHERE aam.business_id = b.id
+      AND aam.mapping_key = seed.mapping_key
+      AND aam.deleted_at IS NULL
+);
+
+UPDATE accounting_account_mappings aam
+SET chart_account_id = ready.chart_account_id,
+    description = ready.description,
+    updated_at = NOW()
+FROM (
+    SELECT b.id AS business_id, seed.mapping_key, coa.id AS chart_account_id, seed.description
+    FROM businesses b
+    JOIN (
+        VALUES
+            ('accounts_receivable', '1100', 'Customer unpaid balances'),
+            ('accounts_payable', '2000', 'Supplier unpaid balances'),
+            ('supplier_advance', '1400', 'Unapplied supplier payments and vendor prepayments'),
+            ('inventory_stock', '1200', 'Inventory stock value'),
+            ('sales_income', '4000', 'POS sales income'),
+            ('bakery_income', '4010', 'Bakery order income'),
+            ('customer_advance', '2200', 'Customer deposits and advances'),
+            ('vat_receivable', '1300', 'Input VAT receivable'),
+            ('vat_payable', '2100', 'Output VAT payable'),
+            ('cogs', '5070', 'Cost of goods sold'),
+            ('sales_returns', '4040', 'Sales returns and allowances'),
+            ('purchase_returns', '5020', 'Purchase returns'),
+            ('wip_inventory', '1210', 'Manufacturing work in process'),
+            ('wastage_expense', '5080', 'Inventory and production wastage'),
+            ('inventory_adjustment_gain', '4100', 'Inventory adjustment gains'),
+            ('inventory_adjustment_loss', '5090', 'Inventory adjustment losses'),
+            ('opening_balance_equity', '3400', 'Opening stock/equity offset'),
+            ('grni', '2050', 'Goods received not invoiced'),
+            ('platform_commission_expense', '6240', 'Delivery platform commissions'),
+            ('delivery_charge_income', '4050', 'Customer delivery charge income'),
+            ('service_charge_income', '4060', 'Customer service charge income'),
+            ('packing_charge_income', '4070', 'Customer packing charge income'),
+            ('charge_refund_account', '4080', 'Refunded customer charges'),
+            ('freight_inward', '5030', 'Supplier freight and carriage inward')
+    ) AS seed(mapping_key, account_code, description) ON TRUE
+    JOIN chart_of_accounts coa
+      ON coa.business_id = b.id
+     AND coa.account_code = seed.account_code
+     AND coa.status = 'active'
+     AND coa.deleted_at IS NULL
+) ready
+WHERE aam.business_id = ready.business_id
+  AND aam.mapping_key = ready.mapping_key
+  AND aam.deleted_at IS NULL
+  AND NOT EXISTS (
+      SELECT 1
+      FROM chart_of_accounts current_coa
+      WHERE current_coa.id = aam.chart_account_id
+        AND current_coa.business_id = aam.business_id
+        AND current_coa.status = 'active'
+        AND current_coa.deleted_at IS NULL
+  );
