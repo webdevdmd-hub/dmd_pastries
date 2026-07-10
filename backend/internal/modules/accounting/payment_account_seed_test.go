@@ -16,6 +16,8 @@ func TestDefaultPaymentAccountSeeds(t *testing.T) {
 			ChartCode:         "1000",
 			IsDefault:         true,
 			RequiresReference: false,
+			ShowInPurchasing:  true,
+			ShowInExpenses:    true,
 		},
 		"Card": {
 			MethodName:        "Card",
@@ -25,6 +27,8 @@ func TestDefaultPaymentAccountSeeds(t *testing.T) {
 			ChartCode:         "1030",
 			IsDefault:         false,
 			RequiresReference: true,
+			ShowInPurchasing:  true,
+			ShowInExpenses:    false,
 		},
 		"Bank Transfer": {
 			MethodName:        "Bank Transfer",
@@ -34,6 +38,8 @@ func TestDefaultPaymentAccountSeeds(t *testing.T) {
 			ChartCode:         "1010",
 			IsDefault:         false,
 			RequiresReference: true,
+			ShowInPurchasing:  true,
+			ShowInExpenses:    true,
 		},
 	}
 

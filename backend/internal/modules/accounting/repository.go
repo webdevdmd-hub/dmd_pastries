@@ -1609,7 +1609,7 @@ func (r *Repository) FindChartAccountByCode(tx *gorm.DB, businessID, code string
 	return &account, err
 }
 
-func (r *Repository) EnsurePaymentMethod(tx *gorm.DB, businessID, methodName, methodType string, isDefault, requiresReference bool) (*defaultPaymentMethodRow, error) {
+func (r *Repository) EnsurePaymentMethod(tx *gorm.DB, businessID, methodName, methodType string, isDefault, requiresReference, showInPurchasing, showInExpenses bool) (*defaultPaymentMethodRow, error) {
 	var row defaultPaymentMethodRow
 	err := tx.Table("payment_methods").
 		Select("id, method_name, method_type").
@@ -1623,12 +1623,10 @@ func (r *Repository) EnsurePaymentMethod(tx *gorm.DB, businessID, methodName, me
 			"show_in_dashboard_collection": true,
 			"allow_split_payment":          true,
 			"requires_reference":           requiresReference,
+			"show_in_purchasing":           showInPurchasing,
+			"show_in_expenses":             showInExpenses,
 			"status":                       "active",
 			"updated_at":                   time.Now().UTC(),
-		}
-		if methodType == "cash" || methodType == "bank_transfer" {
-			updates["show_in_purchasing"] = true
-			updates["show_in_expenses"] = true
 		}
 		if err := tx.Table("payment_methods").Where("id = ? AND business_id = ?", row.ID, businessID).Updates(updates).Error; err != nil {
 			return nil, err
@@ -1654,8 +1652,8 @@ func (r *Repository) EnsurePaymentMethod(tx *gorm.DB, businessID, methodName, me
 		"requires_reference":           requiresReference,
 		"show_in_pos":                  true,
 		"show_in_bakery_orders":        true,
-		"show_in_purchasing":           methodType == "cash" || methodType == "bank_transfer",
-		"show_in_expenses":             methodType == "cash" || methodType == "bank_transfer",
+		"show_in_purchasing":           showInPurchasing,
+		"show_in_expenses":             showInExpenses,
 		"show_in_dashboard_collection": true,
 		"status":                       "active",
 		"created_at":                   time.Now().UTC(),

@@ -478,12 +478,14 @@ type defaultPaymentAccountSeed struct {
 	ChartCode         string
 	IsDefault         bool
 	RequiresReference bool
+	ShowInPurchasing  bool
+	ShowInExpenses    bool
 }
 
 var defaultPaymentAccountSeeds = []defaultPaymentAccountSeed{
-	{MethodName: "Cash", MethodType: "cash", AccountNamePrefix: "Cash Box", AccountType: "cash", ChartCode: "1000", IsDefault: true, RequiresReference: false},
-	{MethodName: "Card", MethodType: "card", AccountNamePrefix: "Card Clearing", AccountType: "card_clearing", ChartCode: "1030", RequiresReference: true},
-	{MethodName: "Bank Transfer", MethodType: "bank_transfer", AccountNamePrefix: "Bank Account", AccountType: "bank", ChartCode: "1010", RequiresReference: true},
+	{MethodName: "Cash", MethodType: "cash", AccountNamePrefix: "Cash Box", AccountType: "cash", ChartCode: "1000", IsDefault: true, RequiresReference: false, ShowInPurchasing: true, ShowInExpenses: true},
+	{MethodName: "Card", MethodType: "card", AccountNamePrefix: "Card Clearing", AccountType: "card_clearing", ChartCode: "1030", RequiresReference: true, ShowInPurchasing: true, ShowInExpenses: false},
+	{MethodName: "Bank Transfer", MethodType: "bank_transfer", AccountNamePrefix: "Bank Account", AccountType: "bank", ChartCode: "1010", RequiresReference: true, ShowInPurchasing: true, ShowInExpenses: true},
 }
 
 func SeedDefaultPaymentAccountsForBusiness(tx *gorm.DB, businessID, userID string, canAccessBranch func(string) bool) (*SeedPaymentAccountsResponse, error) {
@@ -504,7 +506,7 @@ func SeedDefaultPaymentAccountsForBusiness(tx *gorm.DB, businessID, userID strin
 			continue
 		}
 		for _, seed := range defaultPaymentAccountSeeds {
-			method, err := repo.EnsurePaymentMethod(tx, businessID, seed.MethodName, seed.MethodType, seed.IsDefault, seed.RequiresReference)
+			method, err := repo.EnsurePaymentMethod(tx, businessID, seed.MethodName, seed.MethodType, seed.IsDefault, seed.RequiresReference, seed.ShowInPurchasing, seed.ShowInExpenses)
 			if err != nil {
 				return nil, apperrors.Internal("failed to seed payment methods")
 			}
