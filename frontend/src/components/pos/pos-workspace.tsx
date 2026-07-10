@@ -750,7 +750,7 @@ export function POSWorkspace(): JSX.Element {
   return (
     <div className="flex h-screen min-h-[42rem] w-full flex-col overflow-hidden bg-[#f9f9fa] font-sans text-[#09090b]">
       <POSTopBar branchName={branchName} cashierName={user?.fullName ?? "Cashier"} />
-      <main className="grid min-h-0 flex-1 border-y border-[#d4d4d8] lg:grid-cols-[88px_minmax(0,1fr)_420px] xl:grid-cols-[96px_minmax(0,1fr)_440px]">
+      <main className="grid min-h-0 flex-1 border-y border-[#d4d4d8] lg:grid-cols-[144px_minmax(0,1fr)_480px] xl:grid-cols-[152px_minmax(0,1fr)_520px]">
         {!branchScope.hasBranchScope ? (
           <section className="col-span-full flex items-center justify-center">
             <div className="w-full max-w-2xl">
@@ -768,7 +768,7 @@ export function POSWorkspace(): JSX.Element {
             </div>
 
             <section className="scrollbar-hidden min-h-0 overflow-y-auto border-r border-[#d4d4d8] bg-[#f9f9fa]">
-              <div className="sticky top-0 z-10 grid gap-2 border-b border-[#d4d4d8] bg-white px-4 py-3 md:grid-cols-[minmax(0,1fr)_170px_auto_auto]">
+              <div className="sticky top-0 z-10 grid gap-2 border-b border-[#d4d4d8] bg-white px-3 py-2.5 md:grid-cols-[minmax(0,1fr)_145px_auto_auto]">
                 <POSProductSearch onChange={setSearch} value={search} />
                 <POSBarcodeInput
                   inputRef={barcodeInputRef}
@@ -777,7 +777,7 @@ export function POSWorkspace(): JSX.Element {
                   }}
                 />
                 <Button
-                  className="h-10 rounded-md border-[#d4d4d8] bg-white px-3 text-xs font-black text-[#09090b] shadow-none hover:bg-[#f4f4f5]"
+                  className="h-10 rounded-md border-[#d4d4d8] bg-white px-2.5 text-xs font-black text-[#09090b] shadow-none hover:bg-[#f4f4f5]"
                   disabled={!canCreateBakeryOrder}
                   onClick={() => setCreateOrderOpen(true)}
                   type="button"
@@ -786,7 +786,7 @@ export function POSWorkspace(): JSX.Element {
                   <CalendarPlus className="h-4 w-4" />
                   Create Order
                 </Button>
-                <label className="flex h-10 items-center justify-center gap-2 rounded-md border border-[#d4d4d8] bg-white px-3 text-xs font-black text-[#3f3f46] md:justify-start">
+                <label className="flex h-10 items-center justify-center gap-1.5 rounded-md border border-[#d4d4d8] bg-white px-2.5 text-xs font-black text-[#3f3f46] md:justify-start">
                   <Checkbox
                     checked={showPrices}
                     onCheckedChange={(checked) => setShowPrices(checked === true)}

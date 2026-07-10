@@ -236,10 +236,13 @@ func TestFinancialPurchaseTotalsSQLAppliesBranch(t *testing.T) {
 
 	supplierQuery, supplierArgs := financialPurchaseTotalsBySupplierSQL(filter)
 	for _, expected := range []string{
-		"FROM purchase_invoices pi JOIN suppliers s",
+		"FROM purchase_invoices pi LEFT JOIN suppliers s",
+		"s.business_id = pi.business_id",
+		"s.deleted_at IS NULL",
+		"COALESCE(s.supplier_name, 'Unknown supplier') AS supplier_name",
 		"pi.status = 'posted'",
 		"AND pi.branch_id = ?",
-		"GROUP BY pi.supplier_id, s.supplier_name",
+		"GROUP BY pi.supplier_id, COALESCE(s.supplier_name, 'Unknown supplier')",
 	} {
 		if !strings.Contains(supplierQuery, expected) {
 			t.Fatalf("expected supplier totals query to contain %q: %s", expected, supplierQuery)

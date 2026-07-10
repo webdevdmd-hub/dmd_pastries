@@ -1,7 +1,15 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, LoaderCircle, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  LoaderCircle,
+  LockKeyhole,
+  Mail,
+  ShieldCheck,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
@@ -37,6 +45,7 @@ export function LoginForm(): JSX.Element {
   const [rateLimitUntil, setRateLimitUntil] = useState(0);
   const [cooldownNow, setCooldownNow] = useState(() => Date.now());
   const [recoveryLoading, setRecoveryLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const form = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -156,20 +165,20 @@ export function LoginForm(): JSX.Element {
       <CardContent className="p-0">
         <Form {...form}>
           <form
-            className="space-y-5"
+            className="space-y-6"
             onSubmit={(event) => {
               void onSubmit(event);
             }}
           >
             {submitError && !rateLimited ? (
-              <Alert className="border-red-300/30 bg-red-500/10 text-red-100" variant="destructive">
+              <Alert className="border-red-200 bg-red-50 text-red-900" variant="destructive">
                 <AlertTitle>Unable to sign in</AlertTitle>
                 <AlertDescription>{submitError}</AlertDescription>
               </Alert>
             ) : null}
 
             {sessionConflict ? (
-              <Alert className="border-brand-caramel/30 bg-brand-caramel/10 text-brand-latte">
+              <Alert className="border-amber-200 bg-amber-50 text-amber-950">
                 <AlertTitle>Session already active</AlertTitle>
                 <AlertDescription className="space-y-3">
                   <p>
@@ -183,7 +192,7 @@ export function LoginForm(): JSX.Element {
                         void continueSession();
                       }}
                       type="button"
-                      className="bg-brand-latte text-brand-espresso hover:bg-white"
+                      className="bg-[#191918] text-white hover:bg-black"
                     >
                       Continue with current session
                     </Button>
@@ -193,7 +202,7 @@ export function LoginForm(): JSX.Element {
                         void restartSessionLogin();
                       }}
                       type="button"
-                      className="border-white/15 bg-white/5 text-brand-latte hover:bg-white/10"
+                      className="border-[#d8d8d2] bg-white text-[#191918] hover:bg-[#eeeeea]"
                       variant="outline"
                     >
                       Restart login
@@ -204,7 +213,7 @@ export function LoginForm(): JSX.Element {
             ) : null}
 
             {rateLimited ? (
-              <Alert className="border-brand-caramel/30 bg-brand-caramel/10 text-brand-latte">
+              <Alert className="border-amber-200 bg-amber-50 text-amber-950">
                 <AlertTitle>Too many login sync attempts</AlertTitle>
                 <AlertDescription className="space-y-3">
                   <p>
@@ -215,7 +224,7 @@ export function LoginForm(): JSX.Element {
                     , then continue the existing session instead of creating another login attempt.
                   </p>
                   {submitError ? (
-                    <p className="text-sm text-brand-cappuccino">{submitError}</p>
+                    <p className="text-sm text-amber-800">{submitError}</p>
                   ) : null}
                   <Button
                     disabled={recoveryLoading || isCooldownActive}
@@ -223,7 +232,7 @@ export function LoginForm(): JSX.Element {
                       void continueSession();
                     }}
                     type="button"
-                    className="border-white/15 bg-white/5 text-brand-latte hover:bg-white/10"
+                    className="border-amber-300 bg-white text-amber-950 hover:bg-amber-100"
                     variant="outline"
                   >
                     {isCooldownActive
@@ -239,13 +248,13 @@ export function LoginForm(): JSX.Element {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-sm font-medium text-brand-latte/88">Email</FormLabel>
+                  <FormLabel className="text-sm font-medium text-[#2d2d2a]">Email</FormLabel>
                   <FormControl>
                     <div className="relative group">
-                      <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-cappuccino" />
+                      <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b8b85]" />
                       <Input
                         autoComplete="email"
-                        className="h-13 rounded-2xl border-white/10 bg-white/[0.07] pl-11 text-brand-latte shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition placeholder:text-brand-cappuccino/62 focus-visible:border-brand-caramel/60 focus-visible:ring-brand-caramel"
+                        className="h-12 rounded-lg border-[#d6d6d0] bg-white pl-11 text-[#191918] shadow-none transition placeholder:text-[#a2a29c] focus-visible:border-[#191918] focus-visible:ring-[#191918]/10"
                         placeholder="owner@bakery.com"
                         type="email"
                         {...field}
@@ -263,11 +272,11 @@ export function LoginForm(): JSX.Element {
               render={({ field }) => (
                 <FormItem>
                   <div className="flex items-center justify-between gap-3">
-                    <FormLabel className="text-sm font-medium text-brand-latte/88">
+                    <FormLabel className="text-sm font-medium text-[#2d2d2a]">
                       Password
                     </FormLabel>
                     <Link
-                      className="text-sm text-brand-cappuccino hover:text-brand-latte"
+                      className="text-sm text-[#666662] underline-offset-4 hover:text-[#191918] hover:underline"
                       href={ROUTES.forgotPassword}
                     >
                       Forgot password?
@@ -275,14 +284,30 @@ export function LoginForm(): JSX.Element {
                   </div>
                   <FormControl>
                     <div className="relative group">
-                      <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-cappuccino" />
+                      <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b8b85]" />
                       <Input
                         autoComplete="current-password"
-                        className="h-13 rounded-2xl border-white/10 bg-white/[0.07] pl-11 text-brand-latte shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition placeholder:text-brand-cappuccino/62 focus-visible:border-brand-caramel/60 focus-visible:ring-brand-caramel"
+                        className="h-12 rounded-lg border-[#d6d6d0] bg-white pl-11 pr-11 text-[#191918] shadow-none transition placeholder:text-[#a2a29c] focus-visible:border-[#191918] focus-visible:ring-[#191918]/10"
                         placeholder="Enter your password"
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         {...field}
                       />
+                      <button
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        aria-pressed={showPassword}
+                        className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#777772] transition hover:bg-[#eeeeea] hover:text-[#191918] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#191918]/20"
+                        onClick={() => {
+                          setShowPassword((current) => !current);
+                        }}
+                        title={showPassword ? "Hide password" : "Show password"}
+                        type="button"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -291,7 +316,7 @@ export function LoginForm(): JSX.Element {
             />
 
             <Button
-              className="h-13 w-full rounded-2xl bg-brand-latte text-base font-semibold text-brand-espresso shadow-[0_20px_60px_rgba(243,233,215,0.16)] transition hover:-translate-y-0.5 hover:bg-brand-cappuccino hover:shadow-[0_26px_72px_rgba(243,233,215,0.22)]"
+              className="h-12 w-full rounded-lg bg-[#191918] text-sm font-semibold text-white shadow-none transition hover:bg-black"
               disabled={form.formState.isSubmitting || recoveryLoading || isCooldownActive}
               type="submit"
             >
@@ -308,17 +333,17 @@ export function LoginForm(): JSX.Element {
               )}
             </Button>
 
-            <div className="flex items-start gap-3 rounded-2xl border border-brand-caramel/20 bg-brand-caramel/[0.08] p-3 text-xs leading-5 text-brand-latte/64">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-caramel" />
+            <div className="flex items-start gap-3 border-t border-[#deded8] pt-5 text-xs leading-5 text-[#777772]">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#555550]" />
               <span>
                 Login restores backend permissions, branch access, and active workspace context.
               </span>
             </div>
 
-            <p className="text-center text-sm text-brand-cappuccino">
+            <p className="text-center text-sm text-[#70706b]">
               Need an owner account?{" "}
               <Link
-                className="font-medium text-brand-latte underline-offset-4 hover:underline"
+                className="font-medium text-[#191918] underline-offset-4 hover:underline"
                 href={ROUTES.signup}
               >
                 Create one now

@@ -48,6 +48,9 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
   const pathname = usePathname();
   const router = useRouter();
   const { status } = useAuth();
+  const isLoginPage = pathname === ROUTES.login;
+  const isSignupPage = pathname === ROUTES.signup;
+  const usesMinimalAuthLayout = isLoginPage || isSignupPage;
 
   useEffect(() => {
     if (
@@ -58,6 +61,31 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
       router.replace(ROUTES.dashboard);
     }
   }, [pathname, router, status]);
+
+  if (usesMinimalAuthLayout) {
+    return (
+      <div className="min-h-screen bg-[#f4f4f1] text-[#191918]">
+        <main className="mx-auto flex min-h-screen w-full max-w-7xl items-center justify-center px-6 py-12 sm:px-8 lg:px-10">
+          <section
+            className={isSignupPage ? "w-full max-w-[44rem]" : "w-full max-w-[27rem]"}
+            aria-labelledby="auth-heading"
+          >
+            <div className="mb-9">
+              <p className="mb-3 text-xs font-semibold uppercase text-[#70706b]">Account access</p>
+              <h1 className="text-3xl font-semibold leading-tight sm:text-4xl" id="auth-heading">
+                {title}
+              </h1>
+              {!isSignupPage ? (
+                <p className="mt-3 max-w-sm text-sm leading-6 text-[#666662]">{description}</p>
+              ) : null}
+            </div>
+
+            {children}
+          </section>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#050302] text-brand-latte">

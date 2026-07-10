@@ -75,22 +75,17 @@ export function POSCartPanel({
 
   return (
     <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-[#09090b]">
-      <div className="shrink-0 space-y-2 border-b border-[#d4d4d8] p-3">
-        <div className="rounded-md border border-[#d4d4d8] bg-white p-2.5">
+      <div className="grid shrink-0 grid-cols-1 gap-2 border-b border-[#d4d4d8] p-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="min-w-0 rounded-md border border-[#d4d4d8] bg-white p-2.5">
           <POSCustomerSelector onChange={onCustomerChange} value={customerId} />
         </div>
 
-        <div className="rounded-md border border-[#d4d4d8] bg-white p-2.5">
-          <div className="mb-1.5 flex items-center gap-2 text-[#52525b]">
+        <div className="grid min-w-0 grid-rows-[24px_36px] gap-1 rounded-md border border-[#d4d4d8] bg-white p-2.5">
+          <div className="flex h-6 items-center gap-2 text-[#52525b]">
             <Store className="h-4 w-4" />
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#71717a]">
-                Sales Channel
-              </p>
-              <p className="truncate text-sm font-black text-[#09090b]">
-                {selectedChannel?.channelName ?? "Default channel"}
-              </p>
-            </div>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#71717a]">
+              Sales Channel
+            </p>
           </div>
           <SearchableSelect
             ariaLabel="Select sales channel"
@@ -123,18 +118,19 @@ export function POSCartPanel({
             ]}
             placeholder="Default channel"
             searchPlaceholder="Search channels..."
-            triggerClassName="h-9 rounded-md border-[#d4d4d8] bg-[#fafafa] text-sm font-semibold shadow-none hover:bg-white focus-visible:ring-black"
+            showSelectedDescription={false}
+            triggerClassName="h-9 min-h-9 rounded-md border-[#d4d4d8] bg-[#fafafa] text-sm font-semibold shadow-none hover:bg-white focus-visible:ring-black"
             value={salesChannelId || defaultChannelValue}
           />
-          {selectedChannel?.requiresExternalOrderNumber ? (
-            <Input
-              className="mt-2 h-9 rounded-md border-[#d4d4d8] bg-white font-mono text-sm shadow-none focus-visible:ring-black"
-              onChange={(event) => onExternalOrderNumberChange(event.target.value)}
-              placeholder="External order number"
-              value={externalOrderNumber}
-            />
-          ) : null}
         </div>
+        {selectedChannel?.requiresExternalOrderNumber ? (
+          <Input
+            className="h-9 rounded-md border-[#d4d4d8] bg-white font-mono text-sm shadow-none focus-visible:ring-black sm:col-span-2"
+            onChange={(event) => onExternalOrderNumberChange(event.target.value)}
+            placeholder="External order number"
+            value={externalOrderNumber}
+          />
+        ) : null}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">

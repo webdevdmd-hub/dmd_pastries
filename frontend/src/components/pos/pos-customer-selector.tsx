@@ -75,8 +75,8 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
   };
 
   return (
-    <div className="grid gap-1">
-      <div className="flex items-center justify-between gap-2">
+    <div className="grid h-full min-w-0 grid-rows-[24px_36px] gap-1">
+      <div className="flex h-6 items-center justify-between gap-2">
         <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#71717a]">
           Customer
         </span>
@@ -121,7 +121,8 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
         placeholder="Walk-in customer or search..."
         searchPlaceholder="Search by name, code, phone, or email..."
         searchValue={search}
-        triggerClassName="min-h-9 rounded-md border-[#d4d4d8] bg-white text-sm shadow-none hover:bg-[#fafafa] focus-visible:ring-black"
+        showSelectedDescription={false}
+        triggerClassName="h-9 min-h-9 rounded-md border-[#d4d4d8] bg-white text-sm shadow-none hover:bg-[#fafafa] focus-visible:ring-black"
         value={value}
       />
 

@@ -40,6 +40,7 @@ type SearchableSelectProps = {
   placeholder?: string;
   searchPlaceholder?: string;
   searchValue?: string;
+  showSelectedDescription?: boolean;
   triggerClassName?: string;
   value: string | null;
 };
@@ -60,6 +61,7 @@ export function SearchableSelect({
   placeholder = "Select an option",
   searchPlaceholder = "Search...",
   searchValue,
+  showSelectedDescription = true,
   triggerClassName,
   value,
 }: SearchableSelectProps): JSX.Element {
@@ -100,7 +102,7 @@ export function SearchableSelect({
 
   return (
     <Popover onOpenChange={setOpen} open={open}>
-      <div className={cn("relative", className)}>
+      <div className={cn("relative min-w-0 max-w-full", className)}>
         <PopoverTrigger asChild>
           <button
             aria-expanded={open}
@@ -120,7 +122,7 @@ export function SearchableSelect({
               ) : (
                 <span className="block truncate text-muted-foreground">{placeholder}</span>
               )}
-              {selectedOption?.description ? (
+              {showSelectedDescription && selectedOption?.description ? (
                 <span className="block truncate text-xs font-normal text-brand-mocha">
                   {selectedOption.description}
                 </span>

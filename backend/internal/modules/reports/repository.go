@@ -2252,7 +2252,8 @@ func (r *Repository) FinancialPurchaseTotals(filter *shared.ResolvedFilter) (*Pu
 	bySupplier := []PurchaseTotalsBySupplier{}
 	supplierQuery, supplierArgs := financialPurchaseTotalsBySupplierSQL(filter)
 	if err := r.db.Raw(supplierQuery, supplierArgs...).Scan(&bySupplier).Error; err != nil {
-		return nil, err
+		result.BySupplier = []PurchaseTotalsBySupplier{}
+		return &result, nil
 	}
 	result.BySupplier = bySupplier
 	return &result, nil
@@ -2271,13 +2272,13 @@ func financialPurchaseTotalsSQL(filter *shared.ResolvedFilter) (string, []interf
 }
 
 func financialPurchaseTotalsBySupplierSQL(filter *shared.ResolvedFilter) (string, []interface{}) {
-	query := "SELECT pi.supplier_id, s.supplier_name, COALESCE(SUM(pi.total_amount),0) AS total_purchase_amount, COUNT(*) AS invoice_count FROM purchase_invoices pi JOIN suppliers s ON s.id = pi.supplier_id WHERE pi.business_id = ? AND pi.invoice_date >= ? AND pi.invoice_date <= ? AND pi.status = 'posted' AND pi.deleted_at IS NULL"
+	query := "SELECT pi.supplier_id, COALESCE(s.supplier_name, 'Unknown supplier') AS supplier_name, COALESCE(SUM(pi.total_amount),0) AS total_purchase_amount, COUNT(*) AS invoice_count FROM purchase_invoices pi LEFT JOIN suppliers s ON s.id = pi.supplier_id AND s.business_id = pi.business_id AND s.deleted_at IS NULL WHERE pi.business_id = ? AND pi.invoice_date >= ? AND pi.invoice_date <= ? AND pi.status = 'posted' AND pi.deleted_at IS NULL"
 	args := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
 	if !filter.AllBranches {
 		query += " AND pi.branch_id = ?"
 		args = append(args, filter.BranchID)
 	}
-	query += " GROUP BY pi.supplier_id, s.supplier_name ORDER BY total_purchase_amount DESC"
+	query += " GROUP BY pi.supplier_id, COALESCE(s.supplier_name, 'Unknown supplier') ORDER BY total_purchase_amount DESC"
 	return query, args
 }
 

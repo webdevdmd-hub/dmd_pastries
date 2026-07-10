@@ -4,6 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowRight,
   Building2,
+  Eye,
+  EyeOff,
   LoaderCircle,
   LockKeyhole,
   Mail,
@@ -17,7 +19,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -53,10 +55,79 @@ function isDuplicateIdentityError(error: unknown): boolean {
   return /same id, email, or phone already exists/i.test(error.message);
 }
 
+function getSignupErrorMessage(error: unknown): string {
+  const message = (typeof error === "string" ? error : getErrorMessage(error)).toLowerCase();
+
+  if (message.includes("phone")) {
+    return "Check your phone number.";
+  }
+
+  if (
+    message.includes("already exists") ||
+    message.includes("user_already_exists") ||
+    message.includes("duplicate")
+  ) {
+    return "Account already exists.";
+  }
+
+  if (message.includes("password")) {
+    return "Check your password.";
+  }
+
+  if (message.includes("unable to reach") || message.includes("network")) {
+    return "Unable to connect. Try again.";
+  }
+
+  if (
+    message.includes("scope") ||
+    message.includes("project") ||
+    (error instanceof ApiError && error.status >= 500)
+  ) {
+    return "Registration is temporarily unavailable.";
+  }
+
+  if (error instanceof ApiError && error.status === 400) {
+    return "Check the highlighted fields.";
+  }
+
+  return "Registration failed. Try again.";
+}
+
+function getSignupFieldError(field: keyof SignupSchema, message: string): string {
+  const normalizedMessage = message.toLowerCase();
+  const duplicate =
+    normalizedMessage.includes("already exists") ||
+    normalizedMessage.includes("duplicate") ||
+    normalizedMessage.includes("already in use");
+
+  switch (field) {
+    case "fullName":
+      return "Enter your full name.";
+    case "businessName":
+      return "Enter your business name.";
+    case "email":
+      return duplicate ? "Email already in use." : "Enter a valid email address.";
+    case "phone":
+      return duplicate ? "Phone already in use." : "Enter a valid phone number.";
+    case "password":
+      return "Use 8+ characters with uppercase, lowercase, and a number.";
+    case "confirmPassword":
+      return "Passwords do not match.";
+  }
+}
+
+const labelClassName = "text-sm font-medium text-[#2d2d2a]";
+const iconClassName =
+  "pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b8b85]";
+const inputClassName =
+  "h-12 rounded-lg border-[#d6d6d0] bg-white pl-11 text-[#191918] shadow-none transition placeholder:text-[#a2a29c] focus-visible:border-[#191918] focus-visible:ring-[#191918]/10";
+
 export function SignupForm(): JSX.Element {
   const router = useRouter();
   const { register } = useAuth();
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const form = useForm<SignupSchema>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
@@ -82,17 +153,23 @@ export function SignupForm(): JSX.Element {
           const firstMessage = messages[0];
 
           if (isSignupFieldName(field) && firstMessage) {
-            form.setError(field, { message: firstMessage });
+            form.setError(field, { message: getSignupFieldError(field, firstMessage) });
           }
         });
       }
 
       if (isDuplicateIdentityError(error)) {
         form.setError("email", {
-          message: "This email may already exist in Appwrite. Try a different email address.",
+          message: "Email already in use.",
         });
         form.setError("phone", {
-          message: "This phone may already exist in Appwrite. Try a different phone number.",
+          message: "Phone already in use.",
+        });
+      }
+
+      if (getErrorMessage(error).toLowerCase().includes("phone")) {
+        form.setError("phone", {
+          message: "Use country code, for example +971501234567.",
         });
       }
 
@@ -101,19 +178,18 @@ export function SignupForm(): JSX.Element {
   });
 
   return (
-    <Card className="border-white/10 bg-white/[0.07] shadow-none backdrop-blur-xl">
-      <CardContent className="p-4 sm:p-6">
+    <Card className="border-0 bg-transparent shadow-none">
+      <CardContent className="p-0">
         <Form {...form}>
           <form
-            className="space-y-5"
+            className="space-y-6"
             onSubmit={(event) => {
               void onSubmit(event);
             }}
           >
             {submitError ? (
-              <Alert className="border-red-300/30 bg-red-500/10 text-red-100" variant="destructive">
-                <AlertTitle>Unable to create account</AlertTitle>
-                <AlertDescription>{submitError}</AlertDescription>
+              <Alert className="border-red-200 bg-red-50 text-red-900" variant="destructive">
+                <AlertDescription>{getSignupErrorMessage(submitError)}</AlertDescription>
               </Alert>
             ) : null}
 
@@ -123,13 +199,13 @@ export function SignupForm(): JSX.Element {
                 name="fullName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-brand-latte">Full name</FormLabel>
+                    <FormLabel className={labelClassName}>Full name</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <UserRound className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-cappuccino" />
+                        <UserRound className={iconClassName} />
                         <Input
                           autoComplete="name"
-                          className="h-14 rounded-2xl border-white/10 bg-brand-latte/10 pl-11 text-brand-latte placeholder:text-brand-cappuccino/65 focus-visible:ring-brand-caramel"
+                          className={inputClassName}
                           placeholder="Mina Hassan"
                           {...field}
                         />
@@ -144,12 +220,12 @@ export function SignupForm(): JSX.Element {
                 name="businessName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-brand-latte">Business name</FormLabel>
+                    <FormLabel className={labelClassName}>Business name</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Building2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-cappuccino" />
+                        <Building2 className={iconClassName} />
                         <Input
-                          className="h-14 rounded-2xl border-white/10 bg-brand-latte/10 pl-11 text-brand-latte placeholder:text-brand-cappuccino/65 focus-visible:ring-brand-caramel"
+                          className={inputClassName}
                           placeholder="Golden Crust Bakery"
                           {...field}
                         />
@@ -167,13 +243,13 @@ export function SignupForm(): JSX.Element {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-brand-latte">Email</FormLabel>
+                    <FormLabel className={labelClassName}>Email</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-cappuccino" />
+                        <Mail className={iconClassName} />
                         <Input
                           autoComplete="email"
-                          className="h-14 rounded-2xl border-white/10 bg-brand-latte/10 pl-11 text-brand-latte placeholder:text-brand-cappuccino/65 focus-visible:ring-brand-caramel"
+                          className={inputClassName}
                           placeholder="owner@bakery.com"
                           type="email"
                           {...field}
@@ -189,13 +265,13 @@ export function SignupForm(): JSX.Element {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-brand-latte">Phone</FormLabel>
+                    <FormLabel className={labelClassName}>Phone</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Phone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-cappuccino" />
+                        <Phone className={iconClassName} />
                         <Input
                           autoComplete="tel"
-                          className="h-14 rounded-2xl border-white/10 bg-brand-latte/10 pl-11 text-brand-latte placeholder:text-brand-cappuccino/65 focus-visible:ring-brand-caramel"
+                          className={inputClassName}
                           placeholder="+971 50 000 0000"
                           type="tel"
                           {...field}
@@ -214,17 +290,33 @@ export function SignupForm(): JSX.Element {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-brand-latte">Password</FormLabel>
+                    <FormLabel className={labelClassName}>Password</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-cappuccino" />
+                        <LockKeyhole className={iconClassName} />
                         <Input
                           autoComplete="new-password"
-                          className="h-14 rounded-2xl border-white/10 bg-brand-latte/10 pl-11 text-brand-latte placeholder:text-brand-cappuccino/65 focus-visible:ring-brand-caramel"
+                          className={`${inputClassName} pr-11`}
                           placeholder="Create a strong password"
-                          type="password"
+                          type={showPassword ? "text" : "password"}
                           {...field}
                         />
+                        <button
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          aria-pressed={showPassword}
+                          className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#777772] transition hover:bg-[#eeeeea] hover:text-[#191918] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#191918]/20"
+                          onClick={() => {
+                            setShowPassword((current) => !current);
+                          }}
+                          title={showPassword ? "Hide password" : "Show password"}
+                          type="button"
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -236,17 +328,37 @@ export function SignupForm(): JSX.Element {
                 name="confirmPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-brand-latte">Confirm password</FormLabel>
+                    <FormLabel className={labelClassName}>Confirm password</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-cappuccino" />
+                        <LockKeyhole className={iconClassName} />
                         <Input
                           autoComplete="new-password"
-                          className="h-14 rounded-2xl border-white/10 bg-brand-latte/10 pl-11 text-brand-latte placeholder:text-brand-cappuccino/65 focus-visible:ring-brand-caramel"
+                          className={`${inputClassName} pr-11`}
                           placeholder="Repeat your password"
-                          type="password"
+                          type={showConfirmPassword ? "text" : "password"}
                           {...field}
                         />
+                        <button
+                          aria-label={
+                            showConfirmPassword ? "Hide confirm password" : "Show confirm password"
+                          }
+                          aria-pressed={showConfirmPassword}
+                          className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#777772] transition hover:bg-[#eeeeea] hover:text-[#191918] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#191918]/20"
+                          onClick={() => {
+                            setShowConfirmPassword((current) => !current);
+                          }}
+                          title={
+                            showConfirmPassword ? "Hide confirm password" : "Show confirm password"
+                          }
+                          type="button"
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -256,7 +368,7 @@ export function SignupForm(): JSX.Element {
             </div>
 
             <Button
-              className="h-14 w-full rounded-2xl bg-brand-caramel text-base font-semibold text-brand-latte shadow-[0_18px_40px_rgba(176,137,104,0.28)] transition hover:-translate-y-0.5 hover:bg-brand-mocha hover:shadow-[0_24px_55px_rgba(176,137,104,0.36)]"
+              className="h-12 w-full rounded-lg bg-[#191918] text-sm font-semibold text-white shadow-none transition hover:bg-black"
               disabled={form.formState.isSubmitting}
               type="submit"
             >
@@ -273,10 +385,10 @@ export function SignupForm(): JSX.Element {
               )}
             </Button>
 
-            <p className="text-center text-sm text-brand-cappuccino">
+            <p className="text-center text-sm text-[#70706b]">
               Already have access?{" "}
               <Link
-                className="font-medium text-brand-latte underline-offset-4 hover:underline"
+                className="font-medium text-[#191918] underline-offset-4 hover:underline"
                 href={ROUTES.login}
               >
                 Login
