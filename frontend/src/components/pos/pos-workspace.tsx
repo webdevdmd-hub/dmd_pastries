@@ -53,10 +53,7 @@ import {
 import { getErrorMessage } from "@/lib/api/client";
 import { lookupPOSProduct } from "@/lib/api/pos";
 import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
-import {
-  type CheckoutFeedback,
-  resolveCheckoutBlocker,
-} from "@/lib/pos/checkout-feedback";
+import { type CheckoutFeedback, resolveCheckoutBlocker } from "@/lib/pos/checkout-feedback";
 import { getProductCategoryIconForMetadata } from "@/lib/product-category-icons";
 import { checkoutSchema } from "@/lib/validators/pos.schema";
 import type { ProductCategory } from "@/types/master-data";
@@ -534,10 +531,7 @@ export function POSWorkspace(): JSX.Element {
     () => referenceDataQuery.data?.productCategories ?? [],
     [referenceDataQuery.data?.productCategories],
   );
-  const paymentMethods = useMemo(
-    () => paymentMethodsQuery.data ?? [],
-    [paymentMethodsQuery.data],
-  );
+  const paymentMethods = useMemo(() => paymentMethodsQuery.data ?? [], [paymentMethodsQuery.data]);
   const chargeTaxRates = referenceDataQuery.data?.taxRates ?? [];
   const salesChannels = useMemo(
     () =>
@@ -581,10 +575,7 @@ export function POSWorkspace(): JSX.Element {
       return;
     }
 
-    const nextPayment = createAutoSelectedPayment(
-      salesChannelDefaultPaymentMethod,
-      cartTotal,
-    );
+    const nextPayment = createAutoSelectedPayment(salesChannelDefaultPaymentMethod, cartTotal);
     const currentPaymentAlreadyMatches =
       currentPayment?.paymentMethodId === nextPayment.paymentMethodId &&
       currentPayment.paymentMethodName === nextPayment.paymentMethodName &&
@@ -768,7 +759,7 @@ export function POSWorkspace(): JSX.Element {
             </div>
 
             <section className="scrollbar-hidden min-h-0 overflow-y-auto border-r border-[#d4d4d8] bg-[#f9f9fa]">
-              <div className="sticky top-0 z-10 grid gap-2 border-b border-[#d4d4d8] bg-white px-3 py-2.5 md:grid-cols-[minmax(0,1fr)_145px_auto_auto]">
+              <div className="sticky top-0 z-10 grid gap-2 border-b border-[#d4d4d8] bg-white px-3 py-2.5 md:grid-cols-4">
                 <POSProductSearch onChange={setSearch} value={search} />
                 <POSBarcodeInput
                   inputRef={barcodeInputRef}
@@ -777,7 +768,7 @@ export function POSWorkspace(): JSX.Element {
                   }}
                 />
                 <Button
-                  className="h-10 rounded-md border-[#d4d4d8] bg-white px-2.5 text-xs font-black text-[#09090b] shadow-none hover:bg-[#f4f4f5]"
+                  className="h-10 w-full justify-center whitespace-nowrap rounded-md border-[#d4d4d8] bg-white px-2.5 text-xs font-black text-[#09090b] shadow-none hover:bg-[#f4f4f5]"
                   disabled={!canCreateBakeryOrder}
                   onClick={() => setCreateOrderOpen(true)}
                   type="button"
@@ -786,7 +777,7 @@ export function POSWorkspace(): JSX.Element {
                   <CalendarPlus className="h-4 w-4" />
                   Create Order
                 </Button>
-                <label className="flex h-10 items-center justify-center gap-1.5 rounded-md border border-[#d4d4d8] bg-white px-2.5 text-xs font-black text-[#3f3f46] md:justify-start">
+                <label className="flex h-10 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-[#d4d4d8] bg-white px-2.5 text-xs font-black text-[#3f3f46]">
                   <Checkbox
                     checked={showPrices}
                     onCheckedChange={(checked) => setShowPrices(checked === true)}

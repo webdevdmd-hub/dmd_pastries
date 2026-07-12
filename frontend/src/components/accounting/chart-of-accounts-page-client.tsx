@@ -68,6 +68,7 @@ import {
   useUpdateChartAccount,
   useUpdateChartAccountStatus,
 } from "@/hooks/use-accounting";
+import { useBranchScope } from "@/hooks/use-branch-scope";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 import type {
@@ -80,6 +81,7 @@ import type {
 } from "@/types/accounting";
 
 const defaultFilters: ChartAccountsFilters = {
+  branchId: "",
   accountGroup: "",
   accountType: "all",
   limit: 25,
@@ -126,19 +128,23 @@ function formatDate(value: string): string {
 }
 
 export function ChartOfAccountsPageClient(): JSX.Element {
+	const branchScope = useBranchScope();
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([
     PERMISSIONS.accountingView,
     PERMISSIONS.accountingAccountsManage,
   ]);
   const canManage = hasAnyPermission([PERMISSIONS.accountingAccountsManage]);
-  const [filters, setFilters] = useState<ChartAccountsFilters>(defaultFilters);
+  const [filters, setFilters] = useState<ChartAccountsFilters>({
+	...defaultFilters,
+	branchId: branchScope.effectiveBranchId ?? "",
+  });
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<ChartAccount | null>(null);
   const [ledgerAccount, setLedgerAccount] = useState<ChartAccount | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
-  const accountsQuery = useChartAccounts(filters, canView);
+  const accountsQuery = useChartAccounts(filters, canView && Boolean(filters.branchId));
   const seedMutation = useSeedDefaultChartAccounts();
   const createMutation = useCreateChartAccount();
   const updateMutation = useUpdateChartAccount();
@@ -153,14 +159,14 @@ export function ChartOfAccountsPageClient(): JSX.Element {
   const ledgerPreviewFilters = useMemo(
     () => ({
       accountId: selectedAccount?.id ?? "",
-      branchId: "",
+      branchId: filters.branchId ?? "",
       dateFrom: "",
       dateTo: "",
       limit: 5,
       page: 1,
       sortOrder: "desc" as const,
     }),
-    [selectedAccount?.id],
+    [filters.branchId, selectedAccount?.id],
   );
   const ledgerPreviewQuery = useLedgerDetails(
     ledgerPreviewFilters,
@@ -169,6 +175,12 @@ export function ChartOfAccountsPageClient(): JSX.Element {
   const ledgerPreview = ledgerPreviewQuery.data;
   const displayAccount = ledgerPreview?.account ?? selectedAccount;
   const recentTransactions = ledgerPreview?.transactions ?? [];
+
+  useEffect(() => {
+	const branchID = branchScope.effectiveBranchId ?? "";
+	setFilters((current) => current.branchId === branchID ? current : { ...current, branchId: branchID, page: 1 });
+	setSelectedAccountId("");
+  }, [branchScope.effectiveBranchId]);
 
   useEffect(() => {
     if (accounts.length === 0) {
@@ -204,7 +216,10 @@ export function ChartOfAccountsPageClient(): JSX.Element {
 
   const handleCreate = async (payload: CreateChartAccountPayload): Promise<void> => {
     try {
-      const createdAccount = await createMutation.mutateAsync(payload);
+      const createdAccount = await createMutation.mutateAsync({
+		...payload,
+		branchId: filters.branchId ?? "",
+	  });
       toast.success("Chart account created.");
       setSelectedAccountId(createdAccount.id);
       setFormOpen(false);

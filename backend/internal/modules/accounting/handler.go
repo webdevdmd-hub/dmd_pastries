@@ -560,6 +560,7 @@ func parseChartAccountListQuery(c *gin.Context) ChartAccountListQuery {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	return ChartAccountListQuery{
+		BranchID:        c.Query("branch_id"),
 		Search:          c.Query("search"),
 		AccountType:     c.Query("account_type"),
 		AccountGroup:    c.Query("account_group"),

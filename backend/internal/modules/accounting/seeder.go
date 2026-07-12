@@ -98,10 +98,17 @@ func DefaultChartAccountSeeds() []defaultAccountSeed {
 	}
 }
 
-func SeedDefaultChartOfAccounts(tx *gorm.DB, businessID string) error {
+func SeedDefaultChartOfAccounts(tx *gorm.DB, businessID string, requestedBranchIDs ...string) error {
+	branchIDs := requestedBranchIDs
+	if len(branchIDs) == 0 {
+		if err := tx.Table("branches").Where("business_id = ? AND status = ? AND deleted_at IS NULL", businessID, "active").Pluck("id", &branchIDs).Error; err != nil {
+			return err
+		}
+	}
+	for _, branchID := range branchIDs {
 	for _, seed := range DefaultChartAccountSeeds() {
 		var count int64
-		if err := tx.Model(&ChartAccount{}).Where("business_id = ? AND LOWER(account_code) = LOWER(?) AND deleted_at IS NULL", businessID, seed.Code).Count(&count).Error; err != nil {
+		if err := tx.Model(&ChartAccount{}).Where("business_id = ? AND branch_id = ? AND LOWER(account_code) = LOWER(?) AND deleted_at IS NULL", businessID, branchID, seed.Code).Count(&count).Error; err != nil {
 			return err
 		}
 		if count > 0 {
@@ -110,6 +117,7 @@ func SeedDefaultChartOfAccounts(tx *gorm.DB, businessID string) error {
 		account := ChartAccount{
 			ID:                 utils.NewUUID(),
 			BusinessID:         businessID,
+			BranchID:           branchID,
 			AccountCode:        seed.Code,
 			AccountName:        seed.Name,
 			AccountType:        seed.Type,
@@ -124,6 +132,7 @@ func SeedDefaultChartOfAccounts(tx *gorm.DB, businessID string) error {
 		if err := tx.Create(&account).Error; err != nil {
 			return err
 		}
+	}
 	}
 	return nil
 }
@@ -163,17 +172,17 @@ func DefaultAccountMappingSeeds() []defaultAccountMappingSeed {
 	}
 }
 
-func SeedDefaultAccountMappings(tx *gorm.DB, businessID string) error {
-	if err := SeedDefaultChartOfAccounts(tx, businessID); err != nil {
+func SeedDefaultAccountMappings(tx *gorm.DB, businessID, branchID string) error {
+	if err := SeedDefaultChartOfAccounts(tx, businessID, branchID); err != nil {
 		return err
 	}
 	for _, seed := range DefaultAccountMappingSeeds() {
 		var account ChartAccount
-		if err := tx.Where("business_id = ? AND account_code = ? AND status = ? AND deleted_at IS NULL", businessID, seed.AccountCode, "active").First(&account).Error; err != nil {
+		if err := tx.Where("business_id = ? AND branch_id = ? AND account_code = ? AND status = ? AND deleted_at IS NULL", businessID, branchID, seed.AccountCode, "active").First(&account).Error; err != nil {
 			return err
 		}
 		var count int64
-		if err := tx.Model(&AccountMapping{}).Where("business_id = ? AND mapping_key = ? AND deleted_at IS NULL", businessID, seed.Key).Count(&count).Error; err != nil {
+		if err := tx.Model(&AccountMapping{}).Where("business_id = ? AND branch_id = ? AND mapping_key = ? AND deleted_at IS NULL", businessID, branchID, seed.Key).Count(&count).Error; err != nil {
 			return err
 		}
 		if count > 0 {
@@ -182,6 +191,7 @@ func SeedDefaultAccountMappings(tx *gorm.DB, businessID string) error {
 		mapping := AccountMapping{
 			ID:             utils.NewUUID(),
 			BusinessID:     businessID,
+			BranchID:       branchID,
 			MappingKey:     seed.Key,
 			ChartAccountID: account.ID,
 			Description:    seed.Description,

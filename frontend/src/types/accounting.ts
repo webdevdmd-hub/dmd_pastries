@@ -13,6 +13,7 @@ export type AccountingNormalBalance = "debit" | "credit";
 export type ChartAccount = {
   id: string;
   businessId: string;
+  branchId: string;
   parentAccountId: string | null;
   parentAccountName: string;
   accountCode: string;
@@ -30,6 +31,7 @@ export type ChartAccount = {
 };
 
 export type ChartAccountsFilters = {
+  branchId?: string;
   accountGroup: string;
   accountType: AccountingAccountType | "all";
   limit: number;
@@ -50,6 +52,7 @@ export type ChartAccountsResponse = {
 };
 
 export type CreateChartAccountPayload = {
+  branchId?: string;
   allowManualPosting: boolean;
   accountCode: string;
   accountGroup: string;

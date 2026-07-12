@@ -10,11 +10,11 @@ type POSBarcodeInputProps = {
 
 export function POSBarcodeInput({ inputRef, onLookup }: POSBarcodeInputProps): JSX.Element {
   return (
-    <label className="relative block">
+    <label className="relative block min-w-0">
       <span className="sr-only">Barcode lookup</span>
       <ScanLine className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#71717a]" />
       <Input
-        className="h-10 rounded-md border-[#d4d4d8] bg-white pl-10 text-sm text-[#18181b] shadow-none placeholder:text-[#71717a] focus-visible:ring-2 focus-visible:ring-black"
+        className="h-10 w-full min-w-0 rounded-md border-[#d4d4d8] bg-white pl-10 pr-3 text-sm text-[#18181b] shadow-none placeholder:text-[#71717a] focus-visible:ring-2 focus-visible:ring-black"
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             const query = event.currentTarget.value.trim();
@@ -24,7 +24,7 @@ export function POSBarcodeInput({ inputRef, onLookup }: POSBarcodeInputProps): J
             }
           }
         }}
-        placeholder="Scan barcode"
+        placeholder="Barcode"
         ref={inputRef}
       />
     </label>

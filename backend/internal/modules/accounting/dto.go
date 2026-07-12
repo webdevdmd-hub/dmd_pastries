@@ -3,6 +3,7 @@ package accounting
 import "time"
 
 type ChartAccountListQuery struct {
+	BranchID        string
 	Search          string
 	AccountType     string
 	AccountGroup    string
@@ -52,6 +53,7 @@ type PlatformSettlementListQuery struct {
 }
 
 type UpdateAccountMappingsRequest struct {
+	BranchID string            `json:"branch_id" binding:"required,uuid"`
 	Mappings map[string]string `json:"mappings" binding:"required"`
 }
 
@@ -86,6 +88,7 @@ type UpdateAccountingSettingsRequest struct {
 }
 
 type CreateChartAccountRequest struct {
+	BranchID           string  `json:"branch_id" binding:"required,uuid"`
 	ParentAccountID    *string `json:"parent_account_id" binding:"omitempty,uuid"`
 	AccountCode        string  `json:"account_code" binding:"required"`
 	AccountName        string  `json:"account_name" binding:"required"`
@@ -244,6 +247,7 @@ type ReverseJournalEntryRequest struct {
 type ChartAccountResponse struct {
 	ID                 string    `json:"id"`
 	BusinessID         string    `json:"business_id"`
+	BranchID           string    `json:"branch_id"`
 	ParentAccountID    *string   `json:"parent_account_id"`
 	ParentAccountName  string    `json:"parent_account_name"`
 	AccountCode        string    `json:"account_code"`
@@ -263,6 +267,7 @@ type ChartAccountResponse struct {
 type AccountMappingResponse struct {
 	ID               string    `json:"id"`
 	BusinessID       string    `json:"business_id"`
+	BranchID         string    `json:"branch_id"`
 	MappingKey       string    `json:"mapping_key"`
 	ChartAccountID   string    `json:"chart_account_id"`
 	ChartAccountCode string    `json:"chart_account_code"`

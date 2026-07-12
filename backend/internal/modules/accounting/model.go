@@ -9,6 +9,7 @@ import (
 type ChartAccount struct {
 	ID                 string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID         string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID           string         `gorm:"type:uuid;not null;index" json:"branch_id"`
 	ParentAccountID    *string        `gorm:"type:uuid;index" json:"parent_account_id"`
 	AccountCode        string         `gorm:"size:50;not null" json:"account_code"`
 	AccountName        string         `gorm:"size:255;not null" json:"account_name"`
@@ -32,6 +33,7 @@ func (ChartAccount) TableName() string { return "chart_of_accounts" }
 type AccountMapping struct {
 	ID             string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID     string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID       string         `gorm:"type:uuid;not null;index" json:"branch_id"`
 	MappingKey     string         `gorm:"size:100;not null;index" json:"mapping_key"`
 	ChartAccountID string         `gorm:"type:uuid;not null;index" json:"chart_account_id"`
 	Description    string         `json:"description"`

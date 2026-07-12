@@ -251,7 +251,7 @@ func (s *Service) RegisterOwner(req RegisterOwnerRequest, ipAddress, userAgent s
 		return nil, apperrors.Internal("failed to seed default sales channels")
 	}
 
-	if err := accounting.SeedDefaultChartOfAccounts(tx, businessID); err != nil {
+	if err := accounting.SeedDefaultChartOfAccounts(tx, businessID, branchID); err != nil {
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to seed chart of accounts")
 	}

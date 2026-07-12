@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { useBranchScope } from "@/hooks/use-branch-scope";
 import {
   createAccountTransfer,
   createChartAccount,
@@ -106,24 +107,31 @@ function invalidateAccounting(queryClient: ReturnType<typeof useQueryClient>): P
 }
 
 export function useChartAccounts(filters: ChartAccountsFilters, enabled = true) {
+	const { effectiveBranchId } = useBranchScope();
+	const branchId = filters.branchId?.trim() ? filters.branchId : (effectiveBranchId ?? "");
+	const scopedFilters = { ...filters, branchId };
   return useQuery<ChartAccountsResponse>({
-    queryKey: [accountingQueryKey, "chart-of-accounts", filters],
-    queryFn: async () => getChartAccounts(filters),
-    enabled,
+    queryKey: [accountingQueryKey, "chart-of-accounts", scopedFilters],
+    queryFn: async () => getChartAccounts(scopedFilters),
+    enabled: enabled && Boolean(scopedFilters.branchId),
   });
 }
 
 export function useAllChartAccounts(filters: ChartAccountsFilters, enabled = true) {
+	const { effectiveBranchId } = useBranchScope();
+	const branchId = filters.branchId?.trim() ? filters.branchId : (effectiveBranchId ?? "");
+	const scopedFilters = { ...filters, branchId };
   return useQuery<ChartAccount[]>({
-    queryKey: [accountingQueryKey, "chart-of-accounts", "all-pages", filters],
-    queryFn: async () => getAllChartAccounts(filters),
-    enabled,
+    queryKey: [accountingQueryKey, "chart-of-accounts", "all-pages", scopedFilters],
+    queryFn: async () => getAllChartAccounts(scopedFilters),
+    enabled: enabled && Boolean(scopedFilters.branchId),
   });
 }
 
 export function useChartAccount(id: string | null, enabled = true) {
+	const { effectiveBranchId } = useBranchScope();
   return useQuery<ChartAccount>({
-    queryKey: [accountingQueryKey, "chart-of-accounts", id],
+    queryKey: [accountingQueryKey, "chart-of-accounts", effectiveBranchId, id],
     queryFn: async () => {
       if (!id) {
         throw new Error("Chart account ID is required.");
@@ -131,7 +139,7 @@ export function useChartAccount(id: string | null, enabled = true) {
 
       return getChartAccountById(id);
     },
-    enabled: enabled && id !== null,
+    enabled: enabled && id !== null && Boolean(effectiveBranchId),
   });
 }
 
@@ -324,16 +332,19 @@ export function useRunAccountingBackfill() {
 }
 
 export function useJournalEntries(filters: JournalEntriesFilters, enabled = true) {
+	const { effectiveBranchId } = useBranchScope();
+	const scopedFilters = { ...filters, branchId: effectiveBranchId ?? "" };
   return useQuery<JournalEntriesResponse>({
-    queryKey: [accountingQueryKey, "journal-entries", filters],
-    queryFn: async () => getJournalEntries(filters),
-    enabled,
+    queryKey: [accountingQueryKey, "journal-entries", scopedFilters],
+    queryFn: async () => getJournalEntries(scopedFilters),
+    enabled: enabled && Boolean(effectiveBranchId),
   });
 }
 
 export function useJournalEntry(id: string | null, enabled = true) {
+	const { effectiveBranchId } = useBranchScope();
   return useQuery<JournalEntry>({
-    queryKey: [accountingQueryKey, "journal-entries", id],
+    queryKey: [accountingQueryKey, "journal-entries", effectiveBranchId, id],
     queryFn: async () => {
       if (!id) {
         throw new Error("Journal entry ID is required.");
@@ -341,47 +352,57 @@ export function useJournalEntry(id: string | null, enabled = true) {
 
       return getJournalEntryById(id);
     },
-    enabled: enabled && id !== null,
+    enabled: enabled && id !== null && Boolean(effectiveBranchId),
   });
 }
 
 export function useGeneralLedgerReport(filters: GeneralLedgerFilters, enabled = true) {
+	const { effectiveBranchId } = useBranchScope();
+	const scopedFilters = { ...filters, branchId: effectiveBranchId ?? "" };
   return useQuery<GeneralLedgerResponse>({
-    queryKey: [accountingQueryKey, "reports", "general-ledger", filters],
-    queryFn: async () => getGeneralLedgerReport(filters),
-    enabled,
+    queryKey: [accountingQueryKey, "reports", "general-ledger", scopedFilters],
+    queryFn: async () => getGeneralLedgerReport(scopedFilters),
+    enabled: enabled && Boolean(effectiveBranchId),
   });
 }
 
 export function useTrialBalanceReport(filters: TrialBalanceFilters, enabled = true) {
+	const { effectiveBranchId } = useBranchScope();
+	const scopedFilters = { ...filters, branchId: effectiveBranchId ?? "" };
   return useQuery<TrialBalanceResponse>({
-    queryKey: [accountingQueryKey, "reports", "trial-balance", filters],
-    queryFn: async () => getTrialBalanceReport(filters),
-    enabled,
+    queryKey: [accountingQueryKey, "reports", "trial-balance", scopedFilters],
+    queryFn: async () => getTrialBalanceReport(scopedFilters),
+    enabled: enabled && Boolean(effectiveBranchId),
   });
 }
 
 export function useProfitLossReport(filters: ProfitLossFilters, enabled = true) {
+	const { effectiveBranchId } = useBranchScope();
+	const scopedFilters = { ...filters, branchId: effectiveBranchId ?? "" };
   return useQuery<ProfitLossResponse>({
-    queryKey: [accountingQueryKey, "reports", "profit-loss", filters],
-    queryFn: async () => getProfitLossReport(filters),
-    enabled,
+    queryKey: [accountingQueryKey, "reports", "profit-loss", scopedFilters],
+    queryFn: async () => getProfitLossReport(scopedFilters),
+    enabled: enabled && Boolean(effectiveBranchId),
   });
 }
 
 export function useBalanceSheetReport(filters: BalanceSheetFilters, enabled = true) {
+	const { effectiveBranchId } = useBranchScope();
+	const scopedFilters = { ...filters, branchId: effectiveBranchId ?? "" };
   return useQuery<BalanceSheetResponse>({
-    queryKey: [accountingQueryKey, "reports", "balance-sheet", filters],
-    queryFn: async () => getBalanceSheetReport(filters),
-    enabled,
+    queryKey: [accountingQueryKey, "reports", "balance-sheet", scopedFilters],
+    queryFn: async () => getBalanceSheetReport(scopedFilters),
+    enabled: enabled && Boolean(effectiveBranchId),
   });
 }
 
 export function useLedgerDetails(filters: LedgerDetailsFilters, enabled = true) {
+	const { effectiveBranchId } = useBranchScope();
+	const scopedFilters = { ...filters, branchId: effectiveBranchId ?? "" };
   return useQuery<LedgerDetailsResponse>({
-    queryKey: [accountingQueryKey, "ledger-details", filters],
-    queryFn: async () => getLedgerDetails(filters),
-    enabled: enabled && filters.accountId.length > 0,
+    queryKey: [accountingQueryKey, "ledger-details", scopedFilters],
+    queryFn: async () => getLedgerDetails(scopedFilters),
+    enabled: enabled && filters.accountId.length > 0 && Boolean(effectiveBranchId),
   });
 }
 

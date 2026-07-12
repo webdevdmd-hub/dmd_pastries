@@ -23,7 +23,43 @@ func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository) *Ser
 	return &Service{db: db, repo: repo, auditRepo: auditRepo}
 }
 
+func requiredAccountingBranch(currentUser *utils.AuthContext, requested string) (string, error) {
+	branchID, err := currentUser.ResolveOperationalBranch(strings.TrimSpace(requested))
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(branchID) == "" {
+		return "", apperrors.BadRequest("branch_id is required", nil)
+	}
+	return branchID, nil
+}
+
+func ensureAccountingRecordBranch(currentUser *utils.AuthContext, branchID *string) error {
+	selectedBranchID, err := requiredAccountingBranch(currentUser, "")
+	if err != nil {
+		return err
+	}
+	if branchID == nil || *branchID != selectedBranchID {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func scopeReconciliationQuery(currentUser *utils.AuthContext, query ReconciliationQuery) (ReconciliationQuery, error) {
+	branchID, err := requiredAccountingBranch(currentUser, query.BranchID)
+	if err != nil {
+		return query, err
+	}
+	query.BranchID = branchID
+	return query, nil
+}
+
 func (s *Service) ListChartAccounts(currentUser *utils.AuthContext, query ChartAccountListQuery) (*PaginatedResponse[ChartAccountResponse], error) {
+	branchID, err := requiredAccountingBranch(currentUser, query.BranchID)
+	if err != nil {
+		return nil, err
+	}
+	query.BranchID = branchID
 	query.Page, query.Limit = normalizePagination(query.Page, query.Limit)
 	query.Search = strings.TrimSpace(query.Search)
 	if err := validateChartAccountFilters(query); err != nil {
@@ -41,8 +77,12 @@ func (s *Service) ListChartAccounts(currentUser *utils.AuthContext, query ChartA
 }
 
 func (s *Service) SeedDefaults(currentUser *utils.AuthContext, ipAddress, userAgent string) error {
+	branchID, err := requiredAccountingBranch(currentUser, "")
+	if err != nil {
+		return err
+	}
 	return s.withTransaction(func(tx *gorm.DB) error {
-		if err := SeedDefaultAccountMappings(tx, currentUser.BusinessID); err != nil {
+		if err := SeedDefaultAccountMappings(tx, currentUser.BusinessID, branchID); err != nil {
 			return apperrors.Internal("failed to seed chart of accounts")
 		}
 		return s.writeAudit(tx, currentUser, "accounting.chart_accounts_seeded", currentUser.BusinessID, "Chart of accounts defaults seeded.", ipAddress, userAgent)
@@ -50,7 +90,11 @@ func (s *Service) SeedDefaults(currentUser *utils.AuthContext, ipAddress, userAg
 }
 
 func (s *Service) ListAccountMappings(currentUser *utils.AuthContext) ([]AccountMappingResponse, error) {
-	rows, err := s.repo.ListAccountMappings(currentUser.BusinessID)
+	branchID, err := requiredAccountingBranch(currentUser, "")
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.repo.ListAccountMappings(currentUser.BusinessID, branchID)
 	if err != nil {
 		return nil, apperrors.Internal("failed to list account mappings")
 	}
@@ -58,8 +102,12 @@ func (s *Service) ListAccountMappings(currentUser *utils.AuthContext) ([]Account
 }
 
 func (s *Service) SeedAccountMappings(currentUser *utils.AuthContext, ipAddress, userAgent string) ([]AccountMappingResponse, error) {
+	branchID, err := requiredAccountingBranch(currentUser, "")
+	if err != nil {
+		return nil, err
+	}
 	if err := s.withTransaction(func(tx *gorm.DB) error {
-		if err := SeedDefaultAccountMappings(tx, currentUser.BusinessID); err != nil {
+		if err := SeedDefaultAccountMappings(tx, currentUser.BusinessID, branchID); err != nil {
 			return apperrors.Internal("failed to seed account mappings")
 		}
 		return s.writeAudit(tx, currentUser, "accounting.account_mappings_seeded", currentUser.BusinessID, "Account mappings defaults seeded.", ipAddress, userAgent)
@@ -142,6 +190,10 @@ func (s *Service) UpdateAccountingSettings(currentUser *utils.AuthContext, req U
 }
 
 func (s *Service) CreateChartAccount(currentUser *utils.AuthContext, req CreateChartAccountRequest, ipAddress, userAgent string) (*ChartAccountResponse, error) {
+	branchID, err := requiredAccountingBranch(currentUser, req.BranchID)
+	if err != nil {
+		return nil, err
+	}
 	if err := validateCreateChartAccountRequest(req); err != nil {
 		return nil, err
 	}
@@ -151,19 +203,20 @@ func (s *Service) CreateChartAccount(currentUser *utils.AuthContext, req CreateC
 	}
 	var createdID string
 	if err := s.withTransaction(func(tx *gorm.DB) error {
-		exists, err := s.repo.AccountCodeExists(tx, currentUser.BusinessID, strings.TrimSpace(req.AccountCode))
+		exists, err := s.repo.AccountCodeExistsForBranch(tx, currentUser.BusinessID, branchID, strings.TrimSpace(req.AccountCode))
 		if err != nil {
 			return apperrors.Internal("failed to validate account code")
 		}
 		if exists {
 			return apperrors.Conflict("account_code already exists", nil)
 		}
-		if err := s.validateParentAccount(currentUser.BusinessID, cleanStringPointer(req.ParentAccountID), ""); err != nil {
+		if err := s.validateParentAccount(currentUser.BusinessID, branchID, cleanStringPointer(req.ParentAccountID), ""); err != nil {
 			return err
 		}
 		account := &ChartAccount{
 			ID:                 utils.NewUUID(),
 			BusinessID:         currentUser.BusinessID,
+			BranchID:           branchID,
 			ParentAccountID:    cleanStringPointer(req.ParentAccountID),
 			AccountCode:        strings.TrimSpace(req.AccountCode),
 			AccountName:        strings.TrimSpace(req.AccountName),
@@ -190,7 +243,11 @@ func (s *Service) CreateChartAccount(currentUser *utils.AuthContext, req CreateC
 }
 
 func (s *Service) GetChartAccount(currentUser *utils.AuthContext, id string) (*ChartAccountResponse, error) {
-	account, err := s.repo.FindByID(currentUser.BusinessID, id)
+	branchID, err := requiredAccountingBranch(currentUser, "")
+	if err != nil {
+		return nil, err
+	}
+	account, err := s.repo.FindByIDForBranch(currentUser.BusinessID, branchID, id)
 	if err != nil {
 		return nil, mapChartAccountNotFound(err)
 	}
@@ -202,7 +259,12 @@ func (s *Service) GetChartAccount(currentUser *utils.AuthContext, id string) (*C
 }
 
 func (s *Service) GetLedgerDetails(currentUser *utils.AuthContext, id string, query LedgerDetailsQuery, ipAddress, userAgent string) (*LedgerDetailsResponse, error) {
-	account, err := s.repo.FindByID(currentUser.BusinessID, id)
+	branchID, err := requiredAccountingBranch(currentUser, query.BranchID)
+	if err != nil {
+		return nil, err
+	}
+	query.BranchID = branchID
+	account, err := s.repo.FindByIDForBranch(currentUser.BusinessID, branchID, id)
 	if err != nil {
 		return nil, mapChartAccountNotFound(err)
 	}
@@ -274,10 +336,13 @@ func (s *Service) UpdateChartAccount(currentUser *utils.AuthContext, id string, 
 	if err != nil {
 		return nil, mapChartAccountNotFound(err)
 	}
+	if err := ensureAccountingRecordBranch(currentUser, &account.BranchID); err != nil {
+		return nil, mapChartAccountNotFound(err)
+	}
 	updates := map[string]interface{}{"updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
 	if req.ParentAccountID != nil {
 		parentID := cleanStringPointer(req.ParentAccountID)
-		if err := s.validateParentAccount(currentUser.BusinessID, parentID, id); err != nil {
+		if err := s.validateParentAccount(currentUser.BusinessID, account.BranchID, parentID, id); err != nil {
 			return nil, err
 		}
 		updates["parent_account_id"] = parentID
@@ -327,6 +392,9 @@ func (s *Service) UpdateChartAccountStatus(currentUser *utils.AuthContext, id st
 	if err != nil {
 		return nil, mapChartAccountNotFound(err)
 	}
+	if err := ensureAccountingRecordBranch(currentUser, &account.BranchID); err != nil {
+		return nil, mapChartAccountNotFound(err)
+	}
 	if account.IsSystemAccount && req.Status != "active" {
 		return nil, apperrors.Forbidden("system chart accounts cannot be deactivated")
 	}
@@ -345,6 +413,9 @@ func (s *Service) UpdateChartAccountStatus(currentUser *utils.AuthContext, id st
 func (s *Service) DeleteChartAccount(currentUser *utils.AuthContext, id, ipAddress, userAgent string) error {
 	account, err := s.repo.FindByID(currentUser.BusinessID, id)
 	if err != nil {
+		return mapChartAccountNotFound(err)
+	}
+	if err := ensureAccountingRecordBranch(currentUser, &account.BranchID); err != nil {
 		return mapChartAccountNotFound(err)
 	}
 	if account.IsSystemAccount {
@@ -367,6 +438,11 @@ func (s *Service) DeleteChartAccount(currentUser *utils.AuthContext, id, ipAddre
 }
 
 func (s *Service) ListPaymentAccounts(currentUser *utils.AuthContext, query PaymentAccountListQuery) (*PaginatedResponse[PaymentAccountResponse], error) {
+	branchID, err := requiredAccountingBranch(currentUser, query.BranchID)
+	if err != nil {
+		return nil, err
+	}
+	query.BranchID = branchID
 	query.Page, query.Limit = normalizePagination(query.Page, query.Limit)
 	query.Search = strings.TrimSpace(query.Search)
 	query.BranchID = strings.TrimSpace(query.BranchID)
@@ -410,10 +486,15 @@ func (s *Service) CreatePaymentAccount(currentUser *utils.AuthContext, req Creat
 	if !validAccountStatus(status) {
 		return nil, apperrors.BadRequest("invalid status", nil)
 	}
-	branchID := cleanStringPointer(req.BranchID)
-	if err := s.validateJournalBranch(s.db, currentUser, branchID); err != nil {
+	requestedBranchID := ""
+	if req.BranchID != nil {
+		requestedBranchID = *req.BranchID
+	}
+	resolvedBranchID, err := requiredAccountingBranch(currentUser, requestedBranchID)
+	if err != nil {
 		return nil, err
 	}
+	branchID := &resolvedBranchID
 	if exists, err := s.repo.PaymentAccountNameExists(currentUser.BusinessID, branchID, name, ""); err != nil {
 		return nil, apperrors.Internal("failed to validate payment account name")
 	} else if exists {
@@ -426,8 +507,12 @@ func (s *Service) CreatePaymentAccount(currentUser *utils.AuthContext, req Creat
 	}
 	var createdID string
 	if err := s.withTransaction(func(tx *gorm.DB) error {
-		if _, err := s.repo.ValidateActiveAssetChartAccount(tx, currentUser.BusinessID, chartAccountID); err != nil {
+		chartAccount, err := s.repo.ValidateActiveAccountForBranch(tx, currentUser.BusinessID, resolvedBranchID, chartAccountID)
+		if err != nil || chartAccount.AccountType != "asset" {
 			if err == gorm.ErrRecordNotFound {
+				return apperrors.BadRequest("chart_account_id must reference an active asset account", nil)
+			}
+			if err == nil {
 				return apperrors.BadRequest("chart_account_id must reference an active asset account", nil)
 			}
 			return apperrors.Internal("failed to validate chart account")
@@ -546,8 +631,8 @@ func (s *Service) GetPaymentAccount(currentUser *utils.AuthContext, id string) (
 	if err != nil {
 		return nil, mapPaymentAccountNotFound(err)
 	}
-	if account.BranchID != nil && *account.BranchID != "" && !currentUser.CanAccessBranch(*account.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := ensureAccountingRecordBranch(currentUser, account.BranchID); err != nil {
+		return nil, mapPaymentAccountNotFound(err)
 	}
 	response, err := s.repo.LoadPaymentAccountResponse(currentUser.BusinessID, *account)
 	if err != nil {
@@ -561,8 +646,8 @@ func (s *Service) UpdatePaymentAccount(currentUser *utils.AuthContext, id string
 	if err != nil {
 		return nil, mapPaymentAccountNotFound(err)
 	}
-	if account.BranchID != nil && *account.BranchID != "" && !currentUser.CanAccessBranch(*account.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := ensureAccountingRecordBranch(currentUser, account.BranchID); err != nil {
+		return nil, mapPaymentAccountNotFound(err)
 	}
 	targetBranchID := account.BranchID
 	if req.BranchID != nil {
@@ -696,6 +781,11 @@ func (s *Service) DeletePaymentAccount(currentUser *utils.AuthContext, id, ipAdd
 }
 
 func (s *Service) ListAccountTransfers(currentUser *utils.AuthContext, query AccountTransferListQuery) (*PaginatedResponse[AccountTransferResponse], error) {
+	branchID, err := requiredAccountingBranch(currentUser, query.BranchID)
+	if err != nil {
+		return nil, err
+	}
+	query.BranchID = branchID
 	query.Page, query.Limit = normalizePagination(query.Page, query.Limit)
 	query.BranchID = strings.TrimSpace(query.BranchID)
 	query.PaymentAccountID = strings.TrimSpace(query.PaymentAccountID)
@@ -792,8 +882,8 @@ func (s *Service) GetAccountTransfer(currentUser *utils.AuthContext, id string) 
 	if err != nil {
 		return nil, mapAccountTransferNotFound(err)
 	}
-	if transfer.BranchID != nil && *transfer.BranchID != "" && !currentUser.CanAccessBranch(*transfer.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := ensureAccountingRecordBranch(currentUser, transfer.BranchID); err != nil {
+		return nil, mapAccountTransferNotFound(err)
 	}
 	response, err := s.repo.LoadAccountTransferResponse(currentUser.BusinessID, *transfer)
 	if err != nil {
@@ -803,6 +893,11 @@ func (s *Service) GetAccountTransfer(currentUser *utils.AuthContext, id string) 
 }
 
 func (s *Service) ListPlatformSettlements(currentUser *utils.AuthContext, query PlatformSettlementListQuery) (*PaginatedResponse[PlatformSettlementResponse], error) {
+	branchID, err := requiredAccountingBranch(currentUser, query.BranchID)
+	if err != nil {
+		return nil, err
+	}
+	query.BranchID = branchID
 	query.Page, query.Limit = normalizePagination(query.Page, query.Limit)
 	query.BranchID = strings.TrimSpace(query.BranchID)
 	query.PlatformPaymentAccountID = strings.TrimSpace(query.PlatformPaymentAccountID)
@@ -923,8 +1018,8 @@ func (s *Service) GetPlatformSettlement(currentUser *utils.AuthContext, id strin
 	if err != nil {
 		return nil, mapPlatformSettlementNotFound(err)
 	}
-	if settlement.BranchID != nil && *settlement.BranchID != "" && !currentUser.CanAccessBranch(*settlement.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := ensureAccountingRecordBranch(currentUser, settlement.BranchID); err != nil {
+		return nil, mapPlatformSettlementNotFound(err)
 	}
 	response, err := s.repo.LoadPlatformSettlementResponse(currentUser.BusinessID, *settlement)
 	if err != nil {
@@ -2535,6 +2630,11 @@ func (s *Service) backfillOneJournal(currentUser *utils.AuthContext, target, id 
 }
 
 func (s *Service) ListJournalEntries(currentUser *utils.AuthContext, query JournalEntryListQuery) (*PaginatedResponse[JournalEntryResponse], error) {
+	branchID, err := requiredAccountingBranch(currentUser, query.BranchID)
+	if err != nil {
+		return nil, err
+	}
+	query.BranchID = branchID
 	query.Page, query.Limit = normalizePagination(query.Page, query.Limit)
 	query.Search = strings.TrimSpace(query.Search)
 	query.JournalOrigin = strings.ToLower(strings.TrimSpace(query.JournalOrigin))
@@ -2556,6 +2656,11 @@ func (s *Service) ListJournalEntries(currentUser *utils.AuthContext, query Journ
 }
 
 func (s *Service) GetGeneralLedger(currentUser *utils.AuthContext, query GeneralLedgerQuery, ipAddress, userAgent string) (*GeneralLedgerResponse, error) {
+	branchID, err := requiredAccountingBranch(currentUser, query.BranchID)
+	if err != nil {
+		return nil, err
+	}
+	query.BranchID = branchID
 	query.Page, query.Limit = normalizePagination(query.Page, query.Limit)
 	query.AccountID = strings.TrimSpace(query.AccountID)
 	query.BranchID = strings.TrimSpace(query.BranchID)
@@ -2621,6 +2726,11 @@ func (s *Service) GetGeneralLedger(currentUser *utils.AuthContext, query General
 }
 
 func (s *Service) GetTrialBalance(currentUser *utils.AuthContext, query TrialBalanceQuery, ipAddress, userAgent string) (*TrialBalanceResponse, error) {
+	branchID, err := requiredAccountingBranch(currentUser, query.BranchID)
+	if err != nil {
+		return nil, err
+	}
+	query.BranchID = branchID
 	query.BranchID = strings.TrimSpace(query.BranchID)
 	if err := s.validateAccountingReportFilters(currentUser, "", query.BranchID, query.DateFrom, query.DateTo); err != nil {
 		return nil, err
@@ -2648,6 +2758,11 @@ func (s *Service) GetTrialBalance(currentUser *utils.AuthContext, query TrialBal
 }
 
 func (s *Service) GetProfitLoss(currentUser *utils.AuthContext, query ProfitLossQuery, ipAddress, userAgent string) (*ProfitLossResponse, error) {
+	branchID, err := requiredAccountingBranch(currentUser, query.BranchID)
+	if err != nil {
+		return nil, err
+	}
+	query.BranchID = branchID
 	query.BranchID = strings.TrimSpace(query.BranchID)
 	if err := s.validateAccountingReportFilters(currentUser, "", query.BranchID, query.DateFrom, query.DateTo); err != nil {
 		return nil, err
@@ -2689,6 +2804,11 @@ func (s *Service) GetProfitLoss(currentUser *utils.AuthContext, query ProfitLoss
 }
 
 func (s *Service) GetBalanceSheet(currentUser *utils.AuthContext, query BalanceSheetQuery, ipAddress, userAgent string) (*BalanceSheetResponse, error) {
+	branchID, err := requiredAccountingBranch(currentUser, query.BranchID)
+	if err != nil {
+		return nil, err
+	}
+	query.BranchID = branchID
 	query.BranchID = strings.TrimSpace(query.BranchID)
 	query.AsOfDate = strings.TrimSpace(query.AsOfDate)
 	if err := s.validateBalanceSheetFilters(currentUser, query); err != nil {
@@ -2742,6 +2862,10 @@ func (s *Service) GetBalanceSheet(currentUser *utils.AuthContext, query BalanceS
 
 func (s *Service) GetReconciliationHealth(currentUser *utils.AuthContext, query ReconciliationQuery, ipAddress, userAgent string) (*ReconciliationHealthResponse, error) {
 	query = normalizeReconciliationQuery(query)
+	query, err := scopeReconciliationQuery(currentUser, query)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.validateReconciliationQuery(currentUser, query); err != nil {
 		return nil, err
 	}
@@ -2795,6 +2919,10 @@ func (s *Service) GetReconciliationHealth(currentUser *utils.AuthContext, query 
 
 func (s *Service) GetInventoryReconciliation(currentUser *utils.AuthContext, query ReconciliationQuery, ipAddress, userAgent string) (*ReconciliationCheckResponse, error) {
 	query = normalizeReconciliationQuery(query)
+	query, err := scopeReconciliationQuery(currentUser, query)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.validateReconciliationQuery(currentUser, query); err != nil {
 		return nil, err
 	}
@@ -2886,6 +3014,10 @@ func (s *Service) GetInventoryReconciliationDetails(currentUser *utils.AuthConte
 
 func (s *Service) GetAPReconciliation(currentUser *utils.AuthContext, query ReconciliationQuery, ipAddress, userAgent string) (*ReconciliationCheckResponse, error) {
 	query = normalizeReconciliationQuery(query)
+	query, err := scopeReconciliationQuery(currentUser, query)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.validateReconciliationQuery(currentUser, query); err != nil {
 		return nil, err
 	}
@@ -2904,6 +3036,10 @@ func (s *Service) GetAPReconciliation(currentUser *utils.AuthContext, query Reco
 
 func (s *Service) GetARReconciliation(currentUser *utils.AuthContext, query ReconciliationQuery, ipAddress, userAgent string) (*ReconciliationCheckResponse, error) {
 	query = normalizeReconciliationQuery(query)
+	query, err := scopeReconciliationQuery(currentUser, query)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.validateReconciliationQuery(currentUser, query); err != nil {
 		return nil, err
 	}
@@ -2922,6 +3058,10 @@ func (s *Service) GetARReconciliation(currentUser *utils.AuthContext, query Reco
 
 func (s *Service) GetPaymentAccountReconciliation(currentUser *utils.AuthContext, query ReconciliationQuery, ipAddress, userAgent string) (*PaymentAccountReconciliationResponse, error) {
 	query = normalizeReconciliationQuery(query)
+	query, err := scopeReconciliationQuery(currentUser, query)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.validateReconciliationQuery(currentUser, query); err != nil {
 		return nil, err
 	}
@@ -3041,13 +3181,21 @@ func (s *Service) CreateJournalEntry(currentUser *utils.AuthContext, req CreateJ
 	if err != nil {
 		return nil, err
 	}
-	branchID := cleanStringPointer(req.BranchID)
+	requestedBranchID := ""
+	if req.BranchID != nil {
+		requestedBranchID = *req.BranchID
+	}
+	resolvedBranchID, err := requiredAccountingBranch(currentUser, requestedBranchID)
+	if err != nil {
+		return nil, err
+	}
+	branchID := &resolvedBranchID
 	var createdID string
 	if err := s.withTransaction(func(tx *gorm.DB) error {
 		if err := s.validateJournalBranch(tx, currentUser, branchID); err != nil {
 			return err
 		}
-		lines, totalDebit, totalCredit, err := s.buildJournalLines(tx, currentUser.BusinessID, "", req.Lines)
+		lines, totalDebit, totalCredit, err := s.buildJournalLines(tx, currentUser.BusinessID, branchID, "", req.Lines)
 		if err != nil {
 			return err
 		}
@@ -3091,6 +3239,10 @@ func (s *Service) GetJournalEntry(currentUser *utils.AuthContext, id string) (*J
 	if err != nil {
 		return nil, mapJournalEntryNotFound(err)
 	}
+	branchID, err := requiredAccountingBranch(currentUser, "")
+	if err != nil || entry.BranchID == nil || *entry.BranchID != branchID {
+		return nil, mapJournalEntryNotFound(gorm.ErrRecordNotFound)
+	}
 	response, err := s.repo.LoadJournalEntryResponse(currentUser.BusinessID, *entry, true)
 	if err != nil {
 		return nil, apperrors.Internal("failed to load journal entry details")
@@ -3104,16 +3256,15 @@ func (s *Service) UpdateJournalEntry(currentUser *utils.AuthContext, id string, 
 		if err != nil {
 			return mapJournalEntryNotFound(err)
 		}
+		if err := ensureAccountingRecordBranch(currentUser, entry.BranchID); err != nil {
+			return mapJournalEntryNotFound(err)
+		}
 		if entry.Status != "draft" {
 			return apperrors.BadRequest("only draft journal entries can be updated", nil)
 		}
 		updates := map[string]interface{}{"updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
 		if req.BranchID != nil {
-			branchID := cleanStringPointer(req.BranchID)
-			if err := s.validateJournalBranch(tx, currentUser, branchID); err != nil {
-				return err
-			}
-			updates["branch_id"] = branchID
+			return apperrors.BadRequest("journal entry branch cannot be changed", nil)
 		}
 		if req.EntryDate != nil {
 			entryDate, err := parseRequiredDate(*req.EntryDate, "entry_date")
@@ -3135,7 +3286,7 @@ func (s *Service) UpdateJournalEntry(currentUser *utils.AuthContext, id string, 
 			updates["narration"] = strings.TrimSpace(*req.Narration)
 		}
 		if len(req.Lines) > 0 {
-			lines, totalDebit, totalCredit, err := s.buildJournalLines(tx, currentUser.BusinessID, entry.ID, req.Lines)
+			lines, totalDebit, totalCredit, err := s.buildJournalLines(tx, currentUser.BusinessID, entry.BranchID, entry.ID, req.Lines)
 			if err != nil {
 				return err
 			}
@@ -3162,6 +3313,9 @@ func (s *Service) PostJournalEntry(currentUser *utils.AuthContext, id, ipAddress
 	if err := s.withTransaction(func(tx *gorm.DB) error {
 		entry, err := s.repo.FindJournalEntryForUpdate(tx, currentUser.BusinessID, id)
 		if err != nil {
+			return mapJournalEntryNotFound(err)
+		}
+		if err := ensureAccountingRecordBranch(currentUser, entry.BranchID); err != nil {
 			return mapJournalEntryNotFound(err)
 		}
 		if entry.Status != "draft" {
@@ -3192,8 +3346,8 @@ func (s *Service) DeleteJournalEntry(currentUser *utils.AuthContext, id, ipAddre
 		if err != nil {
 			return mapJournalEntryNotFound(err)
 		}
-		if entry.BranchID != nil && *entry.BranchID != "" && !currentUser.CanAccessBranch(*entry.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := ensureAccountingRecordBranch(currentUser, entry.BranchID); err != nil {
+			return mapJournalEntryNotFound(err)
 		}
 		if strings.TrimSpace(entry.SourceType) != "" {
 			return apperrors.BadRequest("system-generated journal entries must be deleted from the source document", nil)
@@ -3228,6 +3382,9 @@ func (s *Service) ReverseJournalEntry(currentUser *utils.AuthContext, id string,
 	if err := s.withTransaction(func(tx *gorm.DB) error {
 		entry, err := s.repo.FindJournalEntryForUpdate(tx, currentUser.BusinessID, id)
 		if err != nil {
+			return mapJournalEntryNotFound(err)
+		}
+		if err := ensureAccountingRecordBranch(currentUser, entry.BranchID); err != nil {
 			return mapJournalEntryNotFound(err)
 		}
 		if entry.Status != "posted" {
@@ -3313,7 +3470,7 @@ func (s *Service) validateJournalBranch(tx *gorm.DB, currentUser *utils.AuthCont
 	return nil
 }
 
-func (s *Service) buildJournalLines(tx *gorm.DB, businessID, entryID string, lineRequests []JournalEntryLineRequest) ([]JournalEntryLine, float64, float64, error) {
+func (s *Service) buildJournalLines(tx *gorm.DB, businessID string, branchID *string, entryID string, lineRequests []JournalEntryLineRequest) ([]JournalEntryLine, float64, float64, error) {
 	if len(lineRequests) < 2 {
 		return nil, 0, 0, apperrors.BadRequest("journal entry must have at least two lines", nil)
 	}
@@ -3334,6 +3491,9 @@ func (s *Service) buildJournalLines(tx *gorm.DB, businessID, entryID string, lin
 		account, err := s.repo.ValidateActiveAccount(tx, businessID, strings.TrimSpace(lineReq.AccountID))
 		if err != nil {
 			return nil, 0, 0, apperrors.BadRequest("invalid account_id", map[string]interface{}{"line_number": i + 1})
+		}
+		if branchID == nil || account.BranchID != *branchID {
+			return nil, 0, 0, apperrors.BadRequest("account_id does not belong to the selected branch", map[string]interface{}{"line_number": i + 1})
 		}
 		if !account.AllowManualPosting {
 			return nil, 0, 0, apperrors.BadRequest("manual posting is not allowed for this account", map[string]interface{}{"line_number": i + 1, "account_id": account.ID})
@@ -3359,7 +3519,7 @@ func (s *Service) buildJournalLines(tx *gorm.DB, businessID, entryID string, lin
 	return lines, totalDebit, totalCredit, nil
 }
 
-func (s *Service) validateParentAccount(businessID string, parentID *string, selfID string) error {
+func (s *Service) validateParentAccount(businessID, branchID string, parentID *string, selfID string) error {
 	if parentID == nil || *parentID == "" {
 		return nil
 	}
@@ -3368,7 +3528,7 @@ func (s *Service) validateParentAccount(businessID string, parentID *string, sel
 	}
 	nextParentID := *parentID
 	for depth := 0; depth < 50; depth++ {
-		parent, err := s.repo.FindByID(businessID, nextParentID)
+		parent, err := s.repo.FindByIDForBranch(businessID, branchID, nextParentID)
 		if err != nil {
 			return apperrors.BadRequest("invalid parent_account_id", nil)
 		}
@@ -4159,6 +4319,13 @@ func (s *Service) loadActivePaymentAccount(currentUser *utils.AuthContext, id st
 }
 
 func (s *Service) resolvePaymentOperationBranch(currentUser *utils.AuthContext, requested *string, accounts ...*PaymentAccount) (*string, error) {
+	if requested == nil || strings.TrimSpace(*requested) == "" {
+		branchID, err := requiredAccountingBranch(currentUser, "")
+		if err != nil {
+			return nil, err
+		}
+		requested = &branchID
+	}
 	if requested != nil && *requested != "" {
 		if err := s.validateJournalBranch(s.db, currentUser, requested); err != nil {
 			return nil, err
@@ -4234,7 +4401,7 @@ func (s *Service) buildPlatformSettlementDeductions(businessID string, requests 
 
 func (s *Service) createPostedTransferJournal(tx *gorm.DB, currentUser *utils.AuthContext, entryDate time.Time, branchID *string, sourceType, sourceID, referenceNumber, narration string, lineRequests []JournalEntryLineRequest) (string, error) {
 	entryID := utils.NewUUID()
-	lines, totalDebit, totalCredit, err := s.buildJournalLines(tx, currentUser.BusinessID, entryID, lineRequests)
+	lines, totalDebit, totalCredit, err := s.buildJournalLines(tx, currentUser.BusinessID, branchID, entryID, lineRequests)
 	if err != nil {
 		return "", err
 	}

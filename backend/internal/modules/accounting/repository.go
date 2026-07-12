@@ -335,7 +335,7 @@ func (r *Repository) HardDeleteJournalEntry(tx *gorm.DB, businessID, id string) 
 }
 
 func (r *Repository) List(businessID string, query ChartAccountListQuery) ([]ChartAccount, int64, error) {
-	db := r.db.Model(&ChartAccount{}).Where("business_id = ? AND deleted_at IS NULL", businessID)
+	db := r.db.Model(&ChartAccount{}).Where("business_id = ? AND branch_id = ? AND deleted_at IS NULL", businessID, query.BranchID)
 	db = applyChartAccountFilters(db, query)
 	var total int64
 	if err := db.Count(&total).Error; err != nil {
@@ -351,6 +351,12 @@ func (r *Repository) List(businessID string, query ChartAccountListQuery) ([]Cha
 		Limit(query.Limit).
 		Find(&accounts).Error
 	return accounts, total, err
+}
+
+func (r *Repository) FindByIDForBranch(businessID, branchID, id string) (*ChartAccount, error) {
+	var account ChartAccount
+	err := r.db.Where("business_id = ? AND branch_id = ? AND id = ? AND deleted_at IS NULL", businessID, branchID, id).First(&account).Error
+	return &account, err
 }
 
 func (r *Repository) FindByID(businessID, id string) (*ChartAccount, error) {
@@ -420,10 +426,22 @@ func (r *Repository) AccountCodeExists(tx *gorm.DB, businessID, code string) (bo
 	return count > 0, err
 }
 
+func (r *Repository) AccountCodeExistsForBranch(tx *gorm.DB, businessID, branchID, code string) (bool, error) {
+	var count int64
+	err := tx.Model(&ChartAccount{}).Where("business_id = ? AND branch_id = ? AND LOWER(account_code) = LOWER(?) AND deleted_at IS NULL", businessID, branchID, code).Count(&count).Error
+	return count > 0, err
+}
+
 func (r *Repository) HasChildren(tx *gorm.DB, businessID, id string) (bool, error) {
 	var count int64
 	err := tx.Model(&ChartAccount{}).Where("business_id = ? AND parent_account_id = ? AND deleted_at IS NULL", businessID, id).Count(&count).Error
 	return count > 0, err
+}
+
+func (r *Repository) ValidateActiveAccountForBranch(tx *gorm.DB, businessID, branchID, accountID string) (*ChartAccount, error) {
+	var account ChartAccount
+	err := tx.Where("business_id = ? AND branch_id = ? AND id = ? AND status = ? AND deleted_at IS NULL", businessID, branchID, accountID, "active").First(&account).Error
+	return &account, err
 }
 
 func (r *Repository) ValidateActiveAccount(tx *gorm.DB, businessID, accountID string) (*ChartAccount, error) {
@@ -438,10 +456,10 @@ func (r *Repository) FindActiveAccountByCode(tx *gorm.DB, businessID, accountCod
 	return &account, err
 }
 
-func (r *Repository) ListAccountMappings(businessID string) ([]AccountMappingResponse, error) {
+func (r *Repository) ListAccountMappings(businessID, branchID string) ([]AccountMappingResponse, error) {
 	var rows []AccountMappingResponse
 	err := r.db.Table("accounting_account_mappings aam").
-		Select(`aam.id, aam.business_id, aam.mapping_key, aam.chart_account_id,
+		Select(`aam.id, aam.business_id, aam.branch_id, aam.mapping_key, aam.chart_account_id,
 			coa.account_code AS chart_account_code,
 			coa.account_name AS chart_account_name,
 			coa.account_type AS chart_account_type,
@@ -450,7 +468,7 @@ func (r *Repository) ListAccountMappings(businessID string) ([]AccountMappingRes
 			aam.created_at,
 			aam.updated_at`).
 		Joins("JOIN chart_of_accounts coa ON coa.id = aam.chart_account_id AND coa.business_id = aam.business_id AND coa.deleted_at IS NULL").
-		Where("aam.business_id = ? AND aam.deleted_at IS NULL", businessID).
+		Where("aam.business_id = ? AND aam.branch_id = ? AND coa.branch_id = ? AND aam.deleted_at IS NULL", businessID, branchID, branchID).
 		Order("aam.mapping_key ASC").
 		Scan(&rows).Error
 	return rows, err
@@ -2947,6 +2965,7 @@ func toChartAccountResponse(account ChartAccount, parentName string) ChartAccoun
 	return ChartAccountResponse{
 		ID:                 account.ID,
 		BusinessID:         account.BusinessID,
+		BranchID:           account.BranchID,
 		ParentAccountID:    account.ParentAccountID,
 		ParentAccountName:  parentName,
 		AccountCode:        account.AccountCode,
