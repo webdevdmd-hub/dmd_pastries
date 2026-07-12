@@ -1,7 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -184,6 +184,8 @@ export function BatchFormDialog({
   const [productionDate, setProductionDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
   const [feedback, setFeedback] = useState<ProductionFeedback | null>(null);
+  const [isCheckingPreview, setIsCheckingPreview] = useState(false);
+  const productionActionInFlightRef = useRef(false);
   const selectableBranches = branches.filter(
     (branch) =>
       branch.id === batch?.branchId ||
@@ -206,7 +208,6 @@ export function BatchFormDialog({
     );
     setNotes(batch?.notes ?? "");
     setFeedback(null);
-
   }, [batch, branchScope.effectiveBranchId, open]);
 
   const clearFeedback = (): void => {
@@ -279,9 +280,6 @@ export function BatchFormDialog({
   const productionPreview = productionPreviewQuery.data;
   const previewHasNoComponentLines = productionPreview?.components.length === 0;
   const previewHadComponentLines = productionPreview !== undefined && !previewHasNoComponentLines;
-  const previewMatchesForm =
-    productionPreview?.recipeId === recipeId &&
-    quantitiesMatch(productionPreview.quantityProduced, plannedQuantity);
   const shouldShowPreviewPanel =
     selectedRecipe !== undefined ||
     productionPreview !== undefined ||
@@ -367,57 +365,48 @@ export function BatchFormDialog({
   };
 
   const submitProduction = async (): Promise<void> => {
-    if (isSubmitting) {
+    if (isSubmitting || productionActionInFlightRef.current) {
       return;
     }
 
-    const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
-
-    const result = createProductionSchema.safeParse({
-      branchId,
-      notes,
-      productId,
-      productVariantId: selectedRecipe?.productVariantId ?? null,
-      productionDate,
-      quantityProduced: plannedQuantity,
-      recipeId,
-    });
-
-    if (!result.success) {
-      showError(result.error.issues[0]?.message ?? "Please check the production form.");
-      return;
-    }
-
-    if (recipeIsKnownInactive(selectedRecipe)) {
-      showError("Only an active recipe can be used to create production.");
-      return;
-    }
-
-    if (recipeHasKnownMissingComponents(selectedRecipe)) {
-      showError(EMPTY_BOM_PRODUCTION_MESSAGE);
-      return;
-    }
-
-    if (productionPreviewQuery.isLoading || productionPreviewQuery.isFetching) {
-      showError("Production preview is still checking stock availability. Try again in a moment.");
-      return;
-    }
-
-    if (productionPreviewQuery.isError) {
-      showError(productionFailureMessage(productionPreviewQuery.error));
-      return;
-    }
-
-    if (!previewMatchesForm) {
-      showError(productionPreview ? PREVIEW_OUT_OF_SYNC_MESSAGE : PREVIEW_REQUIRED_MESSAGE);
-      return;
-    }
-
-    if (!(await validateFreshPreview())) {
-      return;
-    }
+    productionActionInFlightRef.current = true;
 
     try {
+      const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
+
+      const result = createProductionSchema.safeParse({
+        branchId,
+        notes,
+        productId,
+        productVariantId: selectedRecipe?.productVariantId ?? null,
+        productionDate,
+        quantityProduced: plannedQuantity,
+        recipeId,
+      });
+
+      if (!result.success) {
+        showError(result.error.issues[0]?.message ?? "Please check the production form.");
+        return;
+      }
+
+      if (recipeIsKnownInactive(selectedRecipe)) {
+        showError("Only an active recipe can be used to create production.");
+        return;
+      }
+
+      if (recipeHasKnownMissingComponents(selectedRecipe)) {
+        showError(EMPTY_BOM_PRODUCTION_MESSAGE);
+        return;
+      }
+
+      setIsCheckingPreview(true);
+      const previewIsValid = await validateFreshPreview();
+      setIsCheckingPreview(false);
+
+      if (!previewIsValid) {
+        return;
+      }
+
       await onProduceNow(result.data);
     } catch (error) {
       showError(
@@ -426,11 +415,14 @@ export function BatchFormDialog({
         }),
         "Production failed",
       );
+    } finally {
+      productionActionInFlightRef.current = false;
+      setIsCheckingPreview(false);
     }
   };
 
   const submitPlannedProduction = async (): Promise<void> => {
-    if (isSubmitting) {
+    if (isSubmitting || productionActionInFlightRef.current) {
       return;
     }
 
@@ -438,58 +430,49 @@ export function BatchFormDialog({
       return;
     }
 
-    const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
-
-    const productionResult = createBatchSchema.safeParse({
-      branchId,
-      notes,
-      plannedQuantity,
-      productId,
-      productionDate,
-      recipeId,
-    });
-    const produceResult = produceSchema.safeParse({ quantityProduced: plannedQuantity });
-
-    if (!productionResult.success) {
-      showError(productionResult.error.issues[0]?.message ?? "Please check the production form.");
-      return;
-    }
-
-    if (!produceResult.success) {
-      showError(produceResult.error.issues[0]?.message ?? "Please check produced quantity.");
-      return;
-    }
-
-    if (recipeIsKnownInactive(selectedRecipe)) {
-      showError("Only an active recipe can be used to create production.");
-      return;
-    }
-
-    if (recipeHasKnownMissingComponents(selectedRecipe)) {
-      showError(EMPTY_BOM_PRODUCTION_MESSAGE);
-      return;
-    }
-
-    if (productionPreviewQuery.isLoading || productionPreviewQuery.isFetching) {
-      showError("Production preview is still checking stock availability. Try again in a moment.");
-      return;
-    }
-
-    if (productionPreviewQuery.isError) {
-      showError(productionFailureMessage(productionPreviewQuery.error));
-      return;
-    }
-
-    if (!previewMatchesForm) {
-      showError(productionPreview ? PREVIEW_OUT_OF_SYNC_MESSAGE : PREVIEW_REQUIRED_MESSAGE);
-      return;
-    }
-
-    if (!(await validateFreshPreview())) {
-      return;
-    }
+    productionActionInFlightRef.current = true;
 
     try {
+      const selectedRecipe = recipes.find((recipe) => recipe.id === recipeId);
+
+      const productionResult = createBatchSchema.safeParse({
+        branchId,
+        notes,
+        plannedQuantity,
+        productId,
+        productionDate,
+        recipeId,
+      });
+      const produceResult = produceSchema.safeParse({ quantityProduced: plannedQuantity });
+
+      if (!productionResult.success) {
+        showError(productionResult.error.issues[0]?.message ?? "Please check the production form.");
+        return;
+      }
+
+      if (!produceResult.success) {
+        showError(produceResult.error.issues[0]?.message ?? "Please check produced quantity.");
+        return;
+      }
+
+      if (recipeIsKnownInactive(selectedRecipe)) {
+        showError("Only an active recipe can be used to create production.");
+        return;
+      }
+
+      if (recipeHasKnownMissingComponents(selectedRecipe)) {
+        showError(EMPTY_BOM_PRODUCTION_MESSAGE);
+        return;
+      }
+
+      setIsCheckingPreview(true);
+      const previewIsValid = await validateFreshPreview();
+      setIsCheckingPreview(false);
+
+      if (!previewIsValid) {
+        return;
+      }
+
       await onProducePlanned(batch.id, {
         notes: productionResult.data.notes,
         productionDate: productionResult.data.productionDate,
@@ -502,10 +485,13 @@ export function BatchFormDialog({
         }),
         "Production failed",
       );
+    } finally {
+      productionActionInFlightRef.current = false;
+      setIsCheckingPreview(false);
     }
   };
   const isCreateDisabled = isSubmitting || selectedRecipeIsKnownInactive;
-  const isProduceDisabled = isSubmitting;
+  const isProduceDisabled = isSubmitting || isCheckingPreview;
 
   return (
     <Dialog
@@ -848,7 +834,11 @@ export function BatchFormDialog({
               onClick={() => void submitPlannedProduction()}
               type="button"
             >
-              {isSubmitting ? "Producing..." : "Produce planned"}
+              {isCheckingPreview
+                ? "Checking stock..."
+                : isSubmitting
+                  ? "Producing..."
+                  : "Produce planned"}
             </Button>
           ) : null}
           {!batch ? (
@@ -858,7 +848,11 @@ export function BatchFormDialog({
               onClick={() => void submitProduction()}
               type="button"
             >
-              Produce now
+              {isCheckingPreview
+                ? "Checking stock..."
+                : isSubmitting
+                  ? "Producing..."
+                  : "Produce now"}
             </Button>
           ) : null}
         </DialogFooter>
