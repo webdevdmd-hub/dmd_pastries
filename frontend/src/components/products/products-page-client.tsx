@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Box, Eye, PackageCheck, PlusCircle, ShieldAlert } from "lucide-react";
+import { Box, Boxes, CircleDollarSign, Eye, PackageCheck, PlusCircle } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/hooks/use-auth";
+import { useInventory } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import {
   useApplyProductPriceSuggestion,
@@ -53,7 +54,7 @@ import {
   getHistoryDeleteConflictMessage,
   isHistoryDeleteConflict,
 } from "@/lib/api/delete-conflicts";
-import { isPosSelectableProduct } from "@/lib/selectors/eligibility";
+import type { InventoryFilters } from "@/types/inventory";
 import type {
   CreateProductPayload,
   CreateProductVariantPayload,
@@ -93,18 +94,26 @@ function createProductCountFilters(overrides: Partial<ProductListFilters>): Prod
 
 const catalogCountFilters = createProductCountFilters({});
 const activeCountFilters = createProductCountFilters({ status: "active" });
-const posReadyCountFilters = createProductCountFilters({
-  status: "active",
-  isPosVisible: "true",
-  isSellable: "true",
-});
-const archivedCountFilters = createProductCountFilters({ status: "archived" });
+const productInventoryFilters: InventoryFilters = {
+  branchId: "",
+  expiryTrackedOnly: false,
+  includeUninitialized: true,
+  itemType: "all",
+  lowStockOnly: false,
+  productType: "all",
+  search: "",
+  status: "all",
+};
 
 function formatMoney(value: number): string {
   return `AED ${value.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function formatQuantity(value: number): string {
+  return value.toLocaleString("en-AE", { maximumFractionDigits: 3 });
 }
 
 type ProductSearchParams = {
@@ -169,6 +178,7 @@ export function ProductsPageClient(): JSX.Element {
 
   const canViewProducts = hasAnyPermission([PERMISSIONS.productsView]);
   const canCreateProducts = hasAnyPermission([PERMISSIONS.productsCreate]);
+  const canViewInventory = hasAnyPermission([PERMISSIONS.inventoryView]);
   const canManageProducts = hasAnyPermission([
     PERMISSIONS.productsCreate,
     PERMISSIONS.productsEdit,
@@ -179,8 +189,7 @@ export function ProductsPageClient(): JSX.Element {
   const productsQuery = useProducts(filters, canViewProducts);
   const catalogCountQuery = useProducts(catalogCountFilters, canViewProducts);
   const activeCountQuery = useProducts(activeCountFilters, canViewProducts);
-  const posReadyCountQuery = useProducts(posReadyCountFilters, canViewProducts);
-  const archivedCountQuery = useProducts(archivedCountFilters, canViewProducts);
+  const inventoryQuery = useInventory(productInventoryFilters, canViewProducts && canViewInventory);
   const priceSuggestionsQuery = useProductPriceSuggestions(
     { status: "pending", limit: 8 },
     canViewProducts,
@@ -198,22 +207,43 @@ export function ProductsPageClient(): JSX.Element {
   const dismissSuggestionMutation = useDismissProductPriceSuggestion();
   const bulkApplySuggestionMutation = useBulkApplyProductPriceSuggestions();
   const list = useMemo(() => productsQuery.data?.items ?? [], [productsQuery.data?.items]);
+  const inventoryByProduct = useMemo(() => {
+    const summaries = new Map<
+      string,
+      { availableQuantity: number; currentQuantity: number; unitSymbol: string }
+    >();
+
+    (inventoryQuery.data ?? []).forEach((item) => {
+      if (!item.productId) return;
+      const current = summaries.get(item.productId) ?? {
+        availableQuantity: 0,
+        currentQuantity: 0,
+        unitSymbol: item.unitSymbol || item.unitName,
+      };
+      current.currentQuantity += item.currentQuantity;
+      current.availableQuantity += item.availableQuantity;
+      if (!current.unitSymbol) current.unitSymbol = item.unitSymbol || item.unitName;
+      summaries.set(item.productId, current);
+    });
+
+    return summaries;
+  }, [inventoryQuery.data]);
   const stats = useMemo(() => {
     const active = list.filter((product) => product.status === "active").length;
-    const archived = list.filter((product) => product.status === "archived").length;
-    const posReady = list.filter(isPosSelectableProduct).length;
+    const currentQuantity = Array.from(inventoryByProduct.values()).reduce(
+      (total, item) => total + item.currentQuantity,
+      0,
+    );
     return {
       total: catalogCountQuery.data?.total ?? productsQuery.data?.total ?? list.length,
       active: activeCountQuery.data?.total ?? active,
-      archived: archivedCountQuery.data?.total ?? archived,
-      posReady: posReadyCountQuery.data?.total ?? posReady,
+      currentQuantity,
     };
   }, [
     activeCountQuery.data?.total,
-    archivedCountQuery.data?.total,
     catalogCountQuery.data?.total,
+    inventoryByProduct,
     list,
-    posReadyCountQuery.data?.total,
     productsQuery.data?.total,
   ]);
   const totalPages = Math.max(1, Math.ceil((productsQuery.data?.total ?? 0) / filters.limit));
@@ -344,10 +374,8 @@ export function ProductsPageClient(): JSX.Element {
   };
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-5">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
-        title="Products"
-        description="Manage sellable items, bakery products, retail items, variants, pricing, tax, and POS visibility."
         actions={
           canCreateProducts ? (
             <Button
@@ -355,41 +383,53 @@ export function ProductsPageClient(): JSX.Element {
                 setSelectedProduct(null);
                 setFormOpen(true);
               }}
+              type="button"
             >
               <PlusCircle className="h-4 w-4" />
               Add Product
             </Button>
           ) : undefined
         }
+        description="Manage product records, stock quantities, purchase costs, selling prices, and POS availability."
+        title="Products"
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
           { icon: PackageCheck, label: "Catalog records", value: stats.total },
-          { icon: ShieldAlert, label: "Active products", value: stats.active },
-          { icon: Eye, label: "POS-ready", value: stats.posReady },
-          { icon: Archive, label: "Archived", value: stats.archived },
+          { icon: Eye, label: "Active products", value: stats.active },
+          {
+            icon: Boxes,
+            label: "Current quantity",
+            value:
+              canViewInventory && inventoryQuery.isSuccess
+                ? formatQuantity(stats.currentQuantity)
+                : "-",
+          },
+          {
+            icon: CircleDollarSign,
+            label: "Price updates",
+            value: priceSuggestionsQuery.data?.total ?? 0,
+          },
         ].map((item) => (
-          <Card key={item.label} className="overflow-hidden">
-            <CardContent className="flex items-center justify-between gap-3 p-4">
+          <Card className="bg-white/80" key={item.label}>
+            <CardContent className="flex items-center justify-between p-6">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha">
-                  {item.label}
-                </p>
-                <p className="mt-1 text-3xl font-semibold text-brand-espresso">{item.value}</p>
+                <p className="text-sm text-brand-mocha">{item.label}</p>
+                <p className="mt-2 text-3xl font-semibold text-brand-espresso">{item.value}</p>
               </div>
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-latte text-brand-mocha">
-                <item.icon className="h-5 w-5" />
-              </span>
+              <div className="rounded-2xl bg-brand-cappuccino/35 p-3 text-brand-mocha">
+                <item.icon className="h-6 w-6" />
+              </div>
             </CardContent>
           </Card>
         ))}
-      </div>
+      </section>
 
       {priceSuggestions.length > 0 ? (
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden bg-white/80">
           <CardContent className="p-0">
-            <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 bg-brand-latte/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold text-brand-espresso">Price suggestions</p>
                 <p className="text-xs text-brand-mocha">
@@ -433,7 +473,7 @@ export function ProductsPageClient(): JSX.Element {
                         {suggestion.variantName ? ` / ${suggestion.variantName}` : ""}
                       </p>
                       <p className="text-xs text-brand-mocha">
-                        {suggestion.sourceNumber ?? suggestion.sourceType} ·{" "}
+                        {suggestion.sourceNumber ?? suggestion.sourceType} /{" "}
                         {suggestion.pricingType} {suggestion.pricingPercent}%
                       </p>
                     </div>
@@ -519,9 +559,9 @@ export function ProductsPageClient(): JSX.Element {
         />
       ) : null}
       {!productsQuery.isLoading && !productsQuery.error && list.length > 0 ? (
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden bg-white/80">
           <CardContent className="p-0">
-            <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 bg-white/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold text-brand-espresso">Product catalog</p>
                 <p className="text-xs text-brand-mocha">
@@ -534,6 +574,8 @@ export function ProductsPageClient(): JSX.Element {
             </div>
             <ProductsTable
               canManage={canManageProducts}
+              inventoryAvailable={canViewInventory && inventoryQuery.isSuccess}
+              inventoryByProduct={inventoryByProduct}
               onDelete={(product) => setConfirmState({ action: "delete", product })}
               onEdit={(product) => {
                 setSelectedProduct(product);
@@ -556,7 +598,7 @@ export function ProductsPageClient(): JSX.Element {
         </Card>
       ) : null}
 
-      <div className="flex flex-col gap-3 rounded-3xl border border-brand-cappuccino/70 bg-white/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-3xl border border-brand-cappuccino bg-white/75 p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
         <Button
           disabled={filters.page <= 1}
           onClick={() => setFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
