@@ -29,6 +29,22 @@ func TestAccountingBranchIsolationDropsLegacyIndexesBeforeCloning(t *testing.T) 
 		"INSERT INTO accounting_account_mappings (",
 		"CREATE UNIQUE INDEX idx_accounting_account_mappings_branch_unique_active",
 	)
+	assertStatementOrder(t, sql,
+		"CREATE TEMP TABLE tmp_payment_account_merge",
+		"UPDATE payment_accounts payment\nSET branch_id = defaults.branch_id",
+	)
+	assertStatementOrder(t, sql,
+		"UPDATE payment_methods method",
+		"UPDATE payment_accounts legacy\nSET branch_id = merge.branch_id",
+	)
+	assertStatementOrder(t, sql,
+		"UPDATE payment_method_account_mappings mapping",
+		"UPDATE payment_accounts legacy\nSET branch_id = merge.branch_id",
+	)
+	assertStatementOrder(t, sql,
+		"SET account_name = LEFT(legacy.account_name, 132)",
+		"UPDATE payment_accounts payment\nSET branch_id = defaults.branch_id",
+	)
 }
 
 func assertStatementOrder(t *testing.T, sql string, first string, second string) {

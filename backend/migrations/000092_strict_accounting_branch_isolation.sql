@@ -109,6 +109,73 @@ WHERE line.journal_entry_id = entry.id
   AND mapping.old_account_id = line.account_id
   AND mapping.branch_id = entry.branch_id;
 
+CREATE TEMP TABLE tmp_payment_account_merge (
+    legacy_payment_account_id UUID PRIMARY KEY,
+    canonical_payment_account_id UUID NOT NULL,
+    branch_id UUID NOT NULL
+) ON COMMIT DROP;
+
+INSERT INTO tmp_payment_account_merge (
+    legacy_payment_account_id, canonical_payment_account_id, branch_id
+)
+SELECT legacy.id, canonical.id, defaults.branch_id
+FROM payment_accounts legacy
+JOIN tmp_accounting_default_branches defaults
+  ON defaults.business_id = legacy.business_id
+JOIN payment_accounts canonical
+  ON canonical.business_id = legacy.business_id
+ AND canonical.branch_id = defaults.branch_id
+ AND canonical.chart_account_id = legacy.chart_account_id
+ AND canonical.deleted_at IS NULL
+WHERE legacy.branch_id IS NULL
+  AND legacy.deleted_at IS NULL;
+
+UPDATE payment_methods method
+SET default_payment_account_id = merge.canonical_payment_account_id,
+    updated_at = NOW()
+FROM tmp_payment_account_merge merge
+WHERE method.default_payment_account_id = merge.legacy_payment_account_id
+  AND method.deleted_at IS NULL;
+
+UPDATE payment_method_account_mappings mapping
+SET payment_account_id = canonical.id,
+    updated_at = NOW()
+FROM tmp_payment_account_merge merge,
+     payment_accounts legacy,
+     payment_accounts canonical
+WHERE mapping.payment_account_id = merge.legacy_payment_account_id
+  AND legacy.id = merge.legacy_payment_account_id
+  AND canonical.business_id = legacy.business_id
+  AND canonical.branch_id = mapping.branch_id
+  AND canonical.chart_account_id = legacy.chart_account_id
+  AND canonical.deleted_at IS NULL
+  AND mapping.deleted_at IS NULL;
+
+UPDATE payment_accounts legacy
+SET branch_id = merge.branch_id,
+    status = 'inactive',
+    updated_at = NOW(),
+    deleted_at = NOW()
+FROM tmp_payment_account_merge merge
+WHERE legacy.id = merge.legacy_payment_account_id;
+
+UPDATE payment_accounts legacy
+SET account_name = LEFT(legacy.account_name, 132)
+        || ' (Legacy ' || LEFT(legacy.id::text, 8) || ')',
+    updated_at = NOW()
+FROM tmp_accounting_default_branches defaults
+WHERE legacy.business_id = defaults.business_id
+  AND legacy.branch_id IS NULL
+  AND legacy.deleted_at IS NULL
+  AND EXISTS (
+      SELECT 1
+      FROM payment_accounts canonical
+      WHERE canonical.business_id = legacy.business_id
+        AND canonical.branch_id = defaults.branch_id
+        AND LOWER(canonical.account_name) = LOWER(legacy.account_name)
+        AND canonical.deleted_at IS NULL
+  );
+
 UPDATE payment_accounts payment
 SET branch_id = defaults.branch_id
 FROM tmp_accounting_default_branches defaults
