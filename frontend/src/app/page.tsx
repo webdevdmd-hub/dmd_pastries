@@ -77,14 +77,6 @@ export default function HomePage(): JSX.Element {
 
           <nav className="flex items-center gap-2" aria-label="Account access">
             <Link
-              aria-label="Login"
-              className="hidden h-10 items-center justify-center px-3 text-sm font-semibold text-[#3e4340] transition-colors hover:text-black sm:inline-flex"
-              href={ROUTES.login}
-              title="Login"
-            >
-              <span>Login</span>
-            </Link>
-            <Link
               className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-md bg-[#171918] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#343836] sm:px-4 sm:text-sm"
               href={ROUTES.signup}
             >

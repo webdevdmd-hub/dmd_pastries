@@ -194,7 +194,7 @@ export function BakeryOperationsScene(): JSX.Element {
             type="button"
           >
             <LogIn className="h-4 w-4" />
-            Login Door
+            Login
           </button>
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#171918] px-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#343836] disabled:cursor-wait disabled:opacity-60"
@@ -204,7 +204,7 @@ export function BakeryOperationsScene(): JSX.Element {
             type="button"
           >
             <UserPlus className="h-4 w-4" />
-            Sign Up Door
+            Sign Up
             <ArrowRight className="hidden h-4 w-4 sm:block" />
           </button>
         </div>

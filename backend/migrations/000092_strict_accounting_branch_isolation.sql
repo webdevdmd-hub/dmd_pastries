@@ -3,11 +3,48 @@
 ALTER TABLE chart_of_accounts ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id);
 ALTER TABLE accounting_account_mappings ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id);
 
+-- Archived businesses can retain ledger rows after all of their branches are removed.
+-- Give those rows a historical branch so the branch ownership constraints can be enforced.
+INSERT INTO branches (
+    id, business_id, branch_name, name, code, timezone, is_default, status,
+    created_at, updated_at, deleted_at
+)
+SELECT gen_random_uuid(), business.id,
+       CASE WHEN business.deleted_at IS NULL THEN 'Main Branch' ELSE 'Archived Branch' END,
+       CASE WHEN business.deleted_at IS NULL THEN 'Main Branch' ELSE 'Archived Branch' END,
+       CASE WHEN business.deleted_at IS NULL THEN 'MAIN' ELSE 'ARCHIVE' END,
+       COALESCE(NULLIF(business.timezone, ''), 'Asia/Dubai'), true,
+       CASE WHEN business.deleted_at IS NULL THEN 'active' ELSE 'inactive' END,
+       now(), now(), business.deleted_at
+FROM businesses business
+WHERE EXISTS (
+    SELECT 1
+    FROM chart_of_accounts account
+    WHERE account.business_id = business.id
+)
+AND (
+    (
+        business.deleted_at IS NULL
+        AND NOT EXISTS (
+            SELECT 1
+            FROM branches branch
+            WHERE branch.business_id = business.id AND branch.deleted_at IS NULL
+        )
+    )
+    OR (
+        business.deleted_at IS NOT NULL
+        AND NOT EXISTS (
+            SELECT 1
+            FROM branches branch
+            WHERE branch.business_id = business.id
+        )
+    )
+);
+
 CREATE TEMP TABLE tmp_accounting_default_branches ON COMMIT DROP AS
 SELECT DISTINCT ON (business_id) business_id, id AS branch_id
 FROM branches
-WHERE deleted_at IS NULL
-ORDER BY business_id, is_default DESC, created_at ASC, id ASC;
+ORDER BY business_id, (deleted_at IS NULL) DESC, is_default DESC, created_at ASC, id ASC;
 
 UPDATE journal_entries je
 SET branch_id = defaults.branch_id
