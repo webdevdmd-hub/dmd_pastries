@@ -77,31 +77,34 @@ export default function HomePage(): JSX.Element {
 
           <nav className="flex items-center gap-2" aria-label="Account access">
             <Link
-              className="px-3 py-2 text-sm font-semibold text-[#3e4340] transition-colors hover:text-black"
+              aria-label="Login"
+              className="hidden h-10 items-center justify-center px-3 text-sm font-semibold text-[#3e4340] transition-colors hover:text-black sm:inline-flex"
               href={ROUTES.login}
+              title="Login"
             >
-              Login
+              <span>Login</span>
             </Link>
             <Link
               className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-md bg-[#171918] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#343836] sm:px-4 sm:text-sm"
               href={ROUTES.signup}
             >
-              Create account
+              <span className="sm:hidden">Sign up</span>
+              <span className="hidden sm:inline">Create account</span>
               <ArrowRight className="h-4 w-4" />
             </Link>
           </nav>
         </header>
 
-        <div className="pointer-events-none relative z-10 mx-auto grid min-h-[calc(96svh-5rem)] max-w-[90rem] items-center px-5 pb-24 pt-10 sm:px-8 lg:min-h-[calc(88svh-5rem)] lg:grid-cols-[0.82fr_1.18fr] lg:px-12 lg:pb-16 lg:pt-0">
+        <div className="pointer-events-none relative z-10 mx-auto grid min-h-[calc(96svh-5rem)] max-w-[90rem] items-start px-5 pb-24 pt-8 sm:items-center sm:px-8 sm:pt-10 lg:min-h-[calc(88svh-5rem)] lg:grid-cols-[0.82fr_1.18fr] lg:px-12 lg:pb-16 lg:pt-0">
           <div className="pointer-events-auto max-w-2xl">
             <p className="mb-5 flex items-center gap-2 text-xs font-bold uppercase text-[#646a67]">
               <span className="h-2 w-2 rounded-full bg-[#45b894]" />
               Production-based bakery ERP
             </p>
-            <h1 className="text-5xl font-semibold leading-[0.98] sm:text-6xl lg:text-7xl">
+            <h1 className="text-4xl font-semibold leading-[1.04] sm:text-6xl sm:leading-[0.98] lg:text-7xl">
               Run your bakery from one system.
             </h1>
-            <p className="mt-6 max-w-xl text-base leading-7 text-[#555b58] sm:text-lg sm:leading-8">
+            <p className="mt-5 max-w-xl text-sm leading-6 text-[#555b58] sm:mt-6 sm:text-lg sm:leading-8">
               Pastries POS connects counter sales, purchasing, inventory, recipes, production,
               bakery orders, accounting, and reports across every branch.
             </p>
