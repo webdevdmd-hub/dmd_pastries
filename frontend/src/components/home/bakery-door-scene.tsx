@@ -497,7 +497,7 @@ function BakeryWorld({
           accent="#78cbd7"
           destination="login"
           disabled={disabled}
-          label="LOGIN DOOR"
+          label="LOGIN"
           onSelect={onSelect}
           panelRef={loginDoorRef}
           position={[-3.45, 0, -1.28]}
@@ -506,7 +506,7 @@ function BakeryWorld({
           accent="#67d0ad"
           destination="signup"
           disabled={disabled}
-          label="SIGN UP DOOR"
+          label="SIGN UP"
           onSelect={onSelect}
           panelRef={signupDoorRef}
           position={[3.45, 0, -1.28]}
