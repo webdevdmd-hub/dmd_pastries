@@ -3,6 +3,11 @@
 ALTER TABLE chart_of_accounts ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id);
 ALTER TABLE accounting_account_mappings ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id);
 
+-- Remove business-global uniqueness before cloning records into each branch.
+-- Replacement branch-scoped indexes are created after all references are relinked.
+DROP INDEX IF EXISTS idx_chart_of_accounts_business_code;
+DROP INDEX IF EXISTS idx_accounting_account_mappings_unique_active;
+
 -- Archived businesses can retain ledger rows after all of their branches are removed.
 -- Give those rows a historical branch so the branch ownership constraints can be enforced.
 INSERT INTO branches (
@@ -197,9 +202,6 @@ UPDATE accounting_account_mappings mapping
 SET branch_id = defaults.branch_id
 FROM tmp_accounting_default_branches defaults
 WHERE mapping.business_id = defaults.business_id AND mapping.branch_id IS NULL;
-
-DROP INDEX IF EXISTS idx_chart_of_accounts_business_code;
-DROP INDEX IF EXISTS idx_accounting_account_mappings_unique_active;
 
 CREATE UNIQUE INDEX idx_chart_of_accounts_business_branch_code
     ON chart_of_accounts(business_id, branch_id, LOWER(account_code))
