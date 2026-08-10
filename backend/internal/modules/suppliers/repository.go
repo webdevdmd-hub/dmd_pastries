@@ -108,11 +108,7 @@ func (r *Repository) NextSupplierCode(tx *gorm.DB, businessID, branchID string) 
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+branchID+":suppliers").Error; err != nil {
 		return "", err
 	}
-	var count int64
-	if err := tx.Model(&Supplier{}).Where("business_id = ? AND branch_id = ?", businessID, branchID).Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("SUP-%06d", count+1), nil
+	return utils.NextSequentialNumber(tx.Table("suppliers").Where("business_id = ? AND branch_id = ?", businessID, branchID), "supplier_code", "SUP-", 6)
 }
 
 func (r *Repository) SupplierCodeExists(tx *gorm.DB, businessID, branchID, value string) (bool, error) {

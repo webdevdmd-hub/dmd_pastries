@@ -1,4 +1,5 @@
 import type { PurchaseInvoiceFormInitialValues } from "@/components/purchasing/purchase-invoice-form-dialog";
+import { createUuid } from "@/lib/uuid";
 import type { PurchaseItemLineDraft, PurchaseOrder } from "@/types/purchasing";
 
 function today(): string {
@@ -14,7 +15,7 @@ function purchaseOrderItemToBillLine(item: PurchaseOrder["items"][number]): Purc
       ingredientId: null,
       itemNameSnapshot: item.itemNameSnapshot,
       itemType: "account",
-      lineId: crypto.randomUUID(),
+      lineId: createUuid(),
       lineType: "account",
       packagingItemId: null,
       productId: null,
@@ -33,7 +34,7 @@ function purchaseOrderItemToBillLine(item: PurchaseOrder["items"][number]): Purc
     ingredientId: item.ingredientId,
     itemNameSnapshot: item.itemNameSnapshot,
     itemType: "product",
-    lineId: crypto.randomUUID(),
+    lineId: createUuid(),
     lineType: "product",
     packagingItemId: item.packagingItemId,
     productId: item.productId,

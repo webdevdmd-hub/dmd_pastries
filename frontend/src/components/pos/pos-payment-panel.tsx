@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import type { JSX } from "react";
 
+import { POSNumberInput } from "@/components/pos/pos-number-input";
 import { POSPaymentMethodButton } from "@/components/pos/pos-payment-method-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -166,18 +167,15 @@ export function POSPaymentPanel({
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <Input
+              <POSNumberInput
                 className="h-9 rounded-md border-[#d4d4d8] bg-white font-mono shadow-none focus-visible:ring-black"
-                min={0}
-                onChange={(event) =>
+                onValueChange={(amount) =>
                   updatePayment(payment.paymentMethodId, {
-                    amount: Number(event.target.value),
+                    amount: amount ?? 0,
                   })
                 }
                 placeholder="Paid amount"
-                step="0.01"
-                type="number"
-                value={String(payment.amount)}
+                value={payment.amount}
               />
               {payment.requiresReference ? (
                 <div className="mt-2 space-y-1">

@@ -1,5 +1,5 @@
 import { classifyApiMonitorStatus, recordApiMonitorEvent } from "@/lib/api-monitor/store";
-import { createAppwriteJwt } from "@/lib/appwrite/auth";
+import { clearCachedAppwriteJwt, createAppwriteJwt } from "@/lib/appwrite/auth";
 import { notifySessionExpired } from "@/lib/auth/session-events";
 import { getPublicEnvValue } from "@/lib/public-env";
 import type { ApiFailure, ApiResponse, ApiSuccess, FieldErrorMap } from "@/types/api";
@@ -359,6 +359,9 @@ export async function apiRequest<TResponse, TBody = undefined>(
     const errors = normalized.success ? undefined : normalized.errors;
     const errorDetails = normalized.success ? undefined : normalized.errorDetails;
     if (response.status === 401) {
+      // Drop the cached JWT so the next request mints a fresh one instead of
+      // replaying the rejected token until it expires.
+      clearCachedAppwriteJwt();
       notifySessionExpired();
     }
 
@@ -475,6 +478,7 @@ export async function apiBlobRequest<TBody = undefined>(
     }
 
     if (response.status === 401) {
+      clearCachedAppwriteJwt();
       notifySessionExpired();
     }
 

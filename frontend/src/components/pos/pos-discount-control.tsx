@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import { Input } from "@/components/ui/input";
+import { POSNumberInput } from "@/components/pos/pos-number-input";
 import {
   Select,
   SelectContent,
@@ -44,14 +44,12 @@ export function POSDiscountControl({
             <SelectItem value="percentage">Percent</SelectItem>
           </SelectContent>
         </Select>
-        <Input
+        <POSNumberInput
           className="h-8 rounded-md border-[#d4d4d8] bg-white text-xs shadow-none focus-visible:ring-black"
           disabled={!type}
-          min={0}
-          onChange={(event) => onChange(type, Number(event.target.value))}
+          onValueChange={(nextValue) => onChange(type, nextValue)}
           placeholder="0.00"
-          type="number"
-          value={value === null ? "" : String(value)}
+          value={value}
         />
       </div>
     </div>

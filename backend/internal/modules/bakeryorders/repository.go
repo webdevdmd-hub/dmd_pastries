@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"pastries-pos/internal/shared/utils"
 )
 
 type Repository struct {
@@ -112,11 +114,7 @@ func (r *Repository) NextOrderNumber(tx *gorm.DB, businessID string) (string, er
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":bakery_orders").Error; err != nil {
 		return "", err
 	}
-	var count int64
-	if err := tx.Model(&BakeryOrder{}).Where("business_id = ?", businessID).Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("ORD-%06d", count+1), nil
+	return utils.NextSequentialNumber(tx.Table("bakery_orders").Where("business_id = ?", businessID), "order_number", "ORD-", 6)
 }
 
 func (r *Repository) Items(businessID, orderID string) ([]BakeryOrderItem, error) {
@@ -348,11 +346,7 @@ func (r *Repository) NextProductCode(tx *gorm.DB, businessID, branchID string) (
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+branchID+":products").Error; err != nil {
 		return "", err
 	}
-	var count int64
-	if err := tx.Table("products").Where("business_id = ? AND branch_id = ?", businessID, branchID).Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("PRD-%06d", count+1), nil
+	return utils.NextSequentialNumber(tx.Table("products").Where("business_id = ? AND branch_id = ?", businessID, branchID), "product_code", "PRD-", 6)
 }
 
 func (r *Repository) ProductValueExists(tx *gorm.DB, businessID, branchID, column, value string) (bool, error) {

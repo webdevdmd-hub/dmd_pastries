@@ -1,2 +1,17 @@
+[variables]
+# husky's prepare script exits non-zero when .git is absent in the build
+# environment; the Dockerfile guards this the same way (HUSKY=0 + --ignore-scripts).
+HUSKY = "0"
+NEXT_TELEMETRY_DISABLED = "1"
+
 [phases.setup]
 nixPkgs = ["nodejs_22", "pnpm-10_x"]
+
+[phases.install]
+cmds = ["pnpm install --frozen-lockfile --ignore-scripts"]
+
+[phases.build]
+cmds = ["pnpm build"]
+
+[start]
+cmd = "pnpm start"

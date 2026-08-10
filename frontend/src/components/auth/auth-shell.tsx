@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/hooks/use-auth";
+import { authenticatedHomeRoute } from "@/lib/auth/routes";
 
 type AuthShellProps = {
   children: ReactNode;
@@ -47,20 +48,23 @@ const platformNodes = [
 export function AuthShell({ children, title, description }: AuthShellProps): JSX.Element {
   const pathname = usePathname();
   const router = useRouter();
-  const { status } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const isLoginPage = pathname === ROUTES.login;
   const isSignupPage = pathname === ROUTES.signup;
   const usesMinimalAuthLayout = isLoginPage || isSignupPage;
 
   useEffect(() => {
     if (
-      status === "authenticated" &&
+      isAuthenticated &&
+      user &&
       pathname !== ROUTES.verifyEmail &&
       pathname !== ROUTES.acceptInvitation
     ) {
-      router.replace(ROUTES.dashboard);
+      // Use the same home-route resolution as the login form so both redirects
+      // agree (platform admins go straight to super-admin, no hop chain).
+      router.replace(authenticatedHomeRoute(user));
     }
-  }, [pathname, router, status]);
+  }, [isAuthenticated, pathname, router, user]);
 
   if (usesMinimalAuthLayout) {
     return (

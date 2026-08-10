@@ -18,8 +18,14 @@ func NewRouter(cfg config.Config) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
+	// CORS_ALLOWED_ORIGINS restricts browser access to known frontends;
+	// an empty list falls back to allowing every origin so local setups keep working.
+	allowedOrigins := cfg.CORSAllowedOrigins
+	if len(allowedOrigins) == 0 {
+		allowedOrigins = []string{"*"}
+	}
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-Appwrite-Project", "X-Appwrite-JWT", "X-Appwrite-Response-Format", "Cache-Control", "Pragma"},
 		ExposeHeaders:    []string{"Content-Length"},

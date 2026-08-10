@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import type { JSX, ReactNode } from "react";
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -13,9 +14,12 @@ import {
   requestPasswordReset,
 } from "@/lib/api/auth";
 import { switchBranch } from "@/lib/api/business";
-import { getErrorMessage } from "@/lib/api/client";
+import { ApiError, getErrorMessage } from "@/lib/api/client";
 import {
+  AppwriteRateLimitError,
   AppwriteSessionAlreadyExistsError,
+  clearCachedAppwriteJwt,
+  clearStoredAppwriteSession,
   getCurrentAppwriteAccount,
   getCurrentAppwriteSession,
   hasStoredAppwriteSession,
@@ -92,6 +96,7 @@ type AuthProviderProps = {
 };
 
 export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<SafeUserProfile | null>(null);
   const profileRefreshPromiseRef = useRef<Promise<SafeUserProfile> | null>(null);
@@ -163,13 +168,21 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       }
 
       await refreshCurrentProfile();
-    } catch {
-      try {
-        await logoutFromAppwrite();
-      } catch {
-        // Swallow logout cleanup failure and reset local state.
+    } catch (error) {
+      const isDefinitiveAuthFailure =
+        error instanceof ApiError && (error.status === 401 || error.status === 403);
+
+      if (isDefinitiveAuthFailure) {
+        try {
+          await logoutFromAppwrite();
+        } catch {
+          // Swallow logout cleanup failure and reset local state.
+        }
       }
 
+      // Transient failures (backend unreachable, 5xx, rate limit) keep the
+      // Appwrite session intact so the user can retry without re-entering
+      // credentials; login() reuses the existing session on the next attempt.
       setUser(null);
       setStatus("unauthenticated");
     }
@@ -214,7 +227,25 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
         ]);
 
         if (session || account) {
-          return;
+          // The Appwrite session is still valid, so this 401 came from the backend
+          // itself (account not linked, deactivated, or access revoked). Retry one
+          // profile sync with a fresh token; if that also fails with a definitive
+          // auth error, the session is unusable and keeping it would leave the
+          // user silently stuck.
+          try {
+            clearCachedAppwriteJwt();
+            await refreshCurrentProfile();
+            return;
+          } catch (error) {
+            const isDefinitiveAuthFailure =
+              error instanceof ApiError && (error.status === 401 || error.status === 403);
+
+            if (!isDefinitiveAuthFailure) {
+              // Transient failure (network, 5xx, rate limit) — keep the session.
+              return;
+            }
+            // Fall through to sign out and redirect to login.
+          }
         }
 
         try {
@@ -241,7 +272,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
 
       sessionExpirationPromiseRef.current = sessionExpirationPromise;
     });
-  }, []);
+  }, [refreshCurrentProfile]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -253,6 +284,23 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
           const existingSession = await getCurrentAppwriteSession();
 
           if (existingSession) {
+            const account = await getCurrentAppwriteAccount();
+
+            if (account?.email.toLowerCase() === input.email.trim().toLowerCase()) {
+              // The user already holds a live Appwrite session for this same
+              // account — reuse it instead of blocking the login.
+              try {
+                await loginSync();
+                return await refreshCurrentProfile();
+              } catch (error) {
+                if (error instanceof AppwriteRateLimitError) {
+                  throw error;
+                }
+
+                throw new AppwriteSessionAlreadyExistsError();
+              }
+            }
+
             throw new AppwriteSessionAlreadyExistsError();
           }
 
@@ -293,6 +341,15 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
         const registered = await registerOwner(input);
 
         try {
+          // A leftover Appwrite session from another account makes the auto-login
+          // throw user_session_already_exists and strands the freshly created
+          // account, so clear it first (mirrors restartLogin).
+          try {
+            await logoutFromAppwrite();
+          } catch {
+            // No session to clean up.
+          }
+
           await loginWithAppwrite(input.email, input.password);
           await loginSync();
           const profile = await refreshCurrentProfile();
@@ -324,10 +381,20 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
             // Logout must continue even if backend audit sync is unavailable.
           }
 
-          await logoutFromAppwrite();
+          try {
+            await logoutFromAppwrite();
+          } catch {
+            // Appwrite is unreachable — drop the stored session credentials so
+            // restoreSession cannot silently sign the user back in on a shared
+            // terminal.
+            clearStoredAppwriteSession();
+          }
         } finally {
           setUser(null);
           setStatus("unauthenticated");
+          // Purge cached per-tenant data so the next login cannot briefly see
+          // the previous user's products, sales, or customers.
+          queryClient.clear();
         }
       },
       async forgotPassword(input) {
@@ -345,13 +412,16 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
         try {
           await refreshCurrentProfile();
         } catch (error) {
-          setStatus("authenticated");
+          if (user) {
+            setStatus("authenticated");
+          }
+
           throw new Error(getErrorMessage(error));
         }
       },
       restoreSession,
     }),
-    [refreshCurrentProfile, restoreSession, runAuthOperation, status, user],
+    [queryClient, refreshCurrentProfile, restoreSession, runAuthOperation, status, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

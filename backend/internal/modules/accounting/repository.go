@@ -1546,12 +1546,8 @@ func (r *Repository) NextJournalEntryNumber(tx *gorm.DB, businessID string, entr
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+datePart+":journal_entries").Error; err != nil {
 		return "", err
 	}
-	var count int64
 	prefix := "JV-" + datePart + "-"
-	if err := tx.Model(&JournalEntry{}).Where("business_id = ? AND entry_number LIKE ?", businessID, prefix+"%").Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s%06d", prefix, count+1), nil
+	return utils.NextSequentialNumber(tx.Table("journal_entries").Where("business_id = ?", businessID), "entry_number", prefix, 6)
 }
 
 func (r *Repository) LoadResponses(businessID string, accounts []ChartAccount) ([]ChartAccountResponse, error) {
@@ -1892,12 +1888,8 @@ func (r *Repository) NextAccountTransferNumber(tx *gorm.DB, businessID string, t
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+datePart+":account_transfers").Error; err != nil {
 		return "", err
 	}
-	var count int64
 	prefix := "TRF-" + datePart + "-"
-	if err := tx.Model(&AccountTransfer{}).Where("business_id = ? AND transfer_number LIKE ?", businessID, prefix+"%").Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s%06d", prefix, count+1), nil
+	return utils.NextSequentialNumber(tx.Table("account_transfers").Where("business_id = ?", businessID), "transfer_number", prefix, 6)
 }
 
 func (r *Repository) CreateAccountTransfer(tx *gorm.DB, transfer *AccountTransfer) error {
@@ -1986,12 +1978,8 @@ func (r *Repository) NextPlatformSettlementNumber(tx *gorm.DB, businessID string
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+datePart+":platform_settlements").Error; err != nil {
 		return "", err
 	}
-	var count int64
 	prefix := "STL-" + datePart + "-"
-	if err := tx.Model(&PlatformSettlement{}).Where("business_id = ? AND settlement_number LIKE ?", businessID, prefix+"%").Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s%06d", prefix, count+1), nil
+	return utils.NextSequentialNumber(tx.Table("platform_settlements").Where("business_id = ?", businessID), "settlement_number", prefix, 6)
 }
 
 func (r *Repository) CreatePlatformSettlement(tx *gorm.DB, settlement *PlatformSettlement, deductions []PlatformSettlementDeduction) error {

@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { createUuid } from "@/lib/uuid";
 import { purchaseOrderSchema } from "@/lib/validators/purchasing.schema";
 import type { ChartAccount } from "@/types/accounting";
 import type {
@@ -49,7 +50,7 @@ function emptyLine(): PurchaseItemLineDraft {
     expiryDate: null,
     ingredientId: null,
     itemType: "product",
-    lineId: crypto.randomUUID(),
+    lineId: createUuid(),
     packagingItemId: null,
     productId: null,
     productVariantId: null,
@@ -142,7 +143,7 @@ export function PurchaseOrderFormDialog({
             ingredientId: item.ingredientId,
             itemType: item.lineType === "account" ? ("account" as const) : ("product" as const),
             itemNameSnapshot: item.itemNameSnapshot,
-            lineId: item.id || crypto.randomUUID(),
+            lineId: item.id || createUuid(),
             lineType: item.lineType,
             packagingItemId: item.packagingItemId,
             productId: item.productId,

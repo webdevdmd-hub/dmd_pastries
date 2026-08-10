@@ -311,26 +311,28 @@ export function OrderFormPage({
   );
 
   const validPreviewPayload = useMemo(() => {
-    const previewPayload =
-      isEdit && currentOrder
-        ? {
-            ...draftPayload,
-            items: mapSavedItemsToPayload(currentOrder.items),
-          }
-        : draftPayload;
-
     if (
-      (selectedSalesChannel?.requiresExternalOrderNumber === true &&
-        !previewPayload.externalOrderNumber)
+      selectedSalesChannel?.requiresExternalOrderNumber === true &&
+      !draftPayload.externalOrderNumber
     ) {
       return null;
     }
 
-    const result = createOrderSchema.safeParse(previewPayload);
+    const result = createOrderSchema.safeParse(draftPayload);
     return result.success ? result.data : null;
-  }, [currentOrder, draftPayload, isEdit, selectedSalesChannel?.requiresExternalOrderNumber]);
+  }, [draftPayload, selectedSalesChannel?.requiresExternalOrderNumber]);
 
-  const previewQuery = useOrderPreview(validPreviewPayload, canManage);
+  // Debounce the preview payload so typing doesn't fire a preview request per keystroke.
+  const [debouncedPreviewPayload, setDebouncedPreviewPayload] = useState<CreateOrderPayload | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedPreviewPayload(validPreviewPayload), 300);
+    return () => window.clearTimeout(timeout);
+  }, [validPreviewPayload]);
+
+  const previewQuery = useOrderPreview(debouncedPreviewPayload, canManage);
 
   const buildPayload = (): CreateOrderPayload => draftPayload;
 

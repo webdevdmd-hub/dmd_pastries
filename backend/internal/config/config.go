@@ -35,6 +35,7 @@ type Config struct {
 	MigrationsPath           string
 	SuperAdminEnabled        bool
 	SuperAdminEmails         []string
+	CORSAllowedOrigins       []string
 }
 
 func Load() Config {
@@ -54,6 +55,7 @@ func Load() Config {
 	cfg.MigrationsPath = getEnv("MIGRATIONS_PATH", "migrations")
 	cfg.SuperAdminEnabled = getEnvBool("SUPER_ADMIN_ENABLED", false)
 	cfg.SuperAdminEmails = getEnvStringList("SUPER_ADMIN_EMAILS")
+	cfg.CORSAllowedOrigins = getEnvStringList("CORS_ALLOWED_ORIGINS")
 	return cfg
 }
 

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"pastries-pos/internal/shared/utils"
 )
 
 type Repository struct {
@@ -133,11 +135,7 @@ func (r *Repository) NextRecipeCode(tx *gorm.DB, businessID, branchID string) (s
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+branchID+":recipes").Error; err != nil {
 		return "", err
 	}
-	var count int64
-	if err := tx.Model(&Recipe{}).Where("business_id = ? AND branch_id = ?", businessID, branchID).Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("RCP-%06d", count+1), nil
+	return utils.NextSequentialNumber(tx.Table("recipes").Where("business_id = ? AND branch_id = ?", businessID, branchID), "recipe_code", "RCP-", 6)
 }
 
 func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string) (*ProductInfo, error) {

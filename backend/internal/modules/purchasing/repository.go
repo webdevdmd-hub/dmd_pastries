@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"pastries-pos/internal/modules/accounting"
+	"pastries-pos/internal/shared/utils"
 )
 
 type Repository struct {
@@ -1191,11 +1192,7 @@ func (r *Repository) NextNumber(tx *gorm.DB, businessID, table, column, prefix, 
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+lockName).Error; err != nil {
 		return "", err
 	}
-	var count int64
-	if err := tx.Table(table).Where("business_id = ?", businessID).Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s-%06d", prefix, count+1), nil
+	return utils.NextSequentialNumber(tx.Table(table).Where("business_id = ?", businessID), column, prefix+"-", 6)
 }
 
 func (r *Repository) ValidateBranch(tx *gorm.DB, businessID, branchID string) error {

@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { createUuid } from "@/lib/uuid";
 import { purchaseReceiveSchema } from "@/lib/validators/purchasing.schema";
 import { PRODUCT_TYPE_LABELS } from "@/types/product";
 import type {
@@ -50,7 +51,7 @@ function emptyLine(): PurchaseItemLineDraft {
     expiryDate: null,
     ingredientId: null,
     itemType: "product",
-    lineId: crypto.randomUUID(),
+    lineId: createUuid(),
     lineType: "product",
     packagingItemId: null,
     productId: null,
@@ -72,7 +73,7 @@ function linesFromOrder(order: PurchaseOrder): PurchaseItemLineDraft[] {
       ingredientId: item.ingredientId,
       itemType: "product",
       itemNameSnapshot: item.itemNameSnapshot,
-      lineId: item.id || crypto.randomUUID(),
+      lineId: item.id || createUuid(),
       lineType: "product",
       packagingItemId: item.packagingItemId,
       productId: item.productId,
@@ -99,7 +100,7 @@ function linesFromInvoice(invoice: PurchaseInvoice): PurchaseItemLineDraft[] {
       ingredientId: item.ingredientId,
       itemType: "product",
       itemNameSnapshot: item.itemNameSnapshot,
-      lineId: item.id || crypto.randomUUID(),
+      lineId: item.id || createUuid(),
       lineType: "product",
       packagingItemId: item.packagingItemId,
       productId: item.productId,

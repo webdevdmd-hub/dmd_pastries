@@ -1,7 +1,6 @@
 package payments
 
 import (
-	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -9,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	reportshared "pastries-pos/internal/modules/reports/shared"
+	"pastries-pos/internal/shared/utils"
 )
 
 type Repository struct {
@@ -420,12 +420,8 @@ func (r *Repository) GenerateRefundNumber(tx *gorm.DB, businessID string, now ti
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+datePart+":payment_refunds").Error; err != nil {
 		return "", err
 	}
-	var count int64
 	prefix := "PAY-RFND-" + datePart + "-"
-	if err := tx.Model(&PaymentRefund{}).Where("business_id = ? AND refund_number LIKE ?", businessID, prefix+"%").Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s%06d", prefix, count+1), nil
+	return utils.NextSequentialNumber(tx.Table("payment_refunds").Where("business_id = ?", businessID), "refund_number", prefix, 6)
 }
 
 func (r *Repository) ListRefunds(businessID string, query RefundListQuery) ([]PaymentRefundResponse, int64, error) {

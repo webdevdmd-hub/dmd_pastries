@@ -30,6 +30,7 @@ export type POSProduct = {
   taxRateId: string | null;
   taxRateName: string | null;
   taxRatePercentage: number;
+  taxRateIsInclusive: boolean;
   productType: ProductType;
   itemStructure: ItemStructure;
   salePrice: number;
@@ -80,6 +81,7 @@ export type CartItem = {
   discountValue: number | null;
   taxRatePercentage: number;
   taxRateName: string | null;
+  taxRateIsInclusive: boolean;
   lineSubtotal: number;
   discountAmount: number;
   taxAmount: number;
@@ -168,6 +170,8 @@ export type HeldSaleResumeData = {
 };
 
 export type ReceiptLine = {
+  productId: string | null;
+  productVariantId: string | null;
   name: string;
   quantity: number;
   unitPrice: number;

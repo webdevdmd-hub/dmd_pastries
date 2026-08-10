@@ -86,11 +86,7 @@ func (r *Repository) NextCustomerCode(tx *gorm.DB, businessID, branchID string) 
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+branchID+":customers").Error; err != nil {
 		return "", err
 	}
-	var count int64
-	if err := tx.Model(&Customer{}).Where("business_id = ? AND branch_id = ?", businessID, branchID).Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("CUST-%06d", count+1), nil
+	return utils.NextSequentialNumber(tx.Table("customers").Where("business_id = ? AND branch_id = ?", businessID, branchID), "customer_code", "CUST-", 6)
 }
 
 func (r *Repository) CustomerCodeExists(tx *gorm.DB, businessID, branchID, value string) (bool, error) {

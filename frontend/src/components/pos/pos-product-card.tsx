@@ -30,6 +30,8 @@ export function POSProductCard({
   const ignoreNextClickRef = useRef(false);
   const imageUrl = getProductImagePreviewUrl(product.imageFileId) ?? product.imageUrl;
   const hasVariants = product.variants.length > 0;
+  const isOutOfStock =
+    product.availableStockQuantity !== null && product.availableStockQuantity <= 0;
 
   const clearLongPressTimer = (): void => {
     if (longPressTimerRef.current) {
@@ -46,7 +48,8 @@ export function POSProductCard({
   return (
     <article className="group relative flex min-h-[14.5rem] flex-col overflow-hidden rounded-lg border border-[#d4d4d8] bg-white text-[#09090b] transition hover:border-[#71717a] focus-within:ring-2 focus-within:ring-black focus-within:ring-offset-2">
       <Button
-        className="h-full flex-1 flex-col items-stretch justify-start rounded-none bg-white p-0 text-left text-[#09090b] shadow-none hover:bg-white"
+        className="h-full flex-1 flex-col items-stretch justify-start rounded-none bg-white p-0 text-left text-[#09090b] shadow-none hover:bg-white disabled:opacity-60"
+        disabled={isOutOfStock && !hasVariants}
         onClick={() => {
           if (ignoreNextClickRef.current) {
             ignoreNextClickRef.current = false;
@@ -101,6 +104,11 @@ export function POSProductCard({
           </div>
         </div>
       </Button>
+      {isOutOfStock ? (
+        <span className="absolute left-3 top-3 rounded-full bg-red-100 px-2 py-0.5 text-[0.62rem] font-black uppercase tracking-[0.12em] text-red-700">
+          Out of stock
+        </span>
+      ) : null}
       {hasVariants ? (
         <Button
           className="absolute right-3 top-3 h-7 rounded-md bg-black px-2.5 font-mono text-[0.62rem] font-black uppercase tracking-[0.12em] text-white shadow-none hover:bg-[#18181b]"

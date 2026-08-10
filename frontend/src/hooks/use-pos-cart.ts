@@ -23,29 +23,45 @@ function roundMoney(value: number): number {
 }
 
 function calculateDiscount(subtotal: number, type: CartDiscountType | null, value: number | null) {
-  if (!type || value === null) {
+  if (!type || value === null || !Number.isFinite(value)) {
     return 0;
   }
 
   if (type === "percentage") {
-    return roundMoney(subtotal * Math.min(value, 100) * 0.01);
+    return roundMoney(subtotal * Math.min(Math.max(value, 0), 100) * 0.01);
   }
 
-  return roundMoney(Math.min(value, subtotal));
+  return roundMoney(Math.min(Math.max(value, 0), subtotal));
+}
+
+// Mirror the backend's calculateTax: inclusive rates back the tax out of the
+// price instead of adding it on top.
+function calculateTax(amount: number, rate: number, inclusive: boolean): number {
+  if (amount <= 0 || rate <= 0) {
+    return 0;
+  }
+
+  if (inclusive) {
+    return roundMoney(amount - amount / (1 + rate / 100));
+  }
+
+  return roundMoney((amount * rate) / 100);
 }
 
 function calculateLine(item: CartItem): CartItem {
   const lineSubtotal = roundMoney(item.quantity * item.unitPrice);
   const discountAmount = calculateDiscount(lineSubtotal, item.discountType, item.discountValue);
   const taxableAmount = Math.max(lineSubtotal - discountAmount, 0);
-  const taxAmount = roundMoney(taxableAmount * (item.taxRatePercentage / 100));
+  const taxAmount = calculateTax(taxableAmount, item.taxRatePercentage, item.taxRateIsInclusive);
 
   return {
     ...item,
     lineSubtotal,
     discountAmount,
     taxAmount,
-    lineTotal: roundMoney(taxableAmount + taxAmount),
+    lineTotal: item.taxRateIsInclusive
+      ? roundMoney(taxableAmount)
+      : roundMoney(taxableAmount + taxAmount),
   };
 }
 
@@ -93,6 +109,7 @@ export function usePOSCart() {
           discountValue: null,
           taxRatePercentage: product.taxRatePercentage,
           taxRateName: product.taxRateName,
+          taxRateIsInclusive: product.taxRateIsInclusive,
           lineSubtotal: unitPrice,
           discountAmount: 0,
           taxAmount: 0,
@@ -107,11 +124,13 @@ export function usePOSCart() {
   };
 
   const updateQuantity = (cartItemId: string, quantity: number): void => {
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      return;
+    }
+
     setItems((currentItems) =>
       currentItems.map((item) =>
-        item.cartItemId === cartItemId
-          ? calculateLine({ ...item, quantity: Math.max(1, quantity) })
-          : item,
+        item.cartItemId === cartItemId ? calculateLine({ ...item, quantity }) : item,
       ),
     );
   };
@@ -154,19 +173,33 @@ export function usePOSCart() {
   const totals = useMemo<CartTotals>(() => {
     const itemSubtotal = roundMoney(items.reduce((sum, item) => sum + item.lineSubtotal, 0));
     const lineDiscounts = roundMoney(items.reduce((sum, item) => sum + item.discountAmount, 0));
-    const saleDiscount = calculateDiscount(
-      Math.max(itemSubtotal - lineDiscounts, 0),
-      saleDiscountType,
-      saleDiscountValue,
+    // Mirror the backend checkout math: the sale discount is allocated proportionally
+    // onto each line and tax is computed on the discounted line amount.
+    const lineNets = items.map((item) =>
+      roundMoney(Math.max(item.lineSubtotal - item.discountAmount, 0)),
     );
-    const taxAmount = roundMoney(items.reduce((sum, item) => sum + item.taxAmount, 0));
+    const lineNetTotal = roundMoney(lineNets.reduce((sum, net) => sum + net, 0));
+    const saleDiscount = calculateDiscount(lineNetTotal, saleDiscountType, saleDiscountValue);
+
+    let taxAmount = 0;
+    let itemsTotal = 0;
+    items.forEach((item, index) => {
+      const lineNet = lineNets[index] ?? 0;
+      const allocatedSaleDiscount =
+        saleDiscount > 0 && lineNetTotal > 0 && lineNet > 0
+          ? roundMoney((saleDiscount * lineNet) / lineNetTotal)
+          : 0;
+      const discountedLine = roundMoney(
+        Math.max(item.lineSubtotal - item.discountAmount - allocatedSaleDiscount, 0),
+      );
+      const lineTax = calculateTax(discountedLine, item.taxRatePercentage, item.taxRateIsInclusive);
+      taxAmount += lineTax;
+      itemsTotal += item.taxRateIsInclusive ? discountedLine : discountedLine + lineTax;
+    });
+    taxAmount = roundMoney(taxAmount);
+
     const { chargeAmount, chargeTaxAmount } = calculateDocumentChargeTotals(charges);
-    const total = roundMoney(
-      Math.max(itemSubtotal - lineDiscounts - saleDiscount, 0) +
-        taxAmount +
-        chargeAmount +
-        chargeTaxAmount,
-    );
+    const total = roundMoney(itemsTotal + chargeAmount + chargeTaxAmount);
     const paidAmount = roundMoney(payments.reduce((sum, payment) => sum + payment.amount, 0));
 
     return {

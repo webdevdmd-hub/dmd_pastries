@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"pastries-pos/internal/shared/utils"
 )
 
 type Repository struct {
@@ -72,11 +74,7 @@ func (r *Repository) NextCode(tx *gorm.DB, businessID, branchID string) (string,
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+branchID+":packaging").Error; err != nil {
 		return "", err
 	}
-	var count int64
-	if err := tx.Model(&PackagingItem{}).Where("business_id = ? AND branch_id = ?", businessID, branchID).Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("PKG-%06d", count+1), nil
+	return utils.NextSequentialNumber(tx.Table("packaging_items").Where("business_id = ? AND branch_id = ?", businessID, branchID), "packaging_code", "PKG-", 6)
 }
 
 func (r *Repository) CodeExists(tx *gorm.DB, businessID, branchID, code string) (bool, error) {

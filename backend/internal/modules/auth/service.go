@@ -107,6 +107,9 @@ func (s *Service) RegisterOwner(req RegisterOwnerRequest, ipAddress, userAgent s
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
+			// Without the re-panic the function returns (nil, nil) and the handler
+			// reports a 201 success for a registration that never happened.
+			panic(r)
 		}
 	}()
 
@@ -322,6 +325,10 @@ func defaultRolePresets() []defaultRolePreset {
 				"customers.view",
 				"customers.create",
 				"customers.quick_create",
+				// Needed so the frontend can self-repair a null current_branch_id by
+				// switching to the cashier's assigned branch; the service still
+				// enforces CanAccessBranch.
+				"branches.switch",
 				"orders.view",
 				"orders.create",
 				"orders.payments.manage",
@@ -997,9 +1004,17 @@ func (s *Service) buildProfileByUserID(userID, businessID string) (*AuthProfileR
 		return nil, apperrors.Internal("failed to load assigned branch")
 	}
 
+	// A business without a subscription row (imported data, partially rolled-back
+	// registration) must still be able to log in; treat it as inactive instead of
+	// failing the whole profile with a 500.
+	subscriptionStatus := "inactive"
 	subscription, err := s.subscriptionRepo.FindByBusinessID(user.BusinessID)
 	if err != nil {
-		return nil, apperrors.Internal("failed to load subscription")
+		if err != gorm.ErrRecordNotFound {
+			return nil, apperrors.Internal("failed to load subscription")
+		}
+	} else {
+		subscriptionStatus = subscription.Status
 	}
 
 	return &AuthProfileResponse{
@@ -1016,7 +1031,7 @@ func (s *Service) buildProfileByUserID(userID, businessID string) (*AuthProfileR
 		RoleID:               user.RoleID,
 		RoleName:             user.Role.RoleName,
 		Permissions:          visiblePermissionKeys(permissionKeys),
-		SubscriptionStatus:   subscription.Status,
+		SubscriptionStatus:   subscriptionStatus,
 		FullName:             user.FullName,
 		Email:                user.Email,
 		Phone:                user.Phone,

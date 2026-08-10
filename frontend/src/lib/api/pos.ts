@@ -67,7 +67,10 @@ type BackendPOSProduct = {
   unit?: string | { unit_name?: string; symbol?: string } | null;
   unit_name?: string;
   tax_rate_id?: string | null;
-  tax_rate?: string | { tax_name?: string; rate_percentage?: number } | null;
+  tax_rate?:
+    | string
+    | { tax_name?: string; rate_percentage?: number; is_inclusive?: boolean }
+    | null;
   tax_rate_name?: string | null;
   tax_rate_percentage?: number;
   product_type?: string;
@@ -221,6 +224,8 @@ type BackendCheckoutPayload = {
 };
 
 type BackendReceiptLine = {
+  product_id?: string;
+  product_variant_id?: string | null;
   name?: string;
   item_name?: string;
   item_name_snapshot?: string;
@@ -305,6 +310,7 @@ type BackendHeldSaleItem = {
   discount_value?: number | null;
   tax_rate_percentage?: number;
   tax_rate_name?: string | null;
+  tax_rate_is_inclusive?: boolean;
   line_subtotal?: number;
   discount_amount?: number;
   tax_amount?: number;
@@ -355,6 +361,7 @@ type BackendHoldSalePayload = {
     discount_value: number | null;
     tax_rate_percentage: number;
     tax_rate_name: string | null;
+    tax_rate_is_inclusive: boolean;
   }[];
   sale_discount_type: string | null;
   sale_discount_value: number | null;
@@ -598,6 +605,10 @@ function getTaxRatePercentage(product: BackendPOSProduct): number {
   return 0;
 }
 
+function getTaxRateIsInclusive(product: BackendPOSProduct): boolean {
+  return isObject(product.tax_rate) && product.tax_rate.is_inclusive === true;
+}
+
 function parseProduct(value: unknown): POSProduct {
   if (!isObject(value)) {
     throw new Error("Backend POS product payload is invalid.");
@@ -619,6 +630,7 @@ function parseProduct(value: unknown): POSProduct {
     taxRateId: optionalString(product.tax_rate_id),
     taxRateName: getTaxRateName(product),
     taxRatePercentage: getTaxRatePercentage(product),
+    taxRateIsInclusive: getTaxRateIsInclusive(product),
     productType: isProductType(product.product_type) ? product.product_type : "finished_product",
     itemStructure: isItemStructure(product.item_structure) ? product.item_structure : "single",
     salePrice: requiredNumber(product.sale_price),
@@ -991,11 +1003,20 @@ function parseReceipt(value: unknown): SaleReceipt {
     soldAt: requiredString(receipt.sold_at, new Date().toISOString()),
     items: lines.map((line): SaleReceipt["items"][number] => {
       if (!isObject(line)) {
-        return { name: "Item", quantity: 1, unitPrice: 0, lineTotal: 0 };
+        return {
+          productId: null,
+          productVariantId: null,
+          name: "Item",
+          quantity: 1,
+          unitPrice: 0,
+          lineTotal: 0,
+        };
       }
 
       const receiptLine = line as BackendReceiptLine;
       return {
+        productId: optionalString(receiptLine.product_id),
+        productVariantId: optionalString(receiptLine.product_variant_id),
         name: getReceiptLineName(receiptLine),
         quantity: requiredNumber(receiptLine.quantity, 1),
         unitPrice: requiredNumber(receiptLine.unit_price),
@@ -1032,11 +1053,20 @@ function parseFallbackReceipt(response: BackendCheckoutResponse): SaleReceipt {
     soldAt: requiredString(response.sold_at, new Date().toISOString()),
     items: items.map((line): SaleReceipt["items"][number] => {
       if (!isObject(line)) {
-        return { name: "Item", quantity: 1, unitPrice: 0, lineTotal: 0 };
+        return {
+          productId: null,
+          productVariantId: null,
+          name: "Item",
+          quantity: 1,
+          unitPrice: 0,
+          lineTotal: 0,
+        };
       }
 
       const receiptLine = line as BackendReceiptLine;
       return {
+        productId: optionalString(receiptLine.product_id),
+        productVariantId: optionalString(receiptLine.product_variant_id),
         name: getReceiptLineName(receiptLine),
         quantity: requiredNumber(receiptLine.quantity, 1),
         unitPrice: requiredNumber(receiptLine.unit_price),
@@ -1141,6 +1171,7 @@ function toBackendHoldSalePayload(payload: HoldSalePayload): BackendHoldSalePayl
       discount_value: item.discountValue,
       tax_rate_percentage: item.taxRatePercentage,
       tax_rate_name: item.taxRateName,
+      tax_rate_is_inclusive: item.taxRateIsInclusive,
     })),
     sale_discount_type: payload.saleDiscountType,
     sale_discount_value: payload.saleDiscountValue,
@@ -1220,6 +1251,7 @@ function parseHeldSaleCartItem(value: unknown): CartItem {
     discountValue: typeof item.discount_value === "number" ? item.discount_value : null,
     taxRatePercentage: requiredNumber(item.tax_rate_percentage),
     taxRateName: optionalString(item.tax_rate_name),
+    taxRateIsInclusive: item.tax_rate_is_inclusive === true,
     lineSubtotal: requiredNumber(item.line_subtotal, quantity * unitPrice),
     discountAmount: requiredNumber(item.discount_amount),
     taxAmount: requiredNumber(item.tax_amount),

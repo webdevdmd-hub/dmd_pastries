@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { createUuid } from "@/lib/uuid";
 import { purchaseInvoiceSchema } from "@/lib/validators/purchasing.schema";
 import type { ChartAccount } from "@/types/accounting";
 import type {
@@ -62,7 +63,7 @@ function emptyLine(): PurchaseItemLineDraft {
     ingredientId: null,
     itemType: "product",
     lineType: "product",
-    lineId: crypto.randomUUID(),
+    lineId: createUuid(),
     packagingItemId: null,
     productId: null,
     productVariantId: null,
@@ -147,7 +148,7 @@ export function PurchaseInvoiceFormDialog({
             ingredientId: item.ingredientId,
             itemType: item.lineType === "account" ? ("account" as const) : ("product" as const),
             itemNameSnapshot: item.itemNameSnapshot,
-            lineId: item.id || crypto.randomUUID(),
+            lineId: item.id || createUuid(),
             lineType: item.lineType,
             packagingItemId: item.packagingItemId,
             productId: item.productId,
@@ -175,7 +176,7 @@ export function PurchaseInvoiceFormDialog({
     setNotes(source?.notes ?? "");
     setLines(
       source?.items.length
-        ? source.items.map((item) => ({ ...item, lineId: item.lineId || crypto.randomUUID() }))
+        ? source.items.map((item) => ({ ...item, lineId: item.lineId || createUuid() }))
         : [emptyLine()],
     );
     setError(null);

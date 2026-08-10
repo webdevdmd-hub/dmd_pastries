@@ -14,7 +14,7 @@ export default function POSLayout({
   children: ReactNode;
 }>): JSX.Element {
   const router = useRouter();
-  const { status } = useAuth();
+  const { isAuthenticated, status } = useAuth();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -22,7 +22,7 @@ export default function POSLayout({
     }
   }, [router, status]);
 
-  if (status !== "authenticated") {
+  if (!isAuthenticated) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-brand-latte">
         <LoadingState />

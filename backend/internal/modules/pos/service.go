@@ -658,7 +658,7 @@ func (s *Service) RefundSale(currentUser *utils.AuthContext, saleID string, req 
 	}
 	defer rollbackIfOpen(tx)
 
-	sale, err := s.repo.FindSaleByID(tx, currentUser.BusinessID, saleID)
+	sale, err := s.repo.FindSaleByIDForUpdate(tx, currentUser.BusinessID, saleID)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, apperrors.NotFound("sale not found")
@@ -712,11 +712,17 @@ func (s *Service) RefundSale(currentUser *utils.AuthContext, saleID string, req 
 	if err := s.createOperationalPaymentRefunds(tx, currentUser, sale, refund, now); err != nil {
 		return nil, err
 	}
-	if err := s.repo.UpdateSale(tx, currentUser.BusinessID, sale.ID, map[string]interface{}{
-		"sale_status":    newSaleStatus,
-		"payment_status": "refunded",
-		"updated_at":     now,
-	}); err != nil {
+	saleUpdates := map[string]interface{}{
+		"sale_status": newSaleStatus,
+		"updated_at":  now,
+	}
+	// The sales.payment_status check constraint only allows unpaid/partial/paid/refunded,
+	// so a partial refund keeps the existing payment status; sale_status carries
+	// "partially_refunded".
+	if newSaleStatus == "refunded" {
+		saleUpdates["payment_status"] = "refunded"
+	}
+	if err := s.repo.UpdateSale(tx, currentUser.BusinessID, sale.ID, saleUpdates); err != nil {
 		return nil, apperrors.Internal("failed to update sale")
 	}
 	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{

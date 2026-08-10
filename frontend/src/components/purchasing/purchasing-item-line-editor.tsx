@@ -27,6 +27,7 @@ import {
   isPurchasableProduct,
   isSelectableTaxRate,
 } from "@/lib/selectors/eligibility";
+import { createUuid } from "@/lib/uuid";
 import type { ChartAccount } from "@/types/accounting";
 import type { CreateProductPayload, Product } from "@/types/product";
 import { PRODUCT_TYPE_LABELS } from "@/types/product";
@@ -66,7 +67,7 @@ function createLine(): PurchaseItemLineDraft {
     itemNameSnapshot: null,
     itemType: "product",
     lineType: "product",
-    lineId: crypto.randomUUID(),
+    lineId: createUuid(),
     packagingItemId: null,
     productId: null,
     productVariantId: null,
@@ -85,7 +86,7 @@ function createAccountLine(): PurchaseItemLineDraft {
     ingredientId: null,
     itemNameSnapshot: "",
     itemType: "account",
-    lineId: crypto.randomUUID(),
+    lineId: createUuid(),
     lineType: "account",
     packagingItemId: null,
     productId: null,

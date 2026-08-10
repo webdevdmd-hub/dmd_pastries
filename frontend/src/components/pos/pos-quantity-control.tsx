@@ -1,8 +1,8 @@
 import { Minus, Plus } from "lucide-react";
 import type { JSX } from "react";
 
+import { POSNumberInput } from "@/components/pos/pos-number-input";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 type POSQuantityControlProps = {
   onChange: (quantity: number) => void;
@@ -22,14 +22,15 @@ export function POSQuantityControl({ onChange, quantity }: POSQuantityControlPro
       >
         <Minus className="h-3.5 w-3.5" />
       </Button>
-      <Input
+      <POSNumberInput
         aria-label="Quantity"
         className="h-8 w-14 rounded-md border-[#d4d4d8] text-center font-mono text-sm"
-        min={0.001}
-        onChange={(event) => onChange(Number(event.target.value))}
-        step={0.001}
-        type="number"
-        value={String(quantity)}
+        onValueChange={(nextQuantity) => {
+          if (nextQuantity !== null) {
+            onChange(nextQuantity);
+          }
+        }}
+        value={quantity}
       />
       <Button
         aria-label="Increase quantity"

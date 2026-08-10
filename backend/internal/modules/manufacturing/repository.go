@@ -7,6 +7,8 @@ import (
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"pastries-pos/internal/shared/utils"
 )
 
 type Repository struct {
@@ -107,11 +109,7 @@ func (r *Repository) NextNumber(tx *gorm.DB, businessID string) (string, error) 
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":production_batches").Error; err != nil {
 		return "", err
 	}
-	var count int64
-	if err := tx.Model(&ProductionBatch{}).Where("business_id = ?", businessID).Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("MFG-%06d", count+1), nil
+	return utils.NextSequentialNumber(tx.Table("production_batches").Where("business_id = ?", businessID), "production_batch_number", "MFG-", 6)
 }
 
 func (r *Repository) ActiveRecipe(tx *gorm.DB, businessID, branchID, recipeID string) (*recipeInfo, error) {

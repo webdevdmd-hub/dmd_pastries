@@ -55,6 +55,7 @@ import { lookupPOSProduct } from "@/lib/api/pos";
 import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
 import { type CheckoutFeedback, resolveCheckoutBlocker } from "@/lib/pos/checkout-feedback";
 import { getProductCategoryIconForMetadata } from "@/lib/product-category-icons";
+import { createUuid } from "@/lib/uuid";
 import { checkoutSchema } from "@/lib/validators/pos.schema";
 import type { ProductCategory } from "@/types/master-data";
 import type {
@@ -85,10 +86,18 @@ function getCartReceiptItemName(item: CartItem): string {
 }
 
 function withCartItemNames(receipt: SaleReceipt, cartItems: CartItem[]): SaleReceipt {
+  const cartItemsById = new Map(cartItems.map((item) => [item.cartItemId, item]));
+
   return {
     ...receipt,
-    items: receipt.items.map((receiptItem, index) => {
-      const cartItem = cartItems[index];
+    items: receipt.items.map((receiptItem) => {
+      if (!receiptItem.productId) {
+        return receiptItem;
+      }
+
+      const cartItem = cartItemsById.get(
+        `${receiptItem.productId}:${receiptItem.productVariantId ?? "base"}`,
+      );
 
       if (!cartItem) {
         return receiptItem;
@@ -288,12 +297,34 @@ export function POSWorkspace(): JSX.Element {
   }, [cart]);
 
   const addProduct = (product: POSProduct, variant?: POSProductVariant): void => {
+    const displayName = variant
+      ? `${product.productName} - ${variant.variantName}`
+      : product.productName;
+    const availableQuantity = variant
+      ? variant.availableStockQuantity
+      : product.availableStockQuantity;
+
+    if (availableQuantity !== null && availableQuantity <= 0) {
+      toast.error(`${displayName} is out of stock.`);
+      return;
+    }
+
+    const cartItemId = `${product.id}:${variant?.id ?? "base"}`;
+    const existingItem = cart.items.find((item) => item.cartItemId === cartItemId);
+
+    if (
+      availableQuantity !== null &&
+      existingItem &&
+      existingItem.quantity + 1 > availableQuantity
+    ) {
+      toast.error(
+        `Only ${availableQuantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} of ${displayName} in stock.`,
+      );
+      return;
+    }
+
     cart.addProduct(variant ? { product, variant } : { product });
-    toast.success(
-      variant
-        ? `${product.productName} - ${variant.variantName} added to cart`
-        : `${product.productName} added to cart`,
-    );
+    toast.success(`${displayName} added to cart`);
     barcodeInputRef.current?.focus();
   };
 
@@ -337,7 +368,7 @@ export function POSWorkspace(): JSX.Element {
       return checkoutReference;
     }
 
-    const reference = crypto.randomUUID();
+    const reference = createUuid();
     setCheckoutReference(reference);
     return reference;
   };
@@ -363,6 +394,8 @@ export function POSWorkspace(): JSX.Element {
     setAutoSelectedPaymentMethodId(null);
     setPaymentAutoSelectionSuppressedChannelId(null);
     cart.clearCart();
+    setCustomerId(null);
+    setSalesChannelId("");
     if (checkedOut.receiptWarning) {
       toast.warning(checkedOut.receiptWarning);
     } else {
@@ -497,8 +530,14 @@ export function POSWorkspace(): JSX.Element {
 
     try {
       const resumed = await resumeHeldSaleMutation.mutateAsync(heldSaleId);
+      // Held sales stored before tax inclusivity was tracked don't carry the flag,
+      // so recover it from the loaded product catalog.
+      const restoredItems = resumed.items.map((item) => {
+        const product = categorySourceProducts.find((entry) => entry.id === item.productId);
+        return product ? { ...item, taxRateIsInclusive: product.taxRateIsInclusive } : item;
+      });
       cart.restoreHeldSaleCart(
-        resumed.items,
+        restoredItems,
         resumed.saleDiscountType,
         resumed.saleDiscountValue,
         resumed.charges,
@@ -618,6 +657,22 @@ export function POSWorkspace(): JSX.Element {
     () => categorySourceProductsQuery.data ?? [],
     [categorySourceProductsQuery.data],
   );
+  const stockByCartItemId = useMemo(() => {
+    const stockMap = new Map<string, number>();
+
+    categorySourceProducts.forEach((product) => {
+      if (product.availableStockQuantity !== null) {
+        stockMap.set(`${product.id}:base`, product.availableStockQuantity);
+      }
+      product.variants.forEach((variant) => {
+        if (variant.availableStockQuantity !== null) {
+          stockMap.set(`${product.id}:${variant.id}`, variant.availableStockQuantity);
+        }
+      });
+    });
+
+    return stockMap;
+  }, [categorySourceProducts]);
   const referenceCategoryById = useMemo(() => {
     const categoryMap = new Map<string, ProductCategory>();
 
@@ -720,6 +775,14 @@ export function POSWorkspace(): JSX.Element {
       }}
       onQuantityChange={(cartItemId, quantity) => {
         clearCheckoutFeedback();
+        const maxQuantity = stockByCartItemId.get(cartItemId);
+        if (maxQuantity !== undefined && quantity > maxQuantity) {
+          toast.warning(
+            `Only ${maxQuantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} in stock.`,
+          );
+          cart.updateQuantity(cartItemId, maxQuantity);
+          return;
+        }
         cart.updateQuantity(cartItemId, quantity);
       }}
       onRemoveItem={(cartItemId) => {

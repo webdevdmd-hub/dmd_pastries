@@ -276,12 +276,16 @@ export function ProductsPageClient(): JSX.Element {
     searchParamFilters.status,
   ]);
 
+  useEffect(() => {
+    if (productsQuery.error instanceof ApiError && productsQuery.error.status === 401) {
+      void logout().finally(() => {
+        router.replace(ROUTES.login);
+      });
+    }
+  }, [logout, productsQuery.error, router]);
+
   if (!canViewProducts) {
     return <ProductsAccessDeniedCard />;
-  }
-
-  if (productsQuery.error instanceof ApiError && productsQuery.error.status === 401) {
-    void logout().finally(() => router.replace(ROUTES.login));
   }
 
   const submitProductCreate = async (payload: CreateProductPayload): Promise<void> => {

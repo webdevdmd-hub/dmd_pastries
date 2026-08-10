@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	"pastries-pos/internal/modules/accounting"
+	"pastries-pos/internal/shared/utils"
 )
 
 type Repository struct {
@@ -235,12 +236,8 @@ func (r *Repository) NextExpenseNumber(tx *gorm.DB, businessID string, expenseDa
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+datePart+":expenses").Error; err != nil {
 		return "", err
 	}
-	var count int64
 	prefix := "EXP-" + datePart + "-"
-	if err := tx.Model(&Expense{}).Where("business_id = ? AND expense_number LIKE ?", businessID, prefix+"%").Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s%06d", prefix, count+1), nil
+	return utils.NextSequentialNumber(tx.Table("expenses").Where("business_id = ?", businessID), "expense_number", prefix, 6)
 }
 
 func (r *Repository) NextJournalEntryNumber(tx *gorm.DB, businessID string, entryDate time.Time) (string, error) {
@@ -248,12 +245,8 @@ func (r *Repository) NextJournalEntryNumber(tx *gorm.DB, businessID string, entr
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+datePart+":journal_entries").Error; err != nil {
 		return "", err
 	}
-	var count int64
 	prefix := "JV-" + datePart + "-"
-	if err := tx.Model(&accounting.JournalEntry{}).Where("business_id = ? AND entry_number LIKE ?", businessID, prefix+"%").Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s%06d", prefix, count+1), nil
+	return utils.NextSequentialNumber(tx.Table("journal_entries").Where("business_id = ?", businessID), "entry_number", prefix, 6)
 }
 
 func (r *Repository) CreateJournalEntry(tx *gorm.DB, entry *accounting.JournalEntry, lines []accounting.JournalEntryLine) error {

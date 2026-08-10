@@ -99,7 +99,7 @@ export function useOrderPreview(payload: CreateOrderPayload | null, enabled = tr
       return previewOrder(payload);
     },
     enabled: enabled && payload !== null,
-    staleTime: 0,
+    staleTime: 60_000,
   });
 }
 

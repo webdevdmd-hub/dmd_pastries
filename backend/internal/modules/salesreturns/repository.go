@@ -1,13 +1,13 @@
 package salesreturns
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
 
 	"pastries-pos/internal/modules/charges"
+	"pastries-pos/internal/shared/utils"
 )
 
 type Repository struct {
@@ -354,11 +354,7 @@ func (r *Repository) GenerateReturnNumber(tx *gorm.DB, businessID string) (strin
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":sales_returns").Error; err != nil {
 		return "", err
 	}
-	var count int64
-	if err := tx.Model(&SalesReturn{}).Where("business_id = ? AND return_number LIKE ?", businessID, "CN-%").Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("CN-%06d", count+1), nil
+	return utils.NextSequentialNumber(tx.Table("sales_returns").Where("business_id = ?", businessID), "return_number", "CN-", 6)
 }
 
 func (r *Repository) GeneratePaymentRefundNumber(tx *gorm.DB, businessID string, now time.Time) (string, error) {
@@ -366,12 +362,8 @@ func (r *Repository) GeneratePaymentRefundNumber(tx *gorm.DB, businessID string,
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+datePart+":payment_refunds").Error; err != nil {
 		return "", err
 	}
-	var count int64
 	prefix := "PAY-RFND-" + datePart + "-"
-	if err := tx.Table("payment_refunds").Where("business_id = ? AND refund_number LIKE ?", businessID, prefix+"%").Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s%06d", prefix, count+1), nil
+	return utils.NextSequentialNumber(tx.Table("payment_refunds").Where("business_id = ?", businessID), "refund_number", prefix, 6)
 }
 
 func (r *Repository) LoadResponse(businessID string, salesReturn SalesReturn) (SalesReturnResponse, error) {

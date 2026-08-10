@@ -1,14 +1,15 @@
 package pos
 
 import (
-	"fmt"
 	"math"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"pastries-pos/internal/modules/charges"
+	"pastries-pos/internal/shared/utils"
 )
 
 type Repository struct {
@@ -367,12 +368,8 @@ func (r *Repository) GenerateSaleNumber(tx *gorm.DB, businessID string, soldAt t
 		return "", err
 	}
 
-	var count int64
 	prefix := "SALE-" + datePart + "-"
-	if err := tx.Model(&Sale{}).Where("business_id = ? AND sale_number LIKE ?", businessID, prefix+"%").Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s%06d", prefix, count+1), nil
+	return utils.NextSequentialNumber(tx.Table("sales").Where("business_id = ?", businessID), "sale_number", prefix, 6)
 }
 
 func (r *Repository) LockCheckoutReference(tx *gorm.DB, businessID, checkoutReference string) error {
@@ -386,12 +383,8 @@ func (r *Repository) GenerateHoldNumber(tx *gorm.DB, businessID string, heldAt t
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
 		return "", err
 	}
-	var count int64
 	prefix := "HOLD-" + datePart + "-"
-	if err := tx.Model(&HeldSale{}).Where("business_id = ? AND hold_number LIKE ?", businessID, prefix+"%").Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s%06d", prefix, count+1), nil
+	return utils.NextSequentialNumber(tx.Table("held_sales").Where("business_id = ?", businessID), "hold_number", prefix, 6)
 }
 
 func (r *Repository) GenerateRefundNumber(tx *gorm.DB, businessID string, createdAt time.Time) (string, error) {
@@ -400,12 +393,8 @@ func (r *Repository) GenerateRefundNumber(tx *gorm.DB, businessID string, create
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
 		return "", err
 	}
-	var count int64
 	prefix := "RFND-" + datePart + "-"
-	if err := tx.Model(&SaleRefund{}).Where("business_id = ? AND refund_number LIKE ?", businessID, prefix+"%").Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s%06d", prefix, count+1), nil
+	return utils.NextSequentialNumber(tx.Table("sale_refunds").Where("business_id = ?", businessID), "refund_number", prefix, 6)
 }
 
 func (r *Repository) GeneratePaymentRefundNumber(tx *gorm.DB, businessID string, createdAt time.Time) (string, error) {
@@ -414,12 +403,8 @@ func (r *Repository) GeneratePaymentRefundNumber(tx *gorm.DB, businessID string,
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
 		return "", err
 	}
-	var count int64
 	prefix := "PAY-RFND-" + datePart + "-"
-	if err := tx.Model(&POSPaymentRefund{}).Where("business_id = ? AND refund_number LIKE ?", businessID, prefix+"%").Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s%06d", prefix, count+1), nil
+	return utils.NextSequentialNumber(tx.Table("payment_refunds").Where("business_id = ?", businessID), "refund_number", prefix, 6)
 }
 
 func (r *Repository) CreateSale(tx *gorm.DB, sale *Sale, items []SaleItem, payments []SalePayment) error {
@@ -469,6 +454,19 @@ func (r *Repository) ListSales(businessID string, query SalesListQuery) ([]SaleS
 func (r *Repository) FindSaleByID(tx *gorm.DB, businessID, saleID string) (*Sale, error) {
 	var sale Sale
 	err := tx.Where("id = ? AND business_id = ? AND deleted_at IS NULL", saleID, businessID).Take(&sale).Error
+	if err != nil {
+		return nil, err
+	}
+	return &sale, nil
+}
+
+// FindSaleByIDForUpdate locks the sale row so concurrent refunds serialize on it
+// and cannot both pass the remaining-amount check.
+func (r *Repository) FindSaleByIDForUpdate(tx *gorm.DB, businessID, saleID string) (*Sale, error) {
+	var sale Sale
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ? AND business_id = ? AND deleted_at IS NULL", saleID, businessID).
+		Take(&sale).Error
 	if err != nil {
 		return nil, err
 	}

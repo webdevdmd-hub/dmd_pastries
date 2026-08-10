@@ -127,6 +127,47 @@ export function hasStoredAppwriteSession(): boolean {
   }
 }
 
+// Removes the locally stored Appwrite session credentials so a later
+// restoreSession() cannot silently resume a session the user asked to end
+// (e.g. when Appwrite is unreachable during logout on a shared terminal).
+export function clearStoredAppwriteSession(): void {
+  clearCachedAppwriteJwt();
+
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (isE2EAuthEnabled()) {
+    clearE2ESession();
+    return;
+  }
+
+  const fallbackCookies = window.localStorage.getItem("cookieFallback");
+
+  if (!fallbackCookies) {
+    return;
+  }
+
+  const currentProjectId = getAppwriteProjectId();
+
+  try {
+    const parsed = JSON.parse(fallbackCookies) as unknown;
+
+    if (!isObject(parsed) || !currentProjectId) {
+      window.localStorage.removeItem("cookieFallback");
+      return;
+    }
+
+    const sessionKey = `a_session_${currentProjectId}`;
+    const remaining = Object.fromEntries(
+      Object.entries(parsed).filter(([key]) => key !== sessionKey),
+    );
+    window.localStorage.setItem("cookieFallback", JSON.stringify(remaining));
+  } catch {
+    window.localStorage.removeItem("cookieFallback");
+  }
+}
+
 export async function getCurrentAppwriteAccount(): Promise<Models.User<Models.Preferences> | null> {
   if (isE2EAuthEnabled()) {
     return hasE2ESession() ? buildE2EAccount() : null;
@@ -283,6 +324,12 @@ export async function verifyEmailWithSecret(userId: string, secret: string): Pro
 }
 
 function isE2EAuthEnabled(): boolean {
+  // Never allow the E2E credential bypass in production builds; the check is
+  // statically replaced at build time so the fake-session branches tree-shake out.
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+
   return (
     getPublicEnvValue("NEXT_PUBLIC_E2E_AUTH_ENABLED") === "true" && getE2EAuthToken().length > 0
   );

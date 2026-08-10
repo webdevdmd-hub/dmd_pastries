@@ -15,7 +15,7 @@ export default function DashboardLayout({
   children: ReactNode;
 }>): JSX.Element {
   const router = useRouter();
-  const { status, user } = useAuth();
+  const { isAuthenticated, status, user } = useAuth();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -26,7 +26,7 @@ export default function DashboardLayout({
     }
   }, [router, status, user?.isPlatformAdmin]);
 
-  if (status !== "authenticated") {
+  if (!isAuthenticated || user?.isPlatformAdmin) {
     return (
       <div className="min-h-screen bg-brand-latte px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
