@@ -1,11 +1,4 @@
-import {
-  Banknote,
-  CalendarClock,
-  Clock3,
-  ReceiptText,
-  RotateCcw,
-  WalletCards,
-} from "lucide-react";
+import { Banknote, CalendarClock, Clock3, ReceiptText, RotateCcw, WalletCards } from "lucide-react";
 import type { JSX } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";

@@ -64,10 +64,7 @@ export function ReportsDashboardClient(): JSX.Element {
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const summaryQuery = useReportsDashboardSummary(appliedFilters, canLoadReportsDashboard);
   const salesChartQuery = useSalesReportChart(appliedFilters, canLoadReportsDashboard);
-  const paymentsChartQuery = usePaymentsReportChart(
-    appliedFilters,
-    canLoadReportsDashboard,
-  );
+  const paymentsChartQuery = usePaymentsReportChart(appliedFilters, canLoadReportsDashboard);
   const ordersChartQuery = useOrdersReportChart(appliedFilters, canLoadReportsDashboard);
 
   if (!canView) {

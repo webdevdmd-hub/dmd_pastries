@@ -203,9 +203,7 @@ function normalizeApiResponse(value: unknown): ApiResponse<unknown> {
     const errorDetails = isObject(value.errors) ? value.errors : undefined;
     const messageSuffix = backendError.messageSuffix ?? backendErrors.messageSuffix;
     const resolvedMessage =
-      messageSuffix && messageSuffix !== message
-        ? `${message}: ${messageSuffix}`
-        : message;
+      messageSuffix && messageSuffix !== message ? `${message}: ${messageSuffix}` : message;
 
     return {
       success: false,
@@ -570,10 +568,7 @@ export async function apiProbeRequest(
         }
       }
 
-      if (
-        response.status === 400 &&
-        options?.expectedValidationMessages?.includes(errorMessage)
-      ) {
+      if (response.status === 400 && options?.expectedValidationMessages?.includes(errorMessage)) {
         status = "expected_validation";
         success = true;
       }

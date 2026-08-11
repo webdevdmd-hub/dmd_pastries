@@ -1331,7 +1331,7 @@ func (r *Repository) UnitSymbol(unitID string) string {
 	return symbol
 }
 
-func (r *Repository) Summary(businessID, branchID string) (*PurchasingSummaryResponse, error) {
+func (r *Repository) Summary(businessID, branchID, timezone string) (*PurchasingSummaryResponse, error) {
 	var response PurchasingSummaryResponse
 	orderDB := r.db.Model(&PurchaseOrder{}).Where("business_id = ? AND deleted_at IS NULL", businessID)
 	openOrderDB := r.db.Model(&PurchaseOrder{}).Where("business_id = ? AND status IN ? AND deleted_at IS NULL", businessID, []string{"draft", "ordered", "partially_received"})
@@ -1351,7 +1351,10 @@ func (r *Repository) Summary(businessID, branchID string) (*PurchasingSummaryRes
 	_ = openOrderDB.Count(&response.OpenPurchaseOrders).Error
 	_ = invoiceDB.Count(&response.TotalInvoices).Error
 	_ = unpaidInvoiceDB.Scan(&response.UnpaidInvoiceAmount).Error
-	start := time.Now().UTC().AddDate(0, 0, -time.Now().UTC().Day()+1)
+	// "This month" means the month where the business is, not where the server
+	// is. Computing it in UTC put late-evening activity in the wrong month for
+	// any business ahead of UTC.
+	start := monthStartIn(timezone)
 	_ = purchasesMonthDB.Where("invoice_date >= ?", start).Scan(&response.PurchasesThisMonth).Error
 	_ = receivedMonthDB.Where("pr.received_date >= ?", start).Scan(&response.ReceivedThisMonth).Error
 	response.UnpaidInvoiceAmount = roundMoney(response.UnpaidInvoiceAmount)
@@ -1730,4 +1733,15 @@ type IngredientInfo struct {
 	UnitID          string
 	IsStockTracked  bool
 	IsExpiryTracked bool
+}
+
+// monthStartIn returns midnight on the first of the current month in the given
+// timezone, expressed in UTC for comparison against stored timestamps.
+func monthStartIn(timezone string) time.Time {
+	location, err := time.LoadLocation(strings.TrimSpace(timezone))
+	if err != nil || location == nil {
+		location = time.UTC
+	}
+	now := time.Now().In(location)
+	return time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, location).UTC()
 }

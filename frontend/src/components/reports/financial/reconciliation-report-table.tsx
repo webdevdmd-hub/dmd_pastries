@@ -38,7 +38,9 @@ export function ReconciliationReportTable({ rows }: { rows: ReconciliationRow[] 
       </TableHeader>
       <TableBody>
         {rows.map((row) => (
-          <TableRow key={row.transactionId || `${row.sourceType}-${row.sourceNumber}-${row.transactionAt}`}>
+          <TableRow
+            key={row.transactionId || `${row.sourceType}-${row.sourceNumber}-${row.transactionAt}`}
+          >
             <TableCell>{formatDate(row.transactionAt)}</TableCell>
             <TableCell>{row.branchName || "-"}</TableCell>
             <TableCell>{row.transactionType || "-"}</TableCell>

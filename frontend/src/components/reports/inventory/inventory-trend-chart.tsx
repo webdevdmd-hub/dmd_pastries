@@ -17,10 +17,7 @@ export function InventoryTrendChart({ chart }: { chart: InventoryTrendChartData 
   });
 
   return (
-    <ResponsiveChartFrame
-      ariaLabel="Inventory stock in and stock out trend chart"
-      className="h-80"
-    >
+    <ResponsiveChartFrame ariaLabel="Inventory stock in and stock out trend chart" className="h-80">
       {({ height, width }) => (
         <BarChart data={rows} height={height} width={width}>
           <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />

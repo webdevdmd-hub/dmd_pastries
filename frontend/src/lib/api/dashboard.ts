@@ -86,9 +86,8 @@ function stringField(value: Record<string, unknown>, key: string): string {
 function isUuidLike(value: string): boolean {
   const trimmed = value.trim();
   return (
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      trimmed,
-    ) || /^[0-9a-f]{32}$/i.test(trimmed)
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed) ||
+    /^[0-9a-f]{32}$/i.test(trimmed)
   );
 }
 
@@ -180,10 +179,7 @@ function parseAdminDashboard(value: unknown): AdminDashboard {
     },
     manufacturing: {
       activeBatches: numberField(manufacturing, "active_batches"),
-      completedToday: numberFieldAny(manufacturing, [
-        "completed_batches_today",
-        "completed_today",
-      ]),
+      completedToday: numberFieldAny(manufacturing, ["completed_batches_today", "completed_today"]),
     },
     orders: {
       inProduction: numberFieldAny(orders, ["in_production_orders", "in_production"]),
@@ -404,7 +400,9 @@ async function getDashboard<TResponse>(
   return response.data;
 }
 
-export async function getAdminDashboard(filters?: DashboardRequestFilters): Promise<AdminDashboard> {
+export async function getAdminDashboard(
+  filters?: DashboardRequestFilters,
+): Promise<AdminDashboard> {
   return getDashboard(`/api/v1/dashboard/admin${toSearchParams(filters)}`, parseAdminDashboard);
 }
 

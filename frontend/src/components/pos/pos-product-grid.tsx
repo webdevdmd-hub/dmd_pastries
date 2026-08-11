@@ -55,8 +55,8 @@ export function POSProductGrid({
     return (
       <div className="flex min-h-80 items-center justify-center rounded-lg border border-dashed border-[#c8c5ca] bg-white p-8 text-center">
         <div>
-          <p className="font-semibold text-[#09090b]">No POS products found.</p>
-          <p className="mt-1 text-sm text-[#71717a]">
+          <p className="font-semibold text-zinc-950">No POS products found.</p>
+          <p className="mt-1 text-sm text-zinc-500">
             Active POS-visible products will appear here.
           </p>
         </div>
@@ -77,7 +77,7 @@ export function POSProductGrid({
       ))}
       {canCreateOrder && onCreateOrder ? (
         <Button
-          className="flex min-h-[14.5rem] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#a1a1aa] bg-[#fafafa] text-[#52525b] shadow-none hover:border-black hover:bg-white hover:text-black"
+          className="flex min-h-[14.5rem] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-400 bg-zinc-50 text-zinc-600 shadow-none hover:border-black hover:bg-white hover:text-black"
           onClick={onCreateOrder}
           type="button"
           variant="outline"

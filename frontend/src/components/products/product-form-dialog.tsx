@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { getProductImagePreviewUrl, uploadProductImage } from "@/lib/appwrite/storage";
 import { isSelectableTaxRate } from "@/lib/selectors/eligibility";
+import { cn } from "@/lib/utils/cn";
 import { type ProductSchema, productSchema } from "@/lib/validators/product.schema";
 import type { ProductReferenceData } from "@/types/product";
 import {
@@ -61,6 +62,53 @@ type ProductFormDefaults = {
 
 function FieldError({ message }: { message: string | undefined }): JSX.Element | null {
   return message ? <p className="text-xs font-medium text-red-700">{message}</p> : null;
+}
+
+const PRODUCT_FORM_STEPS = [
+  { label: "Identity", description: "Name, type & category" },
+  { label: "Pricing", description: "Prices, tax & margins" },
+  { label: "Behavior", description: "POS & inventory options" },
+  { label: "Details", description: "SKU, barcode & media" },
+] as const;
+
+// Fields that belong to each step, used to validate the current step before
+// advancing and to route the user to the first step that has a submit error.
+const PRODUCT_FORM_STEP_FIELDS: readonly (readonly (keyof ProductSchema)[])[] = [
+  ["productName", "productType", "itemStructure", "categoryId", "unitId"],
+  [
+    "salePrice",
+    "costPrice",
+    "costUpdatePolicy",
+    "pricingType",
+    "pricingPercent",
+    "minimumSalePrice",
+    "taxRateId",
+    "autoPriceUpdateEnabled",
+    "salePriceLocked",
+  ],
+  [
+    "preparationTimeMinutes",
+    "isSellable",
+    "isPosVisible",
+    "isPurchasable",
+    "isStockTracked",
+    "isExpiryTracked",
+    "isCustomOrderAvailable",
+  ],
+  ["sku", "barcode", "description", "imageFileId"],
+];
+
+const LAST_PRODUCT_FORM_STEP = PRODUCT_FORM_STEPS.length - 1;
+
+function stepForField(field: keyof ProductSchema): number {
+  const index = PRODUCT_FORM_STEP_FIELDS.findIndex((fields) => fields.includes(field));
+  return index === -1 ? 0 : index;
+}
+
+function firstErrorStep(errorFields: (keyof ProductSchema)[]): number {
+  return errorFields
+    .map(stepForField)
+    .reduce((min, current) => (current < min ? current : min), LAST_PRODUCT_FORM_STEP);
 }
 
 function defaultSellableForProductType(productType: ProductSchema["productType"]): boolean {
@@ -131,6 +179,7 @@ export function ProductFormDialog({
 }: ProductFormDialogProps): JSX.Element {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [step, setStep] = useState(0);
   const form = useForm<ProductSchema>({
     resolver: zodResolver(productSchema),
     defaultValues: toDefaultValues(product, { defaultItemStructure, defaultProductType }),
@@ -164,6 +213,21 @@ export function ProductFormDialog({
     form.reset(toDefaultValues(product, { defaultItemStructure, defaultProductType }));
     setSelectedImage(null);
   }, [defaultItemStructure, defaultProductType, form, product]);
+
+  // Always start the wizard on the first step whenever the dialog is opened.
+  useEffect(() => {
+    if (open) {
+      setStep(0);
+    }
+  }, [open]);
+
+  const goToNextStep = async (): Promise<void> => {
+    const stepFields = PRODUCT_FORM_STEP_FIELDS[step] ?? [];
+    const isStepValid = await form.trigger([...stepFields]);
+    if (isStepValid) {
+      setStep((current) => Math.min(current + 1, LAST_PRODUCT_FORM_STEP));
+    }
+  };
 
   useEffect(() => {
     const categoryId = form.getValues("categoryId");
@@ -283,6 +347,7 @@ export function ProductFormDialog({
         message: selectedUnitId ? "Select a valid unit." : "Unit is required.",
         type: "manual",
       });
+      setStep(stepForField("unitId"));
       return;
     }
 
@@ -294,6 +359,7 @@ export function ProductFormDialog({
         message: "Select a category compatible with the selected product type.",
         type: "manual",
       });
+      setStep(stepForField("categoryId"));
       return;
     }
 
@@ -358,15 +424,62 @@ export function ProductFormDialog({
             Set the catalog identity, pricing, POS visibility, and stock behavior for this item.
           </DialogDescription>
         </DialogHeader>
+        <nav aria-label="Product form steps" className="flex items-stretch gap-2">
+          {PRODUCT_FORM_STEPS.map((formStep, index) => {
+            const isActive = index === step;
+            const isComplete = index < step;
+
+            return (
+              <button
+                aria-current={isActive ? "step" : undefined}
+                className={cn(
+                  "flex flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
+                  isActive
+                    ? "border-brand-caramel bg-brand-latte"
+                    : "border-brand-cappuccino/60 hover:bg-brand-latte/50",
+                )}
+                key={formStep.label}
+                onClick={() => setStep(index)}
+                type="button"
+              >
+                <span
+                  className={cn(
+                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                    isActive
+                      ? "bg-brand-caramel text-white"
+                      : isComplete
+                        ? "bg-brand-mocha text-white"
+                        : "bg-brand-cappuccino/60 text-brand-espresso",
+                  )}
+                >
+                  {index + 1}
+                </span>
+                <span className="hidden min-w-0 sm:block">
+                  <span className="block truncate text-sm font-semibold text-brand-espresso">
+                    {formStep.label}
+                  </span>
+                  <span className="block truncate text-xs text-brand-mocha">
+                    {formStep.description}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </nav>
         <form
           className="flex flex-col gap-4"
           onSubmit={(event) => {
-            void form.handleSubmit((values) => {
-              void onSubmit(values);
-            })(event);
+            void form.handleSubmit(
+              (values) => {
+                void onSubmit(values);
+              },
+              (errors) => {
+                setStep(firstErrorStep(Object.keys(errors) as (keyof ProductSchema)[]));
+              },
+            )(event);
           }}
         >
-          <Card>
+          <Card className={cn(step === 0 ? undefined : "hidden")}>
             <CardContent className="p-4">
               <div className="mb-4">
                 <h3 className="font-semibold text-brand-espresso">Catalog identity</h3>
@@ -491,7 +604,7 @@ export function ProductFormDialog({
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className={cn(step === 1 ? undefined : "hidden")}>
             <CardContent className="p-4">
               <div className="mb-4">
                 <h3 className="font-semibold text-brand-espresso">Pricing and tax</h3>
@@ -617,7 +730,7 @@ export function ProductFormDialog({
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className={cn(step === 2 ? undefined : "hidden")}>
             <CardContent className="p-4">
               <div className="mb-4">
                 <h3 className="font-semibold text-brand-espresso">Operational behavior</h3>
@@ -702,7 +815,7 @@ export function ProductFormDialog({
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className={cn(step === 3 ? undefined : "hidden")}>
             <CardContent className="p-4">
               <div className="mb-4">
                 <h3 className="font-semibold text-brand-espresso">Identifiers and media</h3>
@@ -752,17 +865,39 @@ export function ProductFormDialog({
             </CardContent>
           </Card>
 
-          <DialogFooter className="sticky bottom-0 -mx-2 rounded-2xl border border-brand-cappuccino/70 bg-white/95 p-3 backdrop-blur">
-            <Button onClick={onClose} type="button" variant="outline">
-              Cancel
-            </Button>
-            <Button disabled={submitting || isUploadingImage} type="submit">
-              {submitting || isUploadingImage
-                ? "Saving..."
-                : product
-                  ? "Save changes"
-                  : "Create product"}
-            </Button>
+          <DialogFooter className="sticky bottom-0 -mx-2 flex-row items-center justify-between gap-2 rounded-2xl border border-brand-cappuccino/70 bg-white/95 p-3 backdrop-blur">
+            <div className="flex items-center gap-2">
+              <Button onClick={onClose} type="button" variant="outline">
+                Cancel
+              </Button>
+              {step > 0 ? (
+                <Button
+                  onClick={() => setStep((current) => Math.max(0, current - 1))}
+                  type="button"
+                  variant="outline"
+                >
+                  Back
+                </Button>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="hidden text-xs text-brand-mocha sm:inline">
+                Step {step + 1} of {PRODUCT_FORM_STEPS.length}
+              </span>
+              {step < LAST_PRODUCT_FORM_STEP ? (
+                <Button onClick={() => void goToNextStep()} type="button">
+                  Next
+                </Button>
+              ) : (
+                <Button disabled={submitting || isUploadingImage} type="submit">
+                  {submitting || isUploadingImage
+                    ? "Saving..."
+                    : product
+                      ? "Save changes"
+                      : "Create product"}
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>

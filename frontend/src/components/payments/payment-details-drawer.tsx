@@ -107,10 +107,7 @@ export function PaymentDetailsDrawer({
               <DetailRow label="Source ID" value={payment.sourceId} />
               <DetailRow label="Customer" value={payment.customerName ?? "Walk-in customer"} />
               <DetailRow label="Branch" value={payment.branchName} />
-              <DetailRow
-                label="Payment Type"
-                value={orderPaymentTypeLabel(payment.paymentType)}
-              />
+              <DetailRow label="Payment Type" value={orderPaymentTypeLabel(payment.paymentType)} />
               <DetailRow label="Reference" value={payment.referenceNumber ?? "No reference"} />
               <DetailRow
                 label="Provider transaction"

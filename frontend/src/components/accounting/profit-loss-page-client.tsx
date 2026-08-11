@@ -78,7 +78,7 @@ function StatementAmount({
     <td
       className={cn(
         "w-44 px-6 py-3 text-right tabular-nums",
-        strong ? "font-bold text-slate-950" : "font-medium text-[#2563eb]",
+        strong ? "font-bold text-slate-950" : "font-medium text-blue-600",
       )}
     >
       {money(value)}
@@ -104,7 +104,7 @@ function SectionRows({
           className="border-b border-slate-100 transition-colors hover:bg-slate-50"
           key={item.accountId}
         >
-          <td className="px-10 py-3 font-medium text-[#2563eb]">{item.accountName}</td>
+          <td className="px-10 py-3 font-medium text-blue-600">{item.accountName}</td>
           <StatementAmount value={item.amount} />
         </tr>
       ))}

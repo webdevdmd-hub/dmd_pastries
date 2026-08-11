@@ -16,12 +16,16 @@ import (
 // and the caller must hold an advisory lock covering the sequence to serialize
 // concurrent issuers.
 func NextSequentialNumber(query *gorm.DB, column, prefix string, width int) (string, error) {
-	suffixStart := len(prefix) + 1
+	// The start position must be inlined as an integer literal: bound as a
+	// parameter it reaches Postgres as text, which selects the regex form
+	// substring(col from '15') instead of the positional substring(col from 15),
+	// making the extraction NULL and resetting every sequence to 1.
+	suffixExpr := fmt.Sprintf("substring(%s from %d)", column, len(prefix)+1)
 	var next int64
 	err := query.
 		Where(column+" LIKE ?", prefix+"%").
-		Where("substring("+column+" from ?) ~ '^[0-9]+$'", suffixStart).
-		Select("COALESCE(MAX(substring("+column+" from ?)::bigint), 0)", suffixStart).
+		Where(suffixExpr + " ~ '^[0-9]+$'").
+		Select("COALESCE(MAX(" + suffixExpr + "::bigint), 0)").
 		Scan(&next).Error
 	if err != nil {
 		return "", err

@@ -124,9 +124,7 @@ export function ProductDetailsDrawer({
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline">Sellable: {product.isSellable ? "Yes" : "No"}</Badge>
               <Badge variant="outline">POS: {getProductPosVisibilityLabel(product)}</Badge>
-              <Badge variant="outline">
-                Purchasable: {product.isPurchasable ? "Yes" : "No"}
-              </Badge>
+              <Badge variant="outline">Purchasable: {product.isPurchasable ? "Yes" : "No"}</Badge>
               <Badge variant="outline">
                 Stock: {product.isStockTracked ? "Tracked" : "Not tracked"}
               </Badge>

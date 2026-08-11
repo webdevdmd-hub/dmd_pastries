@@ -22,6 +22,13 @@ func (s *Service) ListActivityLogs(currentUser *utils.AuthContext, query Activit
 	if err != nil {
 		return nil, err
 	}
+	branchID, allBranches, err := currentUser.ResolveBranchScope("", "")
+	if err != nil {
+		return nil, err
+	}
+	if !allBranches {
+		filter.BranchID = branchID
+	}
 	logs, nextCursorValue, err := s.repo.ListActivity(filter)
 	if err != nil {
 		return nil, apperrors.Internal("failed to list activity logs")

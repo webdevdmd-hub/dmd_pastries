@@ -67,10 +67,7 @@ import { usePermission } from "@/hooks/use-permission";
 import { usePurchasingBranches, usePurchasingSuppliers } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import { uploadStorageFile } from "@/lib/appwrite/storage";
-import {
-  isLedgerAllowedForContext,
-  isPaymentAccountForBranch,
-} from "@/lib/selectors/eligibility";
+import { isLedgerAllowedForContext, isPaymentAccountForBranch } from "@/lib/selectors/eligibility";
 import type { AccountingAccountType, ChartAccount, PaymentAccount } from "@/types/accounting";
 import type { Customer } from "@/types/customer";
 import type {
@@ -196,8 +193,7 @@ function paidThroughOptions(
   return accounts
     .filter(
       (account) =>
-        account.chartAccountId.length > 0 &&
-        isPaymentAccountForBranch(account, branchId),
+        account.chartAccountId.length > 0 && isPaymentAccountForBranch(account, branchId),
     )
     .map((account) => ({
       description: [
@@ -430,7 +426,9 @@ function ExpenseFormDialog({
       return;
     }
 
-    if (!paidThroughAccountOptions.some((option) => option.value === payload.paidThroughAccountId)) {
+    if (
+      !paidThroughAccountOptions.some((option) => option.value === payload.paidThroughAccountId)
+    ) {
       setError("Select an active payment account available for this branch.");
       return;
     }
@@ -746,10 +744,9 @@ export function ExpensesPageClient({
   );
   const paymentAccountList = paymentAccountsQuery.data?.items ?? [];
   const isAccountLoading =
-    expenseAccountsQuery.isLoading ||
-    cogsAccountsQuery.isLoading ||
-    paymentAccountsQuery.isLoading;
-  const accountQueryError = expenseAccountsQuery.error ?? cogsAccountsQuery.error ?? paymentAccountsQuery.error;
+    expenseAccountsQuery.isLoading || cogsAccountsQuery.isLoading || paymentAccountsQuery.isLoading;
+  const accountQueryError =
+    expenseAccountsQuery.error ?? cogsAccountsQuery.error ?? paymentAccountsQuery.error;
   const accountErrorMessage = accountQueryError ? getErrorMessage(accountQueryError) : null;
   const retryAccountQueries = (): void => {
     void expenseAccountsQuery.refetch();

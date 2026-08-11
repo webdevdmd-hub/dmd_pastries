@@ -33,6 +33,12 @@ func RegisterRoutes(
 	group.PATCH("/payment-statuses/:id", masterDataManage, handler.UpdatePaymentStatus)
 	group.PATCH("/payment-statuses/:id/status", masterDataManage, handler.UpdatePaymentStatusStatus)
 
+	// Ingredient and packaging categories had handlers, configs and a
+	// branch-scoped service, but were never registered — so the settings pages
+	// that call these paths had no backend at all.
+	registerSimpleRoutes(group, "/ingredient-categories", handler, ingredientConfig(), masterDataView, masterDataManage, "Ingredient")
+	registerSimpleRoutes(group, "/packaging-categories", handler, packagingConfig(), masterDataView, masterDataManage, "Packaging")
+
 	group.GET("/product-categories", masterDataView, handler.ListProductCategories)
 	group.POST("/product-categories", masterDataManage, handler.CreateProductCategory)
 	group.GET("/product-categories/:id", masterDataView, handler.GetProductCategory)

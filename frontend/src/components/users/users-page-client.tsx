@@ -63,8 +63,7 @@ import type {
   UserStatus,
 } from "@/types/user";
 
-const selfDestructiveActionMessage =
-  "You cannot deactivate, suspend, or delete your own account.";
+const selfDestructiveActionMessage = "You cannot deactivate, suspend, or delete your own account.";
 
 function isDestructiveStatus(status: UserStatus): boolean {
   return status === "inactive" || status === "suspended";

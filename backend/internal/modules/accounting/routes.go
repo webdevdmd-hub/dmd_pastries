@@ -26,6 +26,9 @@ func RegisterRoutes(
 	group.PATCH("/account-mappings", manage, handler.UpdateAccountMappings)
 
 	group.GET("/setup-readiness", view, handler.GetAccountingSetupReadiness)
+	// All-branch diagnostic: which branches can post, and how much existing
+	// data already crosses branch boundaries.
+	group.GET("/setup-readiness/branches", manage, handler.GetBranchAccountingReadiness)
 
 	group.GET("/settings", view, handler.GetAccountingSettings)
 	group.PATCH("/settings", manage, handler.UpdateAccountingSettings)

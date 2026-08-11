@@ -45,6 +45,30 @@ type ReportBaseFilter struct {
 	UpcomingDays      int
 }
 
+// MonthToDate returns a copy of the filter widened to the calendar month
+// containing its end date, in the filter's own timezone.
+//
+// The dashboard's "monthly" figures were reading the same window as "today",
+// because the month bounds were simply copied from the request window. Widening
+// here keeps the month in the user's timezone rather than the server's.
+func (f *ResolvedFilter) MonthToDate() *ResolvedFilter {
+	if f == nil {
+		return nil
+	}
+	location, err := time.LoadLocation(f.Timezone)
+	if err != nil || location == nil {
+		location = time.UTC
+	}
+
+	end := f.DateTo.In(location)
+	monthStart := time.Date(end.Year(), end.Month(), 1, 0, 0, 0, 0, location)
+
+	widened := *f
+	widened.DateFrom = monthStart
+	widened.StartUTC = monthStart.UTC()
+	return &widened
+}
+
 type ResolvedFilter struct {
 	BusinessID        string
 	BranchID          string

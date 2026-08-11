@@ -56,9 +56,7 @@ function displayText(value: string, fallback = "-"): string {
 function statusBadge(row: InventoryAccountingReconciliationRow): JSX.Element {
   if (row.possibleReasonKey === "pending_bill_posting") {
     return (
-      <Badge className="border-amber-200 bg-amber-50 text-amber-800">
-        Pending Bill Posting
-      </Badge>
+      <Badge className="border-amber-200 bg-amber-50 text-amber-800">Pending Bill Posting</Badge>
     );
   }
 
@@ -190,7 +188,9 @@ export function InventoryAccountingUnassignedLinesTable({
               </TableCell>
               <TableCell>
                 <div className="min-w-40">
-                  <p className="font-medium">{displayText(formatLabel(line.sourceType), "Manual")}</p>
+                  <p className="font-medium">
+                    {displayText(formatLabel(line.sourceType), "Manual")}
+                  </p>
                   <p className="text-xs text-brand-mocha">{line.sourceId ?? "-"}</p>
                 </div>
               </TableCell>

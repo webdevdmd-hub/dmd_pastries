@@ -340,13 +340,18 @@ function parseDailySummary(value: unknown): DailyPaymentSummary {
     depositCollected: requiredNumber(value.deposit_collected),
     balanceCollected: requiredNumber(value.balance_collected),
     fullCollected: requiredNumber(value.full_collected),
-    transactionsCount: requiredNumber(value.transactions_count, requiredNumber(value.payments_count)),
+    transactionsCount: requiredNumber(
+      value.transactions_count,
+      requiredNumber(value.payments_count),
+    ),
     sourceOfTruth: requiredString(value.source_of_truth),
     consistencyWarnings: warnings,
   };
 }
 
-function parseConsistencyWarning(value: unknown): DailyPaymentSummary["consistencyWarnings"][number] {
+function parseConsistencyWarning(
+  value: unknown,
+): DailyPaymentSummary["consistencyWarnings"][number] {
   const warning = isObject(value) ? (value as BackendConsistencyWarning) : {};
   return {
     code: requiredString(warning.code),

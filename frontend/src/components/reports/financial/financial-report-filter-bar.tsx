@@ -149,9 +149,7 @@ export function FinancialReportFilterBar({
             <label className="text-sm font-medium text-brand-espresso">Group by</label>
             <Select
               value={filters.groupBy}
-              onValueChange={(groupBy: FinancialReportGroupBy) =>
-                onChange({ ...filters, groupBy })
-              }
+              onValueChange={(groupBy: FinancialReportGroupBy) => onChange({ ...filters, groupBy })}
             >
               <SelectTrigger>
                 <SelectValue />

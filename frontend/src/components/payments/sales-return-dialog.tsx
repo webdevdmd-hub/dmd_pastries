@@ -392,9 +392,7 @@ export function SalesReturnDialog({
                         <span>Item refund amount</span>
                         <span className="font-semibold text-brand-espresso">
                           {formatMoney(
-                            refundMode === "refund"
-                              ? estimatedRefundPreview.itemRefundAmount
-                              : 0,
+                            refundMode === "refund" ? estimatedRefundPreview.itemRefundAmount : 0,
                           )}
                         </span>
                       </div>

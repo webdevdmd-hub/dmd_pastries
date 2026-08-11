@@ -86,9 +86,7 @@ export function CustomerRecentTransactionsTable({
                     <TableCell>{transaction.sourceNumber || "-"}</TableCell>
                     <TableCell>{transaction.description || "-"}</TableCell>
                     <TableCell>{transaction.status || transaction.paymentStatus || "-"}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      {amount(transaction)}
-                    </TableCell>
+                    <TableCell className="text-right font-medium">{amount(transaction)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

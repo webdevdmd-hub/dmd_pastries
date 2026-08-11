@@ -130,8 +130,8 @@ func (s *Service) GetOrder(currentUser *utils.AuthContext, id string) (*BakeryOr
 	if err != nil {
 		return nil, notFound(err, "bakery order not found")
 	}
-	if !currentUser.CanAccessBranch(order.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+		return nil, err
 	}
 	dto := s.orderResponse(currentUser.BusinessID, *order, true)
 	return &dto, nil
@@ -143,8 +143,8 @@ func (s *Service) UpdateOrder(currentUser *utils.AuthContext, id string, req Upd
 		if err != nil {
 			return notFound(err, "bakery order not found")
 		}
-		if !currentUser.CanAccessBranch(order.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
 		}
 		if order.OrderStatus == "cancelled" || order.OrderStatus == "completed" {
 			return apperrors.BadRequest("completed or cancelled orders cannot be edited", nil)
@@ -238,8 +238,8 @@ func (s *Service) UpdateStatus(currentUser *utils.AuthContext, id string, req Up
 		if err != nil {
 			return notFound(err, "bakery order not found")
 		}
-		if !currentUser.CanAccessBranch(order.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
 		}
 		if !allowedStatusTransition(order.OrderStatus, status) {
 			return apperrors.BadRequest("invalid order status transition", map[string]string{"from": order.OrderStatus, "to": status})
@@ -266,8 +266,8 @@ func (s *Service) DeleteOrder(currentUser *utils.AuthContext, id, ipAddress, use
 		if err != nil {
 			return notFound(err, "bakery order not found")
 		}
-		if !currentUser.CanAccessBranch(order.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
 		}
 		if order.OrderStatus == "completed" {
 			return apperrors.BadRequest("completed orders cannot be deleted; cancel them instead", nil)
@@ -285,8 +285,8 @@ func (s *Service) AddItem(currentUser *utils.AuthContext, orderID string, req Or
 		if err != nil {
 			return notFound(err, "bakery order not found")
 		}
-		if !currentUser.CanAccessBranch(order.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
 		}
 		if !orderCanEdit(order.OrderStatus) {
 			return apperrors.BadRequest("items cannot be changed for this order status", nil)
@@ -315,8 +315,8 @@ func (s *Service) UpdateItem(currentUser *utils.AuthContext, orderID, itemID str
 		if err != nil {
 			return notFound(err, "bakery order not found")
 		}
-		if !currentUser.CanAccessBranch(order.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
 		}
 		if !orderCanEdit(order.OrderStatus) {
 			return apperrors.BadRequest("items cannot be changed for this order status", nil)
@@ -349,8 +349,8 @@ func (s *Service) DeleteItem(currentUser *utils.AuthContext, orderID, itemID, ip
 		if err != nil {
 			return notFound(err, "bakery order not found")
 		}
-		if !currentUser.CanAccessBranch(order.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
 		}
 		if !orderCanEdit(order.OrderStatus) {
 			return apperrors.BadRequest("items cannot be changed for this order status", nil)
@@ -576,8 +576,8 @@ func (s *Service) ListPayments(currentUser *utils.AuthContext, orderID string) (
 	if err != nil {
 		return nil, notFound(err, "bakery order not found")
 	}
-	if !currentUser.CanAccessBranch(order.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+		return nil, err
 	}
 	return s.repo.Payments(currentUser.BusinessID, orderID)
 }
@@ -597,8 +597,8 @@ func (s *Service) AddPayment(currentUser *utils.AuthContext, orderID string, req
 		if err != nil {
 			return notFound(err, "bakery order not found")
 		}
-		if !currentUser.CanAccessBranch(order.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
 		}
 		if order.OrderStatus == "cancelled" {
 			return apperrors.BadRequest("cannot add payment to cancelled order", nil)
@@ -672,8 +672,8 @@ func (s *Service) AssignProduction(currentUser *utils.AuthContext, orderID strin
 		if err != nil {
 			return notFound(err, "bakery order not found")
 		}
-		if !currentUser.CanAccessBranch(order.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
 		}
 		if err := s.repo.ProductionBatch(tx, currentUser.BusinessID, order.BranchID, req.ProductionBatchID); err != nil {
 			return notFound(err, "production batch not found")
@@ -709,8 +709,8 @@ func (s *Service) CreateProductionFromItem(currentUser *utils.AuthContext, order
 		if err != nil {
 			return notFound(err, "bakery order not found")
 		}
-		if !currentUser.CanAccessBranch(lockedOrder.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(lockedOrder.BranchID); err != nil {
+			return err
 		}
 		if !orderCanCreateProduction(lockedOrder.OrderStatus) {
 			return apperrors.BadRequest("production cannot be created for this order status", map[string]string{"order_status": lockedOrder.OrderStatus})
@@ -786,8 +786,8 @@ func (s *Service) UpdateProductionStatus(currentUser *utils.AuthContext, orderID
 		if err != nil {
 			return notFound(err, "bakery order not found")
 		}
-		if !currentUser.CanAccessBranch(order.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
 		}
 		production := &BakeryOrderProduction{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BakeryOrderID: orderID, Status: status}
 		if err := s.repo.UpsertProduction(tx, production); err != nil {
@@ -818,8 +818,8 @@ func (s *Service) ListPackaging(currentUser *utils.AuthContext, orderID string) 
 	if err != nil {
 		return nil, notFound(err, "bakery order not found")
 	}
-	if !currentUser.CanAccessBranch(order.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+		return nil, err
 	}
 	return s.repo.Packaging(currentUser.BusinessID, orderID)
 }
@@ -848,8 +848,8 @@ func (s *Service) AddPackaging(currentUser *utils.AuthContext, orderID string, r
 		if err != nil {
 			return notFound(err, "bakery order not found")
 		}
-		if !currentUser.CanAccessBranch(order.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
 		}
 		product, err := s.repo.Product(tx, currentUser.BusinessID, order.BranchID, req.ComponentProductID)
 		if err != nil {
@@ -1187,8 +1187,8 @@ func (s *Service) lockCustomItemForConversion(tx *gorm.DB, currentUser *utils.Au
 	if err != nil {
 		return nil, nil, notFound(err, "bakery order not found")
 	}
-	if !currentUser.CanAccessBranch(order.BranchID) {
-		return nil, nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+		return nil, nil, err
 	}
 	if order.OrderStatus == "cancelled" {
 		return nil, nil, apperrors.BadRequest("cancelled orders cannot be converted to catalog items", nil)

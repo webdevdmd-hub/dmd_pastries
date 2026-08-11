@@ -8,7 +8,9 @@ type PageProps = {
   }>;
 };
 
-export default async function SuperAdminUserDetailPage({ params }: PageProps): Promise<JSX.Element> {
+export default async function SuperAdminUserDetailPage({
+  params,
+}: PageProps): Promise<JSX.Element> {
   const { id } = await params;
 
   return <SuperAdminUserDetailPageClient userId={id} />;

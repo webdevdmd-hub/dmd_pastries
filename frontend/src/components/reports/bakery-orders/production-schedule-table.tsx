@@ -19,7 +19,8 @@ function productionStatusLabel(status: string): string {
 }
 
 function productionStatusBadge(row: ProductionScheduleRow): JSX.Element {
-  const variant = row.productionStatus === "not_linked" || !row.productionStatus ? "outline" : "secondary";
+  const variant =
+    row.productionStatus === "not_linked" || !row.productionStatus ? "outline" : "secondary";
   return <Badge variant={variant}>{productionStatusLabel(row.productionStatus)}</Badge>;
 }
 

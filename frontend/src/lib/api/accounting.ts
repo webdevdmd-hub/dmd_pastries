@@ -94,7 +94,7 @@ type BackendJournalEntryPayload = {
 };
 
 type BackendChartAccountPayload = {
-	branch_id: string;
+  branch_id: string;
   account_code: string;
   account_group: string;
   account_name: string;
@@ -1060,7 +1060,7 @@ function normalBalanceForAccountType(accountType: AccountingAccountType): Accoun
 
 function createPayload(payload: CreateChartAccountPayload): BackendChartAccountPayload {
   return {
-	branch_id: payload.branchId ?? "",
+    branch_id: payload.branchId ?? "",
     account_code: payload.accountCode,
     account_group: payload.accountGroup,
     account_name: payload.accountName,
@@ -1209,7 +1209,7 @@ export async function getChartAccounts(
     `/api/v1/accounting/chart-of-accounts${toQueryString({
       account_group: filters.accountGroup,
       account_type: filters.accountType,
-	  branch_id: filters.branchId,
+      branch_id: filters.branchId,
       limit: filters.limit,
       page: filters.page,
       parent_account_id: filters.parentAccountId,

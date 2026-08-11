@@ -169,8 +169,8 @@ func (s *Service) ProductionPreview(currentUser *utils.AuthContext, recipeID, br
 	if err := validateUUID(branchID, "branch_id"); err != nil {
 		return nil, err
 	}
-	if !currentUser.CanAccessBranch(branchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(branchID); err != nil {
+		return nil, err
 	}
 	recipe, err := s.repo.ActiveRecipe(s.db, currentUser.BusinessID, branchID, recipeID)
 	if err != nil {
@@ -236,8 +236,8 @@ func (s *Service) GetBatch(currentUser *utils.AuthContext, id string) (*Producti
 	if err != nil {
 		return nil, notFound(err, "production batch not found")
 	}
-	if !currentUser.CanAccessBranch(batch.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+		return nil, err
 	}
 	dto := s.batchResponse(currentUser.BusinessID, *batch, true)
 	return &dto, nil
@@ -249,8 +249,8 @@ func (s *Service) UpdateBatch(currentUser *utils.AuthContext, id string, req Upd
 		if err != nil {
 			return notFound(err, "production batch not found")
 		}
-		if !currentUser.CanAccessBranch(batch.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+			return err
 		}
 		updates := map[string]interface{}{"updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
 		if strings.TrimSpace(req.Notes) != "" {
@@ -289,8 +289,8 @@ func (s *Service) StartBatch(currentUser *utils.AuthContext, id, ipAddress, user
 		if err != nil {
 			return notFound(err, "production batch not found")
 		}
-		if !currentUser.CanAccessBranch(batch.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+			return err
 		}
 		if batch.Status != "draft" && batch.Status != "planned" {
 			return apperrors.BadRequest("only draft or planned batches can be started", nil)
@@ -319,8 +319,8 @@ func (s *Service) UpdateIngredient(currentUser *utils.AuthContext, batchID, line
 		if err != nil {
 			return notFound(err, "production batch not found")
 		}
-		if !currentUser.CanAccessBranch(batch.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+			return err
 		}
 		if !batchCanEditConsumption(batch.Status) {
 			return apperrors.BadRequest("consumption lines cannot be edited for this batch status", nil)
@@ -367,8 +367,8 @@ func (s *Service) UpdatePackaging(currentUser *utils.AuthContext, batchID, lineI
 		if err != nil {
 			return notFound(err, "production batch not found")
 		}
-		if !currentUser.CanAccessBranch(batch.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+			return err
 		}
 		if !batchCanEditConsumption(batch.Status) {
 			return apperrors.BadRequest("consumption lines cannot be edited for this batch status", nil)
@@ -415,8 +415,8 @@ func (s *Service) ProduceBatch(currentUser *utils.AuthContext, id string, req Pr
 		if err != nil {
 			return notFound(err, "production batch not found")
 		}
-		if !currentUser.CanAccessBranch(batch.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+			return err
 		}
 		if !batchCanProduce(batch.Status) {
 			return apperrors.BadRequest("only draft, planned, or in_progress batches can be produced", productionBatchIssueDetails("invalid_batch_status", batch))
@@ -455,8 +455,8 @@ func (s *Service) RecordWastage(currentUser *utils.AuthContext, id string, req W
 		if err != nil {
 			return notFound(err, "production batch not found")
 		}
-		if !currentUser.CanAccessBranch(batch.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+			return err
 		}
 		if batch.Status != "planned" && batch.Status != "in_progress" {
 			return apperrors.BadRequest("only planned or in_progress batches can record wastage", nil)
@@ -483,8 +483,8 @@ func (s *Service) GetOutputs(currentUser *utils.AuthContext, id string) (*Produc
 	if err != nil {
 		return nil, notFound(err, "production batch not found")
 	}
-	if !currentUser.CanAccessBranch(batch.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+		return nil, err
 	}
 
 	_, _, _, productName, productVariantName, _ := s.repo.NameLookups(currentUser.BusinessID, *batch)
@@ -517,8 +517,8 @@ func (s *Service) GetWastage(currentUser *utils.AuthContext, id string) (*Produc
 	if err != nil {
 		return nil, notFound(err, "production batch not found")
 	}
-	if !currentUser.CanAccessBranch(batch.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+		return nil, err
 	}
 
 	ingredients, err := s.repo.Ingredients(id, currentUser.BusinessID)
@@ -574,8 +574,8 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	if err != nil {
 		return notFound(err, "production batch not found")
 	}
-	if !currentUser.CanAccessBranch(batch.BranchID) {
-		return apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+		return err
 	}
 	if !batchCanProduce(batch.Status) {
 		return apperrors.BadRequest("only draft, planned, or in_progress batches can be completed", productionBatchIssueDetails("invalid_batch_status", batch))
@@ -745,8 +745,8 @@ func (s *Service) CancelBatch(currentUser *utils.AuthContext, id string, req Can
 		if err != nil {
 			return notFound(err, "production batch not found")
 		}
-		if !currentUser.CanAccessBranch(batch.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+			return err
 		}
 		if batch.Status == "completed" {
 			return apperrors.BadRequest("completed batches cannot be cancelled", nil)
@@ -772,8 +772,8 @@ func (s *Service) DeleteBatch(currentUser *utils.AuthContext, id, ipAddress, use
 		if err != nil {
 			return notFound(err, "production batch not found")
 		}
-		if !currentUser.CanAccessBranch(batch.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+			return err
 		}
 		if batch.Status == "completed" {
 			return apperrors.BadRequest("completed batches cannot be deleted because stock movements already exist", nil)
@@ -790,8 +790,8 @@ func (s *Service) ListIngredients(currentUser *utils.AuthContext, batchID string
 	if err != nil {
 		return nil, notFound(err, "production batch not found")
 	}
-	if !currentUser.CanAccessBranch(batch.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+		return nil, err
 	}
 	lines, err := s.repo.Ingredients(batchID, currentUser.BusinessID)
 	return s.ingredientResponses(lines), err
@@ -802,8 +802,8 @@ func (s *Service) ListPackaging(currentUser *utils.AuthContext, batchID string) 
 	if err != nil {
 		return nil, notFound(err, "production batch not found")
 	}
-	if !currentUser.CanAccessBranch(batch.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+		return nil, err
 	}
 	lines, err := s.repo.Packaging(batchID, currentUser.BusinessID)
 	return s.packagingResponses(lines), err

@@ -137,7 +137,7 @@ function AmountCell({ strong = false, value }: { strong?: boolean; value: number
     <td
       className={cn(
         "w-52 px-6 py-3 text-right tabular-nums",
-        strong ? "font-bold text-slate-950" : "font-medium text-[#2563eb]",
+        strong ? "font-bold text-slate-950" : "font-medium text-blue-600",
       )}
     >
       {money(value)}
@@ -175,7 +175,7 @@ function BalanceSheetRows({
                 <span
                   className={cn(
                     "inline-flex items-center gap-2 font-medium",
-                    item.isCalculated ? "text-slate-700" : "text-[#2563eb]",
+                    item.isCalculated ? "text-slate-700" : "text-blue-600",
                   )}
                 >
                   {getBalanceSheetItemLabel(item)}

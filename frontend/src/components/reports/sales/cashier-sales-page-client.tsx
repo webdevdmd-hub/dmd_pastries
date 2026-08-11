@@ -59,19 +59,16 @@ export function CashierSalesPageClient(): JSX.Element {
   const reportError = reportQuery.error;
   const canShowReport = reportQuery.isSuccess && !reportError;
   const rows = reportQuery.data ?? [];
-  const topNetSales = rows.reduce(
-    (top, row) => (row.netSales > top.netSales ? row : top),
-    {
-      cashierName: "-",
-      netSales: 0,
-      salesCount: 0,
-      cashierUserId: "",
-      itemsSold: 0,
-      grossSales: 0,
-      refundCount: 0,
-      voidCount: 0,
-    },
-  );
+  const topNetSales = rows.reduce((top, row) => (row.netSales > top.netSales ? row : top), {
+    cashierName: "-",
+    netSales: 0,
+    salesCount: 0,
+    cashierUserId: "",
+    itemsSold: 0,
+    grossSales: 0,
+    refundCount: 0,
+    voidCount: 0,
+  });
   const topSalesCount = rows.reduce(
     (top, row) => (row.salesCount > top.salesCount ? row : top),
     topNetSales,

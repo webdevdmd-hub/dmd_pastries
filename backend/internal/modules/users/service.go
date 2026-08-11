@@ -80,12 +80,8 @@ func (s *Service) GetUser(currentUser *utils.AuthContext, userID string) (*UserR
 		}
 		return nil, apperrors.Internal("failed to fetch user")
 	}
-	branchID, allBranches, err := currentUser.ResolveBranchScope("", "")
-	if err != nil {
+	if err := s.ensureTargetUserBranch(currentUser, user.BranchID); err != nil {
 		return nil, err
-	}
-	if !allBranches && (user.BranchID == nil || *user.BranchID != branchID) {
-		return nil, apperrors.Forbidden("branch access denied")
 	}
 
 	response := toUserResponse(*user)
@@ -178,7 +174,27 @@ func (s *Service) CreateInvitation(currentUser *utils.AuthContext, req CreateInv
 	return &response, nil
 }
 
+// ensureTargetUserBranch confines a staff mutation to the caller's branch.
+//
+// Reads were already branch-checked but writes were not, so a manager could
+// suspend, rename, re-role or reassign staff belonging to another branch.
+func (s *Service) ensureTargetUserBranch(currentUser *utils.AuthContext, branchID *string) error {
+	if branchID == nil || strings.TrimSpace(*branchID) == "" {
+		// Owners and all-branch staff have no home branch, so only a caller
+		// with all-branch access may act on them.
+		if currentUser.CanAccessAllBranches {
+			return nil
+		}
+		return apperrors.Forbidden("branch access denied")
+	}
+	return currentUser.EnsureRecordBranch(*branchID)
+}
+
 func (s *Service) ListInvitations(currentUser *utils.AuthContext, status string) ([]InvitationResponse, error) {
+	branchID, allBranches, err := currentUser.ResolveBranchScope("", "")
+	if err != nil {
+		return nil, err
+	}
 	invites, err := s.repo.ListInvitations(currentUser.BusinessID, status)
 	if err != nil {
 		return nil, apperrors.Internal("failed to list invitations")
@@ -186,6 +202,11 @@ func (s *Service) ListInvitations(currentUser *utils.AuthContext, status string)
 
 	response := make([]InvitationResponse, 0, len(invites))
 	for _, invite := range invites {
+		// Invitations record the branch the invitee will join; listing them
+		// unfiltered exposed other branches' pending staff.
+		if !allBranches && (invite.BranchID == nil || *invite.BranchID != branchID) {
+			continue
+		}
 		response = append(response, toInvitationResponse(invite))
 	}
 	return response, nil
@@ -198,6 +219,9 @@ func (s *Service) ResendInvitation(currentUser *utils.AuthContext, invitationID,
 			return nil, apperrors.NotFound("invitation not found")
 		}
 		return nil, apperrors.Internal("failed to fetch invitation")
+	}
+	if err := s.ensureTargetUserBranch(currentUser, invite.BranchID); err != nil {
+		return nil, err
 	}
 	if invite.Status != "pending" {
 		return nil, apperrors.BadRequest("only pending invitations can be resent", nil)
@@ -252,6 +276,9 @@ func (s *Service) CancelInvitation(currentUser *utils.AuthContext, invitationID,
 			return nil, apperrors.NotFound("invitation not found")
 		}
 		return nil, apperrors.Internal("failed to fetch invitation")
+	}
+	if err := s.ensureTargetUserBranch(currentUser, invite.BranchID); err != nil {
+		return nil, err
 	}
 	if invite.Status != "pending" {
 		return nil, apperrors.BadRequest("only pending invitations can be cancelled", nil)
@@ -607,6 +634,9 @@ func (s *Service) UpdateUser(currentUser *utils.AuthContext, userID string, req 
 		}
 		return nil, apperrors.Internal("failed to fetch user")
 	}
+	if err := s.ensureTargetUserBranch(currentUser, user.BranchID); err != nil {
+		return nil, err
+	}
 
 	updates := map[string]interface{}{}
 	if req.FullName != "" {
@@ -642,18 +672,24 @@ func (s *Service) UpdateUser(currentUser *utils.AuthContext, userID string, req 
 	}
 
 	updates["updated_at"] = time.Now().UTC()
-	if err := s.repo.UpdateByBusinessID(user.ID, currentUser.BusinessID, updates); err != nil {
-		return nil, err
-	}
-	if req.BranchID != nil {
-		if err := s.repo.EnsureBranchAccess(s.db, currentUser.BusinessID, user.ID, updates["branch_id"].(string)); err != nil {
-			return nil, apperrors.Internal("failed to grant branch access")
-		}
-	}
 
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return nil, apperrors.Internal("failed to start transaction")
+	}
+
+	// The user row and their branch access must move together: committing one
+	// without the other leaves users.branch_id disagreeing with
+	// user_branch_access, which is what grants access to a branch they left.
+	if err := s.repo.UpdateByBusinessIDTx(tx, user.ID, currentUser.BusinessID, updates); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+	if req.BranchID != nil {
+		if err := s.repo.ReplaceBranchAccess(tx, currentUser.BusinessID, user.ID, updates["branch_id"].(string)); err != nil {
+			tx.Rollback()
+			return nil, apperrors.Internal("failed to update branch access")
+		}
 	}
 
 	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{
@@ -695,6 +731,9 @@ func (s *Service) DeleteUser(currentUser *utils.AuthContext, userID string, ipAd
 			return nil, apperrors.NotFound("user not found")
 		}
 		return nil, apperrors.Internal("failed to fetch user")
+	}
+	if err := s.ensureTargetUserBranch(currentUser, user.BranchID); err != nil {
+		return nil, err
 	}
 
 	business, err := s.businessRepo.FindByID(currentUser.BusinessID)
@@ -771,6 +810,9 @@ func (s *Service) RestoreUser(currentUser *utils.AuthContext, userID string, ipA
 		}
 		return nil, apperrors.Internal("failed to fetch user")
 	}
+	if err := s.ensureTargetUserBranch(currentUser, user.BranchID); err != nil {
+		return nil, err
+	}
 
 	tx := s.db.Begin()
 	if tx.Error != nil {
@@ -827,19 +869,31 @@ func (s *Service) AssignUserBranch(currentUser *utils.AuthContext, userID string
 		}
 		return nil, apperrors.Internal("failed to fetch user")
 	}
+	if err := s.ensureTargetUserBranch(currentUser, user.BranchID); err != nil {
+		return nil, err
+	}
 
-	if err := s.repo.UpdateByBusinessID(user.ID, currentUser.BusinessID, map[string]interface{}{
+	tx := s.db.Begin()
+	if tx.Error != nil {
+		return nil, apperrors.Internal("failed to start transaction")
+	}
+
+	if err := s.repo.UpdateByBusinessIDTx(tx, user.ID, currentUser.BusinessID, map[string]interface{}{
 		"branch_id":         resolvedBranchID,
 		"current_branch_id": resolvedBranchID,
 		"updated_at":        time.Now().UTC(),
 	}); err != nil {
+		tx.Rollback()
 		return nil, err
 	}
-	if err := s.repo.EnsureBranchAccess(s.db, currentUser.BusinessID, user.ID, resolvedBranchID); err != nil {
-		return nil, apperrors.Internal("failed to grant branch access")
+	// Replace rather than add: the branch the user is being moved off must stop
+	// authorizing their record access.
+	if err := s.repo.ReplaceBranchAccess(tx, currentUser.BusinessID, user.ID, resolvedBranchID); err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("failed to update branch access")
 	}
 
-	if err := s.auditRepo.CreateActivity(s.db, audit.ActivityInput{
+	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{
 		BusinessID:   currentUser.BusinessID,
 		ActorUserID:  currentUser.UserID,
 		TargetUserID: &user.ID,
@@ -851,7 +905,12 @@ func (s *Service) AssignUserBranch(currentUser *utils.AuthContext, userID string
 		IPAddress:    ipAddress,
 		UserAgent:    userAgent,
 	}); err != nil {
+		tx.Rollback()
 		return nil, apperrors.Internal("failed to create activity log")
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, apperrors.Internal("failed to commit branch assignment")
 	}
 
 	updated, err := s.repo.FindByIDAndBusinessID(user.ID, currentUser.BusinessID)
@@ -863,11 +922,15 @@ func (s *Service) AssignUserBranch(currentUser *utils.AuthContext, userID string
 }
 
 func (s *Service) GetUserActivity(currentUser *utils.AuthContext, userID string, query audit.ActivityLogQuery) (*audit.ActivityLogListResponse, error) {
-	if _, err := s.repo.FindByIDAndBusinessIDUnscoped(userID, currentUser.BusinessID); err != nil {
+	target, err := s.repo.FindByIDAndBusinessIDUnscoped(userID, currentUser.BusinessID)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, apperrors.NotFound("user not found")
 		}
 		return nil, apperrors.Internal("failed to fetch user")
+	}
+	if err := s.ensureTargetUserBranch(currentUser, target.BranchID); err != nil {
+		return nil, err
 	}
 
 	limit, err := audit.NormalizeActivityLogLimit(query.LimitValue)
@@ -879,6 +942,13 @@ func (s *Service) GetUserActivity(currentUser *utils.AuthContext, userID string,
 	filter, err := s.auditRepo.ResolveActivityLogFilter(currentUser.BusinessID, query, limit)
 	if err != nil {
 		return nil, err
+	}
+	branchID, allBranches, err := currentUser.ResolveBranchScope("", "")
+	if err != nil {
+		return nil, err
+	}
+	if !allBranches {
+		filter.BranchID = branchID
 	}
 	logs, nextCursorValue, err := s.auditRepo.ListActivity(filter)
 	if err != nil {
@@ -906,6 +976,19 @@ func (s *Service) UpdateUserStatus(currentUser *utils.AuthContext, userID string
 	}
 	if !allowedUserStatus(req.Status) {
 		return nil, apperrors.BadRequest("invalid status", map[string]interface{}{"allowed_statuses": []string{"active", "inactive", "suspended", "invited"}})
+	}
+
+	// This path previously updated by id alone, with no fetch and therefore no
+	// branch check, so a manager could suspend staff at any branch.
+	user, err := s.repo.FindByIDAndBusinessID(userID, currentUser.BusinessID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.NotFound("user not found")
+		}
+		return nil, apperrors.Internal("failed to fetch user")
+	}
+	if err := s.ensureTargetUserBranch(currentUser, user.BranchID); err != nil {
+		return nil, err
 	}
 
 	if err := s.repo.UpdateByBusinessID(userID, currentUser.BusinessID, map[string]interface{}{

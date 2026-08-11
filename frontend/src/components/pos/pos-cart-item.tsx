@@ -36,12 +36,12 @@ export function POSCartItem({
     item.discountAmount > 0 ? `Discount ${formatMoney(item.discountAmount)}` : "Discount";
 
   return (
-    <div className="rounded-lg border border-[#d4d4d8] bg-white p-2">
+    <div className="rounded-lg border border-zinc-300 bg-white p-2">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-black text-[#09090b]">{item.productName}</p>
+          <p className="truncate text-sm font-black text-zinc-950">{item.productName}</p>
           {item.variantName ? (
-            <p className="truncate text-[0.68rem] text-[#71717a]">{item.variantName}</p>
+            <p className="truncate text-[0.68rem] text-zinc-500">{item.variantName}</p>
           ) : null}
         </div>
         <Button
@@ -57,7 +57,7 @@ export function POSCartItem({
       </div>
       <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <Button
-          className="h-7 justify-self-start rounded-md px-2 text-[0.68rem] text-[#52525b] hover:bg-[#f4f4f5]"
+          className="h-7 justify-self-start rounded-md px-2 text-[0.68rem] text-zinc-600 hover:bg-zinc-100"
           onClick={() => setDiscountOpen((current) => !current)}
           type="button"
           variant="ghost"
@@ -68,7 +68,7 @@ export function POSCartItem({
           onChange={(quantity) => onQuantityChange(item.cartItemId, quantity)}
           quantity={item.quantity}
         />
-        <p className="font-mono text-right text-xs font-black text-[#09090b]">
+        <p className="font-mono text-right text-xs font-black text-zinc-950">
           {formatMoney(item.lineTotal)}
         </p>
       </div>

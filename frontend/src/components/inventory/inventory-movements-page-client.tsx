@@ -23,6 +23,7 @@ import {
 import { PERMISSIONS } from "@/constants/permissions";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useBranches } from "@/hooks/use-branches";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useInventoryMovements } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
@@ -48,7 +49,15 @@ export function InventoryMovementsPageClient(): JSX.Element {
     ...defaultFilters,
     branchId: branchScope.defaultBranchId,
   });
-  const movementsQuery = useInventoryMovements(filters, canView && branchScope.hasBranchScope);
+  const debouncedSearch = useDebouncedValue(filters.search);
+  const movementsQueryFilters = useMemo(
+    () => ({ ...filters, search: debouncedSearch }),
+    [debouncedSearch, filters],
+  );
+  const movementsQuery = useInventoryMovements(
+    movementsQueryFilters,
+    canView && branchScope.hasBranchScope,
+  );
   const branchesQuery = useBranches(canView);
   const branchOptions = useMemo(
     () =>

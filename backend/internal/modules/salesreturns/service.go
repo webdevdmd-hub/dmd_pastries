@@ -48,6 +48,18 @@ func (s *Service) List(currentUser *utils.AuthContext, query SalesReturnListQuer
 	if err := validateListQuery(currentUser, query); err != nil {
 		return nil, err
 	}
+	// The branch predicate used to be applied only when the client happened to
+	// send branch_id, so omitting it listed every branch's returns. Resolve the
+	// scope here so the filter is never optional.
+	branchID, allBranches, err := currentUser.ResolveBranchScope(query.BranchID, "")
+	if err != nil {
+		return nil, err
+	}
+	if allBranches {
+		query.BranchID = ""
+	} else {
+		query.BranchID = branchID
+	}
 	rows, total, err := s.repo.List(currentUser.BusinessID, query)
 	if err != nil {
 		return nil, apperrors.Internal("failed to list sales returns")
@@ -75,8 +87,8 @@ func (s *Service) Get(currentUser *utils.AuthContext, id string) (SalesReturnRes
 	if err != nil {
 		return SalesReturnResponse{}, mapNotFound(err, "sales return not found")
 	}
-	if !currentUser.CanAccessBranch(row.BranchID) {
-		return SalesReturnResponse{}, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(row.BranchID); err != nil {
+		return SalesReturnResponse{}, err
 	}
 	return s.repo.LoadResponse(currentUser.BusinessID, *row)
 }
@@ -181,8 +193,8 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateSa
 		if existing.Status != "draft" {
 			return apperrors.BadRequest("only draft sales returns can be edited", nil)
 		}
-		if !currentUser.CanAccessBranch(existing.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(existing.BranchID); err != nil {
+			return err
 		}
 		sale, err := s.validateSaleForReturn(tx, currentUser, existing.SaleID)
 		if err != nil {
@@ -261,8 +273,8 @@ func (s *Service) Post(currentUser *utils.AuthContext, id string, ipAddress, use
 		if salesReturn.Status != "draft" {
 			return apperrors.BadRequest("only draft sales returns can be posted", nil)
 		}
-		if !currentUser.CanAccessBranch(salesReturn.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(salesReturn.BranchID); err != nil {
+			return err
 		}
 		if salesReturn.RefundMode == "refund" && !hasAnyPermission(currentUser, "sales_returns.refund", "payments.refund", "sales_returns.manage") {
 			return apperrors.Forbidden("missing refund permission")
@@ -316,6 +328,16 @@ func (s *Service) Post(currentUser *utils.AuthContext, id string, ipAddress, use
 		if err := s.repo.Update(tx, currentUser.BusinessID, salesReturn.ID, updates); err != nil {
 			return apperrors.Internal("failed to post sales return")
 		}
+		// Only a "refund" return reverses revenue. A "none" return still posts
+		// its inventory journal below, so the goods come back and COGS falls
+		// while revenue stands — the sale is treated as earned because the
+		// customer was not paid anything back.
+		//
+		// That is deliberate for a no-refund return, but it does raise reported
+		// gross margin. If "none" is being used for returns settled outside the
+		// system, the revenue side needs a counterparty account and this gate
+		// has to change; refund_mode currently permits only 'none' and 'refund'
+		// (see migration 000051).
 		if salesReturn.RefundMode == "refund" && s.accountingService != nil {
 			journalID, err := s.accountingService.PostSalesReturnJournal(tx, currentUser, salesReturn.ID)
 			if err != nil {
@@ -361,8 +383,8 @@ func (s *Service) Cancel(currentUser *utils.AuthContext, id string, ipAddress, u
 		if salesReturn.Status != "draft" {
 			return apperrors.BadRequest("only draft sales returns can be cancelled", nil)
 		}
-		if !currentUser.CanAccessBranch(salesReturn.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(salesReturn.BranchID); err != nil {
+			return err
 		}
 		now := time.Now().UTC()
 		if err := s.repo.Update(tx, currentUser.BusinessID, salesReturn.ID, map[string]interface{}{
@@ -394,8 +416,8 @@ func (s *Service) ReturnableItems(currentUser *utils.AuthContext, saleID string)
 	if err != nil {
 		return nil, mapNotFound(err, "sale not found")
 	}
-	if !currentUser.CanAccessBranch(sale.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(sale.BranchID); err != nil {
+		return nil, err
 	}
 	if sale.SaleStatus != "completed" {
 		return nil, apperrors.BadRequest("only completed POS sales can be returned", nil)
@@ -452,8 +474,8 @@ func (s *Service) validateSaleForReturn(tx *gorm.DB, currentUser *utils.AuthCont
 	if err != nil {
 		return nil, mapNotFound(err, "sale not found")
 	}
-	if !currentUser.CanAccessBranch(sale.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(sale.BranchID); err != nil {
+		return nil, err
 	}
 	if sale.SaleStatus != "completed" {
 		return nil, apperrors.BadRequest("only completed POS sales can be returned", nil)

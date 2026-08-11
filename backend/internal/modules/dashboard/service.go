@@ -41,8 +41,13 @@ func (s *Service) AdminDashboard(currentUser *utils.AuthContext, values url.Valu
 	if err != nil {
 		return nil, adminDashboardLoadError("dashboard_summary", "dashboard_summary_failed", filter, err)
 	}
+	// A genuine month-to-date figure, resolved in the request timezone.
+	monthlySales := summary.Sales.TotalSales
+	if monthSummary, monthErr := s.reports.DashboardSummary(filter.MonthToDate()); monthErr == nil {
+		monthlySales = monthSummary.Sales.TotalSales
+	}
 	scope := scopeFromReportFilter(filter)
-	result, err := s.repo.AdminDashboard(scope, summary)
+	result, err := s.repo.AdminDashboard(scope, summary, monthlySales)
 	if err != nil {
 		return nil, adminDashboardLoadError("admin_widgets", "admin_widgets_failed", filter, err)
 	}
@@ -129,8 +134,15 @@ func (s *Service) RecentActivity(currentUser *utils.AuthContext, values url.Valu
 		return nil, apperrors.Internal("failed to load recent activity")
 	}
 	limit := parseLimit(values.Get("limit"), 20, 100)
+	// The branch scope was resolved above and then thrown away, so the feed
+	// showed every branch's activity.
+	activityBranchID := scope.BranchID
+	if scope.AllBranches {
+		activityBranchID = ""
+	}
 	logs, _, err := s.auditRepo.ListActivity(&audit.ActivityLogFilter{
 		BusinessID: scope.BusinessID,
+		BranchID:   activityBranchID,
 		Limit:      limit,
 	})
 	if err != nil {

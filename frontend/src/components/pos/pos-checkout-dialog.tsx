@@ -84,16 +84,16 @@ export function POSCheckoutDialog({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="scrollbar-hidden bottom-5 left-auto right-5 top-auto max-h-[calc(100vh-7rem)] w-[calc(100vw-2.5rem)] max-w-[440px] translate-x-0 translate-y-0 overflow-y-auto rounded-lg border-[#d4d4d8] bg-white p-5 text-[#09090b] shadow-lg xl:max-w-[460px] 2xl:max-w-[480px]">
+      <DialogContent className="scrollbar-hidden bottom-5 left-auto right-5 top-auto max-h-[calc(100vh-7rem)] w-[calc(100vw-2.5rem)] max-w-[440px] translate-x-0 translate-y-0 overflow-y-auto rounded-lg border-zinc-300 bg-white p-5 text-zinc-950 shadow-lg xl:max-w-[460px] 2xl:max-w-[480px]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-black tracking-tight">Checkout</DialogTitle>
-          <DialogDescription className="text-[#52525b]">
+          <DialogDescription className="text-zinc-600">
             Apply sale discount, split payment methods, and confirm the final checkout.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="rounded-lg border border-[#d4d4d8] bg-[#fafafa] p-4">
+          <div className="rounded-lg border border-zinc-300 bg-zinc-50 p-4">
             <POSDiscountControl
               label="Sale discount"
               onChange={onSaleDiscountChange}
@@ -102,7 +102,7 @@ export function POSCheckoutDialog({
             />
           </div>
 
-          <div className="rounded-lg border border-[#d4d4d8] bg-[#fafafa] p-4">
+          <div className="rounded-lg border border-zinc-300 bg-zinc-50 p-4">
             <DocumentChargesEditor
               charges={charges}
               compact
@@ -120,7 +120,7 @@ export function POSCheckoutDialog({
             total={totals.total}
           />
 
-          <div className="rounded-lg border border-[#d4d4d8] bg-white p-4 font-mono text-sm">
+          <div className="rounded-lg border border-zinc-300 bg-white p-4 font-mono text-sm">
             <div className="flex justify-between">
               <span>Subtotal</span>
               <strong>{formatMoney(totals.subtotal)}</strong>
@@ -145,7 +145,7 @@ export function POSCheckoutDialog({
                 </div>
               </>
             ) : null}
-            <div className="mt-3 flex justify-between border-t border-[#d4d4d8] pt-3 text-lg">
+            <div className="mt-3 flex justify-between border-t border-zinc-300 pt-3 text-lg">
               <span>Total</span>
               <strong>{formatMoney(totals.total)}</strong>
             </div>
@@ -176,7 +176,7 @@ export function POSCheckoutDialog({
 
         <DialogFooter>
           <Button
-            className="rounded-md border-[#d4d4d8] bg-white text-[#09090b] hover:bg-[#f4f4f5]"
+            className="rounded-md border-zinc-300 bg-white text-zinc-950 hover:bg-zinc-100"
             onClick={() => onOpenChange(false)}
             type="button"
             variant="outline"
@@ -184,7 +184,7 @@ export function POSCheckoutDialog({
             Cancel
           </Button>
           <Button
-            className="rounded-md bg-black text-white hover:bg-[#18181b]"
+            className="rounded-md bg-black text-white hover:bg-zinc-900"
             disabled={cannotConfirm}
             onClick={onConfirm}
             type="button"

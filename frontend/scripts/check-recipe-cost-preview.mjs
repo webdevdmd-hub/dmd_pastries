@@ -15,12 +15,7 @@ const transpiled = ts.transpileModule(source, {
   },
 });
 const moduleState = { exports: {} };
-const moduleFactory = new Function(
-  "exports",
-  "module",
-  "require",
-  transpiled.outputText,
-);
+const moduleFactory = new Function("exports", "module", "require", transpiled.outputText);
 
 moduleFactory(moduleState.exports, moduleState, (specifier) => {
   throw new Error(`Unexpected runtime import while loading recipe cost preview: ${specifier}`);

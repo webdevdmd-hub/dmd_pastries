@@ -128,7 +128,7 @@ function formatDate(value: string): string {
 }
 
 export function ChartOfAccountsPageClient(): JSX.Element {
-	const branchScope = useBranchScope();
+  const branchScope = useBranchScope();
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([
     PERMISSIONS.accountingView,
@@ -136,8 +136,8 @@ export function ChartOfAccountsPageClient(): JSX.Element {
   ]);
   const canManage = hasAnyPermission([PERMISSIONS.accountingAccountsManage]);
   const [filters, setFilters] = useState<ChartAccountsFilters>({
-	...defaultFilters,
-	branchId: branchScope.effectiveBranchId ?? "",
+    ...defaultFilters,
+    branchId: branchScope.effectiveBranchId ?? "",
   });
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -177,9 +177,11 @@ export function ChartOfAccountsPageClient(): JSX.Element {
   const recentTransactions = ledgerPreview?.transactions ?? [];
 
   useEffect(() => {
-	const branchID = branchScope.effectiveBranchId ?? "";
-	setFilters((current) => current.branchId === branchID ? current : { ...current, branchId: branchID, page: 1 });
-	setSelectedAccountId("");
+    const branchID = branchScope.effectiveBranchId ?? "";
+    setFilters((current) =>
+      current.branchId === branchID ? current : { ...current, branchId: branchID, page: 1 },
+    );
+    setSelectedAccountId("");
   }, [branchScope.effectiveBranchId]);
 
   useEffect(() => {
@@ -217,9 +219,9 @@ export function ChartOfAccountsPageClient(): JSX.Element {
   const handleCreate = async (payload: CreateChartAccountPayload): Promise<void> => {
     try {
       const createdAccount = await createMutation.mutateAsync({
-		...payload,
-		branchId: filters.branchId ?? "",
-	  });
+        ...payload,
+        branchId: filters.branchId ?? "",
+      });
       toast.success("Chart account created.");
       setSelectedAccountId(createdAccount.id);
       setFormOpen(false);

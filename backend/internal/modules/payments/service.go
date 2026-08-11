@@ -66,8 +66,8 @@ func (s *Service) GetPayment(currentUser *utils.AuthContext, id string) (*Paymen
 		}
 		return nil, apperrors.Internal("failed to load payment")
 	}
-	if !currentUser.CanAccessBranch(payment.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(payment.BranchID); err != nil {
+		return nil, err
 	}
 	return payment, nil
 }
@@ -80,8 +80,8 @@ func (s *Service) SalePayments(currentUser *utils.AuthContext, saleID string) (*
 		}
 		return nil, apperrors.Internal("failed to load sale")
 	}
-	if !currentUser.CanAccessBranch(sale.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(sale.BranchID); err != nil {
+		return nil, err
 	}
 	payments, err := s.repo.ListSalePayments(currentUser.BusinessID, saleID)
 	if err != nil {
@@ -124,8 +124,8 @@ func (s *Service) AddPayment(currentUser *utils.AuthContext, saleID string, req 
 	if sale.SaleStatus == "voided" || sale.SaleStatus == "refunded" {
 		return nil, apperrors.BadRequest("sale cannot accept new payments", nil)
 	}
-	if !currentUser.CanAccessBranch(sale.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(sale.BranchID); err != nil {
+		return nil, err
 	}
 	method, err := s.repo.FindPaymentMethod(tx, currentUser.BusinessID, req.PaymentMethodID)
 	if err != nil {
@@ -166,6 +166,14 @@ func (s *Service) AddPayment(currentUser *utils.AuthContext, saleID string, req 
 	if err := s.repo.CreatePayment(tx, payment); err != nil {
 		return nil, apperrors.Internal("failed to create payment")
 	}
+	// Relieve accounts receivable. Without this the sale's AR debit from
+	// checkout is never credited back, so the receivable balance grows with
+	// every credit sale and never comes down.
+	if s.accountingService != nil {
+		if _, err := s.accountingService.PostPOSSalePaymentJournal(tx, currentUser, payment.ID); err != nil {
+			return nil, err
+		}
+	}
 	if err := s.syncSalePaymentStatus(tx, currentUser.BusinessID, sale.ID, now, roundMoney(maxFloat(sale.ChangeAmount, overpayAmount))); err != nil {
 		return nil, err
 	}
@@ -202,8 +210,8 @@ func (s *Service) RefundPayment(currentUser *utils.AuthContext, paymentID string
 	if payment.PaymentStatus != "completed" && payment.PaymentStatus != "partially_refunded" {
 		return nil, apperrors.BadRequest("payment cannot be refunded", nil)
 	}
-	if !currentUser.CanAccessBranch(payment.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(payment.BranchID); err != nil {
+		return nil, err
 	}
 	sale, err := s.repo.FindSale(tx, currentUser.BusinessID, payment.SaleID)
 	if err != nil {
@@ -315,8 +323,8 @@ func (s *Service) GetRefund(currentUser *utils.AuthContext, id string) (*Payment
 		}
 		return nil, apperrors.Internal("failed to load refund")
 	}
-	if !currentUser.CanAccessBranch(refund.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(refund.BranchID); err != nil {
+		return nil, err
 	}
 	return refund, nil
 }
@@ -460,8 +468,8 @@ func (s *Service) GetReconciliation(currentUser *utils.AuthContext, id string) (
 		}
 		return nil, apperrors.Internal("failed to load reconciliation")
 	}
-	if !currentUser.CanAccessBranch(item.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(item.BranchID); err != nil {
+		return nil, err
 	}
 	return item, nil
 }

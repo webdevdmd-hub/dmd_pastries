@@ -254,7 +254,11 @@ func (s *Service) RegisterOwner(req RegisterOwnerRequest, ipAddress, userAgent s
 		return nil, apperrors.Internal("failed to seed default sales channels")
 	}
 
-	if err := accounting.SeedDefaultChartOfAccounts(tx, businessID, branchID); err != nil {
+	// Seeds the chart of accounts *and* the default account mappings. Seeding
+	// only the accounts left every new business with zero mappings, so each
+	// posting path fell through to its self-healing fallback instead of
+	// resolving a configured account.
+	if err := accounting.SeedDefaultAccountMappings(tx, businessID, branchID); err != nil {
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to seed chart of accounts")
 	}
@@ -1078,6 +1082,18 @@ func (s *Service) userBranchScope(user *users.User) (*userBranchScope, error) {
 	roleName := strings.ToLower(strings.TrimSpace(user.Role.RoleName))
 	isOwner := ownerUserID != nil && *ownerUserID == user.ID
 	canAccessAll := user.CanAccessAllBranches || isOwner || roleName == "admin"
+
+	// Granting all-branch access on a role *name* is authorization by string
+	// match: any role someone names "admin" confers it, whatever permissions it
+	// actually holds. Removing the clause outright can lock a live owner out, so
+	// log it first. Once these users have can_access_all_branches set
+	// explicitly, the roleName check above can be dropped.
+	if !user.CanAccessAllBranches && !isOwner && roleName == "admin" {
+		log.Printf(
+			"branch-access: user_id=%s business_id=%s granted all-branch access by role name %q; set users.can_access_all_branches explicitly",
+			user.ID, user.BusinessID, user.Role.RoleName,
+		)
+	}
 
 	allowedBranchIDs, err := s.repo.AllowedBranchIDs(user.BusinessID, user.ID)
 	if err != nil {

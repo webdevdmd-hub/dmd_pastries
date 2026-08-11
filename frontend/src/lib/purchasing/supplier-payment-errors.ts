@@ -14,7 +14,9 @@ export function supplierPaymentErrorMessage(error: unknown): string {
         ? error.errorDetails.available_balance
         : null;
     const paymentAmount =
-      typeof error.errorDetails.payment_amount === "number" ? error.errorDetails.payment_amount : null;
+      typeof error.errorDetails.payment_amount === "number"
+        ? error.errorDetails.payment_amount
+        : null;
 
     if (availableBalance !== null && paymentAmount !== null) {
       return `Insufficient balance in selected payment account. Available balance is ${formatCurrency(

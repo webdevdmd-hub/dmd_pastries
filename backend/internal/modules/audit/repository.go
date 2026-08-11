@@ -49,7 +49,11 @@ func (r *Repository) BusinessTimezone(businessID string) (string, error) {
 }
 
 type ActivityInput struct {
-	BusinessID   string
+	BusinessID string
+	// BranchID scopes the entry to the branch the action affected. Leave nil
+	// only for genuinely business-wide actions; readers fall back to the
+	// actor's branch when it is absent.
+	BranchID     *string
 	ActorUserID  string
 	TargetUserID *string
 	EventType    string
@@ -76,9 +80,15 @@ func (r *Repository) CreateActivity(tx *gorm.DB, input ActivityInput) error {
 		targetUserID = nil
 	}
 
+	branchID := input.BranchID
+	if branchID != nil && strings.TrimSpace(*branchID) == "" {
+		branchID = nil
+	}
+
 	return tx.Create(&AuditLog{
 		ID:           utils.NewUUID(),
 		BusinessID:   input.BusinessID,
+		BranchID:     branchID,
 		UserID:       input.ActorUserID,
 		ModuleName:   input.EntityType,
 		ActionType:   input.EventType,
@@ -120,6 +130,15 @@ func (r *Repository) ListActivity(filter *ActivityLogFilter) ([]AuditLog, string
 	}
 
 	query := r.db.Where("business_id = ?", filter.BusinessID)
+	if filter.BranchID != "" {
+		// Older rows predate audit_logs.branch_id, so fall back to the branch
+		// of the user who performed the action. Entries with neither are
+		// business-wide and stay hidden from branch-scoped callers.
+		query = query.Where(
+			"COALESCE(audit_logs.branch_id, (SELECT u.branch_id FROM users u WHERE u.id = audit_logs.actor_user_id)) = ?",
+			filter.BranchID,
+		)
+	}
 	if filter.EntityType != "" {
 		query = query.Where("entity_type = ?", filter.EntityType)
 	}

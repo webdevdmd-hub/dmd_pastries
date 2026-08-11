@@ -93,9 +93,12 @@ export function OrderProductionSection({
     productionForm.recipeId.trim().length > 0 &&
     isActiveRecipe(selectedRecipe) &&
     selectedRecipeHasBom &&
-    (selectedItem.itemSource === "custom" || recipeMatchesSelectedItem(selectedRecipe, selectedItem));
+    (selectedItem.itemSource === "custom" ||
+      recipeMatchesSelectedItem(selectedRecipe, selectedItem));
   const catalogItemMissingProduct =
-    selectedItem !== null && selectedItem.itemSource !== "custom" && selectedItem.productId === null;
+    selectedItem !== null &&
+    selectedItem.itemSource !== "custom" &&
+    selectedItem.productId === null;
   const productRecipeUnavailable =
     selectedItem !== null &&
     selectedItem.itemSource !== "custom" &&
@@ -132,26 +135,23 @@ export function OrderProductionSection({
     !hasValidPlannedQuantity ||
     !hasValidProductionDate ||
     createProductionMutation.isPending;
-  const recipeOptions = useMemo<SearchableComboboxOption[]>(
-    () => {
-      const recipes = productRecipe
-        ? [
-            productRecipe,
-            ...(recipesQuery.data ?? []).filter((recipe) => recipe.id !== productRecipe.id),
-          ]
-        : (recipesQuery.data ?? []);
+  const recipeOptions = useMemo<SearchableComboboxOption[]>(() => {
+    const recipes = productRecipe
+      ? [
+          productRecipe,
+          ...(recipesQuery.data ?? []).filter((recipe) => recipe.id !== productRecipe.id),
+        ]
+      : (recipesQuery.data ?? []);
 
-      return recipes.map((recipe) => ({
-        value: recipe.id,
-        label: recipe.recipeName,
-        description: [recipe.recipeCode, recipe.productName, recipe.productVariantName]
-          .filter((part): part is string => typeof part === "string" && part.length > 0)
-          .join(" - "),
-        keywords: [recipe.recipeName, recipe.recipeCode, recipe.productName],
-      }));
-    },
-    [productRecipe, recipesQuery.data],
-  );
+    return recipes.map((recipe) => ({
+      value: recipe.id,
+      label: recipe.recipeName,
+      description: [recipe.recipeCode, recipe.productName, recipe.productVariantName]
+        .filter((part): part is string => typeof part === "string" && part.length > 0)
+        .join(" - "),
+      keywords: [recipe.recipeName, recipe.recipeCode, recipe.productName],
+    }));
+  }, [productRecipe, recipesQuery.data]);
 
   useEffect(() => {
     if (!selectedItem || selectedItem.itemSource === "custom") {

@@ -9,6 +9,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	reportshared "pastries-pos/internal/modules/reports/shared"
+	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
 
@@ -103,6 +105,24 @@ type bakeryPaymentAccountingRow struct {
 	ChartAccountID            string
 	JournalEntryID            *string
 	PaidAt                    time.Time
+}
+
+type posSalePaymentAccountingRow struct {
+	ID                        string
+	BusinessID                string
+	BranchID                  string
+	SaleID                    string
+	Amount                    float64
+	PaymentStatus             string
+	PaymentMethodNameSnapshot string
+	JournalEntryID            *string
+	PaidAt                    time.Time
+	SaleNumber                string
+	SaleStatus                string
+	SaleTotalAmount           float64
+	PaymentAccountBranchID    *string
+	PaymentAccountName        string
+	ChartAccountID            string
 }
 
 type salesReturnAccountingRow struct {
@@ -444,15 +464,11 @@ func (r *Repository) ValidateActiveAccountForBranch(tx *gorm.DB, businessID, bra
 	return &account, err
 }
 
-func (r *Repository) ValidateActiveAccount(tx *gorm.DB, businessID, accountID string) (*ChartAccount, error) {
+// Account codes are unique per (business, branch) since migration 000092, so a
+// lookup without a branch matches one row per branch and returns an arbitrary one.
+func (r *Repository) FindActiveAccountByCode(tx *gorm.DB, businessID, branchID, accountCode string) (*ChartAccount, error) {
 	var account ChartAccount
-	err := tx.Where("business_id = ? AND id = ? AND status = ? AND deleted_at IS NULL", businessID, accountID, "active").First(&account).Error
-	return &account, err
-}
-
-func (r *Repository) FindActiveAccountByCode(tx *gorm.DB, businessID, accountCode string) (*ChartAccount, error) {
-	var account ChartAccount
-	err := tx.Where("business_id = ? AND account_code = ? AND status = ? AND deleted_at IS NULL", businessID, accountCode, "active").First(&account).Error
+	err := tx.Where("business_id = ? AND branch_id = ? AND account_code = ? AND status = ? AND deleted_at IS NULL", businessID, branchID, accountCode, "active").First(&account).Error
 	return &account, err
 }
 
@@ -558,9 +574,10 @@ func (r *Repository) CountPurchaseReturnMovementsMissingAccountingJournal(busine
 	return count, err
 }
 
-func (r *Repository) FindAccountMapping(tx *gorm.DB, businessID, mappingKey string) (*AccountMapping, error) {
+// Mappings are unique per (business, branch, mapping_key) since migration 000092.
+func (r *Repository) FindAccountMapping(tx *gorm.DB, businessID, branchID, mappingKey string) (*AccountMapping, error) {
 	var mapping AccountMapping
-	err := tx.Where("business_id = ? AND mapping_key = ? AND deleted_at IS NULL", businessID, mappingKey).First(&mapping).Error
+	err := tx.Where("business_id = ? AND branch_id = ? AND mapping_key = ? AND deleted_at IS NULL", businessID, branchID, mappingKey).First(&mapping).Error
 	return &mapping, err
 }
 
@@ -635,8 +652,13 @@ func (r *Repository) UpdateAccountingSettings(tx *gorm.DB, businessID string, up
 }
 
 func (r *Repository) UpsertAccountMapping(tx *gorm.DB, mapping *AccountMapping) error {
+	// branch_id is NOT NULL on this table since migration 000092. Matching
+	// without it would rewrite a different branch's mapping.
+	if strings.TrimSpace(mapping.BranchID) == "" {
+		return apperrors.Internal("account mapping requires a branch")
+	}
 	var existing AccountMapping
-	err := tx.Where("business_id = ? AND mapping_key = ? AND deleted_at IS NULL", mapping.BusinessID, mapping.MappingKey).First(&existing).Error
+	err := tx.Where("business_id = ? AND branch_id = ? AND mapping_key = ? AND deleted_at IS NULL", mapping.BusinessID, mapping.BranchID, mapping.MappingKey).First(&existing).Error
 	if err == nil {
 		return tx.Model(&existing).Updates(map[string]interface{}{
 			"chart_account_id": mapping.ChartAccountID,
@@ -943,6 +965,65 @@ func (r *Repository) UpdatePOSSaleAccountingJournalID(tx *gorm.DB, businessID, s
 	return nil
 }
 
+// FindPOSSalePaymentForAccounting loads one sale payment with everything needed
+// to post it: the sale it settles, and the payment account its method resolves
+// to for that branch.
+func (r *Repository) FindPOSSalePaymentForAccounting(tx *gorm.DB, businessID, paymentID string) (*posSalePaymentAccountingRow, error) {
+	var row posSalePaymentAccountingRow
+	err := tx.Table("sale_payments sp").
+		Select(`
+			sp.id,
+			sp.business_id,
+			sp.branch_id,
+			sp.sale_id,
+			sp.amount,
+			sp.payment_status,
+			sp.payment_method_name_snapshot,
+			sp.journal_entry_id,
+			sp.paid_at,
+			s.sale_number,
+			s.sale_status,
+			s.total_amount AS sale_total_amount,
+			pa.branch_id AS payment_account_branch_id,
+			COALESCE(pa.account_name, '') AS payment_account_name,
+			COALESCE(pa.chart_account_id::text, '') AS chart_account_id
+		`).
+		Joins("JOIN sales s ON s.id = sp.sale_id AND s.business_id = sp.business_id AND s.deleted_at IS NULL").
+		Joins("JOIN payment_methods pm ON pm.id = sp.payment_method_id AND pm.business_id = sp.business_id AND pm.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_method_account_mappings pmam ON pmam.payment_method_id = pm.id AND pmam.business_id = sp.business_id AND pmam.branch_id = sp.branch_id AND pmam.status = 'active' AND pmam.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AND pa.business_id = sp.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL AND (pa.branch_id IS NULL OR pa.branch_id = sp.branch_id)").
+		Where("sp.business_id = ? AND sp.id = ? AND sp.deleted_at IS NULL", businessID, paymentID).
+		Take(&row).Error
+	return &row, err
+}
+
+// SumPostedSalePaymentsExcluding totals the payments already credited against a
+// sale's receivable, so a later payment can tell how much of the balance is
+// genuinely still outstanding.
+func (r *Repository) SumPostedSalePaymentsExcluding(tx *gorm.DB, businessID, saleID, excludePaymentID string) (float64, error) {
+	var total float64
+	err := tx.Table("sale_payments").
+		Select("COALESCE(SUM(amount), 0)").
+		Where("business_id = ? AND sale_id = ? AND id <> ? AND deleted_at IS NULL", businessID, saleID, excludePaymentID).
+		Where("journal_entry_id IS NOT NULL").
+		Where("payment_status IN ?", []string{"completed", "partially_refunded", "refunded"}).
+		Scan(&total).Error
+	return roundMoney(total), err
+}
+
+func (r *Repository) UpdatePOSSalePaymentJournalID(tx *gorm.DB, businessID, paymentID, journalEntryID string) error {
+	result := tx.Table("sale_payments").
+		Where("business_id = ? AND id = ?", businessID, paymentID).
+		Updates(map[string]interface{}{"journal_entry_id": journalEntryID, "updated_at": time.Now().UTC()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func (r *Repository) UpdatePOSSalePaymentJournalIDs(tx *gorm.DB, businessID, saleID, journalEntryID string) error {
 	return tx.Table("sale_payments").
 		Where("business_id = ? AND sale_id = ? AND deleted_at IS NULL AND payment_status = ?", businessID, saleID, "completed").
@@ -1212,10 +1293,40 @@ func (r *Repository) backfillCandidateQuery(tx *gorm.DB, businessID, target stri
 
 func backfillTargetQuery(target string) (table, idColumn, businessColumn, branchColumn, deletedCondition, dateColumn, statusColumn, statusValue, missingCondition, extraCondition string) {
 	switch target {
+	case "sale_movement_costs":
+		// Repair target, not a journal poster: re-prices zero-cost sale_out
+		// movements from the product/variant cost_price so the pos_sales
+		// target can post COGS. Must run before pos_sales. Movements already
+		// linked to a journal are excluded — their cost is in the ledger.
+		return "stock_movements", "id", "business_id", "branch_id", "", "created_at", "", "",
+			"COALESCE(total_cost, 0) <= 0",
+			`movement_type = 'sale_out'
+			 AND reference_type = 'sale'
+			 AND item_type IN ('product','product_variant')
+			 AND accounting_journal_entry_id IS NULL
+			 AND EXISTS (
+			     SELECT 1 FROM sales s
+			     WHERE s.id = stock_movements.reference_id
+			       AND s.business_id = stock_movements.business_id
+			       AND s.deleted_at IS NULL
+			       AND ` + reportshared.SaleRevenueCondition("s") + `
+			 )`
 	case "pos_sales":
-		return "sales", "id", "business_id", "branch_id", "deleted_at IS NULL", "sold_at", "sale_status", "completed", "(accounting_journal_entry_id IS NULL OR cogs_journal_entry_id IS NULL)", ""
+		// Status set must match the reports' missing-journal predicate
+		// (reportshared.SaleRevenueCondition); the tuple's statusColumn can
+		// only express equality, so the filter lives in extraCondition.
+		return "sales", "id", "business_id", "branch_id", "deleted_at IS NULL", "sold_at", "", "", "(accounting_journal_entry_id IS NULL OR cogs_journal_entry_id IS NULL)", reportshared.SaleRevenueCondition("")
+	case "pos_sale_payments":
+		// Payments captured during checkout are stamped with the sale's own
+		// journal id, so only post-checkout settlements are selected here.
+		// Run this after "pos_sales" so a sale that has never posted gets its
+		// checkout payments stamped first.
+		return "sale_payments", "id", "business_id", "branch_id", "deleted_at IS NULL", "paid_at", "payment_status", "completed", "journal_entry_id IS NULL", ""
 	case "bakery_orders":
-		return "bakery_orders", "id", "business_id", "branch_id", "deleted_at IS NULL", "created_at", "order_status", "completed", "accounting_journal_entry_id IS NULL", ""
+		// Windowed by event_date to match the reports' missing-journal check —
+		// a date-windowed backfill on created_at can miss exactly the rows the
+		// report flags.
+		return "bakery_orders", "id", "business_id", "branch_id", "deleted_at IS NULL", "event_date", "order_status", "completed", "accounting_journal_entry_id IS NULL", ""
 	case "bakery_order_payments":
 		return "bakery_order_payments", "id", "business_id", "", "", "paid_at", "", "", "journal_entry_id IS NULL", ""
 	case "payment_refunds":
@@ -1241,15 +1352,49 @@ func backfillTargetQuery(target string) (table, idColumn, businessColumn, branch
 	}
 }
 
-func (r *Repository) ListMissingRequiredAccountMappings(tx *gorm.DB, businessID string, keys []string) ([]string, error) {
+// RepriceZeroCostSaleMovement sets a zero-cost sale_out movement's cost from
+// the product/variant cost_price (variant falls back to its parent product).
+// The guards repeat the sale_movement_costs candidate conditions so a movement
+// that was journaled or priced between candidate listing and repair is left
+// untouched. Returns true when the row was updated.
+func (r *Repository) RepriceZeroCostSaleMovement(tx *gorm.DB, businessID, movementID string) (bool, error) {
+	result := tx.Exec(`
+		UPDATE stock_movements sm
+		SET unit_cost_snapshot = basis.cost,
+		    total_cost = ROUND((basis.cost * sm.quantity)::numeric, 2)
+		FROM (
+			SELECT ii.id AS inventory_item_id,
+			       COALESCE(pv.cost_price, p.cost_price, 0) AS cost
+			FROM inventory_items ii
+			JOIN products p ON p.id = ii.product_id AND p.business_id = ii.business_id
+			LEFT JOIN product_variants pv ON pv.id = ii.product_variant_id AND pv.business_id = ii.business_id
+			WHERE ii.business_id = ?
+		) basis
+		WHERE sm.id = ?
+		  AND sm.business_id = ?
+		  AND sm.inventory_item_id = basis.inventory_item_id
+		  AND sm.movement_type = 'sale_out'
+		  AND COALESCE(sm.total_cost, 0) <= 0
+		  AND sm.accounting_journal_entry_id IS NULL
+		  AND basis.cost > 0`,
+		businessID, movementID, businessID)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
+}
+
+// Mappings are per branch, so a business-wide check reports a branch as ready
+// when it has no mappings of its own, as long as some other branch does.
+func (r *Repository) ListMissingRequiredAccountMappings(tx *gorm.DB, businessID, branchID string, keys []string) ([]string, error) {
 	if len(keys) == 0 {
 		return []string{}, nil
 	}
 	var existing []string
 	err := tx.Table("accounting_account_mappings aam").
 		Select("aam.mapping_key").
-		Joins("JOIN chart_of_accounts coa ON coa.id = aam.chart_account_id AND coa.business_id = aam.business_id AND coa.status = 'active' AND coa.deleted_at IS NULL").
-		Where("aam.business_id = ? AND aam.mapping_key IN ? AND aam.deleted_at IS NULL", businessID, keys).
+		Joins("JOIN chart_of_accounts coa ON coa.id = aam.chart_account_id AND coa.business_id = aam.business_id AND coa.branch_id = aam.branch_id AND coa.status = 'active' AND coa.deleted_at IS NULL").
+		Where("aam.business_id = ? AND aam.branch_id = ? AND aam.mapping_key IN ? AND aam.deleted_at IS NULL", businessID, branchID, keys).
 		Pluck("aam.mapping_key", &existing).Error
 	if err != nil {
 		return nil, err
@@ -1617,9 +1762,84 @@ func (r *Repository) ActiveBranches(tx *gorm.DB, businessID string) ([]defaultPa
 	return rows, err
 }
 
-func (r *Repository) FindChartAccountByCode(tx *gorm.DB, businessID, code string) (*ChartAccount, error) {
+type branchAccountingReadinessRow struct {
+	BranchID                       string
+	BranchName                     string
+	ChartAccountCount              int64
+	MappingCount                   int64
+	PaymentAccountCount            int64
+	CrossBranchMappingCount        int64
+	CrossBranchPaymentAccountCount int64
+	CrossBranchJournalLineCount    int64
+}
+
+// BranchAccountingReadiness counts, per branch, what accounting configuration
+// exists and how much of it already points at a different branch.
+//
+// The cross-branch counts are the ones that matter most: they are the residue
+// of postings made while account lookups ignored the branch, and no code change
+// clears them.
+func (r *Repository) BranchAccountingReadiness(businessID string) ([]branchAccountingReadinessRow, error) {
+	var rows []branchAccountingReadinessRow
+	err := r.db.Raw(`
+		SELECT b.id   AS branch_id,
+		       b.branch_name,
+		       (SELECT COUNT(*) FROM chart_of_accounts coa
+		         WHERE coa.business_id = b.business_id AND coa.branch_id = b.id
+		           AND coa.deleted_at IS NULL)                       AS chart_account_count,
+		       (SELECT COUNT(*) FROM accounting_account_mappings aam
+		         WHERE aam.business_id = b.business_id AND aam.branch_id = b.id
+		           AND aam.deleted_at IS NULL)                       AS mapping_count,
+		       (SELECT COUNT(*) FROM payment_accounts pa
+		         WHERE pa.business_id = b.business_id AND pa.branch_id = b.id
+		           AND pa.deleted_at IS NULL)                        AS payment_account_count,
+		       (SELECT COUNT(*) FROM accounting_account_mappings aam
+		          JOIN chart_of_accounts coa ON coa.id = aam.chart_account_id
+		         WHERE aam.business_id = b.business_id AND aam.branch_id = b.id
+		           AND aam.deleted_at IS NULL
+		           AND coa.branch_id IS DISTINCT FROM b.id)          AS cross_branch_mapping_count,
+		       (SELECT COUNT(*) FROM payment_accounts pa
+		          JOIN chart_of_accounts coa ON coa.id = pa.chart_account_id
+		         WHERE pa.business_id = b.business_id AND pa.branch_id = b.id
+		           AND pa.deleted_at IS NULL
+		           AND coa.branch_id IS DISTINCT FROM b.id)          AS cross_branch_payment_account_count,
+		       (SELECT COUNT(*) FROM journal_entry_lines jel
+		          JOIN journal_entries   je  ON je.id  = jel.journal_entry_id
+		          JOIN chart_of_accounts coa ON coa.id = jel.account_id
+		         WHERE je.business_id = b.business_id AND je.branch_id = b.id
+		           AND jel.deleted_at IS NULL AND je.deleted_at IS NULL
+		           AND coa.branch_id IS DISTINCT FROM je.branch_id)  AS cross_branch_journal_line_count
+		FROM branches b
+		WHERE b.business_id = ? AND b.deleted_at IS NULL
+		ORDER BY b.branch_name ASC
+	`, businessID).Scan(&rows).Error
+	return rows, err
+}
+
+// ListSeededAccountCodes returns the account codes a branch already has, so the
+// readiness report can name the ones it is missing.
+func (r *Repository) ListSeededAccountCodes(businessID, branchID string) ([]string, error) {
+	var codes []string
+	err := r.db.Table("chart_of_accounts").
+		Where("business_id = ? AND branch_id = ? AND deleted_at IS NULL", businessID, branchID).
+		Pluck("account_code", &codes).Error
+	return codes, err
+}
+
+// ListSeededMappingKeys returns the mapping keys a branch already has.
+func (r *Repository) ListSeededMappingKeys(businessID, branchID string) ([]string, error) {
+	var keys []string
+	err := r.db.Table("accounting_account_mappings").
+		Where("business_id = ? AND branch_id = ? AND deleted_at IS NULL", businessID, branchID).
+		Pluck("mapping_key", &keys).Error
+	return keys, err
+}
+
+// Without the branch this links a branch's payment account to another branch's
+// cash/bank/card ledger account.
+func (r *Repository) FindChartAccountByCode(tx *gorm.DB, businessID, branchID, code string) (*ChartAccount, error) {
 	var account ChartAccount
-	err := tx.Where("business_id = ? AND account_code = ? AND status = ? AND deleted_at IS NULL", businessID, code, "active").First(&account).Error
+	err := tx.Where("business_id = ? AND branch_id = ? AND account_code = ? AND status = ? AND deleted_at IS NULL", businessID, branchID, code, "active").First(&account).Error
 	return &account, err
 }
 
@@ -1827,9 +2047,9 @@ func (r *Repository) CountPaymentMethodsUsingPaymentAccount(tx *gorm.DB, busines
 	return count, err
 }
 
-func (r *Repository) ValidateActiveAssetChartAccount(tx *gorm.DB, businessID, accountID string) (*ChartAccount, error) {
+func (r *Repository) ValidateActiveAssetChartAccount(tx *gorm.DB, businessID, branchID, accountID string) (*ChartAccount, error) {
 	var account ChartAccount
-	err := tx.Where("business_id = ? AND id = ? AND account_type = ? AND status = ? AND deleted_at IS NULL", businessID, accountID, "asset", "active").First(&account).Error
+	err := tx.Where("business_id = ? AND branch_id = ? AND id = ? AND account_type = ? AND status = ? AND deleted_at IS NULL", businessID, branchID, accountID, "asset", "active").First(&account).Error
 	return &account, err
 }
 
@@ -2241,8 +2461,10 @@ func (r *Repository) ListGeneralLedgerRows(businessID string, query GeneralLedge
 
 func (r *Repository) ListTrialBalanceRows(businessID string, query TrialBalanceQuery) ([]TrialBalanceRowResponse, error) {
 	branchFilter := ""
+	accountBranchFilter := ""
 	if strings.TrimSpace(query.BranchID) != "" {
 		branchFilter = "AND je.branch_id = ?"
+		accountBranchFilter = "AND coa.branch_id = ?"
 	}
 	var rows []TrialBalanceRowResponse
 	err := r.db.Raw(`
@@ -2278,6 +2500,8 @@ func (r *Repository) ListTrialBalanceRows(businessID string, query TrialBalanceQ
 		FROM chart_of_accounts coa
 		LEFT JOIN account_totals at ON at.account_id = coa.id
 		WHERE coa.business_id = ?
+		  AND coa.deleted_at IS NULL
+		  `+accountBranchFilter+`
 		  AND (? = true OR ABS(COALESCE(at.opening_balance, 0)) > 0.004 OR ABS(COALESCE(at.period_debit, 0)) > 0.004 OR ABS(COALESCE(at.period_credit, 0)) > 0.004)
 		ORDER BY coa.account_code ASC
 	`, trialBalanceArgs(businessID, query, branchFilter != "")...).Scan(&rows).Error
@@ -2735,9 +2959,15 @@ func (r *Repository) ListPaymentAccountReconciliationRows(businessID, branchID s
 			coa.id AS chart_account_id,
 			coa.account_code AS chart_account_code,
 			coa.account_name AS chart_account_name,
+			-- Placeholder: the service replaces this per row with the real
+			-- as-of ledger balance for the linked chart account.
 			0::numeric AS ledger_amount,
-			'ledger_only' AS status,
-			'Payment accounts do not store a separate operational balance yet; compare using the linked chart account ledger.' AS notes`).
+			CASE WHEN coa.branch_id IS DISTINCT FROM pa.branch_id
+			     THEN 'cross_branch_account'
+			     ELSE 'ledger_only' END AS status,
+			CASE WHEN coa.branch_id IS DISTINCT FROM pa.branch_id
+			     THEN 'This payment account is linked to another branch''s ledger account, so its balance is posted to the wrong branch. See docs/accounting-branch-backfill.md step 2.'
+			     ELSE 'Payment accounts hold no separate operational balance, so this shows the linked chart account ledger only.' END AS notes`).
 		Joins("JOIN chart_of_accounts coa ON coa.id = pa.chart_account_id AND coa.business_id = pa.business_id AND coa.deleted_at IS NULL").
 		Joins("LEFT JOIN branches b ON b.id = pa.branch_id AND b.business_id = pa.business_id").
 		Where("pa.business_id = ? AND pa.deleted_at IS NULL AND pa.status = ?", businessID, "active")
@@ -2770,7 +3000,11 @@ func trialBalanceArgs(businessID string, query TrialBalanceQuery, hasBranchFilte
 	if hasBranchFilter {
 		args = append(args, query.BranchID)
 	}
-	args = append(args, businessID, query.IncludeZeroBalances)
+	args = append(args, businessID)
+	if hasBranchFilter {
+		args = append(args, query.BranchID)
+	}
+	args = append(args, query.IncludeZeroBalances)
 	return args
 }
 

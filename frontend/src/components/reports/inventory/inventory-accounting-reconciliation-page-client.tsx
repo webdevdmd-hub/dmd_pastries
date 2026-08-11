@@ -144,10 +144,22 @@ export function InventoryAccountingReconciliationPageClient(): JSX.Element {
         onReset={resetFilters}
       />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <SummaryTile label="Operational value" value={formatMoney(report?.totalOperationalValue ?? 0)} />
-        <SummaryTile label="Stock ledger value" value={formatMoney(report?.totalInventoryLedgerValue ?? 0)} />
-        <SummaryTile label="Linked accounting value" value={formatMoney(report?.totalAccountingInventoryValue ?? 0)} />
-        <SummaryTile label="Inventory / Stock GL" value={formatMoney(report?.generalLedgerInventoryBalance ?? 0)} />
+        <SummaryTile
+          label="Operational value"
+          value={formatMoney(report?.totalOperationalValue ?? 0)}
+        />
+        <SummaryTile
+          label="Stock ledger value"
+          value={formatMoney(report?.totalInventoryLedgerValue ?? 0)}
+        />
+        <SummaryTile
+          label="Linked accounting value"
+          value={formatMoney(report?.totalAccountingInventoryValue ?? 0)}
+        />
+        <SummaryTile
+          label="Inventory / Stock GL"
+          value={formatMoney(report?.generalLedgerInventoryBalance ?? 0)}
+        />
         <SummaryTile
           label="Unassigned GL difference"
           tone={Math.abs(report?.unassignedAccountingDifference ?? 0) > 0.01 ? "danger" : "default"}
@@ -170,8 +182,8 @@ export function InventoryAccountingReconciliationPageClient(): JSX.Element {
                 Unassigned Inventory / Stock GL Lines
               </h2>
               <p className="text-sm text-brand-mocha">
-                {String(report?.unassignedAccountingLineCount ?? unassignedLines.length)} posted journal
-                lines affect Inventory / Stock but are not linked to stock movements.
+                {String(report?.unassignedAccountingLineCount ?? unassignedLines.length)} posted
+                journal lines affect Inventory / Stock but are not linked to stock movements.
               </p>
             </div>
             <InventoryAccountingUnassignedLinesTable lines={unassignedLines} />

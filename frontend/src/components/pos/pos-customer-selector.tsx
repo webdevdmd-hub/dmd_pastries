@@ -77,11 +77,11 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
   return (
     <div className="grid h-full min-w-0 grid-rows-[24px_36px] gap-1">
       <div className="flex h-6 items-center justify-between gap-2">
-        <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#71717a]">
+        <span className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">
           Customer
         </span>
         <Button
-          className="h-6 rounded-md px-2 text-xs text-[#09090b] hover:bg-[#f4f4f5]"
+          className="h-6 rounded-md px-2 text-xs text-zinc-950 hover:bg-zinc-100"
           onClick={() => setQuickCreateOpen(true)}
           type="button"
           variant="ghost"
@@ -93,7 +93,7 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
 
       <SearchableSelect
         ariaLabel="Select POS customer"
-        contentClassName="rounded-md border-[#d4d4d8] bg-white"
+        contentClassName="rounded-md border-zinc-300 bg-white"
         emptyMessage={
           search.trim().length < 2
             ? "Type at least 2 characters to search customers."
@@ -122,7 +122,7 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
         searchPlaceholder="Search by name, code, phone, or email..."
         searchValue={search}
         showSelectedDescription={false}
-        triggerClassName="h-9 min-h-9 rounded-md border-[#d4d4d8] bg-white text-sm shadow-none hover:bg-[#fafafa] focus-visible:ring-black"
+        triggerClassName="h-9 min-h-9 rounded-md border-zinc-300 bg-white text-sm shadow-none hover:bg-zinc-50 focus-visible:ring-black"
         value={value}
       />
 

@@ -77,8 +77,8 @@ export function ReportUnavailablePageClient({
             <div className="space-y-2">
               <p className="text-lg font-semibold text-brand-espresso">Coming Soon</p>
               <p className="max-w-2xl text-sm leading-6 text-brand-mocha">
-                This report is not available yet. Please go back to the Reports Index to
-                view available reports.
+                This report is not available yet. Please go back to the Reports Index to view
+                available reports.
               </p>
             </div>
           </div>

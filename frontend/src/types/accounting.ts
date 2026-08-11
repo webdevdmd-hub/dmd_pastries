@@ -395,9 +395,11 @@ export type AccountingBackfillTarget =
   | "expenses"
   | "manufacturing_batches"
   | "payment_refunds"
+  | "pos_sale_payments"
   | "pos_sales"
   | "purchase_invoices"
   | "purchase_returns"
+  | "sale_movement_costs"
   | "sales_returns"
   | "stock_movements"
   | "supplier_payments";

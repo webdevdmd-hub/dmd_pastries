@@ -151,44 +151,43 @@ export function UserFormDialog({
   const updateRoleId = updateForm.watch("roleId");
   const canUpdateRoleUseUnassignedBranch = canRoleUseUnassignedBranch(roleOptions, updateRoleId);
   const isSelfEdit = mode === "edit" && user?.id === currentUserId;
-  const createDataNotice =
-    rolesLoading
+  const createDataNotice = rolesLoading
+    ? {
+        title: "Roles are loading",
+        message: "Wait for role options to load before creating a user.",
+        variant: "default" as const,
+      }
+    : roleLoadError
       ? {
-          title: "Roles are loading",
-          message: "Wait for role options to load before creating a user.",
-          variant: "default" as const,
+          title: "Roles could not be loaded",
+          message: roleLoadError,
+          variant: "destructive" as const,
         }
-      : roleLoadError
+      : roleOptions.length === 0
         ? {
-            title: "Roles could not be loaded",
-            message: roleLoadError,
+            title: "No roles available",
+            message: "Create or load at least one role before creating a user.",
             variant: "destructive" as const,
           }
-        : roleOptions.length === 0
+        : branchesLoading
           ? {
-              title: "No roles available",
-              message: "Create or load at least one role before creating a user.",
-              variant: "destructive" as const,
+              title: "Branches are loading",
+              message: "Wait for active branches to load before creating a user.",
+              variant: "default" as const,
             }
-          : branchesLoading
+          : branchLoadError
             ? {
-                title: "Branches are loading",
-                message: "Wait for active branches to load before creating a user.",
-                variant: "default" as const,
+                title: "Branches could not be loaded",
+                message: branchLoadError,
+                variant: "destructive" as const,
               }
-            : branchLoadError
+            : assignableBranches.length === 0
               ? {
-                  title: "Branches could not be loaded",
-                  message: branchLoadError,
+                  title: "No active branches available",
+                  message: "Create or activate a branch before creating an operational user.",
                   variant: "destructive" as const,
                 }
-              : assignableBranches.length === 0
-                ? {
-                    title: "No active branches available",
-                    message: "Create or activate a branch before creating an operational user.",
-                    variant: "destructive" as const,
-                  }
-                : null;
+              : null;
 
   useEffect(() => {
     if (!open) {

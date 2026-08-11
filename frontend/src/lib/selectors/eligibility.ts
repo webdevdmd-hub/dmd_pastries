@@ -91,10 +91,7 @@ export function getProductPosVisibilityLabel(product: Product): ProductPosVisibi
   return "Hidden from POS";
 }
 
-export function isPosSelectableProductVariant(
-  product: Product,
-  variant: ProductVariant,
-): boolean {
+export function isPosSelectableProductVariant(product: Product, variant: ProductVariant): boolean {
   return isPosSelectableProduct(product) && variant.status === "active";
 }
 

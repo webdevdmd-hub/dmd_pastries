@@ -90,7 +90,8 @@ export function InventoryReportsPageClient(): JSX.Element {
     if (next) setFilters({ ...next, timezone });
   };
 
-  const resetFilters = (): void => setFilters({ ...toInventoryReportFilters(initialDraft), timezone });
+  const resetFilters = (): void =>
+    setFilters({ ...toInventoryReportFilters(initialDraft), timezone });
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">

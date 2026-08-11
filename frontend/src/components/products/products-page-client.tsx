@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/hooks/use-auth";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useInventory } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import {
@@ -186,7 +187,15 @@ export function ProductsPageClient(): JSX.Element {
     PERMISSIONS.productsStatusUpdate,
     PERMISSIONS.productsVariantsManage,
   ]);
-  const productsQuery = useProducts(filters, canViewProducts);
+  // The search box writes into filters on every keystroke; only the debounced
+  // value may reach the query key, or each keystroke becomes a fetch plus a
+  // permanently cached query entry.
+  const debouncedSearch = useDebouncedValue(filters.search);
+  const queryFilters = useMemo(
+    () => ({ ...filters, search: debouncedSearch }),
+    [debouncedSearch, filters],
+  );
+  const productsQuery = useProducts(queryFilters, canViewProducts);
   const catalogCountQuery = useProducts(catalogCountFilters, canViewProducts);
   const activeCountQuery = useProducts(activeCountFilters, canViewProducts);
   const inventoryQuery = useInventory(productInventoryFilters, canViewProducts && canViewInventory);

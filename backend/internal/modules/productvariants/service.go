@@ -22,7 +22,7 @@ func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository) *Ser
 }
 
 func (s *Service) ListVariants(currentUser *utils.AuthContext, productID string) ([]VariantResponse, error) {
-	if err := s.ensureProduct(currentUser.BusinessID, productID); err != nil {
+	if err := s.ensureProduct(currentUser, productID); err != nil {
 		return nil, err
 	}
 	variants, err := s.repo.List(productID, currentUser.BusinessID)
@@ -37,7 +37,7 @@ func (s *Service) ListVariants(currentUser *utils.AuthContext, productID string)
 }
 
 func (s *Service) CreateVariant(currentUser *utils.AuthContext, productID string, req CreateVariantRequest, ipAddress, userAgent string) (*VariantResponse, error) {
-	if err := s.ensureProduct(currentUser.BusinessID, productID); err != nil {
+	if err := s.ensureProduct(currentUser, productID); err != nil {
 		return nil, err
 	}
 	if err := s.validateCreate(currentUser.BusinessID, req); err != nil {
@@ -81,6 +81,9 @@ func (s *Service) CreateVariant(currentUser *utils.AuthContext, productID string
 }
 
 func (s *Service) GetVariant(currentUser *utils.AuthContext, productID, variantID string) (*VariantResponse, error) {
+	if err := s.ensureProduct(currentUser, productID); err != nil {
+		return nil, err
+	}
 	variant, err := s.repo.FindByID(productID, variantID, currentUser.BusinessID)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -93,6 +96,9 @@ func (s *Service) GetVariant(currentUser *utils.AuthContext, productID, variantI
 }
 
 func (s *Service) UpdateVariant(currentUser *utils.AuthContext, productID, variantID string, req UpdateVariantRequest, ipAddress, userAgent string) (*VariantResponse, error) {
+	if err := s.ensureProduct(currentUser, productID); err != nil {
+		return nil, err
+	}
 	if _, err := s.repo.FindByID(productID, variantID, currentUser.BusinessID); err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, apperrors.NotFound("variant not found")
@@ -151,6 +157,9 @@ func (s *Service) UpdateVariant(currentUser *utils.AuthContext, productID, varia
 }
 
 func (s *Service) UpdateVariantStatus(currentUser *utils.AuthContext, productID, variantID string, req UpdateVariantStatusRequest, ipAddress, userAgent string) (*VariantResponse, error) {
+	if err := s.ensureProduct(currentUser, productID); err != nil {
+		return nil, err
+	}
 	if !validVariantStatus(req.Status) {
 		return nil, apperrors.BadRequest("invalid status", nil)
 	}
@@ -163,6 +172,9 @@ func (s *Service) UpdateVariantStatus(currentUser *utils.AuthContext, productID,
 }
 
 func (s *Service) DeleteVariant(currentUser *utils.AuthContext, productID, variantID string, ipAddress, userAgent string) error {
+	if err := s.ensureProduct(currentUser, productID); err != nil {
+		return err
+	}
 	return s.updateWithAudit(currentUser, "product_variant.deleted", variantID, "Product variant deleted.", ipAddress, userAgent, func(tx *gorm.DB) error {
 		return s.repo.Update(tx, productID, variantID, currentUser.BusinessID, map[string]interface{}{
 			"status":     "archived",
@@ -172,8 +184,20 @@ func (s *Service) DeleteVariant(currentUser *utils.AuthContext, productID, varia
 	})
 }
 
-func (s *Service) ensureProduct(businessID, productID string) error {
-	exists, err := s.repo.ProductExists(productID, businessID)
+// ensureProduct confines every variant operation to the caller's branch.
+//
+// product_variants carries no branch column, so without this check a request
+// could read and modify another branch's catalogue and pricing simply by
+// addressing that branch's product id.
+func (s *Service) ensureProduct(currentUser *utils.AuthContext, productID string) error {
+	branchID, allBranches, err := currentUser.ResolveBranchScope("", "")
+	if err != nil {
+		return err
+	}
+	if allBranches {
+		branchID = ""
+	}
+	exists, err := s.repo.ProductExists(productID, currentUser.BusinessID, branchID)
 	if err != nil {
 		return apperrors.Internal("failed to load product")
 	}

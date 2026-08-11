@@ -159,7 +159,9 @@ function parseActivityLog(value: unknown): ActivityLog {
     targetUserName:
       typeof backendActivity.target_user_name === "string" ? backendActivity.target_user_name : "",
     targetUserEmail:
-      typeof backendActivity.target_user_email === "string" ? backendActivity.target_user_email : "",
+      typeof backendActivity.target_user_email === "string"
+        ? backendActivity.target_user_email
+        : "",
     eventType,
     entityType,
     entityId: typeof backendActivity.entity_id === "string" ? backendActivity.entity_id : null,

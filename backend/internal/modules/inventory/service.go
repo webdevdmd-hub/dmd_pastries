@@ -2,6 +2,7 @@ package inventory
 
 import (
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -83,8 +84,8 @@ func (s *Service) GetInventoryItem(currentUser *utils.AuthContext, id string) (*
 	if err != nil {
 		return nil, mapNotFound(err, "inventory item not found")
 	}
-	if !currentUser.CanAccessBranch(item.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(item.BranchID); err != nil {
+		return nil, err
 	}
 	response, err := s.repo.LoadInventoryResponse(currentUser.BusinessID, *item)
 	return &response, err
@@ -127,8 +128,8 @@ func (s *Service) GetStockLocation(currentUser *utils.AuthContext, id string) (*
 	if err != nil {
 		return nil, mapNotFound(err, "stock location not found")
 	}
-	if !currentUser.CanAccessBranch(location.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(location.BranchID); err != nil {
+		return nil, err
 	}
 	dto := s.repo.LoadStockLocationResponse(*location)
 	return &dto, nil
@@ -191,8 +192,8 @@ func (s *Service) UpdateStockLocation(currentUser *utils.AuthContext, id string,
 	if err != nil {
 		return nil, mapNotFound(err, "stock location not found")
 	}
-	if !currentUser.CanAccessBranch(location.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(location.BranchID); err != nil {
+		return nil, err
 	}
 	updates := map[string]interface{}{"updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
 	if req.LocationName != nil {
@@ -250,8 +251,8 @@ func (s *Service) UpdateStockLocationStatus(currentUser *utils.AuthContext, id s
 	if err != nil {
 		return nil, mapNotFound(err, "stock location not found")
 	}
-	if !currentUser.CanAccessBranch(location.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(location.BranchID); err != nil {
+		return nil, err
 	}
 	if req.Status == "inactive" {
 		hasStock, err := s.repo.StockLocationHasStock(s.db, currentUser.BusinessID, id)
@@ -283,8 +284,8 @@ func (s *Service) SetDefaultStockLocation(currentUser *utils.AuthContext, id, ip
 	if err != nil {
 		return nil, mapNotFound(err, "stock location not found")
 	}
-	if !currentUser.CanAccessBranch(location.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(location.BranchID); err != nil {
+		return nil, err
 	}
 	if location.Status != "active" {
 		return nil, apperrors.BadRequest("cannot set inactive location as default", nil)
@@ -313,8 +314,8 @@ func (s *Service) DeleteStockLocation(currentUser *utils.AuthContext, id, ipAddr
 	if err != nil {
 		return mapNotFound(err, "stock location not found")
 	}
-	if !currentUser.CanAccessBranch(location.BranchID) {
-		return apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(location.BranchID); err != nil {
+		return err
 	}
 	if location.IsDefault {
 		return apperrors.BadRequest("cannot delete default location", nil)
@@ -371,8 +372,8 @@ func (s *Service) GetInventoryItemLocationBalances(currentUser *utils.AuthContex
 	if err != nil {
 		return nil, mapNotFound(err, "inventory item not found")
 	}
-	if !currentUser.CanAccessBranch(item.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(item.BranchID); err != nil {
+		return nil, err
 	}
 	var branchName string
 	_ = s.db.Table("branches").Select("branch_name").Where("id = ? AND business_id = ?", item.BranchID, currentUser.BusinessID).Scan(&branchName).Error
@@ -433,8 +434,8 @@ func (s *Service) GetStockTransfer(currentUser *utils.AuthContext, id string) (*
 	if err != nil {
 		return nil, mapNotFound(err, "stock transfer not found")
 	}
-	if !currentUser.CanAccessBranch(transfer.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(transfer.BranchID); err != nil {
+		return nil, err
 	}
 	dto, err := s.repo.LoadStockTransferResponse(*transfer)
 	return &dto, err
@@ -492,8 +493,8 @@ func (s *Service) CompleteStockTransfer(currentUser *utils.AuthContext, id, ipAd
 		if err != nil {
 			return mapNotFound(err, "stock transfer not found")
 		}
-		if !currentUser.CanAccessBranch(transfer.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(transfer.BranchID); err != nil {
+			return err
 		}
 		if transfer.Status != "draft" {
 			return apperrors.BadRequest("only draft transfers can be completed", nil)
@@ -590,8 +591,8 @@ func (s *Service) CancelStockTransfer(currentUser *utils.AuthContext, id, ipAddr
 		if err != nil {
 			return mapNotFound(err, "stock transfer not found")
 		}
-		if !currentUser.CanAccessBranch(transfer.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(transfer.BranchID); err != nil {
+			return err
 		}
 		if transfer.Status != "draft" {
 			return apperrors.BadRequest("only draft transfers can be cancelled", nil)
@@ -739,8 +740,8 @@ func (s *Service) AdjustStock(currentUser *utils.AuthContext, id string, req Adj
 		if err != nil {
 			return mapNotFound(err, "inventory item not found")
 		}
-		if !currentUser.CanAccessBranch(item.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(item.BranchID); err != nil {
+			return err
 		}
 		movementType := "adjustment_in"
 		if req.AdjustmentType == "decrease" {
@@ -812,8 +813,8 @@ func (s *Service) ListMovements(currentUser *utils.AuthContext, inventoryItemID 
 		if err != nil {
 			return nil, mapNotFound(err, "inventory item not found")
 		}
-		if !currentUser.CanAccessBranch(item.BranchID) {
-			return nil, apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(item.BranchID); err != nil {
+			return nil, err
 		}
 	}
 	movements, total, err := s.repo.ListMovements(currentUser.BusinessID, inventoryItemID, query)
@@ -840,8 +841,8 @@ func (s *Service) GetStockMovement(currentUser *utils.AuthContext, id string) (*
 	if err != nil {
 		return nil, mapNotFound(err, "stock movement not found")
 	}
-	if !currentUser.CanAccessBranch(movement.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(movement.BranchID); err != nil {
+		return nil, err
 	}
 	movementResponse, err := s.repo.LoadMovementResponse(*movement)
 	if err != nil {
@@ -903,8 +904,8 @@ func (s *Service) ManualStockMovement(currentUser *utils.AuthContext, req Manual
 		if err != nil {
 			return mapNotFound(err, "inventory item not found")
 		}
-		if !currentUser.CanAccessBranch(item.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(item.BranchID); err != nil {
+			return err
 		}
 		movement, err := s.ApplyMovement(tx, ApplyStockMovementInput{
 			BusinessID:      currentUser.BusinessID,
@@ -948,8 +949,8 @@ func (s *Service) ReverseStockMovement(currentUser *utils.AuthContext, id string
 		if err != nil {
 			return mapNotFound(err, "stock movement not found")
 		}
-		if !currentUser.CanAccessBranch(original.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(original.BranchID); err != nil {
+			return err
 		}
 		if original.IsReversal {
 			return apperrors.BadRequest("reversal movements cannot be reversed", nil)
@@ -1028,8 +1029,8 @@ func (s *Service) InventoryLedgerAudit(currentUser *utils.AuthContext, inventory
 	if err != nil {
 		return nil, mapNotFound(err, "inventory item not found")
 	}
-	if !currentUser.CanAccessBranch(item.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(item.BranchID); err != nil {
+		return nil, err
 	}
 	result, err := s.repo.LedgerAudit(currentUser.BusinessID, inventoryItemID)
 	if err != nil {
@@ -1106,8 +1107,8 @@ func (s *Service) ListExpiryBatches(currentUser *utils.AuthContext, inventoryIte
 	if err != nil {
 		return nil, mapNotFound(err, "inventory item not found")
 	}
-	if !currentUser.CanAccessBranch(item.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(item.BranchID); err != nil {
+		return nil, err
 	}
 	batches, err := s.repo.ListExpiryBatches(currentUser.BusinessID, inventoryItemID)
 	return toExpiryBatchResponses(batches), err
@@ -1135,8 +1136,8 @@ func (s *Service) CreateExpiryBatch(currentUser *utils.AuthContext, inventoryIte
 		if err != nil {
 			return mapNotFound(err, "inventory item not found")
 		}
-		if !currentUser.CanAccessBranch(item.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(item.BranchID); err != nil {
+			return err
 		}
 		if !item.IsExpiryTracked {
 			return apperrors.BadRequest("inventory item is not expiry tracked", nil)
@@ -1170,8 +1171,8 @@ func (s *Service) UpdateExpiryBatch(currentUser *utils.AuthContext, batchID stri
 	if err != nil {
 		return nil, mapNotFound(err, "expiry batch not found")
 	}
-	if !currentUser.CanAccessBranch(batch.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+		return nil, err
 	}
 	updates := map[string]interface{}{"updated_at": time.Now().UTC()}
 	if req.BatchNumber != nil {
@@ -1227,8 +1228,8 @@ func (s *Service) UpdateExpiryBatchStatus(currentUser *utils.AuthContext, batchI
 	if err != nil {
 		return nil, mapNotFound(err, "expiry batch not found")
 	}
-	if !currentUser.CanAccessBranch(batch.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
+		return nil, err
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := s.repo.UpdateExpiryBatch(tx, batchID, currentUser.BusinessID, map[string]interface{}{"status": req.Status, "updated_at": time.Now().UTC()}); err != nil {
@@ -1353,7 +1354,25 @@ func (s *Service) ApplyMovement(tx *gorm.DB, input ApplyStockMovementInput) (*St
 	if available < 0 {
 		return nil, apperrors.BadRequest("available stock cannot go below zero", nil)
 	}
-	unitCostSnapshot, totalCost, averageUnitCost, inventoryValue := calculateValuation(direction, before, beforeValue, beforeAverageCost, input.Quantity, input.UnitCost)
+	effectiveUnitCost := input.UnitCost
+	if direction == "out" && effectiveUnitCost <= 0 && item.AverageUnitCost <= 0 &&
+		(item.ItemType == "product" || item.ItemType == "product_variant") && item.ProductID != nil {
+		// The item has no cost history (never received via purchase, production,
+		// or valued opening stock), so the movement would be recorded at zero
+		// cost and COGS would post nothing. Fall back to the master-data cost
+		// price. A lookup failure must not block the movement — selling is
+		// never gated on costing.
+		basis, basisErr := s.repo.FindProductCostBasis(tx, item.BusinessID, *item.ProductID, item.ProductVariantID)
+		if basisErr != nil {
+			log.Printf("inventory: cost-basis lookup failed for %s movement (business_id=%s inventory_item_id=%s): %v",
+				input.MovementType, item.BusinessID, item.ID, basisErr)
+		} else if resolved := outboundUnitCostBasis(input.UnitCost, item.AverageUnitCost, basis); resolved > 0 {
+			effectiveUnitCost = resolved
+			log.Printf("inventory: using product cost_price fallback for zero-cost %s movement (business_id=%s inventory_item_id=%s unit_cost=%.4f)",
+				input.MovementType, item.BusinessID, item.ID, resolved)
+		}
+	}
+	unitCostSnapshot, totalCost, averageUnitCost, inventoryValue := calculateValuation(direction, before, beforeValue, beforeAverageCost, input.Quantity, effectiveUnitCost)
 	if err := s.repo.UpdateInventoryItem(tx, item.ID, input.BusinessID, map[string]interface{}{
 		"current_quantity":   after,
 		"available_quantity": available,
@@ -1650,6 +1669,22 @@ func movementDirection(movementType string) (string, error) {
 	}
 }
 
+// outboundUnitCostBasis picks the unit cost for an outbound movement in
+// priority order: explicit input cost, then the item's weighted average, then
+// the product/variant master-data cost_price. Returns 0 when nothing applies.
+func outboundUnitCostBasis(inputUnitCost, averageUnitCost, productCostBasis float64) float64 {
+	if inputUnitCost > 0 {
+		return inputUnitCost
+	}
+	if averageUnitCost > 0 {
+		return averageUnitCost
+	}
+	if productCostBasis > 0 {
+		return productCostBasis
+	}
+	return 0
+}
+
 func calculateValuation(direction string, beforeQuantity, beforeValue, beforeAverageCost, quantity, inputUnitCost float64) (float64, float64, float64, float64) {
 	unitCost := inputUnitCost
 	if unitCost <= 0 {
@@ -1776,8 +1811,8 @@ func (s *Service) validateStockTransferRequest(currentUser *utils.AuthContext, r
 	if err != nil {
 		return mapNotFound(err, "inventory item not found")
 	}
-	if !currentUser.CanAccessBranch(item.BranchID) {
-		return apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(item.BranchID); err != nil {
+		return err
 	}
 	if strings.TrimSpace(req.UnitID) != "" && req.UnitID != item.UnitID {
 		return apperrors.BadRequest("unit_id must match inventory item unit", nil)

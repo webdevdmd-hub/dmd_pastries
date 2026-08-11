@@ -113,7 +113,10 @@ export function MovementDetailsDrawer({
                     label="From location"
                     value={locationName(movement.fromStockLocationName)}
                   />
-                  <DetailRow label="To location" value={locationName(movement.toStockLocationName)} />
+                  <DetailRow
+                    label="To location"
+                    value={locationName(movement.toStockLocationName)}
+                  />
                   <DetailRow label="Transfer number" value={movement.referenceNumber ?? "None"} />
                 </>
               ) : null}

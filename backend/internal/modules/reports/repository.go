@@ -684,21 +684,46 @@ func (r *Repository) DailySalesReport(filter *shared.ResolvedFilter) ([]DailySal
 		DiscountTotal float64
 		TaxTotal      float64
 	}{}
-	query := fmt.Sprintf(`
-		SELECT %s AS bucket,
-			COALESCE(SUM(s.subtotal_amount),0) AS gross_sales,
-			COALESCE(SUM(s.total_amount),0) AS net_sales,
-			COUNT(DISTINCT s.id) FILTER (WHERE %s) AS sales_count,
-			COALESCE(SUM(si.quantity),0) AS items_sold,
-			COALESCE(SUM(s.discount_amount),0) + COALESCE(SUM(si.discount_amount),0) AS discount_total,
-			COALESCE(SUM(s.tax_amount),0) AS tax_total
-		FROM sales s
-		LEFT JOIN sale_items si ON si.sale_id = s.id
-		LEFT JOIN products p ON p.id = si.product_id
-		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND %s AND s.deleted_at IS NULL`, dateTrunc(filter.GroupBy, "s.sold_at"), reportActiveSaleStatusCondition("s"), reportGrossSaleStatusCondition("s"))
+	// Header amounts are summed per bucket over sales counted once each; only
+	// quantity and line discount come from sale_items, aggregated separately
+	// and joined back on the bucket.
+	headerWhere := "s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND " +
+		reportGrossSaleStatusCondition("s") + " AND s.deleted_at IS NULL"
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	query, args = addSalesFilters(query, args, filter)
-	query += " GROUP BY bucket ORDER BY bucket ASC"
+	headerWhere, args = addHeaderSalesFilters(headerWhere, args, filter)
+	existsSQL, existsArgs := salesLineScopeExists("s", filter)
+	lineSQL, lineArgs := salesLineDirectFilter(filter)
+	args = append(append(args, existsArgs...), lineArgs...)
+
+	query := fmt.Sprintf(`
+		WITH scoped_sales AS (
+			SELECT s.id, %s AS bucket, s.subtotal_amount, s.total_amount,
+			       s.tax_amount, s.discount_amount, s.sale_status
+			FROM sales s
+			WHERE %s%s
+		),
+		line_totals AS (
+			SELECT ss.bucket,
+			       COALESCE(SUM(si.quantity),0)        AS items_sold,
+			       COALESCE(SUM(si.discount_amount),0) AS line_discount
+			FROM sale_items si
+			JOIN scoped_sales ss ON ss.id = si.sale_id
+			LEFT JOIN products p ON p.id = si.product_id
+			WHERE 1 = 1%s
+			GROUP BY ss.bucket
+		)
+		SELECT ss.bucket AS bucket,
+			COALESCE(SUM(ss.subtotal_amount),0) AS gross_sales,
+			COALESCE(SUM(ss.total_amount),0) AS net_sales,
+			COUNT(*) FILTER (WHERE %s) AS sales_count,
+			COALESCE(MAX(lt.items_sold),0) AS items_sold,
+			COALESCE(SUM(ss.discount_amount),0) + COALESCE(MAX(lt.line_discount),0) AS discount_total,
+			COALESCE(SUM(ss.tax_amount),0) AS tax_total
+		FROM scoped_sales ss
+		LEFT JOIN line_totals lt ON lt.bucket = ss.bucket`,
+		dateTrunc(filter.GroupBy, "s.sold_at"), headerWhere, existsSQL, lineSQL,
+		reportActiveSaleStatusCondition("ss"))
+	query += " GROUP BY ss.bucket ORDER BY ss.bucket ASC"
 	if err := r.db.Raw(query, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
@@ -810,7 +835,31 @@ func (r *Repository) SalesByCategory(filter *shared.ResolvedFilter) ([]CategoryS
 func (r *Repository) SalesByCashier(filter *shared.ResolvedFilter) ([]CashierSalesReportItem, error) {
 	items := []CashierSalesReportItem{}
 	refundsQuery, refundArgs := salesRefundAllocationsSQL(filter, filter.StartUTC, filter.EndUTC)
+	// Header amounts are summed per cashier over sales counted once each; only
+	// quantity comes from sale_items. Note this scope deliberately keeps every
+	// status, because void_count needs the voided sales too.
+	headerWhere := "s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.deleted_at IS NULL"
+	headerArgs := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
+	headerWhere, headerArgs = addHeaderSalesFilters(headerWhere, headerArgs, filter)
+	existsSQL, existsArgs := salesLineScopeExists("s", filter)
+	lineSQL, lineArgs := salesLineDirectFilter(filter)
+
 	query := `
+		WITH scoped_sales AS (
+			SELECT s.id, s.cashier_user_id, u.full_name AS cashier_name,
+			       s.subtotal_amount, s.total_amount, s.sale_status
+			FROM sales s
+			JOIN users u ON u.id = s.cashier_user_id
+			WHERE ` + headerWhere + existsSQL + `
+		),
+		line_totals AS (
+			SELECT ss.cashier_user_id, COALESCE(SUM(si.quantity),0) AS items_sold
+			FROM sale_items si
+			JOIN scoped_sales ss ON ss.id = si.sale_id
+			LEFT JOIN products p ON p.id = si.product_id
+			WHERE ` + reportGrossSaleStatusCondition("ss") + lineSQL + `
+			GROUP BY ss.cashier_user_id
+		)
 		SELECT cashier_user_id, cashier_name,
 			COALESCE(SUM(sales_count),0) AS sales_count,
 			COALESCE(SUM(items_sold),0) AS items_sold,
@@ -819,22 +868,19 @@ func (r *Repository) SalesByCashier(filter *shared.ResolvedFilter) ([]CashierSal
 			COALESCE(SUM(refund_count),0) AS refund_count,
 			COALESCE(SUM(void_count),0) AS void_count
 		FROM (
-			SELECT s.cashier_user_id, u.full_name AS cashier_name,
-				COUNT(DISTINCT s.id) FILTER (WHERE ` + reportActiveSaleStatusCondition("s") + `) AS sales_count,
-				COALESCE(SUM(si.quantity) FILTER (WHERE ` + reportGrossSaleStatusCondition("s") + `),0) AS items_sold,
-				COALESCE(SUM(s.subtotal_amount) FILTER (WHERE ` + reportGrossSaleStatusCondition("s") + `),0) AS gross_sales,
-				COALESCE(SUM(s.total_amount) FILTER (WHERE ` + reportGrossSaleStatusCondition("s") + `),0) AS net_sales,
+			SELECT ss.cashier_user_id, ss.cashier_name,
+				COUNT(*) FILTER (WHERE ` + reportActiveSaleStatusCondition("ss") + `) AS sales_count,
+				COALESCE(MAX(lt.items_sold),0) AS items_sold,
+				COALESCE(SUM(ss.subtotal_amount) FILTER (WHERE ` + reportGrossSaleStatusCondition("ss") + `),0) AS gross_sales,
+				COALESCE(SUM(ss.total_amount) FILTER (WHERE ` + reportGrossSaleStatusCondition("ss") + `),0) AS net_sales,
 				0 AS refund_count,
-				COUNT(DISTINCT s.id) FILTER (WHERE s.sale_status = 'voided') AS void_count
-			FROM sales s
-			JOIN users u ON u.id = s.cashier_user_id
-			LEFT JOIN sale_items si ON si.sale_id = s.id
-			LEFT JOIN products p ON p.id = si.product_id
-			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.deleted_at IS NULL`
-	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	query, args = addSalesFilters(query, args, filter)
+				COUNT(*) FILTER (WHERE ss.sale_status = 'voided') AS void_count
+			FROM scoped_sales ss
+			LEFT JOIN line_totals lt ON lt.cashier_user_id = ss.cashier_user_id`
+	// Placeholders are positional: header, then EXISTS, then line filters.
+	args := append(append(headerArgs, existsArgs...), lineArgs...)
 	query += `
-			GROUP BY s.cashier_user_id, u.full_name
+			GROUP BY ss.cashier_user_id, ss.cashier_name
 			UNION ALL
 			SELECT refunds.cashier_user_id, u.full_name AS cashier_name,
 				0 AS sales_count,
@@ -859,7 +905,33 @@ func (r *Repository) SalesByCashier(filter *shared.ResolvedFilter) ([]CashierSal
 func (r *Repository) SalesByBranch(filter *shared.ResolvedFilter) ([]BranchSalesReportItem, error) {
 	items := []BranchSalesReportItem{}
 	refundsQuery, refundArgs := salesRefundAllocationsSQL(filter, filter.StartUTC, filter.EndUTC)
+
+	// Header amounts are summed per branch over sales counted once each; only
+	// quantity comes from sale_items, aggregated separately and joined back on
+	// the branch.
+	headerWhere := "s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND " +
+		reportGrossSaleStatusCondition("s") + " AND s.deleted_at IS NULL"
+	headerArgs := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
+	headerWhere, headerArgs = addHeaderSalesFilters(headerWhere, headerArgs, filter)
+	existsSQL, existsArgs := salesLineScopeExists("s", filter)
+	lineSQL, lineArgs := salesLineDirectFilter(filter)
+
 	query := `
+		WITH scoped_sales AS (
+			SELECT s.id, s.branch_id, b.branch_name, s.subtotal_amount,
+			       s.total_amount, s.tax_amount, s.sale_status
+			FROM sales s
+			JOIN branches b ON b.id = s.branch_id
+			WHERE ` + headerWhere + existsSQL + `
+		),
+		line_totals AS (
+			SELECT ss.branch_id, COALESCE(SUM(si.quantity),0) AS items_sold
+			FROM sale_items si
+			JOIN scoped_sales ss ON ss.id = si.sale_id
+			LEFT JOIN products p ON p.id = si.product_id
+			WHERE 1 = 1` + lineSQL + `
+			GROUP BY ss.branch_id
+		)
 		SELECT branch_id, branch_name,
 			COALESCE(SUM(sales_count),0) AS sales_count,
 			COALESCE(SUM(items_sold),0) AS items_sold,
@@ -867,21 +939,18 @@ func (r *Repository) SalesByBranch(filter *shared.ResolvedFilter) ([]BranchSales
 			COALESCE(SUM(net_sales),0) AS net_sales,
 			COALESCE(SUM(tax_total),0) AS tax_total
 		FROM (
-			SELECT s.branch_id, b.branch_name,
-				COUNT(DISTINCT s.id) FILTER (WHERE ` + reportActiveSaleStatusCondition("s") + `) AS sales_count,
-				COALESCE(SUM(si.quantity),0) AS items_sold,
-				COALESCE(SUM(s.subtotal_amount),0) AS gross_sales,
-				COALESCE(SUM(s.total_amount),0) AS net_sales,
-				COALESCE(SUM(s.tax_amount),0) AS tax_total
-			FROM sales s
-			JOIN branches b ON b.id = s.branch_id
-			LEFT JOIN sale_items si ON si.sale_id = s.id
-			LEFT JOIN products p ON p.id = si.product_id
-			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND ` + reportGrossSaleStatusCondition("s") + ` AND s.deleted_at IS NULL`
-	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	query, args = addSalesFilters(query, args, filter)
+			SELECT ss.branch_id, ss.branch_name,
+				COUNT(*) FILTER (WHERE ` + reportActiveSaleStatusCondition("ss") + `) AS sales_count,
+				COALESCE(MAX(lt.items_sold),0) AS items_sold,
+				COALESCE(SUM(ss.subtotal_amount),0) AS gross_sales,
+				COALESCE(SUM(ss.total_amount),0) AS net_sales,
+				COALESCE(SUM(ss.tax_amount),0) AS tax_total
+			FROM scoped_sales ss
+			LEFT JOIN line_totals lt ON lt.branch_id = ss.branch_id`
+	// Placeholders are positional: header, then EXISTS, then line filters.
+	args := append(append(headerArgs, existsArgs...), lineArgs...)
 	query += `
-			GROUP BY s.branch_id, b.branch_name
+			GROUP BY ss.branch_id, ss.branch_name
 			UNION ALL
 			SELECT refunds.branch_id, b.branch_name,
 				0 AS sales_count,
@@ -909,17 +978,40 @@ func (r *Repository) DiscountReport(filter *shared.ResolvedFilter) (*DiscountRep
 		DiscountedSalesCount int64
 		GrossSales           float64
 	}
+	// Sale-level discount and gross sales are header amounts and must be summed
+	// once per sale; line-level discount comes from sale_items. The discounted
+	// count needs both, so the CTE carries a per-sale flag for line discounts
+	// rather than counting across a join.
+	headerWhere := "s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND " +
+		reportGrossSaleStatusCondition("s") + " AND s.deleted_at IS NULL"
+	headerArgs := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
+	headerWhere, headerArgs = addHeaderSalesFilters(headerWhere, headerArgs, filter)
+	existsSQL, existsArgs := salesLineScopeExists("s", filter)
+	lineSQL, lineArgs := salesLineDirectFilter(filter)
+
 	query := `
-		SELECT COALESCE(SUM(s.discount_amount),0) AS sale_level_discount,
-			COALESCE(SUM(si.discount_amount),0) AS line_level_discount,
-			COUNT(DISTINCT s.id) FILTER (WHERE s.discount_amount > 0 OR si.discount_amount > 0) AS discounted_sales_count,
-			COALESCE(SUM(s.subtotal_amount),0) AS gross_sales
-		FROM sales s
-		LEFT JOIN sale_items si ON si.sale_id = s.id
-		LEFT JOIN products p ON p.id = si.product_id
-		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND ` + reportGrossSaleStatusCondition("s") + ` AND s.deleted_at IS NULL`
-	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	query, args = addSalesFilters(query, args, filter)
+		WITH scoped_sales AS (
+			SELECT s.id, s.discount_amount, s.subtotal_amount
+			FROM sales s
+			WHERE ` + headerWhere + existsSQL + `
+		),
+		line_discounts AS (
+			SELECT ss.id AS sale_id,
+			       COALESCE(SUM(si.discount_amount),0) AS line_discount
+			FROM sale_items si
+			JOIN scoped_sales ss ON ss.id = si.sale_id
+			LEFT JOIN products p ON p.id = si.product_id
+			WHERE 1 = 1` + lineSQL + `
+			GROUP BY ss.id
+		)
+		SELECT COALESCE(SUM(ss.discount_amount),0) AS sale_level_discount,
+			COALESCE(SUM(ld.line_discount),0) AS line_level_discount,
+			COUNT(*) FILTER (WHERE ss.discount_amount > 0 OR COALESCE(ld.line_discount,0) > 0) AS discounted_sales_count,
+			COALESCE(SUM(ss.subtotal_amount),0) AS gross_sales
+		FROM scoped_sales ss
+		LEFT JOIN line_discounts ld ON ld.sale_id = ss.id`
+	// Placeholders are positional: header, then EXISTS, then line filters.
+	args := append(append(headerArgs, existsArgs...), lineArgs...)
 	if err := r.db.Raw(query, args...).Scan(&summary).Error; err != nil {
 		return nil, err
 	}
@@ -970,7 +1062,21 @@ func (r *Repository) TaxReport(filter *shared.ResolvedFilter) ([]TaxReportItem, 
 		FROM (
 			SELECT si.tax_rate_id, COALESCE(si.tax_rate_name_snapshot,'No Tax') AS tax_name,
 				COALESCE(si.tax_rate_percentage_snapshot,0) AS tax_percentage,
-				COALESCE(SUM(si.line_subtotal - si.discount_amount),0) AS taxable_amount,
+				-- Derive the taxable base from the tax actually charged rather
+				-- than from the line total. For a tax-inclusive rate the line
+				-- total already contains the tax, so subtracting only the
+				-- discount overstated the base by exactly the tax amount.
+				--
+				-- This is exact for both modes, because the tax was computed
+				-- from the true base either way:
+				--   exclusive: tax = base * pct/100
+				--   inclusive: tax = gross * pct/(100+pct), base = gross - tax
+				-- and in both cases base = tax * 100 / pct.
+				COALESCE(SUM(
+					CASE WHEN COALESCE(si.tax_rate_percentage_snapshot,0) > 0
+					     THEN si.tax_amount * 100.0 / si.tax_rate_percentage_snapshot
+					     ELSE si.line_subtotal - si.discount_amount END
+				),0) AS taxable_amount,
 				COALESCE(SUM(si.tax_amount),0) AS tax_collected,
 				COUNT(DISTINCT s.id) FILTER (WHERE ` + reportActiveSaleStatusCondition("s") + `) AS sales_count
 			FROM sale_items si
@@ -1144,16 +1250,20 @@ func slowMovingProductsSQL(filter *shared.ResolvedFilter) (string, []interface{}
 
 func (r *Repository) SalesTrend(filter *shared.ResolvedFilter) ([]trendSeriesRow, error) {
 	rows := []trendSeriesRow{}
+	// Only header columns are selected here, so the sale_items join contributed
+	// nothing but row multiplication. A product/category filter becomes an
+	// EXISTS instead.
 	query := fmt.Sprintf(`
 		SELECT %s AS bucket,
 			COALESCE(SUM(s.total_amount),0) AS net_sales,
 			COUNT(DISTINCT s.id) FILTER (WHERE %s)::numeric AS sales_count
 		FROM sales s
-		LEFT JOIN sale_items si ON si.sale_id = s.id
-		LEFT JOIN products p ON p.id = si.product_id
 		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND %s AND s.deleted_at IS NULL`, dateTrunc(filter.GroupBy, "s.sold_at"), reportActiveSaleStatusCondition("s"), reportGrossSaleStatusCondition("s"))
 	args := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
-	query, args = addSalesFilters(query, args, filter)
+	query, args = addHeaderSalesFilters(query, args, filter)
+	existsSQL, existsArgs := salesLineScopeExists("s", filter)
+	query += existsSQL
+	args = append(args, existsArgs...)
 	query += " GROUP BY bucket ORDER BY bucket ASC"
 	if err := r.db.Raw(query, args...).Scan(&rows).Error; err != nil {
 		return nil, err
@@ -2321,19 +2431,45 @@ func (r *Repository) salesSummary(filter *shared.ResolvedFilter) (*SalesSummary,
 
 func (r *Repository) salesReportSummaryForRange(filter *shared.ResolvedFilter, startUTC, endUTC time.Time) (*SalesReportSummaryResponse, error) {
 	var row salesSummarySQLRow
+
+	// Header amounts are summed over sales counted once each; only quantity and
+	// line-level discount come from sale_items. Joining the two in one query
+	// multiplied every header amount by the sale's line count.
+	headerWhere := `s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND ` +
+		reportGrossSaleStatusCondition("s") + ` AND s.deleted_at IS NULL`
+	headerArgs := []interface{}{filter.BusinessID, startUTC, endUTC}
+	headerWhere, headerArgs = addHeaderSalesFilters(headerWhere, headerArgs, filter)
+
+	existsSQL, existsArgs := salesLineScopeExists("s", filter)
+	lineSQL, lineArgs := salesLineDirectFilter(filter)
+
 	query := `
-		SELECT COALESCE(SUM(s.subtotal_amount),0) AS gross_sales,
-			COALESCE(SUM(s.total_amount),0) AS net_sales,
-			COUNT(DISTINCT s.id) FILTER (WHERE ` + reportActiveSaleStatusCondition("s") + `) AS sales_count,
-			COALESCE(SUM(si.quantity),0) AS items_sold,
-			COALESCE(SUM(s.discount_amount),0) + COALESCE(SUM(si.discount_amount),0) AS discount_total,
-			COALESCE(SUM(s.tax_amount),0) AS tax_total
-		FROM sales s
-		LEFT JOIN sale_items si ON si.sale_id = s.id
-		LEFT JOIN products p ON p.id = si.product_id
-		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND ` + reportGrossSaleStatusCondition("s") + ` AND s.deleted_at IS NULL`
-	args := []interface{}{filter.BusinessID, startUTC, endUTC}
-	query, args = addSalesFilters(query, args, filter)
+		WITH scoped_sales AS (
+			SELECT s.id, s.subtotal_amount, s.total_amount, s.tax_amount,
+			       s.discount_amount, s.sale_status
+			FROM sales s
+			WHERE ` + headerWhere + existsSQL + `
+		),
+		line_totals AS (
+			SELECT COALESCE(SUM(si.quantity),0)        AS items_sold,
+			       COALESCE(SUM(si.discount_amount),0) AS line_discount
+			FROM sale_items si
+			JOIN scoped_sales ss ON ss.id = si.sale_id
+			LEFT JOIN products p ON p.id = si.product_id
+			WHERE 1 = 1` + lineSQL + `
+		)
+		SELECT COALESCE((SELECT SUM(subtotal_amount) FROM scoped_sales),0) AS gross_sales,
+		       COALESCE((SELECT SUM(total_amount)    FROM scoped_sales),0) AS net_sales,
+		       COALESCE((SELECT COUNT(*) FROM scoped_sales ss
+		                  WHERE ` + reportActiveSaleStatusCondition("ss") + `),0) AS sales_count,
+		       COALESCE((SELECT items_sold FROM line_totals),0)            AS items_sold,
+		       COALESCE((SELECT SUM(discount_amount) FROM scoped_sales),0)
+		         + COALESCE((SELECT line_discount FROM line_totals),0)     AS discount_total,
+		       COALESCE((SELECT SUM(tax_amount)      FROM scoped_sales),0) AS tax_total`
+
+	// Placeholders are positional and the query is assembled from three
+	// fragments, so the arguments must follow the same textual order.
+	args := append(append(headerArgs, existsArgs...), lineArgs...)
 	if err := r.db.Raw(query, args...).Scan(&row).Error; err != nil {
 		return nil, err
 	}
@@ -2510,28 +2646,6 @@ func addBranchCondition(query string, args []interface{}, filter *shared.Resolve
 	return query, args
 }
 
-func (r *Repository) ledgerFinancialTotals(filter *shared.ResolvedFilter, startUTC, endUTC time.Time) (*ledgerFinancialTotals, error) {
-	totals, err := shared.LedgerFinancialTotals(r.db, shared.MetricScopeFromFilter(filter), startUTC, endUTC)
-	if err != nil {
-		return nil, err
-	}
-	return &ledgerFinancialTotals{
-		Revenue:             totals.Revenue,
-		GrossRevenue:        totals.GrossRevenue,
-		Refunded:            totals.Refunded,
-		Tax:                 totals.Tax,
-		Collected:           totals.Collected,
-		CashCollected:       totals.CashCollected,
-		CardCollected:       totals.CardCollected,
-		BankCollected:       totals.BankCollected,
-		OutstandingCustomer: totals.OutstandingCustomer,
-		SupplierPayable:     totals.SupplierPayable,
-		PurchaseTotal:       totals.PurchaseTotal,
-		PaymentCount:        totals.PaymentCount,
-		RefundCount:         totals.RefundCount,
-	}, nil
-}
-
 func (r *Repository) consistencyWarnings(filter *shared.ResolvedFilter, startUTC, endUTC time.Time) ([]ReportConsistencyWarning, error) {
 	rows, err := shared.JournalConsistencyWarnings(r.db, shared.MetricScopeFromFilter(filter), startUTC, endUTC)
 	if err != nil {
@@ -2547,175 +2661,6 @@ func (r *Repository) consistencyWarnings(filter *shared.ResolvedFilter, startUTC
 		})
 	}
 	return warnings, nil
-}
-
-func (r *Repository) ledgerIncomeAmount(businessID, branchID string, allBranches bool, dateFrom, dateTo string, sourceTypes []string, positiveCreditsOnly bool) (float64, error) {
-	branchClause, args := ledgerBranchClause(branchID, allBranches)
-	args = append([]interface{}{businessID, dateFrom, dateTo, sourceTypes}, args...)
-	expression := "jel.credit_amount - jel.debit_amount"
-	if positiveCreditsOnly {
-		expression = "jel.credit_amount"
-	}
-	var total float64
-	err := r.db.Raw(`
-		SELECT COALESCE(SUM(`+expression+`), 0)
-		FROM journal_entry_lines jel
-		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
-		JOIN chart_of_accounts coa ON coa.id = jel.account_id AND coa.business_id = jel.business_id
-		WHERE jel.business_id = ?
-		  AND jel.deleted_at IS NULL
-		  AND je.deleted_at IS NULL
-		  AND je.status IN ('posted', 'reversed')
-		  AND je.entry_date >= ?
-		  AND je.entry_date <= ?
-		  AND je.source_type IN ?
-		  AND coa.account_type = 'income'
-		  `+branchClause, args...).Scan(&total).Error
-	return roundMoney(total), err
-}
-
-func (r *Repository) ledgerTaxAmount(businessID, branchID string, allBranches bool, dateFrom, dateTo string, sourceTypes []string) (float64, error) {
-	branchClause, args := ledgerBranchClause(branchID, allBranches)
-	args = append([]interface{}{businessID, dateFrom, dateTo, sourceTypes, businessID}, args...)
-	var total float64
-	err := r.db.Raw(`
-		SELECT COALESCE(SUM(jel.credit_amount - jel.debit_amount), 0)
-		FROM journal_entry_lines jel
-		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
-		WHERE jel.business_id = ?
-		  AND jel.deleted_at IS NULL
-		  AND je.deleted_at IS NULL
-		  AND je.status IN ('posted', 'reversed')
-		  AND je.entry_date >= ?
-		  AND je.entry_date <= ?
-		  AND je.source_type IN ?
-		  AND jel.account_id = (
-		    SELECT COALESCE(aam.chart_account_id, coa.id)
-		    FROM chart_of_accounts coa
-		    LEFT JOIN accounting_account_mappings aam ON aam.business_id = coa.business_id AND aam.mapping_key = 'vat_payable' AND aam.deleted_at IS NULL
-		    WHERE coa.business_id = ? AND coa.account_code = '2100' AND coa.deleted_at IS NULL
-		    ORDER BY CASE WHEN aam.chart_account_id IS NOT NULL THEN 0 ELSE 1 END
-		    LIMIT 1
-		  )
-		  `+branchClause, args...).Scan(&total).Error
-	return roundMoney(total), err
-}
-
-func (r *Repository) ledgerPaymentAccountDebits(businessID, branchID string, allBranches bool, dateFrom, dateTo string, sourceTypes []string) (float64, float64, float64, float64, int64, error) {
-	branchClause, args := ledgerBranchClause(branchID, allBranches)
-	args = append([]interface{}{businessID, dateFrom, dateTo, sourceTypes}, args...)
-	var row struct {
-		Total        float64
-		Cash         float64
-		Card         float64
-		Bank         float64
-		PaymentCount int64
-	}
-	err := r.db.Raw(`
-		SELECT COALESCE(SUM(jel.debit_amount), 0) AS total,
-		       COALESCE(SUM(jel.debit_amount) FILTER (WHERE pa.account_type = 'cash'), 0) AS cash,
-		       COALESCE(SUM(jel.debit_amount) FILTER (WHERE pa.account_type = 'card_clearing'), 0) AS card,
-		       COALESCE(SUM(jel.debit_amount) FILTER (WHERE pa.account_type IN ('bank', 'wallet', 'platform_clearing')), 0) AS bank,
-		       COUNT(DISTINCT je.id) AS payment_count
-		FROM journal_entry_lines jel
-		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
-		JOIN payment_accounts pa ON pa.chart_account_id = jel.account_id AND pa.business_id = jel.business_id AND pa.deleted_at IS NULL
-		WHERE jel.business_id = ?
-		  AND jel.deleted_at IS NULL
-		  AND je.deleted_at IS NULL
-		  AND je.status IN ('posted', 'reversed')
-		  AND je.entry_date >= ?
-		  AND je.entry_date <= ?
-		  AND je.source_type IN ?
-		  AND jel.debit_amount > 0
-		  `+branchClause, args...).Scan(&row).Error
-	return roundMoney(row.Total), roundMoney(row.Cash), roundMoney(row.Card), roundMoney(row.Bank), row.PaymentCount, err
-}
-
-func (r *Repository) ledgerPaymentAccountCredits(businessID, branchID string, allBranches bool, dateFrom, dateTo string, sourceTypes []string) (float64, int64, error) {
-	branchClause, args := ledgerBranchClause(branchID, allBranches)
-	args = append([]interface{}{businessID, dateFrom, dateTo, sourceTypes}, args...)
-	var row struct {
-		Total       float64
-		RefundCount int64
-	}
-	err := r.db.Raw(`
-		SELECT COALESCE(SUM(jel.credit_amount), 0) AS total,
-		       COUNT(DISTINCT je.id) AS refund_count
-		FROM journal_entry_lines jel
-		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
-		JOIN payment_accounts pa ON pa.chart_account_id = jel.account_id AND pa.business_id = jel.business_id AND pa.deleted_at IS NULL
-		WHERE jel.business_id = ?
-		  AND jel.deleted_at IS NULL
-		  AND je.deleted_at IS NULL
-		  AND je.status IN ('posted', 'reversed')
-		  AND je.entry_date >= ?
-		  AND je.entry_date <= ?
-		  AND je.source_type IN ?
-		  AND jel.credit_amount > 0
-		  `+branchClause, args...).Scan(&row).Error
-	return roundMoney(row.Total), row.RefundCount, err
-}
-
-func (r *Repository) ledgerMappedBalance(businessID, branchID string, allBranches bool, mappingKey, fallbackCode, asOfDate string) (float64, error) {
-	branchClause, args := ledgerBranchClause(branchID, allBranches)
-	args = append([]interface{}{mappingKey, businessID, fallbackCode, businessID, asOfDate}, args...)
-	var total float64
-	err := r.db.Raw(`
-		WITH target_account AS (
-			SELECT COALESCE(aam.chart_account_id, coa.id) AS account_id, coa.normal_balance
-			FROM chart_of_accounts coa
-			LEFT JOIN accounting_account_mappings aam ON aam.business_id = coa.business_id AND aam.mapping_key = ? AND aam.deleted_at IS NULL
-			WHERE coa.business_id = ? AND coa.account_code = ? AND coa.deleted_at IS NULL
-			ORDER BY CASE WHEN aam.chart_account_id IS NOT NULL THEN 0 ELSE 1 END
-			LIMIT 1
-		)
-		SELECT COALESCE(SUM(CASE WHEN ta.normal_balance = 'credit' THEN jel.credit_amount - jel.debit_amount ELSE jel.debit_amount - jel.credit_amount END), 0)
-		FROM target_account ta
-		JOIN journal_entry_lines jel ON jel.account_id = ta.account_id
-		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
-		WHERE jel.business_id = ?
-		  AND jel.deleted_at IS NULL
-		  AND je.deleted_at IS NULL
-		  AND je.status IN ('posted', 'reversed')
-		  AND je.entry_date <= ?
-		  `+branchClause, args...).Scan(&total).Error
-	return roundMoney(total), err
-}
-
-func (r *Repository) ledgerMappedMovement(businessID, branchID string, allBranches bool, mappingKey, fallbackCode, dateFrom, dateTo string, sourceTypes []string) (float64, error) {
-	branchClause, args := ledgerBranchClause(branchID, allBranches)
-	args = append([]interface{}{mappingKey, businessID, fallbackCode, businessID, dateFrom, dateTo, sourceTypes}, args...)
-	var total float64
-	err := r.db.Raw(`
-		WITH target_account AS (
-			SELECT COALESCE(aam.chart_account_id, coa.id) AS account_id, coa.normal_balance
-			FROM chart_of_accounts coa
-			LEFT JOIN accounting_account_mappings aam ON aam.business_id = coa.business_id AND aam.mapping_key = ? AND aam.deleted_at IS NULL
-			WHERE coa.business_id = ? AND coa.account_code = ? AND coa.deleted_at IS NULL
-			ORDER BY CASE WHEN aam.chart_account_id IS NOT NULL THEN 0 ELSE 1 END
-			LIMIT 1
-		)
-		SELECT COALESCE(SUM(CASE WHEN ta.normal_balance = 'credit' THEN jel.credit_amount - jel.debit_amount ELSE jel.debit_amount - jel.credit_amount END), 0)
-		FROM target_account ta
-		JOIN journal_entry_lines jel ON jel.account_id = ta.account_id
-		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
-		WHERE jel.business_id = ?
-		  AND jel.deleted_at IS NULL
-		  AND je.deleted_at IS NULL
-		  AND je.status IN ('posted', 'reversed')
-		  AND je.entry_date >= ?
-		  AND je.entry_date <= ?
-		  AND je.source_type IN ?
-		  `+branchClause, args...).Scan(&total).Error
-	return roundMoney(total), err
-}
-
-func ledgerBranchClause(branchID string, allBranches bool) (string, []interface{}) {
-	if allBranches {
-		return "", []interface{}{}
-	}
-	return " AND je.branch_id = ?", []interface{}{branchID}
 }
 
 func inventoryItemSelect() string {
@@ -3177,10 +3122,16 @@ func financialSupplierPayableSummarySQL(filter *shared.ResolvedFilter) (string, 
 	if filter.SourceType != "" && filter.SourceType != "purchase_invoice" {
 		return "SELECT 0::numeric", []interface{}{}
 	}
+	// Only posted bills are liabilities. This used to admit drafts via
+	// status <> 'cancelled' while the accounting reconciliation counted only
+	// posted ones, which guaranteed a payable variance whenever drafts existed.
 	query := `
 		SELECT COALESCE(SUM(pi.balance_amount),0)
 		FROM purchase_invoices pi
-		WHERE pi.business_id = ? AND pi.invoice_date >= ? AND pi.invoice_date <= ? AND pi.status <> 'cancelled' AND pi.payment_status IN ('unpaid','partial','overdue') AND pi.deleted_at IS NULL`
+		WHERE pi.business_id = ? AND pi.invoice_date >= ? AND pi.invoice_date <= ?
+		  AND ` + shared.PurchaseInvoiceLedgerCondition("pi") + `
+		  AND ` + shared.PurchaseInvoiceOutstandingCondition("pi") + `
+		  AND pi.deleted_at IS NULL`
 	args := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
 	if !filter.AllBranches {
 		query += " AND pi.branch_id = ?"
@@ -3196,7 +3147,9 @@ func financialPurchaseTotalSummarySQL(filter *shared.ResolvedFilter) (string, []
 	query := `
 		SELECT COALESCE(SUM(total_amount),0)
 		FROM purchase_invoices
-		WHERE business_id = ? AND invoice_date >= ? AND invoice_date <= ? AND status = 'posted' AND deleted_at IS NULL`
+		WHERE business_id = ? AND invoice_date >= ? AND invoice_date <= ?
+		  AND ` + shared.PurchaseInvoiceLedgerCondition("") + `
+		  AND deleted_at IS NULL`
 	args := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
 	if !filter.AllBranches {
 		query += " AND branch_id = ?"
@@ -3499,6 +3452,51 @@ func addSalesFilters(query string, args []interface{}, filter *shared.ResolvedFi
 	return query, args
 }
 
+// salesLineScopeExists restricts sale HEADER rows to sales containing at least
+// one matching line, without joining.
+//
+// Product and category filters live on sale_items, so header aggregates used to
+// reach them through a join — which multiplied every header amount by the
+// number of lines on the sale. An EXISTS applies the same restriction while
+// each sale is still counted once.
+//
+// Returns an empty fragment when no line-level filter is active.
+func salesLineScopeExists(alias string, filter *shared.ResolvedFilter) (string, []interface{}) {
+	if filter.ProductID == "" && filter.CategoryID == "" {
+		return "", nil
+	}
+	fragment := ` AND EXISTS (
+		SELECT 1 FROM sale_items si2
+		LEFT JOIN products p2 ON p2.id = si2.product_id
+		WHERE si2.sale_id = ` + alias + `.id`
+	args := []interface{}{}
+	if filter.ProductID != "" {
+		fragment += " AND si2.product_id = ?"
+		args = append(args, filter.ProductID)
+	}
+	if filter.CategoryID != "" {
+		fragment += " AND p2.category_id = ?"
+		args = append(args, filter.CategoryID)
+	}
+	return fragment + ")", args
+}
+
+// salesLineDirectFilter applies the same product/category restriction when
+// aggregating line-level values, which are legitimately per line.
+func salesLineDirectFilter(filter *shared.ResolvedFilter) (string, []interface{}) {
+	fragment := ""
+	args := []interface{}{}
+	if filter.ProductID != "" {
+		fragment += " AND si.product_id = ?"
+		args = append(args, filter.ProductID)
+	}
+	if filter.CategoryID != "" {
+		fragment += " AND p.category_id = ?"
+		args = append(args, filter.CategoryID)
+	}
+	return fragment, args
+}
+
 func addHeaderSalesFilters(query string, args []interface{}, filter *shared.ResolvedFilter) (string, []interface{}) {
 	if !filter.AllBranches {
 		query += " AND s.branch_id = ?"
@@ -3601,8 +3599,13 @@ func salesRefundAllocationsSQL(filter *shared.ResolvedFilter, startUTC, endUTC t
 				WHEN COALESCE(NULLIF(s.total_amount, 0), NULLIF(sale_totals.sale_total, 0)) IS NULL THEN 0
 				ELSE pr.refund_amount * (si.tax_amount / COALESCE(NULLIF(s.total_amount, 0), NULLIF(sale_totals.sale_total, 0)))
 			END AS tax_refund,
+			-- Same derivation as TaxReport: for a tax-inclusive rate the line
+			-- total contains the tax, so the taxable base comes from the tax
+			-- charged, not from the line total.
 			CASE
 				WHEN COALESCE(NULLIF(s.total_amount, 0), NULLIF(sale_totals.sale_total, 0)) IS NULL THEN 0
+				WHEN COALESCE(si.tax_rate_percentage_snapshot, 0) > 0
+					THEN pr.refund_amount * ((si.tax_amount * 100.0 / si.tax_rate_percentage_snapshot) / COALESCE(NULLIF(s.total_amount, 0), NULLIF(sale_totals.sale_total, 0)))
 				ELSE pr.refund_amount * ((si.line_subtotal - si.discount_amount) / COALESCE(NULLIF(s.total_amount, 0), NULLIF(sale_totals.sale_total, 0)))
 			END AS taxable_refund
 		FROM payment_refunds pr

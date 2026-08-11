@@ -147,7 +147,7 @@ function groupTrialBalanceItems(items: readonly TrialBalanceItem[]): TrialBalanc
 }
 
 function AmountCell({ value }: { value: number }): JSX.Element {
-  return <td className="w-40 px-6 py-3 text-right tabular-nums text-[#2563eb]">{money(value)}</td>;
+  return <td className="w-40 px-6 py-3 text-right tabular-nums text-blue-600">{money(value)}</td>;
 }
 
 export function TrialBalancePageClient(): JSX.Element {
@@ -349,7 +349,7 @@ export function TrialBalancePageClient(): JSX.Element {
                                 className="border-b border-slate-100 transition-colors hover:bg-slate-50"
                                 key={item.accountId}
                               >
-                                <td className="px-14 py-3 font-medium text-[#2563eb]">
+                                <td className="px-14 py-3 font-medium text-blue-600">
                                   {item.accountName}
                                 </td>
                                 <AmountCell value={item.closingDebit} />

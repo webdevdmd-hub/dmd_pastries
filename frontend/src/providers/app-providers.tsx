@@ -4,6 +4,7 @@ import type { JSX, ReactNode } from "react";
 import { Toaster } from "sonner";
 
 import { AuthProvider } from "@/providers/auth-provider";
+import { ChunkReloadProvider } from "@/providers/chunk-reload-provider";
 import { QueryProvider } from "@/providers/query-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
 
@@ -16,6 +17,7 @@ export function AppProviders({ children }: AppProvidersProps): JSX.Element {
     <QueryProvider>
       <ThemeProvider>
         <AuthProvider>
+          <ChunkReloadProvider />
           {children}
           <Toaster richColors position="top-right" />
         </AuthProvider>

@@ -399,7 +399,7 @@ func (h *Handler) ReverseReturn(c *gin.Context) {
 }
 
 func (h *Handler) Summary(c *gin.Context) {
-	result, err := h.service.Summary(utils.MustAuthContext(c))
+	result, err := h.service.Summary(utils.MustAuthContext(c), c.Query("timezone"))
 	respond(c, "purchasing summary fetched successfully", result, err)
 }
 

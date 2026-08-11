@@ -100,8 +100,8 @@ func (s *Service) GetOrder(currentUser *utils.AuthContext, id string) (*Purchase
 	if err != nil {
 		return nil, notFound(err, "purchase order not found")
 	}
-	if !currentUser.CanAccessBranch(order.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+		return nil, err
 	}
 	dto := s.orderResponse(currentUser.BusinessID, *order, true)
 	return &dto, nil
@@ -113,8 +113,8 @@ func (s *Service) UpdateOrder(currentUser *utils.AuthContext, id string, req Upd
 		if err != nil {
 			return notFound(err, "purchase order not found")
 		}
-		if !currentUser.CanAccessBranch(existing.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(existing.BranchID); err != nil {
+			return err
 		}
 		if existing.Status == "partially_received" {
 			return s.updatePartiallyReceivedOrder(tx, currentUser, existing, req, ipAddress, userAgent)
@@ -309,8 +309,8 @@ func (s *Service) CreateOrderRevision(currentUser *utils.AuthContext, id string,
 		if err != nil {
 			return notFound(err, "purchase order not found")
 		}
-		if !currentUser.CanAccessBranch(existing.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(existing.BranchID); err != nil {
+			return err
 		}
 		if existing.Status == "cancelled" {
 			return apperrors.BadRequest("cancelled purchase orders cannot be revised", nil)
@@ -388,8 +388,8 @@ func (s *Service) GetOrderRevision(currentUser *utils.AuthContext, revisionID st
 	if err != nil {
 		return nil, notFound(err, "purchase order not found")
 	}
-	if !currentUser.CanAccessBranch(order.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+		return nil, err
 	}
 	var impact PurchaseOrderRevisionImpactResponse
 	_ = json.Unmarshal(revision.ImpactSummary, &impact)
@@ -574,8 +574,8 @@ func (s *Service) UpdateOrderStatus(currentUser *utils.AuthContext, id string, r
 		if err != nil {
 			return notFound(err, "purchase order not found")
 		}
-		if !currentUser.CanAccessBranch(order.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
 		}
 		if req.Status == "cancelled" && (order.Status == "partially_received" || order.Status == "received") {
 			return apperrors.BadRequest("received purchase orders cannot be cancelled", nil)
@@ -601,8 +601,8 @@ func (s *Service) ReopenOrder(currentUser *utils.AuthContext, id, ipAddress, use
 		if err != nil {
 			return notFound(err, "purchase order not found")
 		}
-		if !currentUser.CanAccessBranch(order.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
 		}
 		if order.Status != "cancelled" {
 			return apperrors.BadRequest("only cancelled purchase orders can be reopened", nil)
@@ -630,8 +630,8 @@ func (s *Service) DuplicateOrder(currentUser *utils.AuthContext, id, ipAddress, 
 	if err != nil {
 		return nil, notFound(err, "purchase order not found")
 	}
-	if !currentUser.CanAccessBranch(source.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(source.BranchID); err != nil {
+		return nil, err
 	}
 	sourceItems, err := s.repo.OrderItems(id, currentUser.BusinessID)
 	if err != nil {
@@ -691,8 +691,8 @@ func (s *Service) DeleteOrder(currentUser *utils.AuthContext, id, ipAddress, use
 		if err != nil {
 			return notFound(err, "purchase order not found")
 		}
-		if !currentUser.CanAccessBranch(order.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
 		}
 		historyCount, err := s.repo.FinalizedPurchaseOrderHistoryCount(tx, currentUser.BusinessID, order.ID)
 		if err != nil {
@@ -718,8 +718,8 @@ func (s *Service) ConvertOrderToInvoice(currentUser *utils.AuthContext, id strin
 		if err != nil {
 			return notFound(err, "purchase order not found")
 		}
-		if !currentUser.CanAccessBranch(order.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
 		}
 		if order.Status == "cancelled" || order.Status == "received" || order.Status == "partially_received" {
 			return apperrors.BadRequest("cancelled, received, or partially received purchase orders cannot be converted", nil)
@@ -856,8 +856,8 @@ func (s *Service) GetDocumentChain(currentUser *utils.AuthContext, purchaseOrder
 	if err != nil {
 		return nil, notFound(err, "purchase order not found")
 	}
-	if !currentUser.CanAccessBranch(order.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+		return nil, err
 	}
 	invoices, err := s.repo.InvoicesForOrder(currentUser.BusinessID, purchaseOrderID)
 	if err != nil {
@@ -967,8 +967,8 @@ func (s *Service) GetInvoice(currentUser *utils.AuthContext, id string) (*Purcha
 	if err != nil {
 		return nil, notFound(err, "purchase invoice not found")
 	}
-	if !currentUser.CanAccessBranch(invoice.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(invoice.BranchID); err != nil {
+		return nil, err
 	}
 	dto := s.invoiceResponse(currentUser.BusinessID, *invoice, true)
 	return &dto, nil
@@ -1003,8 +1003,8 @@ func (s *Service) ListInvoicePaymentsByInvoice(currentUser *utils.AuthContext, i
 	if err != nil {
 		return nil, notFound(err, "purchase invoice not found")
 	}
-	if !currentUser.CanAccessBranch(invoice.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(invoice.BranchID); err != nil {
+		return nil, err
 	}
 	payments, err := s.repo.ListInvoicePayments(currentUser.BusinessID, invoiceID)
 	if err != nil {
@@ -1063,8 +1063,8 @@ func (s *Service) GetSupplierPayment(currentUser *utils.AuthContext, id string) 
 	if err != nil {
 		return nil, notFound(err, "supplier payment not found")
 	}
-	if !currentUser.CanAccessBranch(payment.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(payment.BranchID); err != nil {
+		return nil, err
 	}
 	response, err := s.repo.SupplierPaymentResponse(currentUser.BusinessID, id)
 	if err != nil {
@@ -1098,8 +1098,8 @@ func (s *Service) AddInvoicePayment(currentUser *utils.AuthContext, invoiceID st
 	if err != nil {
 		return nil, notFound(err, "purchase invoice not found")
 	}
-	if !currentUser.CanAccessBranch(invoice.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(invoice.BranchID); err != nil {
+		return nil, err
 	}
 	if invoice.Status != "posted" {
 		return nil, apperrors.BadRequest("only posted purchase invoices can be paid", nil)
@@ -1315,8 +1315,8 @@ func (s *Service) UpdateSupplierPayment(currentUser *utils.AuthContext, id strin
 		if err != nil {
 			return notFound(err, "supplier payment not found")
 		}
-		if !currentUser.CanAccessBranch(existing.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(existing.BranchID); err != nil {
+			return err
 		}
 		if existing.Status != "completed" {
 			return apperrors.BadRequest("only completed supplier payments can be edited", nil)
@@ -1448,8 +1448,8 @@ func (s *Service) DeleteSupplierPayment(currentUser *utils.AuthContext, id strin
 		if err != nil {
 			return notFound(err, "supplier payment not found")
 		}
-		if !currentUser.CanAccessBranch(payment.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(payment.BranchID); err != nil {
+			return err
 		}
 		if payment.Status != "completed" {
 			return apperrors.BadRequest("only completed supplier payments can be deleted", nil)
@@ -1570,8 +1570,8 @@ func (s *Service) UpdateInvoice(currentUser *utils.AuthContext, id string, req U
 		if err != nil {
 			return notFound(err, "purchase invoice not found")
 		}
-		if !currentUser.CanAccessBranch(existing.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(existing.BranchID); err != nil {
+			return err
 		}
 		if existing.Status != "draft" && existing.Status != "posted" {
 			return apperrors.BadRequest("only draft or safe posted invoices can be edited", nil)
@@ -1683,8 +1683,8 @@ func (s *Service) PostInvoice(currentUser *utils.AuthContext, id, ipAddress, use
 		if err != nil {
 			return notFound(err, "purchase invoice not found")
 		}
-		if !currentUser.CanAccessBranch(invoice.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(invoice.BranchID); err != nil {
+			return err
 		}
 		if invoice.Status != "draft" {
 			return apperrors.BadRequest("only draft invoices can be posted", nil)
@@ -1711,8 +1711,8 @@ func (s *Service) CancelInvoice(currentUser *utils.AuthContext, id string, req C
 		if err != nil {
 			return notFound(err, "purchase invoice not found")
 		}
-		if !currentUser.CanAccessBranch(invoice.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(invoice.BranchID); err != nil {
+			return err
 		}
 		if invoice.Status == "cancelled" {
 			return apperrors.BadRequest("purchase invoice is already cancelled", map[string]interface{}{"reason": "purchase_invoice_already_cancelled"})
@@ -1879,8 +1879,8 @@ func (s *Service) ConvertInvoiceToReceipt(currentUser *utils.AuthContext, id str
 		if err != nil {
 			return notFound(err, "purchase invoice not found")
 		}
-		if !currentUser.CanAccessBranch(invoice.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(invoice.BranchID); err != nil {
+			return err
 		}
 		if invoice.Status != "posted" {
 			return apperrors.BadRequest("only posted purchase invoices can be converted to receipt", nil)
@@ -1949,8 +1949,8 @@ func (s *Service) ReceiveOrder(currentUser *utils.AuthContext, orderID string, r
 	if err != nil {
 		return nil, notFound(err, "purchase order not found")
 	}
-	if !currentUser.CanAccessBranch(order.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+		return nil, err
 	}
 	if strings.TrimSpace(req.BranchID) != "" && strings.TrimSpace(req.BranchID) != order.BranchID {
 		return nil, apperrors.BadRequest("purchase order branch does not match receipt branch", nil)
@@ -2076,8 +2076,8 @@ func (s *Service) GetReceipt(currentUser *utils.AuthContext, id string) (*Purcha
 	if err != nil {
 		return nil, notFound(err, "purchase receipt not found")
 	}
-	if !currentUser.CanAccessBranch(receipt.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(receipt.BranchID); err != nil {
+		return nil, err
 	}
 	accountingState, err := s.receiptAccountingState(currentUser.BusinessID, *receipt)
 	if err != nil {
@@ -2096,8 +2096,8 @@ func (s *Service) PostReceipt(currentUser *utils.AuthContext, id, ipAddress, use
 		if err != nil {
 			return notFound(err, "purchase receipt not found")
 		}
-		if !currentUser.CanAccessBranch(receipt.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(receipt.BranchID); err != nil {
+			return err
 		}
 		if receipt.Status != "draft" {
 			return apperrors.BadRequest("only draft receipts can be posted", nil)
@@ -2125,8 +2125,8 @@ func (s *Service) CancelReceipt(currentUser *utils.AuthContext, id, ipAddress, u
 		if err != nil {
 			return notFound(err, "purchase receipt not found")
 		}
-		if !currentUser.CanAccessBranch(receipt.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(receipt.BranchID); err != nil {
+			return err
 		}
 		if receipt.Status == "cancelled" {
 			return apperrors.BadRequest("receipt is already cancelled", nil)
@@ -2235,8 +2235,8 @@ func (s *Service) GetReturn(currentUser *utils.AuthContext, id string) (*Purchas
 	if err != nil {
 		return nil, notFound(err, "purchase return not found")
 	}
-	if !currentUser.CanAccessBranch(purchaseReturn.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(purchaseReturn.BranchID); err != nil {
+		return nil, err
 	}
 	dto := s.purchaseReturnResponse(currentUser.BusinessID, *purchaseReturn, true)
 	return &dto, nil
@@ -2251,8 +2251,8 @@ func (s *Service) UpdateReturn(currentUser *utils.AuthContext, id string, req Up
 		if err != nil {
 			return notFound(err, "purchase return not found")
 		}
-		if !currentUser.CanAccessBranch(existing.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(existing.BranchID); err != nil {
+			return err
 		}
 		if existing.Status != "draft" {
 			return apperrors.BadRequest("only draft purchase returns can be edited", nil)
@@ -2311,8 +2311,8 @@ func (s *Service) PostReturn(currentUser *utils.AuthContext, id, ipAddress, user
 		if err != nil {
 			return notFound(err, "purchase return not found")
 		}
-		if !currentUser.CanAccessBranch(purchaseReturn.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(purchaseReturn.BranchID); err != nil {
+			return err
 		}
 		if purchaseReturn.Status != "draft" {
 			return apperrors.BadRequest("only draft purchase returns can be posted", nil)
@@ -2433,8 +2433,8 @@ func (s *Service) CancelReturn(currentUser *utils.AuthContext, id, ipAddress, us
 		if err != nil {
 			return notFound(err, "purchase return not found")
 		}
-		if !currentUser.CanAccessBranch(purchaseReturn.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(purchaseReturn.BranchID); err != nil {
+			return err
 		}
 		if purchaseReturn.Status != "draft" {
 			return apperrors.BadRequest("only draft purchase returns can be cancelled", nil)
@@ -2468,8 +2468,8 @@ func (s *Service) ReverseReturn(currentUser *utils.AuthContext, id string, req R
 		if err != nil {
 			return notFound(err, "purchase return not found")
 		}
-		if !currentUser.CanAccessBranch(purchaseReturn.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(purchaseReturn.BranchID); err != nil {
+			return err
 		}
 		if purchaseReturn.Status != "posted" {
 			return apperrors.BadRequest("only posted vendor credits can be reversed", nil)
@@ -2590,8 +2590,8 @@ func (s *Service) ReceiptReturnableItems(currentUser *utils.AuthContext, receipt
 	if err != nil {
 		return nil, notFound(err, "purchase receipt not found")
 	}
-	if !currentUser.CanAccessBranch(receipt.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(receipt.BranchID); err != nil {
+		return nil, err
 	}
 	if receipt.Status != "posted" {
 		return nil, apperrors.BadRequest("only posted purchase receipts have returnable items", nil)
@@ -2636,8 +2636,8 @@ func (s *Service) ListReturnsByReceipt(currentUser *utils.AuthContext, receiptID
 	if err != nil {
 		return nil, notFound(err, "purchase receipt not found")
 	}
-	if !currentUser.CanAccessBranch(receipt.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(receipt.BranchID); err != nil {
+		return nil, err
 	}
 	rows, err := s.repo.PurchaseReturnsForReceipt(currentUser.BusinessID, receiptID)
 	if err != nil {
@@ -2650,15 +2650,22 @@ func (s *Service) ListReturnsByReceipt(currentUser *utils.AuthContext, receiptID
 	return result, nil
 }
 
-func (s *Service) Summary(currentUser *utils.AuthContext) (*PurchasingSummaryResponse, error) {
+// defaultBusinessTimezone matches the reports module's default, so "this month"
+// means the same window on the purchasing dashboard as it does in reports.
+const defaultBusinessTimezone = "Asia/Dubai"
+
+func (s *Service) Summary(currentUser *utils.AuthContext, timezone string) (*PurchasingSummaryResponse, error) {
 	branchID, allBranches, err := currentUser.ResolveBranchScope("", "")
 	if err != nil {
 		return nil, err
 	}
-	if allBranches {
-		return s.repo.Summary(currentUser.BusinessID, "")
+	if strings.TrimSpace(timezone) == "" {
+		timezone = defaultBusinessTimezone
 	}
-	return s.repo.Summary(currentUser.BusinessID, branchID)
+	if allBranches {
+		return s.repo.Summary(currentUser.BusinessID, "", timezone)
+	}
+	return s.repo.Summary(currentUser.BusinessID, branchID, timezone)
 }
 
 func (s *Service) SupplierHistory(currentUser *utils.AuthContext, supplierID string) (*SupplierHistoryResponse, error) {
@@ -3051,8 +3058,8 @@ func (s *Service) buildPurchaseReturn(tx *gorm.DB, currentUser *utils.AuthContex
 	if err != nil {
 		return nil, nil, nil, notFound(err, "purchase receipt not found")
 	}
-	if !currentUser.CanAccessBranch(receipt.BranchID) {
-		return nil, nil, nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(receipt.BranchID); err != nil {
+		return nil, nil, nil, err
 	}
 	if receipt.Status != "posted" {
 		return nil, nil, nil, apperrors.BadRequest("only posted purchase receipts can be returned", nil)

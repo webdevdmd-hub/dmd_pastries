@@ -297,9 +297,7 @@ export function PurchaseSupplierPaymentDialog({
 
           <DialogFooter>
             {form.formState.errors.root?.message ? (
-              <p className="mr-auto text-sm text-red-700">
-                {form.formState.errors.root.message}
-              </p>
+              <p className="mr-auto text-sm text-red-700">{form.formState.errors.root.message}</p>
             ) : null}
             <Button onClick={onClose} type="button" variant="outline">
               Cancel

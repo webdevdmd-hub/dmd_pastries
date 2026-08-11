@@ -25,6 +25,7 @@ import {
 import { PERMISSIONS } from "@/constants/permissions";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useBranches } from "@/hooks/use-branches";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useAdjustStock, useLowStock } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
@@ -52,7 +53,12 @@ export function LowStockPageClient(): JSX.Element {
     branchId: branchScope.defaultBranchId,
   });
   const [adjustmentItem, setAdjustmentItem] = useState<InventoryItem | null>(null);
-  const lowStockQuery = useLowStock(filters, canView && branchScope.hasBranchScope);
+  const debouncedSearch = useDebouncedValue(filters.search);
+  const lowStockQueryFilters = useMemo(
+    () => ({ ...filters, search: debouncedSearch }),
+    [debouncedSearch, filters],
+  );
+  const lowStockQuery = useLowStock(lowStockQueryFilters, canView && branchScope.hasBranchScope);
   const branchesQuery = useBranches(canView);
   const adjustmentMutation = useAdjustStock();
 

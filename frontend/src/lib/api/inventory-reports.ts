@@ -522,9 +522,7 @@ function parseInventoryAccountingReconciliationRow(
   };
 }
 
-function parseInventoryAccountingUnassignedLine(
-  value: unknown,
-): InventoryAccountingUnassignedLine {
+function parseInventoryAccountingUnassignedLine(value: unknown): InventoryAccountingUnassignedLine {
   const row = isObject(value) ? (value as BackendInventoryAccountingUnassignedLine) : {};
 
   return {

@@ -134,7 +134,7 @@ func JournalConsistencyWarnings(db *gorm.DB, scope MetricScope, startUTC, endUTC
 				FROM sales s
 				WHERE s.business_id = ?
 				  AND s.deleted_at IS NULL
-				  AND s.sale_status <> 'voided'
+				  AND ` + SaleRevenueCondition("s") + `
 				  AND s.sold_at >= ?
 				  AND s.sold_at < ?
 				  AND NOT EXISTS (
@@ -386,8 +386,10 @@ func LedgerIncomeAmount(db *gorm.DB, scope MetricScope, dateFrom, dateTo string,
 }
 
 func LedgerTaxAmount(db *gorm.DB, scope MetricScope, dateFrom, dateTo string, sourceTypes []string) (float64, error) {
-	branchClause, args := ledgerBranchClause(scope)
-	args = append([]interface{}{scope.BusinessID, dateFrom, dateTo, sourceTypes, scope.BusinessID}, args...)
+	branchClause, branchArgs := ledgerBranchClause(scope)
+	accountBranchClause, accountBranchArgs := ledgerAccountBranchClause(scope)
+	args := append([]interface{}{scope.BusinessID, dateFrom, dateTo, sourceTypes, scope.BusinessID}, accountBranchArgs...)
+	args = append(args, branchArgs...)
 	var total float64
 	err := db.Raw(`
 		SELECT COALESCE(SUM(jel.credit_amount - jel.debit_amount), 0)
@@ -403,8 +405,9 @@ func LedgerTaxAmount(db *gorm.DB, scope MetricScope, dateFrom, dateTo string, so
 		  AND jel.account_id = (
 		    SELECT COALESCE(aam.chart_account_id, coa.id)
 		    FROM chart_of_accounts coa
-		    LEFT JOIN accounting_account_mappings aam ON aam.business_id = coa.business_id AND aam.mapping_key = 'vat_payable' AND aam.deleted_at IS NULL
+		    LEFT JOIN accounting_account_mappings aam ON aam.business_id = coa.business_id AND aam.branch_id = coa.branch_id AND aam.mapping_key = 'vat_payable' AND aam.deleted_at IS NULL
 		    WHERE coa.business_id = ? AND coa.account_code = '2100' AND coa.deleted_at IS NULL
+		    `+accountBranchClause+`
 		    ORDER BY CASE WHEN aam.chart_account_id IS NOT NULL THEN 0 ELSE 1 END
 		    LIMIT 1
 		  )
@@ -469,15 +472,19 @@ func LedgerPaymentAccountCredits(db *gorm.DB, scope MetricScope, dateFrom, dateT
 }
 
 func LedgerMappedBalance(db *gorm.DB, scope MetricScope, mappingKey, fallbackCode, asOfDate string) (float64, error) {
-	branchClause, args := ledgerBranchClause(scope)
-	args = append([]interface{}{mappingKey, scope.BusinessID, fallbackCode, scope.BusinessID, asOfDate}, args...)
+	branchClause, branchArgs := ledgerBranchClause(scope)
+	accountBranchClause, accountBranchArgs := ledgerAccountBranchClause(scope)
+	args := append([]interface{}{mappingKey, scope.BusinessID, fallbackCode}, accountBranchArgs...)
+	args = append(args, scope.BusinessID, asOfDate)
+	args = append(args, branchArgs...)
 	var total float64
 	err := db.Raw(`
 		WITH target_account AS (
 			SELECT COALESCE(aam.chart_account_id, coa.id) AS account_id, coa.normal_balance
 			FROM chart_of_accounts coa
-			LEFT JOIN accounting_account_mappings aam ON aam.business_id = coa.business_id AND aam.mapping_key = ? AND aam.deleted_at IS NULL
+			LEFT JOIN accounting_account_mappings aam ON aam.business_id = coa.business_id AND aam.branch_id = coa.branch_id AND aam.mapping_key = ? AND aam.deleted_at IS NULL
 			WHERE coa.business_id = ? AND coa.account_code = ? AND coa.deleted_at IS NULL
+			`+accountBranchClause+`
 			ORDER BY CASE WHEN aam.chart_account_id IS NOT NULL THEN 0 ELSE 1 END
 			LIMIT 1
 		)
@@ -495,15 +502,19 @@ func LedgerMappedBalance(db *gorm.DB, scope MetricScope, mappingKey, fallbackCod
 }
 
 func LedgerMappedMovement(db *gorm.DB, scope MetricScope, mappingKey, fallbackCode, dateFrom, dateTo string, sourceTypes []string) (float64, error) {
-	branchClause, args := ledgerBranchClause(scope)
-	args = append([]interface{}{mappingKey, scope.BusinessID, fallbackCode, scope.BusinessID, dateFrom, dateTo, sourceTypes}, args...)
+	branchClause, branchArgs := ledgerBranchClause(scope)
+	accountBranchClause, accountBranchArgs := ledgerAccountBranchClause(scope)
+	args := append([]interface{}{mappingKey, scope.BusinessID, fallbackCode}, accountBranchArgs...)
+	args = append(args, scope.BusinessID, dateFrom, dateTo, sourceTypes)
+	args = append(args, branchArgs...)
 	var total float64
 	err := db.Raw(`
 		WITH target_account AS (
 			SELECT COALESCE(aam.chart_account_id, coa.id) AS account_id, coa.normal_balance
 			FROM chart_of_accounts coa
-			LEFT JOIN accounting_account_mappings aam ON aam.business_id = coa.business_id AND aam.mapping_key = ? AND aam.deleted_at IS NULL
+			LEFT JOIN accounting_account_mappings aam ON aam.business_id = coa.business_id AND aam.branch_id = coa.branch_id AND aam.mapping_key = ? AND aam.deleted_at IS NULL
 			WHERE coa.business_id = ? AND coa.account_code = ? AND coa.deleted_at IS NULL
+			`+accountBranchClause+`
 			ORDER BY CASE WHEN aam.chart_account_id IS NOT NULL THEN 0 ELSE 1 END
 			LIMIT 1
 		)
@@ -551,6 +562,16 @@ func ledgerBranchClause(scope MetricScope) (string, []interface{}) {
 		return "", []interface{}{}
 	}
 	return " AND je.branch_id = ?", []interface{}{scope.BranchID}
+}
+
+// ledgerAccountBranchClause scopes the single-account lookups that pick one
+// chart account with LIMIT 1. Account codes repeat once per branch, so without
+// this a branch metric reads another branch's account and reports zero.
+func ledgerAccountBranchClause(scope MetricScope) (string, []interface{}) {
+	if scope.AllBranches {
+		return "", []interface{}{}
+	}
+	return " AND coa.branch_id = ?", []interface{}{scope.BranchID}
 }
 
 func addConsistencyBranchFilter(query string, args []interface{}, scope MetricScope, branchColumn string) (string, []interface{}) {

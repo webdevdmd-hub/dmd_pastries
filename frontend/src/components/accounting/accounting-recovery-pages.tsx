@@ -56,8 +56,14 @@ import type {
   ChartAccount,
 } from "@/types/accounting";
 
+// Mirrors the backend's defaultBackfillTargets order: sale_movement_costs
+// re-prices zero-cost sale movements before pos_sales posts COGS from them,
+// and pos_sale_payments must follow pos_sales (checkout payments are stamped
+// by the sale's own journal).
 const backfillTargets: AccountingBackfillTarget[] = [
+  "sale_movement_costs",
   "pos_sales",
+  "pos_sale_payments",
   "bakery_order_payments",
   "payment_refunds",
   "bakery_orders",

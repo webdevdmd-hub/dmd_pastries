@@ -35,6 +35,7 @@ import {
 import { PERMISSIONS } from "@/constants/permissions";
 import { useAuth } from "@/hooks/use-auth";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePermission } from "@/hooks/use-permission";
 import { usePOSCart } from "@/hooks/use-pos-cart";
 import {
@@ -69,17 +70,6 @@ import type {
 import type { PaymentMethod, ReceiptLayout, SalesChannel } from "@/types/settings";
 
 const POS_SHOW_PRICES_STORAGE_KEY = "pos.showPrices";
-
-function useDebouncedValue(value: string, delay: number): string {
-  const [debounced, setDebounced] = useState(value);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => setDebounced(value), delay);
-    return () => window.clearTimeout(timeout);
-  }, [delay, value]);
-
-  return debounced;
-}
 
 function getCartReceiptItemName(item: CartItem): string {
   return item.variantName ? `${item.productName} - ${item.variantName}` : item.productName;
@@ -802,9 +792,9 @@ export function POSWorkspace(): JSX.Element {
   );
 
   return (
-    <div className="flex h-screen min-h-[42rem] w-full flex-col overflow-hidden bg-[#f9f9fa] font-sans text-[#09090b]">
+    <div className="flex h-screen min-h-[42rem] w-full flex-col overflow-hidden bg-[#f9f9fa] font-sans text-zinc-950">
       <POSTopBar branchName={branchName} cashierName={user?.fullName ?? "Cashier"} />
-      <main className="grid min-h-0 flex-1 border-y border-[#d4d4d8] lg:grid-cols-[144px_minmax(0,1fr)_480px] xl:grid-cols-[152px_minmax(0,1fr)_520px]">
+      <main className="grid min-h-0 flex-1 border-y border-zinc-300 lg:grid-cols-[144px_minmax(0,1fr)_480px] xl:grid-cols-[152px_minmax(0,1fr)_520px]">
         {!branchScope.hasBranchScope ? (
           <section className="col-span-full flex items-center justify-center">
             <div className="w-full max-w-2xl">
@@ -821,8 +811,8 @@ export function POSWorkspace(): JSX.Element {
               />
             </div>
 
-            <section className="scrollbar-hidden min-h-0 overflow-y-auto border-r border-[#d4d4d8] bg-[#f9f9fa]">
-              <div className="sticky top-0 z-10 grid gap-2 border-b border-[#d4d4d8] bg-white px-3 py-2.5 md:grid-cols-4">
+            <section className="scrollbar-hidden min-h-0 overflow-y-auto border-r border-zinc-300 bg-[#f9f9fa]">
+              <div className="sticky top-0 z-10 grid gap-2 border-b border-zinc-300 bg-white px-3 py-2.5 md:grid-cols-4">
                 <POSProductSearch onChange={setSearch} value={search} />
                 <POSBarcodeInput
                   inputRef={barcodeInputRef}
@@ -831,7 +821,7 @@ export function POSWorkspace(): JSX.Element {
                   }}
                 />
                 <Button
-                  className="h-10 w-full justify-center whitespace-nowrap rounded-md border-[#d4d4d8] bg-white px-2.5 text-xs font-black text-[#09090b] shadow-none hover:bg-[#f4f4f5]"
+                  className="h-10 w-full justify-center whitespace-nowrap rounded-md border-zinc-300 bg-white px-2.5 text-xs font-black text-zinc-950 shadow-none hover:bg-zinc-100"
                   disabled={!canCreateBakeryOrder}
                   onClick={() => setCreateOrderOpen(true)}
                   type="button"
@@ -840,7 +830,7 @@ export function POSWorkspace(): JSX.Element {
                   <CalendarPlus className="h-4 w-4" />
                   Create Order
                 </Button>
-                <label className="flex h-10 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-[#d4d4d8] bg-white px-2.5 text-xs font-black text-[#3f3f46]">
+                <label className="flex h-10 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-zinc-300 bg-white px-2.5 text-xs font-black text-zinc-700">
                   <Checkbox
                     checked={showPrices}
                     onCheckedChange={(checked) => setShowPrices(checked === true)}
@@ -848,9 +838,9 @@ export function POSWorkspace(): JSX.Element {
                   Show prices
                 </label>
               </div>
-              <div className="flex gap-2 overflow-x-auto border-b border-[#d4d4d8] bg-white px-3 py-2 lg:hidden">
+              <div className="flex gap-2 overflow-x-auto border-b border-zinc-300 bg-white px-3 py-2 lg:hidden">
                 <Button
-                  className="rounded-md border-[#d4d4d8]"
+                  className="rounded-md border-zinc-300"
                   onClick={() => setCategoryId("all")}
                   type="button"
                   variant={categoryId === "all" ? "default" : "outline"}
@@ -862,7 +852,7 @@ export function POSWorkspace(): JSX.Element {
 
                   return (
                     <Button
-                      className="rounded-md border-[#d4d4d8]"
+                      className="rounded-md border-zinc-300"
                       key={category.id}
                       onClick={() => setCategoryId(category.id)}
                       type="button"
@@ -900,7 +890,7 @@ export function POSWorkspace(): JSX.Element {
       </main>
 
       <Button
-        className="fixed bottom-4 right-4 z-20 h-14 rounded-md bg-black px-5 font-black text-white shadow-lg hover:bg-[#18181b] lg:hidden"
+        className="fixed bottom-4 right-4 z-20 h-14 rounded-md bg-black px-5 font-black text-white shadow-lg hover:bg-zinc-900 lg:hidden"
         onClick={() => setMobileCartOpen(true)}
         type="button"
       >
@@ -909,7 +899,7 @@ export function POSWorkspace(): JSX.Element {
       </Button>
 
       <Sheet onOpenChange={setMobileCartOpen} open={mobileCartOpen}>
-        <SheetContent className="w-full border-[#d4d4d8] bg-white p-0 sm:max-w-md" side="right">
+        <SheetContent className="w-full border-zinc-300 bg-white p-0 sm:max-w-md" side="right">
           <SheetHeader className="sr-only">
             <SheetTitle>POS cart</SheetTitle>
             <SheetDescription>Review active cart items and checkout controls.</SheetDescription>
@@ -922,13 +912,13 @@ export function POSWorkspace(): JSX.Element {
         onOpenChange={(open) => !open && setVariantProduct(null)}
         open={variantProduct !== null}
       >
-        <DialogContent className="max-w-[34rem] rounded-lg border-[#d4d4d8] bg-white p-0 text-[#09090b] shadow-lg">
-          <div className="border-b border-[#d4d4d8] bg-[#fafafa] px-5 py-4">
+        <DialogContent className="max-w-[34rem] rounded-lg border-zinc-300 bg-white p-0 text-zinc-950 shadow-lg">
+          <div className="border-b border-zinc-300 bg-zinc-50 px-5 py-4">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tight">
                 Choose a variant
               </DialogTitle>
-              <DialogDescription className="text-[#52525b]">
+              <DialogDescription className="text-zinc-600">
                 {variantProduct?.productName}
               </DialogDescription>
             </DialogHeader>
@@ -958,7 +948,7 @@ export function POSWorkspace(): JSX.Element {
 
                 return (
                   <Button
-                    className="h-auto items-center justify-between gap-4 rounded-lg border-[#d4d4d8] bg-white p-3 text-left shadow-none transition hover:border-[#71717a] hover:bg-[#fafafa] disabled:border-red-200 disabled:bg-red-50 disabled:text-red-800"
+                    className="h-auto items-center justify-between gap-4 rounded-lg border-zinc-300 bg-white p-3 text-left shadow-none transition hover:border-zinc-500 hover:bg-zinc-50 disabled:border-red-200 disabled:bg-red-50 disabled:text-red-800"
                     disabled={isOutOfStock}
                     key={variant.id}
                     onClick={() => {
@@ -968,7 +958,7 @@ export function POSWorkspace(): JSX.Element {
                     type="button"
                     variant="outline"
                   >
-                    <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[#d4d4d8] bg-[#f4f4f5] text-[#71717a]">
+                    <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-zinc-300 bg-zinc-100 text-zinc-500">
                       {variantImageUrl ? (
                         <img alt="" className="h-full w-full object-cover" src={variantImageUrl} />
                       ) : (
@@ -976,11 +966,11 @@ export function POSWorkspace(): JSX.Element {
                       )}
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
-                      <span className="line-clamp-1 text-base font-black text-[#09090b]">
+                      <span className="line-clamp-1 text-base font-black text-zinc-950">
                         {variant.variantName}
                       </span>
                       {metadata ? (
-                        <span className="line-clamp-1 text-xs font-medium text-[#71717a]">
+                        <span className="line-clamp-1 text-xs font-medium text-zinc-500">
                           {metadata}
                         </span>
                       ) : null}
@@ -988,7 +978,7 @@ export function POSWorkspace(): JSX.Element {
                         className={
                           isOutOfStock
                             ? "rounded-full bg-red-100 px-2 py-0.5 text-[0.68rem] font-black text-red-700"
-                            : "rounded-md bg-[#f4f4f5] px-2 py-0.5 text-[0.68rem] font-black text-[#52525b]"
+                            : "rounded-md bg-zinc-100 px-2 py-0.5 text-[0.68rem] font-black text-zinc-600"
                         }
                       >
                         {stockLabel}
@@ -996,7 +986,7 @@ export function POSWorkspace(): JSX.Element {
                     </span>
                     <span className="flex shrink-0 flex-col items-end gap-1">
                       {showPrices ? (
-                        <span className="font-mono text-base font-black text-[#09090b]">
+                        <span className="font-mono text-base font-black text-zinc-950">
                           AED {variant.salePrice.toFixed(2)}
                         </span>
                       ) : null}

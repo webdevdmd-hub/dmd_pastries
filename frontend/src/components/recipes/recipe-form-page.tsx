@@ -198,8 +198,9 @@ export function RecipeFormPage({
   const [draftPackaging, setDraftPackaging] = useState<RecipePackagingPayload[]>([]);
   const [ingredientPreviewDraft, setIngredientPreviewDraft] =
     useState<IngredientPreviewDraft | null>(null);
-  const [packagingPreviewDraft, setPackagingPreviewDraft] =
-    useState<PackagingPreviewDraft | null>(null);
+  const [packagingPreviewDraft, setPackagingPreviewDraft] = useState<PackagingPreviewDraft | null>(
+    null,
+  );
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [versionOpen, setVersionOpen] = useState(false);
   const recipeQuery = useRecipe(recipeId, recipeId !== null);

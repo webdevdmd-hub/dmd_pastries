@@ -41,10 +41,7 @@ export function ResponsiveChartFrame({
     const updateSize = (): void => {
       const nextSize = measureElement(frame);
       setSize((currentSize) => {
-        if (
-          currentSize?.height === nextSize?.height &&
-          currentSize?.width === nextSize?.width
-        ) {
+        if (currentSize?.height === nextSize?.height && currentSize?.width === nextSize?.width) {
           return currentSize;
         }
 
@@ -64,11 +61,11 @@ export function ResponsiveChartFrame({
 
   return (
     <div ref={frameRef} aria-label={ariaLabel} className={cn("w-full", className)} role="img">
-      {size ? (
-        children(size)
-      ) : (
-        (fallback ?? <div aria-hidden="true" className="h-full w-full rounded-3xl bg-brand-latte/40" />)
-      )}
+      {size
+        ? children(size)
+        : (fallback ?? (
+            <div aria-hidden="true" className="h-full w-full rounded-3xl bg-brand-latte/40" />
+          ))}
     </div>
   );
 }

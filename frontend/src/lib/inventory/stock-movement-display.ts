@@ -43,7 +43,8 @@ function referenceLabel(movement: StockMovementDisplaySource): string {
   if (displayReference) return displayReference;
 
   const referenceNumber = clean(movement.referenceNumber);
-  if (referenceNumber) return referenceNumber.startsWith("#") ? referenceNumber : `#${referenceNumber}`;
+  if (referenceNumber)
+    return referenceNumber.startsWith("#") ? referenceNumber : `#${referenceNumber}`;
 
   const referenceType = clean(movement.referenceType);
   return referenceType ? referenceType.replace(/_/g, " ") : "Manual";
@@ -109,7 +110,10 @@ export function stockMovementDescription(movement: StockMovementDisplaySource): 
     case "reversal":
       return `Reversal of stock movement ${reference}`;
     default:
-      return withReason(clean(movement.movementLabel) ?? movementTypeLabel(movement.movementType), movement.reason);
+      return withReason(
+        clean(movement.movementLabel) ?? movementTypeLabel(movement.movementType),
+        movement.reason,
+      );
   }
 }
 

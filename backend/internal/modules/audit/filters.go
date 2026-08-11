@@ -11,7 +11,10 @@ import (
 const defaultActivityLogTimezone = "Asia/Dubai"
 
 type ActivityLogFilter struct {
-	BusinessID   string
+	BusinessID string
+	// BranchID confines the feed to one branch. Empty means all branches and
+	// is only valid for callers holding all-branch access.
+	BranchID     string
 	EntityType   string
 	TargetUserID string
 	Cursor       string

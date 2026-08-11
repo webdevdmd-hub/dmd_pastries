@@ -31,6 +31,6 @@ export default function POSLayout({
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#f9f9fa] text-[#09090b]">{children}</div>
+    <div className="h-screen w-screen overflow-hidden bg-[#f9f9fa] text-zinc-950">{children}</div>
   );
 }

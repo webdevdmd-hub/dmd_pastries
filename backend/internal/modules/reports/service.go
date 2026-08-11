@@ -649,19 +649,21 @@ func (s *Service) writeAudit(currentUser *utils.AuthContext, eventType, entityTy
 			break
 		}
 		metadata = map[string]interface{}{
-			"branch_id":     filter.BranchID,
-			"all_branches":  filter.AllBranches,
-			"date_from":     filter.DateFrom.Format("2006-01-02"),
-			"date_to":       filter.DateTo.Format("2006-01-02"),
-			"timezone":      filter.Timezone,
-			"group_by":      filter.GroupBy,
-			"generated_at":  time.Now().UTC().Format(time.RFC3339),
-			"cache_enabled": s.cache != nil,
+			"branch_id":    filter.BranchID,
+			"all_branches": filter.AllBranches,
+			"date_from":    filter.DateFrom.Format("2006-01-02"),
+			"date_to":      filter.DateTo.Format("2006-01-02"),
+			"timezone":     filter.Timezone,
+			"group_by":     filter.GroupBy,
+			"generated_at": time.Now().UTC().Format(time.RFC3339),
+			// The cache is an unwired stub, so reports are always computed
+			// live. Reporting otherwise made audit records misleading.
+			"cache_enabled": false,
 		}
 	case map[string]interface{}:
 		metadata = value
 		metadata["generated_at"] = time.Now().UTC().Format(time.RFC3339)
-		metadata["cache_enabled"] = s.cache != nil
+		metadata["cache_enabled"] = false
 	}
 	return s.auditRepo.CreateActivity(s.db, audit.ActivityInput{
 		BusinessID:  currentUser.BusinessID,

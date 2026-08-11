@@ -1727,7 +1727,9 @@ export async function getSupplierPayments(
   return response.data;
 }
 
-export async function getPurchasingPaymentMethods(branchId: string | null): Promise<PaymentMethod[]> {
+export async function getPurchasingPaymentMethods(
+  branchId: string | null,
+): Promise<PaymentMethod[]> {
   const response = await apiRequest<PaymentMethod[]>(
     `/api/v1/purchasing/payment-methods${toQueryString({ branch_id: branchId })}`,
     {
@@ -2064,9 +2066,11 @@ export async function getProducts(): Promise<PurchasingProductOption[]> {
   const products = await getAllProductPages();
   const productsById = new Map<string, PurchasingProductOption>();
 
-  products.filter((product) => product.isPurchasable && product.status === "active").forEach((product) => {
-    productsById.set(product.id, product);
-  });
+  products
+    .filter((product) => product.isPurchasable && product.status === "active")
+    .forEach((product) => {
+      productsById.set(product.id, product);
+    });
 
   return Array.from(productsById.values()).sort((first, second) => {
     const nameComparison = first.productName.localeCompare(second.productName);

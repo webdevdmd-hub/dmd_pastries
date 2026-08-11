@@ -16,6 +16,8 @@ import { ROUTES } from "@/constants/routes";
 import { usePermission } from "@/hooks/use-permission";
 import { cn } from "@/lib/utils/cn";
 
+const NAV_OPEN_GROUPS_STORAGE_KEY = "pos.nav.open-groups";
+
 type AppNavigationListProps = {
   collapsed?: boolean;
   onNavigate?: () => void;
@@ -168,9 +170,54 @@ export function AppNavigationList({
     [pathname, visibleGroups],
   );
   const activeParentItemLabelsKey = activeParentItemLabels.join("|");
+  // Default to every group expanded so the full module set is discoverable on
+  // first load. Once hydrated, the user's persisted collapse choices take over.
   const [openGroups, setOpenGroups] = useState<Set<string>>(
-    () => new Set(["Core", ...activeGroupLabels, ...activeParentItemLabels]),
+    () =>
+      new Set([
+        ...visibleGroups.map((group) => group.label),
+        ...activeGroupLabels,
+        ...activeParentItemLabels,
+      ]),
   );
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  // Restore the user's saved expand/collapse state once on mount, always
+  // keeping the active route's group open so navigation never hides the
+  // current page. Runs mount-only; active labels are read from first render.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(NAV_OPEN_GROUPS_STORAGE_KEY);
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const restored = parsed.filter((value): value is string => typeof value === "string");
+          setOpenGroups(
+            () => new Set([...restored, ...activeGroupLabels, ...activeParentItemLabels]),
+          );
+        }
+      }
+    } catch {
+      // Ignore malformed or unavailable storage and keep the default state.
+    }
+
+    setHasHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist changes after hydration so we never overwrite saved state with the
+  // pre-hydration default.
+  useEffect(() => {
+    if (!hasHydrated) {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(NAV_OPEN_GROUPS_STORAGE_KEY, JSON.stringify([...openGroups]));
+    } catch {
+      // Ignore unavailable storage (e.g. privacy mode).
+    }
+  }, [hasHydrated, openGroups]);
 
   useEffect(() => {
     if (!activeGroupLabelsKey) {
@@ -214,7 +261,7 @@ export function AppNavigationList({
               className={cn(
                 "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[0.66rem] font-semibold uppercase tracking-[0.2em] transition-colors",
                 isPosTheme
-                  ? "text-[#71717a] hover:bg-[#e4e4e7] hover:text-[#09090b]"
+                  ? "text-zinc-500 hover:bg-zinc-200 hover:text-zinc-950"
                   : "text-workspace-sidebar-muted hover:bg-white/[0.06] hover:text-white",
                 collapsed ? "justify-center px-2" : "",
               )}
@@ -237,7 +284,7 @@ export function AppNavigationList({
                 <span
                   className={cn(
                     "h-1.5 w-1.5 rounded-full",
-                    isPosTheme ? "bg-[#71717a]" : "bg-workspace-sidebar-muted",
+                    isPosTheme ? "bg-zinc-500" : "bg-workspace-sidebar-muted",
                   )}
                 />
               ) : (
@@ -272,8 +319,8 @@ export function AppNavigationList({
                               "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                               isPosTheme
                                 ? isParentActive
-                                  ? "bg-[#09090b] text-white shadow-none"
-                                  : "text-[#3f3f46] hover:bg-[#e4e4e7] hover:text-[#09090b]"
+                                  ? "bg-zinc-950 text-white shadow-none"
+                                  : "text-zinc-700 hover:bg-zinc-200 hover:text-zinc-950"
                                 : isParentActive
                                   ? "bg-workspace-sidebar-active text-white shadow-sm"
                                   : "text-white/78 hover:bg-white/[0.07] hover:text-white",
@@ -315,7 +362,7 @@ export function AppNavigationList({
                           <div
                             className={cn(
                               "ml-4 grid gap-1 border-l pl-3",
-                              isPosTheme ? "border-[#d4d4d8]" : "border-white/10",
+                              isPosTheme ? "border-zinc-300" : "border-white/10",
                             )}
                           >
                             {item.children?.map((child) => {
@@ -328,8 +375,8 @@ export function AppNavigationList({
                                     "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                                     isPosTheme
                                       ? childIsActive
-                                        ? "bg-[#09090b] text-white shadow-none"
-                                        : "text-[#52525b] hover:bg-[#e4e4e7] hover:text-[#09090b]"
+                                        ? "bg-zinc-950 text-white shadow-none"
+                                        : "text-zinc-600 hover:bg-zinc-200 hover:text-zinc-950"
                                       : childIsActive
                                         ? "bg-white text-workspace-sidebar shadow-sm"
                                         : "text-white/65 hover:bg-white/[0.07] hover:text-white",
@@ -356,8 +403,8 @@ export function AppNavigationList({
                           "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                           isPosTheme
                             ? isActive
-                              ? "bg-[#09090b] text-white shadow-none"
-                              : "text-[#3f3f46] hover:bg-[#e4e4e7] hover:text-[#09090b]"
+                              ? "bg-zinc-950 text-white shadow-none"
+                              : "text-zinc-700 hover:bg-zinc-200 hover:text-zinc-950"
                             : isActive
                               ? "bg-workspace-sidebar-active text-white shadow-sm"
                               : "text-white/78 hover:bg-white/[0.07] hover:text-white",

@@ -26,11 +26,13 @@ const bakeryOrdersReportFiltersBaseSchema = z.object({
   paymentStatus: z.string().optional(),
 });
 
-export const bakeryOrdersReportFiltersSchema = bakeryOrdersReportFiltersBaseSchema
-  .refine((value) => new Date(value.dateFrom).getTime() <= new Date(value.dateTo).getTime(), {
+export const bakeryOrdersReportFiltersSchema = bakeryOrdersReportFiltersBaseSchema.refine(
+  (value) => new Date(value.dateFrom).getTime() <= new Date(value.dateTo).getTime(),
+  {
     message: "Date from must be before date to.",
     path: ["dateFrom"],
-  });
+  },
+);
 
 export const bakeryOrdersPendingPaymentsFiltersSchema = bakeryOrdersReportFiltersBaseSchema
   .extend({

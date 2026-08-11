@@ -17,12 +17,12 @@ export function POSCategorySidebar({
   selectedCategoryId,
 }: POSCategorySidebarProps): JSX.Element {
   return (
-    <aside className="scrollbar-hidden flex h-full flex-col items-stretch gap-2 overflow-y-auto border-r border-[#d4d4d8] bg-white px-2.5 py-3">
+    <aside className="scrollbar-hidden flex h-full flex-col items-stretch gap-2 overflow-y-auto border-r border-zinc-300 bg-white px-2.5 py-3">
       <Button
         className={
           selectedCategoryId === "all"
-            ? "h-14 justify-start gap-2 rounded-md border-black bg-black px-3 text-xs font-black text-white hover:bg-[#18181b]"
-            : "h-14 justify-start gap-2 rounded-md border-[#d4d4d8] bg-white px-3 text-xs font-black text-[#3f3f46] hover:bg-[#f4f4f5]"
+            ? "h-14 justify-start gap-2 rounded-md border-black bg-black px-3 text-xs font-black text-white hover:bg-zinc-900"
+            : "h-14 justify-start gap-2 rounded-md border-zinc-300 bg-white px-3 text-xs font-black text-zinc-700 hover:bg-zinc-100"
         }
         onClick={() => onSelect("all")}
         type="button"
@@ -38,8 +38,8 @@ export function POSCategorySidebar({
           <Button
             className={
               selectedCategoryId === category.id
-                ? "h-14 justify-start gap-2 rounded-md border-black bg-black px-3 text-white hover:bg-[#18181b]"
-                : "h-14 justify-start gap-2 rounded-md border-[#d4d4d8] bg-white px-3 text-[#3f3f46] hover:bg-[#f4f4f5]"
+                ? "h-14 justify-start gap-2 rounded-md border-black bg-black px-3 text-white hover:bg-zinc-900"
+                : "h-14 justify-start gap-2 rounded-md border-zinc-300 bg-white px-3 text-zinc-700 hover:bg-zinc-100"
             }
             key={category.id}
             onClick={() => onSelect(category.id)}

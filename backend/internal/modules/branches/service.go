@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
 	"pastries-pos/internal/modules/inventory"
 	apperrors "pastries-pos/internal/shared/errors"
@@ -123,9 +124,30 @@ func (s *Service) CreateBranch(currentUser *utils.AuthContext, req CreateBranchR
 		}
 	}
 
+	// Seed the branch's accounting configuration. Since migration 000092 the
+	// chart of accounts, account mappings and payment accounts are all
+	// branch-scoped, so a branch created without them cannot post a single
+	// journal: the first sale either fails or resolves accounts from whichever
+	// branch happens to match first.
+	//
+	// SeedDefaultAccountMappings seeds the chart of accounts itself, and both
+	// seeders are idempotent, so re-running is harmless.
+	if err := accounting.SeedDefaultAccountMappings(tx, currentUser.BusinessID, branch.ID); err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("failed to seed branch chart of accounts")
+	}
+	if _, err := accounting.SeedDefaultPaymentAccountsForBusiness(
+		tx, currentUser.BusinessID, currentUser.UserID,
+		func(branchID string) bool { return branchID == branch.ID },
+	); err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("failed to seed branch payment accounts")
+	}
+
 	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{
 		BusinessID:  currentUser.BusinessID,
 		ActorUserID: currentUser.UserID,
+		BranchID:    &branch.ID,
 		EventType:   "branch.created",
 		EntityType:  "branch",
 		EntityID:    branch.ID,

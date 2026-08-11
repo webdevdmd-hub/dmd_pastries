@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/table";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
   useCancelStockTransfer,
   useCompleteStockTransfer,
@@ -102,7 +103,15 @@ export function StockTransfersPageClient(): JSX.Element {
   const [filters, setFilters] = useState<StockTransferFilters>(() => defaultFilters());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [payload, setPayload] = useState<StockTransferPayload>(emptyPayload);
-  const transfersQuery = useStockTransfers(filters, canView && branchScope.hasBranchScope);
+  const debouncedSearch = useDebouncedValue(filters.search);
+  const transfersQueryFilters = useMemo(
+    () => ({ ...filters, search: debouncedSearch }),
+    [debouncedSearch, filters],
+  );
+  const transfersQuery = useStockTransfers(
+    transfersQueryFilters,
+    canView && branchScope.hasBranchScope,
+  );
   const locationsQuery = useStockLocations(canView && branchScope.hasBranchScope);
   const inventoryQuery = useInventory(
     {

@@ -593,6 +593,43 @@ type AccountingSetupReadinessResponse struct {
 	CheckedAt time.Time                `json:"checked_at"`
 }
 
+// BranchAccountingReadinessRow reports whether one branch can actually post.
+//
+// Accounting configuration became branch-scoped in migration 000092, but branch
+// creation did not seed it and account lookups ignored the branch. This report
+// is the detection side of both defects: it shows which branches are missing
+// configuration, and how much existing data already points across branches.
+type BranchAccountingReadinessRow struct {
+	BranchID   string `json:"branch_id"`
+	BranchName string `json:"branch_name"`
+
+	ChartAccountCount         int64    `json:"chart_account_count"`
+	ExpectedChartAccountCount int64    `json:"expected_chart_account_count"`
+	MissingAccountCodes       []string `json:"missing_account_codes"`
+
+	MappingCount         int64    `json:"mapping_count"`
+	ExpectedMappingCount int64    `json:"expected_mapping_count"`
+	MissingMappingKeys   []string `json:"missing_mapping_keys"`
+
+	PaymentAccountCount int64 `json:"payment_account_count"`
+
+	// Damage already present in the data. These are not fixed by deploying
+	// code; they need the documented backfill in
+	// docs/accounting-branch-backfill.md.
+	CrossBranchMappingCount        int64 `json:"cross_branch_mapping_count"`
+	CrossBranchPaymentAccountCount int64 `json:"cross_branch_payment_account_count"`
+	CrossBranchJournalLineCount    int64 `json:"cross_branch_journal_line_count"`
+
+	// ready | incomplete | corrupt
+	Status string `json:"status"`
+}
+
+type BranchAccountingReadinessResponse struct {
+	Ready     bool                           `json:"ready"`
+	Branches  []BranchAccountingReadinessRow `json:"branches"`
+	CheckedAt time.Time                      `json:"checked_at"`
+}
+
 type ReconciliationQuery struct {
 	BranchID string
 	AsOfDate string

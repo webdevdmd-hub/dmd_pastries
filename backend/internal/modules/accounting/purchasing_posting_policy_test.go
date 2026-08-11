@@ -41,7 +41,9 @@ func TestBackfillReadinessUsesSelectedTargets(t *testing.T) {
 
 	service := &Service{}
 	req := normalizeBackfillRequest(BackfillJournalsRequest{Targets: targets, DryRun: true})
-	if err := service.validateBackfillRequest(&utils.AuthContext{}, req); err != nil {
+	// Backfills are branch-scoped: an unscoped run would post journals across
+	// every branch of the business.
+	if _, err := service.validateBackfillRequest(backfillAuthContext(), req); err != nil {
 		t.Fatalf("selected readiness targets should pass dry-run validation: %v", err)
 	}
 }
@@ -64,7 +66,7 @@ func TestBackfillReadinessRejectsInvalidSelectedTarget(t *testing.T) {
 		Targets: []string{"purchase_receipts"},
 	})
 	req := normalizeBackfillRequest(BackfillJournalsRequest{Targets: targets, DryRun: true})
-	err := service.validateBackfillRequest(&utils.AuthContext{}, req)
+	_, err := service.validateBackfillRequest(backfillAuthContext(), req)
 	if err == nil {
 		t.Fatal("purchase_receipts should fail readiness validation")
 	}
@@ -338,4 +340,14 @@ func hasJournalEntryFilterCondition(conditions []journalEntryFilterCondition, cl
 		}
 	}
 	return false
+}
+
+// backfillAuthContext is a caller scoped to a single branch, which every
+// backfill now requires.
+func backfillAuthContext() *utils.AuthContext {
+	branchID := "11111111-1111-4111-8111-111111111111"
+	return &utils.AuthContext{
+		CurrentBranchID:  &branchID,
+		AllowedBranchIDs: []string{branchID},
+	}
 }

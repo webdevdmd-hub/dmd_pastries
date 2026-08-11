@@ -411,12 +411,17 @@ func (r *Repository) CreateReceiptLayout(tx *gorm.DB, layout *ReceiptLayout) err
 func (r *Repository) ListReceiptLayouts(businessID, branchID, receiptType, status string) ([]ReceiptLayout, error) {
 	var layouts []ReceiptLayout
 	query := r.db.Where("business_id = ? AND deleted_at IS NULL", businessID)
-	if branchID != "" {
-		if branchID == "global" {
-			query = query.Where("branch_id IS NULL")
-		} else {
-			query = query.Where("branch_id = ?", branchID)
-		}
+	switch branchID {
+	case "":
+		// No predicate: reserved for callers with all-branch access. Branch
+		// callers are given their own branch by the service, so an omitted
+		// branch no longer lists every branch's layouts.
+	case "global":
+		query = query.Where("branch_id IS NULL")
+	default:
+		// Global layouts apply to every branch, so they belong in a branch's
+		// list alongside its own.
+		query = query.Where("branch_id = ? OR branch_id IS NULL", branchID)
 	}
 	if receiptType != "" {
 		query = query.Where("receipt_type = ?", receiptType)

@@ -55,8 +55,8 @@ func (s *Service) Get(currentUser *utils.AuthContext, id string) (ExpenseRespons
 	if err != nil {
 		return ExpenseResponse{}, mapNotFound(err, "expense not found")
 	}
-	if !currentUser.CanAccessBranch(expense.BranchID) {
-		return ExpenseResponse{}, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(expense.BranchID); err != nil {
+		return ExpenseResponse{}, err
 	}
 	return s.repo.LoadResponse(currentUser.BusinessID, *expense)
 }
@@ -147,8 +147,8 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateEx
 		if err != nil {
 			return mapNotFound(err, "expense not found")
 		}
-		if !currentUser.CanAccessBranch(existing.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(existing.BranchID); err != nil {
+			return err
 		}
 		if existing.Status != "posted" {
 			return apperrors.BadRequest("only posted expenses can be updated", nil)
@@ -251,8 +251,8 @@ func (s *Service) Delete(currentUser *utils.AuthContext, id string, ipAddress, u
 		if err != nil {
 			return mapNotFound(err, "expense not found")
 		}
-		if !currentUser.CanAccessBranch(expense.BranchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(expense.BranchID); err != nil {
+			return err
 		}
 		journalIDs, err := s.repo.ListExpenseJournalEntryIDs(tx, currentUser.BusinessID, expense.ID)
 		if err != nil {
@@ -422,9 +422,9 @@ func (s *Service) validateExpenseInput(tx *gorm.DB, businessID, branchID, expens
 	if err := s.repo.ValidateBranch(tx, businessID, branchID); err != nil {
 		return mapNotFound(err, "branch not found")
 	}
-	expenseAccount, err := s.repo.ValidateAccount(tx, businessID, expenseAccountID)
+	expenseAccount, err := s.repo.ValidateAccount(tx, businessID, branchID, expenseAccountID)
 	if err != nil {
-		return mapNotFound(err, "expense account not found")
+		return mapNotFound(err, "expense account not found for this branch")
 	}
 	if expenseAccount.AccountType != "expense" && expenseAccount.AccountType != "cogs" {
 		return apperrors.BadRequest("expense_account_id must be an expense or cogs account", nil)
@@ -452,13 +452,28 @@ func (s *Service) validateExpenseInput(tx *gorm.DB, businessID, branchID, expens
 }
 
 func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext, expense Expense, sourceType string, reversedEntryID *string) (string, error) {
+	// This path builds its lines by hand rather than going through the shared
+	// builder, so the guards that builder applies are applied here instead.
+	branchID := strings.TrimSpace(expense.BranchID)
+	if branchID == "" {
+		return "", apperrors.Internal("expense journal requires a branch")
+	}
+	amount := roundExpenseMoney(expense.Amount)
+	if amount <= 0 {
+		return "", apperrors.BadRequest("expense amount must be greater than zero to post a journal", nil)
+	}
+	if existing, err := s.repo.FindPostedJournalBySource(tx, expense.BusinessID, sourceType, expense.ID); err == nil && existing.ID != "" {
+		return existing.ID, nil
+	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", err
+	}
+
 	entryNumber, err := s.repo.NextJournalEntryNumber(tx, expense.BusinessID, expense.ExpenseDate)
 	if err != nil {
 		return "", err
 	}
 	now := time.Now().UTC()
 	sourceID := expense.ID
-	branchID := expense.BranchID
 	entry := accounting.JournalEntry{
 		ID:              utils.NewUUID(),
 		BusinessID:      expense.BusinessID,
@@ -470,8 +485,8 @@ func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext
 		SourceID:        &sourceID,
 		Narration:       "Expense " + expense.ExpenseNumber,
 		Status:          "posted",
-		TotalDebit:      expense.Amount,
-		TotalCredit:     expense.Amount,
+		TotalDebit:      amount,
+		TotalCredit:     amount,
 		PostedAt:        &now,
 		PostedByUserID:  &currentUser.UserID,
 		ReversedEntryID: reversedEntryID,
@@ -483,10 +498,11 @@ func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext
 		{
 			ID:             utils.NewUUID(),
 			BusinessID:     expense.BusinessID,
+			BranchID:       &branchID,
 			JournalEntryID: entry.ID,
 			AccountID:      expense.ExpenseAccountID,
 			LineNumber:     1,
-			DebitAmount:    expense.Amount,
+			DebitAmount:    amount,
 			CreditAmount:   0,
 			Description:    coalesceReference(expense.Notes, "Expense "+expense.ExpenseNumber),
 			CreatedAt:      now,
@@ -495,11 +511,12 @@ func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext
 		{
 			ID:             utils.NewUUID(),
 			BusinessID:     expense.BusinessID,
+			BranchID:       &branchID,
 			JournalEntryID: entry.ID,
 			AccountID:      expense.PaidThroughAccountID,
 			LineNumber:     2,
 			DebitAmount:    0,
-			CreditAmount:   expense.Amount,
+			CreditAmount:   amount,
 			Description:    "Paid through account",
 			CreatedAt:      now,
 			UpdatedAt:      now,
@@ -528,7 +545,19 @@ func (s *Service) postReversalJournal(tx *gorm.DB, currentUser *utils.AuthContex
 	}
 	now := time.Now().UTC()
 	sourceID := expense.ID
-	branchID := expense.BranchID
+	branchID := strings.TrimSpace(expense.BranchID)
+	if branchID == "" {
+		return "", apperrors.Internal("expense reversal requires a branch")
+	}
+	// A reversal flips each original line, so its totals are the original's
+	// totals swapped -- not the current expense amount, which may have changed.
+	reversalDebit, reversalCredit := 0.0, 0.0
+	for _, line := range lines {
+		reversalDebit += line.CreditAmount
+		reversalCredit += line.DebitAmount
+	}
+	reversalDebit = roundExpenseMoney(reversalDebit)
+	reversalCredit = roundExpenseMoney(reversalCredit)
 	entry := accounting.JournalEntry{
 		ID:              utils.NewUUID(),
 		BusinessID:      expense.BusinessID,
@@ -540,8 +569,8 @@ func (s *Service) postReversalJournal(tx *gorm.DB, currentUser *utils.AuthContex
 		SourceID:        &sourceID,
 		Narration:       "Reversal for expense " + expense.ExpenseNumber,
 		Status:          "posted",
-		TotalDebit:      expense.Amount,
-		TotalCredit:     expense.Amount,
+		TotalDebit:      reversalDebit,
+		TotalCredit:     reversalCredit,
 		PostedAt:        &now,
 		PostedByUserID:  &currentUser.UserID,
 		ReversedEntryID: expense.JournalEntryID,
@@ -554,6 +583,7 @@ func (s *Service) postReversalJournal(tx *gorm.DB, currentUser *utils.AuthContex
 		reversalLines = append(reversalLines, accounting.JournalEntryLine{
 			ID:             utils.NewUUID(),
 			BusinessID:     expense.BusinessID,
+			BranchID:       &branchID,
 			JournalEntryID: entry.ID,
 			AccountID:      line.AccountID,
 			LineNumber:     line.LineNumber,
@@ -579,8 +609,8 @@ func normalizeListQuery(currentUser *utils.AuthContext, query *ExpenseListQuery)
 	}
 	branchID := strings.TrimSpace(query.BranchID)
 	if branchID != "" {
-		if !currentUser.CanAccessBranch(branchID) {
-			return apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(branchID); err != nil {
+			return err
 		}
 		query.BranchID = branchID
 	} else if !currentUser.CanAccessAllBranches {
@@ -670,4 +700,10 @@ func mapNotFound(err error, message string) error {
 		return apperrors.NotFound(message)
 	}
 	return err
+}
+
+// roundExpenseMoney matches the ledger's two-decimal precision, so the header
+// totals and the two lines cannot disagree.
+func roundExpenseMoney(value float64) float64 {
+	return math.Round(value*100) / 100
 }

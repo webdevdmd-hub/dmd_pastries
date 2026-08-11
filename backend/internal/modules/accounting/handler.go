@@ -123,6 +123,15 @@ func (h *Handler) GetAccountingSetupReadiness(c *gin.Context) {
 	response.Success(c, 200, "accounting setup readiness fetched successfully", result)
 }
 
+func (h *Handler) GetBranchAccountingReadiness(c *gin.Context) {
+	result, err := h.service.GetBranchAccountingReadiness(utils.MustAuthContext(c), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "branch accounting readiness fetched successfully", result)
+}
+
 func (h *Handler) CreateChartAccount(c *gin.Context) {
 	var req CreateChartAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

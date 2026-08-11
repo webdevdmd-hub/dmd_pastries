@@ -1,7 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { AccessDeniedCard } from "@/components/inventory/access-denied-card";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/table";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useLocationBalances, useStockLocations } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
@@ -56,7 +57,15 @@ export function LocationBalancesPageClient(): JSX.Element {
   const canView = hasAnyPermission([PERMISSIONS.inventoryView]);
   const [filters, setFilters] = useState<LocationBalanceFilters>(() => defaultFilters());
   const locationsQuery = useStockLocations(canView && branchScope.hasBranchScope);
-  const balancesQuery = useLocationBalances(filters, canView && branchScope.hasBranchScope);
+  const debouncedSearch = useDebouncedValue(filters.search);
+  const balancesQueryFilters = useMemo(
+    () => ({ ...filters, search: debouncedSearch }),
+    [debouncedSearch, filters],
+  );
+  const balancesQuery = useLocationBalances(
+    balancesQueryFilters,
+    canView && branchScope.hasBranchScope,
+  );
   const balances = balancesQuery.data ?? [];
   const isPermissionDenied =
     balancesQuery.error instanceof ApiError && balancesQuery.error.status === 403;

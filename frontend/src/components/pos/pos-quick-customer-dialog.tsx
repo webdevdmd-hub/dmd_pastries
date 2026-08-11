@@ -54,12 +54,12 @@ export function POSQuickCustomerDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent className="rounded-lg border-[#d4d4d8] bg-white text-[#09090b] shadow-lg">
+      <DialogContent className="rounded-lg border-zinc-300 bg-white text-zinc-950 shadow-lg">
         <DialogHeader>
           <DialogTitle className="text-2xl font-black tracking-tight">
             Quick create customer
           </DialogTitle>
-          <DialogDescription className="text-[#52525b]">
+          <DialogDescription className="text-zinc-600">
             Create a customer during billing and select them for this cart.
           </DialogDescription>
         </DialogHeader>
@@ -72,7 +72,7 @@ export function POSQuickCustomerDialog({
           <label className="grid gap-2">
             <Label htmlFor="pos-customer-name">Full name</Label>
             <Input
-              className="rounded-md border-[#d4d4d8] bg-white shadow-none focus-visible:ring-black"
+              className="rounded-md border-zinc-300 bg-white shadow-none focus-visible:ring-black"
               id="pos-customer-name"
               {...form.register("fullName")}
             />
@@ -83,7 +83,7 @@ export function POSQuickCustomerDialog({
           <label className="grid gap-2">
             <Label htmlFor="pos-customer-phone">Phone</Label>
             <Input
-              className="rounded-md border-[#d4d4d8] bg-white shadow-none focus-visible:ring-black"
+              className="rounded-md border-zinc-300 bg-white shadow-none focus-visible:ring-black"
               id="pos-customer-phone"
               {...form.register("phone")}
             />
@@ -94,7 +94,7 @@ export function POSQuickCustomerDialog({
           <label className="grid gap-2">
             <Label htmlFor="pos-customer-email">Email</Label>
             <Input
-              className="rounded-md border-[#d4d4d8] bg-white shadow-none focus-visible:ring-black"
+              className="rounded-md border-zinc-300 bg-white shadow-none focus-visible:ring-black"
               id="pos-customer-email"
               type="email"
               {...form.register("email")}
@@ -103,14 +103,14 @@ export function POSQuickCustomerDialog({
               <span className="text-sm text-red-700">{form.formState.errors.email.message}</span>
             ) : null}
           </label>
-          <p className="text-xs leading-5 text-[#52525b]">
+          <p className="text-xs leading-5 text-zinc-600">
             Phone or email is optional for quick walk-in capture, but recommended for future lookup.
             If an active customer already exists with the same contact, the backend returns that
             profile and it will be selected.
           </p>
           <DialogFooter>
             <Button
-              className="rounded-md border-[#d4d4d8] bg-white text-[#09090b] hover:bg-[#f4f4f5]"
+              className="rounded-md border-zinc-300 bg-white text-zinc-950 hover:bg-zinc-100"
               disabled={isSubmitting}
               onClick={onClose}
               type="button"
@@ -119,7 +119,7 @@ export function POSQuickCustomerDialog({
               Cancel
             </Button>
             <Button
-              className="rounded-md bg-black text-white hover:bg-[#18181b]"
+              className="rounded-md bg-black text-white hover:bg-zinc-900"
               disabled={isSubmitting}
               type="submit"
             >

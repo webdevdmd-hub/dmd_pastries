@@ -34,6 +34,7 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useBranches } from "@/hooks/use-branches";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
   useAdjustStock,
   useCreateExpiryBatch,
@@ -127,7 +128,17 @@ export function InventoryPageClient(): JSX.Element {
   const [batchItem, setBatchItem] = useState<InventoryItem | null>(null);
   const [openingStockItem, setOpeningStockItem] = useState<InventoryItem | null>(null);
   const timezone = useMemo(resolveDashboardTimezone, []);
-  const inventoryQuery = useInventory(filters, canView && branchScope.hasBranchScope);
+  // Keystrokes land in filters immediately; only the debounced search may key
+  // the query, or every keystroke fetches and caches a new list.
+  const debouncedSearch = useDebouncedValue(filters.search);
+  const inventoryQueryFilters = useMemo(
+    () => ({ ...filters, search: debouncedSearch }),
+    [debouncedSearch, filters],
+  );
+  const inventoryQuery = useInventory(
+    inventoryQueryFilters,
+    canView && branchScope.hasBranchScope,
+  );
   const expiryAlertsQuery = useExpiryAlerts(
     {
       branchId: filters.branchId,

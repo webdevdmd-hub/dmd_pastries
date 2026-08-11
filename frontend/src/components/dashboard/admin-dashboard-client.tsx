@@ -28,6 +28,7 @@ import { DashboardErrorState } from "@/components/dashboard/dashboard-error-stat
 import { DashboardRiskChart } from "@/components/dashboard/dashboard-risk-chart";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { DashboardTrendChart } from "@/components/dashboard/dashboard-trend-chart";
+import { GettingStartedChecklist } from "@/components/dashboard/getting-started-checklist";
 import { ReportFilterBar, type ReportFilterDraft } from "@/components/reports/report-filter-bar";
 import { formatCurrency, formatNumber } from "@/components/reports/sales/sales-report-format";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
@@ -545,6 +546,8 @@ export function AdminDashboardClient(): JSX.Element {
             onRetry={() => void dashboardQuery.refetch()}
             warnings={dashboard.loadWarnings}
           />
+
+          <GettingStartedChecklist hasFirstSale={dashboard.sales.salesCountToday > 0} />
 
           <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
             <div className="grid sm:grid-cols-2 xl:grid-cols-5">

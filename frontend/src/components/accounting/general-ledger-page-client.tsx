@@ -43,8 +43,7 @@ import { getErrorMessage } from "@/lib/api/client";
 import type { GeneralLedgerFilters } from "@/types/accounting";
 
 const allValue = "all";
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function dateInputValue(date: Date): string {
   const year = date.getFullYear();

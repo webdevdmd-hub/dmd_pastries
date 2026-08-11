@@ -8,7 +8,7 @@
     "pnpm": "10.10.0"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "cross-env NODE_OPTIONS=--max-old-space-size=8192 next dev",
     "build": "next build --webpack",
     "postbuild": "node scripts/prepare-standalone-assets.mjs",
     "start": "node .next/standalone/server.js",
@@ -71,6 +71,7 @@
     "@types/react-dom": "^19.1.2",
     "@types/three": "^0.185.1",
     "autoprefixer": "^10.4.21",
+    "cross-env": "^10.1.0",
     "eslint": "^9.25.1",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-import": "^2.31.0",

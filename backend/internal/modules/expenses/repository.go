@@ -356,9 +356,21 @@ func (r *Repository) ValidateCustomer(tx *gorm.DB, businessID, branchID, custome
 	return nil
 }
 
-func (r *Repository) ValidateAccount(tx *gorm.DB, businessID, accountID string) (*accounting.ChartAccount, error) {
+// Chart accounts are branch-scoped since migration 000092, so an expense must
+// be booked against an account belonging to its own branch.
+// FindPostedJournalBySource makes expense posting idempotent: a retry returns
+// the entry already posted for that expense instead of creating a second one.
+func (r *Repository) FindPostedJournalBySource(tx *gorm.DB, businessID, sourceType, sourceID string) (*accounting.JournalEntry, error) {
+	var entry accounting.JournalEntry
+	err := tx.Where("business_id = ? AND source_type = ? AND source_id = ? AND status IN ? AND deleted_at IS NULL",
+		businessID, sourceType, sourceID, []string{"posted", "reversed"}).
+		First(&entry).Error
+	return &entry, err
+}
+
+func (r *Repository) ValidateAccount(tx *gorm.DB, businessID, branchID, accountID string) (*accounting.ChartAccount, error) {
 	var account accounting.ChartAccount
-	err := tx.Where("business_id = ? AND id = ? AND status = ? AND deleted_at IS NULL", businessID, accountID, "active").First(&account).Error
+	err := tx.Where("business_id = ? AND branch_id = ? AND id = ? AND status = ? AND deleted_at IS NULL", businessID, branchID, accountID, "active").First(&account).Error
 	return &account, err
 }
 
@@ -371,6 +383,7 @@ func (r *Repository) ValidatePaidThroughPaymentAccount(tx *gorm.DB, businessID, 
 		Where("pa.status = ?", "active").
 		Where("pa.account_type IN ?", []string{"cash", "bank", "card_clearing", "platform_clearing", "wallet", "other"}).
 		Where("(pa.branch_id IS NULL OR pa.branch_id = ?)", branchID).
+		Where("coa.branch_id = ?", branchID).
 		First(&account).Error
 	return &account, err
 }

@@ -233,7 +233,9 @@ export function PurchaseDocumentChain({
                     <PurchaseReceiptAccountingBadge receipt={receipt} />
                   </div>
                   {receipt.accountingStatus === "pending_bill_posting" ? (
-                    <p className="mt-2 text-xs text-brand-mocha">{receipt.accountingStatusDetail}</p>
+                    <p className="mt-2 text-xs text-brand-mocha">
+                      {receipt.accountingStatusDetail}
+                    </p>
                   ) : null}
                 </ChainCard>
               ))

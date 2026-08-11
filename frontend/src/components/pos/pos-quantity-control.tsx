@@ -14,7 +14,7 @@ export function POSQuantityControl({ onChange, quantity }: POSQuantityControlPro
     <div className="flex items-center gap-1">
       <Button
         aria-label="Decrease quantity"
-        className="h-8 w-8 rounded-md border-[#d4d4d8] bg-white text-[#18181b] hover:bg-[#f4f4f5]"
+        className="h-8 w-8 rounded-md border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100"
         onClick={() => onChange(quantity - 1)}
         size="icon"
         type="button"
@@ -24,7 +24,7 @@ export function POSQuantityControl({ onChange, quantity }: POSQuantityControlPro
       </Button>
       <POSNumberInput
         aria-label="Quantity"
-        className="h-8 w-14 rounded-md border-[#d4d4d8] text-center font-mono text-sm"
+        className="h-8 w-14 rounded-md border-zinc-300 text-center font-mono text-sm"
         onValueChange={(nextQuantity) => {
           if (nextQuantity !== null) {
             onChange(nextQuantity);
@@ -34,7 +34,7 @@ export function POSQuantityControl({ onChange, quantity }: POSQuantityControlPro
       />
       <Button
         aria-label="Increase quantity"
-        className="h-8 w-8 rounded-md border-[#d4d4d8] bg-white text-[#18181b] hover:bg-[#f4f4f5]"
+        className="h-8 w-8 rounded-md border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100"
         onClick={() => onChange(quantity + 1)}
         size="icon"
         type="button"

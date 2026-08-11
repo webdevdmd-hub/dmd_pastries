@@ -37,14 +37,25 @@ func TestAdminDashboardUsesReportsSummaryForComparableMetrics(t *testing.T) {
 		},
 	}
 
+	const monthlySales = 5400.00
 	admin := adminDashboardFromReportSummary(
 		summary,
+		monthlySales,
 		8,
 		9,
 		300.50,
 		AdminCustomersWidget{NewCustomersToday: 10},
 		nil,
 	)
+
+	// Monthly sales come from their own month-to-date query. They used to be
+	// copied from the request window, so the tile never showed a month.
+	if admin.Sales.MonthlySales != monthlySales {
+		t.Fatalf("monthly sales = %.2f, want %.2f", admin.Sales.MonthlySales, monthlySales)
+	}
+	if admin.Sales.MonthlySales == admin.Sales.TodaySales {
+		t.Fatal("monthly sales must not be the same value as today's sales")
+	}
 
 	if admin.Sales.TodaySales != summary.Sales.TotalSales {
 		t.Fatalf("admin sales must match reports summary sales: got %.2f want %.2f", admin.Sales.TodaySales, summary.Sales.TotalSales)
@@ -84,6 +95,7 @@ func TestAdminDashboardFromReportSummaryPreservesLoadWarnings(t *testing.T) {
 
 	admin := adminDashboardFromReportSummary(
 		summary,
+		0,
 		0,
 		0,
 		0,

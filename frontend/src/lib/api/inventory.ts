@@ -274,7 +274,10 @@ function parseStockMovement(value: unknown): StockMovement {
     totalCost: numberValue(value.total_cost),
     valuationMethod: nullableString(value.valuation_method),
     accountingJournalEntryId: nullableString(value.accounting_journal_entry_id),
-    createdByUserName: stringValue(value.created_by_name, stringValue(value.created_by_user_name, "System")),
+    createdByUserName: stringValue(
+      value.created_by_name,
+      stringValue(value.created_by_user_name, "System"),
+    ),
     createdAt: stringValue(value.created_at),
   };
 }

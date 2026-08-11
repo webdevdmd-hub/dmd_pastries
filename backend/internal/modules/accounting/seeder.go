@@ -106,33 +106,33 @@ func SeedDefaultChartOfAccounts(tx *gorm.DB, businessID string, requestedBranchI
 		}
 	}
 	for _, branchID := range branchIDs {
-	for _, seed := range DefaultChartAccountSeeds() {
-		var count int64
-		if err := tx.Model(&ChartAccount{}).Where("business_id = ? AND branch_id = ? AND LOWER(account_code) = LOWER(?) AND deleted_at IS NULL", businessID, branchID, seed.Code).Count(&count).Error; err != nil {
-			return err
+		for _, seed := range DefaultChartAccountSeeds() {
+			var count int64
+			if err := tx.Model(&ChartAccount{}).Where("business_id = ? AND branch_id = ? AND LOWER(account_code) = LOWER(?) AND deleted_at IS NULL", businessID, branchID, seed.Code).Count(&count).Error; err != nil {
+				return err
+			}
+			if count > 0 {
+				continue
+			}
+			account := ChartAccount{
+				ID:                 utils.NewUUID(),
+				BusinessID:         businessID,
+				BranchID:           branchID,
+				AccountCode:        seed.Code,
+				AccountName:        seed.Name,
+				AccountType:        seed.Type,
+				AccountGroup:       seed.Group,
+				NormalBalance:      seed.NormalBalance,
+				Description:        strings.TrimSpace(seed.Description),
+				IsSystemAccount:    true,
+				IsControlAccount:   seed.IsControlAccount,
+				AllowManualPosting: seed.AllowManualPosting,
+				Status:             "active",
+			}
+			if err := tx.Create(&account).Error; err != nil {
+				return err
+			}
 		}
-		if count > 0 {
-			continue
-		}
-		account := ChartAccount{
-			ID:                 utils.NewUUID(),
-			BusinessID:         businessID,
-			BranchID:           branchID,
-			AccountCode:        seed.Code,
-			AccountName:        seed.Name,
-			AccountType:        seed.Type,
-			AccountGroup:       seed.Group,
-			NormalBalance:      seed.NormalBalance,
-			Description:        strings.TrimSpace(seed.Description),
-			IsSystemAccount:    true,
-			IsControlAccount:   seed.IsControlAccount,
-			AllowManualPosting: seed.AllowManualPosting,
-			Status:             "active",
-		}
-		if err := tx.Create(&account).Error; err != nil {
-			return err
-		}
-	}
 	}
 	return nil
 }

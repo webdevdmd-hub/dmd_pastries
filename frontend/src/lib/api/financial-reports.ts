@@ -214,9 +214,7 @@ function parsePaymentRow(value: unknown): PaymentsReportRow {
 
 function parsePaymentMethodRow(value: unknown): PaymentMethodReportRow {
   const row = isObject(value) ? (value as BackendPaymentMethodRow) : {};
-  const grossTransactionCount = numberOrZero(
-    row.gross_transaction_count ?? row.transaction_count,
-  );
+  const grossTransactionCount = numberOrZero(row.gross_transaction_count ?? row.transaction_count);
   const refundTransactionCount = numberOrZero(row.refund_transaction_count);
   const netTransactionCount = numberOrZero(
     row.net_transaction_count ?? Math.max(grossTransactionCount - refundTransactionCount, 0),

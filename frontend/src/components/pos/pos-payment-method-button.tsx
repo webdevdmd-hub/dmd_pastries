@@ -20,8 +20,8 @@ export function POSPaymentMethodButton({
     <Button
       className={
         selected
-          ? "h-10 rounded-md border-black bg-black text-sm font-black text-white hover:bg-[#18181b]"
-          : "h-10 rounded-md border-[#d4d4d8] bg-white text-sm font-bold text-[#18181b] hover:bg-[#f4f4f5]"
+          ? "h-10 rounded-md border-black bg-black text-sm font-black text-white hover:bg-zinc-900"
+          : "h-10 rounded-md border-zinc-300 bg-white text-sm font-bold text-zinc-900 hover:bg-zinc-100"
       }
       disabled={disabled}
       onClick={() => onSelect(method)}

@@ -12,9 +12,7 @@ import {
   type BakeryOrdersReportFilterDraft,
   toBakeryOrdersReportFilters,
 } from "@/components/reports/bakery-orders/bakery-orders-report-filter-bar";
-import {
-  defaultBakeryOrdersReportDraft,
-} from "@/components/reports/bakery-orders/bakery-orders-report-page-utils";
+import { defaultBakeryOrdersReportDraft } from "@/components/reports/bakery-orders/bakery-orders-report-page-utils";
 import { PendingPaymentsSummaryCard } from "@/components/reports/bakery-orders/pending-payments-summary-card";
 import { PendingPaymentsTable } from "@/components/reports/bakery-orders/pending-payments-table";
 import { ReportPageHeader } from "@/components/reports/report-page-header";

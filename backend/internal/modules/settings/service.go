@@ -970,6 +970,17 @@ func (s *Service) ListReceiptLayouts(currentUser *utils.AuthContext, branchID, r
 			return nil, err
 		}
 	}
+	if branchID == "" {
+		// An omitted branch used to mean "no filter", which listed every
+		// branch's receipt configuration. Fall back to the caller's branch.
+		scopedBranchID, allBranches, err := currentUser.ResolveBranchScope("", "")
+		if err != nil {
+			return nil, err
+		}
+		if !allBranches {
+			branchID = scopedBranchID
+		}
+	}
 	layouts, err := s.repo.ListReceiptLayouts(currentUser.BusinessID, branchID, strings.TrimSpace(receiptType), strings.TrimSpace(status))
 	if err != nil {
 		return nil, apperrors.Internal("failed to list receipt layouts")
@@ -1487,8 +1498,8 @@ func (s *Service) validateReceiptLayoutBranch(currentUser *utils.AuthContext, br
 	if _, err := uuid.Parse(normalized); err != nil {
 		return apperrors.BadRequest("branch_id must be a valid UUID", nil)
 	}
-	if !currentUser.CanAccessBranch(normalized) {
-		return apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(normalized); err != nil {
+		return err
 	}
 	var count int64
 	if err := s.db.Table("branches").

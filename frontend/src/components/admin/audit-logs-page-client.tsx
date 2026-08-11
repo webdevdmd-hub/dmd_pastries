@@ -122,7 +122,9 @@ function formatAuditValue(value: ActivityMetadataValue | null): string {
   return formatMetadataValue(value);
 }
 
-function visibleMetadataEntries(metadata: ActivityLog["metadata"]): [string, ActivityMetadataValue][] {
+function visibleMetadataEntries(
+  metadata: ActivityLog["metadata"],
+): [string, ActivityMetadataValue][] {
   const hiddenKeys = new Set([
     "changes",
     "record_label",
@@ -298,10 +300,13 @@ function LogsList({
           </div>
           {targetLabel(item) ? (
             <p className="mt-3 text-sm text-brand-mocha">
-              Target user: <span className="font-medium text-brand-espresso">{targetLabel(item)}</span>
+              Target user:{" "}
+              <span className="font-medium text-brand-espresso">{targetLabel(item)}</span>
             </p>
           ) : null}
-          {item.summary && item.summary !== item.actionLabel && item.summary !== item.recordLabel ? (
+          {item.summary &&
+          item.summary !== item.actionLabel &&
+          item.summary !== item.recordLabel ? (
             <p className="mt-3 text-sm text-brand-mocha">{item.summary}</p>
           ) : null}
           {item.changes.length > 0 ? (
@@ -520,10 +525,7 @@ export function AuditLogsPageClient(): JSX.Element {
             timezone={auditTimezone}
           />
           <div className="grid gap-3 md:grid-cols-[220px_1fr]">
-            <Select
-              value={entityFilter}
-              onValueChange={handleEntityFilterChange}
-            >
+            <Select value={entityFilter} onValueChange={handleEntityFilterChange}>
               <SelectTrigger>
                 <SelectValue placeholder="Filter by entity" />
               </SelectTrigger>

@@ -155,8 +155,12 @@ type JournalEntry struct {
 func (JournalEntry) TableName() string { return "journal_entries" }
 
 type JournalEntryLine struct {
-	ID             string         `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID     string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	ID         string `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID string `gorm:"type:uuid;not null;index" json:"business_id"`
+	// BranchID must match both the entry's branch and the account's branch;
+	// migration 000095 enforces that with composite foreign keys. Nullable only
+	// so historical rows can be backfilled by an operator.
+	BranchID       *string        `gorm:"type:uuid;index" json:"branch_id"`
 	JournalEntryID string         `gorm:"type:uuid;not null;index" json:"journal_entry_id"`
 	AccountID      string         `gorm:"type:uuid;not null;index" json:"account_id"`
 	LineNumber     int            `gorm:"not null" json:"line_number"`

@@ -140,10 +140,7 @@ export function PaymentsPageClient(): JSX.Element {
     timezone,
   };
   const paymentsQuery = usePayments(filters, canView && branchScope.hasBranchScope);
-  const summaryQuery = useDailyPaymentSummary(
-    summaryParams,
-    canView && branchScope.hasBranchScope,
-  );
+  const summaryQuery = useDailyPaymentSummary(summaryParams, canView && branchScope.hasBranchScope);
   const methodSummaryQuery = usePaymentSummaryByMethod(
     summaryParams,
     canView && branchScope.hasBranchScope,

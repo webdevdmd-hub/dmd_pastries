@@ -14,9 +14,17 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) ProductExists(productID, businessID string) (bool, error) {
+// ProductExists gates every variant operation. Variants have no branch column of
+// their own, so their parent product — which is branch-scoped — is what confines
+// them to a branch. Pass an empty branchID only for callers with all-branch access.
+func (r *Repository) ProductExists(productID, businessID, branchID string) (bool, error) {
 	var count int64
-	err := r.db.Table("products").Where("id = ? AND business_id = ? AND deleted_at IS NULL", productID, businessID).Count(&count).Error
+	query := r.db.Table("products").
+		Where("id = ? AND business_id = ? AND deleted_at IS NULL", productID, businessID)
+	if branchID != "" {
+		query = query.Where("branch_id = ?", branchID)
+	}
+	err := query.Count(&count).Error
 	return count > 0, err
 }
 

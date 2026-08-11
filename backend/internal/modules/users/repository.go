@@ -109,12 +109,30 @@ func (r *Repository) UpdateByBusinessIDTx(tx *gorm.DB, userID, businessID string
 	return nil
 }
 
+// EnsureBranchAccess grants access additively. Use it only when creating a user
+// or accepting an invitation, where there is no prior access to supersede.
+//
+// For a transfer or reassignment use ReplaceBranchAccess: this function alone
+// would leave the old branch in place, and nothing else revokes it.
 func (r *Repository) EnsureBranchAccess(tx *gorm.DB, businessID, userID, branchID string) error {
 	access := UserBranchAccess{BusinessID: businessID, UserID: userID, BranchID: branchID}
 	defaults := UserBranchAccess{ID: uuid.NewString()}
 	return tx.Where("business_id = ? AND user_id = ? AND branch_id = ?", businessID, userID, branchID).
 		Attrs(defaults).
 		FirstOrCreate(&access).Error
+}
+
+// ReplaceBranchAccess makes branchID the user's only branch access row.
+//
+// Branch access was previously insert-only, so a user moved from one branch to
+// another accumulated both. Their allowed-branch set — and therefore every
+// record guard built on it — kept authorizing the branch they had left.
+func (r *Repository) ReplaceBranchAccess(tx *gorm.DB, businessID, userID, branchID string) error {
+	if err := tx.Where("business_id = ? AND user_id = ? AND branch_id <> ?", businessID, userID, branchID).
+		Delete(&UserBranchAccess{}).Error; err != nil {
+		return err
+	}
+	return r.EnsureBranchAccess(tx, businessID, userID, branchID)
 }
 
 func (r *Repository) SoftDeleteByBusinessID(tx *gorm.DB, userID, businessID string) error {

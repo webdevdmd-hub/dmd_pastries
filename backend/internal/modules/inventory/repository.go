@@ -126,6 +126,30 @@ func (r *Repository) FindInventoryItemForUpdate(tx *gorm.DB, id, businessID stri
 	return &item, err
 }
 
+// FindProductCostBasis returns the master-data cost price for a product or
+// variant inventory item, used only as a valuation fallback when the item has
+// no cost history. A variant with no cost of its own falls back to its parent
+// product's cost_price. Returns 0 when no cost is defined.
+func (r *Repository) FindProductCostBasis(tx *gorm.DB, businessID, productID string, productVariantID *string) (float64, error) {
+	var basis float64
+	if productVariantID != nil && strings.TrimSpace(*productVariantID) != "" {
+		err := tx.Raw(`
+			SELECT COALESCE(pv.cost_price, p.cost_price, 0)
+			FROM product_variants pv
+			JOIN products p ON p.id = pv.product_id AND p.business_id = pv.business_id
+			WHERE pv.id = ? AND pv.business_id = ?
+			  AND pv.deleted_at IS NULL AND p.deleted_at IS NULL`,
+			strings.TrimSpace(*productVariantID), businessID).Scan(&basis).Error
+		return basis, err
+	}
+	err := tx.Raw(`
+		SELECT COALESCE(cost_price, 0)
+		FROM products
+		WHERE id = ? AND business_id = ? AND deleted_at IS NULL`,
+		productID, businessID).Scan(&basis).Error
+	return basis, err
+}
+
 func (r *Repository) FindExistingItem(tx *gorm.DB, businessID, branchID, itemType string, itemID *string, variantID ...*string) (*InventoryItem, error) {
 	var item InventoryItem
 	query := tx.Where("business_id = ? AND branch_id = ? AND item_type = ? AND deleted_at IS NULL", businessID, branchID, itemType)

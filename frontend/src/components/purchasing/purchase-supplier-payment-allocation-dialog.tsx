@@ -481,9 +481,9 @@ export function PurchaseSupplierPaymentAllocationDialog({
                   ? `Paid through: ${selectedMethod.defaultPaymentAccountName || "Linked account"}`
                   : !hasPaymentMethods
                     ? "Set up an active purchasing payment method with a linked payment account for this branch."
-                  : selectedMethod
-                    ? "Paid-through account will be resolved from branch payment setup."
-                  : ""}
+                    : selectedMethod
+                      ? "Paid-through account will be resolved from branch payment setup."
+                      : ""}
               </p>
             </div>
 

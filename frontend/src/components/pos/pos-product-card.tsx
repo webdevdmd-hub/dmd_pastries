@@ -46,9 +46,9 @@ export function POSProductCard({
   };
 
   return (
-    <article className="group relative flex min-h-[14.5rem] flex-col overflow-hidden rounded-lg border border-[#d4d4d8] bg-white text-[#09090b] transition hover:border-[#71717a] focus-within:ring-2 focus-within:ring-black focus-within:ring-offset-2">
+    <article className="group relative flex min-h-[14.5rem] flex-col overflow-hidden rounded-lg border border-zinc-300 bg-white text-zinc-950 transition hover:border-zinc-500 focus-within:ring-2 focus-within:ring-black focus-within:ring-offset-2">
       <Button
-        className="h-full flex-1 flex-col items-stretch justify-start rounded-none bg-white p-0 text-left text-[#09090b] shadow-none hover:bg-white disabled:opacity-60"
+        className="h-full flex-1 flex-col items-stretch justify-start rounded-none bg-white p-0 text-left text-zinc-950 shadow-none hover:bg-white disabled:opacity-60"
         disabled={isOutOfStock && !hasVariants}
         onClick={() => {
           if (ignoreNextClickRef.current) {
@@ -77,11 +77,11 @@ export function POSProductCard({
           {imageUrl ? (
             <img
               alt={product.productName}
-              className="h-32 w-full bg-[#f4f4f5] object-cover"
+              className="h-32 w-full bg-zinc-100 object-cover"
               src={imageUrl}
             />
           ) : (
-            <div className="flex h-32 w-full items-center justify-center bg-[#f4f4f5] text-[#71717a]">
+            <div className="flex h-32 w-full items-center justify-center bg-zinc-100 text-zinc-500">
               <PackagePlus className="h-8 w-8" />
             </div>
           )}
@@ -90,10 +90,10 @@ export function POSProductCard({
               {product.productName}
             </p>
             <div className="mt-2 flex min-w-0 items-end justify-between gap-2">
-              <span className="min-w-0 truncate text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[#71717a]">
+              <span className="min-w-0 truncate text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-zinc-500">
                 {product.categoryName}
               </span>
-              <span className="min-h-5 shrink-0 text-right font-mono text-sm font-black leading-none text-[#09090b]">
+              <span className="min-h-5 shrink-0 text-right font-mono text-sm font-black leading-none text-zinc-950">
                 {showPrices ? (
                   <span aria-label={`${product.productName} price`}>
                     {formatMoney(product.salePrice)}
@@ -111,7 +111,7 @@ export function POSProductCard({
       ) : null}
       {hasVariants ? (
         <Button
-          className="absolute right-3 top-3 h-7 rounded-md bg-black px-2.5 font-mono text-[0.62rem] font-black uppercase tracking-[0.12em] text-white shadow-none hover:bg-[#18181b]"
+          className="absolute right-3 top-3 h-7 rounded-md bg-black px-2.5 font-mono text-[0.62rem] font-black uppercase tracking-[0.12em] text-white shadow-none hover:bg-zinc-900"
           onClick={(event) => {
             event.stopPropagation();
             openVariants();

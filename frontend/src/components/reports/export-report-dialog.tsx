@@ -228,7 +228,7 @@ export function ExportReportDialog({
                     <SelectItem key={branch.id} value={branch.id}>
                       {branch.name} ({branch.code})
                     </SelectItem>
-                ))}
+                  ))}
               </SelectContent>
             </Select>
             {form.formState.errors.filters?.branchId ? (
@@ -313,7 +313,9 @@ export function ExportReportDialog({
                 <dd className="break-all font-mono text-xs">{previewFilename}</dd>
               </div>
             </dl>
-            {selectedOption?.description ? <p className="mt-3">{selectedOption.description}</p> : null}
+            {selectedOption?.description ? (
+              <p className="mt-3">{selectedOption.description}</p>
+            ) : null}
           </div>
           {exportError ? (
             <Alert className="md:col-span-2 border-red-200 bg-red-50 text-red-950">

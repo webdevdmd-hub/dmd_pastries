@@ -34,12 +34,12 @@ export function POSTopBar({ branchName, cashierName, onMenuClick }: POSTopBarPro
   }, []);
 
   return (
-    <header className="grid h-16 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center border-b border-[#d4d4d8] bg-[#fafafa] px-4 text-[#09090b] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+    <header className="grid h-16 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center border-b border-zinc-300 bg-zinc-50 px-4 text-zinc-950 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
       <div className="flex min-w-0 items-center gap-3">
         {onMenuClick ? (
           <Button
             aria-label="Open POS menu"
-            className="h-10 w-10 rounded-md border-[#d4d4d8] bg-white text-[#18181b] hover:bg-[#f4f4f5]"
+            className="h-10 w-10 rounded-md border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100"
             onClick={onMenuClick}
             size="icon"
             type="button"
@@ -49,16 +49,16 @@ export function POSTopBar({ branchName, cashierName, onMenuClick }: POSTopBarPro
           </Button>
         ) : null}
         <div>
-          <p className="text-base font-black tracking-tight text-[#09090b]">POS Billing</p>
-          <p className="text-xs font-medium text-[#71717a] lg:hidden">{branchName}</p>
+          <p className="text-base font-black tracking-tight text-zinc-950">POS Billing</p>
+          <p className="text-xs font-medium text-zinc-500 lg:hidden">{branchName}</p>
         </div>
       </div>
 
       <div className="hidden min-w-[16rem] text-right lg:block">
-        <p className="text-sm font-black text-[#09090b]">
+        <p className="text-sm font-black text-zinc-950">
           {cashierName} - {branchName}
         </p>
-        <p className="font-mono text-xs text-[#52525b]">
+        <p className="font-mono text-xs text-zinc-600">
           {clock.toLocaleTimeString("en-AE", {
             hour: "2-digit",
             minute: "2-digit",
@@ -69,16 +69,16 @@ export function POSTopBar({ branchName, cashierName, onMenuClick }: POSTopBarPro
       </div>
 
       <div className="flex min-w-0 items-center justify-end gap-3">
-        <div className="hidden border-l border-[#d4d4d8] pl-4 text-sm sm:block">
-          <p className="font-medium text-[#18181b]">Admin User</p>
-          <p className="flex items-center gap-1.5 text-[#52525b]">
+        <div className="hidden border-l border-zinc-300 pl-4 text-sm sm:block">
+          <p className="font-medium text-zinc-900">Admin User</p>
+          <p className="flex items-center gap-1.5 text-zinc-600">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
             Connected
           </p>
         </div>
         <Button
           aria-label="Notifications"
-          className="hidden h-10 w-10 rounded-md border-transparent bg-transparent text-[#18181b] hover:bg-[#f4f4f5] md:inline-flex"
+          className="hidden h-10 w-10 rounded-md border-transparent bg-transparent text-zinc-900 hover:bg-zinc-100 md:inline-flex"
           size="icon"
           type="button"
           variant="ghost"
@@ -87,7 +87,7 @@ export function POSTopBar({ branchName, cashierName, onMenuClick }: POSTopBarPro
         </Button>
         <Button
           asChild
-          className="hidden h-10 rounded-md bg-black px-4 text-sm font-black text-white hover:bg-[#27272a] sm:inline-flex"
+          className="hidden h-10 rounded-md bg-black px-4 text-sm font-black text-white hover:bg-zinc-800 sm:inline-flex"
           variant="default"
         >
           <Link href={ROUTES.dashboard}>
@@ -99,7 +99,7 @@ export function POSTopBar({ branchName, cashierName, onMenuClick }: POSTopBarPro
           <DropdownMenuTrigger asChild>
             <Button
               aria-label="Open user menu"
-              className="h-10 w-10 rounded-full border-[#d4d4d8] bg-white text-[#18181b] hover:bg-[#f4f4f5]"
+              className="h-10 w-10 rounded-full border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100"
               size="icon"
               variant="outline"
             >
@@ -109,7 +109,7 @@ export function POSTopBar({ branchName, cashierName, onMenuClick }: POSTopBarPro
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>
               <span className="block">{user?.fullName ?? "Cashier"}</span>
-              <span className="block text-xs font-normal text-[#71717a]">
+              <span className="block text-xs font-normal text-zinc-500">
                 {user?.email ?? "Signed in"}
               </span>
             </DropdownMenuLabel>

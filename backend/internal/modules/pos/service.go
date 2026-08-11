@@ -132,22 +132,22 @@ func resolvePOSPaymentMethodBranch(currentUser *utils.AuthContext, requestedBran
 		if _, err := uuid.Parse(requestedBranchID); err != nil {
 			return "", apperrors.BadRequest("branch_id must be a valid UUID", nil)
 		}
-		if !currentUser.CanAccessBranch(requestedBranchID) {
-			return "", apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(requestedBranchID); err != nil {
+			return "", err
 		}
 		return requestedBranchID, nil
 	}
 	if currentUser.CurrentBranchID != nil && strings.TrimSpace(*currentUser.CurrentBranchID) != "" {
 		currentBranchID := strings.TrimSpace(*currentUser.CurrentBranchID)
-		if !currentUser.CanAccessBranch(currentBranchID) {
-			return "", apperrors.Forbidden("current branch access denied")
+		if err := currentUser.EnsureRecordBranch(currentBranchID); err != nil {
+			return "", err
 		}
 		return currentBranchID, nil
 	}
 	if currentUser.AssignedBranchID != nil && strings.TrimSpace(*currentUser.AssignedBranchID) != "" {
 		assignedBranchID := strings.TrimSpace(*currentUser.AssignedBranchID)
-		if !currentUser.CanAccessBranch(assignedBranchID) {
-			return "", apperrors.Forbidden("assigned branch access denied")
+		if err := currentUser.EnsureRecordBranch(assignedBranchID); err != nil {
+			return "", err
 		}
 		return assignedBranchID, nil
 	}
@@ -200,8 +200,8 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 		return nil, apperrors.Internal("failed to lock checkout reference")
 	}
 	if existingSale, err := s.repo.FindSaleByCheckoutReference(tx, currentUser.BusinessID, req.CheckoutReference); err == nil {
-		if !currentUser.CanAccessBranch(existingSale.BranchID) {
-			return nil, apperrors.Forbidden("branch access denied")
+		if err := currentUser.EnsureRecordBranch(existingSale.BranchID); err != nil {
+			return nil, err
 		}
 		existingSaleID := existingSale.ID
 		_ = tx.Rollback().Error
@@ -296,8 +296,8 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 			tx = nil
 			existingSale, findErr := s.repo.FindSaleByCheckoutReference(s.db, currentUser.BusinessID, req.CheckoutReference)
 			if findErr == nil {
-				if !currentUser.CanAccessBranch(existingSale.BranchID) {
-					return nil, apperrors.Forbidden("branch access denied")
+				if err := currentUser.EnsureRecordBranch(existingSale.BranchID); err != nil {
+					return nil, err
 				}
 				return s.loadCheckoutSaleResponse(currentUser.BusinessID, existingSale.ID)
 			}
@@ -465,8 +465,8 @@ func (s *Service) GetHeldSale(currentUser *utils.AuthContext, id string) (*HeldS
 		}
 		return nil, apperrors.Internal("failed to load held sale")
 	}
-	if !currentUser.CanAccessBranch(heldSale.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(heldSale.BranchID); err != nil {
+		return nil, err
 	}
 	return heldSale, nil
 }
@@ -487,8 +487,8 @@ func (s *Service) ResumeHeldSale(currentUser *utils.AuthContext, id, ipAddress, 
 	if heldSale.Status != "held" {
 		return nil, apperrors.BadRequest("only held sales can be resumed", nil)
 	}
-	if !currentUser.CanAccessBranch(heldSale.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(heldSale.BranchID); err != nil {
+		return nil, err
 	}
 	now := time.Now().UTC()
 	if err := s.repo.UpdateHeldSale(tx, currentUser.BusinessID, id, map[string]interface{}{
@@ -528,8 +528,8 @@ func (s *Service) CancelHeldSale(currentUser *utils.AuthContext, id, ipAddress, 
 	if heldSale.Status != "held" {
 		return apperrors.BadRequest("only held sales can be cancelled", nil)
 	}
-	if !currentUser.CanAccessBranch(heldSale.BranchID) {
-		return apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(heldSale.BranchID); err != nil {
+		return err
 	}
 	now := time.Now().UTC()
 	if err := s.repo.UpdateHeldSale(tx, currentUser.BusinessID, id, map[string]interface{}{
@@ -586,8 +586,8 @@ func (s *Service) GetSale(currentUser *utils.AuthContext, saleID string) (*SaleR
 		}
 		return nil, apperrors.Internal("failed to load sale")
 	}
-	if !currentUser.CanAccessBranch(response.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(response.BranchID); err != nil {
+		return nil, err
 	}
 	return response, nil
 }
@@ -604,8 +604,8 @@ func (s *Service) GetCheckoutStatus(currentUser *utils.AuthContext, checkoutRefe
 		}
 		return nil, apperrors.Internal("failed to load checkout status")
 	}
-	if !currentUser.CanAccessBranch(sale.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(sale.BranchID); err != nil {
+		return nil, err
 	}
 	return s.loadCheckoutSaleResponse(currentUser.BusinessID, sale.ID)
 }
@@ -618,8 +618,8 @@ func (s *Service) GetReceipt(currentUser *utils.AuthContext, saleID string, ipAd
 		}
 		return nil, apperrors.Internal("failed to load sale")
 	}
-	if !currentUser.CanAccessBranch(sale.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(sale.BranchID); err != nil {
+		return nil, err
 	}
 	receipt, err := s.repo.LoadReceipt(*sale)
 	if err != nil {
@@ -668,8 +668,8 @@ func (s *Service) RefundSale(currentUser *utils.AuthContext, saleID string, req 
 	if sale.SaleStatus != "completed" && sale.SaleStatus != "partially_refunded" {
 		return nil, apperrors.BadRequest("sale cannot be refunded", nil)
 	}
-	if !currentUser.CanAccessBranch(sale.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(sale.BranchID); err != nil {
+		return nil, err
 	}
 	operationalRefunded, err := s.repo.SumOperationalRefunds(tx, currentUser.BusinessID, saleID)
 	if err != nil {
@@ -839,8 +839,8 @@ func (s *Service) VoidSale(currentUser *utils.AuthContext, saleID string, req Vo
 	if sale.SaleStatus != "completed" {
 		return nil, apperrors.BadRequest("only completed sales can be voided", nil)
 	}
-	if !currentUser.CanAccessBranch(sale.BranchID) {
-		return nil, apperrors.Forbidden("branch access denied")
+	if err := currentUser.EnsureRecordBranch(sale.BranchID); err != nil {
+		return nil, err
 	}
 	saleVoid := &SaleVoid{
 		ID:              utils.NewUUID(),

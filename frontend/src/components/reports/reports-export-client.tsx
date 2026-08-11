@@ -202,7 +202,9 @@ export function ReportsExportClient(): JSX.Element {
       const download = triggerCsvDownload(blob);
 
       setLatestDownload(download);
-      toast.success(`${selectedExportOption?.label ?? "Report"} CSV export started: ${blob.filename}`);
+      toast.success(
+        `${selectedExportOption?.label ?? "Report"} CSV export started: ${blob.filename}`,
+      );
     } catch (error) {
       const message = getErrorMessage(error);
 
@@ -229,7 +231,9 @@ export function ReportsExportClient(): JSX.Element {
             }}
           >
             <Download className="h-4 w-4" />
-            {selectedExportOption ? `Export ${selectedExportOption.label} CSV` : "Select report to export"}
+            {selectedExportOption
+              ? `Export ${selectedExportOption.label} CSV`
+              : "Select report to export"}
           </Button>
         }
       />

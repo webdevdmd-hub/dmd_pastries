@@ -16,10 +16,7 @@ export function DeliveryVsPickupChart({ report }: { report: DeliveryVsPickupRepo
     },
   ];
   return (
-    <ResponsiveChartFrame
-      ariaLabel="Pickup versus delivery count and value chart"
-      className="h-72"
-    >
+    <ResponsiveChartFrame ariaLabel="Pickup versus delivery count and value chart" className="h-72">
       {({ height, width }) => (
         <BarChart data={rows} height={height} width={width}>
           <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />

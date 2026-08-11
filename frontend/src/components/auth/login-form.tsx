@@ -223,9 +223,7 @@ export function LoginForm(): JSX.Element {
                       : "60 seconds"}
                     , then continue the existing session instead of creating another login attempt.
                   </p>
-                  {submitError ? (
-                    <p className="text-sm text-amber-800">{submitError}</p>
-                  ) : null}
+                  {submitError ? <p className="text-sm text-amber-800">{submitError}</p> : null}
                   <Button
                     disabled={recoveryLoading || isCooldownActive}
                     onClick={() => {
@@ -272,9 +270,7 @@ export function LoginForm(): JSX.Element {
               render={({ field }) => (
                 <FormItem>
                   <div className="flex items-center justify-between gap-3">
-                    <FormLabel className="text-sm font-medium text-[#2d2d2a]">
-                      Password
-                    </FormLabel>
+                    <FormLabel className="text-sm font-medium text-[#2d2d2a]">Password</FormLabel>
                     <Link
                       className="text-sm text-[#666662] underline-offset-4 hover:text-[#191918] hover:underline"
                       href={ROUTES.forgotPassword}

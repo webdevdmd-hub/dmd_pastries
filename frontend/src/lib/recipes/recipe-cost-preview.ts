@@ -1,4 +1,8 @@
-import type { RecipeIngredientLine, RecipePackagingLine, RecipeProductOption } from "@/types/recipes";
+import type {
+  RecipeIngredientLine,
+  RecipePackagingLine,
+  RecipeProductOption,
+} from "@/types/recipes";
 
 type NumericInput = number | string | null | undefined;
 
@@ -83,12 +87,12 @@ function lineHasUnitMismatch(
   unitId: string,
 ): boolean {
   const product = productForLine(products, componentProductId);
-  return product !== null && product.unitId.length > 0 && unitId.length > 0 && product.unitId !== unitId;
+  return (
+    product !== null && product.unitId.length > 0 && unitId.length > 0 && product.unitId !== unitId
+  );
 }
 
-export function ingredientLineToCostInput(
-  line: RecipeIngredientLine,
-): RecipeCostIngredientInput {
+export function ingredientLineToCostInput(line: RecipeIngredientLine): RecipeCostIngredientInput {
   return {
     componentProductId: line.componentProductId,
     componentVariantId: line.componentVariantId,
