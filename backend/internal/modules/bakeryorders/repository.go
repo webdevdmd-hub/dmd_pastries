@@ -176,6 +176,74 @@ func (r *Repository) CreatePayment(tx *gorm.DB, payment *BakeryOrderPayment) err
 	return tx.Create(payment).Error
 }
 
+type consumableStockRow struct {
+	InventoryItemID *string
+	IsStockTracked  bool
+	DisplayName     string
+}
+
+// FindProductStock resolves an order item's product/variant to its inventory
+// item on the order's branch (mirrors the sales-return lookup).
+func (r *Repository) FindProductStock(tx *gorm.DB, businessID, branchID, productID string, variantID *string) (*consumableStockRow, error) {
+	var row consumableStockRow
+	query := tx.Table("products p").
+		Select("p.is_stock_tracked, p.product_name AS display_name, ii.id AS inventory_item_id").
+		Where("p.id = ? AND p.business_id = ? AND p.branch_id = ? AND p.deleted_at IS NULL", productID, businessID, branchID)
+	if variantID != nil && strings.TrimSpace(*variantID) != "" {
+		query = query.
+			Joins("JOIN product_variants pv ON pv.product_id = p.id AND pv.business_id = p.business_id AND pv.id = ? AND pv.deleted_at IS NULL", strings.TrimSpace(*variantID)).
+			Joins("LEFT JOIN inventory_items ii ON ii.business_id = p.business_id AND ii.branch_id = ? AND ii.item_type = ? AND ii.product_id = p.id AND ii.product_variant_id = pv.id AND ii.deleted_at IS NULL", branchID, "product_variant")
+	} else {
+		query = query.
+			Joins("LEFT JOIN inventory_items ii ON ii.business_id = p.business_id AND ii.branch_id = ? AND ii.item_type = ? AND ii.product_id = p.id AND ii.product_variant_id IS NULL AND ii.deleted_at IS NULL", branchID, "product")
+	}
+	err := query.Take(&row).Error
+	return &row, err
+}
+
+// FindPackagingStock resolves a packaging component to its inventory item on
+// the order's branch. A missing row means the packaging is not stock-tracked.
+func (r *Repository) FindPackagingStock(tx *gorm.DB, businessID, branchID, packagingItemID string) (*consumableStockRow, error) {
+	var row consumableStockRow
+	err := tx.Table("inventory_items ii").
+		Select("ii.id AS inventory_item_id, true AS is_stock_tracked, COALESCE(pi.packaging_name, '') AS display_name").
+		Joins("LEFT JOIN packaging_items pi ON pi.id = ii.packaging_item_id AND pi.business_id = ii.business_id").
+		Where("ii.business_id = ? AND ii.branch_id = ? AND ii.item_type = ? AND ii.packaging_item_id = ? AND ii.deleted_at IS NULL", businessID, branchID, "packaging", packagingItemID).
+		Take(&row).Error
+	return &row, err
+}
+
+// PackagingRows returns the raw packaging requirement rows for an order.
+func (r *Repository) PackagingRows(tx *gorm.DB, businessID, orderID string) ([]BakeryOrderPackaging, error) {
+	var rows []BakeryOrderPackaging
+	err := tx.Where("business_id = ? AND bakery_order_id = ?", businessID, orderID).Find(&rows).Error
+	return rows, err
+}
+
+type outboundMovementRow struct {
+	ID              string
+	InventoryItemID string
+	Quantity        float64
+	TotalCost       float64
+}
+
+// OutboundMovements lists the order's un-reversed outbound stock movements,
+// used to restock symmetrically on cancellation.
+func (r *Repository) OutboundMovements(tx *gorm.DB, businessID, orderID string) ([]outboundMovementRow, error) {
+	var rows []outboundMovementRow
+	err := tx.Table("stock_movements").
+		Select("id, inventory_item_id, quantity, total_cost").
+		Where("business_id = ? AND reference_type = ? AND reference_id = ? AND movement_direction = ? AND is_reversed = false", businessID, "bakery_order", orderID, "out").
+		Find(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) MarkMovementReversed(tx *gorm.DB, businessID, movementID, reversalMovementID string) error {
+	return tx.Table("stock_movements").
+		Where("business_id = ? AND id = ?", businessID, movementID).
+		Updates(map[string]interface{}{"is_reversed": true, "reversed_by_movement_id": reversalMovementID}).Error
+}
+
 func (r *Repository) CountOrderPayments(tx *gorm.DB, businessID, orderID string) (int64, error) {
 	var count int64
 	err := tx.Table("bakery_order_payments").

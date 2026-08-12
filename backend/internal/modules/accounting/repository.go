@@ -87,6 +87,8 @@ type bakeryOrderAccountingRow struct {
 	ChargeTaxAmount          float64
 	OrderStatus              string
 	AccountingJournalEntryID *string
+	COGSJournalEntryID       *string
+	EventDate                time.Time
 }
 
 type bakeryPaymentAccountingRow struct {
@@ -1081,10 +1083,36 @@ func (r *Repository) UpdatePOSPaymentRefundJournalID(tx *gorm.DB, businessID, re
 func (r *Repository) FindBakeryOrderForAccounting(tx *gorm.DB, businessID, orderID string) (*bakeryOrderAccountingRow, error) {
 	var row bakeryOrderAccountingRow
 	err := tx.Table("bakery_orders").
-		Select("id, business_id, branch_id, order_number, total_amount, paid_amount, balance_amount, tax_amount, charge_amount, charge_tax_amount, order_status, accounting_journal_entry_id").
+		Select("id, business_id, branch_id, order_number, total_amount, paid_amount, balance_amount, tax_amount, charge_amount, charge_tax_amount, order_status, accounting_journal_entry_id, cogs_journal_entry_id, event_date").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, orderID).
 		Take(&row).Error
 	return &row, err
+}
+
+func (r *Repository) UpdateBakeryOrderCOGSJournalID(tx *gorm.DB, businessID, orderID, journalEntryID string) error {
+	result := tx.Table("bakery_orders").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, orderID).
+		Updates(map[string]interface{}{"cogs_journal_entry_id": journalEntryID, "updated_at": time.Now().UTC()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) UpdateBakeryOrderCOGSReversalJournalID(tx *gorm.DB, businessID, orderID, journalEntryID string) error {
+	result := tx.Table("bakery_orders").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, orderID).
+		Updates(map[string]interface{}{"cogs_reversal_journal_entry_id": journalEntryID, "updated_at": time.Now().UTC()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *Repository) FindBakeryPaymentForAccounting(tx *gorm.DB, businessID, paymentID string) (*bakeryPaymentAccountingRow, error) {

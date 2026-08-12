@@ -13,6 +13,7 @@ import (
 	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
 	"pastries-pos/internal/modules/charges"
+	"pastries-pos/internal/modules/inventory"
 	"pastries-pos/internal/modules/manufacturing"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
@@ -23,14 +24,16 @@ type Service struct {
 	repo                 *Repository
 	auditRepo            *audit.Repository
 	manufacturingService *manufacturing.Service
+	inventoryService     *inventory.Service
 	accountingService    *accounting.Service
 }
 
 const noValidProductionRecipeMessage = "No valid recipe found for this product. Please create or select a recipe before creating production."
 
-func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository, manufacturingService *manufacturing.Service, accountingService ...*accounting.Service) *Service {
+func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository, manufacturingService *manufacturing.Service, inventoryService *inventory.Service, accountingService ...*accounting.Service) *Service {
 	service := &Service{db: db, repo: repo, auditRepo: auditRepo}
 	service.manufacturingService = manufacturingService
+	service.inventoryService = inventoryService
 	if len(accountingService) > 0 {
 		service.accountingService = accountingService[0]
 	}
@@ -247,9 +250,29 @@ func (s *Service) UpdateStatus(currentUser *utils.AuthContext, id string, req Up
 		if err := s.repo.UpdateOrder(tx, id, currentUser.BusinessID, map[string]interface{}{"order_status": status, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}); err != nil {
 			return err
 		}
-		if status == "completed" && s.accountingService != nil {
-			if _, err := s.accountingService.PostBakeryOrderRevenueJournal(tx, currentUser, id); err != nil {
+		if status == "completed" {
+			// Phase 4 / W1: stock leaves and COGS posts at completion, the
+			// same event that posts revenue (2026-08-12 decision §1).
+			if err := s.consumeInventoryForCompletion(tx, currentUser, order); err != nil {
 				return err
+			}
+			if s.accountingService != nil {
+				if _, err := s.accountingService.PostBakeryOrderRevenueJournal(tx, currentUser, id); err != nil {
+					return err
+				}
+				if _, err := s.accountingService.PostBakeryOrderCOGSJournal(tx, currentUser, id); err != nil {
+					return err
+				}
+			}
+		}
+		if status == "cancelled" && order.OrderStatus == "completed" {
+			if err := s.restockInventoryForCancellation(tx, currentUser, order); err != nil {
+				return err
+			}
+			if s.accountingService != nil {
+				if _, err := s.accountingService.ReverseBakeryOrderCOGSJournal(tx, currentUser, id); err != nil {
+					return err
+				}
 			}
 		}
 		return s.audit(tx, currentUser, "bakery_order.status_updated", id, "Bakery order status updated", ipAddress, userAgent)
@@ -258,6 +281,125 @@ func (s *Service) UpdateStatus(currentUser *utils.AuthContext, id string, req Up
 		return nil, err
 	}
 	return s.GetOrder(currentUser, id)
+}
+
+// consumeInventoryForCompletion relieves stock for every stock-tracked item
+// and packaging component on the order (Phase 4 / W1). Custom items and
+// non-tracked components are skipped; cost comes from the standard outbound
+// basis (item average cost, product cost_price fallback).
+func (s *Service) consumeInventoryForCompletion(tx *gorm.DB, currentUser *utils.AuthContext, order *BakeryOrder) error {
+	if s.inventoryService == nil {
+		return apperrors.Internal("inventory service unavailable for bakery order completion")
+	}
+	items, err := s.repo.Items(currentUser.BusinessID, order.ID)
+	if err != nil {
+		return apperrors.Internal("failed to load bakery order items for stock consumption")
+	}
+	for _, item := range items {
+		if item.ProductID == nil || strings.TrimSpace(*item.ProductID) == "" {
+			continue // custom item: no stock basis
+		}
+		stock, err := s.repo.FindProductStock(tx, currentUser.BusinessID, order.BranchID, strings.TrimSpace(*item.ProductID), item.ProductVariantID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				continue
+			}
+			return apperrors.Internal("failed to resolve stock for bakery order item")
+		}
+		if !stock.IsStockTracked || stock.InventoryItemID == nil || strings.TrimSpace(*stock.InventoryItemID) == "" {
+			continue
+		}
+		if _, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{
+			BusinessID:      currentUser.BusinessID,
+			InventoryItemID: *stock.InventoryItemID,
+			MovementType:    "sale_out",
+			Quantity:        item.Quantity,
+			ReferenceType:   "bakery_order",
+			ReferenceID:     &order.ID,
+			ReferenceNumber: order.OrderNumber,
+			Reason:          "Bakery order completed",
+			CreatedByUserID: currentUser.UserID,
+		}); err != nil {
+			return err
+		}
+	}
+	packaging, err := s.repo.PackagingRows(tx, currentUser.BusinessID, order.ID)
+	if err != nil {
+		return apperrors.Internal("failed to load bakery order packaging for stock consumption")
+	}
+	for _, pack := range packaging {
+		var stock *consumableStockRow
+		switch {
+		case pack.PackagingItemID != nil && strings.TrimSpace(*pack.PackagingItemID) != "":
+			stock, err = s.repo.FindPackagingStock(tx, currentUser.BusinessID, order.BranchID, strings.TrimSpace(*pack.PackagingItemID))
+		case pack.ComponentProductID != nil && strings.TrimSpace(*pack.ComponentProductID) != "":
+			stock, err = s.repo.FindProductStock(tx, currentUser.BusinessID, order.BranchID, strings.TrimSpace(*pack.ComponentProductID), pack.ComponentVariantID)
+		default:
+			continue
+		}
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				continue
+			}
+			return apperrors.Internal("failed to resolve stock for bakery order packaging")
+		}
+		if !stock.IsStockTracked || stock.InventoryItemID == nil || strings.TrimSpace(*stock.InventoryItemID) == "" {
+			continue
+		}
+		if _, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{
+			BusinessID:      currentUser.BusinessID,
+			InventoryItemID: *stock.InventoryItemID,
+			MovementType:    "sale_out",
+			Quantity:        pack.QuantityRequired,
+			ReferenceType:   "bakery_order",
+			ReferenceID:     &order.ID,
+			ReferenceNumber: order.OrderNumber,
+			Reason:          "Bakery order packaging consumed",
+			CreatedByUserID: currentUser.UserID,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// restockInventoryForCancellation mirrors the order's outbound movements back
+// into stock at their original cost when a completed order is cancelled.
+func (s *Service) restockInventoryForCancellation(tx *gorm.DB, currentUser *utils.AuthContext, order *BakeryOrder) error {
+	if s.inventoryService == nil {
+		return apperrors.Internal("inventory service unavailable for bakery order cancellation")
+	}
+	movements, err := s.repo.OutboundMovements(tx, currentUser.BusinessID, order.ID)
+	if err != nil {
+		return apperrors.Internal("failed to load bakery order stock movements for restock")
+	}
+	for _, movement := range movements {
+		unitCost := 0.0
+		if movement.Quantity > 0 {
+			unitCost = movement.TotalCost / movement.Quantity
+		}
+		reversal, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{
+			BusinessID:         currentUser.BusinessID,
+			InventoryItemID:    movement.InventoryItemID,
+			MovementType:       "return_in",
+			Quantity:           movement.Quantity,
+			UnitCost:           unitCost,
+			ReferenceType:      "bakery_order_cancelled",
+			ReferenceID:        &order.ID,
+			ReferenceNumber:    order.OrderNumber,
+			Reason:             "Bakery order cancelled",
+			IsReversal:         true,
+			ReversedMovementID: &movement.ID,
+			CreatedByUserID:    currentUser.UserID,
+		})
+		if err != nil {
+			return err
+		}
+		if err := s.repo.MarkMovementReversed(tx, currentUser.BusinessID, movement.ID, reversal.ID); err != nil {
+			return apperrors.Internal("failed to mark bakery order stock movement reversed")
+		}
+	}
+	return nil
 }
 
 func (s *Service) DeleteOrder(currentUser *utils.AuthContext, id, ipAddress, userAgent string) error {

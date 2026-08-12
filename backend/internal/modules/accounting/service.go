@@ -1587,7 +1587,7 @@ func (s *Service) PostBakeryOrderRevenueJournal(tx *gorm.DB, currentUser *utils.
 	if vatPayable != nil {
 		lines = append(lines, JournalEntryLineRequest{AccountID: vatPayable.ID, CreditAmount: taxAmount, Description: "VAT payable on bakery order"})
 	}
-	journalID, err := s.createPostedSystemJournal(tx, currentUser, time.Now().UTC(), order.BranchID, "bakery_order_revenue", order.ID, order.OrderNumber, "Bakery order revenue "+order.OrderNumber, lines)
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, bakeryOrderEntryDate(order.EventDate), order.BranchID, "bakery_order_revenue", order.ID, order.OrderNumber, "Bakery order revenue "+order.OrderNumber, lines)
 	if err != nil {
 		return "", err
 	}
@@ -1595,6 +1595,95 @@ func (s *Service) PostBakeryOrderRevenueJournal(tx *gorm.DB, currentUser *utils.
 		return "", apperrors.Internal("failed to update bakery order accounting journal")
 	}
 	return journalID, nil
+}
+
+// bakeryOrderEntryDate picks the ledger date for bakery order journals. Live
+// completions happen "now", but backfilled or late completions must land in
+// the order's own period — so a past event date wins over the clock.
+func bakeryOrderEntryDate(eventDate time.Time) time.Time {
+	now := time.Now().UTC()
+	if !eventDate.IsZero() && eventDate.Before(now) {
+		return eventDate
+	}
+	return now
+}
+
+// PostBakeryOrderCOGSJournal relieves inventory for a completed bakery order
+// (Phase 4 / W1): Dr COGS 5070 / Cr Inventory 1200 at the summed cost of the
+// order's outbound stock movements (reference_type='bakery_order'). Mirrors
+// PostPOSSaleCOGSJournal, including the zero-cost visibility rule.
+func (s *Service) PostBakeryOrderCOGSJournal(tx *gorm.DB, currentUser *utils.AuthContext, orderID string) (string, error) {
+	order, err := s.repo.FindBakeryOrderForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(orderID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load bakery order for COGS accounting")
+	}
+	if order.COGSJournalEntryID != nil && *order.COGSJournalEntryID != "" {
+		return *order.COGSJournalEntryID, nil
+	}
+	if order.OrderStatus != "completed" {
+		return "", nil
+	}
+	costTotal, err := s.repo.SumStockMovementCostByReference(tx, currentUser.BusinessID, "bakery_order", order.ID, "out")
+	if err != nil {
+		return "", apperrors.Internal("failed to calculate bakery order inventory cost")
+	}
+	costTotal = roundMoney(costTotal)
+	if costTotal <= 0 {
+		// Custom-only orders legitimately consume nothing; stock-tracked orders
+		// with zero cost are a COGS gap that must stay visible.
+		log.Printf(
+			"accounting: bakery order %s has zero outbound cost; COGS journal skipped (business_id=%s order_id=%s)",
+			order.OrderNumber, currentUser.BusinessID, order.ID,
+		)
+		return "", nil
+	}
+	cogsAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, order.BranchID, "cogs", "5070", "Cost of Goods Sold")
+	if err != nil {
+		return "", err
+	}
+	inventoryAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, order.BranchID, "inventory_stock", "1200", "Inventory / Stock")
+	if err != nil {
+		return "", err
+	}
+	lines := []JournalEntryLineRequest{
+		{AccountID: cogsAccount.ID, DebitAmount: costTotal, Description: "COGS for bakery order " + order.OrderNumber},
+		{AccountID: inventoryAccount.ID, CreditAmount: costTotal, Description: "Inventory cost relieved for bakery order " + order.OrderNumber},
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, bakeryOrderEntryDate(order.EventDate), order.BranchID, "bakery_order_cogs", order.ID, order.OrderNumber, "Bakery order COGS "+order.OrderNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdateBakeryOrderCOGSJournalID(tx, currentUser.BusinessID, order.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update bakery order COGS journal")
+	}
+	if err := s.repo.UpdateStockMovementJournalByReference(tx, currentUser.BusinessID, "bakery_order", order.ID, "out", journalID); err != nil {
+		return "", apperrors.Internal("failed to link bakery order stock movements to COGS journal")
+	}
+	return journalID, nil
+}
+
+// ReverseBakeryOrderCOGSJournal mirrors the COGS journal when a completed
+// order is cancelled. The caller restocks the movements; this reverses the
+// ledger side. Idempotent via the stored reversal id.
+func (s *Service) ReverseBakeryOrderCOGSJournal(tx *gorm.DB, currentUser *utils.AuthContext, orderID string) (string, error) {
+	order, err := s.repo.FindBakeryOrderForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(orderID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load bakery order for COGS reversal")
+	}
+	if order.COGSJournalEntryID == nil || strings.TrimSpace(*order.COGSJournalEntryID) == "" {
+		return "", nil
+	}
+	reversalID, err := s.reversePostedJournalInTx(tx, currentUser, *order.COGSJournalEntryID, "bakery_order_cogs_reversal", "Bakery order cancelled: COGS reversal "+order.OrderNumber)
+	if err != nil {
+		return "", err
+	}
+	if reversalID == "" {
+		return "", nil
+	}
+	if err := s.repo.UpdateBakeryOrderCOGSReversalJournalID(tx, currentUser.BusinessID, order.ID, reversalID); err != nil {
+		return "", apperrors.Internal("failed to update bakery order COGS reversal journal")
+	}
+	return reversalID, nil
 }
 
 func validateBakeryOrderRevenuePostedJournal(entry *JournalEntry, orderID string) error {
