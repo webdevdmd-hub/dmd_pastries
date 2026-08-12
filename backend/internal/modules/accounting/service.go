@@ -1889,6 +1889,33 @@ func (s *Service) ReversePurchaseReturnJournal(tx *gorm.DB, currentUser *utils.A
 	return s.reversePostedJournalInTx(tx, currentUser, journalEntryID, "purchase_return_reversal", "Vendor credit reversal "+strings.TrimSpace(returnNumber))
 }
 
+// buildReversalLines mirrors a posted journal's lines with debit/credit
+// swapped. Each reversal line must carry the branch of the line it reverses
+// (falling back to the entry's branch for pre-000095 rows) — otherwise the
+// reversal writes NULL branch_id lines that silently bypass the composite
+// branch FKs and block the planned SET NOT NULL hardening.
+func buildReversalLines(entry *JournalEntry, lines []JournalEntryLine, reversalID string) []JournalEntryLine {
+	reversalLines := make([]JournalEntryLine, 0, len(lines))
+	for i, line := range lines {
+		branchID := line.BranchID
+		if branchID == nil {
+			branchID = entry.BranchID
+		}
+		reversalLines = append(reversalLines, JournalEntryLine{
+			ID:             utils.NewUUID(),
+			BusinessID:     entry.BusinessID,
+			BranchID:       branchID,
+			JournalEntryID: reversalID,
+			AccountID:      line.AccountID,
+			LineNumber:     i + 1,
+			DebitAmount:    roundMoney(line.CreditAmount),
+			CreditAmount:   roundMoney(line.DebitAmount),
+			Description:    "Reversal: " + line.Description,
+		})
+	}
+	return reversalLines
+}
+
 func (s *Service) reversePostedJournalInTx(tx *gorm.DB, currentUser *utils.AuthContext, journalEntryID, sourceType, narration string) (string, error) {
 	entry, err := s.repo.FindJournalEntryForUpdate(tx, currentUser.BusinessID, strings.TrimSpace(journalEntryID))
 	if err != nil {
@@ -1909,19 +1936,7 @@ func (s *Service) reversePostedJournalInTx(tx *gorm.DB, currentUser *utils.AuthC
 		return "", apperrors.Internal("failed to generate reversal journal entry number")
 	}
 	reversalID := utils.NewUUID()
-	reversalLines := make([]JournalEntryLine, 0, len(lines))
-	for i, line := range lines {
-		reversalLines = append(reversalLines, JournalEntryLine{
-			ID:             utils.NewUUID(),
-			BusinessID:     currentUser.BusinessID,
-			JournalEntryID: reversalID,
-			AccountID:      line.AccountID,
-			LineNumber:     i + 1,
-			DebitAmount:    roundMoney(line.CreditAmount),
-			CreditAmount:   roundMoney(line.DebitAmount),
-			Description:    "Reversal: " + line.Description,
-		})
-	}
+	reversalLines := buildReversalLines(entry, lines, reversalID)
 	now := time.Now().UTC()
 	reversal := &JournalEntry{
 		ID:              reversalID,
@@ -3701,7 +3716,7 @@ func (s *Service) ReverseJournalEntry(currentUser *utils.AuthContext, id string,
 		if entry.Status != "posted" {
 			return apperrors.BadRequest("only posted journal entries can be reversed", nil)
 		}
-		lines, err := s.repo.ListJournalEntryLines(currentUser.BusinessID, entry.ID)
+		lines, err := s.repo.ListJournalEntryLinesForUpdate(tx, currentUser.BusinessID, entry.ID)
 		if err != nil {
 			return apperrors.Internal("failed to load journal entry lines")
 		}
@@ -3710,19 +3725,7 @@ func (s *Service) ReverseJournalEntry(currentUser *utils.AuthContext, id string,
 			return apperrors.Internal("failed to generate reversal journal entry number")
 		}
 		reversalID = utils.NewUUID()
-		reversalLines := make([]JournalEntryLine, 0, len(lines))
-		for i, line := range lines {
-			reversalLines = append(reversalLines, JournalEntryLine{
-				ID:             utils.NewUUID(),
-				BusinessID:     currentUser.BusinessID,
-				JournalEntryID: reversalID,
-				AccountID:      line.AccountID,
-				LineNumber:     i + 1,
-				DebitAmount:    roundMoney(line.CreditAmount),
-				CreditAmount:   roundMoney(line.DebitAmount),
-				Description:    "Reversal: " + line.Description,
-			})
-		}
+		reversalLines := buildReversalLines(entry, lines, reversalID)
 		narration := strings.TrimSpace(req.Narration)
 		if narration == "" {
 			narration = "Reversal of " + entry.EntryNumber
