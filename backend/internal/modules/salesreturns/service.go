@@ -717,7 +717,7 @@ func (s *Service) validateRefundRequest(tx *gorm.DB, businessID, saleID, branchI
 	if paymentMethodID == nil || strings.TrimSpace(*paymentMethodID) == "" {
 		return apperrors.BadRequest("refund_payment_method_id is required when refund_mode=refund", nil)
 	}
-	method, err := s.repo.FindPaymentMethod(tx, businessID, strings.TrimSpace(*paymentMethodID))
+	method, err := s.repo.FindPaymentMethod(tx, businessID, branchID, strings.TrimSpace(*paymentMethodID))
 	if err != nil {
 		return mapNotFound(err, "payment method not found")
 	}
@@ -789,7 +789,7 @@ func (s *Service) applyRestockMovement(tx *gorm.DB, currentUser *utils.AuthConte
 }
 
 func (s *Service) createPaymentRefund(tx *gorm.DB, currentUser *utils.AuthContext, sale *saleRow, salesReturn *SalesReturn) (string, error) {
-	method, err := s.repo.FindPaymentMethod(tx, currentUser.BusinessID, *salesReturn.RefundPaymentMethodID)
+	method, err := s.repo.FindPaymentMethod(tx, currentUser.BusinessID, sale.BranchID, *salesReturn.RefundPaymentMethodID)
 	if err != nil {
 		return "", mapNotFound(err, "payment method not found")
 	}

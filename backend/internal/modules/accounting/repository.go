@@ -828,7 +828,7 @@ func (r *Repository) FindPurchaseInvoicePaymentForAccounting(tx *gorm.DB, busine
 			pip.payment_method_name_snapshot,
 			pip.amount,
 			pip.payment_status,
-			pm.default_payment_account_id,
+			COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AS default_payment_account_id,
 			pa.branch_id AS payment_account_branch_id,
 			COALESCE(pa.account_name, '') AS payment_account_name,
 			COALESCE(pa.chart_account_id::text, '') AS chart_account_id,
@@ -837,7 +837,8 @@ func (r *Repository) FindPurchaseInvoicePaymentForAccounting(tx *gorm.DB, busine
 		`).
 		Joins("JOIN purchase_invoices pi ON pi.id = pip.purchase_invoice_id AND pi.business_id = pip.business_id AND pi.deleted_at IS NULL").
 		Joins("JOIN payment_methods pm ON pm.id = pip.payment_method_id AND pm.business_id = pip.business_id AND pm.deleted_at IS NULL").
-		Joins("LEFT JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = pip.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_method_account_mappings pmam ON pmam.payment_method_id = pm.id AND pmam.business_id = pip.business_id AND pmam.branch_id = pip.branch_id AND pmam.status = 'active' AND pmam.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AND pa.business_id = pip.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL AND (pa.branch_id IS NULL OR pa.branch_id = pip.branch_id)").
 		Where("pip.business_id = ? AND pip.id = ? AND pip.deleted_at IS NULL", businessID, paymentID).
 		Take(&row).Error
 	return &row, err
@@ -1045,7 +1046,7 @@ func (r *Repository) FindPOSPaymentRefundForAccounting(tx *gorm.DB, businessID, 
 			pr.refund_amount,
 			pr.refund_reason,
 			pr.refund_status,
-			pm.default_payment_account_id,
+			COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AS default_payment_account_id,
 			pa.branch_id AS payment_account_branch_id,
 			COALESCE(pa.account_name, '') AS payment_account_name,
 			COALESCE(pa.chart_account_id::text, '') AS chart_account_id,
@@ -1053,7 +1054,8 @@ func (r *Repository) FindPOSPaymentRefundForAccounting(tx *gorm.DB, businessID, 
 			pr.refunded_at
 		`).
 		Joins("JOIN payment_methods pm ON pm.id = pr.payment_method_id AND pm.business_id = pr.business_id AND pm.deleted_at IS NULL").
-		Joins("LEFT JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = pr.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_method_account_mappings pmam ON pmam.payment_method_id = pm.id AND pmam.business_id = pr.business_id AND pmam.branch_id = pr.branch_id AND pmam.status = 'active' AND pmam.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AND pa.business_id = pr.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL AND (pa.branch_id IS NULL OR pa.branch_id = pr.branch_id)").
 		Where("pr.business_id = ? AND pr.id = ? AND pr.deleted_at IS NULL", businessID, refundID).
 		Take(&row).Error
 	return &row, err
@@ -1094,7 +1096,7 @@ func (r *Repository) FindBakeryPaymentForAccounting(tx *gorm.DB, businessID, pay
 			bop.payment_type,
 			bop.amount,
 			bop.payment_method_name_snapshot,
-			pm.default_payment_account_id,
+			COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AS default_payment_account_id,
 			pa.branch_id AS payment_account_branch_id,
 			COALESCE(pa.account_name, '') AS payment_account_name,
 			COALESCE(pa.chart_account_id::text, '') AS chart_account_id,
@@ -1103,7 +1105,8 @@ func (r *Repository) FindBakeryPaymentForAccounting(tx *gorm.DB, businessID, pay
 		`).
 		Joins("JOIN bakery_orders bo ON bo.id = bop.bakery_order_id AND bo.business_id = bop.business_id AND bo.deleted_at IS NULL").
 		Joins("JOIN payment_methods pm ON pm.id = bop.payment_method_id AND pm.business_id = bop.business_id AND pm.deleted_at IS NULL").
-		Joins("LEFT JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = bop.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_method_account_mappings pmam ON pmam.payment_method_id = pm.id AND pmam.business_id = bop.business_id AND pmam.branch_id = bo.branch_id AND pmam.status = 'active' AND pmam.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AND pa.business_id = bop.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL AND (pa.branch_id IS NULL OR pa.branch_id = bo.branch_id)").
 		Where("bop.business_id = ? AND bop.id = ?", businessID, paymentID).
 		Take(&row).Error
 	return &row, err
@@ -1153,7 +1156,7 @@ func (r *Repository) FindSalesReturnForAccounting(tx *gorm.DB, businessID, sales
 			sr.status,
 			sr.refund_payment_method_id,
 			COALESCE(pm.method_name, '') AS refund_payment_method_name,
-			pm.default_payment_account_id,
+			COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AS default_payment_account_id,
 			pa.branch_id AS payment_account_branch_id,
 			COALESCE(pa.account_name, '') AS payment_account_name,
 			COALESCE(pa.chart_account_id::text, '') AS chart_account_id,
@@ -1161,7 +1164,8 @@ func (r *Repository) FindSalesReturnForAccounting(tx *gorm.DB, businessID, sales
 			sr.inventory_journal_entry_id
 		`).
 		Joins("LEFT JOIN payment_methods pm ON pm.id = sr.refund_payment_method_id AND pm.business_id = sr.business_id AND pm.deleted_at IS NULL").
-		Joins("LEFT JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = sr.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_method_account_mappings pmam ON pmam.payment_method_id = pm.id AND pmam.business_id = sr.business_id AND pmam.branch_id = sr.branch_id AND pmam.status = 'active' AND pmam.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AND pa.business_id = sr.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL AND (pa.branch_id IS NULL OR pa.branch_id = sr.branch_id)").
 		Where("sr.business_id = ? AND sr.id = ? AND sr.deleted_at IS NULL", businessID, salesReturnID).
 		Take(&row).Error
 	return &row, err

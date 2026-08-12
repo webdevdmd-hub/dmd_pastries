@@ -280,7 +280,7 @@ func (r *Repository) AvailableRefundableAmount(tx *gorm.DB, businessID, saleID s
 	return collected - refunded, nil
 }
 
-func (r *Repository) FindPaymentMethod(tx *gorm.DB, businessID, methodID string) (*paymentMethodRow, error) {
+func (r *Repository) FindPaymentMethod(tx *gorm.DB, businessID, branchID, methodID string) (*paymentMethodRow, error) {
 	var row paymentMethodRow
 	err := tx.Table("payment_methods pm").
 		Select(`
@@ -288,12 +288,13 @@ func (r *Repository) FindPaymentMethod(tx *gorm.DB, businessID, methodID string)
 			pm.method_name,
 			pm.method_type,
 			pm.requires_reference,
-			pm.default_payment_account_id,
+			COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AS default_payment_account_id,
 			pa.branch_id AS payment_account_branch_id,
 			COALESCE(pa.account_name, '') AS payment_account_name,
 			COALESCE(pa.chart_account_id::text, '') AS chart_account_id
 		`).
-		Joins("LEFT JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = pm.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_method_account_mappings pmam ON pmam.payment_method_id = pm.id AND pmam.business_id = pm.business_id AND pmam.branch_id = ? AND pmam.status = 'active' AND pmam.deleted_at IS NULL", branchID).
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AND pa.business_id = pm.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL AND (pa.branch_id IS NULL OR pa.branch_id = ?)", branchID).
 		Where("pm.business_id = ? AND pm.id = ? AND pm.status = ? AND pm.deleted_at IS NULL", businessID, methodID, "active").
 		Take(&row).Error
 	return &row, err
