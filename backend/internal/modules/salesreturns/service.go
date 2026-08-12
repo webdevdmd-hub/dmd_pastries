@@ -970,7 +970,8 @@ func (s *Service) saleStockMovementUnitCost(tx *gorm.DB, businessID, saleID, inv
 	var unitCost float64
 	err := tx.Table("stock_movements").
 		Select("COALESCE(SUM(total_cost) / NULLIF(SUM(quantity), 0), 0)").
-		Where("business_id = ? AND reference_type = ? AND reference_id = ? AND inventory_item_id = ? AND movement_direction = ? AND deleted_at IS NULL", businessID, "sale", saleID, inventoryItemID, "out").
+		// stock_movements is not soft-deleted; a soft-delete predicate here makes Postgres reject the query.
+		Where("business_id = ? AND reference_type = ? AND reference_id = ? AND inventory_item_id = ? AND movement_direction = ?", businessID, "sale", saleID, inventoryItemID, "out").
 		Scan(&unitCost).Error
 	if err != nil {
 		return 0, apperrors.Internal("failed to calculate original sale stock cost")
