@@ -16,6 +16,7 @@ import { Fragment, type JSX } from "react";
 import { toast } from "sonner";
 
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { useBreadcrumbLabel } from "@/components/layout/breadcrumb-label";
 import { ThemeSelector } from "@/components/theme/theme-selector";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -64,6 +65,17 @@ function formatSegment(segment: string): string {
     .join(" ");
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Record identifiers must never be humanised into a fake title — a bill at
+ * `/purchasing/invoices/{uuid}` would otherwise read as
+ * "E4c93786 5eb5 4fa2 A52b 8e940950e70" in the breadcrumb.
+ */
+function isRecordIdSegment(segment: string): boolean {
+  return UUID_PATTERN.test(segment) || /^\d+$/.test(segment) || /^[0-9a-f]{16,}$/i.test(segment);
+}
+
 export function AppHeader(): JSX.Element {
   const pathname = usePathname();
   const router = useRouter();
@@ -71,6 +83,7 @@ export function AppHeader(): JSX.Element {
   const branchScope = useBranchScope();
   const { hasAnyPermission, hasPermission } = usePermission();
   const segments = pathname.split("/").filter(Boolean);
+  const breadcrumbLabel = useBreadcrumbLabel();
   const canViewAuditLogs = hasAnyPermission([PERMISSIONS.auditLogsView]);
   const canViewSettings = hasPermission(PERMISSIONS.settingsView);
   const canViewBranches = hasAnyPermission([
@@ -268,15 +281,20 @@ export function AppHeader(): JSX.Element {
             {segments.map((segment, index) => {
               const href = `/${segments.slice(0, index + 1).join("/")}`;
               const isLast = index === segments.length - 1;
+              // Show the record's business reference (bill no, order no) when the
+              // page published one; never fall back to the raw identifier.
+              const label = isRecordIdSegment(segment)
+                ? ((isLast ? breadcrumbLabel : null) ?? "Details")
+                : formatSegment(segment);
 
               return (
                 <Fragment key={`${href}-group`}>
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
                     {isLast ? (
-                      <BreadcrumbPage>{formatSegment(segment)}</BreadcrumbPage>
+                      <BreadcrumbPage>{label}</BreadcrumbPage>
                     ) : (
-                      <BreadcrumbLink href={href}>{formatSegment(segment)}</BreadcrumbLink>
+                      <BreadcrumbLink href={href}>{label}</BreadcrumbLink>
                     )}
                   </BreadcrumbItem>
                 </Fragment>

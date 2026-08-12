@@ -23,3 +23,4 @@ out/
 
 # Environment files (never commit any .env, including .example files)
 .env*
+.gstack/

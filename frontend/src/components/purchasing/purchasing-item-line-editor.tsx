@@ -1,8 +1,8 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { FileText, GripVertical, Package, Plus, Trash2 } from "lucide-react";
-import type { JSX } from "react";
+import { AlertTriangle, FileText, Lock, Package, Plus, Trash2 } from "lucide-react";
+import type { JSX, ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -27,6 +27,7 @@ import {
   isPurchasableProduct,
   isSelectableTaxRate,
 } from "@/lib/selectors/eligibility";
+import { cn } from "@/lib/utils/cn";
 import { createUuid } from "@/lib/uuid";
 import type { ChartAccount } from "@/types/accounting";
 import type { CreateProductPayload, Product } from "@/types/product";
@@ -46,6 +47,7 @@ type PurchasingItemLineEditorProps = {
   disableAddRows?: boolean;
   legacyChargeAmount?: number;
   legacyChargeTaxAmount?: number;
+  lineErrors?: Record<string, string>;
   lineLocks?: Record<string, { minQuantity: number; receivedQuantity: number }>;
   lines: PurchaseItemLineDraft[];
   onLinesChange: (lines: PurchaseItemLineDraft[]) => void;
@@ -158,6 +160,14 @@ function optionSearchText(option: SearchableComboboxOption): string {
     .toLowerCase();
 }
 
+function MiniLabel({ children }: { children: ReactNode }): JSX.Element {
+  return (
+    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-workspace-muted">
+      {children}
+    </span>
+  );
+}
+
 export function PurchasingItemLineEditor({
   accounts = [],
   allowBatchFields = false,
@@ -166,6 +176,7 @@ export function PurchasingItemLineEditor({
   disableAddRows = false,
   legacyChargeAmount = 0,
   legacyChargeTaxAmount = 0,
+  lineErrors = {},
   lineLocks = {},
   lines,
   onLinesChange,
@@ -276,6 +287,26 @@ export function PurchasingItemLineEditor({
     ).length;
     return `Matching accounts (${String(matchingAccounts)})`;
   }, [accountOptions, accountSearch]);
+  const referenceNotices = useMemo(() => {
+    const notices: string[] = [];
+    if (products.length === 0) {
+      notices.push(
+        "No products available — add products in Product Master, or use an account row for non-stock costs.",
+      );
+    }
+    if (units.length === 0) {
+      notices.push("No units configured — add a unit of measure before adding product lines.");
+    }
+    if (taxRates.length === 0) {
+      notices.push("No tax rates configured — lines will post without tax until one is added.");
+    }
+    if (showAccountRows && accounts.length === 0) {
+      notices.push(
+        "No chart accounts available for account rows — add accounts in the chart of accounts first.",
+      );
+    }
+    return notices;
+  }, [accounts.length, products.length, showAccountRows, taxRates.length, units.length]);
   const applyCreatedProductToLine = (product: Product): void => {
     const targetLineId =
       productCreateLineId ??
@@ -319,8 +350,8 @@ export function PurchasingItemLineEditor({
 
   return (
     <>
-      <section className="flex min-h-0 w-full flex-1 flex-col rounded-xl border border-brand-cappuccino/70 bg-white shadow-sm">
-        <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+      <section className="flex min-h-0 w-full flex-1 flex-col rounded-md border border-workspace-border bg-white shadow-sm">
+        <div className="flex flex-col gap-2 border-b border-workspace-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold text-brand-mocha">Item Rates Are</span>
             <Select value="tax-exclusive">
@@ -337,26 +368,38 @@ export function PurchasingItemLineEditor({
           </p>
         </div>
 
-        <div className="min-h-0 w-full flex-1 overflow-auto">
-          <table className="w-full min-w-[1180px] table-fixed border-collapse text-xs">
+        {referenceNotices.length > 0 ? (
+          <ul className="space-y-1 border-b border-workspace-border bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {referenceNotices.map((notice) => (
+              <li className="flex items-start gap-1.5" key={notice}>
+                <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{notice}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        <div className="min-h-0 w-full flex-1 overflow-x-auto overflow-y-auto">
+          <table className="w-full min-w-[1050px] table-fixed border-collapse text-xs">
             <thead>
-              <tr className="border-b border-brand-cappuccino/70 bg-brand-latte/30 text-left text-xs font-semibold text-brand-mocha">
-                <th className="w-[105px] px-1.5 py-2">{showAccountRows ? "Row type" : ""}</th>
-                <th className="w-[260px] px-2 py-2">Item Details</th>
-                <th className="w-[250px] px-2 py-2">Account</th>
-                <th className="w-[78px] px-2 py-2 text-right">Qty</th>
-                <th className="w-[92px] px-2 py-2 text-right">Rate</th>
-                <th className="w-[92px] px-2 py-2 text-right">Discount</th>
-                <th className="w-[132px] px-2 py-2">Tax</th>
-                <th className="w-[120px] px-2 py-2">Unit</th>
+              <tr className="sticky top-0 z-10 border-b border-workspace-border bg-brand-latte/40 text-left text-xs font-semibold text-brand-mocha">
+                <th className="w-[92px] px-1.5 py-2">{showAccountRows ? "Row type" : ""}</th>
+                <th className="w-[220px] px-2 py-2">Item Details</th>
+                <th className="w-[200px] px-2 py-2">Account</th>
+                <th className="w-[64px] px-2 py-2 text-right">Qty</th>
+                <th className="w-[78px] px-2 py-2 text-right">Rate</th>
+                <th className="w-[78px] px-2 py-2 text-right">Discount</th>
+                <th className="w-[118px] px-2 py-2">Tax</th>
+                <th className="w-[104px] px-2 py-2">Unit</th>
                 <th className="w-[92px] px-2 py-2 text-right">Amount</th>
-                <th className="w-[42px] px-1.5 py-2" aria-label="Actions" />
+                <th className="w-[36px] px-1.5 py-2" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
               {safeLines.map((line, index) => {
                 const lineLock = lineLocks[line.lineId];
                 const isLineLocked = Boolean(lineLock);
+                const lineError = lineErrors[line.lineId];
                 const accountLine = showAccountRows && isAccountLine(line);
                 const selectedProduct =
                   products.find((product) => product.id === line.productId) ?? null;
@@ -376,7 +419,14 @@ export function PurchasingItemLineEditor({
                 const selectedTaxRate = taxRates.find((rate) => rate.id === line.taxRateId);
 
                 return (
-                  <tr className="border-b border-brand-cappuccino/70 align-top" key={line.lineId}>
+                  <tr
+                    className={cn(
+                      "border-b border-workspace-border align-top",
+                      accountLine ? "border-l-2 border-l-amber-400 bg-amber-50/30" : "border-l-2 border-l-brand-caramel/60",
+                      lineError ? "bg-red-50/60" : undefined,
+                    )}
+                    key={line.lineId}
+                  >
                     <td className="px-1.5 py-2 text-brand-mocha">
                       {showAccountRows ? (
                         <Select
@@ -400,19 +450,37 @@ export function PurchasingItemLineEditor({
                             );
                           }}
                         >
-                          <SelectTrigger className="h-8 text-xs">
+                          <SelectTrigger
+                            className={cn(
+                              "h-8 text-xs font-semibold",
+                              accountLine ? "text-amber-800" : "text-brand-espresso",
+                            )}
+                          >
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="product">Product Row</SelectItem>
-                            <SelectItem value="account">Account Row</SelectItem>
+                            <SelectItem value="product">
+                              <span className="inline-flex items-center gap-1.5">
+                                <Package className="h-3.5 w-3.5" />
+                                Product Row
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="account">
+                              <span className="inline-flex items-center gap-1.5">
+                                <FileText className="h-3.5 w-3.5" />
+                                Account Row
+                              </span>
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       ) : (
-                        <GripVertical className="mt-2 h-4 w-4" />
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-brand-mocha">
+                          <Package className="h-3.5 w-3.5" />
+                          Item {index + 1}
+                        </span>
                       )}
                     </td>
-                    <td className="bg-brand-latte/20 px-2 py-2">
+                    <td className="bg-brand-latte/10 px-2 py-2">
                       {accountLine ? (
                         <div className="space-y-2">
                           <Input
@@ -431,7 +499,7 @@ export function PurchasingItemLineEditor({
                             value={line.description ?? line.itemNameSnapshot ?? ""}
                           />
                           <div className="flex flex-wrap items-center gap-2 text-[11px] text-brand-mocha">
-                            <span className="inline-flex items-center gap-1 rounded bg-brand-cappuccino/60 px-1.5 py-0.5 font-semibold uppercase tracking-[0.12em] text-brand-espresso">
+                            <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 font-semibold uppercase tracking-[0.12em] text-amber-800">
                               <FileText className="h-3 w-3" />
                               Account Row
                             </span>
@@ -466,13 +534,35 @@ export function PurchasingItemLineEditor({
                               line.itemNameSnapshot,
                             )}
                             placeholder={line.itemNameSnapshot ?? "Select Product Master item"}
+                            renderOption={(option) => {
+                              const product = products.find((item) => item.id === option.value);
+                              return (
+                                <span className="min-w-0 flex-1">
+                                  <span className="flex items-center justify-between gap-2">
+                                    <span className="block truncate font-medium">
+                                      {option.label}
+                                    </span>
+                                    {product?.costPrice != null ? (
+                                      <span className="shrink-0 text-xs font-semibold tabular-nums text-brand-espresso">
+                                        {formatAmount(product.costPrice)}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                  {option.description ? (
+                                    <span className="block truncate text-xs text-brand-mocha">
+                                      {option.description}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              );
+                            }}
                             searchPlaceholder="Search product, code, SKU, barcode..."
                             triggerClassName="h-8 text-xs"
                             value={line.productId ?? ""}
                           />
                           {canCreateProductInEditor ? (
                             <Button
-                              className="h-auto px-0 text-xs text-blue-700"
+                              className="h-7 gap-1 rounded-md border border-dashed border-blue-300 bg-blue-50/60 px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                               disabled={isLineLocked}
                               onClick={() => {
                                 if (onCreateProductRequest) {
@@ -482,38 +572,41 @@ export function PurchasingItemLineEditor({
                                 setProductCreateLineId(line.lineId);
                               }}
                               type="button"
-                              variant="link"
+                              variant="outline"
                             >
                               <Plus className="h-3.5 w-3.5" />
                               Create product
                             </Button>
                           ) : null}
                           {selectedProduct && activeVariants.length > 0 ? (
-                            <SearchableCombobox
-                              emptyMessage="No matching variants found."
-                              disabled={isLineLocked}
-                              onValueChange={(productVariantId) => {
-                                const selectedVariant = activeVariants.find(
-                                  (variant) => variant.id === productVariantId,
-                                );
-                                onLinesChange(
-                                  updateLine(safeLines, line.lineId, {
-                                    itemNameSnapshot:
-                                      productVariantId.length === 0
-                                        ? selectedProduct.productName
-                                        : `${selectedProduct.productName} / ${selectedVariant?.variantName ?? "Variant"}`,
-                                    productVariantId:
-                                      productVariantId.length === 0 ? null : productVariantId,
-                                    unitCost: selectedVariant?.costPrice ?? line.unitCost,
-                                  }),
-                                );
-                              }}
-                              options={variantOptions}
-                              placeholder="Select variant"
-                              searchPlaceholder="Search variant, SKU, barcode..."
-                              triggerClassName="h-8 text-xs"
-                              value={line.productVariantId ?? ""}
-                            />
+                            <div>
+                              <MiniLabel>Variant</MiniLabel>
+                              <SearchableCombobox
+                                emptyMessage="No matching variants found."
+                                disabled={isLineLocked}
+                                onValueChange={(productVariantId) => {
+                                  const selectedVariant = activeVariants.find(
+                                    (variant) => variant.id === productVariantId,
+                                  );
+                                  onLinesChange(
+                                    updateLine(safeLines, line.lineId, {
+                                      itemNameSnapshot:
+                                        productVariantId.length === 0
+                                          ? selectedProduct.productName
+                                          : `${selectedProduct.productName} / ${selectedVariant?.variantName ?? "Variant"}`,
+                                      productVariantId:
+                                        productVariantId.length === 0 ? null : productVariantId,
+                                      unitCost: selectedVariant?.costPrice ?? line.unitCost,
+                                    }),
+                                  );
+                                }}
+                                options={variantOptions}
+                                placeholder="Select variant"
+                                searchPlaceholder="Search variant, SKU, barcode..."
+                                triggerClassName="h-8 text-xs"
+                                value={line.productVariantId ?? ""}
+                              />
+                            </div>
                           ) : null}
                           <div className="flex flex-wrap items-center gap-2 text-[11px] text-brand-mocha">
                             <span className="inline-flex items-center gap-1 rounded bg-brand-cappuccino/60 px-1.5 py-0.5 font-semibold uppercase tracking-[0.12em] text-brand-espresso">
@@ -534,32 +627,38 @@ export function PurchasingItemLineEditor({
                           ) : null}
                           {allowBatchFields ? (
                             <div className="grid gap-2 sm:grid-cols-2">
-                              <Input
-                                aria-label="Batch number"
-                                className="h-8"
-                                onChange={(event) =>
-                                  onLinesChange(
-                                    updateLine(safeLines, line.lineId, {
-                                      batchNumber: event.target.value || null,
-                                    }),
-                                  )
-                                }
-                                placeholder="Batch"
-                                value={line.batchNumber ?? ""}
-                              />
-                              <Input
-                                aria-label="Expiry date"
-                                className="h-8"
-                                onChange={(event) =>
-                                  onLinesChange(
-                                    updateLine(safeLines, line.lineId, {
-                                      expiryDate: event.target.value || null,
-                                    }),
-                                  )
-                                }
-                                type="date"
-                                value={line.expiryDate ?? ""}
-                              />
+                              <div>
+                                <MiniLabel>Batch</MiniLabel>
+                                <Input
+                                  aria-label="Batch number"
+                                  className="h-8"
+                                  onChange={(event) =>
+                                    onLinesChange(
+                                      updateLine(safeLines, line.lineId, {
+                                        batchNumber: event.target.value || null,
+                                      }),
+                                    )
+                                  }
+                                  placeholder="Batch"
+                                  value={line.batchNumber ?? ""}
+                                />
+                              </div>
+                              <div>
+                                <MiniLabel>Expiry</MiniLabel>
+                                <Input
+                                  aria-label="Expiry date"
+                                  className="h-8"
+                                  onChange={(event) =>
+                                    onLinesChange(
+                                      updateLine(safeLines, line.lineId, {
+                                        expiryDate: event.target.value || null,
+                                      }),
+                                    )
+                                  }
+                                  type="date"
+                                  value={line.expiryDate ?? ""}
+                                />
+                              </div>
                             </div>
                           ) : null}
                         </div>
@@ -597,15 +696,16 @@ export function PurchasingItemLineEditor({
                           value={line.accountId ?? ""}
                         />
                       ) : (
-                        <div className="rounded-md border border-brand-cappuccino/70 bg-white px-2 py-1.5 text-xs font-semibold text-brand-espresso">
+                        <div className="rounded-md border border-workspace-border bg-white px-2 py-1.5 text-xs font-semibold text-brand-espresso">
                           Inventory Asset
                         </div>
                       )}
                     </td>
                     <td className="px-2 py-2">
                       <Input
+                        aria-invalid={isLineLocked && Boolean(lineError)}
                         aria-label={`Quantity for item line ${String(index + 1)}`}
-                        className="h-8 text-right text-xs"
+                        className="h-8 text-right text-xs tabular-nums"
                         disabled={accountLine && isLineLocked}
                         min={lineLock ? String(lineLock.minQuantity) : "0"}
                         onChange={(event) =>
@@ -619,8 +719,9 @@ export function PurchasingItemLineEditor({
                         value={line.quantity}
                       />
                       {lineLock ? (
-                        <p className="mt-1 text-right text-[11px] leading-4 text-brand-mocha">
-                          Received {formatAmount(lineLock.receivedQuantity)}
+                        <p className="mt-1 flex items-center justify-end gap-1 text-right text-[11px] leading-4 text-amber-700">
+                          <Lock aria-hidden="true" className="h-3 w-3 shrink-0" />
+                          Received {formatAmount(lineLock.receivedQuantity)} · can&apos;t go lower
                         </p>
                       ) : null}
                       {selectedProduct?.isStockTracked ? (
@@ -628,11 +729,16 @@ export function PurchasingItemLineEditor({
                           Stock
                         </p>
                       ) : null}
+                      {lineError ? (
+                        <p className="mt-1 text-right text-[11px] font-semibold leading-4 text-red-700">
+                          {lineError}
+                        </p>
+                      ) : null}
                     </td>
                     <td className="px-2 py-2">
                       <Input
                         aria-label={`Rate for item line ${String(index + 1)}`}
-                        className="h-8 text-right text-xs"
+                        className="h-8 text-right text-xs tabular-nums"
                         disabled={isLineLocked}
                         min="0"
                         onChange={(event) =>
@@ -649,7 +755,7 @@ export function PurchasingItemLineEditor({
                     <td className="px-2 py-2">
                       <Input
                         aria-label={`Discount for item line ${String(index + 1)}`}
-                        className="h-8 text-right text-xs"
+                        className="h-8 text-right text-xs tabular-nums"
                         disabled={isLineLocked}
                         min="0"
                         onChange={(event) =>
@@ -688,7 +794,7 @@ export function PurchasingItemLineEditor({
                         </SelectContent>
                       </Select>
                       {selectedTaxRate ? (
-                        <p className="mt-1 text-[11px] text-brand-mocha">
+                        <p className="mt-1 text-[11px] tabular-nums text-brand-mocha">
                           Tax {formatAmount(lineTaxAmount(line, taxRates))}
                         </p>
                       ) : null}
@@ -711,8 +817,10 @@ export function PurchasingItemLineEditor({
                         />
                       )}
                     </td>
-                    <td className="px-2 py-2 text-right font-semibold text-brand-espresso">
-                      {formatAmount(lineNetAmount(line))}
+                    <td className="px-2 py-2 text-right">
+                      <span className="inline-flex rounded-md bg-brand-latte/60 px-2 py-1 text-sm font-bold tabular-nums text-brand-espresso">
+                        {formatAmount(lineNetAmount(line))}
+                      </span>
                     </td>
                     <td className="px-1.5 py-2">
                       <Button
@@ -735,68 +843,74 @@ export function PurchasingItemLineEditor({
           </table>
         </div>
 
-        <div className="grid gap-3 border-t border-brand-cappuccino/70 px-3 py-3 lg:grid-cols-[1fr_430px]">
+        <div className="grid gap-3 border-t border-workspace-border px-3 py-3 lg:grid-cols-[1fr_430px]">
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              className="px-0 text-blue-700"
-              disabled={disableAddRows}
-              onClick={() => onLinesChange([...safeLines, createLine()])}
-              type="button"
-              variant="link"
-            >
-              <Plus className="h-4 w-4" />
-              Add product row
-            </Button>
-            {showAccountRows ? (
+            {disableAddRows ? (
+              <p className="text-xs text-workspace-muted">
+                Adding new lines isn&apos;t available in this mode.
+              </p>
+            ) : (
               <>
-                <span className="text-brand-cappuccino">|</span>
                 <Button
-                  className="px-0 text-blue-700"
-                  disabled={disableAddRows}
-                  onClick={() => onLinesChange([...safeLines, createAccountLine()])}
+                  className="h-8 gap-1.5 text-xs"
+                  onClick={() => onLinesChange([...safeLines, createLine()])}
+                  size="sm"
                   type="button"
-                  variant="link"
+                  variant="outline"
                 >
-                  <Plus className="h-4 w-4" />
-                  Add account row
+                  <Plus className="h-3.5 w-3.5" />
+                  Add product row
+                </Button>
+                {showAccountRows ? (
+                  <Button
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={() => onLinesChange([...safeLines, createAccountLine()])}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add account row
+                  </Button>
+                ) : null}
+                <Button
+                  className="h-8 gap-1.5 text-xs"
+                  onClick={() =>
+                    onLinesChange([...safeLines, createLine(), createLine(), createLine()])
+                  }
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add items in bulk
                 </Button>
               </>
-            ) : null}
-            <span className="text-brand-cappuccino">|</span>
-            <Button
-              className="px-0 text-blue-700"
-              disabled={disableAddRows}
-              onClick={() =>
-                onLinesChange([...safeLines, createLine(), createLine(), createLine()])
-              }
-              type="button"
-              variant="link"
-            >
-              <Plus className="h-4 w-4" />
-              Add items in bulk
-            </Button>
+            )}
           </div>
 
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-brand-mocha">Subtotal</span>
-              <span className="font-semibold text-brand-espresso">
+              <span className="font-semibold tabular-nums text-brand-espresso">
                 {formatAmount(totals.subtotal)}
               </span>
             </div>
-            <div className="flex items-start justify-between gap-6 border-t border-brand-cappuccino/60 pt-2">
+            <div className="flex items-start justify-between gap-6 border-t border-workspace-border pt-2">
               <div>
                 <span className="text-brand-mocha">Line discounts</span>
                 <p className="text-xs text-blue-700">Applied per line</p>
               </div>
-              <span className="font-semibold text-red-700">-{formatAmount(totals.discount)}</span>
+              <span className="font-semibold tabular-nums text-red-700">
+                -{formatAmount(totals.discount)}
+              </span>
             </div>
             {showAccountRows && onBillDiscountAmountChange ? (
-              <div className="grid grid-cols-[1fr_150px] items-center gap-3 border-t border-brand-cappuccino/60 pt-2">
+              <div className="grid grid-cols-[1fr_150px] items-center gap-3 border-t border-workspace-border pt-2">
                 <span className="text-brand-mocha">Bill discount</span>
                 <Input
                   aria-label="Bill discount"
-                  className="h-9 text-right text-xs"
+                  className="h-9 text-right text-xs tabular-nums"
                   min="0"
                   onChange={(event) => onBillDiscountAmountChange(Number(event.target.value))}
                   type="number"
@@ -804,28 +918,30 @@ export function PurchasingItemLineEditor({
                 />
               </div>
             ) : showAccountRows || billDiscountAmount > 0 ? (
-              <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
+              <div className="flex items-center justify-between border-t border-workspace-border pt-2">
                 <span className="text-brand-mocha">Bill discount</span>
-                <span className="font-semibold text-red-700">
+                <span className="font-semibold tabular-nums text-red-700">
                   -{formatAmount(billDiscountAmount)}
                 </span>
               </div>
             ) : null}
-            <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
+            <div className="flex items-center justify-between border-t border-workspace-border pt-2">
               <span className="text-brand-mocha">Tax</span>
-              <span className="font-semibold text-brand-espresso">{formatAmount(totals.tax)}</span>
+              <span className="font-semibold tabular-nums text-brand-espresso">
+                {formatAmount(totals.tax)}
+              </span>
             </div>
             {totals.legacyCharges > 0 ? (
-              <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
+              <div className="flex items-center justify-between border-t border-workspace-border pt-2">
                 <span className="text-brand-mocha">Legacy charges</span>
-                <span className="font-semibold text-brand-espresso">
+                <span className="font-semibold tabular-nums text-brand-espresso">
                   {formatAmount(totals.legacyCharges)}
                 </span>
               </div>
             ) : null}
-            <div className="flex items-center justify-between rounded-lg bg-brand-latte px-3 py-2 text-base">
+            <div className="flex items-center justify-between rounded-md bg-brand-latte px-3 py-2.5 text-base">
               <span className="font-semibold text-brand-mocha">Grand total</span>
-              <span className="text-lg font-bold text-brand-espresso">
+              <span className="text-lg font-bold tabular-nums text-brand-espresso">
                 {formatAmount(totals.total)}
               </span>
             </div>
@@ -833,13 +949,13 @@ export function PurchasingItemLineEditor({
               <>
                 <div className="flex items-center justify-between">
                   <span className="text-brand-mocha">Paid</span>
-                  <span className="font-semibold text-brand-espresso">
+                  <span className="font-semibold tabular-nums text-brand-espresso">
                     {formatAmount(paidAmount)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-brand-mocha">Balance due</span>
-                  <span className="font-semibold text-brand-espresso">
+                  <span className="font-semibold tabular-nums text-brand-espresso">
                     {formatAmount(totals.balanceDue)}
                   </span>
                 </div>

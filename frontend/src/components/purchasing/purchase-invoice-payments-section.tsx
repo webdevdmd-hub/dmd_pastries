@@ -9,7 +9,6 @@ import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state
 import { PurchaseSupplierPaymentDialog } from "@/components/purchasing/purchase-supplier-payment-dialog";
 import { PurchaseSupplierPaymentsTable } from "@/components/purchasing/purchase-supplier-payments-table";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   useAddSupplierInvoicePayment,
   usePurchasingPaymentMethods,
@@ -49,11 +48,11 @@ export function PurchaseInvoicePaymentsSection({
   };
 
   return (
-    <Card className="bg-white/85">
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+      <div className="flex flex-col gap-3 border-b border-workspace-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <CardTitle>Payments Made</CardTitle>
-          <p className="mt-1 text-sm text-brand-mocha">
+          <h2 className="text-lg font-semibold text-brand-espresso">Payments made</h2>
+          <p className="mt-1 text-sm text-workspace-muted">
             Money paid out for this bill. Balance:{" "}
             <span className="font-semibold text-brand-espresso">
               {formatCurrency(invoice.balanceAmount)}
@@ -69,20 +68,20 @@ export function PurchaseInvoicePaymentsSection({
           <Plus className="h-4 w-4" />
           Add Payment
         </Button>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="p-5">
         {invoice.status !== "posted" ? (
-          <p className="rounded-2xl border border-dashed border-brand-cappuccino bg-brand-latte/50 p-4 text-sm text-brand-mocha">
+          <p className="rounded-md border border-dashed border-workspace-border bg-zinc-50 p-4 text-sm text-workspace-muted">
             Post the bill before recording payments.
           </p>
         ) : null}
         {invoice.status === "posted" && invoice.balanceAmount <= 0 ? (
-          <p className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+          <p className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
             This bill is fully paid.
           </p>
         ) : null}
         {paymentsQuery.isLoading ? (
-          <p className="rounded-2xl border border-brand-cappuccino/60 p-4 text-sm text-brand-mocha">
+          <p className="rounded-md border border-workspace-border p-4 text-sm text-workspace-muted">
             Loading payments made...
           </p>
         ) : null}
@@ -102,11 +101,11 @@ export function PurchaseInvoicePaymentsSection({
         {!paymentsQuery.isLoading &&
         !paymentsQuery.error &&
         (paymentsQuery.data ?? []).length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-brand-cappuccino p-4 text-sm text-brand-mocha">
+          <p className="rounded-md border border-dashed border-workspace-border p-4 text-sm text-workspace-muted">
             No payments made yet.
           </p>
         ) : null}
-      </CardContent>
+      </div>
       <PurchaseSupplierPaymentDialog
         balanceAmount={invoice.balanceAmount}
         invoiceNumber={invoice.invoiceNumber}
@@ -116,6 +115,6 @@ export function PurchaseInvoicePaymentsSection({
         onSubmit={handleAddPayment}
         open={dialogOpen}
       />
-    </Card>
+    </section>
   );
 }

@@ -1,22 +1,23 @@
 "use client";
 
+import { AlertTriangle, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { AppBadge } from "@/components/app/app-badge";
+import { usePublishBreadcrumbLabel } from "@/components/layout/breadcrumb-label";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
-import { PurchaseDocumentChain } from "@/components/purchasing/purchase-document-chain";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
 import { PurchaseInvoiceFormDialog } from "@/components/purchasing/purchase-invoice-form-dialog";
+import { PurchaseInvoiceItemLines } from "@/components/purchasing/purchase-invoice-item-lines";
 import { PurchaseInvoicePaymentsSection } from "@/components/purchasing/purchase-invoice-payments-section";
 import { PurchaseInvoiceStatusBadge } from "@/components/purchasing/purchase-invoice-status-badge";
 import { PurchasePaymentStatusBadge } from "@/components/purchasing/purchase-payment-status-badge";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
-import { PurchasingItemLines } from "@/components/purchasing/purchasing-item-lines";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +38,6 @@ import {
   useConvertPurchaseInvoiceToReceipt,
   usePostPurchaseInvoice,
   usePurchaseInvoice,
-  usePurchaseOrderDocumentChain,
   usePurchasingBranches,
   usePurchasingProducts,
   usePurchasingSuppliers,
@@ -47,8 +47,11 @@ import {
 } from "@/hooks/use-purchasing";
 import { getErrorMessage } from "@/lib/api/client";
 import { getPurchaseInvoiceUpdateErrorMessage } from "@/lib/api/purchase-invoice-conflicts";
+import { cn } from "@/lib/utils/cn";
 import type {
   CreatePurchaseInvoicePayload,
+  PurchaseInvoice,
+  PurchasePaymentStatus,
   UpdatePurchaseInvoicePayload,
 } from "@/types/purchasing";
 
@@ -56,8 +59,95 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
 }
 
+function formatDate(value: string | null): string {
+  if (!value) return "Not recorded";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not recorded";
+  return new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(date);
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) return "Not recorded";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not recorded";
+  return new Intl.DateTimeFormat("en-AE", { dateStyle: "medium", timeStyle: "short" }).format(
+    date,
+  );
+}
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function balanceTone(paymentStatus: PurchasePaymentStatus, balanceAmount: number): string {
+  if (balanceAmount <= 0) return "text-emerald-600";
+  if (paymentStatus === "overdue") return "text-red-600";
+  return "text-amber-600";
+}
+
+function receiveStatusMeta(
+  status: PurchaseInvoice["receiveStatus"],
+): { label: string; tone: "muted" | "warning" | "success" } {
+  if (status === "received") return { label: "Received", tone: "success" };
+  if (status === "partially_received") return { label: "Partially received", tone: "warning" };
+  return { label: "Not received", tone: "muted" };
+}
+
+function SectionHeader({
+  action,
+  description,
+  title,
+}: {
+  action?: ReactNode;
+  description?: string;
+  title: string;
+}): JSX.Element {
+  return (
+    <div className="flex flex-col gap-3 border-b border-workspace-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 className="text-lg font-semibold text-brand-espresso">{title}</h2>
+        {description ? <p className="mt-1 text-sm text-workspace-muted">{description}</p> : null}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function InfoField({ label, value }: { label: string; value: ReactNode }): JSX.Element {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs font-semibold uppercase tracking-wide text-workspace-muted">
+        {label}
+      </p>
+      <div className="mt-1 text-sm font-semibold text-brand-espresso">{value}</div>
+    </div>
+  );
+}
+
+function SummaryRow({
+  emphasis = false,
+  label,
+  value,
+}: {
+  emphasis?: boolean;
+  label: string;
+  value: string;
+}): JSX.Element {
+  return (
+    <div className="flex items-center justify-between py-1.5 text-sm">
+      <span className={emphasis ? "font-semibold text-brand-espresso" : "text-workspace-muted"}>
+        {label}
+      </span>
+      <span
+        className={cn(
+          "tabular-nums",
+          emphasis ? "font-semibold text-brand-espresso" : "font-medium text-brand-espresso",
+        )}
+      >
+        {value}
+      </span>
+    </div>
+  );
 }
 
 export function PurchaseInvoiceDetailsPageClient({
@@ -84,10 +174,8 @@ export function PurchaseInvoiceDetailsPageClient({
   const [receivedDate, setReceivedDate] = useState(today());
   const [conversionNotes, setConversionNotes] = useState("");
   const invoiceQuery = usePurchaseInvoice(invoiceId, canView);
-  const chainQuery = usePurchaseOrderDocumentChain(
-    invoiceQuery.data?.purchaseOrderId ?? null,
-    canView && Boolean(invoiceQuery.data?.purchaseOrderId),
-  );
+  // Show the bill number in the breadcrumb instead of the record id.
+  usePublishBreadcrumbLabel(invoiceQuery.data?.invoiceNumber ?? null);
   const branchesQuery = usePurchasingBranches(canView);
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const productsQuery = usePurchasingProducts(canView);
@@ -137,6 +225,9 @@ export function PurchaseInvoiceDetailsPageClient({
   const canCancelInvoice = canCancel && invoice.status === "posted";
   const canEditInvoice = canEdit && invoice.status !== "cancelled";
   const billTitle = invoice.supplierBillNumber ?? invoice.invoiceNumber;
+  const isOverdue = invoice.paymentStatus === "overdue";
+  const receiveStatus = receiveStatusMeta(invoice.receiveStatus);
+  const hasLegacyCharges = invoice.chargeAmount + invoice.chargeTaxAmount > 0;
 
   const openConvertDialog = (): void => {
     setReceivedDate(today());
@@ -167,9 +258,6 @@ export function PurchaseInvoiceDetailsPageClient({
       toast.success("Bill posted.");
       setPostOpen(false);
       await invoiceQuery.refetch();
-      if (invoice.purchaseOrderId) {
-        await chainQuery.refetch();
-      }
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -191,9 +279,6 @@ export function PurchaseInvoiceDetailsPageClient({
       setCancelOpen(false);
       setCancelReason("");
       await invoiceQuery.refetch();
-      if (invoice.purchaseOrderId) {
-        await chainQuery.refetch();
-      }
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -208,9 +293,6 @@ export function PurchaseInvoiceDetailsPageClient({
       toast.success("Bill updated.");
       setEditOpen(false);
       await invoiceQuery.refetch();
-      if (invoice.purchaseOrderId) {
-        await chainQuery.refetch();
-      }
     } catch (error) {
       toast.error(getPurchaseInvoiceUpdateErrorMessage(error));
     }
@@ -221,226 +303,293 @@ export function PurchaseInvoiceDetailsPageClient({
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <div>
-        <Link
-          className="text-sm font-semibold text-brand-mocha hover:text-brand-espresso"
-          href={ROUTES.purchasingInvoices}
-        >
-          Back to Bills
-        </Link>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-4xl text-brand-espresso">{billTitle}</h1>
-          <PurchaseInvoiceStatusBadge status={invoice.status} />
-          <PurchasePaymentStatusBadge status={invoice.paymentStatus} />
-          {canEditInvoice ? (
-            <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
-              Edit
-            </Button>
-          ) : null}
-          {canPostInvoice ? (
-            <Button onClick={() => setPostOpen(true)} type="button">
-              Post Bill
-            </Button>
-          ) : null}
-          {canConvertInvoice ? (
-            <Button onClick={openConvertDialog} type="button">
-              Create receive goods
-            </Button>
-          ) : null}
-          {canCancelInvoice ? (
-            <Button
-              onClick={() => {
-                setCancelReason("");
-                setCancelOpen(true);
-              }}
-              type="button"
-              variant="outline"
-            >
-              Cancel Bill
-            </Button>
-          ) : null}
-        </div>
-        <p className="mt-2 text-sm text-brand-mocha">
-          {invoice.supplierName} / {invoice.branchName} / Internal Bill No {invoice.invoiceNumber}
-        </p>
-      </div>
+      <Link
+        className="w-fit text-sm font-semibold text-brand-mocha hover:text-brand-espresso"
+        href={ROUTES.purchasingInvoices}
+      >
+        Back to Bills
+      </Link>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Total</p>
-            <p className="text-2xl font-semibold text-brand-espresso">
-              {formatCurrency(invoice.totalAmount)}
+      <header className="overflow-hidden rounded-md border border-workspace-border bg-white">
+        <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-workspace-muted">
+              Bill no
             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Paid</p>
-            <p className="text-2xl font-semibold text-brand-espresso">
-              {formatCurrency(invoice.paidAmount)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Balance</p>
-            <p className="text-2xl font-semibold text-brand-espresso">
-              {formatCurrency(invoice.balanceAmount)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Tax</p>
-            <p className="text-2xl font-semibold text-brand-espresso">
-              {formatCurrency(invoice.taxAmount)}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="border-brand-cappuccino bg-white/85">
-        <CardHeader>
-          <CardTitle>Bill details</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <p className="text-brand-mocha">Supplier bill no</p>
-            <p className="font-semibold text-brand-espresso">
-              {invoice.supplierBillNumber ?? "Not recorded"}
-            </p>
-          </div>
-          <div>
-            <p className="text-brand-mocha">Internal bill no</p>
-            <p className="font-semibold text-brand-espresso">{invoice.invoiceNumber}</p>
-          </div>
-          <div>
-            <p className="text-brand-mocha">Supplier</p>
-            <p className="font-semibold text-brand-espresso">{invoice.supplierName}</p>
-          </div>
-          <div>
-            <p className="text-brand-mocha">Branch</p>
-            <p className="font-semibold text-brand-espresso">{invoice.branchName}</p>
-          </div>
-          {invoice.status === "cancelled" ? (
-            <>
-              <div>
-                <p className="text-brand-mocha">Cancelled at</p>
-                <p className="font-semibold text-brand-espresso">
-                  {invoice.cancelledAt ?? "Not recorded"}
-                </p>
-              </div>
-              <div>
-                <p className="text-brand-mocha">Cancel reason</p>
-                <p className="font-semibold text-brand-espresso">
-                  {invoice.cancelReason ?? "Not recorded"}
-                </p>
-              </div>
-              <div>
-                <p className="text-brand-mocha">Reversal journal</p>
-                {invoice.reversalJournalEntryId ? (
-                  <Link
-                    className="font-semibold text-brand-espresso underline-offset-4 hover:underline"
-                    href={`${ROUTES.accountingJournalEntries}?search=${encodeURIComponent(
-                      invoice.reversalJournalEntryId,
-                    )}`}
-                  >
-                    View journal
-                  </Link>
-                ) : (
-                  <p className="font-semibold text-brand-espresso">Not recorded</p>
-                )}
-              </div>
-              <div>
-                <p className="text-brand-mocha">Cancelled receipt</p>
-                <p className="font-semibold text-brand-espresso">
-                  {invoice.cancelledReceiptId ?? "Not recorded"}
-                </p>
-              </div>
-            </>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Card className="border-brand-cappuccino bg-white/85">
-        <CardHeader>
-          <CardTitle>Bill summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-brand-mocha">Subtotal</span>
-            <span className="font-semibold text-brand-espresso">
-              {formatCurrency(invoice.subtotalAmount)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
-            <span className="text-brand-mocha">Line discounts</span>
-            <span className="font-semibold text-red-700">
-              -{formatCurrency(invoice.discountAmount)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
-            <span className="text-brand-mocha">Bill discount</span>
-            <span className="font-semibold text-red-700">
-              -{formatCurrency(invoice.billDiscountAmount)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
-            <span className="text-brand-mocha">Tax</span>
-            <span className="font-semibold text-brand-espresso">
-              {formatCurrency(invoice.taxAmount)}
-            </span>
-          </div>
-          {invoice.chargeAmount + invoice.chargeTaxAmount > 0 ? (
-            <div className="flex items-center justify-between border-t border-brand-cappuccino/60 pt-2">
-              <span className="text-brand-mocha">Legacy charges</span>
-              <span className="font-semibold text-brand-espresso">
-                {formatCurrency(invoice.chargeAmount + invoice.chargeTaxAmount)}
-              </span>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <h1 className="truncate text-3xl font-semibold text-brand-espresso">
+                {invoice.invoiceNumber}
+              </h1>
+              <PurchaseInvoiceStatusBadge status={invoice.status} />
+              <PurchasePaymentStatusBadge status={invoice.paymentStatus} />
             </div>
-          ) : null}
-          <div className="flex items-center justify-between rounded-lg bg-brand-latte px-3 py-2 text-base">
-            <span className="font-semibold text-brand-mocha">Grand total</span>
-            <span className="text-lg font-bold text-brand-espresso">
-              {formatCurrency(invoice.totalAmount)}
-            </span>
+            <p className="mt-2 text-sm text-workspace-muted">
+              {invoice.supplierName} &middot; {invoice.branchName}
+            </p>
+            <p className="mt-3 text-xs text-workspace-muted">
+              Created by {invoice.createdByUserName} on {formatDateTime(invoice.createdAt)}
+              {invoice.updatedAt !== invoice.createdAt
+                ? ` · Last updated ${formatDateTime(invoice.updatedAt)}`
+                : ""}
+            </p>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-brand-mocha">Paid</span>
-            <span className="font-semibold text-brand-espresso">
-              {formatCurrency(invoice.paidAmount)}
-            </span>
+          <div className="flex flex-wrap gap-2 lg:shrink-0 lg:justify-end">
+            {canEditInvoice ? (
+              <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
+                Edit
+              </Button>
+            ) : null}
+            {canPostInvoice ? (
+              <Button onClick={() => setPostOpen(true)} type="button">
+                Post Bill
+              </Button>
+            ) : null}
+            {canConvertInvoice ? (
+              <Button onClick={openConvertDialog} type="button">
+                Create receive goods
+              </Button>
+            ) : null}
+            {canCancelInvoice ? (
+              <Button
+                className="border-red-200 text-red-700 hover:bg-red-50"
+                onClick={() => {
+                  setCancelReason("");
+                  setCancelOpen(true);
+                }}
+                type="button"
+                variant="outline"
+              >
+                Cancel Bill
+              </Button>
+            ) : null}
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-brand-mocha">Balance due</span>
-            <span className="font-semibold text-brand-espresso">
-              {formatCurrency(invoice.balanceAmount)}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </header>
 
-      <PurchasingItemLines lines={invoice.items} title="Bill items" />
-      <PurchaseInvoicePaymentsSection canManage={canManage} invoice={invoice} />
-      {invoice.purchaseOrderId ? (
-        <PurchaseDocumentChain
-          chain={chainQuery.data}
-          error={chainQuery.error}
-          isLoading={chainQuery.isLoading}
-          onRetry={() => {
-            void chainQuery.refetch();
-          }}
-        />
-      ) : null}
-      <Card className="bg-white/85">
-        <CardHeader>
-          <CardTitle>Notes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-brand-mocha">{invoice.notes ?? "No notes recorded."}</p>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+        <div className="flex min-w-0 flex-col gap-6">
+          <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+            <SectionHeader
+              description="Identifiers, dates, and the linked purchase order for this bill."
+              title="Bill info & supplier"
+            />
+            <div className="grid gap-5 p-5 sm:grid-cols-2 lg:grid-cols-3">
+              <InfoField label="Bill no" value={invoice.invoiceNumber} />
+              <InfoField
+                label="Invoice no (supplier)"
+                value={invoice.supplierBillNumber ?? "Not recorded"}
+              />
+              <InfoField label="Supplier" value={invoice.supplierName} />
+              <InfoField label="Branch" value={invoice.branchName} />
+              <InfoField label="Bill date" value={formatDate(invoice.invoiceDate)} />
+              <InfoField
+                label="Due date"
+                value={
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1.5",
+                      isOverdue ? "text-red-700" : undefined,
+                    )}
+                  >
+                    {isOverdue ? (
+                      <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />
+                    ) : null}
+                    {formatDate(invoice.dueDate)}
+                  </span>
+                }
+              />
+              <InfoField
+                label="Purchase order"
+                value={
+                  invoice.purchaseOrderId ? (
+                    <Link
+                      className="inline-flex items-center gap-1 text-brand-espresso underline-offset-4 hover:underline"
+                      href={`${ROUTES.purchasingOrders}/${invoice.purchaseOrderId}`}
+                    >
+                      {invoice.purchaseOrderNumber ?? "View purchase order"}
+                      <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" />
+                    </Link>
+                  ) : (
+                    "Not linked to a purchase order"
+                  )
+                }
+              />
+              <InfoField
+                label="Goods receipt"
+                value={<AppBadge tone={receiveStatus.tone}>{receiveStatus.label}</AppBadge>}
+              />
+            </div>
+          </section>
+
+          {invoice.status === "cancelled" ? (
+            <section className="rounded-md border border-red-200 bg-red-50 p-5">
+              <div className="flex items-start gap-3">
+                <AlertTriangle
+                  aria-hidden="true"
+                  className="mt-0.5 h-5 w-5 shrink-0 text-red-700"
+                />
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base font-semibold text-red-900">This bill was cancelled</h2>
+                  <p className="mt-1 text-sm text-red-800">
+                    Cancelling a posted bill reverses the supplier payable, VAT, and inventory
+                    impact where stock is still available.
+                  </p>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                        Cancelled at
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-red-900">
+                        {formatDateTime(invoice.cancelledAt)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                        Cancel reason
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-red-900">
+                        {invoice.cancelReason ?? "Not recorded"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                        Reversal journal
+                      </p>
+                      {invoice.reversalJournalEntryId ? (
+                        <Link
+                          className="mt-1 inline-block text-sm font-semibold text-red-900 underline-offset-4 hover:underline"
+                          href={`${ROUTES.accountingJournalEntries}?search=${encodeURIComponent(
+                            invoice.reversalJournalEntryId,
+                          )}`}
+                        >
+                          View journal
+                        </Link>
+                      ) : (
+                        <p className="mt-1 text-sm font-semibold text-red-900">Not recorded</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                        Cancelled receipt
+                      </p>
+                      {invoice.cancelledReceiptId ? (
+                        <Link
+                          className="mt-1 inline-block text-sm font-semibold text-red-900 underline-offset-4 hover:underline"
+                          href={`${ROUTES.purchasingReceipts}/${invoice.cancelledReceiptId}`}
+                        >
+                          View receipt
+                        </Link>
+                      ) : (
+                        <p className="mt-1 text-sm font-semibold text-red-900">Not recorded</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+            <SectionHeader
+              description={`${String(invoice.items.length)} line item(s) on this bill.`}
+              title="Bill items"
+            />
+            <PurchaseInvoiceItemLines items={invoice.items} />
+          </section>
+
+          <PurchaseInvoicePaymentsSection canManage={canManage} invoice={invoice} />
+
+          <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+            <SectionHeader title="Notes" />
+            <div className="p-5">
+              <p className="text-sm text-workspace-muted">
+                {invoice.notes ?? "No notes recorded."}
+              </p>
+            </div>
+          </section>
+        </div>
+
+        <div className="flex flex-col gap-6 lg:sticky lg:top-6">
+          <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+            <SectionHeader
+              description="Amounts owed and paid for this bill."
+              title="Financial summary"
+            />
+            <div className="p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-workspace-muted">
+                Balance due
+              </p>
+              <p
+                className={cn(
+                  "mt-1 text-3xl font-bold tabular-nums",
+                  balanceTone(invoice.paymentStatus, invoice.balanceAmount),
+                )}
+              >
+                {formatCurrency(invoice.balanceAmount)}
+              </p>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 border-t border-workspace-border pt-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-workspace-muted">Total</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-brand-espresso">
+                    {formatCurrency(invoice.totalAmount)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase text-workspace-muted">Paid</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-emerald-600">
+                    {formatCurrency(invoice.paidAmount)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 divide-y divide-workspace-border border-t border-workspace-border">
+                <SummaryRow label="Subtotal" value={formatCurrency(invoice.subtotalAmount)} />
+                <SummaryRow
+                  label="Line discounts"
+                  value={
+                    invoice.discountAmount > 0
+                      ? `-${formatCurrency(invoice.discountAmount)}`
+                      : formatCurrency(0)
+                  }
+                />
+                <SummaryRow
+                  label="Bill discount"
+                  value={
+                    invoice.billDiscountAmount > 0
+                      ? `-${formatCurrency(invoice.billDiscountAmount)}`
+                      : formatCurrency(0)
+                  }
+                />
+                <SummaryRow label="Tax" value={formatCurrency(invoice.taxAmount)} />
+                {hasLegacyCharges ? (
+                  <SummaryRow
+                    label="Legacy charges"
+                    value={formatCurrency(invoice.chargeAmount + invoice.chargeTaxAmount)}
+                  />
+                ) : null}
+              </div>
+
+              <div className="mt-3 flex items-center justify-between rounded-md bg-brand-latte px-3 py-2.5">
+                <span className="text-sm font-semibold text-brand-espresso">Grand total</span>
+                <span className="text-base font-bold tabular-nums text-brand-espresso">
+                  {formatCurrency(invoice.totalAmount)}
+                </span>
+              </div>
+
+              <div className="mt-3 space-y-0.5">
+                <SummaryRow label="Paid" value={formatCurrency(invoice.paidAmount)} />
+                <SummaryRow
+                  emphasis
+                  label="Balance due"
+                  value={formatCurrency(invoice.balanceAmount)}
+                />
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
       <PurchaseInvoiceFormDialog
         accounts={[...(purchaseAccountsQuery.data ?? [])]}
         branches={branchesQuery.data ?? []}
