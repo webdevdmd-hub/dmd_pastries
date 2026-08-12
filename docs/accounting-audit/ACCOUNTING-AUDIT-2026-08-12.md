@@ -262,12 +262,12 @@ The goal your owner/accountant asked for — "understandable without inspecting 
 4. **Finish the period model.** Opening-balance entry screen (Cr/Dr per account vs 3400, one-time per go-live); year-end close posting income/COGS/expense into 3100; entry timestamps carried tz-aware and bucketed consistently with reports.
 5. **CoA: keep 82 codes, add the 6 headline groups.** The seeded chart is already Zoho-shaped. Set `parent_account_id` to group under Assets/Liabilities/Equity/Income/COGS/Expenses for readable statements; retire or wire the dead accounts (2050 GRNI pending the §3 decision, 5000/5010/5050/5060, 6240, 6250, 4090); route bill discounts to 4030; retype 4100 out of income or net it under COGS.
 
-**Explicit business decisions needed from your accountant** (they gate the design, listed in `backend/docs/open-accounting-decisions.md`):
-- When does a bakery order consume stock — at production completion, delivery, or completion? What about non-produced (resale) items on orders?
-- Should VAT be due on advances (jurisdiction-dependent — UAE: generally yes on receipt)?
-- GRNI accrual at receipt vs bill-only (current)?
-- What does `refund_mode='none'` mean commercially?
-- Card settlement flow: when/how does 1030 clear to 1010, and who records fees?
+**Business decisions — ✅ ANSWERED in the Phase 2 workshop (2026-08-12**, full detail in `backend/docs/open-accounting-decisions.md` §"DECISIONS"; VAT items to be confirmed with the accountant at next review**):**
+- Bakery orders consume stock + post COGS **at completion** (same event as revenue).
+- VAT recognized **on each payment** (deposits carry proportional VAT); VAT mode **Inclusive / Exclusive / No-tax selectable per document** (POS, bakery, purchasing); **No-tax RBAC-gated** and audit-flagged.
+- GRNI: **keep bill-only** (Zoho behavior); retire account 2050.
+- `refund_mode='none'` becomes **store credit** (Dr 4040 / Cr Customer Advance 2200).
+- Card settlement: **settlement screen** posting Dr Bank + Dr Card Fees / Cr Card Clearing 1030.
 
 ---
 

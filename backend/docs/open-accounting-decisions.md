@@ -9,6 +9,44 @@ that has to be answered before it can be built.
 
 ---
 
+## ✅ DECISIONS — Phase 2 workshop, 2026-08-12
+
+Decided by the owner/developer (webdevdmd) in the Phase 2 decisions workshop.
+Items marked ⚖ should be confirmed with the accountant at the next review, but
+implementation proceeds on these answers.
+
+1. **Bakery COGS (§1): stock leaves and COGS posts at order COMPLETION** — the
+   same event that posts revenue today. Dr COGS 5070 / Cr Inventory 1200 for
+   every stock-tracked / finished-goods item on the order. Production batches
+   keep capitalizing raw materials → finished goods as they do now. Non-produced
+   (resale) items on an order consume like POS items.
+2. **VAT (⚖):**
+   - VAT is recognized **on each payment** — a deposit carries its proportional
+     VAT slice (e.g. inclusive AED 50 deposit → Dr Cash 50 / Cr Customer
+     Advance 47.62 / Cr VAT Payable 2.38); the completion journal recognizes
+     only the remainder.
+   - VAT **mode is selectable per document** across POS sales, bakery orders,
+     and purchase bills: Inclusive (default) / Exclusive / No-tax.
+   - **No-tax is RBAC-gated**: a dedicated permission granted per staff by
+     admin/manager; every no-tax document is audit-flagged and reviewable in a
+     report for VAT filing.
+3. **GRNI (§3): keep bill-only.** No journal at goods receipt; inventory value
+   posts at bill posting (Zoho Books behavior). The reconciliation screen keeps
+   surfacing `pending_bill_posting`. Account 2050 will be retired from the
+   seeded chart.
+4. **`refund_mode='none'` (§2): becomes STORE CREDIT.** Dr Sales Returns 4040 /
+   Cr Customer Advance 2200, plus the existing restock and COGS reversal. The
+   customer's credit is a liability applied to future purchases.
+5. **Card settlement: settlement screen.** New action records processor payout:
+   Dr Bank 1010 + Dr Card Processing Fees (expense) / Cr Card Clearing 1030.
+   This finally lets 1030 clear and makes bank reconciliation possible.
+
+Still open (not blocking Phase 3/4): CoA hierarchy grouping (§4, planned in
+audit Phase 6), per-counterparty sub-ledgers (§5), float64 → decimal money
+(§6), report caching (§7).
+
+---
+
 ## 1. Bakery orders never decrement stock, and post no COGS
 
 **Highest-value remaining gap.**
