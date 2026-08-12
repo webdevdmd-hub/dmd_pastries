@@ -294,8 +294,8 @@ func (r *Repository) ListExpenseJournalEntryIDs(tx *gorm.DB, businessID, expense
 	return ids, err
 }
 
-func (r *Repository) HardDeleteExpense(tx *gorm.DB, businessID, id string) error {
-	result := tx.Unscoped().Where("business_id = ? AND id = ?", businessID, id).Delete(&Expense{})
+func (r *Repository) SoftDeleteExpense(tx *gorm.DB, businessID, id string) error {
+	result := tx.Where("business_id = ? AND id = ?", businessID, id).Delete(&Expense{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -305,19 +305,19 @@ func (r *Repository) HardDeleteExpense(tx *gorm.DB, businessID, id string) error
 	return nil
 }
 
-func (r *Repository) HardDeleteJournalEntries(tx *gorm.DB, businessID string, ids []string) error {
+// SoftDeleteJournalEntries removes an expense's journals from the books while
+// keeping the rows for the audit trail (safe-delete policy: deletions must
+// never physically destroy posted ledger history). The partial unique indexes
+// on journal_entries all carry WHERE deleted_at IS NULL, so retained rows
+// cannot collide with future entry numbers or source idempotency.
+func (r *Repository) SoftDeleteJournalEntries(tx *gorm.DB, businessID string, ids []string) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	if err := tx.Model(&accounting.JournalEntry{}).
-		Where("business_id = ? AND (id IN ? OR reversed_entry_id IN ?)", businessID, ids, ids).
-		Update("reversed_entry_id", nil).Error; err != nil {
+	if err := tx.Where("business_id = ? AND journal_entry_id IN ?", businessID, ids).Delete(&accounting.JournalEntryLine{}).Error; err != nil {
 		return err
 	}
-	if err := tx.Unscoped().Where("business_id = ? AND journal_entry_id IN ?", businessID, ids).Delete(&accounting.JournalEntryLine{}).Error; err != nil {
-		return err
-	}
-	return tx.Unscoped().Where("business_id = ? AND id IN ?", businessID, ids).Delete(&accounting.JournalEntry{}).Error
+	return tx.Where("business_id = ? AND id IN ?", businessID, ids).Delete(&accounting.JournalEntry{}).Error
 }
 
 func (r *Repository) ValidateBranch(tx *gorm.DB, businessID, branchID string) error {

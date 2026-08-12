@@ -258,19 +258,19 @@ func (s *Service) Delete(currentUser *utils.AuthContext, id string, ipAddress, u
 		if err != nil {
 			return err
 		}
-		if err := s.repo.HardDeleteExpense(tx, currentUser.BusinessID, id); err != nil {
+		if err := s.repo.SoftDeleteExpense(tx, currentUser.BusinessID, id); err != nil {
 			return err
 		}
-		if err := s.repo.HardDeleteJournalEntries(tx, currentUser.BusinessID, journalIDs); err != nil {
+		if err := s.repo.SoftDeleteJournalEntries(tx, currentUser.BusinessID, journalIDs); err != nil {
 			return err
 		}
 		return s.auditRepo.CreateActivity(tx, audit.ActivityInput{
 			BusinessID:  currentUser.BusinessID,
 			ActorUserID: currentUser.UserID,
-			EventType:   "expense.hard_deleted",
+			EventType:   "expense.deleted",
 			EntityType:  "expenses",
 			EntityID:    id,
-			Summary:     "Expense hard deleted",
+			Summary:     "Expense deleted with its journal entries",
 			Metadata: audit.RecordMetadata(expense.ExpenseNumber, map[string]interface{}{
 				"expense_number":   expense.ExpenseNumber,
 				"reference_number": expense.ReferenceNumber,

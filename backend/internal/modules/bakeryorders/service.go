@@ -272,6 +272,19 @@ func (s *Service) DeleteOrder(currentUser *utils.AuthContext, id, ipAddress, use
 		if order.OrderStatus == "completed" {
 			return apperrors.BadRequest("completed orders cannot be deleted; cancel them instead", nil)
 		}
+		// Safe-delete dependency guards: deleting an order with recorded
+		// payments or a posted revenue journal would strand Customer Advance /
+		// revenue entries in the ledger with no document behind them.
+		paymentCount, err := s.repo.CountOrderPayments(tx, currentUser.BusinessID, order.ID)
+		if err != nil {
+			return apperrors.Internal("failed to check order payments")
+		}
+		if paymentCount > 0 {
+			return apperrors.BadRequest("orders with recorded payments cannot be deleted; cancel the order instead", map[string]interface{}{"payment_count": paymentCount})
+		}
+		if order.AccountingJournalEntryID != nil && strings.TrimSpace(*order.AccountingJournalEntryID) != "" {
+			return apperrors.BadRequest("orders with posted accounting entries cannot be deleted; cancel the order instead", nil)
+		}
 		if err := s.repo.UpdateOrder(tx, id, currentUser.BusinessID, map[string]interface{}{"deleted_at": gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}); err != nil {
 			return err
 		}

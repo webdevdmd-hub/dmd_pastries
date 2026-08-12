@@ -340,11 +340,15 @@ func (r *Repository) CountJournalReversalLinks(tx *gorm.DB, businessID, id strin
 	return count, err
 }
 
-func (r *Repository) HardDeleteJournalEntry(tx *gorm.DB, businessID, id string) error {
-	if err := tx.Unscoped().Where("business_id = ? AND journal_entry_id = ?", businessID, id).Delete(&JournalEntryLine{}).Error; err != nil {
+// SoftDeleteJournalEntry removes a manual journal from the books while keeping
+// the rows for the audit trail (safe-delete policy: ledger history is never
+// physically destroyed). The unique indexes on journal_entries are partial on
+// deleted_at IS NULL, so retained rows cannot collide with future entries.
+func (r *Repository) SoftDeleteJournalEntry(tx *gorm.DB, businessID, id string) error {
+	if err := tx.Where("business_id = ? AND journal_entry_id = ?", businessID, id).Delete(&JournalEntryLine{}).Error; err != nil {
 		return err
 	}
-	result := tx.Unscoped().Where("business_id = ? AND id = ?", businessID, id).Delete(&JournalEntry{})
+	result := tx.Where("business_id = ? AND id = ?", businessID, id).Delete(&JournalEntry{})
 	if result.Error != nil {
 		return result.Error
 	}

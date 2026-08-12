@@ -176,6 +176,14 @@ func (r *Repository) CreatePayment(tx *gorm.DB, payment *BakeryOrderPayment) err
 	return tx.Create(payment).Error
 }
 
+func (r *Repository) CountOrderPayments(tx *gorm.DB, businessID, orderID string) (int64, error) {
+	var count int64
+	err := tx.Table("bakery_order_payments").
+		Where("business_id = ? AND bakery_order_id = ?", businessID, orderID).
+		Count(&count).Error
+	return count, err
+}
+
 func (r *Repository) Production(businessID, orderID string) (*BakeryOrderProductionResponse, error) {
 	var row BakeryOrderProductionResponse
 	result := r.db.Table("bakery_order_productions bop").

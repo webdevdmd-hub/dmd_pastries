@@ -3686,12 +3686,12 @@ func (s *Service) DeleteJournalEntry(currentUser *utils.AuthContext, id, ipAddre
 			return apperrors.Internal("failed to validate journal reversal links")
 		}
 		if reversalCount > 0 {
-			return apperrors.BadRequest("journal entry has reversal links and cannot be hard deleted", nil)
+			return apperrors.BadRequest("journal entry has reversal links and cannot be deleted", nil)
 		}
-		if err := s.repo.HardDeleteJournalEntry(tx, currentUser.BusinessID, entry.ID); err != nil {
+		if err := s.repo.SoftDeleteJournalEntry(tx, currentUser.BusinessID, entry.ID); err != nil {
 			return mapJournalEntryNotFound(err)
 		}
-		return s.writeAudit(tx, currentUser, "accounting.journal_entry_hard_deleted", entry.ID, "Journal entry hard deleted.", ipAddress, userAgent)
+		return s.writeAudit(tx, currentUser, "accounting.journal_entry_hard_deleted", entry.ID, "Journal entry deleted.", ipAddress, userAgent)
 	})
 }
 

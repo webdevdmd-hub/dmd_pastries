@@ -1496,7 +1496,7 @@ func (s *Service) rollbackSupplierPaymentImpact(tx *gorm.DB, currentUser *utils.
 	if err := s.repo.HardDeleteSupplierPaymentAllocations(tx, currentUser.BusinessID, payment.ID); err != nil {
 		return err
 	}
-	if err := s.repo.HardDeleteSupplierPaymentJournal(tx, currentUser.BusinessID, payment.ID); err != nil {
+	if err := s.repo.SoftDeleteSupplierPaymentJournal(tx, currentUser.BusinessID, payment.ID); err != nil {
 		return apperrors.Internal("failed to delete supplier payment accounting journal")
 	}
 	return nil
@@ -2130,6 +2130,19 @@ func (s *Service) CancelReceipt(currentUser *utils.AuthContext, id, ipAddress, u
 		}
 		if receipt.Status == "cancelled" {
 			return apperrors.BadRequest("receipt is already cancelled", nil)
+		}
+		// Safe-delete dependency guard: cancelling a receipt whose bill is
+		// posted would remove the stock while the bill's Inventory debit stays
+		// on the ledger. The bill must be cancelled first — that path reverses
+		// stock and journal together.
+		if receipt.PurchaseInvoiceID != nil && strings.TrimSpace(*receipt.PurchaseInvoiceID) != "" {
+			invoice, err := s.repo.FindInvoiceForUpdate(tx, *receipt.PurchaseInvoiceID, currentUser.BusinessID)
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperrors.Internal("failed to check linked purchase invoice")
+			}
+			if err == nil && invoice.Status == "posted" {
+				return apperrors.BadRequest("this receipt is billed on a posted purchase invoice; cancel the invoice instead", map[string]interface{}{"invoice_number": invoice.InvoiceNumber})
+			}
 		}
 		items, err := s.repo.ReceiptItems(id, currentUser.BusinessID)
 		if err != nil {

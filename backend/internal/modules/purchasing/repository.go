@@ -638,7 +638,12 @@ func (r *Repository) HardDeleteSupplierPayment(tx *gorm.DB, businessID, supplier
 	return nil
 }
 
-func (r *Repository) HardDeleteSupplierPaymentJournal(tx *gorm.DB, businessID, supplierPaymentID string) error {
+// SoftDeleteSupplierPaymentJournal removes a supplier payment's journals from
+// the books while keeping the rows for the audit trail (safe-delete policy:
+// deletions must never physically destroy posted ledger history). The unique
+// indexes on journal_entries are partial on deleted_at IS NULL, so retained
+// rows cannot collide with a re-posted payment's new journal.
+func (r *Repository) SoftDeleteSupplierPaymentJournal(tx *gorm.DB, businessID, supplierPaymentID string) error {
 	var journalIDs []string
 	if err := tx.Table("journal_entries").
 		Where("business_id = ? AND source_type = ? AND source_id = ? AND deleted_at IS NULL", businessID, "supplier_payment", supplierPaymentID).
@@ -648,12 +653,12 @@ func (r *Repository) HardDeleteSupplierPaymentJournal(tx *gorm.DB, businessID, s
 	if len(journalIDs) == 0 {
 		return nil
 	}
-	if err := tx.Unscoped().
+	if err := tx.
 		Where("business_id = ? AND journal_entry_id IN ?", businessID, journalIDs).
 		Delete(&accounting.JournalEntryLine{}).Error; err != nil {
 		return err
 	}
-	return tx.Unscoped().
+	return tx.
 		Where("business_id = ? AND id IN ?", businessID, journalIDs).
 		Delete(&accounting.JournalEntry{}).Error
 }
