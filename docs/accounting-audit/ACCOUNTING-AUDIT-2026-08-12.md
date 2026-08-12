@@ -274,11 +274,14 @@ The goal your owner/accountant asked for — "understandable without inspecting 
 ## K. Fix priority
 
 ### CRITICAL — the app is wrong or broken today
+
+> **Status 2026-08-12:** Phase 1 shipped on `main` — K1 `9962a12`, K5 `b4d0c44`, K4 `0be21e7`, K3 `2fc1aba` (all with regression/guard tests, full suite green). K3's period-locking piece intentionally waits for the Phase 5 period model.
+
 | # | Fix | Root cause |
 |---|---|---|
-| K1 | `stock_movements.deleted_at` phantom filter crashes void-sale & sales-return (`pos/service.go:964`, `salesreturns/service.go:973`) — **verified live SQL error** | hygiene |
+| K1 | ✅ **FIXED** — `stock_movements.deleted_at` phantom filter crashes void-sale & sales-return (`pos/service.go:964`, `salesreturns/service.go:973`) — **verified live SQL error** | hygiene |
 | K2 | Bakery COGS/inventory relief (after accountant answers the consumption-timing question) + bakery cancellation reversal + bakery refund source in 000087 | RC5, RC3 |
-| K3 | Stop hard-deleting posted journals (expenses delete, supplier-payment edit/delete) → reverse instead | RC3 |
+| K3 | **Safe delete (Zoho-style)** — decided 2026-08-12 with the accountant: keep edit/delete available, but make it safe. (a) Deletion cascades completely & atomically (document + journal + stock movements + allocations — fixes the expense/supplier-payment hard-deletes AND the bakery half-delete); (b) dependency guards (can't delete a bill with applied payments, etc.); (c) period locking — locked periods refuse edit/delete and offer a reversal journal instead (lands with Phase 5 period model); (d) every deletion writes to the audit log before removing rows | RC3 |
 | K4 | Branch-aware account resolution for the four fallback-only paths (POS refunds, bakery payments, sales-return refunds, purchase-invoice payments) — refunds are impossible at non-primary branches today | RC2 |
 
 ### HIGH — ledger integrity & correctness
