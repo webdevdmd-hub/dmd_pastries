@@ -935,6 +935,14 @@ func (s *Service) ListPlatformSettlements(currentUser *utils.AuthContext, query 
 	return &PaginatedResponse[PlatformSettlementResponse]{Items: items, Pagination: PaginationResponse{Page: query.Page, Limit: query.Limit, Total: total, TotalPages: totalPages(total, query.Limit)}}, nil
 }
 
+// isSettleableClearingType lists the payment-account types a settlement can
+// drain: delivery-platform clearing and card-processor clearing (Phase 4 /
+// W5 — card settlements reuse the platform settlement flow; the fee goes to
+// a deduction line, typically 6260 Card Processing Fees).
+func isSettleableClearingType(accountType string) bool {
+	return accountType == "platform_clearing" || accountType == "card_clearing"
+}
+
 func (s *Service) CreatePlatformSettlement(currentUser *utils.AuthContext, req CreatePlatformSettlementRequest, ipAddress, userAgent string) (*PlatformSettlementResponse, error) {
 	settlementDate, err := parseRequiredDate(req.SettlementDate, "settlement_date")
 	if err != nil {
@@ -952,8 +960,8 @@ func (s *Service) CreatePlatformSettlement(currentUser *utils.AuthContext, req C
 	if err != nil {
 		return nil, err
 	}
-	if platformAccount.AccountType != "platform_clearing" {
-		return nil, apperrors.BadRequest("platform_payment_account_id must reference a platform_clearing payment account", nil)
+	if !isSettleableClearingType(platformAccount.AccountType) {
+		return nil, apperrors.BadRequest("platform_payment_account_id must reference a platform_clearing or card_clearing payment account", nil)
 	}
 	depositAccount, err := s.loadActivePaymentAccount(currentUser, strings.TrimSpace(req.DepositPaymentAccountID))
 	if err != nil {
@@ -962,8 +970,8 @@ func (s *Service) CreatePlatformSettlement(currentUser *utils.AuthContext, req C
 	if platformAccount.ID == depositAccount.ID {
 		return nil, apperrors.BadRequest("platform_payment_account_id and deposit_payment_account_id cannot be the same", nil)
 	}
-	if depositAccount.AccountType == "platform_clearing" {
-		return nil, apperrors.BadRequest("deposit_payment_account_id cannot be another platform_clearing account", nil)
+	if isSettleableClearingType(depositAccount.AccountType) {
+		return nil, apperrors.BadRequest("deposit_payment_account_id cannot be another clearing account", nil)
 	}
 	branchID, err := s.resolvePaymentOperationBranch(currentUser, cleanStringPointer(req.BranchID), platformAccount, depositAccount)
 	if err != nil {

@@ -1048,9 +1048,9 @@ function PlatformSettlementDialog({
     >
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create platform settlement</DialogTitle>
+          <DialogTitle>Create settlement</DialogTitle>
           <DialogDescription>
-            Move platform clearing balance to bank/cash and record commission or settlement fees.
+            Move a platform or card clearing balance to bank/cash and record commissions or processing fees.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">
@@ -1075,10 +1075,10 @@ function PlatformSettlementDialog({
             />
           </div>
           <div className="grid gap-2">
-            <Label>Platform account</Label>
+            <Label>Clearing account</Label>
             <SearchableCombobox
               options={accountSelectorOptions}
-              placeholder="Select platform account"
+              placeholder="Select platform or card clearing account"
               value={form.platformPaymentAccountId}
               onValueChange={(platformPaymentAccountId) => update({ platformPaymentAccountId })}
             />
@@ -1204,7 +1204,7 @@ export function PlatformSettlementsPageClient(): JSX.Element {
   const submitSettlement = async (payload: PlatformSettlementPayload): Promise<void> => {
     try {
       await createMutation.mutateAsync(payload);
-      toast.success("Platform settlement created.");
+      toast.success("Settlement created.");
       setDialogOpen(false);
     } catch (error) {
       toast.error(getErrorMessage(error));

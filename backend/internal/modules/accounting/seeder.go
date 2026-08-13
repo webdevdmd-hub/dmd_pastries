@@ -95,6 +95,7 @@ func DefaultChartAccountSeeds() []defaultAccountSeed {
 		{Code: "6230", Name: "Tax Expense", Type: "expense", Group: "tax_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
 		{Code: "6240", Name: "Platform Commission Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true},
 		{Code: "6250", Name: "Delivery Platform Charges", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
+		{Code: "6260", Name: "Card Processing Fees", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true},
 	}
 }
 

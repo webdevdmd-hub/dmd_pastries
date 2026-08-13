@@ -21,3 +21,18 @@ func TestBakeryOrderEntryDate(t *testing.T) {
 		t.Fatalf("zero event date must fall back to now")
 	}
 }
+
+// Phase 4 / W5: card settlements reuse the platform settlement flow, so both
+// clearing types must be accepted as the settlement source — and only those.
+func TestIsSettleableClearingType(t *testing.T) {
+	for _, accepted := range []string{"platform_clearing", "card_clearing"} {
+		if !isSettleableClearingType(accepted) {
+			t.Fatalf("%s must be settleable", accepted)
+		}
+	}
+	for _, rejected := range []string{"cash", "bank", "wallet", "other", "store_credit", ""} {
+		if isSettleableClearingType(rejected) {
+			t.Fatalf("%s must not be settleable", rejected)
+		}
+	}
+}

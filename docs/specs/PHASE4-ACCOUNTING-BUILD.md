@@ -99,6 +99,8 @@ Revert the commit; migration 000097 columns are additive/nullable — safe to le
 
 # W5 — Card settlement screen
 
+> **Implementation note (2026-08-12):** built by REUSING the existing platform-settlement flow instead of a new `card_settlements` entity — `CreatePlatformSettlement` already posts Dr deposit (net) + Dr fee deductions / Cr clearing (gross) with numbering, idempotency, and audit. The only gate was the `platform_clearing`-only validation, now widened to accept `card_clearing` (`isSettleableClearingType`). 6260 seeded via seeder + migration 000098. Settlement reversal moves to W6's reversal-contract registry. The dedicated-entity design below is retained for reference only.
+
 ## Context
 Decision §5. Card sales debit Card Clearing 1030; nothing can credit it (`allow_manual_posting=false`, no flow). Book bank balance never shows card income; fees invisible.
 
