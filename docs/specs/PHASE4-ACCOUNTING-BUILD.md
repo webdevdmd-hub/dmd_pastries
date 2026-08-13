@@ -236,6 +236,11 @@ Unit +6 (calc × 3 modes × sale/bill) · Integration +4 (API enforcement, repor
 
 # W2 — VAT recognition on each payment — depends on W3
 
+> **Implementation note (2026-08-14):** shipped with these deltas from the design below.
+> - Migration is **000102** (`bakery_orders.vat_recognized_amount`). The remainder rule needs no special-casing: slices use the cumulative formula `slice = round(tax × paid_after/total) − recognized_before` (`bakeryPaymentVATSlice`), so the final payment takes the exact remainder and uneven series can't drift. Legacy orders (deposits taken pre-W2, nothing recognized) catch up on their next payment instead of waiting for completion.
+> - Payment journals credit **2200 net of the slice**, so completion debits the NET advance (`paid − vat_recognized`) and credits only the remaining VAT; the W6 cancellation reversal likewise restores the net advance (the recognized slices stay in 2100 until advance refunds reverse them via `bakeryRefundVATSliceBack`, which also decrements the tracker).
+> - Post-completion payments (AR settlements) recognize nothing, unchanged. no_tax orders (W3) slice nothing automatically. No backfill, per the design.
+
 ## Context
 Decision §2a: a deposit carries its proportional VAT slice immediately; completion recognizes only the remainder. Today all VAT waits for completion (`accounting/service.go:1587-1589`), and payment journals post no tax line (`:1396-1399`).
 

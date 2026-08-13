@@ -1523,6 +1523,8 @@ func (s *Service) PostBakeryOrderPaymentJournal(tx *gorm.DB, currentUser *utils.
 	creditAccountCode := "2200"
 	creditAccountName := "Customer Advance"
 	if payment.OrderStatus == "completed" {
+		// Post-completion payments settle the receivable; VAT was fully
+		// recognized at completion, so no slice applies (W2).
 		creditMappingKey = "accounts_receivable"
 		creditAccountCode = "1100"
 		creditAccountName = "Accounts Receivable"
@@ -1531,13 +1533,35 @@ func (s *Service) PostBakeryOrderPaymentJournal(tx *gorm.DB, currentUser *utils.
 	if err != nil {
 		return "", err
 	}
-	lines := []JournalEntryLineRequest{
-		{AccountID: payment.ChartAccountID, DebitAmount: amount, Description: "Bakery order payment via " + payment.PaymentMethodNameSnapshot},
-		{AccountID: creditAccount.ID, CreditAmount: amount, Description: "Bakery order " + payment.PaymentType + " payment"},
+	// Phase 4 / W2: a pre-completion payment carries its proportional VAT
+	// slice immediately — Dr cash (gross) / Cr 2200 (net) + Cr 2100 (slice).
+	// The cumulative rule makes the final payment take the exact remainder.
+	taxSlice := 0.0
+	if payment.OrderStatus != "completed" {
+		paidAfter := roundMoney(payment.OrderPaidAmount + amount)
+		taxSlice = bakeryPaymentVATSlice(roundMoney(payment.OrderTaxAmount), roundMoney(payment.OrderTotalAmount), paidAfter, roundMoney(payment.OrderVatRecognized))
+	}
+	lines := make([]JournalEntryLineRequest, 0, 3)
+	lines = append(lines, JournalEntryLineRequest{AccountID: payment.ChartAccountID, DebitAmount: amount, Description: "Bakery order payment via " + payment.PaymentMethodNameSnapshot})
+	netCredit := roundMoney(amount - taxSlice)
+	if netCredit > 0 {
+		lines = append(lines, JournalEntryLineRequest{AccountID: creditAccount.ID, CreditAmount: netCredit, Description: "Bakery order " + payment.PaymentType + " payment"})
+	}
+	if taxSlice > 0 {
+		vatPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, payment.BranchID, "vat_payable", "2100", "VAT Payable")
+		if err != nil {
+			return "", err
+		}
+		lines = append(lines, JournalEntryLineRequest{AccountID: vatPayable.ID, CreditAmount: taxSlice, Description: "VAT recognized on bakery order payment"})
 	}
 	journalID, err := s.createPostedSystemJournal(tx, currentUser, payment.PaidAt, payment.BranchID, "bakery_order_payment", payment.ID, payment.OrderNumber, "Bakery order payment "+payment.OrderNumber, lines)
 	if err != nil {
 		return "", err
+	}
+	if taxSlice > 0 {
+		if err := s.repo.AdjustBakeryOrderVatRecognized(tx, currentUser.BusinessID, payment.BakeryOrderID, taxSlice); err != nil {
+			return "", apperrors.Internal("failed to track recognized bakery order VAT")
+		}
 	}
 	if err := s.repo.UpdateBakeryPaymentJournalID(tx, currentUser.BusinessID, payment.ID, journalID); err != nil {
 		return "", apperrors.Internal("failed to update bakery order payment accounting journal")
@@ -1705,14 +1729,23 @@ func (s *Service) PostBakeryOrderRevenueJournal(tx *gorm.DB, currentUser *utils.
 		paidAmount = totalAmount
 	}
 	balanceAmount := roundMoney(totalAmount - paidAmount)
+	// Phase 4 / W2: payment journals already recognized part of the VAT and
+	// credited 2200 only net of those slices, so completion clears the NET
+	// advance and posts only the remaining VAT.
+	vatRecognized := roundMoney(order.VatRecognizedAmount)
+	if vatRecognized > taxAmount {
+		vatRecognized = taxAmount
+	}
+	netAdvance := roundMoney(paidAmount - vatRecognized)
+	remainingTax := roundMoney(taxAmount - vatRecognized)
 	chargeLines, chargeNetAmount, err := s.buildChargeCreditLines(tx, currentUser.BusinessID, order.BranchID, "bakery_order", order.ID, "Bakery order charge")
 	if err != nil {
 		return "", err
 	}
 
 	lines := make([]JournalEntryLineRequest, 0, 4+len(chargeLines))
-	if paidAmount > 0 {
-		lines = append(lines, JournalEntryLineRequest{AccountID: customerAdvance.ID, DebitAmount: paidAmount, Description: "Recognize paid bakery order advance"})
+	if netAdvance > 0 {
+		lines = append(lines, JournalEntryLineRequest{AccountID: customerAdvance.ID, DebitAmount: netAdvance, Description: "Recognize paid bakery order advance"})
 	}
 	if balanceAmount > 0 {
 		lines = append(lines, JournalEntryLineRequest{AccountID: accountsReceivable.ID, DebitAmount: balanceAmount, Description: "Bakery order receivable"})
@@ -1722,8 +1755,8 @@ func (s *Service) PostBakeryOrderRevenueJournal(tx *gorm.DB, currentUser *utils.
 		lines = append(lines, JournalEntryLineRequest{AccountID: bakeryIncome.ID, CreditAmount: revenueAmount, Description: "Bakery order income"})
 	}
 	lines = append(lines, chargeLines...)
-	if vatPayable != nil {
-		lines = append(lines, JournalEntryLineRequest{AccountID: vatPayable.ID, CreditAmount: taxAmount, Description: "VAT payable on bakery order"})
+	if vatPayable != nil && remainingTax > 0 {
+		lines = append(lines, JournalEntryLineRequest{AccountID: vatPayable.ID, CreditAmount: remainingTax, Description: "VAT payable on bakery order"})
 	}
 	journalID, err := s.createPostedSystemJournal(tx, currentUser, bakeryOrderEntryDate(order.EventDate), order.BranchID, "bakery_order_revenue", order.ID, order.OrderNumber, "Bakery order revenue "+order.OrderNumber, lines)
 	if err != nil {
@@ -1864,7 +1897,11 @@ func (s *Service) ReverseBakeryOrderRevenueJournal(tx *gorm.DB, currentUser *uti
 	if err != nil {
 		return "", err
 	}
-	lineRequests, err := buildBakeryOrderRevenueReversalLines(originalLines, advanceAccount.ID, arAccount.ID, order.PaidAmount, order.BalanceAmount)
+	// W2: payment journals credited 2200 only net of their VAT slices, so the
+	// reversal restores the NET advance; the recognized slices stay in 2100
+	// until the advance refunds reverse them.
+	netAdvance := roundMoney(order.PaidAmount - order.VatRecognizedAmount)
+	lineRequests, err := buildBakeryOrderRevenueReversalLines(originalLines, advanceAccount.ID, arAccount.ID, netAdvance, order.BalanceAmount)
 	if err != nil {
 		return "", err
 	}
@@ -1951,13 +1988,31 @@ func (s *Service) PostBakeryOrderAdvanceRefundJournal(tx *gorm.DB, currentUser *
 	if err != nil {
 		return "", err
 	}
-	lines := []JournalEntryLineRequest{
-		{AccountID: advanceAccount.ID, DebitAmount: refundAmount, Description: "Customer advance refunded " + refund.RefundNumber},
-		{AccountID: refund.ChartAccountID, CreditAmount: refundAmount, Description: "Advance refund via " + refund.PaymentMethodNameSnapshot},
+	// Phase 4 / W2: the advance was credited net of its VAT slice, so the
+	// refund reverses both — Dr 2200 (net) + Dr 2100 (slice back) / Cr cash.
+	paidAfterRefund := roundMoney(refund.OrderPaidAmount - refundAmount)
+	sliceBack := bakeryRefundVATSliceBack(roundMoney(refund.OrderTaxAmount), roundMoney(refund.OrderTotalAmount), paidAfterRefund, roundMoney(refund.OrderVatRecognized), refundAmount)
+	lines := make([]JournalEntryLineRequest, 0, 3)
+	netDebit := roundMoney(refundAmount - sliceBack)
+	if netDebit > 0 {
+		lines = append(lines, JournalEntryLineRequest{AccountID: advanceAccount.ID, DebitAmount: netDebit, Description: "Customer advance refunded " + refund.RefundNumber})
 	}
+	if sliceBack > 0 {
+		vatPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, refund.BranchID, "vat_payable", "2100", "VAT Payable")
+		if err != nil {
+			return "", err
+		}
+		lines = append(lines, JournalEntryLineRequest{AccountID: vatPayable.ID, DebitAmount: sliceBack, Description: "VAT reversed on advance refund " + refund.RefundNumber})
+	}
+	lines = append(lines, JournalEntryLineRequest{AccountID: refund.ChartAccountID, CreditAmount: refundAmount, Description: "Advance refund via " + refund.PaymentMethodNameSnapshot})
 	journalID, err := s.createPostedSystemJournal(tx, currentUser, refund.RefundedAt, refund.BranchID, "bakery_order_advance_refund", refund.ID, refund.RefundNumber, "Bakery order advance refund "+refund.RefundNumber+" for "+refund.OrderNumber, lines)
 	if err != nil {
 		return "", err
+	}
+	if sliceBack > 0 {
+		if err := s.repo.AdjustBakeryOrderVatRecognized(tx, currentUser.BusinessID, refund.BakeryOrderID, -sliceBack); err != nil {
+			return "", apperrors.Internal("failed to track reversed bakery order VAT")
+		}
 	}
 	if err := s.repo.UpdatePOSPaymentRefundJournalID(tx, currentUser.BusinessID, refund.ID, journalID); err != nil {
 		return "", apperrors.Internal("failed to update bakery order refund accounting journal")

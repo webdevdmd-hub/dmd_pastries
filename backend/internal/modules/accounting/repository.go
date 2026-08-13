@@ -86,6 +86,7 @@ type bakeryOrderAccountingRow struct {
 	ChargeAmount             float64
 	ChargeTaxAmount          float64
 	RefundedAmount           float64
+	VatRecognizedAmount      float64
 	OrderStatus              string
 	AccountingJournalEntryID *string
 	COGSJournalEntryID       *string
@@ -107,6 +108,7 @@ type bakeryPaymentRefundAccountingRow struct {
 	OrderTaxAmount            float64
 	OrderPaidAmount           float64
 	OrderRefundedAmount       float64
+	OrderVatRecognized        float64
 	RefundNumber              string
 	RefundAmount              float64
 	RefundReason              string
@@ -142,6 +144,10 @@ type bakeryPaymentAccountingRow struct {
 	BranchID                  string
 	OrderNumber               string
 	OrderStatus               string
+	OrderTotalAmount          float64
+	OrderTaxAmount            float64
+	OrderPaidAmount           float64
+	OrderVatRecognized        float64
 	PaymentType               string
 	Amount                    float64
 	PaymentMethodNameSnapshot string
@@ -1127,7 +1133,7 @@ func (r *Repository) UpdatePOSPaymentRefundJournalID(tx *gorm.DB, businessID, re
 func (r *Repository) FindBakeryOrderForAccounting(tx *gorm.DB, businessID, orderID string) (*bakeryOrderAccountingRow, error) {
 	var row bakeryOrderAccountingRow
 	err := tx.Table("bakery_orders").
-		Select("id, business_id, branch_id, order_number, total_amount, paid_amount, balance_amount, tax_amount, charge_amount, charge_tax_amount, refunded_amount, order_status, accounting_journal_entry_id, cogs_journal_entry_id, revenue_reversal_journal_entry_id, event_date").
+		Select("id, business_id, branch_id, order_number, total_amount, paid_amount, balance_amount, tax_amount, charge_amount, charge_tax_amount, refunded_amount, vat_recognized_amount, order_status, accounting_journal_entry_id, cogs_journal_entry_id, revenue_reversal_journal_entry_id, event_date").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, orderID).
 		Take(&row).Error
 	return &row, err
@@ -1159,6 +1165,15 @@ func (r *Repository) UpdateBakeryOrderCOGSReversalJournalID(tx *gorm.DB, busines
 	return nil
 }
 
+// AdjustBakeryOrderVatRecognized moves the order's recognized-VAT tracker by
+// delta (positive on payment slices, negative on advance-refund slice-backs).
+func (r *Repository) AdjustBakeryOrderVatRecognized(tx *gorm.DB, businessID, orderID string, delta float64) error {
+	return tx.Exec(
+		"UPDATE bakery_orders SET vat_recognized_amount = ROUND((vat_recognized_amount + ?)::numeric, 2), updated_at = NOW() WHERE business_id = ? AND id = ? AND deleted_at IS NULL",
+		delta, businessID, orderID,
+	).Error
+}
+
 func (r *Repository) UpdateBakeryOrderRevenueReversalJournalID(tx *gorm.DB, businessID, orderID, journalEntryID string) error {
 	result := tx.Table("bakery_orders").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, orderID).
@@ -1188,6 +1203,7 @@ func (r *Repository) FindBakeryPaymentRefundForAccounting(tx *gorm.DB, businessI
 			bo.tax_amount AS order_tax_amount,
 			bo.paid_amount AS order_paid_amount,
 			bo.refunded_amount AS order_refunded_amount,
+			bo.vat_recognized_amount AS order_vat_recognized,
 			pr.refund_number,
 			pr.refund_amount,
 			pr.refund_reason,
@@ -1294,6 +1310,10 @@ func (r *Repository) FindBakeryPaymentForAccounting(tx *gorm.DB, businessID, pay
 			bo.branch_id,
 			bo.order_number,
 			bo.order_status,
+			bo.total_amount AS order_total_amount,
+			bo.tax_amount AS order_tax_amount,
+			bo.paid_amount AS order_paid_amount,
+			bo.vat_recognized_amount AS order_vat_recognized,
 			bop.payment_type,
 			bop.amount,
 			bop.payment_method_name_snapshot,
