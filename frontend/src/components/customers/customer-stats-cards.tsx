@@ -8,7 +8,13 @@ function currency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
 }
 
-export function CustomerStatsCards({ stats }: { stats: CustomerStats | undefined }): JSX.Element {
+export function CustomerStatsCards({
+  creditBalance,
+  stats,
+}: {
+  creditBalance?: number;
+  stats: CustomerStats | undefined;
+}): JSX.Element {
   const cards = [
     { label: "Total Sales", value: currency(stats?.totalSalesAmount ?? 0), icon: Banknote },
     {
@@ -51,6 +57,12 @@ export function CustomerStatsCards({ stats }: { stats: CustomerStats | undefined
       label: "Refunds",
       value: currency(stats?.totalRefundedAmount ?? 0),
       icon: RotateCcw,
+    },
+    {
+      label: "Store Credit",
+      value: currency(creditBalance ?? 0),
+      detail: "Redeemable at POS checkout",
+      icon: WalletCards,
     },
   ];
 

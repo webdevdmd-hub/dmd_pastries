@@ -35,6 +35,7 @@ import {
 import { PERMISSIONS } from "@/constants/permissions";
 import { useAuth } from "@/hooks/use-auth";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { useCustomerCredits } from "@/hooks/use-customer-credits";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePermission } from "@/hooks/use-permission";
 import { usePOSCart } from "@/hooks/use-pos-cart";
@@ -180,6 +181,10 @@ export function POSWorkspace(): JSX.Element {
   const branchId = branchScope.effectiveBranchId ?? "";
   const referenceDataQuery = usePOSReferenceData(branchId || null, branchScope.hasBranchScope);
   const paymentMethodsQuery = usePOSPaymentMethods(branchId || null, branchScope.hasBranchScope);
+  // W4: the selected customer's open store-credit balance gates and caps the
+  // Store Credit tender in the checkout dialog.
+  const customerCreditsQuery = useCustomerCredits(customerId);
+  const customerCreditBalance = customerCreditsQuery.data?.balance ?? 0;
   const { refetch: refetchReferenceData } = referenceDataQuery;
   const { refetch: refetchPaymentMethods } = paymentMethodsQuery;
   const permissionSignature = user?.permissions.join("|") ?? "";
@@ -1004,6 +1009,8 @@ export function POSWorkspace(): JSX.Element {
       <POSCheckoutDialog
         charges={cart.charges}
         confirmButtonLabel={checkoutBlocker?.buttonLabel ?? "Confirm sale"}
+        customerCreditBalance={customerCreditBalance}
+        customerId={customerId}
         feedback={checkoutFeedback}
         isSubmitting={isCheckoutProcessing}
         onConfirm={() => {

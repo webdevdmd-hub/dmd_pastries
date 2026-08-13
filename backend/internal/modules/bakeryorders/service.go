@@ -782,6 +782,12 @@ func (s *Service) AddPayment(currentUser *utils.AuthContext, orderID string, req
 		if !method.ShowInBakeryOrders {
 			return apperrors.BadRequest("payment method is not enabled for bakery orders", nil)
 		}
+		// W4: store-credit redemption is POS-only for now — bakery payments
+		// have no subledger decrement pipeline, so accepting the tender here
+		// would drift the customer_credits balances.
+		if method.MethodType == "store_credit" {
+			return apperrors.BadRequest("store credit can only be redeemed at POS checkout", nil)
+		}
 		if method.RequiresReference && strings.TrimSpace(req.ReferenceNumber) == "" {
 			return apperrors.BadRequest("reference_number is required for this payment method", nil)
 		}
@@ -842,8 +848,10 @@ func (s *Service) AddPayment(currentUser *utils.AuthContext, orderID string, req
 // refund builder (sales-returns allowance + proportional VAT/charge
 // reversal), capped at the collected amount and tracked in refunded_amount.
 func (s *Service) RefundPayment(currentUser *utils.AuthContext, orderID string, req RefundPaymentRequest, ipAddress, userAgent string) (*BakeryOrderResponse, error) {
-	if err := validateUUID(req.PaymentMethodID, "payment_method_id"); err != nil {
-		return nil, err
+	if !req.ConvertToStoreCredit {
+		if err := validateUUID(req.PaymentMethodID, "payment_method_id"); err != nil {
+			return nil, err
+		}
 	}
 	if req.Amount <= 0 {
 		return nil, apperrors.BadRequest("amount must be greater than zero", nil)
@@ -859,13 +867,6 @@ func (s *Service) RefundPayment(currentUser *utils.AuthContext, orderID string, 
 		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
 			return err
 		}
-		method, err := s.repo.PaymentMethod(tx, currentUser.BusinessID, req.PaymentMethodID)
-		if err != nil {
-			return notFound(err, "payment method not found")
-		}
-		if method.RequiresReference && strings.TrimSpace(req.ReferenceNumber) == "" {
-			return apperrors.BadRequest("reference_number is required for this payment method", nil)
-		}
 		refundAmount := roundMoney(req.Amount)
 		completed := order.OrderStatus == "completed"
 		refundable := roundMoney(order.PaidAmount)
@@ -879,6 +880,72 @@ func (s *Service) RefundPayment(currentUser *utils.AuthContext, orderID string, 
 			return apperrors.Internal("refund accounting service is not configured")
 		}
 		now := time.Now().UTC()
+		if req.ConvertToStoreCredit {
+			// W4: the advance stays in 2200; only the subledger owner changes
+			// from "this order" to "this customer". No journal, no cash.
+			if completed {
+				return apperrors.BadRequest("store-credit conversion applies to advance payments; completed orders refund through the normal path", nil)
+			}
+			if order.CustomerID == nil || strings.TrimSpace(*order.CustomerID) == "" {
+				return apperrors.BadRequest("store-credit conversion requires a customer on the order", nil)
+			}
+			if _, err := s.accountingService.CreateCustomerCredit(tx, currentUser, accounting.CreateCustomerCreditInput{
+				BranchID:   order.BranchID,
+				CustomerID: strings.TrimSpace(*order.CustomerID),
+				SourceType: "bakery_order",
+				SourceID:   &order.ID,
+				Amount:     refundAmount,
+				Notes:      "Advance converted to store credit for order " + order.OrderNumber + ": " + strings.TrimSpace(req.Reason),
+			}); err != nil {
+				return err
+			}
+			paid := roundMoney(order.PaidAmount - refundAmount)
+			if paid < 0 {
+				paid = 0
+			}
+			updates := map[string]interface{}{"paid_amount": paid, "updated_by_user_id": currentUser.UserID, "updated_at": now}
+			if order.OrderStatus == "cancelled" {
+				if paid <= 0 {
+					updates["payment_status"] = "refunded"
+				} else {
+					updates["payment_status"] = "partial"
+				}
+			} else {
+				updates["balance_amount"] = roundMoney(order.TotalAmount - paid)
+				updates["payment_status"] = paymentStatus(order.TotalAmount, paid)
+			}
+			if err := s.repo.UpdateOrder(tx, orderID, currentUser.BusinessID, updates); err != nil {
+				return err
+			}
+			return s.auditRepo.CreateActivity(tx, audit.ActivityInput{
+				BusinessID:  currentUser.BusinessID,
+				ActorUserID: currentUser.UserID,
+				EventType:   "bakery_order.advance_converted_to_credit",
+				EntityType:  "bakery_order",
+				EntityID:    order.ID,
+				Summary:     "Bakery order advance converted to store credit",
+				Metadata: audit.Metadata(map[string]interface{}{
+					"source_module":   "bakery_orders",
+					"bakery_order_id": order.ID,
+					"order_number":    order.OrderNumber,
+					"amount":          refundAmount,
+					"customer_id":     strings.TrimSpace(*order.CustomerID),
+					"reason":          strings.TrimSpace(req.Reason),
+				}, nil),
+				IPAddress: ipAddress,
+				UserAgent: userAgent,
+			})
+		}
+		method, err := s.repo.PaymentMethod(tx, currentUser.BusinessID, req.PaymentMethodID)
+		if err != nil {
+			return notFound(err, "payment method not found")
+		}
+		if method.MethodType == "store_credit" {
+			return apperrors.BadRequest("select convert_to_store_credit to grant store credit instead of refunding through the store-credit tender", nil)
+		}
+		if method.RequiresReference && strings.TrimSpace(req.ReferenceNumber) == "" {
+			return apperrors.BadRequest("reference_number is required for this payment method", nil)
+		}
 		refundNumber, err := s.repo.GeneratePaymentRefundNumber(tx, currentUser.BusinessID, now)
 		if err != nil {
 			return apperrors.Internal("failed to generate refund number")

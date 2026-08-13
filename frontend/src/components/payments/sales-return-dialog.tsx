@@ -374,17 +374,18 @@ export function SalesReturnDialog({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="refund">Refund customer</SelectItem>
-                        <SelectItem value="none">No money refund</SelectItem>
+                        <SelectItem value="store_credit">Store credit</SelectItem>
+                        <SelectItem value="none">No compensation</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4">
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
-                      Estimated refund
+                      {refundMode === "store_credit" ? "Estimated store credit" : "Estimated refund"}
                     </p>
                     <p className="mt-1 text-2xl font-black text-brand-espresso">
                       {formatMoney(
-                        refundMode === "refund" ? estimatedRefundPreview.finalRefundAmount : 0,
+                        refundMode !== "none" ? estimatedRefundPreview.finalRefundAmount : 0,
                       )}
                     </p>
                     <div className="mt-3 space-y-1 text-sm text-brand-mocha">
@@ -392,7 +393,7 @@ export function SalesReturnDialog({
                         <span>Item refund amount</span>
                         <span className="font-semibold text-brand-espresso">
                           {formatMoney(
-                            refundMode === "refund" ? estimatedRefundPreview.itemRefundAmount : 0,
+                            refundMode !== "none" ? estimatedRefundPreview.itemRefundAmount : 0,
                           )}
                         </span>
                       </div>
@@ -400,7 +401,7 @@ export function SalesReturnDialog({
                         <span>Refundable VAT</span>
                         <span className="font-semibold text-brand-espresso">
                           {formatMoney(
-                            refundMode === "refund" ? estimatedRefundPreview.refundableVat : 0,
+                            refundMode !== "none" ? estimatedRefundPreview.refundableVat : 0,
                           )}
                         </span>
                       </div>

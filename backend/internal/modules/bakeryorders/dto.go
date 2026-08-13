@@ -87,6 +87,11 @@ type RefundPaymentRequest struct {
 	Amount          float64 `json:"amount"`
 	Reason          string  `json:"reason"`
 	ReferenceNumber string  `json:"reference_number"`
+	// ConvertToStoreCredit turns an advance refund into a store-credit grant
+	// (W4): no money moves and no journal posts — the amount stays in
+	// Customer Advance 2200 and becomes a customer_credits row instead.
+	// Requires a customer on the order; not valid on completed orders.
+	ConvertToStoreCredit bool `json:"convert_to_store_credit"`
 }
 
 type AssignProductionRequest struct {
@@ -320,6 +325,7 @@ type taxRow struct {
 type paymentMethodRow struct {
 	ID                 string
 	MethodName         string
+	MethodType         string
 	RequiresReference  bool
 	ShowInBakeryOrders bool
 }

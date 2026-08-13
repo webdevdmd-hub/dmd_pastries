@@ -9,6 +9,7 @@ import {
   type SearchableSelectOption,
 } from "@/components/shared/searchable-select";
 import { Button } from "@/components/ui/button";
+import { useCustomerCredits } from "@/hooks/use-customer-credits";
 import { useCustomerLookup, useQuickCreateCustomer } from "@/hooks/use-customers";
 import { getErrorMessage } from "@/lib/api/client";
 import type { Customer, QuickCreateCustomerPayload } from "@/types/customer";
@@ -24,6 +25,9 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const lookupQuery = useCustomerLookup(search, true);
   const quickCreateMutation = useQuickCreateCustomer();
+  // W4: surface the selected customer's store-credit balance at the till.
+  const creditsQuery = useCustomerCredits(value);
+  const creditBalance = creditsQuery.data?.balance ?? 0;
   const results = useMemo(() => lookupQuery.data ?? [], [lookupQuery.data]);
   const customerOptions = useMemo<SearchableSelectOption[]>(() => {
     const optionMap = new Map<string, SearchableSelectOption>();
@@ -77,8 +81,16 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
   return (
     <div className="grid h-full min-w-0 grid-rows-[24px_36px] gap-1">
       <div className="flex h-6 items-center justify-between gap-2">
-        <span className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">
+        <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">
           Customer
+          {value && creditBalance > 0 ? (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-bold normal-case tracking-normal text-emerald-800">
+              Credit{" "}
+              {new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(
+                creditBalance,
+              )}
+            </span>
+          ) : null}
         </span>
         <Button
           className="h-6 rounded-md px-2 text-xs text-zinc-950 hover:bg-zinc-100"

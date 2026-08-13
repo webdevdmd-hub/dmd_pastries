@@ -3,8 +3,8 @@ package accounting
 import "testing"
 
 func TestDefaultPaymentAccountSeeds(t *testing.T) {
-	if len(defaultPaymentAccountSeeds) != 3 {
-		t.Fatalf("expected 3 default payment account seeds, got %d", len(defaultPaymentAccountSeeds))
+	if len(defaultPaymentAccountSeeds) != 4 {
+		t.Fatalf("expected 4 default payment account seeds, got %d", len(defaultPaymentAccountSeeds))
 	}
 
 	expected := map[string]defaultPaymentAccountSeed{
@@ -40,6 +40,19 @@ func TestDefaultPaymentAccountSeeds(t *testing.T) {
 			RequiresReference: true,
 			ShowInPurchasing:  true,
 			ShowInExpenses:    true,
+		},
+		// W4: store-credit redemption tender rides the Customer Advance
+		// control account; it must never surface in purchasing or expenses.
+		"Store Credit": {
+			MethodName:        "Store Credit",
+			MethodType:        "store_credit",
+			AccountNamePrefix: "Store Credit",
+			AccountType:       "store_credit",
+			ChartCode:         "2200",
+			IsDefault:         false,
+			RequiresReference: false,
+			ShowInPurchasing:  false,
+			ShowInExpenses:    false,
 		},
 	}
 

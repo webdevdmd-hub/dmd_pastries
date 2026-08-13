@@ -518,12 +518,15 @@ func (s *Service) CreatePaymentAccount(currentUser *utils.AuthContext, req Creat
 	var createdID string
 	if err := s.withTransaction(func(tx *gorm.DB) error {
 		chartAccount, err := s.repo.ValidateActiveAccountForBranch(tx, currentUser.BusinessID, resolvedBranchID, chartAccountID)
-		if err != nil || chartAccount.AccountType != "asset" {
-			if err == gorm.ErrRecordNotFound {
-				return apperrors.BadRequest("chart_account_id must reference an active asset account", nil)
-			}
-			if err == nil {
-				return apperrors.BadRequest("chart_account_id must reference an active asset account", nil)
+		// W4: a store-credit tender rides the Customer Advance liability;
+		// every other payment account must be an asset.
+		requiredChartType := "asset"
+		if accountType == "store_credit" {
+			requiredChartType = "liability"
+		}
+		if err != nil || chartAccount.AccountType != requiredChartType {
+			if err == gorm.ErrRecordNotFound || err == nil {
+				return apperrors.BadRequest("chart_account_id must reference an active "+requiredChartType+" account", nil)
 			}
 			return apperrors.Internal("failed to validate chart account")
 		}
@@ -581,6 +584,9 @@ var defaultPaymentAccountSeeds = []defaultPaymentAccountSeed{
 	{MethodName: "Cash", MethodType: "cash", AccountNamePrefix: "Cash Box", AccountType: "cash", ChartCode: "1000", IsDefault: true, RequiresReference: false, ShowInPurchasing: true, ShowInExpenses: true},
 	{MethodName: "Card", MethodType: "card", AccountNamePrefix: "Card Clearing", AccountType: "card_clearing", ChartCode: "1030", RequiresReference: true, ShowInPurchasing: true, ShowInExpenses: false},
 	{MethodName: "Bank Transfer", MethodType: "bank_transfer", AccountNamePrefix: "Bank Account", AccountType: "bank", ChartCode: "1010", RequiresReference: true, ShowInPurchasing: true, ShowInExpenses: true},
+	// Phase 4 / W4: redemption tender for customer store credit, backed by
+	// Customer Advance 2200. Never usable for purchasing/expenses.
+	{MethodName: "Store Credit", MethodType: "store_credit", AccountNamePrefix: "Store Credit", AccountType: "store_credit", ChartCode: "2200", RequiresReference: false, ShowInPurchasing: false, ShowInExpenses: false},
 }
 
 func SeedDefaultPaymentAccountsForBusiness(tx *gorm.DB, businessID, userID string, canAccessBranch func(string) bool) (*SeedPaymentAccountsResponse, error) {
@@ -2065,7 +2071,7 @@ func (s *Service) PostSalesReturnJournal(tx *gorm.DB, currentUser *utils.AuthCon
 	if salesReturn.JournalEntryID != nil && *salesReturn.JournalEntryID != "" {
 		return *salesReturn.JournalEntryID, nil
 	}
-	if salesReturn.Status != "posted" || salesReturn.RefundMode != "refund" {
+	if salesReturn.Status != "posted" || (salesReturn.RefundMode != "refund" && salesReturn.RefundMode != "store_credit") {
 		return "", nil
 	}
 	refundAmount := roundMoney(salesReturn.RefundAmount)
@@ -2075,11 +2081,26 @@ func (s *Service) PostSalesReturnJournal(tx *gorm.DB, currentUser *utils.AuthCon
 	if refundAmount <= 0 {
 		return "", nil
 	}
-	if salesReturn.DefaultPaymentAccountID == nil || strings.TrimSpace(salesReturn.ChartAccountID) == "" {
-		return "", apperrors.BadRequest("refund payment method is not linked to an active payment account", map[string]interface{}{"payment_method": salesReturn.RefundPaymentMethodName})
-	}
-	if err := validatePaymentAccountBranch(salesReturn.PaymentAccountBranchID, salesReturn.BranchID, salesReturn.PaymentAccountName); err != nil {
-		return "", err
+	// Phase 4 / W4: a store-credit return replaces the cash leg with Customer
+	// Advance 2200 — the money stays with the business as a customer
+	// liability; the subledger row is written by the sales-returns module.
+	creditAccountID, creditDescription := "", ""
+	if salesReturn.RefundMode == "store_credit" {
+		advanceAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, salesReturn.BranchID, "customer_advance", "2200", "Customer Advance")
+		if err != nil {
+			return "", err
+		}
+		creditAccountID = advanceAccount.ID
+		creditDescription = "Store credit issued for " + salesReturn.ReturnNumber
+	} else {
+		if salesReturn.DefaultPaymentAccountID == nil || strings.TrimSpace(salesReturn.ChartAccountID) == "" {
+			return "", apperrors.BadRequest("refund payment method is not linked to an active payment account", map[string]interface{}{"payment_method": salesReturn.RefundPaymentMethodName})
+		}
+		if err := validatePaymentAccountBranch(salesReturn.PaymentAccountBranchID, salesReturn.BranchID, salesReturn.PaymentAccountName); err != nil {
+			return "", err
+		}
+		creditAccountID = salesReturn.ChartAccountID
+		creditDescription = "Refund via " + salesReturn.RefundPaymentMethodName
 	}
 	salesReturnsAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, salesReturn.BranchID, "sales_returns", "4040", "Sales Returns and Allowances")
 	if err != nil {
@@ -2108,7 +2129,7 @@ func (s *Service) PostSalesReturnJournal(tx *gorm.DB, currentUser *utils.AuthCon
 		ChargeSlices:          chargeSlices,
 		VATAccountID:          vatAccountID,
 		TaxSlice:              taxAmount,
-		CashCredits:           []refundCashCredit{{AccountID: salesReturn.ChartAccountID, Amount: refundAmount, Description: "Refund via " + salesReturn.RefundPaymentMethodName}},
+		CashCredits:           []refundCashCredit{{AccountID: creditAccountID, Amount: refundAmount, Description: creditDescription}},
 	})
 	if err != nil {
 		return "", err
@@ -4567,7 +4588,7 @@ func validAccountStatus(value string) bool {
 
 func validPaymentAccountType(value string) bool {
 	switch value {
-	case "cash", "bank", "card_clearing", "platform_clearing", "wallet", "other":
+	case "cash", "bank", "card_clearing", "platform_clearing", "wallet", "other", "store_credit":
 		return true
 	default:
 		return false

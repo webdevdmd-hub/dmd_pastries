@@ -1421,16 +1421,16 @@ func validateTaxType(taxType string) error {
 
 func validatePaymentMethodType(methodType string) error {
 	switch methodType {
-	case "cash", "card", "bank_transfer", "online", "wallet", "custom":
+	case "cash", "card", "bank_transfer", "online", "wallet", "custom", "store_credit":
 		return nil
 	default:
-		return apperrors.BadRequest("method_type must be cash, card, bank_transfer, online, wallet, or custom", nil)
+		return apperrors.BadRequest("method_type must be cash, card, bank_transfer, online, wallet, custom, or store_credit", nil)
 	}
 }
 
 func defaultShowInPOS(methodType string) bool {
 	switch methodType {
-	case "cash", "card", "bank_transfer", "online", "wallet", "custom":
+	case "cash", "card", "bank_transfer", "online", "wallet", "custom", "store_credit":
 		return true
 	default:
 		return false

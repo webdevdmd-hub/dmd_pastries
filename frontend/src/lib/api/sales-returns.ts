@@ -46,7 +46,7 @@ function numberValue(value: unknown, fallback = 0): number {
 }
 
 function isRefundMode(value: unknown): value is RefundMode {
-  return value === "none" || value === "refund";
+  return value === "none" || value === "refund" || value === "store_credit";
 }
 
 function isRestockAction(value: unknown): value is RestockAction {

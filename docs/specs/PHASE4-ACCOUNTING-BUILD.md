@@ -165,6 +165,14 @@ Unit +6 (builder matrix: money-only, goods, credit-sale, charges, VAT modes) · 
 
 # W4 — Store credit (create + redeem) — depends on W6
 
+> **Implementation note (2026-08-13):** shipped with these deltas from the design below.
+> - `refund_mode` becomes **three-way** (`none | refund | store_credit`, migration 000100): historical `'none'` keeps its meaning (goods back, no compensation) instead of being reinterpreted; `store_credit` is the new outcome that posts Dr 4040 (+charges/VAT) / Cr 2200 through the W6 builder and writes the `customer_credits` row.
+> - Subledger: `customer_credits` + `customer_credit_redemptions` (redemption audit trail, migration 000100). Redemption locks rows `FOR UPDATE` oldest-first (`RedeemCustomerCredit`), so racing terminals serialize and over-redemption 400s.
+> - Redemption tender: seeded 4th default payment method **"Store Credit"** (`method_type='store_credit'`) with a per-branch `payment_accounts.account_type='store_credit'` backed by chart 2200 (liability-backed payment accounts are allowed only for this type). POS checkout validates customer + balance server-side and decrements in the sale tx; the tender is hidden client-side without a customer with balance. **Bakery `AddPayment` rejects the tender** (no decrement pipeline there yet).
+> - Bakery advance→credit conversion: `convert_to_store_credit` flag on `POST /bakery-orders/:id/refunds` — subledger row only, no journal (2200 already holds the money), paid_amount decrements.
+> - Endpoints: `GET /accounting/customer-credits?customer_id=` (rows + balance) and `GET /accounting/reconciliation/customer-credits` (subledger vs credit-sourced 2200 activity; bakery conversions are ledger-neutral and added back for comparability).
+> - **Operator action:** existing businesses must re-run `POST /accounting/payment-accounts/seed-defaults` per branch to get the Store Credit tender.
+
 ## Context
 Decision §4: `refund_mode='none'` becomes store credit. 2200 is a control account with no per-customer detail, so a subledger table is required (audit open-decision §5, scoped here to customer credits only).
 

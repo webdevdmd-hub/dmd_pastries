@@ -22,6 +22,8 @@ import type { PaymentMethod, TaxRate } from "@/types/settings";
 type POSCheckoutDialogProps = {
   charges: DocumentChargeDraft[];
   confirmButtonLabel: string;
+  customerCreditBalance: number;
+  customerId: string | null;
   feedback: CheckoutFeedback | null;
   isSubmitting: boolean;
   onChargesChange: (charges: DocumentChargeDraft[]) => void;
@@ -63,6 +65,8 @@ function feedbackClassName(feedback: CheckoutFeedback): string {
 export function POSCheckoutDialog({
   charges,
   confirmButtonLabel,
+  customerCreditBalance,
+  customerId,
   feedback,
   isSubmitting,
   onChargesChange,
@@ -112,7 +116,9 @@ export function POSCheckoutDialog({
           </div>
 
           <POSPaymentPanel
+            customerCreditBalance={customerCreditBalance}
             error={paymentMethodsError}
+            hasCustomer={customerId !== null && customerId.length > 0}
             isLoading={paymentMethodsLoading}
             methods={paymentMethods}
             onPaymentsChange={onPaymentsChange}

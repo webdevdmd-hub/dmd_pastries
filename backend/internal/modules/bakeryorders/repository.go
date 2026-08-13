@@ -464,7 +464,7 @@ func (r *Repository) TaxRate(tx *gorm.DB, businessID string, taxRateID *string) 
 
 func (r *Repository) PaymentMethod(tx *gorm.DB, businessID, methodID string) (*paymentMethodRow, error) {
 	var row paymentMethodRow
-	err := tx.Table("payment_methods").Select("id, method_name, requires_reference, show_in_bakery_orders").Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", methodID, businessID, "active").Take(&row).Error
+	err := tx.Table("payment_methods").Select("id, method_name, method_type, requires_reference, show_in_bakery_orders").Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", methodID, businessID, "active").Take(&row).Error
 	return &row, err
 }
 

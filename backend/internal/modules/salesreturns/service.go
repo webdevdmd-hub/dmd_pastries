@@ -124,13 +124,16 @@ func (s *Service) Create(currentUser *utils.AuthContext, req CreateSalesReturnRe
 				return err
 			}
 		}
+		if err := validateStoreCreditCustomer(normalized.RefundMode, sale.CustomerID); err != nil {
+			return err
+		}
 		returnNumber, err := s.repo.GenerateReturnNumber(tx, currentUser.BusinessID)
 		if err != nil {
 			return apperrors.Internal("failed to generate credit note number")
 		}
 		now := time.Now().UTC()
 		refundAmount := 0.0
-		if normalized.RefundMode == "refund" {
+		if normalized.RefundMode == "refund" || normalized.RefundMode == "store_credit" {
 			refundAmount = total
 		}
 		created = SalesReturn{
@@ -215,9 +218,12 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateSa
 				return err
 			}
 		}
+		if err := validateStoreCreditCustomer(normalized.RefundMode, sale.CustomerID); err != nil {
+			return err
+		}
 		now := time.Now().UTC()
 		refundAmount := 0.0
-		if normalized.RefundMode == "refund" {
+		if normalized.RefundMode == "refund" || normalized.RefundMode == "store_credit" {
 			refundAmount = total
 		}
 		updates := map[string]interface{}{
@@ -276,7 +282,7 @@ func (s *Service) Post(currentUser *utils.AuthContext, id string, ipAddress, use
 		if err := currentUser.EnsureRecordBranch(salesReturn.BranchID); err != nil {
 			return err
 		}
-		if salesReturn.RefundMode == "refund" && !hasAnyPermission(currentUser, "sales_returns.refund", "payments.refund", "sales_returns.manage") {
+		if salesReturn.RefundMode != "none" && !hasAnyPermission(currentUser, "sales_returns.refund", "payments.refund", "sales_returns.manage") {
 			return apperrors.Forbidden("missing refund permission")
 		}
 		sale, err := s.validateSaleForReturn(tx, currentUser, salesReturn.SaleID)
@@ -300,6 +306,9 @@ func (s *Service) Post(currentUser *utils.AuthContext, id string, ipAddress, use
 			if err := s.validateRefundRequest(tx, currentUser.BusinessID, sale.ID, sale.BranchID, salesReturn.RefundPaymentMethodID, salesReturn.RefundReferenceNumber, salesReturn.ReturnTotal); err != nil {
 				return err
 			}
+		}
+		if err := validateStoreCreditCustomer(salesReturn.RefundMode, sale.CustomerID); err != nil {
+			return err
 		}
 		for _, item := range items {
 			if item.RestockAction != "restock" {
@@ -328,17 +337,12 @@ func (s *Service) Post(currentUser *utils.AuthContext, id string, ipAddress, use
 		if err := s.repo.Update(tx, currentUser.BusinessID, salesReturn.ID, updates); err != nil {
 			return apperrors.Internal("failed to post sales return")
 		}
-		// Only a "refund" return reverses revenue. A "none" return still posts
-		// its inventory journal below, so the goods come back and COGS falls
-		// while revenue stands — the sale is treated as earned because the
-		// customer was not paid anything back.
-		//
-		// That is deliberate for a no-refund return, but it does raise reported
-		// gross margin. If "none" is being used for returns settled outside the
-		// system, the revenue side needs a counterparty account and this gate
-		// has to change; refund_mode currently permits only 'none' and 'refund'
-		// (see migration 000051).
-		if salesReturn.RefundMode == "refund" && s.accountingService != nil {
+		// A "refund" or "store_credit" return reverses revenue (the latter
+		// crediting Customer Advance 2200 instead of cash — Phase 4 / W4). A
+		// "none" return still posts only its inventory journal below: goods
+		// come back and COGS falls while revenue stands, because the customer
+		// was not compensated at all.
+		if salesReturn.RefundMode != "none" && s.accountingService != nil {
 			journalID, err := s.accountingService.PostSalesReturnJournal(tx, currentUser, salesReturn.ID)
 			if err != nil {
 				return err
@@ -346,6 +350,20 @@ func (s *Service) Post(currentUser *utils.AuthContext, id string, ipAddress, use
 			if strings.TrimSpace(journalID) != "" {
 				if err := s.repo.Update(tx, currentUser.BusinessID, salesReturn.ID, map[string]interface{}{"journal_entry_id": journalID, "updated_at": time.Now().UTC()}); err != nil {
 					return apperrors.Internal("failed to attach sales return journal")
+				}
+			}
+			if salesReturn.RefundMode == "store_credit" {
+				journalRef := cleanStringPointer(&journalID)
+				if _, err := s.accountingService.CreateCustomerCredit(tx, currentUser, accounting.CreateCustomerCreditInput{
+					BranchID:       salesReturn.BranchID,
+					CustomerID:     strings.TrimSpace(*sale.CustomerID),
+					SourceType:     "sales_return",
+					SourceID:       &salesReturn.ID,
+					JournalEntryID: journalRef,
+					Amount:         salesReturn.ReturnTotal,
+					Notes:          "Store credit for return " + salesReturn.ReturnNumber,
+				}); err != nil {
+					return err
 				}
 			}
 		}
@@ -710,6 +728,18 @@ func (s *Service) validateStoredReturnItems(tx *gorm.DB, businessID, saleID, exc
 	return nil
 }
 
+// validateStoreCreditCustomer gates the store-credit outcome (Phase 4 / W4):
+// credit belongs to a customer account, so a walk-in sale cannot take it.
+func validateStoreCreditCustomer(refundMode string, customerID *string) error {
+	if refundMode != "store_credit" {
+		return nil
+	}
+	if customerID == nil || strings.TrimSpace(*customerID) == "" {
+		return apperrors.BadRequest("store credit requires a customer on the sale; select a customer or choose refund", nil)
+	}
+	return nil
+}
+
 func (s *Service) validateRefundRequest(tx *gorm.DB, businessID, saleID, branchID string, paymentMethodID *string, reference string, amount float64) error {
 	if amount <= 0 {
 		return apperrors.BadRequest("refund amount must be greater than zero", nil)
@@ -843,11 +873,11 @@ func normalizeRequest(saleID, returnDate, reason, refundMode string, refundPayme
 		return normalizedRequest{}, apperrors.BadRequest("return_date must be YYYY-MM-DD", nil)
 	}
 	mode := strings.ToLower(strings.TrimSpace(refundMode))
-	if mode != "none" && mode != "refund" {
+	if mode != "none" && mode != "refund" && mode != "store_credit" {
 		return normalizedRequest{}, apperrors.BadRequest("invalid refund_mode", nil)
 	}
-	if mode != "refund" && len(refundCharges) > 0 {
-		return normalizedRequest{}, apperrors.BadRequest("refund_charges are only allowed when refund_mode=refund", nil)
+	if mode == "none" && len(refundCharges) > 0 {
+		return normalizedRequest{}, apperrors.BadRequest("refund_charges require a refund or store-credit outcome", nil)
 	}
 	return normalizedRequest{
 		SaleID:                strings.TrimSpace(saleID),

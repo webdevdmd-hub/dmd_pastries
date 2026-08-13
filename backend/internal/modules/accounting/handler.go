@@ -482,6 +482,30 @@ func (h *Handler) GetPaymentAccountReconciliation(c *gin.Context) {
 	response.Success(c, 200, "payment account reconciliation fetched successfully", result)
 }
 
+// ListCustomerCredits returns a customer's store-credit rows plus their open
+// balance (Phase 4 / W4).
+func (h *Handler) ListCustomerCredits(c *gin.Context) {
+	credits, err := h.service.ListCustomerCredits(utils.MustAuthContext(c), c.Query("customer_id"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	balance := 0.0
+	for _, credit := range credits {
+		balance += credit.Balance
+	}
+	response.Success(c, 200, "customer credits fetched successfully", gin.H{"items": credits, "balance": roundMoney(balance)})
+}
+
+func (h *Handler) GetCustomerCreditReconciliation(c *gin.Context) {
+	result, err := h.service.CustomerCreditReconciliation(utils.MustAuthContext(c))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "customer credit reconciliation fetched successfully", result)
+}
+
 func (h *Handler) CreateJournalEntry(c *gin.Context) {
 	var req CreateJournalEntryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

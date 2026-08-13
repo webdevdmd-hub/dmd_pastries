@@ -61,6 +61,9 @@ func RegisterRoutes(
 	group.GET("/reconciliation/ap", view, handler.GetAPReconciliation)
 	group.GET("/reconciliation/ar", view, handler.GetARReconciliation)
 	group.GET("/reconciliation/payment-accounts", view, handler.GetPaymentAccountReconciliation)
+	group.GET("/reconciliation/customer-credits", view, handler.GetCustomerCreditReconciliation)
+
+	group.GET("/customer-credits", view, handler.ListCustomerCredits)
 
 	group.GET("/backfill-journals/readiness", manage, handler.GetBackfillReadiness)
 	group.POST("/backfill-journals", manage, handler.BackfillJournals)

@@ -1,6 +1,6 @@
 import type { PaymentMethod } from "@/types/settings";
 
-export type RefundMode = "none" | "refund";
+export type RefundMode = "none" | "refund" | "store_credit";
 export type RestockAction = "restock" | "discard";
 export type SalesReturnStatus = "draft" | "posted" | "cancelled" | "reversed";
 

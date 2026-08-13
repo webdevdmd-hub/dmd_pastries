@@ -244,6 +244,23 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 	if overpayAmount > 0 && cashPaidAmount+0.0001 < overpayAmount {
 		return nil, apperrors.BadRequest("non-cash overpayment is not allowed", nil)
 	}
+	// Phase 4 / W4: a store-credit tender spends the customer's credit
+	// balance, so the sale needs a customer and the redemption (validated +
+	// row-locked in RedeemCustomerCredit) happens after the sale row exists.
+	storeCreditAmount := 0.0
+	for _, payment := range payments {
+		if payment.PaymentMethodTypeSnapshot == "store_credit" {
+			storeCreditAmount = roundMoney(storeCreditAmount + payment.Amount)
+		}
+	}
+	if storeCreditAmount > 0 {
+		if cleanStringPointer(req.CustomerID) == nil {
+			return nil, apperrors.BadRequest("store credit requires a customer on the sale", nil)
+		}
+		if s.accountingService == nil {
+			return nil, apperrors.Internal("store credit accounting service is not configured")
+		}
+	}
 
 	now := time.Now().UTC()
 	saleNumber, err := s.repo.GenerateSaleNumber(tx, currentUser.BusinessID, now)
@@ -307,6 +324,11 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 	if len(calculation.Charges) > 0 {
 		if err := tx.Create(&calculation.Charges).Error; err != nil {
 			return nil, apperrors.Internal("failed to create sale charges")
+		}
+	}
+	if storeCreditAmount > 0 {
+		if err := s.accountingService.RedeemCustomerCredit(tx, currentUser, *sale.CustomerID, sale.ID, storeCreditAmount); err != nil {
+			return nil, err
 		}
 	}
 	if s.accountingService != nil {

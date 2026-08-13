@@ -10,7 +10,11 @@ import type { PaymentInput } from "@/types/pos";
 import type { PaymentMethod } from "@/types/settings";
 
 type POSPaymentPanelProps = {
+  // Open store-credit balance of the selected customer (0 when no customer
+  // is selected). Gates the store-credit tender and caps its amount.
+  customerCreditBalance: number;
   error: Error | null;
+  hasCustomer: boolean;
   isLoading: boolean;
   methods: PaymentMethod[];
   onPaymentsChange: (payments: PaymentInput[]) => void;
@@ -46,14 +50,23 @@ function getPaymentMethodsErrorMessage(error: Error | null): string | null {
 }
 
 export function POSPaymentPanel({
+  customerCreditBalance,
   error,
+  hasCustomer,
   isLoading,
   methods,
   onPaymentsChange,
   payments,
   total,
 }: POSPaymentPanelProps): JSX.Element {
-  const activeMethods = methods.filter((method) => method.status === "active" && method.showInPos);
+  const activeMethods = methods.filter(
+    (method) =>
+      method.status === "active" &&
+      method.showInPos &&
+      // The store-credit tender only exists for a selected customer with an
+      // open balance; the server re-validates and locks the balance.
+      (method.methodType !== "store_credit" || (hasCustomer && customerCreditBalance > 0)),
+  );
   const unavailableMethods = activeMethods.filter((method) => !method.defaultPaymentAccountId);
   const errorMessage = getPaymentMethodsErrorMessage(error);
   const paidAmount = roundMoney(payments.reduce((sum, payment) => sum + payment.amount, 0));
@@ -79,10 +92,14 @@ export function POSPaymentPanel({
       return;
     }
 
+    let amount = payments.length === 0 ? total : balanceDue;
+    if (method.methodType === "store_credit") {
+      amount = roundMoney(Math.min(amount, customerCreditBalance));
+    }
     const nextPayment: PaymentInput = {
       paymentMethodId: method.id,
       paymentMethodName: method.methodName,
-      amount: payments.length === 0 ? total : balanceDue,
+      amount,
       referenceNumber: null,
     };
 
