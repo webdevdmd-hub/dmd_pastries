@@ -99,6 +99,7 @@ type BackendPurchaseInvoicePayload = {
   items?: BackendLinePayload[];
   bill_discount_amount?: number;
   notes?: string | null;
+  tax_mode?: string;
 };
 
 type BackendCancelPurchaseInvoicePayload = {
@@ -569,6 +570,8 @@ function parseInvoice(value: unknown): PurchaseInvoice {
     chargeAmount: numberValue(value.charge_amount),
     chargeTaxAmount: numberValue(value.charge_tax_amount),
     totalAmount: numberValue(value.total_amount),
+    taxMode:
+      value.tax_mode === "exclusive" || value.tax_mode === "no_tax" ? value.tax_mode : "inclusive",
     paidAmount: numberValue(value.paid_amount),
     balanceAmount: numberValue(value.balance_amount),
     receiveStatus: isInvoiceReceiveStatus(value.receive_status)
@@ -865,6 +868,7 @@ function parseDocumentChainInvoice(value: unknown): PurchaseInvoice {
     chargeTaxAmount: 0,
     discountAmount: 0,
     billDiscountAmount: 0,
+    taxMode: "inclusive",
     dueDate: null,
     invoiceDate: stringValue(value.date, stringValue(value.invoice_date)),
     invoiceNumber: stringValue(value.document_number, stringValue(value.invoice_number, "Invoice")),
@@ -1251,6 +1255,7 @@ function invoicePayload(
     nextPayload.bill_discount_amount = payload.billDiscountAmount;
   }
   if (payload.notes !== undefined) nextPayload.notes = payload.notes;
+  if (payload.taxMode) nextPayload.tax_mode = payload.taxMode;
 
   return nextPayload;
 }

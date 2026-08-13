@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { calculateDocumentChargeTotals } from "@/lib/document-charges";
+import { calculateDocumentChargeTotals, type DocumentTaxMode } from "@/lib/document-charges";
 import type { DocumentChargeDraft } from "@/types/document-charges";
 import type {
   CartDiscountType,
@@ -48,20 +48,41 @@ function calculateTax(amount: number, rate: number, inclusive: boolean): number 
   return roundMoney((amount * rate) / 100);
 }
 
-function calculateLine(item: CartItem): CartItem {
+// W3: an explicit document tax mode overrides each rate's own inclusive
+// flag; null keeps the legacy per-rate behavior (matches the server's
+// business-default fallback for single-rate setups).
+function effectiveInclusive(rateInclusive: boolean, taxMode: DocumentTaxMode | null): boolean {
+  if (taxMode === "inclusive") {
+    return true;
+  }
+  if (taxMode === "exclusive") {
+    return false;
+  }
+  return rateInclusive;
+}
+
+function calculateLine(item: CartItem, taxMode: DocumentTaxMode | null = null): CartItem {
   const lineSubtotal = roundMoney(item.quantity * item.unitPrice);
   const discountAmount = calculateDiscount(lineSubtotal, item.discountType, item.discountValue);
   const taxableAmount = Math.max(lineSubtotal - discountAmount, 0);
-  const taxAmount = calculateTax(taxableAmount, item.taxRatePercentage, item.taxRateIsInclusive);
+  if (taxMode === "no_tax") {
+    return {
+      ...item,
+      lineSubtotal,
+      discountAmount,
+      taxAmount: 0,
+      lineTotal: roundMoney(taxableAmount),
+    };
+  }
+  const inclusive = effectiveInclusive(item.taxRateIsInclusive, taxMode);
+  const taxAmount = calculateTax(taxableAmount, item.taxRatePercentage, inclusive);
 
   return {
     ...item,
     lineSubtotal,
     discountAmount,
     taxAmount,
-    lineTotal: item.taxRateIsInclusive
-      ? roundMoney(taxableAmount)
-      : roundMoney(taxableAmount + taxAmount),
+    lineTotal: inclusive ? roundMoney(taxableAmount) : roundMoney(taxableAmount + taxAmount),
   };
 }
 
@@ -75,6 +96,8 @@ export function usePOSCart() {
   const [saleDiscountValue, setSaleDiscountValue] = useState<number | null>(null);
   const [charges, setCharges] = useState<DocumentChargeDraft[]>([]);
   const [payments, setPayments] = useState<PaymentInput[]>([]);
+  // W3: null = business default (server decides; preview uses per-rate math).
+  const [taxMode, setTaxMode] = useState<DocumentTaxMode | null>(null);
 
   const addProduct = ({ product, variant }: AddProductInput): void => {
     const variantId = variant?.id ?? null;
@@ -155,6 +178,7 @@ export function usePOSCart() {
     setSaleDiscountValue(null);
     setCharges([]);
     setPayments([]);
+    setTaxMode(null);
   };
 
   const restoreHeldSaleCart = (
@@ -163,7 +187,7 @@ export function usePOSCart() {
     nextSaleDiscountValue: number | null,
     nextCharges: DocumentChargeDraft[] = [],
   ): void => {
-    setItems(nextItems.map(calculateLine));
+    setItems(nextItems.map((item) => calculateLine(item)));
     setSaleDiscountType(nextSaleDiscountType);
     setSaleDiscountValue(nextSaleDiscountValue);
     setCharges(nextCharges);
@@ -192,14 +216,21 @@ export function usePOSCart() {
       const discountedLine = roundMoney(
         Math.max(item.lineSubtotal - item.discountAmount - allocatedSaleDiscount, 0),
       );
-      const lineTax = calculateTax(discountedLine, item.taxRatePercentage, item.taxRateIsInclusive);
+      const inclusive = effectiveInclusive(item.taxRateIsInclusive, taxMode);
+      const lineTax =
+        taxMode === "no_tax"
+          ? 0
+          : calculateTax(discountedLine, item.taxRatePercentage, inclusive);
       taxAmount += lineTax;
-      itemsTotal += item.taxRateIsInclusive ? discountedLine : discountedLine + lineTax;
+      itemsTotal += inclusive || taxMode === "no_tax" ? discountedLine : discountedLine + lineTax;
     });
     taxAmount = roundMoney(taxAmount);
 
-    const { chargeAmount, chargeTaxAmount } = calculateDocumentChargeTotals(charges);
-    const total = roundMoney(itemsTotal + chargeAmount + chargeTaxAmount);
+    const { chargeAmount, chargeTaxAmount, chargeTotal } = calculateDocumentChargeTotals(
+      charges,
+      taxMode,
+    );
+    const total = roundMoney(itemsTotal + chargeTotal);
     const paidAmount = roundMoney(payments.reduce((sum, payment) => sum + payment.amount, 0));
 
     return {
@@ -213,7 +244,7 @@ export function usePOSCart() {
       changeAmount: roundMoney(Math.max(paidAmount - total, 0)),
       balanceDue: roundMoney(Math.max(total - paidAmount, 0)),
     };
-  }, [charges, items, payments, saleDiscountType, saleDiscountValue]);
+  }, [charges, items, payments, saleDiscountType, saleDiscountValue, taxMode]);
 
   return {
     items,
@@ -221,6 +252,8 @@ export function usePOSCart() {
     payments,
     saleDiscountType,
     saleDiscountValue,
+    taxMode,
+    setTaxMode,
     totals,
     addProduct,
     removeItem,

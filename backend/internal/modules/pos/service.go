@@ -233,6 +233,9 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 	if err != nil {
 		return nil, err
 	}
+	if err := requireNoTaxPermission(currentUser, calculation.TaxMode); err != nil {
+		return nil, err
+	}
 	if len(req.Payments) == 0 && calculation.TotalAmount > 0 {
 		return nil, apperrors.BadRequest("payments are required", nil)
 	}
@@ -292,6 +295,7 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 		ChargeAmount:             calculation.ChargeAmount,
 		ChargeTaxAmount:          calculation.ChargeTaxAmount,
 		TotalAmount:              calculation.TotalAmount,
+		TaxMode:                  calculation.TaxMode,
 		PaidAmount:               roundMoney(paidAmount),
 		ChangeAmount:             changeAmount,
 		PaymentStatus:            paymentStatus(paidAmount, calculation.TotalAmount),
@@ -346,6 +350,27 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 	}
 	if err := s.writeAudit(tx, currentUser, "sale.created", sale.ID, "Sale completed.", ipAddress, userAgent); err != nil {
 		return nil, err
+	}
+	// W3: every no-tax document is audit-flagged for VAT-filing review.
+	if calculation.TaxMode == charges.TaxModeNoTax {
+		if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{
+			BusinessID:  currentUser.BusinessID,
+			ActorUserID: currentUser.UserID,
+			EventType:   "sale.no_tax_applied",
+			EntityType:  "sale",
+			EntityID:    sale.ID,
+			Summary:     "Sale completed with the no-tax mode.",
+			Metadata: audit.Metadata(map[string]interface{}{
+				"source_module": "pos",
+				"sale_number":   sale.SaleNumber,
+				"total_amount":  sale.TotalAmount,
+				"branch_id":     sale.BranchID,
+			}, nil),
+			IPAddress: ipAddress,
+			UserAgent: userAgent,
+		}); err != nil {
+			return nil, apperrors.Internal("failed to record no-tax audit event")
+		}
 	}
 	if err := tx.Commit().Error; err != nil {
 		return nil, apperrors.Internal("failed to commit checkout")
@@ -421,6 +446,7 @@ func (s *Service) CreateHeldSale(currentUser *utils.AuthContext, req HoldSaleReq
 		EstimatedChargeAmount:    calculation.ChargeAmount,
 		EstimatedChargeTaxAmount: calculation.ChargeTaxAmount,
 		EstimatedTotal:           calculation.TotalAmount,
+		TaxMode:                  calculation.TaxMode,
 		Status:                   "held",
 		Notes:                    strings.TrimSpace(req.Notes),
 		HeldAt:                   now,
@@ -1051,6 +1077,7 @@ func stockName(stock *ProductInventoryStockRow) string {
 type saleCalculation struct {
 	Items           []SaleItem
 	Charges         []charges.DocumentCharge
+	TaxMode         string
 	SubtotalAmount  float64
 	DiscountAmount  float64
 	TaxableAmount   float64
@@ -1060,9 +1087,36 @@ type saleCalculation struct {
 	TotalAmount     float64
 }
 
+// resolveDocumentTaxMode validates a requested document tax mode, falling
+// back to the business default when the request carries none (W3).
+func resolveDocumentTaxMode(tx *gorm.DB, businessID, requested string) (string, error) {
+	requested = strings.TrimSpace(requested)
+	if requested == "" {
+		return charges.DefaultTaxMode(tx, businessID), nil
+	}
+	if !charges.ValidTaxMode(requested) {
+		return "", apperrors.BadRequest("tax_mode must be inclusive, exclusive, or no_tax", nil)
+	}
+	return requested, nil
+}
+
+// requireNoTaxPermission gates the no-tax mode behind sales.no_tax.apply (W3).
+func requireNoTaxPermission(currentUser *utils.AuthContext, taxMode string) error {
+	if taxMode != charges.TaxModeNoTax {
+		return nil
+	}
+	for _, permission := range currentUser.Permissions {
+		if permission == "sales.no_tax.apply" {
+			return nil
+		}
+	}
+	return apperrors.Forbidden("missing permission to apply the no-tax mode")
+}
+
 type heldSaleCalculation struct {
 	Items           []HeldSaleItem
 	Charges         []charges.DocumentCharge
+	TaxMode         string
 	SubtotalAmount  float64
 	DiscountAmount  float64
 	TaxAmount       float64
@@ -1072,6 +1126,10 @@ type heldSaleCalculation struct {
 }
 
 func (s *Service) calculateSale(tx *gorm.DB, businessID, branchID, saleID string, req CheckoutRequest) (*saleCalculation, error) {
+	taxMode, err := resolveDocumentTaxMode(tx, businessID, req.TaxMode)
+	if err != nil {
+		return nil, err
+	}
 	items := make([]SaleItem, 0, len(req.Items))
 	subtotal := 0.0
 	lineNets := make([]float64, 0, len(req.Items))
@@ -1145,21 +1203,17 @@ func (s *Service) calculateSale(tx *gorm.DB, businessID, branchID, saleID string
 		allocatedSaleDiscount := proportionalAmount(saleDiscount, lineNets[i], lineNetTotal)
 		items[i].DiscountAmount = roundMoney(items[i].DiscountAmount + allocatedSaleDiscount)
 		discountedLine := roundMoney(items[i].LineSubtotal - items[i].DiscountAmount)
-		lineTax := calculateTax(discountedLine, items[i].TaxRatePercentageSnapshot, lineTaxInclusive[i])
+		// W3: the document's tax mode decides how each line's rate applies;
+		// the rate's own inclusive flag is only the legacy fallback.
+		lineTax, lineTotal := charges.ResolveLineTax(discountedLine, items[i].TaxRatePercentageSnapshot, lineTaxInclusive[i], taxMode)
 		items[i].TaxAmount = lineTax
-		if lineTaxInclusive[i] {
-			items[i].LineTotal = discountedLine
-			taxableAmount += roundMoney(discountedLine - lineTax)
-			totalAmount += discountedLine
-		} else {
-			items[i].LineTotal = roundMoney(discountedLine + lineTax)
-			taxableAmount += discountedLine
-			totalAmount += items[i].LineTotal
-		}
+		items[i].LineTotal = lineTotal
+		taxableAmount += roundMoney(lineTotal - lineTax)
+		totalAmount += lineTotal
 		taxAmount += lineTax
 	}
 
-	chargeRows, chargeTotals, err := charges.BuildCharges(tx, businessID, branchID, "pos_sale", saleID, req.Charges)
+	chargeRows, chargeTotals, err := charges.BuildChargesWithMode(tx, businessID, branchID, "pos_sale", saleID, req.Charges, taxMode)
 	if err != nil {
 		return nil, err
 	}
@@ -1167,6 +1221,7 @@ func (s *Service) calculateSale(tx *gorm.DB, businessID, branchID, saleID string
 	return &saleCalculation{
 		Items:           items,
 		Charges:         chargeRows,
+		TaxMode:         taxMode,
 		SubtotalAmount:  subtotal,
 		DiscountAmount:  roundMoney(sumDiscounts(items)),
 		TaxableAmount:   roundMoney(taxableAmount),
@@ -1178,6 +1233,10 @@ func (s *Service) calculateSale(tx *gorm.DB, businessID, branchID, saleID string
 }
 
 func (s *Service) calculateHeldSale(tx *gorm.DB, businessID, branchID, heldSaleID string, req HoldSaleRequest) (*heldSaleCalculation, error) {
+	taxMode, err := resolveDocumentTaxMode(tx, businessID, req.TaxMode)
+	if err != nil {
+		return nil, err
+	}
 	items := make([]HeldSaleItem, 0, len(req.Items))
 	subtotal := 0.0
 	lineNets := make([]float64, 0, len(req.Items))
@@ -1251,19 +1310,14 @@ func (s *Service) calculateHeldSale(tx *gorm.DB, businessID, branchID, heldSaleI
 		allocatedSaleDiscount := proportionalAmount(saleDiscount, lineNets[i], lineNetTotal)
 		items[i].DiscountAmount = roundMoney(items[i].DiscountAmount + allocatedSaleDiscount)
 		discountedLine := roundMoney(items[i].LineSubtotal - items[i].DiscountAmount)
-		lineTax := calculateTax(discountedLine, items[i].TaxRatePercentageSnapshot, lineTaxInclusive[i])
+		lineTax, lineTotal := charges.ResolveLineTax(discountedLine, items[i].TaxRatePercentageSnapshot, lineTaxInclusive[i], taxMode)
 		items[i].TaxAmount = lineTax
-		if lineTaxInclusive[i] {
-			items[i].LineTotal = discountedLine
-			totalAmount += discountedLine
-		} else {
-			items[i].LineTotal = roundMoney(discountedLine + lineTax)
-			totalAmount += items[i].LineTotal
-		}
+		items[i].LineTotal = lineTotal
+		totalAmount += lineTotal
 		taxAmount += lineTax
 	}
 
-	chargeRows, chargeTotals, err := charges.BuildCharges(tx, businessID, branchID, "held_sale", heldSaleID, req.Charges)
+	chargeRows, chargeTotals, err := charges.BuildChargesWithMode(tx, businessID, branchID, "held_sale", heldSaleID, req.Charges, taxMode)
 	if err != nil {
 		return nil, err
 	}
@@ -1271,6 +1325,7 @@ func (s *Service) calculateHeldSale(tx *gorm.DB, businessID, branchID, heldSaleI
 	return &heldSaleCalculation{
 		Items:           items,
 		Charges:         chargeRows,
+		TaxMode:         taxMode,
 		SubtotalAmount:  roundMoney(subtotal),
 		DiscountAmount:  roundMoney(sumHeldDiscounts(items)),
 		TaxAmount:       roundMoney(taxAmount + chargeTotals.TaxAmount),

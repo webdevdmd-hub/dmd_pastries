@@ -221,6 +221,7 @@ type BackendCheckoutPayload = {
   sales_channel_id: string | null;
   external_order_number: string | null;
   notes: string | null;
+  tax_mode?: string;
 };
 
 type BackendReceiptLine = {
@@ -934,6 +935,7 @@ function toBackendCheckoutPayload(payload: CheckoutPayload): BackendCheckoutPayl
     sales_channel_id: payload.salesChannelId,
     external_order_number: payload.externalOrderNumber,
     notes: payload.notes,
+    ...(payload.taxMode ? { tax_mode: payload.taxMode } : {}),
   };
 }
 

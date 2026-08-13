@@ -127,6 +127,13 @@ func (s *Service) UpdateSettings(currentUser *utils.AuthContext, req UpdateBusin
 	if req.PriceIncludesTax != nil {
 		updates["price_includes_tax"] = *req.PriceIncludesTax
 	}
+	if req.DefaultTaxMode != nil {
+		mode := strings.TrimSpace(*req.DefaultTaxMode)
+		if mode != "inclusive" && mode != "exclusive" && mode != "no_tax" {
+			return nil, apperrors.BadRequest("default_tax_mode must be inclusive, exclusive, or no_tax", nil)
+		}
+		updates["default_tax_mode"] = mode
+	}
 	if req.LowStockAlert != nil {
 		updates["low_stock_alert"] = *req.LowStockAlert
 	}
@@ -289,6 +296,7 @@ func toSettingsResponse(settings BusinessSettings) BusinessSettingsResponse {
 		AllowNegativeStock: settings.AllowNegativeStock,
 		DefaultTaxRate:     settings.DefaultTaxRate,
 		PriceIncludesTax:   settings.PriceIncludesTax,
+		DefaultTaxMode:     settings.DefaultTaxMode,
 		LowStockAlert:      settings.LowStockAlert,
 		DefaultLanguage:    settings.DefaultLanguage,
 		DateFormat:         settings.DateFormat,

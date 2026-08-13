@@ -35,6 +35,7 @@ export const checkoutSchema = z.object({
   salesChannelId: z.string().nullable(),
   externalOrderNumber: z.string().nullable(),
   notes: z.string().nullable(),
+  taxMode: z.enum(["inclusive", "exclusive", "no_tax"]).nullable(),
 });
 
 export type CheckoutSchema = z.infer<typeof checkoutSchema>;

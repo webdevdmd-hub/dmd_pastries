@@ -54,6 +54,7 @@ func (r *Repository) EnsureSettings(tx *gorm.DB, businessID string) (*BusinessSe
 		AllowNegativeStock: false,
 		DefaultTaxRate:     0,
 		PriceIncludesTax:   false,
+		DefaultTaxMode:     "inclusive",
 		LowStockAlert:      true,
 		DefaultLanguage:    "en",
 		DateFormat:         "YYYY-MM-DD",

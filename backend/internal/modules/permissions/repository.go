@@ -76,6 +76,7 @@ func DefaultSeeds() []Seed {
 		{ModuleName: "pos", PermissionKey: "pos.cancel_held_sale", Description: "Cancel held sales"},
 		{ModuleName: "pos", PermissionKey: "pos.refund", Description: "Refund POS orders"},
 		{ModuleName: "pos", PermissionKey: "pos.void", Description: "Void POS sales"},
+		{ModuleName: "pos", PermissionKey: "sales.no_tax.apply", Description: "Apply the no-tax mode to sales documents"},
 		{ModuleName: "sales_returns", PermissionKey: "sales_returns.view", Description: "View sales returns"},
 		{ModuleName: "sales_returns", PermissionKey: "sales_returns.create", Description: "Create sales returns"},
 		{ModuleName: "sales_returns", PermissionKey: "sales_returns.edit", Description: "Edit draft sales returns"},

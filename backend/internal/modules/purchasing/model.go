@@ -100,6 +100,7 @@ type PurchaseInvoice struct {
 	ChargeAmount           float64        `gorm:"not null;default:0" json:"charge_amount"`
 	ChargeTaxAmount        float64        `gorm:"not null;default:0" json:"charge_tax_amount"`
 	TotalAmount            float64        `gorm:"not null;default:0" json:"total_amount"`
+	TaxMode                string         `gorm:"size:20;not null;default:inclusive" json:"tax_mode"`
 	PaidAmount             float64        `gorm:"not null;default:0" json:"paid_amount"`
 	BalanceAmount          float64        `gorm:"not null;default:0" json:"balance_amount"`
 	ReturnedAmount         float64        `gorm:"not null;default:0" json:"returned_amount"`

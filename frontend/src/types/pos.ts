@@ -126,6 +126,8 @@ export type CheckoutPayload = {
   salesChannelId: string | null;
   externalOrderNumber: string | null;
   notes: string | null;
+  // W3: null lets the backend apply the business default tax mode.
+  taxMode: "inclusive" | "exclusive" | "no_tax" | null;
 };
 
 export type HeldSaleStatus = "held" | "resumed" | "cancelled";

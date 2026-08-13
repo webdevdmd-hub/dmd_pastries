@@ -26,6 +26,7 @@ type Sale struct {
 	ChargeAmount             float64        `gorm:"not null;default:0" json:"charge_amount"`
 	ChargeTaxAmount          float64        `gorm:"not null;default:0" json:"charge_tax_amount"`
 	TotalAmount              float64        `gorm:"not null;default:0" json:"total_amount"`
+	TaxMode                  string         `gorm:"size:20;not null;default:inclusive" json:"tax_mode"`
 	PaidAmount               float64        `gorm:"not null;default:0" json:"paid_amount"`
 	ChangeAmount             float64        `gorm:"not null;default:0" json:"change_amount"`
 	PaymentStatus            string         `gorm:"size:50;not null;default:unpaid" json:"payment_status"`
@@ -168,6 +169,7 @@ type HeldSale struct {
 	EstimatedChargeAmount    float64        `gorm:"not null;default:0" json:"estimated_charge_amount"`
 	EstimatedChargeTaxAmount float64        `gorm:"not null;default:0" json:"estimated_charge_tax_amount"`
 	EstimatedTotal           float64        `gorm:"not null;default:0" json:"estimated_total"`
+	TaxMode                  string         `gorm:"size:20;not null;default:inclusive" json:"tax_mode"`
 	Status                   string         `gorm:"size:50;not null;default:held" json:"status"`
 	Notes                    string         `json:"notes"`
 	HeldAt                   time.Time      `gorm:"not null" json:"held_at"`

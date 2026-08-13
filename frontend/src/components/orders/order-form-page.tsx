@@ -227,6 +227,8 @@ export function OrderFormPage({
   const [salesChannelId, setSalesChannelId] = useState("");
   const [externalOrderNumber, setExternalOrderNumber] = useState("");
   const [orderType, setOrderType] = useState<OrderType>("pickup");
+  // W3: "" = business default; the mode is fixed once the order is created.
+  const [taxMode, setTaxMode] = useState<"" | "inclusive" | "exclusive" | "no_tax">("");
   const [eventDate, setEventDate] = useState(todayDateOnly());
   const [pickupTime, setPickupTime] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
@@ -291,6 +293,7 @@ export function OrderFormPage({
       notes: notes || null,
       orderType,
       pickupTime: orderType === "pickup" ? pickupTime || null : null,
+      taxMode: taxMode === "" ? null : taxMode,
     }),
     [
       branchId,
@@ -307,6 +310,7 @@ export function OrderFormPage({
       orderType,
       pickupTime,
       salesChannelId,
+      taxMode,
     ],
   );
 
@@ -645,6 +649,33 @@ export function OrderFormPage({
                       Draft preview failed: {getErrorMessage(previewQuery.error)}
                     </div>
                   ) : null}
+                  <div className="flex items-center justify-between gap-4">
+                    <span>VAT mode</span>
+                    {order ? (
+                      <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-700">
+                        {order.taxMode === "no_tax"
+                          ? "No tax"
+                          : order.taxMode === "exclusive"
+                            ? "Exclusive"
+                            : "Inclusive"}
+                      </span>
+                    ) : (
+                      <select
+                        className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs"
+                        onChange={(event) =>
+                          setTaxMode(event.target.value as typeof taxMode)
+                        }
+                        value={taxMode}
+                      >
+                        <option value="">Business default</option>
+                        <option value="inclusive">Inclusive</option>
+                        <option value="exclusive">Exclusive</option>
+                        {hasAnyPermission([PERMISSIONS.salesNoTaxApply]) ? (
+                          <option value="no_tax">No tax</option>
+                        ) : null}
+                      </select>
+                    )}
+                  </div>
                   <div className="flex items-center justify-between gap-4">
                     <span>Subtotal ({formatCurrency(itemQuantity)} items)</span>
                     <span className="font-mono text-black">

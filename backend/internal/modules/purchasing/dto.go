@@ -130,6 +130,9 @@ type CreatePurchaseInvoiceRequest struct {
 	BillDiscountAmount float64                    `json:"bill_discount_amount"`
 	Charges            []charges.ChargeInput      `json:"charges"`
 	Notes              string                     `json:"notes"`
+	// TaxMode is the bill's VAT mode (W3): inclusive | exclusive | no_tax.
+	// Empty falls back to the business default.
+	TaxMode string `json:"tax_mode"`
 }
 
 type UpdatePurchaseInvoiceRequest struct {
@@ -144,6 +147,7 @@ type UpdatePurchaseInvoiceRequest struct {
 	BillDiscountAmount *float64                   `json:"bill_discount_amount"`
 	Charges            []charges.ChargeInput      `json:"charges"`
 	Notes              string                     `json:"notes"`
+	TaxMode            string                     `json:"tax_mode"`
 }
 
 type PurchaseInvoiceItemInput struct {

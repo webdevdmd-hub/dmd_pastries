@@ -19,6 +19,9 @@ type CheckoutRequest struct {
 	SaleDiscountValue   float64                  `json:"sale_discount_value"`
 	Payments            []CheckoutPaymentRequest `json:"payments"`
 	Notes               string                   `json:"notes"`
+	// TaxMode is the document VAT mode (W3): inclusive | exclusive | no_tax.
+	// Empty falls back to the business default.
+	TaxMode string `json:"tax_mode"`
 }
 
 type CheckoutItemRequest struct {
@@ -56,6 +59,7 @@ type HoldSaleRequest struct {
 	SaleDiscountValue float64               `json:"sale_discount_value"`
 	Notes             string                `json:"notes"`
 	ExpiresAt         *time.Time            `json:"expires_at"`
+	TaxMode           string                `json:"tax_mode"`
 }
 
 type HoldSaleItemRequest struct {
@@ -431,6 +435,7 @@ type HeldSaleResponse struct {
 	EstimatedChargeAmount    float64                  `json:"estimated_charge_amount"`
 	EstimatedChargeTaxAmount float64                  `json:"estimated_charge_tax_amount"`
 	EstimatedTotal           float64                  `json:"estimated_total"`
+	TaxMode                  string                   `json:"tax_mode"`
 	Status                   string                   `json:"status"`
 	Notes                    string                   `json:"notes"`
 	HeldAt                   time.Time                `json:"held_at"`

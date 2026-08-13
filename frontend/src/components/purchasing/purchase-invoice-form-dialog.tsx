@@ -22,7 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PERMISSIONS } from "@/constants/permissions";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { usePermission } from "@/hooks/use-permission";
 import { createUuid } from "@/lib/uuid";
 import { purchaseInvoiceSchema } from "@/lib/validators/purchasing.schema";
 import type { ChartAccount } from "@/types/accounting";
@@ -121,6 +123,10 @@ export function PurchaseInvoiceFormDialog({
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<PurchaseItemLineDraft[]>([emptyLine()]);
   const [error, setError] = useState<string | null>(null);
+  // W3: "" = business default on create; edits carry the stored mode.
+  const [taxMode, setTaxMode] = useState<"" | "inclusive" | "exclusive" | "no_tax">("");
+  const { hasPermission } = usePermission();
+  const canApplyNoTax = hasPermission(PERMISSIONS.salesNoTaxApply);
   const selectableBranches = branches.filter(
     (branch) =>
       branch.id === invoice?.branchId ||
@@ -174,6 +180,7 @@ export function PurchaseInvoiceFormDialog({
     setDueDate(source?.dueDate?.slice(0, 10) ?? "");
     setBillDiscountAmount(source?.billDiscountAmount ?? 0);
     setNotes(source?.notes ?? "");
+    setTaxMode(invoice?.taxMode ?? "");
     setLines(
       source?.items.length
         ? source.items.map((item) => ({ ...item, lineId: item.lineId || createUuid() }))
@@ -197,6 +204,7 @@ export function PurchaseInvoiceFormDialog({
       notes,
       purchaseOrderId,
       supplierId,
+      taxMode: taxMode === "" ? null : taxMode,
     });
 
     if (!result.success) {
@@ -277,6 +285,20 @@ export function PurchaseInvoiceFormDialog({
             type="date"
             value={dueDate}
           />
+          <Select
+            onValueChange={(value) => setTaxMode(value === "default" ? "" : (value as typeof taxMode))}
+            value={taxMode === "" ? "default" : taxMode}
+          >
+            <SelectTrigger aria-label="VAT mode" className="h-9 text-xs">
+              <SelectValue placeholder="VAT mode" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">VAT: Business default</SelectItem>
+              <SelectItem value="inclusive">VAT: Inclusive</SelectItem>
+              <SelectItem value="exclusive">VAT: Exclusive</SelectItem>
+              {canApplyNoTax ? <SelectItem value="no_tax">VAT: No tax</SelectItem> : null}
+            </SelectContent>
+          </Select>
         </div>
         <PurchasingItemLineEditor
           accounts={accounts}

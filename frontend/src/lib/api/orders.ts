@@ -37,6 +37,7 @@ type BackendOrderPayload = {
   customer_id?: string;
   customer_name?: string;
   customer_phone?: string;
+  tax_mode?: string;
   sales_channel_id?: string;
   external_order_number?: string;
   order_type?: OrderType;
@@ -299,6 +300,8 @@ function parseOrder(value: unknown): BakeryOrder {
     chargeTaxAmount: numberValue(value.charge_tax_amount),
     charges: parseDocumentCharges(value.charges),
     totalAmount: numberValue(value.total_amount),
+    taxMode:
+      value.tax_mode === "exclusive" || value.tax_mode === "no_tax" ? value.tax_mode : "inclusive",
     paidAmount: numberValue(value.paid_amount),
     balanceAmount: numberValue(value.balance_amount),
     refundedAmount: numberValue(value.refunded_amount),
@@ -527,6 +530,7 @@ function orderPayload(payload: CreateOrderPayload | UpdateOrderPayload): Backend
       ? { charges: payload.charges.map(toBackendDocumentChargePayload) }
       : {}),
     ...(payload.notes !== undefined ? { notes: requestString(payload.notes) } : {}),
+    ...(payload.taxMode ? { tax_mode: payload.taxMode } : {}),
   };
 }
 

@@ -41,6 +41,7 @@ export type BakeryOrder = {
   chargeTaxAmount: number;
   charges: DocumentCharge[];
   totalAmount: number;
+  taxMode: "inclusive" | "exclusive" | "no_tax";
   paidAmount: number;
   balanceAmount: number;
   refundedAmount: number;
@@ -164,6 +165,8 @@ export type CreateOrderPayload = {
   items: CreateOrderItemPayload[];
   charges: DocumentChargeDraft[];
   notes: string | null;
+  // W3: null lets the backend apply the business default tax mode.
+  taxMode?: "inclusive" | "exclusive" | "no_tax" | null | undefined;
 };
 
 export type UpdateOrderPayload = Partial<CreateOrderPayload>;

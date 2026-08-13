@@ -75,6 +75,7 @@ export const PERMISSIONS = {
   posSell: "pos.sell",
   posVoid: "pos.void",
   posView: "pos.view",
+  salesNoTaxApply: "sales.no_tax.apply",
   productsCreate: "products.create",
   productsDelete: "products.delete",
   productsEdit: "products.edit",

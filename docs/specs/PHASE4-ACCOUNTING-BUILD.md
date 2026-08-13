@@ -200,6 +200,14 @@ Unit +4 (create, redeem, race/lock, reconciliation) · Integration +4 · E2E 2 f
 
 # W3 — Per-document VAT modes + no-tax RBAC
 
+> **Implementation note (2026-08-14):** shipped with these deltas from the design below.
+> - Migration is **000101** (000100 was taken by W4). It also adds `tax_mode` to `held_sales` so held/resumed carts keep their mode.
+> - **Backfill guard:** inclusiveness was historically a property of the tax RATE (`tax_rates.is_inclusive`), not the document — and the seeded UAE VAT rate is exclusive-flagged. A blanket `'inclusive'` default would have repriced those businesses, so the migration derives each business's `default_tax_mode` (and stamps historical documents) from its governing rate's flag. Historical documents are never recalculated.
+> - Mode semantics live once in `charges.ResolveLineTax` + `BuildChargesWithMode` (the charges package is imported by all three selling/buying modules). The empty mode (`TaxModePerRate`) preserves legacy per-rate behavior for document types without a mode (POs, receipts, returns) — including the purchase-line total quirk, kept bug-for-bug.
+> - Requests carry `tax_mode` optionally; empty falls back to `business_settings.default_tax_mode`. The mode is fixed for a document's life (bakery/bill edits recalc under the stored mode; `UpdateInvoice` threads it through its create-request reconstruction).
+> - Permission `sales.no_tax.apply` (module `pos`) is seeded to Admin+Manager (migration grants existing system roles); enforcement is service-side in POS checkout, bakery `buildOrder`, and `buildInvoice`; `*.no_tax_applied` audit events fire on create; report at `GET /reports/financial/no-tax-documents` unions the three sources.
+> - UI: POS cart VAT segmented control, bakery order form selector (badge when editing), bill dialog selector — the No-tax option renders only with the permission. Client cart math mirrors the explicit modes; the "Default" option defers to the server.
+
 ## Context
 Decision §2b/2c: Inclusive / Exclusive / No-tax selectable per document on POS sales, bakery orders, purchase bills; staff pick per order; No-tax permission-gated + audit-flagged.
 

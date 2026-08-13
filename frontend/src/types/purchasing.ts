@@ -186,6 +186,7 @@ export type PurchaseInvoice = {
   chargeAmount: number;
   chargeTaxAmount: number;
   totalAmount: number;
+  taxMode: "inclusive" | "exclusive" | "no_tax";
   paidAmount: number;
   balanceAmount: number;
   receiveStatus: "not_received" | "partially_received" | "received";
@@ -497,6 +498,8 @@ export type CreatePurchaseInvoicePayload = {
   items: PurchaseItemLinePayload[];
   billDiscountAmount?: number | undefined;
   notes: string | null;
+  // W3: undefined/null lets the backend apply the business default.
+  taxMode?: "inclusive" | "exclusive" | "no_tax" | null | undefined;
 };
 
 export type UpdatePurchaseInvoicePayload = Partial<CreatePurchaseInvoicePayload>;

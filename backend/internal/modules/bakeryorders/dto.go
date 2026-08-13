@@ -54,6 +54,9 @@ type CreateOrderRequest struct {
 	Items               []OrderItemRequest    `json:"items"`
 	Charges             []charges.ChargeInput `json:"charges"`
 	Notes               string                `json:"notes"`
+	// TaxMode is the document VAT mode (W3): inclusive | exclusive | no_tax.
+	// Empty falls back to the business default; fixed for the order's life.
+	TaxMode string `json:"tax_mode"`
 }
 
 type UpdateOrderRequest struct {
@@ -193,6 +196,7 @@ type BakeryOrderResponse struct {
 	ChargeAmount             float64                         `json:"charge_amount"`
 	ChargeTaxAmount          float64                         `json:"charge_tax_amount"`
 	TotalAmount              float64                         `json:"total_amount"`
+	TaxMode                  string                          `json:"tax_mode"`
 	PaidAmount               float64                         `json:"paid_amount"`
 	BalanceAmount            float64                         `json:"balance_amount"`
 	RefundedAmount           float64                         `json:"refunded_amount"`

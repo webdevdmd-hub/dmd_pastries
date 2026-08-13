@@ -953,6 +953,12 @@ func (s *Service) CreateInvoice(currentUser *utils.AuthContext, req CreatePurcha
 		if err := s.audit(tx, currentUser, "purchase_invoice.created", invoice.ID, "Purchase invoice created", ipAddress, userAgent); err != nil {
 			return err
 		}
+		// W3: no-tax documents are audit-flagged for VAT-filing review.
+		if invoice.TaxMode == charges.TaxModeNoTax {
+			if err := s.audit(tx, currentUser, "purchase_invoice.no_tax_applied", invoice.ID, "Purchase invoice created with the no-tax mode", ipAddress, userAgent); err != nil {
+				return err
+			}
+		}
 		invoiceID = invoice.ID
 		return nil
 	})
@@ -1599,6 +1605,9 @@ func (s *Service) UpdateInvoice(currentUser *utils.AuthContext, id string, req U
 			BillDiscountAmount: existing.BillDiscountAmount,
 			Charges:            req.Charges,
 			Notes:              req.Notes,
+			// W3: carry the stored mode forward so an edit never silently
+			// resets the bill's tax mode.
+			TaxMode: first(req.TaxMode, existing.TaxMode),
 		}
 		if req.BillDiscountAmount != nil {
 			createReq.BillDiscountAmount = *req.BillDiscountAmount
@@ -1619,12 +1628,12 @@ func (s *Service) UpdateInvoice(currentUser *utils.AuthContext, id string, req U
 		} else if exists {
 			return apperrors.Conflict("invoice_number already exists for this supplier", nil)
 		}
-		updates := map[string]interface{}{"branch_id": invoice.BranchID, "supplier_id": invoice.SupplierID, "purchase_order_id": invoice.PurchaseOrderID, "invoice_number": invoice.InvoiceNumber, "supplier_bill_number": invoice.SupplierBillNumber, "invoice_date": invoice.InvoiceDate, "due_date": invoice.DueDate, "subtotal_amount": invoice.SubtotalAmount, "tax_amount": invoice.TaxAmount, "discount_amount": invoice.DiscountAmount, "bill_discount_amount": invoice.BillDiscountAmount, "charge_amount": invoice.ChargeAmount, "charge_tax_amount": invoice.ChargeTaxAmount, "total_amount": invoice.TotalAmount, "balance_amount": invoice.BalanceAmount, "notes": invoice.Notes, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
+		updates := map[string]interface{}{"branch_id": invoice.BranchID, "supplier_id": invoice.SupplierID, "purchase_order_id": invoice.PurchaseOrderID, "invoice_number": invoice.InvoiceNumber, "supplier_bill_number": invoice.SupplierBillNumber, "invoice_date": invoice.InvoiceDate, "due_date": invoice.DueDate, "subtotal_amount": invoice.SubtotalAmount, "tax_amount": invoice.TaxAmount, "discount_amount": invoice.DiscountAmount, "bill_discount_amount": invoice.BillDiscountAmount, "charge_amount": invoice.ChargeAmount, "charge_tax_amount": invoice.ChargeTaxAmount, "total_amount": invoice.TotalAmount, "tax_mode": invoice.TaxMode, "balance_amount": invoice.BalanceAmount, "notes": invoice.Notes, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
 		if err := s.repo.UpdateInvoice(tx, id, currentUser.BusinessID, updates, items); err != nil {
 			return err
 		}
 		if req.Charges != nil {
-			if _, err := charges.ReplaceCharges(tx, currentUser.BusinessID, invoice.BranchID, "purchase_invoice", id, req.Charges); err != nil {
+			if _, err := charges.ReplaceChargesWithMode(tx, currentUser.BusinessID, invoice.BranchID, "purchase_invoice", id, req.Charges, invoice.TaxMode); err != nil {
 				return err
 			}
 		}
@@ -2865,11 +2874,21 @@ func (s *Service) buildInvoice(tx *gorm.DB, currentUser *utils.AuthContext, id s
 	if invoiceID == "" {
 		invoiceID = utils.NewUUID()
 	}
-	items, total, err := s.buildInvoiceItems(tx, currentUser.BusinessID, req.BranchID, invoiceID, req.Items)
+	// W3: resolve the bill's tax mode once; lines and charges follow it.
+	taxMode := strings.TrimSpace(req.TaxMode)
+	if taxMode == "" {
+		taxMode = charges.DefaultTaxMode(tx, currentUser.BusinessID)
+	} else if !charges.ValidTaxMode(taxMode) {
+		return nil, nil, nil, apperrors.BadRequest("tax_mode must be inclusive, exclusive, or no_tax", nil)
+	}
+	if taxMode == charges.TaxModeNoTax && !hasPermissionKey(currentUser, "sales.no_tax.apply") {
+		return nil, nil, nil, apperrors.Forbidden("missing permission to apply the no-tax mode")
+	}
+	items, total, err := s.buildInvoiceItems(tx, currentUser.BusinessID, req.BranchID, invoiceID, taxMode, req.Items)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	chargeRows, chargeTotals, err := charges.BuildCharges(tx, currentUser.BusinessID, req.BranchID, "purchase_invoice", invoiceID, req.Charges)
+	chargeRows, chargeTotals, err := charges.BuildChargesWithMode(tx, currentUser.BusinessID, req.BranchID, "purchase_invoice", invoiceID, req.Charges, taxMode)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -2882,10 +2901,10 @@ func (s *Service) buildInvoice(tx *gorm.DB, currentUser *utils.AuthContext, id s
 	}
 	taxAmount := roundMoney(total.Tax + chargeTotals.TaxAmount)
 	totalAmount := roundMoney(total.Total - billDiscount + chargeTotals.Total)
-	return &PurchaseInvoice{ID: invoiceID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, SupplierID: req.SupplierID, PurchaseOrderID: nullableString(req.PurchaseOrderID), InvoiceNumber: strings.TrimSpace(req.InvoiceNumber), SupplierBillNumber: strings.TrimSpace(req.SupplierBillNumber), InvoiceDate: invoiceDate, DueDate: dueDate, Status: "draft", PaymentStatus: "unpaid", SubtotalAmount: total.Subtotal, TaxAmount: taxAmount, ChargeAmount: chargeTotals.Amount, ChargeTaxAmount: chargeTotals.TaxAmount, DiscountAmount: total.Discount, BillDiscountAmount: billDiscount, TotalAmount: totalAmount, BalanceAmount: totalAmount, Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}, items, chargeRows, nil
+	return &PurchaseInvoice{ID: invoiceID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, SupplierID: req.SupplierID, PurchaseOrderID: nullableString(req.PurchaseOrderID), InvoiceNumber: strings.TrimSpace(req.InvoiceNumber), SupplierBillNumber: strings.TrimSpace(req.SupplierBillNumber), InvoiceDate: invoiceDate, DueDate: dueDate, Status: "draft", PaymentStatus: "unpaid", SubtotalAmount: total.Subtotal, TaxAmount: taxAmount, ChargeAmount: chargeTotals.Amount, ChargeTaxAmount: chargeTotals.TaxAmount, DiscountAmount: total.Discount, BillDiscountAmount: billDiscount, TotalAmount: totalAmount, TaxMode: taxMode, BalanceAmount: totalAmount, Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}, items, chargeRows, nil
 }
 
-func (s *Service) buildInvoiceItems(tx *gorm.DB, businessID, branchID, invoiceID string, inputItems []PurchaseInvoiceItemInput) ([]PurchaseInvoiceItem, totals, error) {
+func (s *Service) buildInvoiceItems(tx *gorm.DB, businessID, branchID, invoiceID, taxMode string, inputItems []PurchaseInvoiceItemInput) ([]PurchaseInvoiceItem, totals, error) {
 	if len(inputItems) == 0 {
 		return nil, totals{}, apperrors.BadRequest("items are required", nil)
 	}
@@ -2894,7 +2913,7 @@ func (s *Service) buildInvoiceItems(tx *gorm.DB, businessID, branchID, invoiceID
 	for _, input := range inputItems {
 		lineType := normalizedInvoiceLineType(input)
 		if lineType == "account" {
-			item, line, err := s.buildInvoiceAccountLine(tx, businessID, invoiceID, input)
+			item, line, err := s.buildInvoiceAccountLine(tx, businessID, invoiceID, taxMode, input)
 			if err != nil {
 				return nil, totals{}, err
 			}
@@ -2902,7 +2921,7 @@ func (s *Service) buildInvoiceItems(tx *gorm.DB, businessID, branchID, invoiceID
 			items = append(items, item)
 			continue
 		}
-		common, line, err := s.prepareLine(tx, businessID, branchID, lineInput{ItemType: input.ItemType, ProductID: input.ProductID, IngredientID: input.IngredientID, PackagingItemID: input.PackagingItemID, Quantity: input.Quantity, UnitID: input.UnitID, UnitCost: input.UnitCost, DiscountAmount: input.DiscountAmount, TaxRateID: input.TaxRateID})
+		common, line, err := s.prepareLine(tx, businessID, branchID, lineInput{ItemType: input.ItemType, ProductID: input.ProductID, IngredientID: input.IngredientID, PackagingItemID: input.PackagingItemID, Quantity: input.Quantity, UnitID: input.UnitID, UnitCost: input.UnitCost, DiscountAmount: input.DiscountAmount, TaxRateID: input.TaxRateID, TaxMode: taxMode})
 		if err != nil {
 			return nil, totals{}, err
 		}
@@ -2916,7 +2935,7 @@ func (s *Service) buildInvoiceItems(tx *gorm.DB, businessID, branchID, invoiceID
 	return items, total.round(), nil
 }
 
-func (s *Service) buildInvoiceAccountLine(tx *gorm.DB, businessID, invoiceID string, input PurchaseInvoiceItemInput) (PurchaseInvoiceItem, lineTotals, error) {
+func (s *Service) buildInvoiceAccountLine(tx *gorm.DB, businessID, invoiceID, taxMode string, input PurchaseInvoiceItemInput) (PurchaseInvoiceItem, lineTotals, error) {
 	description := strings.TrimSpace(input.Description)
 	if description == "" {
 		description = strings.TrimSpace(input.ItemNameSnapshot)
@@ -2931,7 +2950,7 @@ func (s *Service) buildInvoiceAccountLine(tx *gorm.DB, businessID, invoiceID str
 	if err != nil {
 		return PurchaseInvoiceItem{}, lineTotals{}, err
 	}
-	line, err := s.calculatePurchaseLine(tx, businessID, input.Quantity, input.UnitCost, input.DiscountAmount, input.TaxRateID)
+	line, err := s.calculatePurchaseLineWithMode(tx, businessID, input.Quantity, input.UnitCost, input.DiscountAmount, input.TaxRateID, taxMode)
 	if err != nil {
 		return PurchaseInvoiceItem{}, lineTotals{}, err
 	}
@@ -3327,7 +3346,7 @@ func (s *Service) prepareLine(tx *gorm.DB, businessID, branchID string, input li
 	if err != nil {
 		return preparedItem{}, lineTotals{}, err
 	}
-	line, err := s.calculatePurchaseLine(tx, businessID, input.Quantity, input.UnitCost, input.DiscountAmount, input.TaxRateID)
+	line, err := s.calculatePurchaseLineWithMode(tx, businessID, input.Quantity, input.UnitCost, input.DiscountAmount, input.TaxRateID, input.TaxMode)
 	if err != nil {
 		return preparedItem{}, lineTotals{}, err
 	}
@@ -3335,6 +3354,10 @@ func (s *Service) prepareLine(tx *gorm.DB, businessID, branchID string, input li
 }
 
 func (s *Service) calculatePurchaseLine(tx *gorm.DB, businessID string, quantity, unitCost, discountAmount float64, taxRateID string) (lineTotals, error) {
+	return s.calculatePurchaseLineWithMode(tx, businessID, quantity, unitCost, discountAmount, taxRateID, charges.TaxModePerRate)
+}
+
+func (s *Service) calculatePurchaseLineWithMode(tx *gorm.DB, businessID string, quantity, unitCost, discountAmount float64, taxRateID, taxMode string) (lineTotals, error) {
 	if quantity <= 0 {
 		return lineTotals{}, apperrors.BadRequest("quantity must be greater than zero", nil)
 	}
@@ -3345,8 +3368,10 @@ func (s *Service) calculatePurchaseLine(tx *gorm.DB, businessID string, quantity
 	if discountAmount > subtotal {
 		return lineTotals{}, apperrors.BadRequest("discount_amount cannot exceed line subtotal", nil)
 	}
+	taxable := roundMoney(subtotal - discountAmount)
 	taxAmount := 0.0
-	if strings.TrimSpace(taxRateID) != "" {
+	lineTotal := taxable
+	if strings.TrimSpace(taxRateID) != "" && taxMode != charges.TaxModeNoTax {
 		if err := validateUUID(taxRateID, "tax_rate_id"); err != nil {
 			return lineTotals{}, err
 		}
@@ -3354,16 +3379,32 @@ func (s *Service) calculatePurchaseLine(tx *gorm.DB, businessID string, quantity
 		if err != nil {
 			return lineTotals{}, notFound(err, "tax rate not found")
 		}
-		taxable := subtotal - discountAmount
-		if tax.IsInclusive {
-			taxAmount = taxable - (taxable / (1 + tax.RatePercentage/100))
-		} else {
-			taxAmount = taxable * tax.RatePercentage / 100
+		if taxMode == charges.TaxModePerRate {
+			// Legacy behavior, kept bug-for-bug: the total always adds the
+			// tax back on top, even for inclusive-flagged rates.
+			if tax.IsInclusive {
+				taxAmount = taxable - (taxable / (1 + tax.RatePercentage/100))
+			} else {
+				taxAmount = taxable * tax.RatePercentage / 100
+			}
+			line := lineTotals{Subtotal: roundMoney(subtotal), Discount: roundMoney(discountAmount), Tax: roundMoney(taxAmount)}
+			line.Total = roundMoney(line.Subtotal - line.Discount + line.Tax)
+			return line, nil
+		}
+		// W3: the document mode decides; inclusive totals keep the tax inside.
+		taxAmount, lineTotal = charges.ResolveLineTax(taxable, tax.RatePercentage, tax.IsInclusive, taxMode)
+	}
+	return lineTotals{Subtotal: roundMoney(subtotal), Discount: roundMoney(discountAmount), Tax: roundMoney(taxAmount), Total: roundMoney(lineTotal)}, nil
+}
+
+// hasPermissionKey checks the authenticated user's permission set (W3).
+func hasPermissionKey(currentUser *utils.AuthContext, key string) bool {
+	for _, permission := range currentUser.Permissions {
+		if permission == key {
+			return true
 		}
 	}
-	line := lineTotals{Subtotal: roundMoney(subtotal), Discount: roundMoney(discountAmount), Tax: roundMoney(taxAmount)}
-	line.Total = roundMoney(line.Subtotal - line.Discount + line.Tax)
-	return line, nil
+	return false
 }
 
 func (s *Service) purchaseBillAccount(tx *gorm.DB, businessID, accountID string) (*purchaseBillAccount, error) {
@@ -4217,6 +4258,9 @@ func (t totals) round() totals {
 type lineInput struct {
 	ItemType, ProductID, IngredientID, PackagingItemID, UnitID, TaxRateID string
 	Quantity, UnitCost, DiscountAmount                                    float64
+	// TaxMode is the owning document's VAT mode (W3); empty keeps the
+	// legacy per-rate behavior (purchase orders, receipts, returns).
+	TaxMode string
 }
 
 type purchaseBillAccount struct {

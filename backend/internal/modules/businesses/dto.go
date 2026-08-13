@@ -29,6 +29,7 @@ type BusinessSettingsResponse struct {
 	AllowNegativeStock bool      `json:"allow_negative_stock"`
 	DefaultTaxRate     float64   `json:"default_tax_rate"`
 	PriceIncludesTax   bool      `json:"price_includes_tax"`
+	DefaultTaxMode     string    `json:"default_tax_mode"`
 	LowStockAlert      bool      `json:"low_stock_alert"`
 	DefaultLanguage    string    `json:"default_language"`
 	DateFormat         string    `json:"date_format"`
@@ -41,6 +42,7 @@ type UpdateBusinessSettingsRequest struct {
 	AllowNegativeStock *bool    `json:"allow_negative_stock"`
 	DefaultTaxRate     *float64 `json:"default_tax_rate"`
 	PriceIncludesTax   *bool    `json:"price_includes_tax"`
+	DefaultTaxMode     *string  `json:"default_tax_mode"`
 	LowStockAlert      *bool    `json:"low_stock_alert"`
 	DefaultLanguage    *string  `json:"default_language"`
 	DateFormat         *string  `json:"date_format"`

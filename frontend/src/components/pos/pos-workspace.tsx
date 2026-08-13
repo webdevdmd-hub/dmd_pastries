@@ -431,6 +431,7 @@ export function POSWorkspace(): JSX.Element {
       externalOrderNumber:
         externalOrderNumber.trim().length > 0 ? externalOrderNumber.trim() : null,
       notes: null,
+      taxMode: cart.taxMode,
     };
     const parsed = checkoutSchema.safeParse(payload);
 
@@ -763,6 +764,12 @@ export function POSWorkspace(): JSX.Element {
         clearCheckoutFeedback();
         setExternalOrderNumber(value);
       }}
+      onTaxModeChange={(mode) => {
+        clearCheckoutFeedback();
+        cart.setTaxMode(mode);
+      }}
+      canApplyNoTax={hasPermission(PERMISSIONS.salesNoTaxApply)}
+      taxMode={cart.taxMode}
       onHoldSale={() => setHoldOpen(true)}
       onLineDiscountChange={(cartItemId, discountType, discountValue) => {
         clearCheckoutFeedback();

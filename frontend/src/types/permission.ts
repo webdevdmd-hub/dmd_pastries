@@ -46,6 +46,7 @@ export const PERMISSION_KEYS = [
   "pos.cancel_held_sale",
   "pos.refund",
   "pos.void",
+  "sales.no_tax.apply",
   "payments.view",
   "payments.add",
   "payments.refund",

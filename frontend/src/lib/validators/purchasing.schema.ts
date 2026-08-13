@@ -87,6 +87,7 @@ export const purchaseInvoiceSchema = z.object({
   items: z.array(purchaseItemLineSchema).min(1, "At least one item is required."),
   billDiscountAmount: z.coerce.number().min(0, "Bill discount cannot be negative.").optional(),
   notes: optionalNullableString,
+  taxMode: z.enum(["inclusive", "exclusive", "no_tax"]).nullable().optional(),
 });
 
 export const purchaseReceiveSchema = z.object({

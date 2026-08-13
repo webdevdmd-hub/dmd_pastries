@@ -397,6 +397,7 @@ func defaultRolePresets() []defaultRolePreset {
 				"pos.cancel_held_sale",
 				"pos.refund",
 				"pos.void",
+				"sales.no_tax.apply",
 				"sales_returns.view",
 				"sales_returns.create",
 				"sales_returns.edit",

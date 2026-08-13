@@ -18,7 +18,14 @@ type taxRateRow struct {
 	IsInclusive    bool
 }
 
+// BuildCharges keeps the legacy per-rate tax behavior; document types that
+// carry a tax_mode use BuildChargesWithMode so charges follow the document
+// (Phase 4 / W3).
 func BuildCharges(tx *gorm.DB, businessID, branchID, documentType, documentID string, inputs []ChargeInput) ([]DocumentCharge, ChargeTotals, error) {
+	return BuildChargesWithMode(tx, businessID, branchID, documentType, documentID, inputs, TaxModePerRate)
+}
+
+func BuildChargesWithMode(tx *gorm.DB, businessID, branchID, documentType, documentID string, inputs []ChargeInput, taxMode string) ([]DocumentCharge, ChargeTotals, error) {
 	if len(inputs) == 0 {
 		return nil, ChargeTotals{}, nil
 	}
@@ -51,7 +58,8 @@ func BuildCharges(tx *gorm.DB, businessID, branchID, documentType, documentID st
 		var taxName string
 		var taxPercentage float64
 		var taxAmount float64
-		if strings.TrimSpace(input.TaxRateID) != "" {
+		total := amount
+		if strings.TrimSpace(input.TaxRateID) != "" && taxMode != TaxModeNoTax {
 			tax, err := loadTaxRate(tx, businessID, strings.TrimSpace(input.TaxRateID))
 			if err != nil {
 				if err == gorm.ErrRecordNotFound {
@@ -62,13 +70,7 @@ func BuildCharges(tx *gorm.DB, businessID, branchID, documentType, documentID st
 			taxID = &tax.ID
 			taxName = tax.TaxName
 			taxPercentage = tax.RatePercentage
-			taxAmount = calculateTax(amount, tax.RatePercentage, tax.IsInclusive)
-		}
-		total := amount
-		if taxID != nil {
-			if tax, err := loadTaxRate(tx, businessID, *taxID); err == nil && !tax.IsInclusive {
-				total = roundMoney(amount + taxAmount)
-			}
+			taxAmount, total = ResolveLineTax(amount, tax.RatePercentage, tax.IsInclusive, taxMode)
 		}
 		charge := DocumentCharge{
 			ID:                        utils.NewUUID(),
@@ -96,12 +98,16 @@ func BuildCharges(tx *gorm.DB, businessID, branchID, documentType, documentID st
 }
 
 func ReplaceCharges(tx *gorm.DB, businessID, branchID, documentType, documentID string, inputs []ChargeInput) (ChargeTotals, error) {
+	return ReplaceChargesWithMode(tx, businessID, branchID, documentType, documentID, inputs, TaxModePerRate)
+}
+
+func ReplaceChargesWithMode(tx *gorm.DB, businessID, branchID, documentType, documentID string, inputs []ChargeInput, taxMode string) (ChargeTotals, error) {
 	if err := tx.Model(&DocumentCharge{}).
 		Where("business_id = ? AND document_type = ? AND document_id = ? AND deleted_at IS NULL", businessID, documentType, documentID).
 		Update("deleted_at", gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}).Error; err != nil {
 		return ChargeTotals{}, err
 	}
-	rows, totals, err := BuildCharges(tx, businessID, branchID, documentType, documentID, inputs)
+	rows, totals, err := BuildChargesWithMode(tx, businessID, branchID, documentType, documentID, inputs, taxMode)
 	if err != nil {
 		return ChargeTotals{}, err
 	}

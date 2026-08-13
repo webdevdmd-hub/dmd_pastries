@@ -8,6 +8,7 @@ import { DocumentChargesEditor } from "@/components/shared/document-charges-edit
 import { SearchableSelect } from "@/components/shared/searchable-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { DocumentTaxMode } from "@/lib/document-charges";
 import type { DocumentChargeDraft } from "@/types/document-charges";
 import type { CartDiscountType, CartItem, CartTotals } from "@/types/pos";
 import type { SalesChannel, TaxRate } from "@/types/settings";
@@ -34,12 +35,22 @@ type POSCartPanelProps = {
   onQuantityChange: (cartItemId: string, quantity: number) => void;
   onRemoveItem: (cartItemId: string) => void;
   onSalesChannelChange: (value: string) => void;
+  onTaxModeChange: (mode: DocumentTaxMode | null) => void;
+  canApplyNoTax: boolean;
   externalOrderNumber: string;
   salesChannelId: string;
   salesChannels: SalesChannel[];
+  taxMode: DocumentTaxMode | null;
   taxRates: TaxRate[];
   totals: CartTotals;
 };
+
+const taxModeOptions: { label: string; value: DocumentTaxMode | null }[] = [
+  { label: "Default", value: null },
+  { label: "Incl.", value: "inclusive" },
+  { label: "Excl.", value: "exclusive" },
+  { label: "No tax", value: "no_tax" },
+];
 
 function formatMoney(value: number): string {
   return new Intl.NumberFormat("en-AE", {
@@ -64,9 +75,12 @@ export function POSCartPanel({
   onQuantityChange,
   onRemoveItem,
   onSalesChannelChange,
+  onTaxModeChange,
+  canApplyNoTax,
   externalOrderNumber,
   salesChannelId,
   salesChannels,
+  taxMode,
   taxRates,
   totals,
 }: POSCartPanelProps): JSX.Element {
@@ -171,6 +185,27 @@ export function POSCartPanel({
             taxRates={taxRates}
           />
         ) : null}
+        <div className="flex items-center justify-between gap-2 border-b border-zinc-300 pb-2">
+          <span className="text-xs font-bold uppercase tracking-[0.14em] text-zinc-500">VAT</span>
+          <div className="flex gap-1">
+            {taxModeOptions
+              .filter((option) => option.value !== "no_tax" || canApplyNoTax)
+              .map((option) => (
+                <button
+                  className={`rounded-md border px-2 py-1 text-[0.68rem] font-bold ${
+                    taxMode === option.value
+                      ? "border-zinc-950 bg-zinc-950 text-white"
+                      : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-100"
+                  }`}
+                  key={option.label}
+                  onClick={() => onTaxModeChange(option.value)}
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              ))}
+          </div>
+        </div>
         <div className="space-y-1.5 border-b border-zinc-300 pb-2.5">
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between">

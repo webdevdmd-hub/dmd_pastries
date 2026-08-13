@@ -88,6 +88,12 @@ func (s *Service) CreateOrder(currentUser *utils.AuthContext, req CreateOrderReq
 		if err := s.audit(tx, currentUser, "bakery_order.created", order.ID, "Bakery order created", ipAddress, userAgent); err != nil {
 			return err
 		}
+		// W3: no-tax documents are audit-flagged for VAT-filing review.
+		if order.TaxMode == charges.TaxModeNoTax {
+			if err := s.audit(tx, currentUser, "bakery_order.no_tax_applied", order.ID, "Bakery order created with the no-tax mode", ipAddress, userAgent); err != nil {
+				return err
+			}
+		}
 		orderID = order.ID
 		return nil
 	})
@@ -216,7 +222,7 @@ func (s *Service) UpdateOrder(currentUser *utils.AuthContext, id string, req Upd
 			return err
 		}
 		if req.Charges != nil {
-			if _, err := charges.ReplaceCharges(tx, currentUser.BusinessID, order.BranchID, "bakery_order", order.ID, req.Charges); err != nil {
+			if _, err := charges.ReplaceChargesWithMode(tx, currentUser.BusinessID, order.BranchID, "bakery_order", order.ID, req.Charges, order.TaxMode); err != nil {
 				return err
 			}
 			if err := s.recalculateOrderTotals(tx, currentUser.BusinessID, order.ID); err != nil {
@@ -463,7 +469,7 @@ func (s *Service) AddItem(currentUser *utils.AuthContext, orderID string, req Or
 		if !orderCanEdit(order.OrderStatus) {
 			return apperrors.BadRequest("items cannot be changed for this order status", nil)
 		}
-		item, err := s.buildOrderItem(tx, currentUser.BusinessID, order.BranchID, orderID, req)
+		item, err := s.buildOrderItem(tx, currentUser.BusinessID, order.BranchID, orderID, order.TaxMode, req)
 		if err != nil {
 			return err
 		}
@@ -496,7 +502,7 @@ func (s *Service) UpdateItem(currentUser *utils.AuthContext, orderID, itemID str
 		if _, err := s.repo.FindItemForUpdate(tx, currentUser.BusinessID, orderID, itemID); err != nil {
 			return notFound(err, "bakery order item not found")
 		}
-		item, err := s.buildOrderItem(tx, currentUser.BusinessID, order.BranchID, orderID, req)
+		item, err := s.buildOrderItem(tx, currentUser.BusinessID, order.BranchID, orderID, order.TaxMode, req)
 		if err != nil {
 			return err
 		}
@@ -1315,27 +1321,37 @@ func (s *Service) buildOrder(tx *gorm.DB, currentUser *utils.AuthContext, req Cr
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	// W3: resolve the document tax mode once; items and charges follow it.
+	taxMode := strings.TrimSpace(req.TaxMode)
+	if taxMode == "" {
+		taxMode = charges.DefaultTaxMode(tx, currentUser.BusinessID)
+	} else if !charges.ValidTaxMode(taxMode) {
+		return nil, nil, nil, apperrors.BadRequest("tax_mode must be inclusive, exclusive, or no_tax", nil)
+	}
+	if taxMode == charges.TaxModeNoTax && !hasPermissionKey(currentUser, "sales.no_tax.apply") {
+		return nil, nil, nil, apperrors.Forbidden("missing permission to apply the no-tax mode")
+	}
 	orderID := utils.NewUUID()
 	items := make([]BakeryOrderItem, 0, len(req.Items))
 	for _, itemReq := range req.Items {
-		item, err := s.buildOrderItem(tx, currentUser.BusinessID, req.BranchID, orderID, itemReq)
+		item, err := s.buildOrderItem(tx, currentUser.BusinessID, req.BranchID, orderID, taxMode, itemReq)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		items = append(items, *item)
 	}
 	subtotal, discount, tax, total := orderTotals(items)
-	chargeRows, chargeTotals, err := charges.BuildCharges(tx, currentUser.BusinessID, req.BranchID, "bakery_order", orderID, req.Charges)
+	chargeRows, chargeTotals, err := charges.BuildChargesWithMode(tx, currentUser.BusinessID, req.BranchID, "bakery_order", orderID, req.Charges, taxMode)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	tax = roundMoney(tax + chargeTotals.TaxAmount)
 	total = roundMoney(total + chargeTotals.Total)
-	order := &BakeryOrder{ID: orderID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, CustomerID: customerID, SalesChannelID: &salesChannel.ID, SalesChannelNameSnapshot: salesChannel.ChannelName, ExternalOrderNumber: externalOrderNumber, CustomerNameSnapshot: customerName, CustomerPhoneSnapshot: customerPhone, OrderType: orderType, OrderDate: dateOnly(time.Now().UTC()), EventDate: eventDate, PickupTime: strings.TrimSpace(req.PickupTime), DeliveryTime: strings.TrimSpace(req.DeliveryTime), DeliveryAddress: strings.TrimSpace(req.DeliveryAddr), SubtotalAmount: subtotal, DiscountAmount: discount, TaxAmount: tax, ChargeAmount: chargeTotals.Amount, ChargeTaxAmount: chargeTotals.TaxAmount, TotalAmount: total, PaidAmount: 0, BalanceAmount: total, PaymentStatus: "unpaid", OrderStatus: "new", Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}
+	order := &BakeryOrder{ID: orderID, BusinessID: currentUser.BusinessID, BranchID: req.BranchID, CustomerID: customerID, SalesChannelID: &salesChannel.ID, SalesChannelNameSnapshot: salesChannel.ChannelName, ExternalOrderNumber: externalOrderNumber, CustomerNameSnapshot: customerName, CustomerPhoneSnapshot: customerPhone, OrderType: orderType, OrderDate: dateOnly(time.Now().UTC()), EventDate: eventDate, PickupTime: strings.TrimSpace(req.PickupTime), DeliveryTime: strings.TrimSpace(req.DeliveryTime), DeliveryAddress: strings.TrimSpace(req.DeliveryAddr), SubtotalAmount: subtotal, DiscountAmount: discount, TaxAmount: tax, ChargeAmount: chargeTotals.Amount, ChargeTaxAmount: chargeTotals.TaxAmount, TotalAmount: total, TaxMode: taxMode, PaidAmount: 0, BalanceAmount: total, PaymentStatus: "unpaid", OrderStatus: "new", Notes: strings.TrimSpace(req.Notes), CreatedByUserID: currentUser.UserID, UpdatedByUserID: currentUser.UserID}
 	return order, items, chargeRows, nil
 }
 
-func (s *Service) buildOrderItem(tx *gorm.DB, businessID, branchID, orderID string, req OrderItemRequest) (*BakeryOrderItem, error) {
+func (s *Service) buildOrderItem(tx *gorm.DB, businessID, branchID, orderID, taxMode string, req OrderItemRequest) (*BakeryOrderItem, error) {
 	if err := validateUUID(req.UnitID, "unit_id"); err != nil {
 		return nil, err
 	}
@@ -1431,19 +1447,25 @@ func (s *Service) buildOrderItem(tx *gorm.DB, businessID, branchID, orderID stri
 	lineTotal := taxable
 	if tax != nil {
 		taxRateID = &tax.ID
-		if tax.IsInclusive {
-			taxAmount = roundMoney(taxable - (taxable / (1 + tax.RatePercentage/100)))
-			lineTotal = taxable
-		} else {
-			taxAmount = roundMoney(taxable * tax.RatePercentage / 100)
-			lineTotal = roundMoney(taxable + taxAmount)
-		}
+		// W3: the order's tax mode decides how the rate applies; the rate's
+		// own inclusive flag is only the legacy fallback.
+		taxAmount, lineTotal = charges.ResolveLineTax(taxable, tax.RatePercentage, tax.IsInclusive, taxMode)
 	}
 	customizations, err := normalizeJSON(req.CustomizationsJSON)
 	if err != nil {
 		return nil, err
 	}
 	return &BakeryOrderItem{ID: utils.NewUUID(), BusinessID: businessID, BakeryOrderID: orderID, ProductID: productID, ProductVariantID: productVariantID, ProductNameSnapshot: productName, ProductVariantNameSnapshot: variantName, ItemNameSnapshot: itemName, ItemSource: itemSource, Quantity: roundQuantity(req.Quantity), UnitID: req.UnitID, Weight: weight, Flavor: strings.TrimSpace(req.Flavor), DesignNotes: strings.TrimSpace(req.DesignNotes), MessageText: strings.TrimSpace(req.MessageText), CustomizationsJSON: customizations, UnitPrice: roundMoney(unitPrice), DiscountAmount: roundMoney(req.DiscountAmount), TaxRateID: taxRateID, TaxAmount: taxAmount, LineTotal: lineTotal}, nil
+}
+
+// hasPermissionKey checks the authenticated user's permission set (W3).
+func hasPermissionKey(currentUser *utils.AuthContext, key string) bool {
+	for _, permission := range currentUser.Permissions {
+		if permission == key {
+			return true
+		}
+	}
+	return false
 }
 
 func catalogItemUnitMatchesProduct(requestedUnitID, productUnitID string) bool {
@@ -1668,7 +1690,7 @@ func (s *Service) recalculateOrderTotals(tx *gorm.DB, businessID, orderID string
 }
 
 func (s *Service) orderResponse(businessID string, order BakeryOrder, includeDetails bool) BakeryOrderResponse {
-	response := BakeryOrderResponse{ID: order.ID, BusinessID: order.BusinessID, BranchID: order.BranchID, BranchName: s.repo.BranchName(businessID, order.BranchID), OrderNumber: order.OrderNumber, CustomerID: order.CustomerID, SalesChannelID: order.SalesChannelID, SalesChannelNameSnapshot: order.SalesChannelNameSnapshot, ExternalOrderNumber: order.ExternalOrderNumber, CustomerNameSnapshot: order.CustomerNameSnapshot, CustomerPhoneSnapshot: order.CustomerPhoneSnapshot, OrderType: order.OrderType, OrderDate: order.OrderDate, EventDate: order.EventDate, PickupTime: order.PickupTime, DeliveryTime: order.DeliveryTime, DeliveryAddress: order.DeliveryAddress, SubtotalAmount: roundMoney(order.SubtotalAmount), DiscountAmount: roundMoney(order.DiscountAmount), TaxAmount: roundMoney(order.TaxAmount), ChargeAmount: roundMoney(order.ChargeAmount), ChargeTaxAmount: roundMoney(order.ChargeTaxAmount), TotalAmount: roundMoney(order.TotalAmount), PaidAmount: roundMoney(order.PaidAmount), BalanceAmount: roundMoney(order.BalanceAmount), RefundedAmount: roundMoney(order.RefundedAmount), PaymentStatus: order.PaymentStatus, OrderStatus: order.OrderStatus, AccountingJournalEntryID: order.AccountingJournalEntryID, Notes: order.Notes, CreatedByUserID: order.CreatedByUserID, CreatedByUserName: s.repo.UserName(order.CreatedByUserID), CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt}
+	response := BakeryOrderResponse{ID: order.ID, BusinessID: order.BusinessID, BranchID: order.BranchID, BranchName: s.repo.BranchName(businessID, order.BranchID), OrderNumber: order.OrderNumber, CustomerID: order.CustomerID, SalesChannelID: order.SalesChannelID, SalesChannelNameSnapshot: order.SalesChannelNameSnapshot, ExternalOrderNumber: order.ExternalOrderNumber, CustomerNameSnapshot: order.CustomerNameSnapshot, CustomerPhoneSnapshot: order.CustomerPhoneSnapshot, OrderType: order.OrderType, OrderDate: order.OrderDate, EventDate: order.EventDate, PickupTime: order.PickupTime, DeliveryTime: order.DeliveryTime, DeliveryAddress: order.DeliveryAddress, SubtotalAmount: roundMoney(order.SubtotalAmount), DiscountAmount: roundMoney(order.DiscountAmount), TaxAmount: roundMoney(order.TaxAmount), ChargeAmount: roundMoney(order.ChargeAmount), ChargeTaxAmount: roundMoney(order.ChargeTaxAmount), TotalAmount: roundMoney(order.TotalAmount), TaxMode: order.TaxMode, PaidAmount: roundMoney(order.PaidAmount), BalanceAmount: roundMoney(order.BalanceAmount), RefundedAmount: roundMoney(order.RefundedAmount), PaymentStatus: order.PaymentStatus, OrderStatus: order.OrderStatus, AccountingJournalEntryID: order.AccountingJournalEntryID, Notes: order.Notes, CreatedByUserID: order.CreatedByUserID, CreatedByUserName: s.repo.UserName(order.CreatedByUserID), CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt}
 	if includeDetails {
 		items, _ := s.repo.Items(businessID, order.ID)
 		response.Items = s.itemResponses(businessID, items)

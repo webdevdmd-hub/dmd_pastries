@@ -66,6 +66,7 @@ export const createOrderSchema = z.object({
   items: z.array(orderItemSchema).min(1, "At least one order item is required."),
   charges: documentChargesSchema,
   notes: nullableTrimmedString,
+  taxMode: z.enum(["inclusive", "exclusive", "no_tax"]).nullable().optional(),
 });
 
 export const updateOrderSchema = createOrderSchema.partial();
