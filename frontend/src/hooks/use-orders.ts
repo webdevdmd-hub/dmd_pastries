@@ -20,6 +20,7 @@ import {
   getOrders,
   getOrderSummary,
   previewOrder,
+  refundOrderPayment,
   updateOrder,
   updateOrderItem,
   updateOrderProductionStatus,
@@ -42,6 +43,7 @@ import type {
   CreateOrderItemPayload,
   CreateOrderItemProductionPayload,
   CreateOrderPayload,
+  RefundOrderPaymentPayload,
   UpdateOrderItemPayload,
   UpdateOrderPayload,
   UpdateOrderProductionStatusPayload,
@@ -257,6 +259,17 @@ export function useAddOrderPayment() {
 
   return useMutation<BakeryOrder, Error, { orderId: string; payload: AddOrderPaymentPayload }>({
     mutationFn: async ({ orderId, payload }) => addOrderPayment(orderId, payload),
+    onSuccess: async () => {
+      await invalidateOrders(queryClient);
+    },
+  });
+}
+
+export function useRefundOrderPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation<BakeryOrder, Error, { orderId: string; payload: RefundOrderPaymentPayload }>({
+    mutationFn: async ({ orderId, payload }) => refundOrderPayment(orderId, payload),
     onSuccess: async () => {
       await invalidateOrders(queryClient);
     },

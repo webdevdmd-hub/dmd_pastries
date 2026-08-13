@@ -82,6 +82,13 @@ type AddPaymentRequest struct {
 	PaymentType     string  `json:"payment_type"`
 }
 
+type RefundPaymentRequest struct {
+	PaymentMethodID string  `json:"payment_method_id"`
+	Amount          float64 `json:"amount"`
+	Reason          string  `json:"reason"`
+	ReferenceNumber string  `json:"reference_number"`
+}
+
 type AssignProductionRequest struct {
 	ProductionBatchID string `json:"production_batch_id"`
 }
@@ -183,6 +190,7 @@ type BakeryOrderResponse struct {
 	TotalAmount              float64                         `json:"total_amount"`
 	PaidAmount               float64                         `json:"paid_amount"`
 	BalanceAmount            float64                         `json:"balance_amount"`
+	RefundedAmount           float64                         `json:"refunded_amount"`
 	PaymentStatus            string                          `json:"payment_status"`
 	OrderStatus              string                          `json:"order_status"`
 	AccountingJournalEntryID *string                         `json:"accounting_journal_entry_id"`

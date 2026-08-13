@@ -43,6 +43,7 @@ export type BakeryOrder = {
   totalAmount: number;
   paidAmount: number;
   balanceAmount: number;
+  refundedAmount: number;
   paymentStatus: OrderPaymentStatus;
   orderStatus: OrderStatus;
   notes: string | null;
@@ -175,6 +176,13 @@ export type AddOrderPaymentPayload = {
   paymentMethodId: string;
   amount: number;
   paymentType: OrderPaymentType;
+  referenceNumber: string | null;
+};
+
+export type RefundOrderPaymentPayload = {
+  paymentMethodId: string;
+  amount: number;
+  reason: string;
   referenceNumber: string | null;
 };
 

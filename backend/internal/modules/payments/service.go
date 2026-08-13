@@ -250,7 +250,7 @@ func (s *Service) RefundPayment(currentUser *utils.AuthContext, paymentID string
 		ID:                        utils.NewUUID(),
 		BusinessID:                currentUser.BusinessID,
 		BranchID:                  payment.BranchID,
-		SaleID:                    payment.SaleID,
+		SaleID:                    &payment.SaleID,
 		SalePaymentID:             &payment.ID,
 		RefundSource:              "payment_adjustment",
 		RefundNumber:              refundNumber,

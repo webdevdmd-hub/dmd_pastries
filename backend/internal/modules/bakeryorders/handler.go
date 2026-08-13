@@ -156,6 +156,18 @@ func (h *Handler) AddPayment(c *gin.Context) {
 	respondCreated(c, "bakery order payment added successfully", result, err)
 }
 
+func (h *Handler) RefundPayment(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	var req RefundPaymentRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	result, err := h.service.RefundPayment(utils.MustAuthContext(c), c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
+	respondCreated(c, "bakery order payment refunded successfully", result, err)
+}
+
 func (h *Handler) AssignProduction(c *gin.Context) {
 	if !validParam(c, "id") {
 		return

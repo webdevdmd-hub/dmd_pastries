@@ -247,6 +247,17 @@ func (s *Service) UpdateStatus(currentUser *utils.AuthContext, id string, req Up
 		if !allowedStatusTransition(order.OrderStatus, status) {
 			return apperrors.BadRequest("invalid order status transition", map[string]string{"from": order.OrderStatus, "to": status})
 		}
+		// Phase 4 / W6 cancellation guards: money must never be stranded.
+		// A not-yet-completed order keeps its deposits in Customer Advance,
+		// so they must be refunded (or converted to store credit) first. A
+		// completed order that already took post-completion refunds cannot
+		// be cancelled — its revenue journal is partially reversed through
+		// sales-returns allowances and a mirror would double-reverse it.
+		if status == "cancelled" && order.OrderStatus != "cancelled" {
+			if reason, ok := bakeryOrderCancellationBlocked(order.OrderStatus, order.PaidAmount, order.RefundedAmount); !ok {
+				return apperrors.BadRequest(reason, map[string]interface{}{"paid_amount": roundMoney(order.PaidAmount), "refunded_amount": roundMoney(order.RefundedAmount)})
+			}
+		}
 		if err := s.repo.UpdateOrder(tx, id, currentUser.BusinessID, map[string]interface{}{"order_status": status, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}); err != nil {
 			return err
 		}
@@ -271,6 +282,12 @@ func (s *Service) UpdateStatus(currentUser *utils.AuthContext, id string, req Up
 			}
 			if s.accountingService != nil {
 				if _, err := s.accountingService.ReverseBakeryOrderCOGSJournal(tx, currentUser, id); err != nil {
+					return err
+				}
+				// Phase 4 / W6: the revenue reversal returns the paid money
+				// to Customer Advance, where the advance-refund flow can pay
+				// it back to the customer.
+				if _, err := s.accountingService.ReverseBakeryOrderRevenueJournal(tx, currentUser, id); err != nil {
 					return err
 				}
 			}
@@ -810,6 +827,142 @@ func (s *Service) AddPayment(currentUser *utils.AuthContext, orderID string, req
 			Metadata:    audit.Metadata(metadata, nil),
 			IPAddress:   ipAddress,
 			UserAgent:   userAgent,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetOrder(currentUser, orderID)
+}
+
+// RefundPayment returns bakery-order money to the customer (Phase 4 / W6).
+// On a not-yet-completed (or cancelled) order this is an ADVANCE refund:
+// Dr Customer Advance / Cr payment account, decrementing paid_amount. On a
+// completed order it is a POST-COMPLETION refund routed through the unified
+// refund builder (sales-returns allowance + proportional VAT/charge
+// reversal), capped at the collected amount and tracked in refunded_amount.
+func (s *Service) RefundPayment(currentUser *utils.AuthContext, orderID string, req RefundPaymentRequest, ipAddress, userAgent string) (*BakeryOrderResponse, error) {
+	if err := validateUUID(req.PaymentMethodID, "payment_method_id"); err != nil {
+		return nil, err
+	}
+	if req.Amount <= 0 {
+		return nil, apperrors.BadRequest("amount must be greater than zero", nil)
+	}
+	if strings.TrimSpace(req.Reason) == "" {
+		return nil, apperrors.BadRequest("reason is required", nil)
+	}
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		order, err := s.repo.FindOrderForUpdate(tx, orderID, currentUser.BusinessID)
+		if err != nil {
+			return notFound(err, "bakery order not found")
+		}
+		if err := currentUser.EnsureRecordBranch(order.BranchID); err != nil {
+			return err
+		}
+		method, err := s.repo.PaymentMethod(tx, currentUser.BusinessID, req.PaymentMethodID)
+		if err != nil {
+			return notFound(err, "payment method not found")
+		}
+		if method.RequiresReference && strings.TrimSpace(req.ReferenceNumber) == "" {
+			return apperrors.BadRequest("reference_number is required for this payment method", nil)
+		}
+		refundAmount := roundMoney(req.Amount)
+		completed := order.OrderStatus == "completed"
+		refundable := roundMoney(order.PaidAmount)
+		if completed {
+			refundable = roundMoney(order.PaidAmount - order.RefundedAmount)
+		}
+		if refundAmount > refundable {
+			return apperrors.BadRequest("refund amount cannot exceed the refundable amount", map[string]float64{"refundable_amount": refundable})
+		}
+		if s.accountingService == nil {
+			return apperrors.Internal("refund accounting service is not configured")
+		}
+		now := time.Now().UTC()
+		refundNumber, err := s.repo.GeneratePaymentRefundNumber(tx, currentUser.BusinessID, now)
+		if err != nil {
+			return apperrors.Internal("failed to generate refund number")
+		}
+		refundID := utils.NewUUID()
+		if err := s.repo.CreatePaymentRefund(tx, map[string]interface{}{
+			"id":                           refundID,
+			"business_id":                  currentUser.BusinessID,
+			"branch_id":                    order.BranchID,
+			"bakery_order_id":              order.ID,
+			"refund_source":                "bakery_order",
+			"refund_number":                refundNumber,
+			"payment_method_id":            method.ID,
+			"payment_method_name_snapshot": method.MethodName,
+			"refund_amount":                refundAmount,
+			"refund_reason":                strings.TrimSpace(req.Reason),
+			"refund_status":                "completed",
+			"created_by_user_id":           currentUser.UserID,
+			"refunded_at":                  now,
+			"created_at":                   now,
+			"updated_at":                   now,
+		}); err != nil {
+			return apperrors.Internal("failed to create bakery order refund")
+		}
+		// The journal must post before refunded_amount moves: the completed-
+		// order path prorates its VAT/charge slices cumulatively from the
+		// PRE-refund refunded_amount.
+		if completed {
+			if _, err := s.accountingService.PostBakeryOrderRefundJournal(tx, currentUser, refundID); err != nil {
+				return err
+			}
+		} else {
+			if _, err := s.accountingService.PostBakeryOrderAdvanceRefundJournal(tx, currentUser, refundID); err != nil {
+				return err
+			}
+		}
+		updates := map[string]interface{}{"updated_by_user_id": currentUser.UserID, "updated_at": now}
+		if completed {
+			refunded := roundMoney(order.RefundedAmount + refundAmount)
+			updates["refunded_amount"] = refunded
+			if refunded >= roundMoney(order.PaidAmount) {
+				updates["payment_status"] = "refunded"
+			}
+		} else {
+			paid := roundMoney(order.PaidAmount - refundAmount)
+			if paid < 0 {
+				paid = 0
+			}
+			updates["paid_amount"] = paid
+			if order.OrderStatus == "cancelled" {
+				// A cancelled order's balance is not owed; only track what
+				// is still held for the customer.
+				if paid <= 0 {
+					updates["payment_status"] = "refunded"
+				} else {
+					updates["payment_status"] = "partial"
+				}
+			} else {
+				updates["balance_amount"] = roundMoney(order.TotalAmount - paid)
+				updates["payment_status"] = paymentStatus(order.TotalAmount, paid)
+			}
+		}
+		if err := s.repo.UpdateOrder(tx, orderID, currentUser.BusinessID, updates); err != nil {
+			return err
+		}
+		return s.auditRepo.CreateActivity(tx, audit.ActivityInput{
+			BusinessID:  currentUser.BusinessID,
+			ActorUserID: currentUser.UserID,
+			EventType:   "bakery_order.payment_refunded",
+			EntityType:  "payment_refund",
+			EntityID:    refundID,
+			Summary:     "Bakery order payment refunded",
+			Metadata: audit.Metadata(map[string]interface{}{
+				"source_module":       "bakery_orders",
+				"bakery_order_id":     order.ID,
+				"order_number":        order.OrderNumber,
+				"refund_number":       refundNumber,
+				"refund_amount":       refundAmount,
+				"payment_method_name": method.MethodName,
+				"reason":              strings.TrimSpace(req.Reason),
+				"post_completion":     completed,
+			}, nil),
+			IPAddress: ipAddress,
+			UserAgent: userAgent,
 		})
 	})
 	if err != nil {
@@ -1448,7 +1601,7 @@ func (s *Service) recalculateOrderTotals(tx *gorm.DB, businessID, orderID string
 }
 
 func (s *Service) orderResponse(businessID string, order BakeryOrder, includeDetails bool) BakeryOrderResponse {
-	response := BakeryOrderResponse{ID: order.ID, BusinessID: order.BusinessID, BranchID: order.BranchID, BranchName: s.repo.BranchName(businessID, order.BranchID), OrderNumber: order.OrderNumber, CustomerID: order.CustomerID, SalesChannelID: order.SalesChannelID, SalesChannelNameSnapshot: order.SalesChannelNameSnapshot, ExternalOrderNumber: order.ExternalOrderNumber, CustomerNameSnapshot: order.CustomerNameSnapshot, CustomerPhoneSnapshot: order.CustomerPhoneSnapshot, OrderType: order.OrderType, OrderDate: order.OrderDate, EventDate: order.EventDate, PickupTime: order.PickupTime, DeliveryTime: order.DeliveryTime, DeliveryAddress: order.DeliveryAddress, SubtotalAmount: roundMoney(order.SubtotalAmount), DiscountAmount: roundMoney(order.DiscountAmount), TaxAmount: roundMoney(order.TaxAmount), ChargeAmount: roundMoney(order.ChargeAmount), ChargeTaxAmount: roundMoney(order.ChargeTaxAmount), TotalAmount: roundMoney(order.TotalAmount), PaidAmount: roundMoney(order.PaidAmount), BalanceAmount: roundMoney(order.BalanceAmount), PaymentStatus: order.PaymentStatus, OrderStatus: order.OrderStatus, AccountingJournalEntryID: order.AccountingJournalEntryID, Notes: order.Notes, CreatedByUserID: order.CreatedByUserID, CreatedByUserName: s.repo.UserName(order.CreatedByUserID), CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt}
+	response := BakeryOrderResponse{ID: order.ID, BusinessID: order.BusinessID, BranchID: order.BranchID, BranchName: s.repo.BranchName(businessID, order.BranchID), OrderNumber: order.OrderNumber, CustomerID: order.CustomerID, SalesChannelID: order.SalesChannelID, SalesChannelNameSnapshot: order.SalesChannelNameSnapshot, ExternalOrderNumber: order.ExternalOrderNumber, CustomerNameSnapshot: order.CustomerNameSnapshot, CustomerPhoneSnapshot: order.CustomerPhoneSnapshot, OrderType: order.OrderType, OrderDate: order.OrderDate, EventDate: order.EventDate, PickupTime: order.PickupTime, DeliveryTime: order.DeliveryTime, DeliveryAddress: order.DeliveryAddress, SubtotalAmount: roundMoney(order.SubtotalAmount), DiscountAmount: roundMoney(order.DiscountAmount), TaxAmount: roundMoney(order.TaxAmount), ChargeAmount: roundMoney(order.ChargeAmount), ChargeTaxAmount: roundMoney(order.ChargeTaxAmount), TotalAmount: roundMoney(order.TotalAmount), PaidAmount: roundMoney(order.PaidAmount), BalanceAmount: roundMoney(order.BalanceAmount), RefundedAmount: roundMoney(order.RefundedAmount), PaymentStatus: order.PaymentStatus, OrderStatus: order.OrderStatus, AccountingJournalEntryID: order.AccountingJournalEntryID, Notes: order.Notes, CreatedByUserID: order.CreatedByUserID, CreatedByUserName: s.repo.UserName(order.CreatedByUserID), CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt}
 	if includeDetails {
 		items, _ := s.repo.Items(businessID, order.ID)
 		response.Items = s.itemResponses(businessID, items)
@@ -1745,6 +1898,27 @@ func validCatalogStatus(value string) bool {
 
 func validProductionStatus(value string) bool {
 	return value == "pending" || value == "assigned" || value == "in_progress" || value == "completed"
+}
+
+// bakeryOrderCancellationBlocked is the W6 cancellation guard. It returns a
+// user-facing reason when an order must not be cancelled yet:
+//   - a not-yet-completed order still holding paid advances (refund or
+//     convert to store credit first, so Customer Advance never strands), or
+//   - a completed order with post-completion refunds (its revenue is already
+//     partially reversed through sales-returns allowances; a mirror reversal
+//     would double-reverse it).
+func bakeryOrderCancellationBlocked(orderStatus string, paidAmount, refundedAmount float64) (string, bool) {
+	const epsilon = 0.005
+	if orderStatus == "completed" {
+		if refundedAmount > epsilon {
+			return "this order has post-completion refunds; refund the remaining amount instead of cancelling", false
+		}
+		return "", true
+	}
+	if paidAmount > epsilon {
+		return "refund the order's advance payments (or convert them to store credit) before cancelling", false
+	}
+	return "", true
 }
 
 func allowedStatusTransition(from, to string) bool {

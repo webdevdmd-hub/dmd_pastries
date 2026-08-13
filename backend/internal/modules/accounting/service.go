@@ -1327,6 +1327,130 @@ func (s *Service) PostPOSPaymentRefundJournal(tx *gorm.DB, currentUser *utils.Au
 	return journalID, nil
 }
 
+// PostPOSSaleRefundJournal posts ONE unified journal for a POS refund event
+// (Phase 4 / W6): the refund's proportional VAT and charge slices reverse,
+// outstanding receivable is restored before any cash leaves, and the cash
+// side credits each allocated tender's payment account.
+//
+//	Dr Sales Returns (net) + Dr charge refunds + Dr VAT Payable (tax slice)
+//	  / Cr Accounts Receivable (uncollected slice) + Cr payment accounts (allocated cash)
+//
+// The event is the sale_refunds header; its payment_refunds allocation rows
+// (linked by sale_refund_id) carry no per-row journals — they are all stamped
+// with this journal. The legacy per-row PostPOSPaymentRefundJournal remains
+// only for backfilling pre-W6 refunds.
+func (s *Service) PostPOSSaleRefundJournal(tx *gorm.DB, currentUser *utils.AuthContext, saleRefundID string) (string, error) {
+	refund, err := s.repo.FindSaleRefundForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(saleRefundID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load sale refund for accounting")
+	}
+	existing, err := s.repo.FindPostedJournalBySource(tx, currentUser.BusinessID, "pos_sale_refund", refund.ID)
+	if err == nil && existing.ID != "" {
+		return existing.ID, nil
+	}
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return "", apperrors.Internal("failed to validate existing sale refund journal")
+	}
+	refundAmount := roundMoney(refund.RefundAmount)
+	if refundAmount <= 0 {
+		return "", apperrors.BadRequest("refund must have a positive amount before accounting can be posted", map[string]interface{}{"sale_refund_id": refund.ID})
+	}
+
+	allocations, err := s.repo.ListPaymentRefundsForSaleRefund(tx, currentUser.BusinessID, refund.ID)
+	if err != nil {
+		return "", apperrors.Internal("failed to load refund allocations for accounting")
+	}
+	cashCredits := make([]refundCashCredit, 0, len(allocations))
+	cashTotal := 0.0
+	for _, allocation := range allocations {
+		if allocation.RefundStatus != "completed" || allocation.RefundAmount <= 0 {
+			continue
+		}
+		if allocation.DefaultPaymentAccountID == nil || strings.TrimSpace(allocation.ChartAccountID) == "" {
+			return "", apperrors.BadRequest("refund payment method is not linked to an active payment account", map[string]interface{}{"payment_method": allocation.PaymentMethodNameSnapshot})
+		}
+		if err := validatePaymentAccountBranch(allocation.PaymentAccountBranchID, allocation.BranchID, allocation.PaymentAccountName); err != nil {
+			return "", err
+		}
+		amount := roundMoney(allocation.RefundAmount)
+		cashCredits = append(cashCredits, refundCashCredit{AccountID: allocation.ChartAccountID, Amount: amount, Description: "POS refund via " + allocation.PaymentMethodNameSnapshot})
+		cashTotal = roundMoney(cashTotal + amount)
+	}
+	arSlice := roundMoney(refundAmount - cashTotal)
+	if arSlice < -systemBalanceEpsilon {
+		return "", apperrors.Internal("refund allocations exceed the refund amount")
+	}
+	if arSlice < 0 {
+		arSlice = 0
+	}
+
+	refundedBefore, err := s.repo.SumSaleRefundsExcluding(tx, currentUser.BusinessID, refund.SaleID, refund.ID)
+	if err != nil {
+		return "", apperrors.Internal("failed to total prior refunds for accounting")
+	}
+	charges, err := s.chargeNetAmounts(tx, currentUser.BusinessID, "pos_sale", refund.SaleID)
+	if err != nil {
+		return "", err
+	}
+	taxSlice, chargeSlices, netSlice, err := prorateRefundSlices(refundAmount, refundedBefore, roundMoney(refund.SaleTotalAmount), roundMoney(refund.SaleTaxAmount), charges)
+	if err != nil {
+		return "", apperrors.BadRequest("failed to prorate refund slices: "+err.Error(), map[string]interface{}{"sale_refund_id": refund.ID})
+	}
+
+	salesReturnsAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, refund.BranchID, "sales_returns", "4040", "Sales Returns and Allowances")
+	if err != nil {
+		return "", err
+	}
+	chargeAccountID := ""
+	if len(chargeSlices) > 0 {
+		chargeAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, refund.BranchID, "charge_refund_account", "4080", "Delivery Charge Returns")
+		if err != nil {
+			return "", err
+		}
+		chargeAccountID = chargeAccount.ID
+	}
+	vatAccountID := ""
+	if taxSlice > 0 {
+		vatPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, refund.BranchID, "vat_payable", "2100", "VAT Payable")
+		if err != nil {
+			return "", err
+		}
+		vatAccountID = vatPayable.ID
+	}
+	arAccountID := ""
+	if arSlice > 0 {
+		arAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, refund.BranchID, "accounts_receivable", "1100", "Accounts Receivable")
+		if err != nil {
+			return "", err
+		}
+		arAccountID = arAccount.ID
+	}
+
+	lines, err := buildRefundJournalLines(refundJournalInput{
+		ReferenceNumber:       refund.RefundNumber,
+		SalesReturnsAccountID: salesReturnsAccount.ID,
+		NetAmount:             netSlice,
+		ChargeAccountID:       chargeAccountID,
+		ChargeSlices:          chargeSlices,
+		VATAccountID:          vatAccountID,
+		TaxSlice:              taxSlice,
+		ARAccountID:           arAccountID,
+		ARSlice:               arSlice,
+		CashCredits:           cashCredits,
+	})
+	if err != nil {
+		return "", err
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, refund.CreatedAt, refund.BranchID, "pos_sale_refund", refund.ID, refund.RefundNumber, "POS refund "+refund.RefundNumber+" for sale "+refund.SaleNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdatePaymentRefundJournalIDsBySaleRefund(tx, currentUser.BusinessID, refund.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to link refund allocations to the refund journal")
+	}
+	return journalID, nil
+}
+
 func (s *Service) PostSalesReturnInventoryJournal(tx *gorm.DB, currentUser *utils.AuthContext, salesReturnID string) (string, error) {
 	salesReturn, err := s.repo.FindSalesReturnForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(salesReturnID))
 	if err != nil {
@@ -1694,6 +1818,225 @@ func (s *Service) ReverseBakeryOrderCOGSJournal(tx *gorm.DB, currentUser *utils.
 	return reversalID, nil
 }
 
+// ReverseBakeryOrderRevenueJournal reverses a completed bakery order's
+// revenue journal on cancellation (Phase 4 / W6). The income side is a mirror
+// of the original credits, but the counterparty side is rebuilt from the
+// order's CURRENT paid/outstanding split, because payments recorded after
+// completion have already settled part of the receivable — a blind mirror
+// would over-credit AR and strand the settled cash. The paid money lands back
+// in Customer Advance, where the advance-refund flow can return it.
+func (s *Service) ReverseBakeryOrderRevenueJournal(tx *gorm.DB, currentUser *utils.AuthContext, orderID string) (string, error) {
+	order, err := s.repo.FindBakeryOrderForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(orderID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load bakery order for revenue reversal")
+	}
+	if order.RevenueReversalJournalID != nil && strings.TrimSpace(*order.RevenueReversalJournalID) != "" {
+		return strings.TrimSpace(*order.RevenueReversalJournalID), nil
+	}
+	if order.AccountingJournalEntryID == nil || strings.TrimSpace(*order.AccountingJournalEntryID) == "" {
+		return "", nil
+	}
+	entry, err := s.repo.FindJournalEntryForUpdate(tx, currentUser.BusinessID, strings.TrimSpace(*order.AccountingJournalEntryID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load bakery order revenue journal")
+	}
+	if entry.Status == "reversed" {
+		return "", nil
+	}
+	if entry.Status != "posted" {
+		return "", apperrors.BadRequest("only posted revenue journals can be reversed", nil)
+	}
+	originalLines, err := s.repo.ListJournalEntryLinesForUpdate(tx, currentUser.BusinessID, entry.ID)
+	if err != nil {
+		return "", apperrors.Internal("failed to load bakery order revenue journal lines")
+	}
+	advanceAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, order.BranchID, "customer_advance", "2200", "Customer Advance")
+	if err != nil {
+		return "", err
+	}
+	arAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, order.BranchID, "accounts_receivable", "1100", "Accounts Receivable")
+	if err != nil {
+		return "", err
+	}
+	lineRequests, err := buildBakeryOrderRevenueReversalLines(originalLines, advanceAccount.ID, arAccount.ID, order.PaidAmount, order.BalanceAmount)
+	if err != nil {
+		return "", err
+	}
+
+	reversalEntryNumber, err := s.repo.NextJournalEntryNumber(tx, currentUser.BusinessID, time.Now().UTC())
+	if err != nil {
+		return "", apperrors.Internal("failed to generate reversal journal entry number")
+	}
+	reversalID := utils.NewUUID()
+	now := time.Now().UTC()
+	totalDebit, totalCredit := 0.0, 0.0
+	reversalLines := make([]JournalEntryLine, 0, len(lineRequests))
+	for i, request := range lineRequests {
+		branchID := order.BranchID
+		reversalLines = append(reversalLines, JournalEntryLine{
+			ID:             utils.NewUUID(),
+			BusinessID:     currentUser.BusinessID,
+			BranchID:       &branchID,
+			JournalEntryID: reversalID,
+			AccountID:      request.AccountID,
+			LineNumber:     i + 1,
+			DebitAmount:    roundMoney(request.DebitAmount),
+			CreditAmount:   roundMoney(request.CreditAmount),
+			Description:    request.Description,
+		})
+		totalDebit = roundMoney(totalDebit + request.DebitAmount)
+		totalCredit = roundMoney(totalCredit + request.CreditAmount)
+	}
+	branchID := order.BranchID
+	reversal := &JournalEntry{
+		ID:              reversalID,
+		BusinessID:      currentUser.BusinessID,
+		BranchID:        &branchID,
+		EntryNumber:     reversalEntryNumber,
+		EntryDate:       now,
+		ReferenceNumber: order.OrderNumber,
+		SourceType:      "bakery_order_revenue_reversal",
+		SourceID:        &order.ID,
+		Narration:       "Bakery order cancelled: revenue reversal " + order.OrderNumber,
+		Status:          "posted",
+		TotalDebit:      totalDebit,
+		TotalCredit:     totalCredit,
+		PostedAt:        &now,
+		PostedByUserID:  &currentUser.UserID,
+		ReversedEntryID: &entry.ID,
+		CreatedByUserID: currentUser.UserID,
+		UpdatedByUserID: &currentUser.UserID,
+	}
+	if err := s.repo.CreateJournalEntry(tx, reversal, reversalLines); err != nil {
+		return "", apperrors.Internal("failed to create bakery order revenue reversal journal")
+	}
+	if err := s.repo.UpdateJournalEntry(tx, currentUser.BusinessID, entry.ID, map[string]interface{}{"status": "reversed", "reversed_at": now, "reversed_by_user_id": currentUser.UserID, "updated_by_user_id": currentUser.UserID, "updated_at": now}); err != nil {
+		return "", apperrors.Internal("failed to mark bakery order revenue journal reversed")
+	}
+	if err := s.repo.UpdateBakeryOrderRevenueReversalJournalID(tx, currentUser.BusinessID, order.ID, reversalID); err != nil {
+		return "", apperrors.Internal("failed to update bakery order revenue reversal journal")
+	}
+	return reversalID, nil
+}
+
+// PostBakeryOrderAdvanceRefundJournal returns customer-advance money for a
+// not-yet-completed (or cancelled) bakery order (Phase 4 / W6):
+//
+//	Dr Customer Advance 2200 / Cr payment account
+func (s *Service) PostBakeryOrderAdvanceRefundJournal(tx *gorm.DB, currentUser *utils.AuthContext, paymentRefundID string) (string, error) {
+	refund, err := s.repo.FindBakeryPaymentRefundForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(paymentRefundID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load bakery order refund for accounting")
+	}
+	if refund.JournalEntryID != nil && strings.TrimSpace(*refund.JournalEntryID) != "" {
+		return strings.TrimSpace(*refund.JournalEntryID), nil
+	}
+	refundAmount := roundMoney(refund.RefundAmount)
+	if refundAmount <= 0 {
+		return "", apperrors.BadRequest("completed refund must have a positive amount before accounting can be posted", map[string]interface{}{"payment_refund_id": refund.ID})
+	}
+	if refund.DefaultPaymentAccountID == nil || strings.TrimSpace(refund.ChartAccountID) == "" {
+		return "", apperrors.BadRequest("refund payment method is not linked to an active payment account", map[string]interface{}{"payment_method": refund.PaymentMethodNameSnapshot})
+	}
+	if err := validatePaymentAccountBranch(refund.PaymentAccountBranchID, refund.BranchID, refund.PaymentAccountName); err != nil {
+		return "", err
+	}
+	advanceAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, refund.BranchID, "customer_advance", "2200", "Customer Advance")
+	if err != nil {
+		return "", err
+	}
+	lines := []JournalEntryLineRequest{
+		{AccountID: advanceAccount.ID, DebitAmount: refundAmount, Description: "Customer advance refunded " + refund.RefundNumber},
+		{AccountID: refund.ChartAccountID, CreditAmount: refundAmount, Description: "Advance refund via " + refund.PaymentMethodNameSnapshot},
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, refund.RefundedAt, refund.BranchID, "bakery_order_advance_refund", refund.ID, refund.RefundNumber, "Bakery order advance refund "+refund.RefundNumber+" for "+refund.OrderNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdatePOSPaymentRefundJournalID(tx, currentUser.BusinessID, refund.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update bakery order refund accounting journal")
+	}
+	return journalID, nil
+}
+
+// PostBakeryOrderRefundJournal posts a refund on a COMPLETED bakery order
+// through the unified refund builder (Phase 4 / W6): revenue stands as a
+// sales-returns allowance while the refund's proportional VAT and charge
+// slices reverse. Capped at collected money by the caller, so no AR slice.
+func (s *Service) PostBakeryOrderRefundJournal(tx *gorm.DB, currentUser *utils.AuthContext, paymentRefundID string) (string, error) {
+	refund, err := s.repo.FindBakeryPaymentRefundForAccounting(tx, currentUser.BusinessID, strings.TrimSpace(paymentRefundID))
+	if err != nil {
+		return "", apperrors.Internal("failed to load bakery order refund for accounting")
+	}
+	if refund.JournalEntryID != nil && strings.TrimSpace(*refund.JournalEntryID) != "" {
+		return strings.TrimSpace(*refund.JournalEntryID), nil
+	}
+	if refund.OrderStatus != "completed" {
+		return "", apperrors.BadRequest("post-completion refunds require a completed order", map[string]interface{}{"order_status": refund.OrderStatus})
+	}
+	refundAmount := roundMoney(refund.RefundAmount)
+	if refundAmount <= 0 {
+		return "", apperrors.BadRequest("completed refund must have a positive amount before accounting can be posted", map[string]interface{}{"payment_refund_id": refund.ID})
+	}
+	if refund.DefaultPaymentAccountID == nil || strings.TrimSpace(refund.ChartAccountID) == "" {
+		return "", apperrors.BadRequest("refund payment method is not linked to an active payment account", map[string]interface{}{"payment_method": refund.PaymentMethodNameSnapshot})
+	}
+	if err := validatePaymentAccountBranch(refund.PaymentAccountBranchID, refund.BranchID, refund.PaymentAccountName); err != nil {
+		return "", err
+	}
+	charges, err := s.chargeNetAmounts(tx, currentUser.BusinessID, "bakery_order", refund.BakeryOrderID)
+	if err != nil {
+		return "", err
+	}
+	// OrderRefundedAmount is read before the caller increments it, so it is
+	// the cumulative refunded-before for the proration.
+	taxSlice, chargeSlices, netSlice, err := prorateRefundSlices(refundAmount, roundMoney(refund.OrderRefundedAmount), roundMoney(refund.OrderTotalAmount), roundMoney(refund.OrderTaxAmount), charges)
+	if err != nil {
+		return "", apperrors.BadRequest("failed to prorate refund slices: "+err.Error(), map[string]interface{}{"payment_refund_id": refund.ID})
+	}
+	salesReturnsAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, refund.BranchID, "sales_returns", "4040", "Sales Returns and Allowances")
+	if err != nil {
+		return "", err
+	}
+	chargeAccountID := ""
+	if len(chargeSlices) > 0 {
+		chargeAccount, err := s.requiredMappedAccount(tx, currentUser.BusinessID, refund.BranchID, "charge_refund_account", "4080", "Delivery Charge Returns")
+		if err != nil {
+			return "", err
+		}
+		chargeAccountID = chargeAccount.ID
+	}
+	vatAccountID := ""
+	if taxSlice > 0 {
+		vatPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, refund.BranchID, "vat_payable", "2100", "VAT Payable")
+		if err != nil {
+			return "", err
+		}
+		vatAccountID = vatPayable.ID
+	}
+	lines, err := buildRefundJournalLines(refundJournalInput{
+		ReferenceNumber:       refund.RefundNumber,
+		SalesReturnsAccountID: salesReturnsAccount.ID,
+		NetAmount:             netSlice,
+		ChargeAccountID:       chargeAccountID,
+		ChargeSlices:          chargeSlices,
+		VATAccountID:          vatAccountID,
+		TaxSlice:              taxSlice,
+		CashCredits:           []refundCashCredit{{AccountID: refund.ChartAccountID, Amount: refundAmount, Description: "Bakery order refund via " + refund.PaymentMethodNameSnapshot}},
+	})
+	if err != nil {
+		return "", err
+	}
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, refund.RefundedAt, refund.BranchID, "bakery_order_refund", refund.ID, refund.RefundNumber, "Bakery order refund "+refund.RefundNumber+" for "+refund.OrderNumber, lines)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.UpdatePOSPaymentRefundJournalID(tx, currentUser.BusinessID, refund.ID, journalID); err != nil {
+		return "", apperrors.Internal("failed to update bakery order refund accounting journal")
+	}
+	return journalID, nil
+}
+
 func validateBakeryOrderRevenuePostedJournal(entry *JournalEntry, orderID string) error {
 	if entry == nil || strings.TrimSpace(entry.ID) == "" {
 		return apperrors.Conflict("linked bakery order revenue journal is missing or invalid; run bakery order journal backfill before posting accounting", map[string]interface{}{"bakery_order_id": strings.TrimSpace(orderID)})
@@ -1743,24 +2086,33 @@ func (s *Service) PostSalesReturnJournal(tx *gorm.DB, currentUser *utils.AuthCon
 		return "", err
 	}
 	taxAmount := roundMoney(salesReturn.TaxAmount)
-	chargeLines, chargeNetAmount, err := s.buildChargeRefundDebitLines(tx, currentUser.BusinessID, salesReturn.BranchID, "sales_return", salesReturn.ID, "Refunded customer charge")
+	chargeAccountID, chargeSlices, chargeNetTotal, err := s.chargeRefundSlices(tx, currentUser.BusinessID, salesReturn.BranchID, "sales_return", salesReturn.ID)
 	if err != nil {
 		return "", err
 	}
-	netReturn := roundMoney(refundAmount - taxAmount - chargeNetAmount)
-	lines := make([]JournalEntryLineRequest, 0, 3+len(chargeLines))
-	if netReturn > 0 {
-		lines = append(lines, JournalEntryLineRequest{AccountID: salesReturnsAccount.ID, DebitAmount: netReturn, Description: "Sales return allowance " + salesReturn.ReturnNumber})
-	}
-	lines = append(lines, chargeLines...)
+	vatAccountID := ""
 	if taxAmount > 0 {
 		vatPayable, err := s.requiredMappedAccount(tx, currentUser.BusinessID, salesReturn.BranchID, "vat_payable", "2100", "VAT Payable")
 		if err != nil {
 			return "", err
 		}
-		lines = append(lines, JournalEntryLineRequest{AccountID: vatPayable.ID, DebitAmount: taxAmount, Description: "VAT reversed on sales return"})
+		vatAccountID = vatPayable.ID
 	}
-	lines = append(lines, JournalEntryLineRequest{AccountID: salesReturn.ChartAccountID, CreditAmount: refundAmount, Description: "Refund via " + salesReturn.RefundPaymentMethodName})
+	// Phase 4 / W6: assembled by the unified refund builder — same shape as
+	// POS quick refunds and bakery post-completion refunds.
+	lines, err := buildRefundJournalLines(refundJournalInput{
+		ReferenceNumber:       salesReturn.ReturnNumber,
+		SalesReturnsAccountID: salesReturnsAccount.ID,
+		NetAmount:             roundMoney(refundAmount - taxAmount - chargeNetTotal),
+		ChargeAccountID:       chargeAccountID,
+		ChargeSlices:          chargeSlices,
+		VATAccountID:          vatAccountID,
+		TaxSlice:              taxAmount,
+		CashCredits:           []refundCashCredit{{AccountID: salesReturn.ChartAccountID, Amount: refundAmount, Description: "Refund via " + salesReturn.RefundPaymentMethodName}},
+	})
+	if err != nil {
+		return "", err
+	}
 	journalID, err := s.createPostedSystemJournal(tx, currentUser, salesReturn.ReturnDate, salesReturn.BranchID, "sales_return", salesReturn.ID, salesReturn.ReturnNumber, "Sales return "+salesReturn.ReturnNumber, lines)
 	if err != nil {
 		return "", err
@@ -5107,29 +5459,50 @@ func (s *Service) buildChargeCreditLines(tx *gorm.DB, businessID, branchID, docu
 	return lines, totalNet, nil
 }
 
-func (s *Service) buildChargeRefundDebitLines(tx *gorm.DB, businessID, branchID, documentType, documentID, descriptionPrefix string) ([]JournalEntryLineRequest, float64, error) {
+// chargeRefundSlices loads a document's charges as refundable slices for the
+// unified refund builder, resolving the charge-refund account only when there
+// is something to refund. The returned net total is the sum of the slices.
+func (s *Service) chargeRefundSlices(tx *gorm.DB, businessID, branchID, documentType, documentID string) (string, []RefundChargeSlice, float64, error) {
 	rows, err := s.repo.ListDocumentChargesForAccounting(tx, businessID, documentType, documentID)
 	if err != nil {
-		return nil, 0, apperrors.Internal("failed to load charge refunds for accounting")
+		return "", nil, 0, apperrors.Internal("failed to load charge refunds for accounting")
 	}
-	if len(rows) == 0 {
-		return nil, 0, nil
-	}
-	account, err := s.requiredMappedAccount(tx, businessID, branchID, "charge_refund_account", "4080", "Delivery Charge Returns")
-	if err != nil {
-		return nil, 0, err
-	}
-	lines := make([]JournalEntryLineRequest, 0, len(rows))
+	slices := make([]RefundChargeSlice, 0, len(rows))
 	totalNet := 0.0
 	for _, row := range rows {
 		netAmount := roundMoney(row.TotalAmount - row.TaxAmount)
 		if netAmount <= 0 {
 			continue
 		}
-		lines = append(lines, JournalEntryLineRequest{AccountID: account.ID, DebitAmount: netAmount, Description: descriptionPrefix + ": " + row.ChargeName})
+		slices = append(slices, RefundChargeSlice{Name: row.ChargeName, Amount: netAmount})
 		totalNet = roundMoney(totalNet + netAmount)
 	}
-	return lines, totalNet, nil
+	if len(slices) == 0 {
+		return "", nil, 0, nil
+	}
+	account, err := s.requiredMappedAccount(tx, businessID, branchID, "charge_refund_account", "4080", "Delivery Charge Returns")
+	if err != nil {
+		return "", nil, 0, err
+	}
+	return account.ID, slices, totalNet, nil
+}
+
+// chargeNetAmounts loads a document's charges as proration bases (name +
+// refundable net) for partial-refund slicing.
+func (s *Service) chargeNetAmounts(tx *gorm.DB, businessID, documentType, documentID string) ([]chargeNetAmount, error) {
+	rows, err := s.repo.ListDocumentChargesForAccounting(tx, businessID, documentType, documentID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load document charges for accounting")
+	}
+	charges := make([]chargeNetAmount, 0, len(rows))
+	for _, row := range rows {
+		netAmount := roundMoney(row.TotalAmount - row.TaxAmount)
+		if netAmount <= 0 {
+			continue
+		}
+		charges = append(charges, chargeNetAmount{Name: row.ChargeName, Net: netAmount})
+	}
+	return charges, nil
 }
 
 func (s *Service) buildPurchaseChargeDebitLines(tx *gorm.DB, businessID, branchID, documentType, documentID, descriptionPrefix string) ([]JournalEntryLineRequest, float64, error) {

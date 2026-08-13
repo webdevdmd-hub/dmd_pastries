@@ -25,6 +25,7 @@ import type {
   OrderPaymentStatus,
   OrderStatus,
   OrderType,
+  RefundOrderPaymentPayload,
   UpdateOrderItemPayload,
   UpdateOrderPayload,
   UpdateOrderProductionStatusPayload,
@@ -68,6 +69,13 @@ type BackendOrderPaymentPayload = {
   payment_method_id: string;
   amount: number;
   payment_type: "deposit" | "balance" | "full";
+  reference_number: string;
+};
+
+type BackendOrderRefundPayload = {
+  payment_method_id: string;
+  amount: number;
+  reason: string;
   reference_number: string;
 };
 
@@ -293,6 +301,7 @@ function parseOrder(value: unknown): BakeryOrder {
     totalAmount: numberValue(value.total_amount),
     paidAmount: numberValue(value.paid_amount),
     balanceAmount: numberValue(value.balance_amount),
+    refundedAmount: numberValue(value.refunded_amount),
     paymentStatus: isPaymentStatus(value.payment_status) ? value.payment_status : "unpaid",
     orderStatus: isOrderStatus(value.order_status) ? value.order_status : "new",
     notes: optionalString(value.notes),
@@ -716,6 +725,28 @@ export async function addOrderPayment(
         amount: payload.amount,
         payment_method_id: payload.paymentMethodId,
         payment_type: payload.paymentType,
+        reference_number: requestString(payload.referenceNumber),
+      },
+      parse: parseOrder,
+    },
+  );
+
+  return response.data;
+}
+
+export async function refundOrderPayment(
+  orderId: string,
+  payload: RefundOrderPaymentPayload,
+): Promise<BakeryOrder> {
+  const response = await apiRequest<BakeryOrder, BackendOrderRefundPayload>(
+    `/api/v1/bakery-orders/${orderId}/refunds`,
+    {
+      authMode: "appwrite",
+      method: "POST",
+      body: {
+        amount: payload.amount,
+        payment_method_id: payload.paymentMethodId,
+        reason: payload.reason,
         reference_number: requestString(payload.referenceNumber),
       },
       parse: parseOrder,

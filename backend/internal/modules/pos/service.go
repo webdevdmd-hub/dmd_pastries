@@ -709,7 +709,29 @@ func (s *Service) RefundSale(currentUser *utils.AuthContext, saleID string, req 
 	if err := s.repo.CreateRefund(tx, refund); err != nil {
 		return nil, apperrors.Internal("failed to create refund")
 	}
-	if err := s.createOperationalPaymentRefunds(tx, currentUser, sale, refund, now); err != nil {
+	// Phase 4 / W6: cash is allocated across the sale's collected payments;
+	// whatever the collected money cannot cover is the receivable slice — the
+	// refund first cancels what the customer still owes, and only the
+	// collected part leaves as cash.
+	payments, cashLeftover, err := s.createOperationalPaymentRefunds(tx, currentUser, sale, refund, now)
+	if err != nil {
+		return nil, err
+	}
+	if cashLeftover > 0 {
+		collected := 0.0
+		for _, payment := range payments {
+			collected = roundMoney(collected + payment.Amount)
+		}
+		priorARRefunded := math.Max(0, roundMoney(legacyRefunded-operationalRefunded))
+		outstandingAR := roundMoney(sale.TotalAmount - collected - priorARRefunded)
+		if cashLeftover > outstandingAR+0.005 {
+			return nil, apperrors.BadRequest("refund_amount exceeds refundable payment amount", nil)
+		}
+	}
+	if s.accountingService == nil {
+		return nil, apperrors.Internal("payment refund accounting service is not configured")
+	}
+	if _, err := s.accountingService.PostPOSSaleRefundJournal(tx, currentUser, refund.ID); err != nil {
 		return nil, err
 	}
 	saleUpdates := map[string]interface{}{
@@ -752,10 +774,16 @@ func (s *Service) RefundSale(currentUser *utils.AuthContext, saleID string, req 
 	return s.GetSale(currentUser, sale.ID)
 }
 
-func (s *Service) createOperationalPaymentRefunds(tx *gorm.DB, currentUser *utils.AuthContext, sale *Sale, refund *SaleRefund, refundedAt time.Time) error {
+// createOperationalPaymentRefunds allocates a refund event's cash across the
+// sale's collected payments (oldest first), linking each allocation row to
+// the sale_refunds header. The unified refund journal is posted once by the
+// caller — allocation rows carry no journals of their own (Phase 4 / W6).
+// The returned leftover is the slice no collected payment can cover; the
+// caller validates it against the sale's outstanding receivable.
+func (s *Service) createOperationalPaymentRefunds(tx *gorm.DB, currentUser *utils.AuthContext, sale *Sale, refund *SaleRefund, refundedAt time.Time) ([]SalePayment, float64, error) {
 	payments, err := s.repo.SalePaymentsForRefundAllocation(tx, currentUser.BusinessID, sale.ID)
 	if err != nil {
-		return apperrors.Internal("failed to load sale payments for refund allocation")
+		return nil, 0, apperrors.Internal("failed to load sale payments for refund allocation")
 	}
 	remaining := roundMoney(refund.RefundAmount)
 	for _, payment := range payments {
@@ -764,7 +792,7 @@ func (s *Service) createOperationalPaymentRefunds(tx *gorm.DB, currentUser *util
 		}
 		alreadyRefunded, err := s.repo.SalePaymentRefundedAmount(tx, currentUser.BusinessID, payment.ID)
 		if err != nil {
-			return apperrors.Internal("failed to validate payment refund amount")
+			return nil, 0, apperrors.Internal("failed to validate payment refund amount")
 		}
 		paymentAvailable := roundMoney(payment.Amount - alreadyRefunded)
 		if paymentAvailable <= 0 {
@@ -773,15 +801,17 @@ func (s *Service) createOperationalPaymentRefunds(tx *gorm.DB, currentUser *util
 		refundAmount := roundMoney(math.Min(remaining, paymentAvailable))
 		refundNumber, err := s.repo.GeneratePaymentRefundNumber(tx, currentUser.BusinessID, refundedAt)
 		if err != nil {
-			return apperrors.Internal("failed to generate payment refund number")
+			return nil, 0, apperrors.Internal("failed to generate payment refund number")
 		}
 		paymentID := payment.ID
+		saleRefundID := refund.ID
 		operationalRefund := &POSPaymentRefund{
 			ID:                        utils.NewUUID(),
 			BusinessID:                currentUser.BusinessID,
 			BranchID:                  payment.BranchID,
 			SaleID:                    sale.ID,
 			SalePaymentID:             &paymentID,
+			SaleRefundID:              &saleRefundID,
 			RefundSource:              "pos_sale",
 			RefundNumber:              refundNumber,
 			PaymentMethodID:           payment.PaymentMethodID,
@@ -796,27 +826,18 @@ func (s *Service) createOperationalPaymentRefunds(tx *gorm.DB, currentUser *util
 			UpdatedAt:                 refundedAt,
 		}
 		if err := s.repo.CreateOperationalPaymentRefund(tx, operationalRefund); err != nil {
-			return apperrors.Internal("failed to create operational payment refund")
-		}
-		if s.accountingService == nil {
-			return apperrors.Internal("payment refund accounting service is not configured")
-		}
-		if _, err := s.accountingService.PostPOSPaymentRefundJournal(tx, currentUser, operationalRefund.ID); err != nil {
-			return err
+			return nil, 0, apperrors.Internal("failed to create operational payment refund")
 		}
 		status := "partially_refunded"
 		if roundMoney(alreadyRefunded+refundAmount) >= payment.Amount {
 			status = "refunded"
 		}
 		if err := s.repo.UpdateSalePaymentStatus(tx, currentUser.BusinessID, payment.ID, status, refundedAt); err != nil {
-			return apperrors.Internal("failed to update sale payment refund status")
+			return nil, 0, apperrors.Internal("failed to update sale payment refund status")
 		}
 		remaining = roundMoney(remaining - refundAmount)
 	}
-	if remaining > 0 {
-		return apperrors.BadRequest("refund_amount exceeds refundable payment amount", nil)
-	}
-	return nil
+	return payments, roundMoney(math.Max(remaining, 0)), nil
 }
 
 func (s *Service) VoidSale(currentUser *utils.AuthContext, saleID string, req VoidRequest, ipAddress, userAgent string) (*SaleResponse, error) {

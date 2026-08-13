@@ -119,6 +119,7 @@ type POSPaymentRefund struct {
 	SaleID                    string         `gorm:"type:uuid;not null;index" json:"sale_id"`
 	SalePaymentID             *string        `gorm:"type:uuid;index" json:"sale_payment_id"`
 	SalesReturnID             *string        `gorm:"type:uuid;index" json:"sales_return_id"`
+	SaleRefundID              *string        `gorm:"type:uuid;index" json:"sale_refund_id"`
 	RefundSource              string         `gorm:"size:50;not null;default:pos_sale" json:"refund_source"`
 	RefundNumber              string         `gorm:"size:100;not null" json:"refund_number"`
 	PaymentMethodID           string         `gorm:"type:uuid;not null;index" json:"payment_method_id"`

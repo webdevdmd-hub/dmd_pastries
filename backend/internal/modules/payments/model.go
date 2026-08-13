@@ -31,12 +31,15 @@ func (SalePayment) TableName() string {
 }
 
 type PaymentRefund struct {
-	ID                        string         `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID                string         `gorm:"type:uuid;not null;index" json:"business_id"`
-	BranchID                  string         `gorm:"type:uuid;not null;index" json:"branch_id"`
-	SaleID                    string         `gorm:"type:uuid;not null;index" json:"sale_id"`
+	ID         string `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID string `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID   string `gorm:"type:uuid;not null;index" json:"branch_id"`
+	// SaleID is null for bakery-order refunds (migration 000099); those rows
+	// carry BakeryOrderID instead.
+	SaleID                    *string        `gorm:"type:uuid;index" json:"sale_id"`
 	SalePaymentID             *string        `gorm:"type:uuid;index" json:"sale_payment_id"`
 	SalesReturnID             *string        `gorm:"type:uuid;index" json:"sales_return_id"`
+	BakeryOrderID             *string        `gorm:"type:uuid;index" json:"bakery_order_id"`
 	RefundSource              string         `gorm:"size:50;not null;default:payment_adjustment" json:"refund_source"`
 	RefundNumber              string         `gorm:"size:100;not null" json:"refund_number"`
 	PaymentMethodID           string         `gorm:"type:uuid;not null;index" json:"payment_method_id"`

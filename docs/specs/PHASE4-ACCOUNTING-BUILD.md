@@ -127,6 +127,15 @@ Unit +3 (journal shape, validation, reversal) · Integration +2 (create/reverse 
 
 # W6 — Unified refund/reversal contract
 
+> **Implementation note (2026-08-13):** shipped with these deltas from the design below.
+> - The unified builder is `buildRefundJournalLines` + `prorateRefundSlices` (`accounting/refund_contract.go`), pure and unit-tested; POS quick refunds, sales returns, and bakery post-completion refunds all assemble through it. Partial refunds slice VAT/charges with a **cumulative rounding rule** (slice = rounded cumulative share after − before), so refund series that reach the document total reverse tax exactly.
+> - POS refunds now post **one journal per refund event** (`sale_refunds` header; `payment_refunds.sale_refund_id` links allocation rows — migration 000099). The legacy per-row `PostPOSPaymentRefundJournal` remains only for pre-W6 backfill; the backfill missing-condition also accepts event-journal linkage.
+> - AR-first: a POS refund's unallocatable slice (beyond collected cash) credits AR up to the sale's outstanding receivable.
+> - **Vendor-credit VAT:** receipts carry no tax snapshot (spec assumption was wrong), so a bill-less return derives each line's rate from the matching purchase-order line, then the product master's default rate (`returnItemTaxWithoutInvoice`); genuinely unbilled+unordered receipt lines still reverse zero VAT, which is correct under the bill-only policy.
+> - **Bakery refunds** (`POST /bakery-orders/:id/refunds`): on a NOT-completed (or cancelled) order this is an advance refund `Dr 2200 / Cr cash` decrementing `paid_amount`; on a completed order it routes through the builder (cap = collected − refunded, tracked in `bakery_orders.refunded_amount`; no AR slice, preserving `balance = total − paid`).
+> - **Bakery cancellation:** completed→cancelled now also reverses the revenue journal — the income side mirrors, but the counterparty side is rebuilt as `Cr 2200 = current paid / Cr 1100 = current outstanding` (post-completion settlements make a blind mirror wrong). Paid money lands back in 2200 and is refunded AFTER cancellation via the advance path, avoiding the double-reversal the refund-before-cancel ordering would cause. Guards: non-completed orders must have `paid_amount ≈ 0` to cancel; completed orders with post-completion refunds cannot cancel at all.
+> - **Registry:** `reversalContracts` in `refund_contract.go` maps every posting source_type to its reversal source_type or an explicit rationale; `refund_contract_test.go` AST-scans `service.go` so no posting literal can ship unregistered.
+
 ## Context
 Audit RC3/K7/K9: POS refunds skip VAT/charge reversal and never restore AR; sales-return refunds do it right; invoice-less vendor credits never reverse VAT; bakery has no refund path at all; bakery cancellation posts nothing.
 

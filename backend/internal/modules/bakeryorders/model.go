@@ -31,11 +31,13 @@ type BakeryOrder struct {
 	TotalAmount              float64        `gorm:"not null;default:0" json:"total_amount"`
 	PaidAmount               float64        `gorm:"not null;default:0" json:"paid_amount"`
 	BalanceAmount            float64        `gorm:"not null;default:0" json:"balance_amount"`
+	RefundedAmount           float64        `gorm:"not null;default:0" json:"refunded_amount"`
 	PaymentStatus            string         `gorm:"size:50;not null;default:unpaid" json:"payment_status"`
 	OrderStatus              string         `gorm:"size:50;not null;default:new" json:"order_status"`
 	AccountingJournalEntryID *string        `gorm:"type:uuid;index" json:"accounting_journal_entry_id"`
 	COGSJournalEntryID       *string        `gorm:"type:uuid;index" json:"cogs_journal_entry_id"`
 	COGSReversalJournalID    *string        `gorm:"type:uuid;index;column:cogs_reversal_journal_entry_id" json:"cogs_reversal_journal_entry_id"`
+	RevenueReversalJournalID *string        `gorm:"type:uuid;index;column:revenue_reversal_journal_entry_id" json:"revenue_reversal_journal_entry_id"`
 	Notes                    string         `json:"notes"`
 	CreatedByUserID          string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
 	UpdatedByUserID          string         `gorm:"type:uuid;index" json:"updated_by_user_id"`

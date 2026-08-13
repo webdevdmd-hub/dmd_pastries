@@ -588,6 +588,25 @@ func safeOrderDirection(value string) string {
 	return "desc"
 }
 
+// GeneratePaymentRefundNumber issues the next payment_refunds number. The
+// advisory-lock key and prefix MUST match the POS repository's generator —
+// both modules number the same table, so they serialize on the same lock.
+func (r *Repository) GeneratePaymentRefundNumber(tx *gorm.DB, businessID string, createdAt time.Time) (string, error) {
+	datePart := createdAt.Format("20060102")
+	lockKey := businessID + ":" + datePart + ":payment_refunds"
+	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
+		return "", err
+	}
+	prefix := "PAY-RFND-" + datePart + "-"
+	return utils.NextSequentialNumber(tx.Table("payment_refunds").Where("business_id = ?", businessID), "refund_number", prefix, 6)
+}
+
+// CreatePaymentRefund inserts a bakery-order payment_refunds row. A raw map
+// keeps the bakery module free of a second payment_refunds model.
+func (r *Repository) CreatePaymentRefund(tx *gorm.DB, row map[string]interface{}) error {
+	return tx.Table("payment_refunds").Create(row).Error
+}
+
 func totalPages(total int64, limit int) int {
 	if limit <= 0 {
 		return 0

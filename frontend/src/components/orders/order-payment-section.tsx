@@ -7,9 +7,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { OrderPaymentDialog } from "@/components/orders/order-payment-dialog";
+import { OrderRefundDialog } from "@/components/orders/order-refund-dialog";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/routes";
-import { useAddOrderPayment, useOrderPayments } from "@/hooks/use-orders";
+import { useAddOrderPayment, useOrderPayments, useRefundOrderPayment } from "@/hooks/use-orders";
 import { usePaymentMethods } from "@/hooks/use-payments";
 import { getErrorMessage } from "@/lib/api/client";
 import { orderPaymentTypeLabel } from "@/lib/orders/payment-stage";
@@ -27,9 +28,18 @@ export function OrderPaymentSection({
   order: BakeryOrder | null;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
   const paymentsQuery = useOrderPayments(order?.id ?? null, order !== null);
   const methodsQuery = usePaymentMethods(canManage);
   const addPaymentMutation = useAddOrderPayment();
+  const refundMutation = useRefundOrderPayment();
+  // Completed orders refund against collected money net of prior refunds;
+  // any other status refunds the advance balance held in Customer Advance.
+  const refundableAmount = order
+    ? order.orderStatus === "completed"
+      ? Math.max(order.paidAmount - order.refundedAmount, 0)
+      : Math.max(order.paidAmount, 0)
+    : 0;
   const visiblePaymentMethods = (methodsQuery.data ?? []).filter(
     (method) => method.status === "active" && method.showInBakeryOrders,
   );
@@ -47,15 +57,25 @@ export function OrderPaymentSection({
           <h2 className="text-xl font-semibold text-brand-espresso">Payments</h2>
           <p className="text-sm text-brand-mocha">Deposits, balance payments, and full payments.</p>
         </div>
-        <Button
-          disabled={!order || !canManage || order.balanceAmount <= 0}
-          onClick={() => setOpen(true)}
-          type="button"
-          variant="outline"
-        >
-          <Plus className="h-4 w-4" />
-          Add payment
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            disabled={!order || !canManage || refundableAmount <= 0}
+            onClick={() => setRefundOpen(true)}
+            type="button"
+            variant="outline"
+          >
+            Refund
+          </Button>
+          <Button
+            disabled={!order || !canManage || order.balanceAmount <= 0}
+            onClick={() => setOpen(true)}
+            type="button"
+            variant="outline"
+          >
+            <Plus className="h-4 w-4" />
+            Add payment
+          </Button>
+        </div>
       </div>
       <div className="mt-5 grid gap-3">
         <div className="grid grid-cols-3 gap-3 rounded-2xl bg-brand-latte/70 p-4 text-sm">
@@ -78,6 +98,11 @@ export function OrderPaymentSection({
             </strong>
           </span>
         </div>
+        {order && order.refundedAmount > 0 ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            Refunded after completion: {formatCurrency(order.refundedAmount)}
+          </div>
+        ) : null}
         {order && (order.chargeAmount > 0 || order.chargeTaxAmount > 0) ? (
           <div className="rounded-2xl border border-brand-cappuccino/60 bg-white/80 p-4 text-sm">
             <div className="flex justify-between">
@@ -161,6 +186,26 @@ export function OrderPaymentSection({
         }}
         open={open}
         paidAmount={order?.paidAmount ?? 0}
+      />
+      <OrderRefundDialog
+        isCompleted={order?.orderStatus === "completed"}
+        isSubmitting={refundMutation.isPending}
+        methods={usablePaymentMethods}
+        onClose={() => setRefundOpen(false)}
+        onSubmit={async (payload) => {
+          if (!order) {
+            return;
+          }
+          try {
+            await refundMutation.mutateAsync({ orderId: order.id, payload });
+            toast.success("Order payment refunded.");
+            setRefundOpen(false);
+          } catch (error: unknown) {
+            toast.error(getErrorMessage(error));
+          }
+        }}
+        open={refundOpen}
+        refundableAmount={refundableAmount}
       />
     </section>
   );

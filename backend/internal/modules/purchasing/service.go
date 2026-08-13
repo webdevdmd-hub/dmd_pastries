@@ -3146,6 +3146,16 @@ func (s *Service) buildPurchaseReturnItems(tx *gorm.DB, businessID string, recei
 			return nil, totals{}, err
 		}
 	}
+	// Phase 4 / W6: a bill-less vendor credit must still reverse input VAT.
+	// With no invoice line to prorate from, the tax rate comes from the
+	// purchase-order line, falling back to the product master's default rate.
+	var orderItems []PurchaseOrderItem
+	if invoice == nil && receipt.PurchaseOrderID != nil && strings.TrimSpace(*receipt.PurchaseOrderID) != "" {
+		orderItems, err = s.repo.OrderItems(strings.TrimSpace(*receipt.PurchaseOrderID), businessID)
+		if err != nil {
+			return nil, totals{}, err
+		}
+	}
 	receiptItemByID := make(map[string]PurchaseReceiptItem, len(receiptItems))
 	for _, item := range receiptItems {
 		receiptItemByID[item.ID] = item
@@ -3210,6 +3220,8 @@ func (s *Service) buildPurchaseReturnItems(tx *gorm.DB, businessID string, recei
 			discount = roundMoney(invoiceItem.DiscountAmount * ratio)
 			tax = roundMoney(invoiceItem.TaxAmount * ratio)
 			taxRateID = invoiceItem.TaxRateID
+		} else {
+			tax, taxRateID = s.returnItemTaxWithoutInvoice(tx, businessID, receipt.BranchID, orderItems, receiptItem, input.Quantity)
 		}
 		lineSubtotal := roundMoney(unitCost * input.Quantity)
 		lineTotal := roundMoney(lineSubtotal - discount + tax)
@@ -4592,6 +4604,43 @@ func purchaseReturnInputsFromItems(items []PurchaseReturnItem) []PurchaseReturnI
 		})
 	}
 	return result
+}
+
+// returnItemTaxWithoutInvoice derives a bill-less vendor credit line's VAT
+// (Phase 4 / W6). The rate comes from the matching purchase-order line, then
+// the product master's default rate; ingredient/packaging items without a PO
+// rate carry no VAT. Resolution is best-effort: a stale or deleted rate must
+// not block the return, it just reverses no VAT for that line.
+func (s *Service) returnItemTaxWithoutInvoice(tx *gorm.DB, businessID, branchID string, orderItems []PurchaseOrderItem, receiptItem PurchaseReceiptItem, quantity float64) (float64, *string) {
+	var taxRateID *string
+	if orderItem, ok := matchingOrderItem(orderItems, receiptItem); ok && orderItem.TaxRateID != nil && strings.TrimSpace(*orderItem.TaxRateID) != "" {
+		taxRateID = orderItem.TaxRateID
+	} else if receiptItem.ProductID != nil && strings.TrimSpace(*receiptItem.ProductID) != "" {
+		if productRate, err := s.repo.ProductTaxRateID(tx, businessID, branchID, strings.TrimSpace(*receiptItem.ProductID)); err == nil && productRate != nil && strings.TrimSpace(*productRate) != "" {
+			taxRateID = productRate
+		}
+	}
+	if taxRateID == nil {
+		return 0, nil
+	}
+	line, err := s.calculatePurchaseLine(tx, businessID, quantity, receiptItem.UnitCost, 0, *taxRateID)
+	if err != nil {
+		return 0, nil
+	}
+	return line.Tax, taxRateID
+}
+
+func matchingOrderItem(orderItems []PurchaseOrderItem, receiptItem PurchaseReceiptItem) (PurchaseOrderItem, bool) {
+	for _, item := range orderItems {
+		if item.ItemType == receiptItem.ItemType &&
+			deref(item.UnitID) == receiptItem.UnitID &&
+			equalStringPtr(item.ProductID, receiptItem.ProductID) &&
+			equalStringPtr(item.IngredientID, receiptItem.IngredientID) &&
+			equalStringPtr(item.PackagingItemID, receiptItem.PackagingItemID) {
+			return item, true
+		}
+	}
+	return PurchaseOrderItem{}, false
 }
 
 func matchingInvoiceItem(invoiceItems []PurchaseInvoiceItem, receiptItem PurchaseReceiptItem) (PurchaseInvoiceItem, bool) {

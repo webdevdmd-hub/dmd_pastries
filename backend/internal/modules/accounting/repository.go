@@ -85,10 +85,54 @@ type bakeryOrderAccountingRow struct {
 	TaxAmount                float64
 	ChargeAmount             float64
 	ChargeTaxAmount          float64
+	RefundedAmount           float64
 	OrderStatus              string
 	AccountingJournalEntryID *string
 	COGSJournalEntryID       *string
+	RevenueReversalJournalID *string `gorm:"column:revenue_reversal_journal_entry_id"`
 	EventDate                time.Time
+}
+
+// bakeryPaymentRefundAccountingRow is a bakery-order payment_refunds row with
+// its order money state and the branch-resolved payment chart account, loaded
+// for the two bakery refund posting paths (Phase 4 / W6).
+type bakeryPaymentRefundAccountingRow struct {
+	ID                        string
+	BusinessID                string
+	BakeryOrderID             string
+	BranchID                  string
+	OrderNumber               string
+	OrderStatus               string
+	OrderTotalAmount          float64
+	OrderTaxAmount            float64
+	OrderPaidAmount           float64
+	OrderRefundedAmount       float64
+	RefundNumber              string
+	RefundAmount              float64
+	RefundReason              string
+	RefundStatus              string
+	PaymentMethodNameSnapshot string
+	DefaultPaymentAccountID   *string
+	PaymentAccountBranchID    *string
+	PaymentAccountName        string
+	ChartAccountID            string
+	JournalEntryID            *string
+	RefundedAt                time.Time
+}
+
+// saleRefundAccountingRow is a sale_refunds event header joined with its
+// sale's money profile, loaded when posting the unified POS refund journal.
+type saleRefundAccountingRow struct {
+	ID              string
+	BusinessID      string
+	SaleID          string
+	RefundNumber    string
+	RefundAmount    float64
+	BranchID        string
+	SaleNumber      string
+	SaleTotalAmount float64
+	SaleTaxAmount   float64
+	CreatedAt       time.Time
 }
 
 type bakeryPaymentAccountingRow struct {
@@ -1083,7 +1127,7 @@ func (r *Repository) UpdatePOSPaymentRefundJournalID(tx *gorm.DB, businessID, re
 func (r *Repository) FindBakeryOrderForAccounting(tx *gorm.DB, businessID, orderID string) (*bakeryOrderAccountingRow, error) {
 	var row bakeryOrderAccountingRow
 	err := tx.Table("bakery_orders").
-		Select("id, business_id, branch_id, order_number, total_amount, paid_amount, balance_amount, tax_amount, charge_amount, charge_tax_amount, order_status, accounting_journal_entry_id, cogs_journal_entry_id, event_date").
+		Select("id, business_id, branch_id, order_number, total_amount, paid_amount, balance_amount, tax_amount, charge_amount, charge_tax_amount, refunded_amount, order_status, accounting_journal_entry_id, cogs_journal_entry_id, revenue_reversal_journal_entry_id, event_date").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, orderID).
 		Take(&row).Error
 	return &row, err
@@ -1113,6 +1157,131 @@ func (r *Repository) UpdateBakeryOrderCOGSReversalJournalID(tx *gorm.DB, busines
 		return gorm.ErrRecordNotFound
 	}
 	return nil
+}
+
+func (r *Repository) UpdateBakeryOrderRevenueReversalJournalID(tx *gorm.DB, businessID, orderID, journalEntryID string) error {
+	result := tx.Table("bakery_orders").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, orderID).
+		Updates(map[string]interface{}{"revenue_reversal_journal_entry_id": journalEntryID, "updated_at": time.Now().UTC()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// FindBakeryPaymentRefundForAccounting loads a bakery-order refund row with
+// its order money state and branch-resolved payment chart account (W6).
+func (r *Repository) FindBakeryPaymentRefundForAccounting(tx *gorm.DB, businessID, refundID string) (*bakeryPaymentRefundAccountingRow, error) {
+	var row bakeryPaymentRefundAccountingRow
+	err := tx.Table("payment_refunds pr").
+		Select(`
+			pr.id,
+			pr.business_id,
+			pr.bakery_order_id,
+			bo.branch_id,
+			bo.order_number,
+			bo.order_status,
+			bo.total_amount AS order_total_amount,
+			bo.tax_amount AS order_tax_amount,
+			bo.paid_amount AS order_paid_amount,
+			bo.refunded_amount AS order_refunded_amount,
+			pr.refund_number,
+			pr.refund_amount,
+			pr.refund_reason,
+			pr.refund_status,
+			pr.payment_method_name_snapshot,
+			COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AS default_payment_account_id,
+			pa.branch_id AS payment_account_branch_id,
+			COALESCE(pa.account_name, '') AS payment_account_name,
+			COALESCE(pa.chart_account_id::text, '') AS chart_account_id,
+			pr.journal_entry_id,
+			pr.refunded_at
+		`).
+		Joins("JOIN bakery_orders bo ON bo.id = pr.bakery_order_id AND bo.business_id = pr.business_id AND bo.deleted_at IS NULL").
+		Joins("JOIN payment_methods pm ON pm.id = pr.payment_method_id AND pm.business_id = pr.business_id AND pm.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_method_account_mappings pmam ON pmam.payment_method_id = pm.id AND pmam.business_id = pr.business_id AND pmam.branch_id = bo.branch_id AND pmam.status = 'active' AND pmam.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AND pa.business_id = pr.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL AND (pa.branch_id IS NULL OR pa.branch_id = bo.branch_id)").
+		Where("pr.business_id = ? AND pr.id = ? AND pr.refund_source = 'bakery_order' AND pr.deleted_at IS NULL", businessID, refundID).
+		Take(&row).Error
+	return &row, err
+}
+
+// FindSaleRefundForAccounting loads a POS refund event header with its sale's
+// money profile for the unified refund journal (W6).
+func (r *Repository) FindSaleRefundForAccounting(tx *gorm.DB, businessID, saleRefundID string) (*saleRefundAccountingRow, error) {
+	var row saleRefundAccountingRow
+	err := tx.Table("sale_refunds sr").
+		Select(`
+			sr.id,
+			sr.business_id,
+			sr.sale_id,
+			sr.refund_number,
+			sr.refund_amount,
+			s.branch_id,
+			s.sale_number,
+			s.total_amount AS sale_total_amount,
+			s.tax_amount AS sale_tax_amount,
+			sr.created_at
+		`).
+		Joins("JOIN sales s ON s.id = sr.sale_id AND s.business_id = sr.business_id AND s.deleted_at IS NULL").
+		Where("sr.business_id = ? AND sr.id = ?", businessID, saleRefundID).
+		Take(&row).Error
+	return &row, err
+}
+
+// ListPaymentRefundsForSaleRefund returns the allocation rows of one POS
+// refund event with their branch-resolved payment chart accounts (W6).
+func (r *Repository) ListPaymentRefundsForSaleRefund(tx *gorm.DB, businessID, saleRefundID string) ([]posPaymentRefundAccountingRow, error) {
+	var rows []posPaymentRefundAccountingRow
+	err := tx.Table("payment_refunds pr").
+		Select(`
+			pr.id,
+			pr.business_id,
+			pr.branch_id,
+			pr.sale_id,
+			pr.sale_payment_id,
+			pr.refund_source,
+			pr.refund_number,
+			pr.payment_method_name_snapshot,
+			pr.refund_amount,
+			pr.refund_reason,
+			pr.refund_status,
+			COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AS default_payment_account_id,
+			pa.branch_id AS payment_account_branch_id,
+			COALESCE(pa.account_name, '') AS payment_account_name,
+			COALESCE(pa.chart_account_id::text, '') AS chart_account_id,
+			pr.journal_entry_id,
+			pr.refunded_at
+		`).
+		Joins("JOIN payment_methods pm ON pm.id = pr.payment_method_id AND pm.business_id = pr.business_id AND pm.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_method_account_mappings pmam ON pmam.payment_method_id = pm.id AND pmam.business_id = pr.business_id AND pmam.branch_id = pr.branch_id AND pmam.status = 'active' AND pmam.deleted_at IS NULL").
+		Joins("LEFT JOIN payment_accounts pa ON pa.id = COALESCE(pmam.payment_account_id, pm.default_payment_account_id) AND pa.business_id = pr.business_id AND pa.status = 'active' AND pa.deleted_at IS NULL AND (pa.branch_id IS NULL OR pa.branch_id = pr.branch_id)").
+		Where("pr.business_id = ? AND pr.sale_refund_id = ? AND pr.deleted_at IS NULL", businessID, saleRefundID).
+		Order("pr.created_at ASC, pr.id ASC").
+		Find(&rows).Error
+	return rows, err
+}
+
+// SumSaleRefundsExcluding totals the sale's earlier refund events, so the
+// current one can prorate its VAT/charge slices cumulatively.
+func (r *Repository) SumSaleRefundsExcluding(tx *gorm.DB, businessID, saleID, excludeRefundID string) (float64, error) {
+	var total float64
+	err := tx.Table("sale_refunds").
+		Select("COALESCE(SUM(refund_amount), 0)").
+		Where("business_id = ? AND sale_id = ? AND id <> ?", businessID, saleID, excludeRefundID).
+		Scan(&total).Error
+	return roundMoney(total), err
+}
+
+// UpdatePaymentRefundJournalIDsBySaleRefund stamps every allocation row of a
+// POS refund event with the event's single unified journal.
+func (r *Repository) UpdatePaymentRefundJournalIDsBySaleRefund(tx *gorm.DB, businessID, saleRefundID, journalEntryID string) error {
+	return tx.Table("payment_refunds").
+		Where("business_id = ? AND sale_refund_id = ? AND deleted_at IS NULL", businessID, saleRefundID).
+		Updates(map[string]interface{}{"journal_entry_id": journalEntryID, "updated_at": time.Now().UTC()}).Error
 }
 
 func (r *Repository) FindBakeryPaymentForAccounting(tx *gorm.DB, businessID, paymentID string) (*bakeryPaymentAccountingRow, error) {
@@ -1366,7 +1535,7 @@ func backfillTargetQuery(target string) (table, idColumn, businessColumn, branch
 	case "bakery_order_payments":
 		return "bakery_order_payments", "id", "business_id", "", "", "paid_at", "", "", "journal_entry_id IS NULL", ""
 	case "payment_refunds":
-		return "payment_refunds", "id", "business_id", "branch_id", "deleted_at IS NULL", "refunded_at", "refund_status", "completed", "(journal_entry_id IS NULL OR NOT EXISTS (SELECT 1 FROM journal_entries je WHERE je.business_id = payment_refunds.business_id AND je.source_type = 'pos_sale_refund' AND je.source_id = payment_refunds.id AND je.status IN ('posted','reversed') AND je.deleted_at IS NULL))", "COALESCE(refund_source, 'payment_adjustment') IN ('pos_sale','payment_adjustment')"
+		return "payment_refunds", "id", "business_id", "branch_id", "deleted_at IS NULL", "refunded_at", "refund_status", "completed", "(journal_entry_id IS NULL OR NOT EXISTS (SELECT 1 FROM journal_entries je WHERE je.business_id = payment_refunds.business_id AND je.status IN ('posted','reversed') AND je.deleted_at IS NULL AND ((je.source_type = 'pos_sale_refund' AND je.source_id = payment_refunds.id) OR je.id = payment_refunds.journal_entry_id)))", "COALESCE(refund_source, 'payment_adjustment') IN ('pos_sale','payment_adjustment')"
 	case "purchase_invoices":
 		return "purchase_invoices", "id", "business_id", "branch_id", "deleted_at IS NULL", "invoice_date", "status", "posted", "journal_entry_id IS NULL", ""
 	case "purchase_invoice_payments":

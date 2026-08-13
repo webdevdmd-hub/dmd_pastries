@@ -1309,6 +1309,20 @@ func (r *Repository) PaymentAccountCurrentBalance(tx *gorm.DB, businessID, chart
 	return roundMoney(balance), err
 }
 
+// ProductTaxRateID resolves a product's default tax rate for bill-less
+// vendor-credit VAT (Phase 4 / W6).
+func (r *Repository) ProductTaxRateID(tx *gorm.DB, businessID, branchID, productID string) (*string, error) {
+	var row struct{ TaxRateID *string }
+	err := tx.Table("products").
+		Select("tax_rate_id").
+		Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", productID, businessID, branchID).
+		Take(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	return row.TaxRateID, nil
+}
+
 func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string) (*ProductInfo, error) {
 	var product ProductInfo
 	err := tx.Table("products").
