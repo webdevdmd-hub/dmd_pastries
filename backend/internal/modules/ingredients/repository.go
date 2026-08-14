@@ -3,7 +3,6 @@ package ingredients
 import (
 	"fmt"
 	"math"
-	"pastries-pos/internal/shared/money"
 	"strings"
 
 	"gorm.io/gorm"
@@ -65,7 +64,7 @@ func (r *Repository) Lookup(businessID, branchID string, query LookupQuery) ([]I
 	var items []IngredientLookupItem
 	err := db.Order("i.ingredient_name ASC").Limit(query.Limit).Scan(&items).Error
 	for i := range items {
-		items[i].CostPerUnit = roundMoney(items[i].CostPerUnit)
+		items[i].CostPerUnit = items[i].CostPerUnit.Round2()
 	}
 	return items, err
 }
@@ -136,8 +135,8 @@ func (r *Repository) ToResponse(businessID string, item Ingredient) IngredientRe
 	return IngredientResponse{
 		ID: item.ID, BusinessID: item.BusinessID, BranchID: item.BranchID, IngredientCategoryID: item.IngredientCategoryID, CategoryName: categoryName,
 		SupplierID: item.SupplierID, SupplierName: supplierName, IngredientName: item.IngredientName, IngredientCode: item.IngredientCode,
-		Description: item.Description, UnitID: item.UnitID, UnitName: unitName, UnitSymbol: unitSymbol, CostPerUnit: roundMoney(item.CostPerUnit),
-		IsStockTracked: item.IsStockTracked, IsExpiryTracked: item.IsExpiryTracked, ReorderLevel: roundQuantity(item.ReorderLevel),
+		Description: item.Description, UnitID: item.UnitID, UnitName: unitName, UnitSymbol: unitSymbol, CostPerUnit: item.CostPerUnit.Round2(),
+		IsStockTracked: item.IsStockTracked, IsExpiryTracked: item.IsExpiryTracked, ReorderLevel: item.ReorderLevel.Round4(),
 		ImageURL: item.ImageURL, ImageFileID: item.ImageFileID, Status: item.Status, InventoryItemID: inventoryID, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
 	}
 }
@@ -198,7 +197,3 @@ func totalPages(total int64, limit int) int {
 	}
 	return int(math.Ceil(float64(total) / float64(limit)))
 }
-
-func roundMoney(value float64) float64 { return money.Round2(value) }
-
-func roundQuantity(value float64) float64 { return money.Round4(value) }

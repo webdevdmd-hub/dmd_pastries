@@ -110,11 +110,13 @@ func auditDisplayValue(value interface{}) interface{} {
 			return nil
 		}
 		return typed.UTC().Format(time.RFC3339)
-	// Amounts reach audit metadata as bare floats through reflection. When
-	// money becomes a decimal type (Phase 6 / W4) this switch stops matching
-	// it and silently drops the normalisation, so it needs a decimal case at
-	// that point -- it is the one place the type change is invisible to the
-	// compiler.
+	// Amounts reach audit metadata as bare values through reflection, so this
+	// switch is the one place the float64 -> money.Amount change is invisible
+	// to the compiler: a converted module would fall through to default and
+	// silently stop being normalised. Both forms are handled while the
+	// migration is in progress.
+	case money.Amount:
+		return typed.Round4()
 	case float64:
 		return money.Round4(typed)
 	case float32:

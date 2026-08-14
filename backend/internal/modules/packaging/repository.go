@@ -3,7 +3,6 @@ package packaging
 import (
 	"fmt"
 	"math"
-	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -66,7 +65,7 @@ func (r *Repository) Lookup(businessID, branchID string, query LookupQuery) ([]P
 	var items []PackagingLookupItem
 	err := db.Order("pi.packaging_name ASC").Limit(query.Limit).Scan(&items).Error
 	for i := range items {
-		items[i].CostPerUnit = roundMoney(items[i].CostPerUnit)
+		items[i].CostPerUnit = items[i].CostPerUnit.Round2()
 	}
 	return items, err
 }
@@ -131,7 +130,7 @@ func (r *Repository) ListUsageRules(businessID, branchID, productID string) ([]U
 		Order("pur.is_default DESC, pi.packaging_name ASC").
 		Scan(&rules).Error
 	for i := range rules {
-		rules[i].QuantityRequired = roundQuantity(rules[i].QuantityRequired)
+		rules[i].QuantityRequired = rules[i].QuantityRequired.Round4()
 	}
 	return rules, err
 }
@@ -175,8 +174,8 @@ func (r *Repository) ToResponse(businessID string, item PackagingItem) Packaging
 	return PackagingResponse{
 		ID: item.ID, BusinessID: item.BusinessID, BranchID: item.BranchID, PackagingCategoryID: item.PackagingCategoryID, CategoryName: categoryName,
 		SupplierID: item.SupplierID, SupplierName: supplierName, PackagingName: item.PackagingName, PackagingCode: item.PackagingCode,
-		Description: item.Description, UnitID: item.UnitID, UnitName: unitName, UnitSymbol: unitSymbol, CostPerUnit: roundMoney(item.CostPerUnit),
-		IsStockTracked: item.IsStockTracked, IsConsumable: item.IsConsumable, ReorderLevel: roundQuantity(item.ReorderLevel),
+		Description: item.Description, UnitID: item.UnitID, UnitName: unitName, UnitSymbol: unitSymbol, CostPerUnit: item.CostPerUnit.Round2(),
+		IsStockTracked: item.IsStockTracked, IsConsumable: item.IsConsumable, ReorderLevel: item.ReorderLevel.Round4(),
 		ImageURL: item.ImageURL, ImageFileID: item.ImageFileID, Status: item.Status, InventoryItemID: inventoryID, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
 	}
 }
@@ -234,10 +233,6 @@ func totalPages(total int64, limit int) int {
 	}
 	return int(math.Ceil(float64(total) / float64(limit)))
 }
-
-func roundMoney(value float64) float64 { return money.Round2(value) }
-
-func roundQuantity(value float64) float64 { return money.Round4(value) }
 
 func touch() time.Time {
 	return time.Now().UTC()

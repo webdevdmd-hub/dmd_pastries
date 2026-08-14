@@ -3,7 +3,6 @@ package expenses
 import (
 	"errors"
 	"math"
-	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
 	apperrors "pastries-pos/internal/shared/errors"
+	"pastries-pos/internal/shared/money"
 	"pastries-pos/internal/shared/utils"
 )
 
@@ -167,7 +167,7 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateEx
 			existing.BranchID != normalized.BranchID ||
 			existing.ExpenseAccountID != normalized.ExpenseAccountID ||
 			existing.PaidThroughAccountID != normalized.PaidThroughAccountID ||
-			roundMoney(existing.Amount) != roundMoney(normalized.Amount)
+			!existing.Amount.Round2().Equal(normalized.Amount.Round2())
 
 		now := time.Now().UTC()
 		updates := map[string]interface{}{
@@ -313,7 +313,7 @@ type normalizedExpenseInput struct {
 	PaidThroughAccountID string
 	SupplierID           *string
 	CustomerID           *string
-	Amount               float64
+	Amount               money.Amount
 	ReferenceNumber      string
 	Notes                string
 	ReceiptFileID        string
@@ -329,8 +329,8 @@ func (s *Service) normalizeCreateRequest(currentUser *utils.AuthContext, req Cre
 	if err != nil {
 		return normalizedExpenseInput{}, err
 	}
-	amount := roundMoney(req.Amount)
-	if amount <= 0 {
+	amount := req.Amount.Round2()
+	if !amount.IsPositive() {
 		return normalizedExpenseInput{}, apperrors.BadRequest("amount must be greater than 0", nil)
 	}
 	return normalizedExpenseInput{
@@ -365,11 +365,11 @@ func (s *Service) normalizeUpdateRequest(currentUser *utils.AuthContext, existin
 		}
 		expenseDate = parsed
 	}
-	amount := roundMoney(existing.Amount)
+	amount := existing.Amount.Round2()
 	if req.Amount != nil {
-		amount = roundMoney(*req.Amount)
+		amount = req.Amount.Round2()
 	}
-	if amount <= 0 {
+	if !amount.IsPositive() {
 		return normalizedExpenseInput{}, apperrors.BadRequest("amount must be greater than 0", nil)
 	}
 	expenseAccountID := existing.ExpenseAccountID
@@ -462,10 +462,15 @@ func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext
 	if branchID == "" {
 		return "", apperrors.Internal("expense journal requires a branch")
 	}
-	amount := roundExpenseMoney(expense.Amount)
-	if amount <= 0 {
+	amount := expense.Amount.Round2()
+	if !amount.IsPositive() {
 		return "", apperrors.BadRequest("expense amount must be greater than zero to post a journal", nil)
 	}
+	// The accounting module still carries journal amounts as float64;
+	// converting it is a later step of this migration (Phase 6 / W4). The
+	// value is exact at this point, and NUMERIC(14,2) fits float64 without
+	// losing cents, so the hand-off is lossless.
+	amountFloat := amount.Float64()
 	if existing, err := s.repo.FindPostedJournalBySource(tx, expense.BusinessID, sourceType, expense.ID); err == nil && existing.ID != "" {
 		return existing.ID, nil
 	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -492,8 +497,8 @@ func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext
 		SourceID:        &sourceID,
 		Narration:       "Expense " + expense.ExpenseNumber,
 		Status:          "posted",
-		TotalDebit:      amount,
-		TotalCredit:     amount,
+		TotalDebit:      amountFloat,
+		TotalCredit:     amountFloat,
 		PostedAt:        &now,
 		PostedByUserID:  &currentUser.UserID,
 		ReversedEntryID: reversedEntryID,
@@ -509,7 +514,7 @@ func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext
 			JournalEntryID: entry.ID,
 			AccountID:      expense.ExpenseAccountID,
 			LineNumber:     1,
-			DebitAmount:    amount,
+			DebitAmount:    amountFloat,
 			CreditAmount:   0,
 			Description:    coalesceReference(expense.Notes, "Expense "+expense.ExpenseNumber),
 			CreatedAt:      now,
@@ -523,7 +528,7 @@ func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext
 			AccountID:      expense.PaidThroughAccountID,
 			LineNumber:     2,
 			DebitAmount:    0,
-			CreditAmount:   amount,
+			CreditAmount:   amountFloat,
 			Description:    "Paid through account",
 			CreatedAt:      now,
 			UpdatedAt:      now,
@@ -690,8 +695,6 @@ func normalizePositive(value, fallback int) int {
 	}
 	return value
 }
-
-func roundMoney(value float64) float64 { return money.Round2(value) }
 
 func sameDate(left, right time.Time) bool {
 	return left.Format("2006-01-02") == right.Format("2006-01-02")

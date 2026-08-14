@@ -204,7 +204,7 @@ func (r *Repository) LoadResponses(businessID string, expenses []Expense) ([]Exp
 			PaidThroughAccountName: paidAccount.AccountName,
 			SupplierID:             expense.SupplierID,
 			CustomerID:             expense.CustomerID,
-			Amount:                 roundMoney(expense.Amount),
+			Amount:                 expense.Amount.Round2(),
 			ReferenceNumber:        expense.ReferenceNumber,
 			Notes:                  expense.Notes,
 			ReceiptFileID:          expense.ReceiptFileID,

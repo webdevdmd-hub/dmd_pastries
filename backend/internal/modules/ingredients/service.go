@@ -189,13 +189,13 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateIn
 			updates["unit_id"] = strings.TrimSpace(req.UnitID)
 		}
 		if req.CostPerUnit != nil {
-			if *req.CostPerUnit < 0 {
+			if req.CostPerUnit.IsNegative() {
 				return apperrors.BadRequest("cost_per_unit must be non-negative", nil)
 			}
 			updates["cost_per_unit"] = *req.CostPerUnit
 		}
 		if req.ReorderLevel != nil {
-			if *req.ReorderLevel < 0 {
+			if req.ReorderLevel.IsNegative() {
 				return apperrors.BadRequest("reorder_level must be non-negative", nil)
 			}
 			updates["reorder_level"] = *req.ReorderLevel
@@ -301,10 +301,10 @@ func (s *Service) validateCreatePayload(tx *gorm.DB, businessID, branchID string
 	if err := validateUUID(req.UnitID, "unit_id"); err != nil {
 		return err
 	}
-	if req.CostPerUnit < 0 {
+	if req.CostPerUnit.IsNegative() {
 		return apperrors.BadRequest("cost_per_unit must be non-negative", nil)
 	}
-	if req.ReorderLevel < 0 {
+	if req.ReorderLevel.IsNegative() {
 		return apperrors.BadRequest("reorder_level must be non-negative", nil)
 	}
 	if err := s.repo.ValidateCategory(tx, businessID, branchID, req.IngredientCategoryID); err != nil {
@@ -334,10 +334,12 @@ func (s *Service) ensureInventoryItem(tx *gorm.DB, item *Ingredient) error {
 		CurrentQuantity:   0,
 		ReservedQuantity:  0,
 		AvailableQuantity: 0,
-		ReorderLevel:      item.ReorderLevel,
-		UnitID:            item.UnitID,
-		IsExpiryTracked:   item.IsExpiryTracked,
-		Status:            "active",
+		// The inventory module still carries quantities as float64; it
+		// converts in a later step of this migration (Phase 6 / W4).
+		ReorderLevel:    item.ReorderLevel.Float64(),
+		UnitID:          item.UnitID,
+		IsExpiryTracked: item.IsExpiryTracked,
+		Status:          "active",
 	}
 	return s.inventoryRepo.CreateInventoryItem(tx, inventoryItem)
 }

@@ -1,6 +1,10 @@
 package ingredients
 
-import "time"
+import (
+	"time"
+
+	"pastries-pos/internal/shared/money"
+)
 
 type ListQuery struct {
 	Search               string
@@ -21,32 +25,32 @@ type LookupQuery struct {
 }
 
 type CreateIngredientRequest struct {
-	IngredientName       string  `json:"ingredient_name" binding:"required"`
-	IngredientCategoryID string  `json:"ingredient_category_id" binding:"required"`
-	SupplierID           string  `json:"supplier_id"`
-	UnitID               string  `json:"unit_id" binding:"required"`
-	CostPerUnit          float64 `json:"cost_per_unit"`
-	IsStockTracked       bool    `json:"is_stock_tracked"`
-	IsExpiryTracked      bool    `json:"is_expiry_tracked"`
-	ReorderLevel         float64 `json:"reorder_level"`
-	Description          string  `json:"description"`
-	ImageURL             string  `json:"image_url"`
-	ImageFileID          string  `json:"image_file_id"`
+	IngredientName       string       `json:"ingredient_name" binding:"required"`
+	IngredientCategoryID string       `json:"ingredient_category_id" binding:"required"`
+	SupplierID           string       `json:"supplier_id"`
+	UnitID               string       `json:"unit_id" binding:"required"`
+	CostPerUnit          money.Amount `json:"cost_per_unit"`
+	IsStockTracked       bool         `json:"is_stock_tracked"`
+	IsExpiryTracked      bool         `json:"is_expiry_tracked"`
+	ReorderLevel         money.Amount `json:"reorder_level"`
+	Description          string       `json:"description"`
+	ImageURL             string       `json:"image_url"`
+	ImageFileID          string       `json:"image_file_id"`
 }
 
 type UpdateIngredientRequest struct {
-	IngredientName       string   `json:"ingredient_name"`
-	IngredientCategoryID string   `json:"ingredient_category_id"`
-	SupplierID           *string  `json:"supplier_id"`
-	UnitID               string   `json:"unit_id"`
-	CostPerUnit          *float64 `json:"cost_per_unit"`
-	IsStockTracked       *bool    `json:"is_stock_tracked"`
-	IsExpiryTracked      *bool    `json:"is_expiry_tracked"`
-	ReorderLevel         *float64 `json:"reorder_level"`
-	Description          string   `json:"description"`
-	ImageURL             *string  `json:"image_url"`
-	ImageFileID          string   `json:"image_file_id"`
-	Status               string   `json:"status"`
+	IngredientName       string        `json:"ingredient_name"`
+	IngredientCategoryID string        `json:"ingredient_category_id"`
+	SupplierID           *string       `json:"supplier_id"`
+	UnitID               string        `json:"unit_id"`
+	CostPerUnit          *money.Amount `json:"cost_per_unit"`
+	IsStockTracked       *bool         `json:"is_stock_tracked"`
+	IsExpiryTracked      *bool         `json:"is_expiry_tracked"`
+	ReorderLevel         *money.Amount `json:"reorder_level"`
+	Description          string        `json:"description"`
+	ImageURL             *string       `json:"image_url"`
+	ImageFileID          string        `json:"image_file_id"`
+	Status               string        `json:"status"`
 }
 
 type UpdateStatusRequest struct {
@@ -54,41 +58,41 @@ type UpdateStatusRequest struct {
 }
 
 type IngredientResponse struct {
-	ID                   string    `json:"id"`
-	BusinessID           string    `json:"business_id"`
-	BranchID             string    `json:"branch_id"`
-	IngredientCategoryID string    `json:"ingredient_category_id"`
-	CategoryName         string    `json:"category_name"`
-	SupplierID           *string   `json:"supplier_id"`
-	SupplierName         string    `json:"supplier_name"`
-	IngredientName       string    `json:"ingredient_name"`
-	IngredientCode       string    `json:"ingredient_code"`
-	Description          string    `json:"description"`
-	UnitID               string    `json:"unit_id"`
-	UnitName             string    `json:"unit_name"`
-	UnitSymbol           string    `json:"unit_symbol"`
-	CostPerUnit          float64   `json:"cost_per_unit"`
-	IsStockTracked       bool      `json:"is_stock_tracked"`
-	IsExpiryTracked      bool      `json:"is_expiry_tracked"`
-	ReorderLevel         float64   `json:"reorder_level"`
-	ImageURL             *string   `json:"image_url"`
-	ImageFileID          string    `json:"image_file_id"`
-	Status               string    `json:"status"`
-	InventoryItemID      *string   `json:"inventory_item_id,omitempty"`
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
+	ID                   string       `json:"id"`
+	BusinessID           string       `json:"business_id"`
+	BranchID             string       `json:"branch_id"`
+	IngredientCategoryID string       `json:"ingredient_category_id"`
+	CategoryName         string       `json:"category_name"`
+	SupplierID           *string      `json:"supplier_id"`
+	SupplierName         string       `json:"supplier_name"`
+	IngredientName       string       `json:"ingredient_name"`
+	IngredientCode       string       `json:"ingredient_code"`
+	Description          string       `json:"description"`
+	UnitID               string       `json:"unit_id"`
+	UnitName             string       `json:"unit_name"`
+	UnitSymbol           string       `json:"unit_symbol"`
+	CostPerUnit          money.Amount `json:"cost_per_unit"`
+	IsStockTracked       bool         `json:"is_stock_tracked"`
+	IsExpiryTracked      bool         `json:"is_expiry_tracked"`
+	ReorderLevel         money.Amount `json:"reorder_level"`
+	ImageURL             *string      `json:"image_url"`
+	ImageFileID          string       `json:"image_file_id"`
+	Status               string       `json:"status"`
+	InventoryItemID      *string      `json:"inventory_item_id,omitempty"`
+	CreatedAt            time.Time    `json:"created_at"`
+	UpdatedAt            time.Time    `json:"updated_at"`
 }
 
 type IngredientLookupItem struct {
-	ID              string  `json:"id"`
-	IngredientName  string  `json:"ingredient_name"`
-	IngredientCode  string  `json:"ingredient_code"`
-	UnitID          string  `json:"unit_id"`
-	UnitSymbol      string  `json:"unit_symbol"`
-	CostPerUnit     float64 `json:"cost_per_unit"`
-	IsStockTracked  bool    `json:"is_stock_tracked"`
-	IsExpiryTracked bool    `json:"is_expiry_tracked"`
-	Status          string  `json:"status"`
+	ID              string       `json:"id"`
+	IngredientName  string       `json:"ingredient_name"`
+	IngredientCode  string       `json:"ingredient_code"`
+	UnitID          string       `json:"unit_id"`
+	UnitSymbol      string       `json:"unit_symbol"`
+	CostPerUnit     money.Amount `json:"cost_per_unit"`
+	IsStockTracked  bool         `json:"is_stock_tracked"`
+	IsExpiryTracked bool         `json:"is_expiry_tracked"`
+	Status          string       `json:"status"`
 }
 
 type PaginationResponse struct {

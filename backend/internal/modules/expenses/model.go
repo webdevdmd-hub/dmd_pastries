@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"pastries-pos/internal/shared/money"
 )
 
 type Expense struct {
@@ -16,7 +18,7 @@ type Expense struct {
 	PaidThroughAccountID   string         `gorm:"type:uuid;not null;index" json:"paid_through_account_id"`
 	SupplierID             *string        `gorm:"type:uuid;index" json:"supplier_id"`
 	CustomerID             *string        `gorm:"type:uuid;index" json:"customer_id"`
-	Amount                 float64        `gorm:"not null" json:"amount"`
+	Amount                 money.Amount   `gorm:"type:numeric(14,2);not null" json:"amount"`
 	ReferenceNumber        string         `gorm:"size:255" json:"reference_number"`
 	Notes                  string         `json:"notes"`
 	ReceiptFileID          string         `gorm:"size:500" json:"receipt_file_id"`

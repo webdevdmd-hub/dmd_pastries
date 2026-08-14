@@ -1,6 +1,7 @@
 package ingredients
 
 import (
+	"pastries-pos/internal/shared/money"
 	"time"
 
 	"gorm.io/gorm"
@@ -16,10 +17,10 @@ type Ingredient struct {
 	IngredientCode       string         `gorm:"size:100;not null" json:"ingredient_code"`
 	Description          string         `json:"description"`
 	UnitID               string         `gorm:"type:uuid;not null;index" json:"unit_id"`
-	CostPerUnit          float64        `gorm:"not null;default:0" json:"cost_per_unit"`
+	CostPerUnit          money.Amount   `gorm:"not null;default:0" json:"cost_per_unit"`
 	IsStockTracked       bool           `gorm:"not null;default:true" json:"is_stock_tracked"`
 	IsExpiryTracked      bool           `gorm:"not null;default:true" json:"is_expiry_tracked"`
-	ReorderLevel         float64        `gorm:"not null;default:0" json:"reorder_level"`
+	ReorderLevel         money.Amount   `gorm:"not null;default:0" json:"reorder_level"`
 	ImageURL             *string        `gorm:"size:500" json:"image_url"`
 	ImageFileID          string         `gorm:"size:500" json:"image_file_id"`
 	Status               string         `gorm:"size:50;not null;default:active" json:"status"`

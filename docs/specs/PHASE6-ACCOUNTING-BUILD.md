@@ -263,7 +263,24 @@ The one category where a payload byte legitimately changes is values that today 
 ## Remaining change
 1. ~~**`backend/internal/shared/money`**~~ — done.
 2. ~~**Wire format pinned**~~ — done, via `Amount.MarshalJSON`; the `MarshalJSONWithoutQuotes` global is not used.
-3. Convert **module by module**: leaf modules (charges, expenses, ingredients, packaging, customers, suppliers, dashboard) → inventory + products/pricing (fixing the `:1703` bug) → transactional bulk (pos, salesreturns, bakeryorders, payments, purchasing, manufacturing, recipes) → accounting → reports/shared + audit.
+**Step 3 is PARTIALLY done: `expenses`, `packaging` and `ingredients` are converted.** Their money and quantity fields are `money.Amount` end to end — model, DTOs, validation and arithmetic. Boundary shims (`.Float64()`) mark each hand-off to a module that has not converted yet: expenses → accounting journal lines, packaging/ingredients → inventory reorder levels. Each shim carries a comment naming the step that removes it. `audit/metadata.go` gained its `case money.Amount:` — the reflection landmine, closed while both types are in play.
+
+**`charges` is NOT a leaf and must not be converted here.** The spec listed it as one, but it is imported by ten files across `pos`, `bakeryorders`, `purchasing` and `salesreturns`. It converts with the transactional bulk.
+
+**Remaining leaves: `customers`, `suppliers`, `dashboard`.** These are read-only aggregation. Their money arrives via bare scalar `Scan(&someFloat)` calls rather than model fields, and see the blocker below before converting those.
+
+### Blocker for the rest of W4: no database-backed tests
+
+There is no DB test harness anywhere in the repo — no `TestMain`, no sqlmock, no testcontainers. Every test is pure unit. That is the same gap that let two runtime-fatal year-end-close bugs ship green in Phase 5.
+
+It matters more here than anywhere else. `money.Amount` implements `sql.Scanner` and `driver.Valuer`, and its handling of every form the driver produces is unit-tested — but **whether GORM routes through those methods for a model field is not verified against Postgres.** The failure modes are asymmetric:
+
+- **Write path fails loudly.** If `Valuer` were bypassed, the driver rejects a struct outright.
+- **Read path can fail silently.** If `Scanner` were bypassed, `Amount` has no exported field for GORM to map, so amounts would read back as **zero** rather than erroring.
+
+A silent read-back of zero on money is the worst outcome this migration could produce. **Before converting further modules, stand up a DB-backed integration test** covering write-then-read of a converted model. Until then, each converted module needs a manual smoke check against a real database.
+
+3. Convert the remaining modules **module by module**: leaf modules (charges, expenses, ingredients, packaging, customers, suppliers, dashboard) → inventory + products/pricing (fixing the `:1703` bug) → transactional bulk (pos, salesreturns, bakeryorders, payments, purchasing, manufacturing, recipes) → accounting → reports/shared + audit.
 4. **Quantities convert too**, in the same pass. Keeping them `float64` forces a conversion at ~170 mixed-arithmetic sites and reintroduces float error at exactly the `unit_cost × quantity` multiplication that matters.
 5. `audit/metadata.go:112-115` type-switches on `case float64:` — add `case decimal.Decimal:` or audit metadata silently stops normalizing. This is the one reflection-shaped landmine.
 6. Cleanup: delete `absorbRoundingResidue` + `systemBalanceEpsilon` (dead once differences are exactly zero — the clearest proof the migration worked), shrink `ledgerDriftEpsilon`, remove the inline `+0.0001`/`0.004`/`0.005` literals and the SQL `ABS(...) > 0.004` filters, migrate the 15 exact-literal test assertions to `.Equal()`.
