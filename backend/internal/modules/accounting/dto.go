@@ -111,12 +111,14 @@ type CreateChartAccountRequest struct {
 }
 
 type CreatePaymentAccountRequest struct {
-	BranchID       *string `json:"branch_id" binding:"omitempty,uuid"`
-	AccountName    string  `json:"account_name" binding:"required"`
-	AccountType    string  `json:"account_type" binding:"required"`
-	ChartAccountID string  `json:"chart_account_id" binding:"required,uuid"`
-	Description    string  `json:"description"`
-	Status         string  `json:"status" binding:"omitempty,oneof=active inactive"`
+	BranchID           *string  `json:"branch_id" binding:"omitempty,uuid"`
+	AccountName        string   `json:"account_name" binding:"required"`
+	AccountType        string   `json:"account_type" binding:"required"`
+	ChartAccountID     string   `json:"chart_account_id" binding:"required,uuid"`
+	Description        string   `json:"description"`
+	Status             string   `json:"status" binding:"omitempty,oneof=active inactive"`
+	OpeningBalance     *float64 `json:"opening_balance"`
+	OpeningBalanceDate *string  `json:"opening_balance_date"`
 }
 
 type CreateAccountTransferRequest struct {
@@ -158,12 +160,14 @@ type UpdateChartAccountRequest struct {
 }
 
 type UpdatePaymentAccountRequest struct {
-	BranchID       *string `json:"branch_id" binding:"omitempty,uuid"`
-	AccountName    *string `json:"account_name"`
-	AccountType    *string `json:"account_type"`
-	ChartAccountID *string `json:"chart_account_id" binding:"omitempty,uuid"`
-	Description    *string `json:"description"`
-	Status         *string `json:"status" binding:"omitempty,oneof=active inactive"`
+	BranchID           *string  `json:"branch_id" binding:"omitempty,uuid"`
+	AccountName        *string  `json:"account_name"`
+	AccountType        *string  `json:"account_type"`
+	ChartAccountID     *string  `json:"chart_account_id" binding:"omitempty,uuid"`
+	Description        *string  `json:"description"`
+	Status             *string  `json:"status" binding:"omitempty,oneof=active inactive"`
+	OpeningBalance     *float64 `json:"opening_balance"`
+	OpeningBalanceDate *string  `json:"opening_balance_date"`
 }
 
 type UpdateChartAccountStatusRequest struct {
@@ -304,6 +308,9 @@ type PaymentAccountResponse struct {
 	Description                    string    `json:"description"`
 	CurrentBalance                 float64   `json:"current_balance"`
 	BalanceLabel                   string    `json:"balance_label"`
+	OpeningBalance                 float64   `json:"opening_balance"`
+	OpeningBalanceDate             *string   `json:"opening_balance_date"`
+	OpeningJournalEntryID          *string   `json:"opening_journal_entry_id"`
 	Status                         string    `json:"status"`
 	CreatedAt                      time.Time `json:"created_at"`
 	UpdatedAt                      time.Time `json:"updated_at"`

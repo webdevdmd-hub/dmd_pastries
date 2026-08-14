@@ -123,6 +123,8 @@ type BackendPaymentAccountPayload = {
   chart_account_id?: string;
   description?: string;
   status?: AccountingAccountStatus;
+  opening_balance?: number;
+  opening_balance_date?: string | null;
 };
 
 type BackendAccountTransferPayload = {
@@ -360,6 +362,9 @@ function parsePaymentAccount(value: unknown): PaymentAccount {
     description: stringValue(value.description),
     currentBalance: numberValue(value.current_balance, 0),
     balanceLabel: stringValue(value.balance_label),
+    openingBalance: numberValue(value.opening_balance, 0),
+    openingBalanceDate: optionalString(value.opening_balance_date),
+    openingJournalEntryId: optionalString(value.opening_journal_entry_id),
     status: isAccountStatus(value.status) ? value.status : "active",
     createdAt: stringValue(value.created_at),
     updatedAt: stringValue(value.updated_at),
@@ -1116,6 +1121,10 @@ function paymentAccountPayload(
     ...(payload.chartAccountId !== undefined ? { chart_account_id: payload.chartAccountId } : {}),
     ...(payload.description !== undefined ? { description: payload.description } : {}),
     ...(payload.status !== undefined ? { status: payload.status } : {}),
+    ...(payload.openingBalance !== undefined ? { opening_balance: payload.openingBalance } : {}),
+    ...(payload.openingBalanceDate !== undefined
+      ? { opening_balance_date: payload.openingBalanceDate }
+      : {}),
   };
 }
 

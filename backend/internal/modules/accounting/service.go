@@ -586,6 +586,10 @@ func (s *Service) CreatePaymentAccount(currentUser *utils.AuthContext, req Creat
 	} else if exists {
 		return nil, apperrors.Conflict("chart account is already linked to a payment account for this branch scope", nil)
 	}
+	opening, err := normalizeOpeningBalanceInput(accountType, req.OpeningBalance, req.OpeningBalanceDate)
+	if err != nil {
+		return nil, err
+	}
 	var createdID string
 	if err := s.withTransaction(func(tx *gorm.DB) error {
 		chartAccount, err := s.repo.ValidateActiveAccountForBranch(tx, currentUser.BusinessID, resolvedBranchID, chartAccountID)
@@ -613,10 +617,25 @@ func (s *Service) CreatePaymentAccount(currentUser *utils.AuthContext, req Creat
 			CreatedByUserID: &currentUser.UserID,
 			UpdatedByUserID: &currentUser.UserID,
 		}
+		if opening != nil {
+			account.OpeningBalance = opening.Amount
+			account.OpeningBalanceDate = opening.Date
+		}
 		if err := s.repo.CreatePaymentAccount(tx, account); err != nil {
 			return apperrors.Internal("failed to create payment account")
 		}
 		createdID = account.ID
+		if opening != nil && opening.Amount != 0 {
+			journalID, err := s.applyPaymentAccountOpeningBalance(tx, currentUser, account, *opening)
+			if err != nil {
+				return err
+			}
+			if journalID != nil {
+				if err := s.repo.UpdatePaymentAccount(tx, currentUser.BusinessID, account.ID, map[string]interface{}{"opening_journal_entry_id": *journalID}); err != nil {
+					return apperrors.Internal("failed to link the opening balance journal")
+				}
+			}
+		}
 		return s.writeEntityAudit(tx, currentUser, "payment_account.created", "payment_account", account.ID, "Payment account created.", ipAddress, userAgent)
 	}); err != nil {
 		return nil, err
@@ -800,6 +819,40 @@ func (s *Service) UpdatePaymentAccount(currentUser *utils.AuthContext, id string
 		}
 		updates["status"] = status
 	}
+	targetAccountType := account.AccountType
+	if req.AccountType != nil {
+		targetAccountType = strings.TrimSpace(*req.AccountType)
+	}
+	opening, err := normalizeOpeningBalanceInput(targetAccountType, req.OpeningBalance, req.OpeningBalanceDate)
+	if err != nil {
+		return nil, err
+	}
+	// An opening balance is only reposted when the amount or the date
+	// actually moves; editing a name or description leaves the journal alone.
+	openingChanged := false
+	if opening != nil {
+		mergedOpening := openingBalanceInput{Amount: account.OpeningBalance, Date: account.OpeningBalanceDate}
+		if req.OpeningBalance != nil {
+			mergedOpening.Amount = opening.Amount
+		}
+		if req.OpeningBalanceDate != nil {
+			mergedOpening.Date = opening.Date
+		}
+		if mergedOpening.Amount != 0 && mergedOpening.Date == nil {
+			return nil, apperrors.BadRequest("opening_balance_date is required when opening_balance is not zero", nil)
+		}
+		openingChanged = roundMoney(mergedOpening.Amount) != roundMoney(account.OpeningBalance) ||
+			!sameOptionalDate(mergedOpening.Date, account.OpeningBalanceDate)
+		opening = &mergedOpening
+		if openingChanged {
+			updates["opening_balance"] = mergedOpening.Amount
+			if mergedOpening.Date == nil {
+				updates["opening_balance_date"] = nil
+			} else {
+				updates["opening_balance_date"] = *mergedOpening.Date
+			}
+		}
+	}
 	if len(updates) == 2 {
 		return s.GetPaymentAccount(currentUser, id)
 	}
@@ -813,6 +866,29 @@ func (s *Service) UpdatePaymentAccount(currentUser *utils.AuthContext, id string
 					return apperrors.BadRequest("chart_account_id must reference an active asset account", nil)
 				}
 				return apperrors.Internal("failed to validate chart account")
+			}
+		}
+		if openingChanged && opening != nil {
+			// Repost against the CURRENT row (chart account or branch may
+			// have moved in this same request).
+			reposted := *account
+			if chartAccountID, ok := updates["chart_account_id"].(string); ok {
+				reposted.ChartAccountID = chartAccountID
+			}
+			if req.BranchID != nil {
+				reposted.BranchID = targetBranchID
+			}
+			if req.AccountName != nil {
+				reposted.AccountName = targetName
+			}
+			journalID, err := s.applyPaymentAccountOpeningBalance(tx, currentUser, &reposted, *opening)
+			if err != nil {
+				return err
+			}
+			if journalID == nil {
+				updates["opening_journal_entry_id"] = nil
+			} else {
+				updates["opening_journal_entry_id"] = *journalID
 			}
 		}
 		if err := s.repo.UpdatePaymentAccount(tx, currentUser.BusinessID, id, updates); err != nil {
@@ -864,7 +940,12 @@ func (s *Service) DeletePaymentAccount(currentUser *utils.AuthContext, id, ipAdd
 		if count > 0 {
 			return apperrors.Conflict("payment account is linked to payment methods; unlink it before deleting", nil)
 		}
-		updates := map[string]interface{}{"status": "inactive", "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC(), "deleted_at": gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}}
+		// Without this the account's opening entry would strand a balance in
+		// 3400 Opening Balance Equity for an account that no longer exists.
+		if err := s.clearPaymentAccountOpeningJournal(tx, currentUser, account); err != nil {
+			return err
+		}
+		updates := map[string]interface{}{"status": "inactive", "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC(), "deleted_at": gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}, "opening_journal_entry_id": nil}
 		if err := s.repo.UpdatePaymentAccount(tx, currentUser.BusinessID, id, updates); err != nil {
 			return mapPaymentAccountNotFound(err)
 		}

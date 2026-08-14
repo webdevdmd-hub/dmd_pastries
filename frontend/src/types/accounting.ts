@@ -492,6 +492,9 @@ export type PaymentAccount = {
   description: string;
   currentBalance: number;
   balanceLabel: string;
+  openingBalance: number;
+  openingBalanceDate: string | null;
+  openingJournalEntryId: string | null;
   status: AccountingAccountStatus;
   createdAt: string;
   updatedAt: string;
@@ -527,6 +530,8 @@ export type PaymentAccountPayload = {
   chartAccountId: string;
   description: string;
   status: AccountingAccountStatus;
+  openingBalance: number;
+  openingBalanceDate: string | null;
 };
 
 export type AccountTransfer = {

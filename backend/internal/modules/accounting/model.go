@@ -58,6 +58,13 @@ type PaymentAccount struct {
 	CreatedAt       time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+
+	// Opening balance (Phase 5 / W3): the account's real-world balance when
+	// the business started keeping books here. Posted against 3400 Opening
+	// Balance Equity; editing reposts.
+	OpeningBalance        float64    `gorm:"type:numeric(14,2);not null;default:0" json:"opening_balance"`
+	OpeningBalanceDate    *time.Time `gorm:"type:date" json:"opening_balance_date"`
+	OpeningJournalEntryID *string    `gorm:"type:uuid" json:"opening_journal_entry_id"`
 }
 
 func (PaymentAccount) TableName() string { return "payment_accounts" }

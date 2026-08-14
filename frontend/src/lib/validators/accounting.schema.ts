@@ -78,14 +78,33 @@ export const journalEntrySchema = z
     }
   });
 
-export const paymentAccountSchema = z.object({
-  accountName: z.string().trim().min(1, "Payment account name is required."),
-  accountType: z.enum(["cash", "bank", "card_clearing", "platform_clearing", "wallet", "other"]),
-  branchId: optionalNullableString,
-  chartAccountId: z.string().trim().min(1, "Linked chart account is required."),
-  description: z.string(),
-  status: z.enum(["active", "inactive"]),
-});
+export const paymentAccountSchema = z
+  .object({
+    accountName: z.string().trim().min(1, "Payment account name is required."),
+    accountType: z.enum([
+      "cash",
+      "bank",
+      "card_clearing",
+      "platform_clearing",
+      "wallet",
+      "store_credit",
+      "other",
+    ]),
+    branchId: optionalNullableString,
+    chartAccountId: z.string().trim().min(1, "Linked chart account is required."),
+    description: z.string(),
+    status: z.enum(["active", "inactive"]),
+    openingBalance: z.number().finite("Opening balance must be a number."),
+    openingBalanceDate: optionalNullableString,
+  })
+  .refine((values) => values.openingBalance === 0 || Boolean(values.openingBalanceDate), {
+    message: "Pick the date the opening balance applies from.",
+    path: ["openingBalanceDate"],
+  })
+  .refine((values) => values.accountType !== "store_credit" || values.openingBalance === 0, {
+    message: "Store credit accounts cannot carry an opening balance.",
+    path: ["openingBalance"],
+  });
 
 export const accountTransferSchema = z
   .object({

@@ -210,6 +210,8 @@ type PaymentAccountFormState = {
   chartAccountId: string;
   description: string;
   status: "active" | "inactive";
+  openingBalance: string;
+  openingBalanceDate: string;
 };
 
 function emptyPaymentAccountForm(): PaymentAccountFormState {
@@ -220,6 +222,8 @@ function emptyPaymentAccountForm(): PaymentAccountFormState {
     chartAccountId: "",
     description: "",
     status: "active",
+    openingBalance: "",
+    openingBalanceDate: "",
   };
 }
 
@@ -233,10 +237,22 @@ function paymentAccountToForm(account: PaymentAccount | null): PaymentAccountFor
     chartAccountId: account.chartAccountId,
     description: account.description,
     status: account.status,
+    openingBalance: account.openingBalance === 0 ? "" : String(account.openingBalance),
+    openingBalanceDate: account.openingBalanceDate ?? "",
   };
 }
 
+// Store-credit tenders ride the Customer Advance liability and are funded by
+// credit grants, so the backend refuses an opening balance on them.
+function supportsOpeningBalance(accountType: PaymentAccountType): boolean {
+  return accountType !== "store_credit";
+}
+
 function toPaymentAccountPayload(form: PaymentAccountFormState): PaymentAccountPayload {
+  const openingBalance = supportsOpeningBalance(form.accountType)
+    ? Number(form.openingBalance.trim() || 0)
+    : 0;
+
   return {
     accountName: form.accountName.trim(),
     accountType: form.accountType,
@@ -244,6 +260,9 @@ function toPaymentAccountPayload(form: PaymentAccountFormState): PaymentAccountP
     chartAccountId: form.chartAccountId,
     description: form.description.trim(),
     status: form.status,
+    openingBalance: Number.isFinite(openingBalance) ? openingBalance : 0,
+    openingBalanceDate:
+      openingBalance !== 0 && form.openingBalanceDate ? form.openingBalanceDate : null,
   };
 }
 
@@ -378,6 +397,35 @@ function PaymentAccountDialog({
               </SelectContent>
             </Select>
           </div>
+          {supportsOpeningBalance(form.accountType) ? (
+            <>
+              <div className="grid gap-2">
+                <Label>Opening balance</Label>
+                <Input
+                  onChange={(event) => update({ openingBalance: event.target.value })}
+                  placeholder="0.00"
+                  step="0.01"
+                  type="number"
+                  value={form.openingBalance}
+                />
+                <p className="text-xs text-brand-mocha">
+                  Money already in this account before the books start here. Posts against Opening
+                  Balance Equity (3400).
+                </p>
+              </div>
+              <div className="grid gap-2">
+                <Label>Opening balance as of</Label>
+                <Input
+                  onChange={(event) => update({ openingBalanceDate: event.target.value })}
+                  type="date"
+                  value={form.openingBalanceDate}
+                />
+                <p className="text-xs text-brand-mocha">
+                  Usually the financial-year start. Required when the opening balance is not zero.
+                </p>
+              </div>
+            </>
+          ) : null}
           <div className="grid gap-2 md:col-span-2">
             <Label>Description</Label>
             <Input
@@ -611,6 +659,12 @@ export function PaymentAccountsPageClient({
                   <TableCell>{account.branchName || "Business-wide"}</TableCell>
                   <TableCell>
                     {money(account.currentBalance)} {account.balanceLabel}
+                    {account.openingBalance !== 0 ? (
+                      <span className="block text-xs text-brand-mocha">
+                        Opening {money(account.openingBalance)}
+                        {account.openingBalanceDate ? ` as of ${account.openingBalanceDate}` : ""}
+                      </span>
+                    ) : null}
                   </TableCell>
                   <TableCell>
                     <Badge variant={account.status === "active" ? "secondary" : "default"}>
