@@ -269,6 +269,12 @@ The one category where a payload byte legitimately changes is values that today 
 
 **Remaining leaves: `customers`, `suppliers`, `dashboard`.** These are read-only aggregation. Their money arrives via bare scalar `Scan(&someFloat)` calls rather than model fields, and see the blocker below before converting those.
 
+### RESOLVED: the database-backed harness now exists
+
+`backend/internal/testsupport/testdb` (see `backend/docs/database-tests.md`). It answered the blocking question: **GORM does route model fields through `money.Amount`'s `Scanner` and `Valuer`**, verified against real Postgres. Amounts round-trip at the column scale, and Go and Postgres sums agree exactly. **W4 is unblocked**; convert the remaining modules, adding a round-trip test per converted model.
+
+The original statement of the blocker is kept below because the reasoning still governs how the rest of the migration should be verified.
+
 ### Blocker for the rest of W4: no database-backed tests
 
 There is no DB test harness anywhere in the repo — no `TestMain`, no sqlmock, no testcontainers. Every test is pure unit. That is the same gap that let two runtime-fatal year-end-close bugs ship green in Phase 5.
