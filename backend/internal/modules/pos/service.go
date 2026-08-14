@@ -1543,7 +1543,9 @@ func calculateDiscount(discountType *string, value, base float64) (float64, erro
 	var discount float64
 	switch strings.TrimSpace(*discountType) {
 	case "percentage":
-		discount = base * value / 100
+		// Exact: base*value/100 in float64 rounds to the wrong fils whenever
+		// the true product lands on a half-fils boundary (Phase 6 / W4).
+		discount = money.FromFloat(base).Mul(money.FromFloat(value)).Div(money.FromInt(100)).Round2().Float64()
 	case "fixed":
 		discount = value
 	}
@@ -1551,16 +1553,6 @@ func calculateDiscount(discountType *string, value, base float64) (float64, erro
 		return 0, apperrors.BadRequest("fixed discount cannot exceed subtotal", nil)
 	}
 	return roundMoney(discount), nil
-}
-
-func calculateTax(amount, rate float64, inclusive bool) float64 {
-	if amount <= 0 || rate <= 0 {
-		return 0
-	}
-	if inclusive {
-		return roundMoney(amount - (amount / (1 + rate/100)))
-	}
-	return roundMoney(amount * rate / 100)
 }
 
 func paymentStatus(paidAmount, totalAmount float64) string {
