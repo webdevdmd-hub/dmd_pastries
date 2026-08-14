@@ -536,6 +536,39 @@ type SupplierPayableReportItem struct {
 	OldestDueDate      *string `json:"oldest_due_date"`
 }
 
+// ReportBalanceHeader is the ledger-backed control-account total for a
+// receivables or payables report (Phase 6 / W0).
+//
+// The header and the rows answer different questions and are not expected to
+// be equal: the header is the control-account balance as of the report's end
+// date, while the rows are the documents dated inside the report window. The
+// operational figure is the same-scope cross-check that produces the drift
+// warning, not the row total.
+type ReportBalanceHeader struct {
+	LedgerBalance      float64 `json:"ledger_balance"`
+	OperationalBalance float64 `json:"operational_balance"`
+}
+
+type OutstandingBalancesReportResponse struct {
+	Items               []OutstandingBalanceReportItem `json:"items"`
+	Pagination          interface{}                    `json:"pagination"`
+	Header              ReportBalanceHeader            `json:"header"`
+	SourceOfTruth       string                         `json:"source_of_truth"`
+	ConsistencyWarnings []ReportConsistencyWarning     `json:"consistency_warnings,omitempty"`
+}
+
+type SupplierPayablesReportResponse struct {
+	Items      []SupplierPayableReportItem `json:"items"`
+	Pagination interface{}                 `json:"pagination"`
+	Header     ReportBalanceHeader         `json:"header"`
+	// SupplierAdvances (1400) is surfaced separately rather than netted into
+	// the payable balance: an unapplied supplier payment is an asset, and
+	// netting it would understate both sides.
+	SupplierAdvances    float64                    `json:"supplier_advances"`
+	SourceOfTruth       string                     `json:"source_of_truth"`
+	ConsistencyWarnings []ReportConsistencyWarning `json:"consistency_warnings,omitempty"`
+}
+
 type PurchaseTotalsReportResponse struct {
 	TotalPurchaseAmount  float64                    `json:"total_purchase_amount"`
 	PaidPurchaseAmount   float64                    `json:"paid_purchase_amount"`

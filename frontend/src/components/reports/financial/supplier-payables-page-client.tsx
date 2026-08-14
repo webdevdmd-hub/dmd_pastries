@@ -1,6 +1,6 @@
 "use client";
 
-import { Truck } from "lucide-react";
+import { Truck, Wallet } from "lucide-react";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
 
@@ -16,6 +16,7 @@ import {
   defaultFinancialReportDraft,
   parseFinancialReportDraft,
 } from "@/components/reports/financial/financial-report-page-utils";
+import { ReportLedgerNotice } from "@/components/reports/financial/report-ledger-notice";
 import { SupplierPayablesTable } from "@/components/reports/financial/supplier-payables-table";
 import { ReportKpiCard } from "@/components/reports/report-kpi-card";
 import { ReportPageHeader } from "@/components/reports/report-page-header";
@@ -42,7 +43,11 @@ export function SupplierPayablesPageClient(): JSX.Element {
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useSupplierPayablesReport(filters, canView && hasScope);
-  const totalPayable = (reportQuery.data ?? []).reduce((sum, row) => sum + row.payableBalance, 0);
+  const rows = reportQuery.data?.rows ?? [];
+  // The headline figure is the payables control balance from the ledger; it
+  // used to be the sum of the visible page only.
+  const totalPayable = reportQuery.data?.header.ledgerBalance ?? 0;
+  const supplierAdvances = reportQuery.data?.supplierAdvances ?? 0;
   if (!canView) return <AccessDeniedCard />;
   if (!hasScope) return <NoBranchScopeCard />;
   const applyFilters = (): void => {
@@ -75,7 +80,16 @@ export function SupplierPayablesPageClient(): JSX.Element {
           label="Total Supplier Payables"
           value={formatCurrency(totalPayable)}
         />
+        <ReportKpiCard
+          icon={Wallet}
+          label="Supplier Advances"
+          value={formatCurrency(supplierAdvances)}
+        />
       </div>
+      <ReportLedgerNotice
+        sourceOfTruth={reportQuery.data?.sourceOfTruth ?? ""}
+        warnings={reportQuery.data?.consistencyWarnings ?? []}
+      />
       {reportQuery.error ? (
         <FinancialReportErrorState
           description={getErrorMessage(reportQuery.error)}
@@ -84,8 +98,8 @@ export function SupplierPayablesPageClient(): JSX.Element {
       ) : null}
       <Card className="bg-white/85 shadow-soft">
         <CardContent className="overflow-x-auto p-5">
-          {reportQuery.data && reportQuery.data.length > 0 ? (
-            <SupplierPayablesTable rows={reportQuery.data} />
+          {rows.length > 0 ? (
+            <SupplierPayablesTable rows={rows} />
           ) : (
             <FinancialReportEmptyState message="No supplier payables found." />
           )}

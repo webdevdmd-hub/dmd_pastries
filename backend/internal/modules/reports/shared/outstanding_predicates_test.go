@@ -38,6 +38,11 @@ func TestNoModuleRedeclaresOutstandingPredicates(t *testing.T) {
 	banned := []string{
 		`payment_status IN ('unpaid','partial')`,
 		`payment_status IN ?", businessID, branchID, customerID, "voided"`,
+		// The supplier-payables report carried its own copy of the payable
+		// scope and paired it with status <> 'cancelled', which admits DRAFT
+		// bills into an accounts-payable figure. Only posted bills are
+		// liabilities, so this guaranteed drift against the ledger.
+		`payment_status IN ('unpaid','partial','overdue')`,
 	}
 	var offenders []string
 	err := filepath.Walk(modulesDir, func(path string, info os.FileInfo, walkErr error) error {

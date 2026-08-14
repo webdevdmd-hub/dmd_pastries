@@ -4,12 +4,15 @@ import type {
   FinancialSummary,
   FinancialTrendChart,
   OutstandingBalanceRow,
+  OutstandingBalancesReport,
   PaymentMethodReportRow,
   PaymentsReportRow,
   PurchaseTotalsReport,
   ReconciliationRow,
   RefundReportRow,
+  ReportBalanceHeader,
   SupplierPayableRow,
+  SupplierPayablesReport,
 } from "@/types/financial-reports";
 
 type BackendSummary = {
@@ -137,6 +140,21 @@ function listSource(value: unknown): unknown[] {
 
 function parseList<TItem>(value: unknown, parser: (item: unknown) => TItem): TItem[] {
   return listSource(value).map(parser);
+}
+
+function parseConsistencyWarnings(value: unknown) {
+  const row = isObject(value) ? value : {};
+  return Array.isArray(row.consistency_warnings)
+    ? row.consistency_warnings.map(parseConsistencyWarning)
+    : [];
+}
+
+function parseBalanceHeader(value: unknown): ReportBalanceHeader {
+  const header = isObject(value) && isObject(value.header) ? value.header : {};
+  return {
+    ledgerBalance: numberOrZero(header.ledger_balance),
+    operationalBalance: numberOrZero(header.operational_balance),
+  };
 }
 
 function parseConsistencyWarning(value: unknown) {
@@ -365,18 +383,25 @@ export async function getRefundsReport(
 
 export async function getOutstandingBalancesReport(
   filters: FinancialReportFilters,
-): Promise<OutstandingBalanceRow[]> {
-  return getReport("/api/v1/reports/financial/outstanding-balances", filters, (value) =>
-    parseList(value, parseOutstandingBalanceRow),
-  );
+): Promise<OutstandingBalancesReport> {
+  return getReport("/api/v1/reports/financial/outstanding-balances", filters, (value) => ({
+    consistencyWarnings: parseConsistencyWarnings(value),
+    header: parseBalanceHeader(value),
+    rows: parseList(value, parseOutstandingBalanceRow),
+    sourceOfTruth: isObject(value) ? stringOrEmpty(value.source_of_truth) : "",
+  }));
 }
 
 export async function getSupplierPayablesReport(
   filters: FinancialReportFilters,
-): Promise<SupplierPayableRow[]> {
-  return getReport("/api/v1/reports/financial/supplier-payables", filters, (value) =>
-    parseList(value, parseSupplierPayableRow),
-  );
+): Promise<SupplierPayablesReport> {
+  return getReport("/api/v1/reports/financial/supplier-payables", filters, (value) => ({
+    consistencyWarnings: parseConsistencyWarnings(value),
+    header: parseBalanceHeader(value),
+    rows: parseList(value, parseSupplierPayableRow),
+    sourceOfTruth: isObject(value) ? stringOrEmpty(value.source_of_truth) : "",
+    supplierAdvances: isObject(value) ? numberOrZero(value.supplier_advances) : 0,
+  }));
 }
 
 export async function getPurchaseTotalsReport(

@@ -54,21 +54,26 @@ func TestFinancialSummaryAndDashboardBothReadLedgerTotals(t *testing.T) {
 	}
 	text := string(source)
 
-	summaryIndex := strings.Index(text, "func (r *Repository) FinancialSummary(")
-	if summaryIndex < 0 {
-		t.Fatal("FinancialSummary not found")
+	// Each function must call one of these ledger readers and report drift.
+	// OutstandingBalancesHeader/SupplierPayablesHeader need a single control
+	// balance, so they use LedgerMappedBalance rather than the full totals.
+	required := map[string]string{
+		"FinancialSummary":          "shared.LedgerFinancialTotals(",
+		"paymentsSummary":           "shared.LedgerFinancialTotals(",
+		"OutstandingBalancesHeader": "shared.LedgerMappedBalance(",
+		"SupplierPayablesHeader":    "shared.LedgerMappedBalance(",
 	}
-	paymentsIndex := strings.Index(text, "func (r *Repository) paymentsSummary(")
-	if paymentsIndex < 0 {
-		t.Fatal("paymentsSummary not found")
-	}
-	for name, index := range map[string]int{"FinancialSummary": summaryIndex, "paymentsSummary": paymentsIndex} {
+	for name, ledgerCall := range required {
+		index := strings.Index(text, "func (r *Repository) "+name+"(")
+		if index < 0 {
+			t.Fatalf("%s not found", name)
+		}
 		body := text[index:]
 		if end := strings.Index(body[1:], "\nfunc "); end > 0 {
 			body = body[:end]
 		}
-		if !strings.Contains(body, "shared.LedgerFinancialTotals(") {
-			t.Fatalf("%s must read its money figures from the ledger", name)
+		if !strings.Contains(body, ledgerCall) {
+			t.Fatalf("%s must read its money figures from the ledger (%s)", name, ledgerCall)
 		}
 		if !strings.Contains(body, "ledgerDriftWarnings(") {
 			t.Fatalf("%s must report drift against the operational tables", name)

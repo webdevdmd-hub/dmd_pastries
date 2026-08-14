@@ -512,7 +512,7 @@ func (s *Service) FinancialRefunds(currentUser *utils.AuthContext, values url.Va
 	return &PaginatedResponse[FinancialRefundReportItem]{Items: items, Pagination: shared.NewPagination(filter.Page, filter.Limit, total)}, nil
 }
 
-func (s *Service) FinancialOutstandingBalances(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*PaginatedResponse[OutstandingBalanceReportItem], error) {
+func (s *Service) FinancialOutstandingBalances(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*OutstandingBalancesReportResponse, error) {
 	filter, err := shared.Resolve(currentUser, shared.ParseQuery(values))
 	if err != nil {
 		return nil, err
@@ -521,10 +521,20 @@ func (s *Service) FinancialOutstandingBalances(currentUser *utils.AuthContext, v
 	if err != nil {
 		return nil, apperrors.Internal("failed to generate outstanding balances report")
 	}
-	return &PaginatedResponse[OutstandingBalanceReportItem]{Items: items, Pagination: shared.NewPagination(filter.Page, filter.Limit, total)}, nil
+	header, warnings, err := s.repo.OutstandingBalancesHeader(filter)
+	if err != nil {
+		return nil, apperrors.Internal("failed to generate outstanding balances report")
+	}
+	return &OutstandingBalancesReportResponse{
+		Items:               items,
+		Pagination:          shared.NewPagination(filter.Page, filter.Limit, total),
+		Header:              header,
+		SourceOfTruth:       journalSourceOfTruth,
+		ConsistencyWarnings: warnings,
+	}, nil
 }
 
-func (s *Service) FinancialSupplierPayables(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*PaginatedResponse[SupplierPayableReportItem], error) {
+func (s *Service) FinancialSupplierPayables(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*SupplierPayablesReportResponse, error) {
 	filter, err := shared.Resolve(currentUser, shared.ParseQuery(values))
 	if err != nil {
 		return nil, err
@@ -533,7 +543,18 @@ func (s *Service) FinancialSupplierPayables(currentUser *utils.AuthContext, valu
 	if err != nil {
 		return nil, apperrors.Internal("failed to generate supplier payables report")
 	}
-	return &PaginatedResponse[SupplierPayableReportItem]{Items: items, Pagination: shared.NewPagination(filter.Page, filter.Limit, total)}, nil
+	header, advances, warnings, err := s.repo.SupplierPayablesHeader(filter)
+	if err != nil {
+		return nil, apperrors.Internal("failed to generate supplier payables report")
+	}
+	return &SupplierPayablesReportResponse{
+		Items:               items,
+		Pagination:          shared.NewPagination(filter.Page, filter.Limit, total),
+		Header:              header,
+		SupplierAdvances:    advances,
+		SourceOfTruth:       journalSourceOfTruth,
+		ConsistencyWarnings: warnings,
+	}, nil
 }
 
 func (s *Service) FinancialPurchaseTotals(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*PurchaseTotalsReportResponse, error) {

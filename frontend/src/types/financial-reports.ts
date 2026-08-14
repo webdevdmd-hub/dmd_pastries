@@ -103,6 +103,34 @@ export type SupplierPayableRow = {
   totalInvoiceAmount: number;
 };
 
+/**
+ * Control-account balance behind a receivables or payables report.
+ *
+ * The header is the ledger balance as of the report's end date, so it does
+ * not equal the sum of the listed rows: the rows only cover documents dated
+ * inside the report window. `operationalBalance` is the cross-check that
+ * produces a drift warning, not the row total.
+ */
+export type ReportBalanceHeader = {
+  ledgerBalance: number;
+  operationalBalance: number;
+};
+
+export type OutstandingBalancesReport = {
+  consistencyWarnings: ReportConsistencyWarning[];
+  header: ReportBalanceHeader;
+  rows: OutstandingBalanceRow[];
+  sourceOfTruth: string;
+};
+
+export type SupplierPayablesReport = {
+  consistencyWarnings: ReportConsistencyWarning[];
+  header: ReportBalanceHeader;
+  rows: SupplierPayableRow[];
+  sourceOfTruth: string;
+  supplierAdvances: number;
+};
+
 export type ReconciliationRow = {
   amount: number;
   branchName: string;

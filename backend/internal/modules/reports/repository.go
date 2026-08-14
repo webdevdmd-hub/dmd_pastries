@@ -2289,6 +2289,60 @@ func (r *Repository) FinancialRefunds(filter *shared.ResolvedFilter) ([]Financia
 	return items, total, nil
 }
 
+// OutstandingBalancesHeader returns the receivables control-account balance
+// from the ledger, with the operational sum kept as a cross-check (Phase 6 /
+// W0). Phase 5 / W4 specified this and shipped only the summary and dashboard.
+//
+// The ledger balance is cumulative as of the report's end date; the
+// operational sum covers the documents in the report window. They answer
+// different questions, which is why the drift check compares the ledger to
+// the same operational figure the financial summary uses rather than to the
+// row total.
+func (r *Repository) OutstandingBalancesHeader(filter *shared.ResolvedFilter) (ReportBalanceHeader, []ReportConsistencyWarning, error) {
+	var operational float64
+	query, args := financialOutstandingSummarySQL(filter)
+	if err := r.db.Raw(query, args...).Scan(&operational).Error; err != nil {
+		return ReportBalanceHeader{}, nil, err
+	}
+	ledger, err := shared.LedgerMappedBalance(
+		r.db, shared.MetricScopeFromFilter(filter),
+		"accounts_receivable", "1100", filter.DateTo.Format("2006-01-02"),
+	)
+	if err != nil {
+		return ReportBalanceHeader{}, nil, err
+	}
+	operational = roundMoney(operational)
+	warnings := ledgerDriftWarnings([]ledgerDriftCheck{
+		{Metric: "outstanding_customer_balance", Ledger: ledger, Operational: operational},
+	})
+	return ReportBalanceHeader{LedgerBalance: ledger, OperationalBalance: operational}, warnings, nil
+}
+
+// SupplierPayablesHeader is the payables counterpart. Supplier advances
+// (1400) are returned separately rather than netted against the payable.
+func (r *Repository) SupplierPayablesHeader(filter *shared.ResolvedFilter) (ReportBalanceHeader, float64, []ReportConsistencyWarning, error) {
+	var operational float64
+	query, args := financialSupplierPayableSummarySQL(filter)
+	if err := r.db.Raw(query, args...).Scan(&operational).Error; err != nil {
+		return ReportBalanceHeader{}, 0, nil, err
+	}
+	scope := shared.MetricScopeFromFilter(filter)
+	asOf := filter.DateTo.Format("2006-01-02")
+	ledger, err := shared.LedgerMappedBalance(r.db, scope, "accounts_payable", "2000", asOf)
+	if err != nil {
+		return ReportBalanceHeader{}, 0, nil, err
+	}
+	advances, err := shared.LedgerMappedBalance(r.db, scope, "supplier_advance", "1400", asOf)
+	if err != nil {
+		return ReportBalanceHeader{}, 0, nil, err
+	}
+	operational = roundMoney(operational)
+	warnings := ledgerDriftWarnings([]ledgerDriftCheck{
+		{Metric: "supplier_payable_balance", Ledger: ledger, Operational: operational},
+	})
+	return ReportBalanceHeader{LedgerBalance: ledger, OperationalBalance: operational}, advances, warnings, nil
+}
+
 func (r *Repository) FinancialOutstandingBalances(filter *shared.ResolvedFilter) ([]OutstandingBalanceReportItem, int64, error) {
 	items := []OutstandingBalanceReportItem{}
 	query, args := financialOutstandingRowsSQL(filter)
@@ -2329,7 +2383,10 @@ func (r *Repository) FinancialSupplierPayables(filter *shared.ResolvedFilter) ([
 			WHERE business_id = ? AND return_date >= ? AND return_date <= ? AND status = 'posted' AND deleted_at IS NULL` + creditBranchFilter + `
 			GROUP BY supplier_id
 		) vc ON vc.supplier_id = pi.supplier_id
-		WHERE pi.business_id = ? AND pi.invoice_date >= ? AND pi.invoice_date <= ? AND pi.status <> 'cancelled' AND pi.payment_status IN ('unpaid','partial','overdue') AND pi.deleted_at IS NULL`
+		WHERE pi.business_id = ? AND pi.invoice_date >= ? AND pi.invoice_date <= ?
+		  AND ` + shared.PurchaseInvoiceLedgerCondition("pi") + `
+		  AND ` + shared.PurchaseInvoiceOutstandingCondition("pi") + `
+		  AND pi.deleted_at IS NULL`
 	args := append(creditArgs, filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02"))
 	if !filter.AllBranches {
 		query += " AND pi.branch_id = ?"
@@ -2341,7 +2398,10 @@ func (r *Repository) FinancialSupplierPayables(filter *shared.ResolvedFilter) ([
 		return nil, 0, err
 	}
 	var total int64
-	countQuery := "SELECT COUNT(*) FROM (SELECT pi.supplier_id FROM purchase_invoices pi WHERE pi.business_id = ? AND pi.invoice_date >= ? AND pi.invoice_date <= ? AND pi.status <> 'cancelled' AND pi.payment_status IN ('unpaid','partial','overdue') AND pi.deleted_at IS NULL"
+	countQuery := "SELECT COUNT(*) FROM (SELECT pi.supplier_id FROM purchase_invoices pi WHERE pi.business_id = ? AND pi.invoice_date >= ? AND pi.invoice_date <= ?" +
+		" AND " + shared.PurchaseInvoiceLedgerCondition("pi") +
+		" AND " + shared.PurchaseInvoiceOutstandingCondition("pi") +
+		" AND pi.deleted_at IS NULL"
 	countArgs := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
 	countQuery, countArgs = addBranchCondition(countQuery, countArgs, filter)
 	countQuery += " GROUP BY pi.supplier_id) supplier_count"

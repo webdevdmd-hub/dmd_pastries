@@ -18,13 +18,13 @@ import type {
   FinancialReportFilters,
   FinancialSummary,
   FinancialTrendChart,
-  OutstandingBalanceRow,
+  OutstandingBalancesReport,
   PaymentMethodReportRow,
   PaymentsReportRow,
   PurchaseTotalsReport,
   ReconciliationRow,
   RefundReportRow,
-  SupplierPayableRow,
+  SupplierPayablesReport,
 } from "@/types/financial-reports";
 
 const financialReportsQueryKey = "financial-reports";
@@ -80,7 +80,7 @@ export function useRefundsReport(filters: FinancialReportFilters, enabled = true
 }
 
 export function useOutstandingBalancesReport(filters: FinancialReportFilters, enabled = true) {
-  return useFinancialReportQuery<OutstandingBalanceRow[]>(
+  return useFinancialReportQuery<OutstandingBalancesReport>(
     "outstanding-balances",
     filters,
     async () => getOutstandingBalancesReport(filters),
@@ -89,7 +89,7 @@ export function useOutstandingBalancesReport(filters: FinancialReportFilters, en
 }
 
 export function useSupplierPayablesReport(filters: FinancialReportFilters, enabled = true) {
-  return useFinancialReportQuery<SupplierPayableRow[]>(
+  return useFinancialReportQuery<SupplierPayablesReport>(
     "supplier-payables",
     filters,
     async () => getSupplierPayablesReport(filters),

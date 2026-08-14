@@ -16,6 +16,7 @@ import {
   parseFinancialReportDraft,
 } from "@/components/reports/financial/financial-report-page-utils";
 import { OutstandingBalancesTable } from "@/components/reports/financial/outstanding-balances-table";
+import { ReportLedgerNotice } from "@/components/reports/financial/report-ledger-notice";
 import { ReportKpiCard } from "@/components/reports/report-kpi-card";
 import { ReportPageHeader } from "@/components/reports/report-page-header";
 import { formatCurrency } from "@/components/reports/sales/sales-report-format";
@@ -43,7 +44,11 @@ export function OutstandingBalancesPageClient(): JSX.Element {
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useOutstandingBalancesReport(filters, canView && hasScope);
-  const totalBalance = (reportQuery.data ?? []).reduce((sum, row) => sum + row.balanceAmount, 0);
+  const rows = reportQuery.data?.rows ?? [];
+  // The headline figure is the receivables control balance from the ledger.
+  // It used to be the sum of the visible page, which understated the total
+  // whenever the report ran to more than one page.
+  const totalBalance = reportQuery.data?.header.ledgerBalance ?? 0;
   if (!canView) return <AccessDeniedCard />;
   if (!hasScope) return <NoBranchScopeCard />;
   const applyFilters = (): void => {
@@ -81,6 +86,10 @@ export function OutstandingBalancesPageClient(): JSX.Element {
           value={formatCurrency(totalBalance)}
         />
       </div>
+      <ReportLedgerNotice
+        sourceOfTruth={reportQuery.data?.sourceOfTruth ?? ""}
+        warnings={reportQuery.data?.consistencyWarnings ?? []}
+      />
       {reportQuery.error ? (
         <FinancialReportErrorState
           description={getErrorMessage(reportQuery.error)}
@@ -89,8 +98,8 @@ export function OutstandingBalancesPageClient(): JSX.Element {
       ) : null}
       <Card className="bg-white/85 shadow-soft">
         <CardContent className="overflow-x-auto p-5">
-          {reportQuery.data && reportQuery.data.length > 0 ? (
-            <OutstandingBalancesTable rows={reportQuery.data} />
+          {rows.length > 0 ? (
+            <OutstandingBalancesTable rows={rows} />
           ) : (
             <FinancialReportEmptyState message="No outstanding balances found." />
           )}
