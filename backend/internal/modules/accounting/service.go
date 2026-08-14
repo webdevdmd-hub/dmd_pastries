@@ -5512,8 +5512,15 @@ func (s *Service) createPostedTransferJournal(tx *gorm.DB, currentUser *utils.Au
 	if err := EnsurePeriodOpen(tx, currentUser.BusinessID, entryDate); err != nil {
 		return "", err
 	}
+	if branchID == nil || strings.TrimSpace(*branchID) == "" {
+		return "", apperrors.BadRequest("a branch is required to post a journal entry", nil)
+	}
 	entryID := utils.NewUUID()
-	lines, totalDebit, totalCredit, err := s.buildJournalLines(tx, currentUser.BusinessID, branchID, entryID, lineRequests)
+	// Transfers and settlements are structured system documents (numbered,
+	// source-linked, audited), not free-form manual journals — so they use the
+	// system line builder. The manual-posting flag keeps protecting control
+	// accounts like Card Clearing 1030 from hand-written JVs only (W5).
+	lines, totalDebit, totalCredit, err := s.buildSystemJournalLines(tx, currentUser.BusinessID, strings.TrimSpace(*branchID), entryID, lineRequests)
 	if err != nil {
 		return "", err
 	}
