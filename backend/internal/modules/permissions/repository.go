@@ -188,6 +188,7 @@ func DefaultSeeds() []Seed {
 		{ModuleName: "accounting", PermissionKey: "accounting.view", Description: "View accounting records"},
 		{ModuleName: "accounting", PermissionKey: "accounting.accounts.manage", Description: "Manage chart of accounts"},
 		{ModuleName: "accounting", PermissionKey: "accounting.journal_entries.manage", Description: "Manage journal entries"},
+		{ModuleName: "accounting", PermissionKey: "accounting.period.lock", Description: "Lock and unlock accounting periods (close the books)"},
 		{ModuleName: "expenses", PermissionKey: "expenses.view", Description: "View expenses"},
 		{ModuleName: "expenses", PermissionKey: "expenses.create", Description: "Create expenses"},
 		{ModuleName: "expenses", PermissionKey: "expenses.edit", Description: "Edit expenses"},

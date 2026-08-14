@@ -8,6 +8,7 @@ func RegisterRoutes(
 	authGuard gin.HandlerFunc,
 	view gin.HandlerFunc,
 	manage gin.HandlerFunc,
+	periodLock gin.HandlerFunc,
 ) {
 	group := router.Group("/api/v1/accounting")
 	group.Use(authGuard)
@@ -32,6 +33,7 @@ func RegisterRoutes(
 
 	group.GET("/settings", view, handler.GetAccountingSettings)
 	group.PATCH("/settings", manage, handler.UpdateAccountingSettings)
+	group.PUT("/period-lock", periodLock, handler.UpdatePeriodLock)
 
 	group.GET("/payment-accounts", view, handler.ListPaymentAccounts)
 	group.POST("/payment-accounts/seed-defaults", manage, handler.SeedDefaultPaymentAccounts)

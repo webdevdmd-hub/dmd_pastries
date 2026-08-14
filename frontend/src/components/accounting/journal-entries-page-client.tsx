@@ -2,6 +2,7 @@
 
 import {
   FilePlus2,
+  Lock,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -58,6 +59,7 @@ import {
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import {
+  useAccountingSettings,
   useChartAccounts,
   useCreateJournalEntry,
   useDeleteJournalEntry,
@@ -625,10 +627,20 @@ function JournalEntryFormDialog({
   );
 }
 
+// Server-side EnsurePeriodOpen is authoritative; this only keeps the UI from
+// offering actions the backend will refuse with 422.
+function isEntryInLockedPeriod(entryDate: string, lockedThrough: string | null): boolean {
+  if (!lockedThrough || !entryDate) {
+    return false;
+  }
+  return entryDate.slice(0, 10) <= lockedThrough;
+}
+
 function JournalEntryDetailsPanel({
   canManage,
   entry,
   isLoading,
+  lockedThrough,
   onDelete,
   onEdit,
   onPost,
@@ -637,6 +649,7 @@ function JournalEntryDetailsPanel({
   canManage: boolean;
   entry: JournalEntry | null;
   isLoading: boolean;
+  lockedThrough: string | null;
   onDelete: (entry: JournalEntry) => void;
   onEdit: (entry: JournalEntry) => void;
   onPost: (entry: JournalEntry) => void;
@@ -663,6 +676,11 @@ function JournalEntryDetailsPanel({
     );
   }
 
+  const isLocked = isEntryInLockedPeriod(entry.entryDate, lockedThrough);
+  const lockedHint = lockedThrough
+    ? `Books are closed through ${lockedThrough}. Unlock the period in Accounting Settings to change this entry.`
+    : "";
+
   return (
     <div className="flex min-h-full flex-col bg-white">
       <div className="flex flex-col gap-4 border-b border-brand-cappuccino/60 bg-brand-latte/20 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
@@ -675,27 +693,51 @@ function JournalEntryDetailsPanel({
               {displayText(entry.entryNumber, "Draft journal")}
             </h2>
             <Badge variant={statusBadgeVariant(entry.status)}>{statusLabel(entry.status)}</Badge>
+            {isLocked ? (
+              <Badge className="border-amber-200 bg-amber-50 text-amber-800" variant="outline">
+                <Lock className="h-3 w-3" />
+                Period locked
+              </Badge>
+            ) : null}
           </div>
           <p className="mt-1 text-sm text-brand-mocha">
             {formatDate(entry.entryDate)} | {displayText(entry.branchName, "Business-level")}
           </p>
+          {isLocked ? <p className="mt-1 text-sm text-amber-700">{lockedHint}</p> : null}
         </div>
 
         <div className="flex flex-wrap gap-2">
           {canManage && entry.sourceType === "manual" && entry.status === "draft" ? (
             <>
-              <Button onClick={() => onEdit(entry)} type="button" variant="outline">
+              <Button
+                disabled={isLocked}
+                onClick={() => onEdit(entry)}
+                title={isLocked ? lockedHint : undefined}
+                type="button"
+                variant="outline"
+              >
                 <Pencil className="h-4 w-4" />
                 Edit
               </Button>
-              <Button onClick={() => onPost(entry)} type="button">
+              <Button
+                disabled={isLocked}
+                onClick={() => onPost(entry)}
+                title={isLocked ? lockedHint : undefined}
+                type="button"
+              >
                 <Send className="h-4 w-4" />
                 Post
               </Button>
             </>
           ) : null}
           {canManage && entry.sourceType === "manual" && entry.status === "posted" ? (
-            <Button onClick={() => onReverse(entry)} type="button" variant="outline">
+            <Button
+              disabled={isLocked}
+              onClick={() => onReverse(entry)}
+              title={isLocked ? lockedHint : undefined}
+              type="button"
+              variant="outline"
+            >
               <RotateCcw className="h-4 w-4" />
               Reverse
             </Button>
@@ -703,7 +745,9 @@ function JournalEntryDetailsPanel({
           {canManage && entry.sourceType === "manual" ? (
             <Button
               className="border-red-200 text-red-700 hover:bg-red-50"
+              disabled={isLocked}
               onClick={() => onDelete(entry)}
+              title={isLocked ? lockedHint : undefined}
               type="button"
               variant="outline"
             >
@@ -867,6 +911,8 @@ export function JournalEntriesPageClient(): JSX.Element {
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const entriesQuery = useJournalEntries(filters, canView);
+  const accountingSettingsQuery = useAccountingSettings(canView);
+  const lockedThrough = accountingSettingsQuery.data?.booksClosedThrough ?? null;
   const detailEntryQuery = useJournalEntry(selectedEntryId, selectedEntryId !== null);
   const formEntryQuery = useJournalEntry(
     editingEntryId,
@@ -1286,6 +1332,7 @@ export function JournalEntriesPageClient(): JSX.Element {
               canManage={canManage}
               entry={selectedEntry}
               isLoading={selectedEntryId !== null && detailEntryQuery.isLoading}
+              lockedThrough={lockedThrough}
               onDelete={(entry) => setPendingAction({ entry, type: "delete" })}
               onEdit={openEditForm}
               onPost={(entry) => setPendingAction({ entry, type: "post" })}

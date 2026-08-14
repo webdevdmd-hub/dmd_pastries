@@ -58,13 +58,23 @@ type UpdateAccountMappingsRequest struct {
 }
 
 type AccountingSettingsResponse struct {
-	BusinessID               string    `json:"business_id"`
-	FinancialYearStartMonth  int       `json:"financial_year_start_month"`
-	FinancialYearStartDay    int       `json:"financial_year_start_day"`
-	FinancialYearStartLabel  string    `json:"financial_year_start_label"`
-	UsesDefaultFinancialYear bool      `json:"uses_default_financial_year"`
-	CreatedAt                time.Time `json:"created_at"`
-	UpdatedAt                time.Time `json:"updated_at"`
+	BusinessID               string     `json:"business_id"`
+	FinancialYearStartMonth  int        `json:"financial_year_start_month"`
+	FinancialYearStartDay    int        `json:"financial_year_start_day"`
+	FinancialYearStartLabel  string     `json:"financial_year_start_label"`
+	UsesDefaultFinancialYear bool       `json:"uses_default_financial_year"`
+	BooksClosedThrough       *string    `json:"books_closed_through"`
+	BooksLockUpdatedBy       *string    `json:"books_lock_updated_by"`
+	BooksLockUpdatedAt       *time.Time `json:"books_lock_updated_at"`
+	CreatedAt                time.Time  `json:"created_at"`
+	UpdatedAt                time.Time  `json:"updated_at"`
+}
+
+// UpdatePeriodLockRequest sets, moves, or clears (closed_through = null) the
+// business-wide "close the books" date.
+type UpdatePeriodLockRequest struct {
+	ClosedThrough *string `json:"closed_through"`
+	Reason        string  `json:"reason"`
 }
 
 type PurchasingPostingIntegrityIssue struct {
@@ -538,13 +548,14 @@ type BackfillJournalsRequest struct {
 }
 
 type BackfillTargetResult struct {
-	Target    string   `json:"target"`
-	Scanned   int      `json:"scanned"`
-	WouldPost int      `json:"would_post"`
-	Posted    int      `json:"posted"`
-	Skipped   int      `json:"skipped"`
-	Failed    int      `json:"failed"`
-	Errors    []string `json:"errors,omitempty"`
+	Target        string   `json:"target"`
+	Scanned       int      `json:"scanned"`
+	WouldPost     int      `json:"would_post"`
+	Posted        int      `json:"posted"`
+	Skipped       int      `json:"skipped"`
+	SkippedLocked int      `json:"skipped_locked"`
+	Failed        int      `json:"failed"`
+	Errors        []string `json:"errors,omitempty"`
 }
 
 type BackfillJournalsResponse struct {

@@ -2,6 +2,7 @@ export const PERMISSION_KEYS = [
   "accounting.view",
   "accounting.accounts.manage",
   "accounting.journal_entries.manage",
+  "accounting.period.lock",
   "users.view",
   "users.create",
   "users.edit",

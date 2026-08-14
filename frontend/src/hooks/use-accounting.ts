@@ -50,6 +50,7 @@ import {
   updateJournalEntry,
   updatePaymentAccount,
   updatePaymentAccountStatus,
+  updatePeriodLock,
 } from "@/lib/api/accounting";
 import { invalidateAccountingSetupData } from "@/lib/query-invalidation";
 import type {
@@ -98,6 +99,7 @@ import type {
   UpdateChartAccountPayload,
   UpdateChartAccountStatusPayload,
   UpdateJournalEntryPayload,
+  UpdatePeriodLockPayload,
 } from "@/types/accounting";
 
 const accountingQueryKey = "accounting";
@@ -213,6 +215,17 @@ export function useUpdateAccountingSettings() {
 
   return useMutation<AccountingSettings, Error, UpdateAccountingSettingsPayload>({
     mutationFn: async (payload) => updateAccountingSettings(payload),
+    onSuccess: async () => {
+      await invalidateAccounting(queryClient);
+    },
+  });
+}
+
+export function useUpdatePeriodLock() {
+  const queryClient = useQueryClient();
+
+  return useMutation<AccountingSettings, Error, UpdatePeriodLockPayload>({
+    mutationFn: async (payload) => updatePeriodLock(payload),
     onSuccess: async () => {
       await invalidateAccounting(queryClient);
     },

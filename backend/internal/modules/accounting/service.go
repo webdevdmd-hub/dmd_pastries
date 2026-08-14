@@ -199,6 +199,77 @@ func (s *Service) UpdateAccountingSettings(currentUser *utils.AuthContext, req U
 	return s.GetAccountingSettings(currentUser)
 }
 
+// UpdatePeriodLock sets, moves, or clears the business-wide "close the
+// books" date (Phase 5 / W1). One endpoint covers lock, extend, shrink, and
+// clear — every transition is audited with old and new dates.
+func (s *Service) UpdatePeriodLock(currentUser *utils.AuthContext, req UpdatePeriodLockRequest, ipAddress, userAgent string) (*AccountingSettingsResponse, error) {
+	var newLock *time.Time
+	if req.ClosedThrough != nil && strings.TrimSpace(*req.ClosedThrough) != "" {
+		parsed, err := parseRequiredDate(*req.ClosedThrough, "closed_through")
+		if err != nil {
+			return nil, err
+		}
+		// Locking today or the future would brick live trading (POS posts
+		// with today's date).
+		today := dateOnlyUTC(time.Now().UTC())
+		if !dateOnlyUTC(parsed).Before(today) {
+			return nil, apperrors.BadRequest("closed_through must be a past date", map[string]interface{}{"closed_through": dateOnlyUTC(parsed).Format("2006-01-02")})
+		}
+		truncated := dateOnlyUTC(parsed)
+		newLock = &truncated
+	}
+	current, err := s.repo.EnsureAccountingSettings(s.db, currentUser.BusinessID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load accounting settings")
+	}
+	oldLockLabel := ""
+	if current.BooksClosedThrough != nil {
+		oldLockLabel = dateOnlyUTC(*current.BooksClosedThrough).Format("2006-01-02")
+	}
+	newLockLabel := ""
+	if newLock != nil {
+		newLockLabel = newLock.Format("2006-01-02")
+	}
+	if err := s.withTransaction(func(tx *gorm.DB) error {
+		now := time.Now().UTC()
+		updates := map[string]interface{}{
+			"books_closed_through":          newLock,
+			"books_lock_updated_by_user_id": currentUser.UserID,
+			"books_lock_updated_at":         now,
+			"updated_at":                    now,
+		}
+		if err := s.repo.UpdateAccountingSettings(tx, currentUser.BusinessID, updates); err != nil {
+			return apperrors.Internal("failed to update accounting period lock")
+		}
+		summary := "Accounting period lock cleared."
+		if newLock != nil {
+			summary = "Accounting books closed through " + newLockLabel + "."
+		}
+		if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{
+			BusinessID:  currentUser.BusinessID,
+			ActorUserID: currentUser.UserID,
+			EventType:   "accounting.period_lock_updated",
+			EntityType:  "accounting_period",
+			EntityID:    currentUser.BusinessID,
+			Summary:     summary,
+			Metadata: audit.Metadata(map[string]interface{}{
+				"source_module": "accounting",
+				"reason":        strings.TrimSpace(req.Reason),
+			}, []audit.AuditChange{
+				{Field: "books_closed_through", Label: "Books closed through", OldValue: oldLockLabel, NewValue: newLockLabel},
+			}),
+			IPAddress: ipAddress,
+			UserAgent: userAgent,
+		}); err != nil {
+			return apperrors.Internal("failed to create activity log")
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return s.GetAccountingSettings(currentUser)
+}
+
 func (s *Service) CreateChartAccount(currentUser *utils.AuthContext, req CreateChartAccountRequest, ipAddress, userAgent string) (*ChartAccountResponse, error) {
 	branchID, err := requiredAccountingBranch(currentUser, req.BranchID)
 	if err != nil {
@@ -1885,6 +1956,9 @@ func (s *Service) ReverseBakeryOrderRevenueJournal(tx *gorm.DB, currentUser *uti
 	if entry.Status != "posted" {
 		return "", apperrors.BadRequest("only posted revenue journals can be reversed", nil)
 	}
+	if err := EnsurePeriodOpen(tx, currentUser.BusinessID, entry.EntryDate); err != nil {
+		return "", err
+	}
 	originalLines, err := s.repo.ListJournalEntryLinesForUpdate(tx, currentUser.BusinessID, entry.ID)
 	if err != nil {
 		return "", apperrors.Internal("failed to load bakery order revenue journal lines")
@@ -2451,6 +2525,9 @@ func (s *Service) reversePostedJournalInTx(tx *gorm.DB, currentUser *utils.AuthC
 	}
 	if entry.Status != "posted" {
 		return "", apperrors.BadRequest("only posted journals can be reversed", nil)
+	}
+	if err := EnsurePeriodOpen(tx, currentUser.BusinessID, entry.EntryDate); err != nil {
+		return "", err
 	}
 	lines, err := s.repo.ListJournalEntryLinesForUpdate(tx, currentUser.BusinessID, entry.ID)
 	if err != nil {
@@ -3070,6 +3147,12 @@ func (s *Service) BackfillJournals(currentUser *utils.AuthContext, req BackfillJ
 		for _, id := range ids {
 			posted, err := s.backfillOneJournal(currentUser, target, id)
 			if err != nil {
+				// Locked-period documents are an expected condition, not a
+				// failure: the operator locked history on purpose.
+				if IsPeriodLockedError(err) {
+					result.SkippedLocked++
+					continue
+				}
 				result.Failed++
 				if len(result.Errors) < 20 {
 					result.Errors = append(result.Errors, id+": "+err.Error())
@@ -4046,6 +4129,12 @@ func (s *Service) CreateJournalEntry(currentUser *utils.AuthContext, req CreateJ
 		if err := s.validateJournalBranch(tx, currentUser, branchID); err != nil {
 			return err
 		}
+		// Even drafts cannot be dated into a closed period (Zoho behavior);
+		// otherwise they become unpostable orphans after the lock check at
+		// posting time.
+		if err := EnsurePeriodOpen(tx, currentUser.BusinessID, entryDate); err != nil {
+			return err
+		}
 		lines, totalDebit, totalCredit, err := s.buildJournalLines(tx, currentUser.BusinessID, branchID, "", req.Lines)
 		if err != nil {
 			return err
@@ -4113,6 +4202,11 @@ func (s *Service) UpdateJournalEntry(currentUser *utils.AuthContext, id string, 
 		if entry.Status != "draft" {
 			return apperrors.BadRequest("only draft journal entries can be updated", nil)
 		}
+		// Both directions are locked: a draft in a closed period cannot be
+		// touched, and an open draft cannot be moved into a closed period.
+		if err := EnsurePeriodOpen(tx, currentUser.BusinessID, entry.EntryDate); err != nil {
+			return err
+		}
 		updates := map[string]interface{}{"updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
 		if req.BranchID != nil {
 			return apperrors.BadRequest("journal entry branch cannot be changed", nil)
@@ -4120,6 +4214,9 @@ func (s *Service) UpdateJournalEntry(currentUser *utils.AuthContext, id string, 
 		if req.EntryDate != nil {
 			entryDate, err := parseRequiredDate(*req.EntryDate, "entry_date")
 			if err != nil {
+				return err
+			}
+			if err := EnsurePeriodOpen(tx, currentUser.BusinessID, entryDate); err != nil {
 				return err
 			}
 			updates["entry_date"] = entryDate
@@ -4172,6 +4269,10 @@ func (s *Service) PostJournalEntry(currentUser *utils.AuthContext, id, ipAddress
 		if entry.Status != "draft" {
 			return apperrors.BadRequest("only draft journal entries can be posted", nil)
 		}
+		// Re-check at posting time: the lock may have moved since drafting.
+		if err := EnsurePeriodOpen(tx, currentUser.BusinessID, entry.EntryDate); err != nil {
+			return err
+		}
 		lines, err := s.repo.ListJournalEntryLines(currentUser.BusinessID, entry.ID)
 		if err != nil {
 			return apperrors.Internal("failed to validate journal entry lines")
@@ -4213,6 +4314,9 @@ func (s *Service) DeleteJournalEntry(currentUser *utils.AuthContext, id, ipAddre
 		if reversalCount > 0 {
 			return apperrors.BadRequest("journal entry has reversal links and cannot be deleted", nil)
 		}
+		if err := EnsurePeriodOpen(tx, currentUser.BusinessID, entry.EntryDate); err != nil {
+			return err
+		}
 		if err := s.repo.SoftDeleteJournalEntry(tx, currentUser.BusinessID, entry.ID); err != nil {
 			return mapJournalEntryNotFound(err)
 		}
@@ -4240,6 +4344,15 @@ func (s *Service) ReverseJournalEntry(currentUser *utils.AuthContext, id string,
 		}
 		if entry.Status != "posted" {
 			return apperrors.BadRequest("only posted journal entries can be reversed", nil)
+		}
+		// Hard-block (Phase 5 default #3): a reversal flips the original row's
+		// status, mutating locked history. The reversal's own date must also be
+		// in an open period.
+		if err := EnsurePeriodOpen(tx, currentUser.BusinessID, entry.EntryDate); err != nil {
+			return err
+		}
+		if err := EnsurePeriodOpen(tx, currentUser.BusinessID, reversalDate); err != nil {
+			return err
 		}
 		lines, err := s.repo.ListJournalEntryLinesForUpdate(tx, currentUser.BusinessID, entry.ID)
 		if err != nil {
@@ -5135,12 +5248,20 @@ func validateFinancialYearStart(month, day int) error {
 
 func toAccountingSettingsResponse(row *accountingSettingsRow) AccountingSettingsResponse {
 	labelDate := time.Date(2001, time.Month(row.FinancialYearStartMonth), row.FinancialYearStartDay, 0, 0, 0, 0, time.UTC)
+	var booksClosedThrough *string
+	if row.BooksClosedThrough != nil {
+		formatted := dateOnlyUTC(*row.BooksClosedThrough).Format("2006-01-02")
+		booksClosedThrough = &formatted
+	}
 	return AccountingSettingsResponse{
 		BusinessID:               row.BusinessID,
 		FinancialYearStartMonth:  row.FinancialYearStartMonth,
 		FinancialYearStartDay:    row.FinancialYearStartDay,
 		FinancialYearStartLabel:  labelDate.Format("January 2"),
 		UsesDefaultFinancialYear: row.FinancialYearStartMonth == 1 && row.FinancialYearStartDay == 1,
+		BooksClosedThrough:       booksClosedThrough,
+		BooksLockUpdatedBy:       row.BooksLockUpdatedByUserID,
+		BooksLockUpdatedAt:       row.BooksLockUpdatedAt,
 		CreatedAt:                row.CreatedAt,
 		UpdatedAt:                row.UpdatedAt,
 	}
@@ -5271,6 +5392,9 @@ func (s *Service) createPostedTransferJournal(tx *gorm.DB, currentUser *utils.Au
 			return "", apperrors.Internal("failed to validate existing accounting journal")
 		}
 	}
+	if err := EnsurePeriodOpen(tx, currentUser.BusinessID, entryDate); err != nil {
+		return "", err
+	}
 	entryID := utils.NewUUID()
 	lines, totalDebit, totalCredit, err := s.buildJournalLines(tx, currentUser.BusinessID, branchID, entryID, lineRequests)
 	if err != nil {
@@ -5319,6 +5443,9 @@ func (s *Service) createPostedSystemJournal(tx *gorm.DB, currentUser *utils.Auth
 		if err != nil && err != gorm.ErrRecordNotFound {
 			return "", apperrors.Internal("failed to validate existing accounting journal")
 		}
+	}
+	if err := EnsurePeriodOpen(tx, currentUser.BusinessID, entryDate); err != nil {
+		return "", err
 	}
 	entryID := utils.NewUUID()
 	lines, totalDebit, totalCredit, err := s.buildSystemJournalLines(tx, currentUser.BusinessID, branchID, entryID, lineRequests)

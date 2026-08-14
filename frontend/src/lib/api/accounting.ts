@@ -64,6 +64,7 @@ import type {
   UpdateChartAccountPayload,
   UpdateChartAccountStatusPayload,
   UpdateJournalEntryPayload,
+  UpdatePeriodLockPayload,
 } from "@/types/accounting";
 
 type BackendListResponse = {
@@ -733,6 +734,9 @@ function parseAccountingSettings(value: unknown): AccountingSettings {
     financialYearStartDay: numberValue(value.financial_year_start_day, 1),
     financialYearStartLabel: stringValue(value.financial_year_start_label, "January 1"),
     usesDefaultFinancialYear: booleanValue(value.uses_default_financial_year, true),
+    booksClosedThrough: optionalString(value.books_closed_through) ?? null,
+    booksLockUpdatedBy: optionalString(value.books_lock_updated_by) ?? null,
+    booksLockUpdatedAt: optionalString(value.books_lock_updated_at) ?? null,
   };
 }
 
@@ -1361,6 +1365,25 @@ export async function updateAccountingSettings(
     authMode: "appwrite",
     body: accountingSettingsPayload(payload),
     method: "PATCH",
+    parse: parseAccountingSettings,
+  });
+
+  return response.data;
+}
+
+export async function updatePeriodLock(
+  payload: UpdatePeriodLockPayload,
+): Promise<AccountingSettings> {
+  const response = await apiRequest<
+    AccountingSettings,
+    { closed_through: string | null; reason: string }
+  >("/api/v1/accounting/period-lock", {
+    authMode: "appwrite",
+    body: {
+      closed_through: payload.closedThrough,
+      reason: payload.reason,
+    },
+    method: "PUT",
     parse: parseAccountingSettings,
   });
 

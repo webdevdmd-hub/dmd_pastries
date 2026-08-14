@@ -340,11 +340,19 @@ export type AccountingSettings = {
   financialYearStartDay: number;
   financialYearStartLabel: string;
   usesDefaultFinancialYear: boolean;
+  booksClosedThrough: string | null;
+  booksLockUpdatedBy: string | null;
+  booksLockUpdatedAt: string | null;
 };
 
 export type UpdateAccountingSettingsPayload = {
   financialYearStartMonth: number;
   financialYearStartDay: number;
+};
+
+export type UpdatePeriodLockPayload = {
+  closedThrough: string | null;
+  reason: string;
 };
 
 export type AccountMapping = {

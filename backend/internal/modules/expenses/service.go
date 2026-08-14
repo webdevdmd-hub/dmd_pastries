@@ -258,6 +258,9 @@ func (s *Service) Delete(currentUser *utils.AuthContext, id string, ipAddress, u
 		if err != nil {
 			return err
 		}
+		if err := accounting.EnsurePeriodOpenForJournals(tx, currentUser.BusinessID, journalIDs...); err != nil {
+			return err
+		}
 		if err := s.repo.SoftDeleteExpense(tx, currentUser.BusinessID, id); err != nil {
 			return err
 		}
@@ -467,6 +470,9 @@ func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext
 	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return "", err
 	}
+	if err := accounting.EnsurePeriodOpen(tx, expense.BusinessID, expense.ExpenseDate); err != nil {
+		return "", err
+	}
 
 	entryNumber, err := s.repo.NextJournalEntryNumber(tx, expense.BusinessID, expense.ExpenseDate)
 	if err != nil {
@@ -531,6 +537,11 @@ func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext
 func (s *Service) postReversalJournal(tx *gorm.DB, currentUser *utils.AuthContext, expense Expense, sourceType string) (string, error) {
 	if expense.JournalEntryID == nil || *expense.JournalEntryID == "" {
 		return "", apperrors.BadRequest("expense has no journal entry to reverse", nil)
+	}
+	// The binding date is the ORIGINAL journal's — reversing it mutates
+	// locked history (Phase 5 hard-block).
+	if err := accounting.EnsurePeriodOpenForJournals(tx, expense.BusinessID, *expense.JournalEntryID); err != nil {
+		return "", err
 	}
 	lines, err := s.repo.FindJournalLines(tx, expense.BusinessID, *expense.JournalEntryID)
 	if err != nil {

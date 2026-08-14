@@ -45,6 +45,7 @@ import {
   useSeedDefaultAccountMappings,
   useUpdateAccountingSettings,
   useUpdateAccountMappings,
+  useUpdatePeriodLock,
 } from "@/hooks/use-accounting";
 import { useBranches } from "@/hooks/use-branches";
 import { usePermission } from "@/hooks/use-permission";
@@ -99,6 +100,13 @@ const allBranchesValue = "all";
 
 function todayString(): string {
   const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().slice(0, 10);
+}
+
+function yesterdayString(): string {
+  const now = new Date();
+  now.setDate(now.getDate() - 1);
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
   return now.toISOString().slice(0, 10);
 }
@@ -214,10 +222,14 @@ export function AccountingSettingsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.accountingView]);
   const canManage = canManageAccounting(hasAnyPermission);
+  const canLockPeriods = hasAnyPermission([PERMISSIONS.accountingPeriodLock]);
   const settingsQuery = useAccountingSettings(canView);
   const updateSettings = useUpdateAccountingSettings();
+  const updateLock = useUpdatePeriodLock();
   const [month, setMonth] = useState(1);
   const [day, setDay] = useState(1);
+  const [lockDate, setLockDate] = useState("");
+  const [lockReason, setLockReason] = useState("");
 
   const settings = settingsQuery.data;
 
@@ -225,6 +237,7 @@ export function AccountingSettingsPageClient(): JSX.Element {
     if (settings) {
       setMonth(settings.financialYearStartMonth);
       setDay(settings.financialYearStartDay);
+      setLockDate(settings.booksClosedThrough ?? "");
     }
   }, [settings]);
 
@@ -316,6 +329,73 @@ export function AccountingSettingsPageClient(): JSX.Element {
           </Button>
         </div>
         {updateSettings.isError ? <ErrorNotice message={updateSettings.error.message} /> : null}
+      </RecoveryCard>
+
+      <RecoveryCard title="Close the books">
+        <div className="grid gap-5 md:grid-cols-3">
+          <div className="flex flex-col gap-2">
+            <FieldLabel>Current lock</FieldLabel>
+            <p className="text-2xl font-semibold text-foreground">
+              {settings ? (settings.booksClosedThrough ?? "Not locked") : "Loading..."}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {settings?.booksClosedThrough
+                ? "Journals dated on or before this date cannot be created, edited, deleted, or reversed."
+                : "All periods are open for posting and edits."}
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <FieldLabel>Closed through</FieldLabel>
+            <Input
+              disabled={!canLockPeriods}
+              max={yesterdayString()}
+              onChange={(event) => setLockDate(event.target.value)}
+              type="date"
+              value={lockDate}
+            />
+            <p className="text-xs text-muted-foreground">
+              Must be a past date — locking today would block live sales.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <FieldLabel>Reason (optional)</FieldLabel>
+            <Input
+              disabled={!canLockPeriods}
+              onChange={(event) => setLockReason(event.target.value)}
+              placeholder="e.g. VAT Q2 filed"
+              value={lockReason}
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 flex items-center justify-between gap-3 border-t pt-4">
+          <p className="text-sm text-muted-foreground">
+            {canLockPeriods
+              ? "Unlock (audited), correct, then re-lock to fix locked history — there is no override."
+              : "You need `accounting.period.lock` to change the lock."}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              disabled={!canLockPeriods || updateLock.isPending || !settings?.booksClosedThrough}
+              onClick={() => {
+                setLockDate("");
+                updateLock.mutate({ closedThrough: null, reason: lockReason });
+              }}
+              variant="outline"
+            >
+              Clear lock
+            </Button>
+            <Button
+              disabled={!canLockPeriods || updateLock.isPending || !lockDate}
+              onClick={() =>
+                updateLock.mutate({ closedThrough: lockDate, reason: lockReason })
+              }
+            >
+              {settings?.booksClosedThrough ? "Update lock" : "Close the books"}
+            </Button>
+          </div>
+        </div>
+        {updateLock.isError ? <ErrorNotice message={updateLock.error.message} /> : null}
       </RecoveryCard>
     </div>
   );

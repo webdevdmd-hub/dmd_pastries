@@ -91,6 +91,20 @@ func (h *Handler) UpdateAccountingSettings(c *gin.Context) {
 	response.Success(c, 200, "accounting settings updated successfully", result)
 }
 
+func (h *Handler) UpdatePeriodLock(c *gin.Context) {
+	var req UpdatePeriodLockRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.UpdatePeriodLock(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "accounting period lock updated successfully", result)
+}
+
 func (h *Handler) BackfillJournals(c *gin.Context) {
 	var req BackfillJournalsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

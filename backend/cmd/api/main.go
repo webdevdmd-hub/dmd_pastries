@@ -372,6 +372,7 @@ func main() {
 		authMiddleware.RequireAuth(),
 		permit("accounting.view"),
 		permit("accounting.accounts.manage", "accounting.journal_entries.manage"),
+		permit("accounting.period.lock"),
 	)
 	expenses.RegisterRoutes(
 		router,

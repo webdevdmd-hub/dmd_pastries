@@ -1502,6 +1502,11 @@ func (s *Service) rollbackSupplierPaymentImpact(tx *gorm.DB, currentUser *utils.
 	if err := s.repo.HardDeleteSupplierPaymentAllocations(tx, currentUser.BusinessID, payment.ID); err != nil {
 		return err
 	}
+	// Rolling back soft-deletes the payment's posted journals; blocked when
+	// any of them sits in a locked period (Phase 5 hard-block).
+	if err := accounting.EnsurePeriodOpenForSource(tx, currentUser.BusinessID, "supplier_payment", payment.ID); err != nil {
+		return err
+	}
 	if err := s.repo.SoftDeleteSupplierPaymentJournal(tx, currentUser.BusinessID, payment.ID); err != nil {
 		return apperrors.Internal("failed to delete supplier payment accounting journal")
 	}

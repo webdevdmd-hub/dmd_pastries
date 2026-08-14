@@ -341,6 +341,9 @@ type accountingSettingsRow struct {
 	FinancialYearStartDay         int
 	FinancialYearStartMonthIsNull bool
 	FinancialYearStartDayIsNull   bool
+	BooksClosedThrough            *time.Time
+	BooksLockUpdatedByUserID      *string
+	BooksLockUpdatedAt            *time.Time
 	CreatedAt                     time.Time
 	UpdatedAt                     time.Time
 }
@@ -686,6 +689,9 @@ func (r *Repository) FindAccountingSettings(tx *gorm.DB, businessID string) (*ac
 			COALESCE(financial_year_start_day, 1) AS financial_year_start_day,
 			financial_year_start_month IS NULL AS financial_year_start_month_is_null,
 			financial_year_start_day IS NULL AS financial_year_start_day_is_null,
+			books_closed_through,
+			books_lock_updated_by_user_id,
+			books_lock_updated_at,
 			created_at,
 			updated_at
 		`).
