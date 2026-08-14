@@ -252,9 +252,17 @@ Also fixed en route: the platform-settlement balance check compared a rounded le
 
 **Corrected finding:** the scoping report called `inventory/service.go` weighted-average costing a precision bug for rounding a money-per-unit value with the 4-decimal helper. On inspection that is correct, not a bug — unit costs are stored in `NUMERIC(12,4)`, and rounding a cost basis to cents would compound error through a movement series rather than contain it. `money.Round4` documents this. **No costing change was made**, and none should be made without a data comparison.
 
+**Step 2 is DONE.** `shopspring/decimal v1.4.0` is a direct dependency and `money.Amount` wraps it: exact arithmetic, `Round2`/`Round4` matching the old `math.Round` behaviour, `sql.Scanner`/`driver.Valuer` so it sits directly in a GORM model against a NUMERIC column, and `json.Marshaler`/`json.Unmarshaler`.
+
+The wire format is pinned by `Amount.MarshalJSON` rather than the library's global `MarshalJSONWithoutQuotes` flag — the type owns the decision, so no other package can change it and no init-order surprise can unset it. Tests assert `Amount` marshals byte-identically to `float64` across the money value range, including dropping trailing zeros (a NUMERIC(14,2) `1234.50` must still send `1234.5`). **The frontend needs no changes.** A guard test bans importing the decimal library outside this package, so a raw `decimal.Decimal` can never reach a DTO — it would serialize as a quoted string, which the frontend reads as `0`.
+
+The one category where a payload byte legitimately changes is values that today carry binary-float artefacts: `0.30000000000000004` becomes `0.3`.
+
+`Amount` deliberately does **not** round on every operation. Callers round where the scale matters; rounding each intermediate is what compounds error today.
+
 ## Remaining change
-1. ~~**`backend/internal/shared/money`**~~ — done (float-backed). Next: add `shopspring/decimal` and introduce the `Money` type here; the package is already the only seam.
-2. **`decimal.MarshalJSONWithoutQuotes = true` in `cmd/api/main.go`** — pins the wire format identical to today so the frontend needs zero changes. Golden-JSON test per module asserting byte-identical payloads. This is the highest-leverage step in the plan.
+1. ~~**`backend/internal/shared/money`**~~ — done.
+2. ~~**Wire format pinned**~~ — done, via `Amount.MarshalJSON`; the `MarshalJSONWithoutQuotes` global is not used.
 3. Convert **module by module**: leaf modules (charges, expenses, ingredients, packaging, customers, suppliers, dashboard) → inventory + products/pricing (fixing the `:1703` bug) → transactional bulk (pos, salesreturns, bakeryorders, payments, purchasing, manufacturing, recipes) → accounting → reports/shared + audit.
 4. **Quantities convert too**, in the same pass. Keeping them `float64` forces a conversion at ~170 mixed-arithmetic sites and reintroduces float error at exactly the `unit_cost × quantity` multiplication that matters.
 5. `audit/metadata.go:112-115` type-switches on `case float64:` — add `case decimal.Decimal:` or audit metadata silently stops normalizing. This is the one reflection-shaped landmine.
