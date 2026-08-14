@@ -249,14 +249,25 @@ func loadTaxRate(tx *gorm.DB, businessID, taxRateID string) (*taxRateRow, error)
 	return &tax, err
 }
 
+// calculateTax is the single place VAT is derived from a line amount, for
+// every selling and buying module. The arithmetic runs on exact decimals
+// (Phase 6 / W4): extracting inclusive VAT divides, and in float64
+// `amount/(1+rate/100)` is inexact for ordinary values — 105.00 at 5% returns
+// 99.99999999999999, so the tax carries a residue that later has to be
+// absorbed at the journal level. Signatures stay float64 until the
+// transactional modules convert together; only the math moved.
 func calculateTax(amount, rate float64, inclusive bool) float64 {
 	if amount <= 0 || rate <= 0 {
 		return 0
 	}
+	amountExact := money.FromFloat(amount)
+	rateExact := money.FromFloat(rate)
 	if inclusive {
-		return roundMoney(amount - (amount / (1 + rate/100)))
+		// tax = amount - amount / (1 + rate/100)
+		divisor := money.FromInt(1).Add(rateExact.Div(money.FromInt(100)))
+		return amountExact.Sub(amountExact.Div(divisor)).Round2().Float64()
 	}
-	return roundMoney(amount * rate / 100)
+	return amountExact.Mul(rateExact).Div(money.FromInt(100)).Round2().Float64()
 }
 
 func roundMoney(value float64) float64 { return money.Round2(value) }
