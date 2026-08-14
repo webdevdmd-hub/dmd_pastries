@@ -344,6 +344,7 @@ function parseChartAccount(value: unknown): ChartAccount {
     description: stringValue(value.description),
     isSystemAccount: booleanValue(value.is_system_account),
     isControlAccount: booleanValue(value.is_control_account),
+    isHeader: booleanValue(value.is_header),
     allowManualPosting: booleanValue(value.allow_manual_posting, true),
     status: isAccountStatus(value.status) ? value.status : "active",
     createdAt: stringValue(value.created_at),
@@ -653,6 +654,8 @@ function parseProfitLossItem(value: unknown): ProfitLossItem {
     accountName: stringValue(value.account_name, "Account"),
     accountType: isAccountType(value.account_type) ? value.account_type : "income",
     accountGroup: stringValue(value.account_group),
+    headerAccountCode: stringValue(value.header_account_code),
+    headerAccountName: stringValue(value.header_account_name),
     amount: numberValue(value.amount, 0),
   };
 }
@@ -699,6 +702,8 @@ function parseBalanceSheetItem(value: unknown): BalanceSheetItem {
     accountName: stringValue(value.account_name, "Account"),
     accountType: isAccountType(value.account_type) ? value.account_type : "asset",
     accountGroup: stringValue(value.account_group),
+    headerAccountCode: stringValue(value.header_account_code),
+    headerAccountName: stringValue(value.header_account_name),
     amount: numberValue(value.amount, 0),
     isCalculated: booleanValue(value.is_calculated),
   };

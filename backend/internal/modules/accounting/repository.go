@@ -2733,6 +2733,7 @@ func (r *Repository) ListTrialBalanceRows(businessID string, query TrialBalanceQ
 		LEFT JOIN account_totals at ON at.account_id = coa.id
 		WHERE coa.business_id = ?
 		  AND coa.deleted_at IS NULL
+		  AND coa.is_header = false
 		  `+accountBranchFilter+`
 		  AND (? = true OR ABS(COALESCE(at.opening_balance, 0)) > 0.004 OR ABS(COALESCE(at.period_debit, 0)) > 0.004 OR ABS(COALESCE(at.period_credit, 0)) > 0.004)
 		ORDER BY coa.account_code ASC
@@ -2759,6 +2760,8 @@ func (r *Repository) ListProfitLossRows(businessID string, query ProfitLossQuery
 		       coa.account_name,
 		       coa.account_type,
 		       coa.account_group,
+		       COALESCE(hdr.account_code, '') AS header_account_code,
+		       COALESCE(hdr.account_name, '') AS header_account_name,
 		       CASE
 		       	WHEN coa.account_type = 'income' THEN COALESCE(SUM(jel.credit_amount - jel.debit_amount), 0)
 		       	WHEN coa.account_type IN ('cogs', 'expense') THEN COALESCE(SUM(jel.debit_amount - jel.credit_amount), 0)
@@ -2767,6 +2770,7 @@ func (r *Repository) ListProfitLossRows(businessID string, query ProfitLossQuery
 		FROM journal_entry_lines jel
 		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
 		JOIN chart_of_accounts coa ON coa.id = jel.account_id AND coa.business_id = jel.business_id
+		LEFT JOIN chart_of_accounts hdr ON hdr.id = coa.parent_account_id AND hdr.deleted_at IS NULL
 		WHERE jel.business_id = ?
 		  AND jel.deleted_at IS NULL
 		  AND je.deleted_at IS NULL
@@ -2780,7 +2784,7 @@ func (r *Repository) ListProfitLossRows(businessID string, query ProfitLossQuery
 		  -- and balance sheet still include it -- that is its purpose).
 		  AND COALESCE(je.source_type, '') <> 'year_end_close'
 		  `+branchFilter+`
-		GROUP BY coa.id, coa.account_code, coa.account_name, coa.account_type, coa.account_group
+		GROUP BY coa.id, coa.account_code, coa.account_name, coa.account_type, coa.account_group, hdr.account_code, hdr.account_name
 		HAVING ABS(CASE
 		       	WHEN coa.account_type = 'income' THEN COALESCE(SUM(jel.credit_amount - jel.debit_amount), 0)
 		       	WHEN coa.account_type IN ('cogs', 'expense') THEN COALESCE(SUM(jel.debit_amount - jel.credit_amount), 0)
@@ -2915,6 +2919,8 @@ func (r *Repository) ListBalanceSheetRows(businessID string, query BalanceSheetQ
 		       coa.account_name,
 		       coa.account_type,
 		       coa.account_group,
+		       COALESCE(hdr.account_code, '') AS header_account_code,
+		       COALESCE(hdr.account_name, '') AS header_account_name,
 		       CASE
 		       	WHEN coa.account_type = 'asset' THEN COALESCE(SUM(jel.debit_amount - jel.credit_amount), 0)
 		       	WHEN coa.account_type IN ('liability', 'equity') THEN COALESCE(SUM(jel.credit_amount - jel.debit_amount), 0)
@@ -2923,6 +2929,7 @@ func (r *Repository) ListBalanceSheetRows(businessID string, query BalanceSheetQ
 		FROM journal_entry_lines jel
 		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
 		JOIN chart_of_accounts coa ON coa.id = jel.account_id AND coa.business_id = jel.business_id
+		LEFT JOIN chart_of_accounts hdr ON hdr.id = coa.parent_account_id AND hdr.deleted_at IS NULL
 		WHERE jel.business_id = ?
 		  AND jel.deleted_at IS NULL
 		  AND je.deleted_at IS NULL
@@ -2930,7 +2937,7 @@ func (r *Repository) ListBalanceSheetRows(businessID string, query BalanceSheetQ
 		  AND je.entry_date <= ?
 		  AND coa.account_type IN ('asset', 'liability', 'equity')
 		  `+branchFilter+`
-		GROUP BY coa.id, coa.account_code, coa.account_name, coa.account_type, coa.account_group
+		GROUP BY coa.id, coa.account_code, coa.account_name, coa.account_type, coa.account_group, hdr.account_code, hdr.account_name
 		HAVING ABS(CASE
 		       	WHEN coa.account_type = 'asset' THEN COALESCE(SUM(jel.debit_amount - jel.credit_amount), 0)
 		       	WHEN coa.account_type IN ('liability', 'equity') THEN COALESCE(SUM(jel.credit_amount - jel.debit_amount), 0)
@@ -3706,6 +3713,7 @@ func toChartAccountResponse(account ChartAccount, parentName string) ChartAccoun
 		Description:        account.Description,
 		IsSystemAccount:    account.IsSystemAccount,
 		IsControlAccount:   account.IsControlAccount,
+		IsHeader:           account.IsHeader,
 		AllowManualPosting: account.AllowManualPosting,
 		Status:             account.Status,
 		CreatedAt:          account.CreatedAt,

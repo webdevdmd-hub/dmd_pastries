@@ -24,6 +24,8 @@ export type ChartAccount = {
   description: string;
   isSystemAccount: boolean;
   isControlAccount: boolean;
+  /** Grouping row: subtotals its children on statements, never posted to. */
+  isHeader: boolean;
   allowManualPosting: boolean;
   status: AccountingAccountStatus;
   createdAt: string;
@@ -249,6 +251,9 @@ export type ProfitLossItem = {
   accountName: string;
   accountType: AccountingAccountType;
   accountGroup: string;
+  /** Grouping row this account rolls up into; empty when uncategorized. */
+  headerAccountCode: string;
+  headerAccountName: string;
   amount: number;
 };
 
@@ -279,6 +284,9 @@ export type BalanceSheetItem = {
   accountName: string;
   accountType: AccountingAccountType;
   accountGroup: string;
+  /** Grouping row this account rolls up into; empty when uncategorized. */
+  headerAccountCode: string;
+  headerAccountName: string;
   amount: number;
   isCalculated: boolean;
 };

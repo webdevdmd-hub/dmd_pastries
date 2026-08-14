@@ -314,6 +314,7 @@ type ChartAccountResponse struct {
 	Description        string    `json:"description"`
 	IsSystemAccount    bool      `json:"is_system_account"`
 	IsControlAccount   bool      `json:"is_control_account"`
+	IsHeader           bool      `json:"is_header"`
 	AllowManualPosting bool      `json:"allow_manual_posting"`
 	Status             string    `json:"status"`
 	CreatedAt          time.Time `json:"created_at"`
@@ -615,12 +616,16 @@ type TrialBalanceResponse struct {
 }
 
 type ProfitLossAccountRowResponse struct {
-	AccountID    string  `json:"account_id"`
-	AccountCode  string  `json:"account_code"`
-	AccountName  string  `json:"account_name"`
-	AccountType  string  `json:"account_type"`
-	AccountGroup string  `json:"account_group"`
-	Amount       float64 `json:"amount"`
+	AccountID    string `json:"account_id"`
+	AccountCode  string `json:"account_code"`
+	AccountName  string `json:"account_name"`
+	AccountType  string `json:"account_type"`
+	AccountGroup string `json:"account_group"`
+	// Header* name the grouping row this account rolls up into on the
+	// statements (Phase 6 / W3). Empty for accounts with no parent.
+	HeaderAccountCode string  `json:"header_account_code,omitempty"`
+	HeaderAccountName string  `json:"header_account_name,omitempty"`
+	Amount            float64 `json:"amount"`
 }
 
 type ProfitLossSectionResponse struct {
@@ -640,13 +645,17 @@ type ProfitLossResponse struct {
 }
 
 type BalanceSheetAccountRowResponse struct {
-	AccountID    string  `json:"account_id"`
-	AccountCode  string  `json:"account_code"`
-	AccountName  string  `json:"account_name"`
-	AccountType  string  `json:"account_type"`
-	AccountGroup string  `json:"account_group"`
-	Amount       float64 `json:"amount"`
-	IsCalculated bool    `json:"is_calculated,omitempty"`
+	AccountID    string `json:"account_id"`
+	AccountCode  string `json:"account_code"`
+	AccountName  string `json:"account_name"`
+	AccountType  string `json:"account_type"`
+	AccountGroup string `json:"account_group"`
+	// Header* name the grouping row this account rolls up into on the
+	// statements (Phase 6 / W3). Empty for accounts with no parent.
+	HeaderAccountCode string  `json:"header_account_code,omitempty"`
+	HeaderAccountName string  `json:"header_account_name,omitempty"`
+	Amount            float64 `json:"amount"`
+	IsCalculated      bool    `json:"is_calculated,omitempty"`
 }
 
 type BalanceSheetSectionResponse struct {

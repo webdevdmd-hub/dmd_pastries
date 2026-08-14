@@ -88,8 +88,11 @@ function groupSectionItems(section: BalanceSheetSection): GroupedBalanceSheetRow
   const byGroup = new Map<string, BalanceSheetItem[]>();
 
   section.items.forEach((item) => {
-    const currentItems = byGroup.get(item.accountGroup) ?? [];
-    byGroup.set(item.accountGroup, [...currentItems, item]);
+    // Group by the account's header when it has one; accounts that were never
+    // categorized fall back to their account group so nothing disappears.
+    const groupKey = item.headerAccountName || formatGroupName(item.accountGroup);
+    const currentItems = byGroup.get(groupKey) ?? [];
+    byGroup.set(groupKey, [...currentItems, item]);
   });
 
   return Array.from(byGroup.entries()).map(([group, items]) => ({
@@ -163,7 +166,7 @@ function BalanceSheetRows({
       {groups.map((group) => (
         <Fragment key={`${title}-${group.group}`}>
           <tr className="border-b border-slate-100">
-            <td className="px-10 py-3 font-bold text-slate-950">{formatGroupName(group.group)}</td>
+            <td className="px-10 py-3 font-bold text-slate-950">{group.group}</td>
             <AmountCell value={0} />
           </tr>
           {group.items.map((item, itemIndex) => (
@@ -191,7 +194,7 @@ function BalanceSheetRows({
           ))}
           <tr className="border-b border-slate-200">
             <td className="px-10 py-3 font-bold text-slate-950">
-              Total for {formatGroupName(group.group)}
+              Total for {group.group}
             </td>
             <AmountCell strong value={group.amount} />
           </tr>

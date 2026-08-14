@@ -2,7 +2,7 @@
 
 import { Filter, RefreshCw, TrendingUp } from "lucide-react";
 import type { JSX } from "react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 import { AccountingAccessDeniedCard } from "@/components/accounting/accounting-access-denied-card";
 import { PageHeader } from "@/components/shared/page-header";
@@ -86,6 +86,29 @@ function StatementAmount({
   );
 }
 
+type GroupedProfitLossRows = {
+  amount: number;
+  group: string;
+  items: ProfitLossItem[];
+};
+
+function groupSectionItems(section: ProfitLossSection): GroupedProfitLossRows[] {
+  const byGroup = new Map<string, ProfitLossItem[]>();
+
+  section.items.forEach((item) => {
+    // Group by the account's header; accounts that were never categorized fall
+    // back to a single "Other" bucket so nothing disappears from the statement.
+    const groupKey = item.headerAccountName || "Other";
+    byGroup.set(groupKey, [...(byGroup.get(groupKey) ?? []), item]);
+  });
+
+  return Array.from(byGroup.entries()).map(([group, items]) => ({
+    amount: items.reduce((total, item) => total + item.amount, 0),
+    group,
+    items,
+  }));
+}
+
 function SectionRows({
   section,
   title,
@@ -93,20 +116,48 @@ function SectionRows({
   section: ProfitLossSection;
   title: string;
 }): JSX.Element {
+  const groups = groupSectionItems(section);
+  // A single group repeating the section title adds a level without adding
+  // information, so it renders flat.
+  const showGroupHeadings = groups.length > 1;
+
   return (
     <>
       <tr className="border-b border-slate-100">
         <td className="px-6 py-3 text-base font-bold text-slate-950">{title}</td>
         <td />
       </tr>
-      {section.items.map((item: ProfitLossItem) => (
-        <tr
-          className="border-b border-slate-100 transition-colors hover:bg-slate-50"
-          key={item.accountId}
-        >
-          <td className="px-10 py-3 font-medium text-blue-600">{item.accountName}</td>
-          <StatementAmount value={item.amount} />
-        </tr>
+      {groups.map((group) => (
+        <Fragment key={`${title}-${group.group}`}>
+          {showGroupHeadings ? (
+            <tr className="border-b border-slate-100">
+              <td className="px-10 py-3 font-bold text-slate-950">{group.group}</td>
+              <td />
+            </tr>
+          ) : null}
+          {group.items.map((item: ProfitLossItem) => (
+            <tr
+              className="border-b border-slate-100 transition-colors hover:bg-slate-50"
+              key={item.accountId}
+            >
+              <td
+                className={cn(
+                  "py-3 font-medium text-blue-600",
+                  showGroupHeadings ? "px-14" : "px-10",
+                )}
+              >
+                {item.accountName}
+              </td>
+              <StatementAmount value={item.amount} />
+            </tr>
+          ))}
+          {showGroupHeadings ? (
+            <tr className="border-b border-slate-200">
+              <td className="px-10 py-3 font-bold text-slate-950">Total for {group.group}</td>
+              <StatementAmount strong value={group.amount} />
+            </tr>
+          ) : null}
+        </Fragment>
       ))}
       <tr className="border-b border-slate-200">
         <td className="px-6 py-3 font-bold text-slate-950">Total for {title}</td>

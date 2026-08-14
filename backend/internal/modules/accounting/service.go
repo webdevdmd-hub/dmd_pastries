@@ -292,7 +292,7 @@ func (s *Service) CreateChartAccount(currentUser *utils.AuthContext, req CreateC
 		if exists {
 			return apperrors.Conflict("account_code already exists", nil)
 		}
-		if err := s.validateParentAccount(currentUser.BusinessID, branchID, cleanStringPointer(req.ParentAccountID), ""); err != nil {
+		if err := s.validateParentAccount(currentUser.BusinessID, branchID, cleanStringPointer(req.ParentAccountID), "", strings.TrimSpace(req.AccountType)); err != nil {
 			return err
 		}
 		account := &ChartAccount{
@@ -424,7 +424,9 @@ func (s *Service) UpdateChartAccount(currentUser *utils.AuthContext, id string, 
 	updates := map[string]interface{}{"updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
 	if req.ParentAccountID != nil {
 		parentID := cleanStringPointer(req.ParentAccountID)
-		if err := s.validateParentAccount(currentUser.BusinessID, account.BranchID, parentID, id); err != nil {
+		// Chart account types are immutable after creation, so the stored type
+		// is the effective one for the parent compatibility rule.
+		if err := s.validateParentAccount(currentUser.BusinessID, account.BranchID, parentID, id, account.AccountType); err != nil {
 			return nil, err
 		}
 		updates["parent_account_id"] = parentID
@@ -4217,6 +4219,12 @@ func (s *Service) currentYearProfitLossForBalanceSheet(businessID, branchID stri
 		Amount:       roundMoney(netProfit),
 		IsCalculated: true,
 	}
+	// This row is computed, not queried, so it carries no header from SQL. It
+	// still belongs under the equity group on the statement (W3).
+	if header, headerErr := s.repo.FindActiveAccountByCode(s.db, businessID, branchID, "30"); headerErr == nil {
+		row.HeaderAccountCode = header.AccountCode
+		row.HeaderAccountName = header.AccountName
+	}
 	if err == nil {
 		row.AccountID = account.ID
 		row.AccountCode = account.AccountCode
@@ -4565,6 +4573,9 @@ func (s *Service) buildJournalLines(tx *gorm.DB, businessID string, branchID *st
 		if err != nil {
 			return nil, 0, 0, apperrors.BadRequest("account_id does not belong to the selected branch", map[string]interface{}{"line_number": i + 1})
 		}
+		if account.IsHeader {
+			return nil, 0, 0, apperrors.BadRequest("header accounts group other accounts and cannot be posted to", map[string]interface{}{"line_number": i + 1, "account_id": account.ID, "account_code": account.AccountCode})
+		}
 		if !account.AllowManualPosting {
 			return nil, 0, 0, apperrors.BadRequest("manual posting is not allowed for this account", map[string]interface{}{"line_number": i + 1, "account_id": account.ID})
 		}
@@ -4590,15 +4601,30 @@ func (s *Service) buildJournalLines(tx *gorm.DB, businessID string, branchID *st
 	return lines, totalDebit, totalCredit, nil
 }
 
-func (s *Service) validateParentAccount(businessID, branchID string, parentID *string, selfID string) error {
+// validateParentAccount enforces the hierarchy rules (Phase 6 / W3): a parent
+// must be an active header on the same branch and of the same account type,
+// and the chain it belongs to must stay acyclic. childType is the effective
+// account type of the account being parented; it is immutable after creation,
+// so callers pass the stored type when updating.
+func (s *Service) validateParentAccount(businessID, branchID string, parentID *string, selfID, childType string) error {
 	if parentID == nil || *parentID == "" {
 		return nil
 	}
 	if *parentID == selfID {
 		return apperrors.BadRequest("parent_account_id cannot reference the same account", nil)
 	}
+	// A cycle can exist entirely above this account, so track every node seen
+	// rather than only comparing against selfID.
+	visited := map[string]bool{}
+	if strings.TrimSpace(selfID) != "" {
+		visited[selfID] = true
+	}
 	nextParentID := *parentID
 	for depth := 0; depth < 50; depth++ {
+		if visited[nextParentID] {
+			return apperrors.BadRequest("parent_account_id cannot create an account hierarchy cycle", nil)
+		}
+		visited[nextParentID] = true
 		parent, err := s.repo.FindByIDForBranch(businessID, branchID, nextParentID)
 		if err != nil {
 			return apperrors.BadRequest("invalid parent_account_id", nil)
@@ -4606,11 +4632,19 @@ func (s *Service) validateParentAccount(businessID, branchID string, parentID *s
 		if parent.Status != "active" {
 			return apperrors.BadRequest("parent account must be active", nil)
 		}
+		if depth == 0 {
+			if !parent.IsHeader {
+				return apperrors.BadRequest("parent_account_id must reference a header account", map[string]interface{}{"parent_account_code": parent.AccountCode})
+			}
+			if childType != "" && !strings.EqualFold(parent.AccountType, childType) {
+				return apperrors.BadRequest("parent account must have the same account_type", map[string]interface{}{
+					"account_type":        childType,
+					"parent_account_type": parent.AccountType,
+				})
+			}
+		}
 		if parent.ParentAccountID == nil || *parent.ParentAccountID == "" {
 			return nil
-		}
-		if *parent.ParentAccountID == selfID {
-			return apperrors.BadRequest("parent_account_id cannot create an account hierarchy cycle", nil)
 		}
 		nextParentID = *parent.ParentAccountID
 	}
@@ -5630,6 +5664,12 @@ func (s *Service) buildSystemJournalLines(tx *gorm.DB, businessID, branchID, ent
 		account, err := s.repo.ValidateActiveAccountForBranch(tx, businessID, branchID, strings.TrimSpace(lineReq.AccountID))
 		if err != nil {
 			return nil, 0, 0, apperrors.BadRequest("invalid account_id for branch", map[string]interface{}{"line_number": i + 1, "branch_id": branchID})
+		}
+		// Headers carry no postings. The system path never checked this, so a
+		// mis-pointed mapping would have posted into a grouping row silently
+		// and double-counted it against its own children (W3).
+		if account.IsHeader {
+			return nil, 0, 0, apperrors.BadRequest("header accounts group other accounts and cannot be posted to", map[string]interface{}{"line_number": i + 1, "account_id": account.ID, "account_code": account.AccountCode})
 		}
 		lineBranchID := branchID
 		lines = append(lines, JournalEntryLine{

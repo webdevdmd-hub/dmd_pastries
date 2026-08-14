@@ -3416,7 +3416,7 @@ func hasPermissionKey(currentUser *utils.AuthContext, key string) bool {
 func (s *Service) purchaseBillAccount(tx *gorm.DB, businessID, accountID string) (*purchaseBillAccount, error) {
 	var account purchaseBillAccount
 	err := tx.Table("chart_of_accounts").
-		Select("id, account_name, account_code, account_type, status").
+		Select("id, account_name, account_code, account_type, status, is_header, allow_manual_posting").
 		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, accountID).
 		Take(&account).Error
 	if err != nil {
@@ -3424,6 +3424,15 @@ func (s *Service) purchaseBillAccount(tx *gorm.DB, businessID, accountID string)
 	}
 	if account.Status != "active" {
 		return nil, apperrors.BadRequest("account line must use an active chart account", nil)
+	}
+	// A bill's account line is a user-chosen account, so it gets the same
+	// gates as any other user-chosen posting target: never a grouping header,
+	// never a control account the system posts to on its own (W3).
+	if account.IsHeader {
+		return nil, apperrors.BadRequest("account line cannot use a header account", map[string]interface{}{"account_code": account.AccountCode})
+	}
+	if !account.AllowManualPosting {
+		return nil, apperrors.BadRequest("account line cannot use a system-posted control account", map[string]interface{}{"account_code": account.AccountCode})
 	}
 	return &account, nil
 }
@@ -4270,11 +4279,13 @@ type lineInput struct {
 }
 
 type purchaseBillAccount struct {
-	ID          string
-	AccountName string
-	AccountCode string
-	AccountType string
-	Status      string
+	ID                 string
+	AccountName        string
+	AccountCode        string
+	AccountType        string
+	Status             string
+	IsHeader           bool
+	AllowManualPosting bool
 }
 
 type preparedItem struct {

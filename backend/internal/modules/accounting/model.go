@@ -19,6 +19,7 @@ type ChartAccount struct {
 	Description        string         `json:"description"`
 	IsSystemAccount    bool           `gorm:"not null;default:false" json:"is_system_account"`
 	IsControlAccount   bool           `gorm:"not null;default:false" json:"is_control_account"`
+	IsHeader           bool           `gorm:"not null;default:false" json:"is_header"`
 	AllowManualPosting bool           `gorm:"not null;default:true" json:"allow_manual_posting"`
 	Status             string         `gorm:"size:50;not null;default:active" json:"status"`
 	CreatedByUserID    *string        `gorm:"type:uuid;index" json:"created_by_user_id"`

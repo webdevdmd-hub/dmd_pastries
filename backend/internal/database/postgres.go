@@ -157,7 +157,7 @@ func VerifySchema(db *gorm.DB) error {
 		"sales_returns":                   {"return_number", "return_date", "status", "refund_mode", "refund_payment_method_id", "payment_refund_id", "journal_entry_id", "deleted_at"},
 		"sales_return_items":              {"sales_return_id", "sale_item_id", "product_id", "product_variant_id", "restock_action", "stock_location_id", "stock_movement_id", "deleted_at"},
 		"sales_channels":                  {"channel_name", "channel_type", "requires_external_order_number", "default_payment_method_id", "commission_rate", "is_default", "status", "deleted_at"},
-		"chart_of_accounts":               {"parent_account_id", "account_code", "account_name", "account_type", "account_group", "normal_balance", "is_system_account", "is_control_account", "allow_manual_posting", "status", "deleted_at"},
+		"chart_of_accounts":               {"parent_account_id", "account_code", "account_name", "account_type", "account_group", "normal_balance", "is_system_account", "is_control_account", "is_header", "allow_manual_posting", "status", "deleted_at"},
 		"journal_entries":                 {"branch_id", "entry_number", "entry_date", "reference_number", "source_type", "source_id", "narration", "status", "total_debit", "total_credit", "posted_at", "posted_by_user_id", "reversed_entry_id", "reversed_at", "reversed_by_user_id", "deleted_at"},
 		"journal_entry_lines":             {"journal_entry_id", "account_id", "line_number", "debit_amount", "credit_amount", "description", "deleted_at"},
 		"stock_movements":                 {"movement_direction", "reference_number", "notes", "is_reversal", "reversed_movement_id", "is_reversed", "reversed_by_movement_id", "stock_location_id", "from_stock_location_id", "to_stock_location_id"},

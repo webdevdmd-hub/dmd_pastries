@@ -159,7 +159,14 @@ export function ChartAccountFormDialog({
   const [formState, setFormState] = useState<FormState>(emptyFormState());
   const [error, setError] = useState<string | null>(null);
   const isEditing = account !== null;
-  const parentOptions = accounts.filter((option) => option.id !== account?.id);
+  // Only headers can parent an account, and only within the same account type
+  // — the backend enforces both, so offering anything else just produces a 400.
+  const parentOptions = accounts.filter(
+    (option) =>
+      option.id !== account?.id &&
+      option.isHeader &&
+      option.accountType === formState.accountType,
+  );
   const defaultAccountGroupOptions = accountGroupsByType[formState.accountType];
   const displayNormalBalance =
     account?.normalBalance ?? getNormalBalanceForAccountType(formState.accountType);
