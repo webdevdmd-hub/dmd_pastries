@@ -316,7 +316,7 @@ func TestJournalEntrySystemSourceTypeFilterIncludesPurchaseReturn(t *testing.T) 
 	if !hasJournalEntryFilterCondition(conditions, "source_type = ?", "purchase_return") {
 		t.Fatalf("expected purchase_return source_type condition, got %#v", conditions)
 	}
-	if !hasJournalEntryFilterCondition(conditions, "LOWER(entry_number) LIKE ? OR LOWER(reference_number) LIKE ? OR LOWER(narration) LIKE ?", "%vc-000001%") {
+	if !hasJournalEntryFilterCondition(conditions, "LOWER(entry_number) LIKE ? OR LOWER(reference_number) LIKE ? OR LOWER(narration) LIKE ? OR LOWER(id::text) LIKE ? OR LOWER(COALESCE(source_id::text, '')) LIKE ?", "%vc-000001%") {
 		t.Fatalf("expected reference-number search condition for VC-000001, got %#v", conditions)
 	}
 }
