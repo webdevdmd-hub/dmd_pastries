@@ -344,7 +344,9 @@ func (r *Repository) Alerts(scope Scope) (*AlertsResponse, error) {
 	if err := r.db.Raw(orderQuery, orderArgs...).Scan(&response.PendingOrderAlerts).Error; err != nil {
 		return nil, err
 	}
-	paymentQuery := "SELECT order_number, balance_amount FROM bakery_orders WHERE business_id = ? AND payment_status IN ('unpaid','partial') AND balance_amount > 0 AND deleted_at IS NULL"
+	// Same outstanding scope as the reports and the AR reconciliation, so a
+	// cancelled order can no longer show up as a payment alert.
+	paymentQuery := "SELECT order_number, balance_amount FROM bakery_orders WHERE business_id = ? AND deleted_at IS NULL AND " + reportshared.OutstandingBakeryOrderCondition("")
 	paymentArgs := []interface{}{scope.BusinessID}
 	paymentQuery, paymentArgs = addScopedBranch(paymentQuery, paymentArgs, "branch_id", scope)
 	paymentQuery += " ORDER BY balance_amount DESC LIMIT 10"

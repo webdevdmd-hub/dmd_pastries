@@ -40,8 +40,11 @@ func TestStatsRepositoryKeepsCustomerBranchAndStatusScope(t *testing.T) {
 		`payment_status IN ?`,
 		`refund_status = ?`,
 		`deleted_at IS NULL`,
-		`(total_amount - paid_amount) > 0`,
-		`balance_amount > 0`,
+		// The outstanding-balance conditions come from the canonical shared
+		// predicates now, so a customer's balance cannot disagree with the
+		// AR reconciliation or the financial reports (Phase 5 / W4).
+		`reportshared.OutstandingSaleCondition("")`,
+		`reportshared.OutstandingBakeryOrderCondition("")`,
 	} {
 		if !strings.Contains(source, expected) {
 			t.Fatalf("customer stats scope should include %q", expected)

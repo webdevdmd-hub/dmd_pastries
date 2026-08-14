@@ -3260,7 +3260,7 @@ func (r *Repository) SumAccountsPayableOperational(businessID, branchID string) 
 	var total float64
 	db := r.db.Table("purchase_invoices").
 		Select("COALESCE(SUM(balance_amount), 0)").
-		Where("business_id = ? AND deleted_at IS NULL AND status = ? AND payment_status <> ? AND balance_amount > 0", businessID, "posted", "paid")
+		Where("business_id = ? AND deleted_at IS NULL AND "+reportshared.OutstandingPurchaseInvoiceCondition(""), businessID)
 	if strings.TrimSpace(branchID) != "" {
 		db = db.Where("branch_id = ?", strings.TrimSpace(branchID))
 	}
@@ -3269,10 +3269,14 @@ func (r *Repository) SumAccountsPayableOperational(businessID, branchID string) 
 }
 
 func (r *Repository) SumAccountsReceivableOperational(businessID, branchID string) (float64, error) {
+	// The scope must be exactly the documents that debited AR. Filtering
+	// sale_status = 'completed' used to drop partially-refunded sales that
+	// still carry a receivable, which showed up as permanent reconciliation
+	// drift the ledger did not have (Phase 5 / W4).
 	var posTotal float64
 	posDB := r.db.Table("sales").
 		Select("COALESCE(SUM(GREATEST(total_amount - paid_amount, 0)), 0)").
-		Where("business_id = ? AND deleted_at IS NULL AND sale_status = ? AND payment_status <> ?", businessID, "completed", "paid")
+		Where("business_id = ? AND deleted_at IS NULL AND "+reportshared.OutstandingSaleCondition(""), businessID)
 	if strings.TrimSpace(branchID) != "" {
 		posDB = posDB.Where("branch_id = ?", strings.TrimSpace(branchID))
 	}
@@ -3282,7 +3286,7 @@ func (r *Repository) SumAccountsReceivableOperational(businessID, branchID strin
 	var bakeryTotal float64
 	bakeryDB := r.db.Table("bakery_orders").
 		Select("COALESCE(SUM(balance_amount), 0)").
-		Where("business_id = ? AND deleted_at IS NULL AND order_status = ? AND payment_status <> ? AND balance_amount > 0", businessID, "completed", "paid")
+		Where("business_id = ? AND deleted_at IS NULL AND "+reportshared.OutstandingBakeryOrderCondition(""), businessID)
 	if strings.TrimSpace(branchID) != "" {
 		bakeryDB = bakeryDB.Where("branch_id = ?", strings.TrimSpace(branchID))
 	}

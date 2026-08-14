@@ -8,6 +8,7 @@ import (
 
 	"gorm.io/gorm"
 
+	reportshared "pastries-pos/internal/modules/reports/shared"
 	"pastries-pos/internal/shared/utils"
 )
 
@@ -347,28 +348,32 @@ func (r *Repository) Stats(businessID, branchID, customerID string) (*CustomerSt
 		return nil, err
 	}
 	stats.TotalRefundedAmount += saleRefunded
+	// Same predicate as the AR reconciliation and the financial reports, so
+	// a customer's outstanding balance cannot disagree with the totals they
+	// roll up into (Phase 5 / W4).
+	customerScope := "business_id = ? AND branch_id = ? AND customer_id = ? AND deleted_at IS NULL AND "
 	var posOutstanding float64
 	if err := r.db.Table("sales").
 		Select("COALESCE(SUM(total_amount - paid_amount), 0)").
-		Where("business_id = ? AND branch_id = ? AND customer_id = ? AND deleted_at IS NULL AND sale_status <> ? AND payment_status IN ? AND (total_amount - paid_amount) > 0", businessID, branchID, customerID, "voided", []string{"unpaid", "partial"}).
+		Where(customerScope+reportshared.OutstandingSaleCondition(""), businessID, branchID, customerID).
 		Scan(&posOutstanding).Error; err != nil {
 		return nil, err
 	}
 	var bakeryOutstanding float64
 	if err := r.db.Table("bakery_orders").
 		Select("COALESCE(SUM(balance_amount), 0)").
-		Where("business_id = ? AND branch_id = ? AND customer_id = ? AND deleted_at IS NULL AND order_status <> ? AND payment_status IN ? AND balance_amount > 0", businessID, branchID, customerID, "cancelled", []string{"unpaid", "partial"}).
+		Where(customerScope+reportshared.OutstandingBakeryOrderCondition(""), businessID, branchID, customerID).
 		Scan(&bakeryOutstanding).Error; err != nil {
 		return nil, err
 	}
 	var posPending, bakeryPending int64
 	if err := r.db.Table("sales").
-		Where("business_id = ? AND branch_id = ? AND customer_id = ? AND deleted_at IS NULL AND sale_status <> ? AND payment_status IN ? AND (total_amount - paid_amount) > 0", businessID, branchID, customerID, "voided", []string{"unpaid", "partial"}).
+		Where(customerScope+reportshared.OutstandingSaleCondition(""), businessID, branchID, customerID).
 		Count(&posPending).Error; err != nil {
 		return nil, err
 	}
 	if err := r.db.Table("bakery_orders").
-		Where("business_id = ? AND branch_id = ? AND customer_id = ? AND deleted_at IS NULL AND order_status <> ? AND payment_status IN ? AND balance_amount > 0", businessID, branchID, customerID, "cancelled", []string{"unpaid", "partial"}).
+		Where(customerScope+reportshared.OutstandingBakeryOrderCondition(""), businessID, branchID, customerID).
 		Count(&bakeryPending).Error; err != nil {
 		return nil, err
 	}

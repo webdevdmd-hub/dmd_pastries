@@ -107,6 +107,34 @@ func RefundCompletedCondition(alias string) string {
 	return qualify(alias, "refund_status") + " = 'completed'"
 }
 
+// --- Outstanding receivables and payables ----------------------------------
+
+// OutstandingSaleCondition scopes the POS sales that still owe money, i.e.
+// the operational twin of the accounts-receivable ledger balance.
+//
+// Three incompatible versions of this predicate existed: the reports module
+// filtered payment_status IN ('unpaid','partial'), customer stats did the
+// same but with a different voided check, and the AR reconciliation used
+// sale_status = 'completed', which silently dropped partially-refunded sales
+// that still carry a receivable — reporting drift the ledger did not have.
+// The revenue statuses are the correct scope: exactly the sales that debited
+// AR in the first place.
+func OutstandingSaleCondition(alias string) string {
+	return SaleRevenueCondition(alias) + " AND (" + qualify(alias, "total_amount") + " - " + qualify(alias, "paid_amount") + ") > 0"
+}
+
+// OutstandingBakeryOrderCondition is the bakery-order counterpart: a
+// cancelled order's receivable was reversed, so only live orders count.
+func OutstandingBakeryOrderCondition(alias string) string {
+	return qualify(alias, "order_status") + " <> 'cancelled' AND " + qualify(alias, "balance_amount") + " > 0"
+}
+
+// OutstandingPurchaseInvoiceCondition scopes the bills that still owe money —
+// the operational twin of accounts payable. Only posted bills are liabilities.
+func OutstandingPurchaseInvoiceCondition(alias string) string {
+	return PurchaseInvoiceLedgerCondition(alias) + " AND " + qualify(alias, "balance_amount") + " > 0"
+}
+
 // --- Journals --------------------------------------------------------------
 
 // JournalPostedCondition includes reversed entries on purpose: a reversed entry

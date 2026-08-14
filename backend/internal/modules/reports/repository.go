@@ -37,22 +37,6 @@ type salesSummarySQLRow struct {
 	TaxTotal      float64
 }
 
-type ledgerFinancialTotals struct {
-	Revenue             float64
-	GrossRevenue        float64
-	Refunded            float64
-	Tax                 float64
-	Collected           float64
-	CashCollected       float64
-	CardCollected       float64
-	BankCollected       float64
-	OutstandingCustomer float64
-	SupplierPayable     float64
-	PurchaseTotal       float64
-	PaymentCount        int64
-	RefundCount         int64
-}
-
 const (
 	journalSourceOfTruth          = "journal_entries"
 	operationalSalesSourceOfTruth = "sales_and_completed_payment_refunds"
@@ -89,7 +73,7 @@ func (r *Repository) DashboardSummary(filter *shared.ResolvedFilter) (*Dashboard
 	if err != nil {
 		return nil, err
 	}
-	payments, err := r.paymentsSummary(filter)
+	payments, paymentDrift, err := r.paymentsSummary(filter)
 	if err != nil {
 		return nil, err
 	}
@@ -97,12 +81,15 @@ func (r *Repository) DashboardSummary(filter *shared.ResolvedFilter) (*Dashboard
 	if err != nil {
 		return nil, err
 	}
+	warnings = append(warnings, paymentDrift...)
 	return &DashboardSummaryResponse{
-		Sales:               *sales,
-		Inventory:           *inventory,
-		Manufacturing:       *manufacturing,
-		Orders:              *orders,
-		Payments:            *payments,
+		Sales:         *sales,
+		Inventory:     *inventory,
+		Manufacturing: *manufacturing,
+		Orders:        *orders,
+		Payments:      *payments,
+		// Mixed by design: the money KPIs read the ledger, the volume
+		// analytics (sales counts, production, orders) stay operational.
 		SourceOfTruth:       operationalReportsSource,
 		ConsistencyWarnings: warnings,
 	}, nil
@@ -2198,21 +2185,39 @@ func (r *Repository) FinancialSummary(filter *shared.ResolvedFilter) (*Financial
 	if err := r.db.Raw(query, args...).Scan(&purchaseTotal).Error; err != nil {
 		return nil, err
 	}
+	// W4: the ledger is the source of truth for these figures; the
+	// operational sums above are kept as a cross-check so drift is reported
+	// rather than silently deciding the answer.
+	ledger, err := shared.LedgerFinancialTotals(r.db, shared.MetricScopeFromFilter(filter), filter.StartUTC, filter.EndUTC)
+	if err != nil {
+		return nil, err
+	}
+	warnings = append(warnings, ledgerDriftWarnings([]ledgerDriftCheck{
+		{Metric: "gross_sales", Ledger: ledger.GrossRevenue, Operational: roundMoney(grossSales)},
+		{Metric: "total_collected", Ledger: ledger.Collected, Operational: roundMoney(collected.TotalCollected)},
+		{Metric: "total_refunded", Ledger: ledger.Refunded, Operational: roundMoney(refunded.TotalRefunded)},
+		{Metric: "outstanding_customer_balance", Ledger: ledger.OutstandingCustomer, Operational: roundMoney(outstandingCustomerBalance)},
+		{Metric: "supplier_payable_balance", Ledger: ledger.SupplierPayable, Operational: roundMoney(supplierPayableBalance)},
+		{Metric: "purchase_total", Ledger: ledger.PurchaseTotal, Operational: roundMoney(purchaseTotal)},
+	})...)
+
 	return &FinancialSummaryResponse{
-		GrossSales:                 roundMoney(grossSales),
-		TotalCollected:             roundMoney(collected.TotalCollected),
-		TotalRefunded:              roundMoney(refunded.TotalRefunded),
-		NetCollected:               roundMoney(collected.TotalCollected - refunded.TotalRefunded),
-		OutstandingCustomerBalance: roundMoney(outstandingCustomerBalance),
-		PurchaseTotal:              roundMoney(purchaseTotal),
-		SupplierPayableBalance:     roundMoney(supplierPayableBalance),
-		CashCollected:              roundMoney(collected.CashCollected),
-		CardCollected:              roundMoney(collected.CardCollected),
-		BankTransferCollected:      roundMoney(collected.BankTransferCollected),
-		RefundCount:                refunded.RefundCount,
-		PaymentCount:               collected.PaymentCount,
-		SourceOfTruth:              financialTransactionsSource,
-		ConsistencyWarnings:        warnings,
+		GrossSales:                 ledger.GrossRevenue,
+		TotalCollected:             ledger.Collected,
+		TotalRefunded:              ledger.Refunded,
+		NetCollected:               roundMoney(ledger.Collected - ledger.Refunded),
+		OutstandingCustomerBalance: ledger.OutstandingCustomer,
+		PurchaseTotal:              ledger.PurchaseTotal,
+		SupplierPayableBalance:     ledger.SupplierPayable,
+		CashCollected:              ledger.CashCollected,
+		CardCollected:              ledger.CardCollected,
+		BankTransferCollected:      ledger.BankCollected,
+		// Counts stay operational: they count documents, not ledger money,
+		// and one journal can cover several payments.
+		RefundCount:         refunded.RefundCount,
+		PaymentCount:        collected.PaymentCount,
+		SourceOfTruth:       journalSourceOfTruth,
+		ConsistencyWarnings: warnings,
 	}, nil
 }
 
@@ -2533,21 +2538,33 @@ func (r *Repository) ordersSummary(filter *shared.ResolvedFilter) (*OrdersSummar
 	return &row, err
 }
 
-func (r *Repository) paymentsSummary(filter *shared.ResolvedFilter) (*PaymentsSummary, error) {
+// paymentsSummary feeds the dashboard's money KPIs. Like the financial
+// summary it reads the ledger and reports drift against the operational
+// tables, so the dashboard and /reports/financial/summary can no longer
+// disagree (audit RC1).
+func (r *Repository) paymentsSummary(filter *shared.ResolvedFilter) (*PaymentsSummary, []ReportConsistencyWarning, error) {
 	var collected financialCollectedSummaryRow
 	query, args := financialCollectedSummarySQL(filter)
 	if err := r.db.Raw(query, args...).Scan(&collected).Error; err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var refunded financialRefundSummaryRow
 	query, args = financialRefundSummarySQL(filter)
 	if err := r.db.Raw(query, args...).Scan(&refunded).Error; err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	ledger, err := shared.LedgerFinancialTotals(r.db, shared.MetricScopeFromFilter(filter), filter.StartUTC, filter.EndUTC)
+	if err != nil {
+		return nil, nil, err
+	}
+	warnings := ledgerDriftWarnings([]ledgerDriftCheck{
+		{Metric: "total_collected", Ledger: ledger.Collected, Operational: roundMoney(collected.TotalCollected)},
+		{Metric: "total_refunded", Ledger: ledger.Refunded, Operational: roundMoney(refunded.TotalRefunded)},
+	})
 	return &PaymentsSummary{
-		CollectedAmount: roundMoney(collected.TotalCollected),
-		RefundAmount:    roundMoney(refunded.TotalRefunded),
-	}, nil
+		CollectedAmount: ledger.Collected,
+		RefundAmount:    ledger.Refunded,
+	}, warnings, nil
 }
 
 func (r *Repository) salesExportRows(filter *shared.ResolvedFilter) ([]string, [][]string, error) {
@@ -3024,7 +3041,7 @@ func financialOutstandingRowsSQL(filter *shared.ResolvedFilter) (string, []inter
 			FROM sales s
 			JOIN branches b ON b.id = s.branch_id
 			LEFT JOIN customers c ON c.id = s.customer_id
-			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.payment_status IN ('unpaid','partial') AND s.sale_status <> 'voided' AND s.deleted_at IS NULL AND (s.total_amount - s.paid_amount) > 0`
+			WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND s.deleted_at IS NULL AND ` + shared.OutstandingSaleCondition("s")
 		args = append(args, filter.BusinessID, filter.StartUTC, filter.EndUTC)
 		if !filter.AllBranches {
 			pos += " AND s.branch_id = ?"
@@ -3045,7 +3062,7 @@ func financialOutstandingRowsSQL(filter *shared.ResolvedFilter) (string, []inter
 				bo.payment_status
 			FROM bakery_orders bo
 			JOIN branches b ON b.id = bo.branch_id
-			WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.payment_status IN ('unpaid','partial') AND bo.order_status <> 'cancelled' AND bo.deleted_at IS NULL AND bo.balance_amount > 0`
+			WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.deleted_at IS NULL AND ` + shared.OutstandingBakeryOrderCondition("bo")
 		args = append(args, filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02"))
 		if !filter.AllBranches {
 			bakery += " AND bo.branch_id = ?"

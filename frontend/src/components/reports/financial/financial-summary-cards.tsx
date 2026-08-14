@@ -39,13 +39,22 @@ export function FinancialSummaryCards({
           <AlertTitle>Accounting consistency warning</AlertTitle>
           <AlertDescription>
             {warnings
-              .map(
-                (warning) =>
-                  `${String(warning.missingCount)} ${warning.sourceType}: ${warning.message}`,
+              .map((warning) =>
+                // Drift warnings carry no missing count — their message
+                // already names both figures.
+                warning.missingCount > 0
+                  ? `${String(warning.missingCount)} ${warning.sourceType}: ${warning.message}`
+                  : warning.message,
               )
               .join(" ")}
           </AlertDescription>
         </Alert>
+      ) : null}
+      {summary?.sourceOfTruth === "journal_entries" ? (
+        <p className="text-xs text-muted-foreground">
+          These totals are read from the accounting ledger and cross-checked against the
+          operational records.
+        </p>
       ) : null}
       {shouldShowCards ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
