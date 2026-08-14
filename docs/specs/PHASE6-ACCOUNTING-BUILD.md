@@ -186,7 +186,7 @@ Revert; operational path retained as cross-check.
 
 # W3 — Chart of accounts hierarchy
 
-**Blocked on the open decision above. Do not start without the grouping scheme.**
+> **SHIPPED 2026-08-14 (`2cc50d8`).** Grouping scheme decided with the owner: 11 headers, two levels, codes `10/18/20/28/30/40/49/50/60/62/63` (Current & Non-Current Assets, Current & Non-Current Liabilities, Equity, Sales & Service Income, Other Income, Cost of Sales, Operating Expenses, Finance Costs, Tax Expense). Headers seed per branch. Statements group server-side via `header_account_code/name` on each row rather than a second query, so BS/P&L needed no INNER JOIN rework. Migration `000108` (not 109). Deviations from the plan below: no `is_postable` column (the existing `allow_manual_posting` plus the new `is_header` cover it); the unused `chart-accounts-table.tsx` shell was left alone; chart-list tree indentation and the `accountGroupsByType` reconciliation remain open follow-ups.
 
 ## Context
 Open decision §4. `parent_account_id` exists (`000041:6`), the API resolves and validates it (`service.go:4574-4599`), the create/edit dialog already offers a parent picker (`chart-account-form-dialog.tsx:307-328`) — but no seed sets a parent, so the chart is flat and grouping is improvised client-side from `account_group`.
