@@ -614,8 +614,14 @@ func (s *Service) buildChargeRefunds(tx *gorm.DB, businessID, saleID, branchID, 
 		if source.TotalAmount <= 0 {
 			return nil, charges.ChargeTotals{}, apperrors.BadRequest("source charge has no refundable amount", map[string]interface{}{"source_charge_id": sourceID})
 		}
-		ratio := refundAmount / source.TotalAmount
-		taxAmount := roundMoney(source.TaxAmount * ratio)
+		// Exact: the refunded tax is the source tax prorated by how much of the
+		// charge is being refunded. Computing the ratio in float64 first and
+		// multiplying loses a fils on ordinary partial refunds (Phase 6 / W4),
+		// so the whole proration stays in decimal and rounds once at the end.
+		taxAmount := money.FromFloat(source.TaxAmount).
+			Mul(money.FromFloat(refundAmount)).
+			Div(money.FromFloat(source.TotalAmount)).
+			Round2().Float64()
 		netAmount := roundMoney(refundAmount - taxAmount)
 		if netAmount < 0 {
 			netAmount = 0
