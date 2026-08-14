@@ -18,6 +18,7 @@ import {
 } from "@/components/reports/financial/financial-report-page-utils";
 import { FinancialSummaryCards } from "@/components/reports/financial/financial-summary-cards";
 import { FinancialTrendChart } from "@/components/reports/financial/financial-trend-chart";
+import { ReportLedgerNotice } from "@/components/reports/financial/report-ledger-notice";
 import { ReportChartCard } from "@/components/reports/report-chart-card";
 import { ReportPageHeader } from "@/components/reports/report-page-header";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
@@ -112,7 +113,14 @@ export function FinancialReportsPageClient(): JSX.Element {
         onRetry={() => void trendQuery.refetch()}
       >
         {trendQuery.data ? (
-          <FinancialTrendChart chart={trendQuery.data} />
+          <div className="flex flex-col gap-4">
+            <FinancialTrendChart chart={trendQuery.data} />
+            <ReportLedgerNotice
+              note="Each point is read from the accounting ledger and cross-checked against the operational records."
+              sourceOfTruth={trendQuery.data.sourceOfTruth}
+              warnings={trendQuery.data.consistencyWarnings}
+            />
+          </div>
         ) : (
           <FinancialReportEmptyState message="No financial trend data found." />
         )}

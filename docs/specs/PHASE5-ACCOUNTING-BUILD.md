@@ -33,7 +33,7 @@ W1 Period locking ──┬──> W3 Opening balances ──> W4 Reports-read-l
 6. Reopen **soft-deletes** the close journal, never reverses it — the 000096 idempotency index covers `status IN ('posted','reversed')`, so a reversed close journal would permanently occupy the `(business_id, source_type, source_id)` slot and block re-close.
 7. Fiscal years close **oldest-open-first**; re-closing a closed FY is a no-op/409.
 8. Opening balances this phase: **payment accounts only** (Dr the account's chart account / Cr 3400 Opening Balance Equity). Generic per-account editor and per-counterparty AR/AP openings defer to Phase 6; the documented workaround is a manual JV against 3400. *(User decision 2026-08-14.)*
-9. W4 keeps operational computations alive as **cross-checks feeding `consistencyWarnings`** — drift detection, never a silent switch. Sales analytics (`/reports/sales/*`, `/financial/trend`, per-entity customer/supplier stats) stay operational permanently.
+9. W4 keeps operational computations alive as **cross-checks feeding `consistencyWarnings`** — drift detection, never a silent switch. Sales analytics (`/reports/sales/*`, `/financial/trend`, per-entity customer/supplier stats) stay operational permanently. *(Superseded for `/financial/trend`, which moved to the ledger in Phase 6 / W2; the sales trends did not.)*
 10. First year-end close on existing tenants is a **documented operator action** (accountant-reviewed, per business), never automatic. *(User decision 2026-08-14.)*
 11. No feature flags — each child merges only when its QA passes, so main stays releasable.
 
@@ -176,7 +176,7 @@ Audit RC1: `reports/repository.go` (3,755 lines) contains zero ledger queries; e
 2. **`/reports/financial/summary`**: `LedgerFinancialTotals` becomes primary (`SourceOfTruth: "journal_entries"`); operational computation kept as cross-check; per-metric `operational_ledger_drift_<metric>` warnings when |Δ| > 0.05. Response shape otherwise unchanged.
 3. **`/financial/outstanding-balances` + `/financial/supplier-payables`**: header totals from ledger (1100 / 2000, supplier advances 1400 surfaced separately); per-entity rows stay operational (control accounts have no subledger — documented limitation) with row-sum-vs-ledger drift warnings.
 4. **Dashboard**: revenue/collected/refunded KPIs switch to the same `LedgerFinancialTotals` call; `DashboardLoadWarning` carries drift. Ends the summary-vs-dashboard split.
-5. **Stays operational**: `/reports/sales/*`, `/financial/trend`, customer/supplier per-entity stats.
+5. **Stays operational**: `/reports/sales/*`, customer/supplier per-entity stats. *(`/financial/trend` was listed here too; Phase 6 / W2 moved it to the ledger.)*
 6. **Parity validation before merge**: AR/AP reconciliation endpoints + a test harness (seed sale/refund/expense/bill/settlement; assert ledger == operational within epsilon). Pre-existing drift on the dev DB is data repair via backfill, not report-code change.
 
 ## Acceptance criteria

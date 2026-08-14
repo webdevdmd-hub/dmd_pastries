@@ -155,6 +155,8 @@ export type FinancialTrendDataset = {
 };
 
 export type FinancialTrendChart = {
+  consistencyWarnings: ReportConsistencyWarning[];
   datasets: FinancialTrendDataset[];
   labels: string[];
+  sourceOfTruth: string;
 };

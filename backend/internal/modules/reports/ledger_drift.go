@@ -15,9 +15,10 @@ import (
 // difference is reported as a consistency warning instead of one number
 // silently winning.
 //
-// Volume analytics (sales by product/category/cashier, trends, per-entity
-// customer and supplier rows) stay operational -- they describe activity,
-// not ledger positions.
+// Volume analytics (sales by product/category/cashier, per-entity customer
+// and supplier rows) stay operational -- they describe activity, not ledger
+// positions. The financial trend moved to the ledger in Phase 6 / W2; the
+// sales trends did not.
 
 // ledgerDriftEpsilon absorbs per-line rounding between two independent
 // summations of the same money; anything larger is real drift.

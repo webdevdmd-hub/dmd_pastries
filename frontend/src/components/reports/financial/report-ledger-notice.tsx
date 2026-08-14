@@ -13,9 +13,11 @@ import type { ReportConsistencyWarning } from "@/types/financial-reports";
  * summary renders the same thing inline.
  */
 export function ReportLedgerNotice({
+  note,
   sourceOfTruth,
   warnings,
 }: {
+  note?: string | undefined;
   sourceOfTruth: string;
   warnings: ReportConsistencyWarning[];
 }): JSX.Element | null {
@@ -40,9 +42,8 @@ export function ReportLedgerNotice({
       ) : null}
       {sourceOfTruth === "journal_entries" ? (
         <p className="text-xs text-muted-foreground">
-          The balance above is read from the accounting ledger as of the report end date, and
-          cross-checked against the operational records. It covers every open document, so it
-          will not match the sum of the rows below when the date filter excludes older ones.
+          {note ??
+            "The balance above is read from the accounting ledger as of the report end date, and cross-checked against the operational records. It covers every open document, so it will not match the sum of the rows below when the date filter excludes older ones."}
         </p>
       ) : null}
     </div>

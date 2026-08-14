@@ -34,6 +34,8 @@ func TestLedgerMetricArgCountsMatchPlaceholders(t *testing.T) {
 		{"LedgerMappedMovement", 9, 7},
 		// businessID, from, to, sources, businessID, [branch], [branch]
 		{"LedgerTaxAmount", 7, 5},
+		// collectionSources, refundSources, businessID, from, to, sources, [branch]
+		{"LedgerFinancialTotalsByPeriod", 7, 6},
 	}
 
 	for _, tc := range cases {

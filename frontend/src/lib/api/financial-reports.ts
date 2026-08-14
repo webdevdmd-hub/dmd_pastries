@@ -336,7 +336,12 @@ function parseTrend(value: unknown): FinancialTrendChart {
         };
       })
     : [];
-  return { datasets, labels };
+  return {
+    consistencyWarnings: parseConsistencyWarnings(value),
+    datasets,
+    labels,
+    sourceOfTruth: isObject(value) ? stringOrEmpty(value.source_of_truth) : "",
+  };
 }
 
 async function getReport<TResponse>(

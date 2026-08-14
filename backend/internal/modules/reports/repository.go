@@ -2502,6 +2502,45 @@ func (r *Repository) FinancialTrend(filter *shared.ResolvedFilter) ([]trendSerie
 	return rows, nil
 }
 
+// FinancialTrendFromLedger buckets the trend from journal entries and keeps
+// the operational union query as a cross-check (Phase 6 / W2, audit RC1).
+//
+// Drift is reported once per metric across the whole window rather than per
+// bucket: a year of daily buckets would otherwise be able to emit hundreds of
+// warnings for a single missing journal.
+func (r *Repository) FinancialTrendFromLedger(filter *shared.ResolvedFilter) ([]shared.LedgerPeriodTotal, []ReportConsistencyWarning, error) {
+	ledgerRows, err := shared.LedgerFinancialTotalsByPeriod(
+		r.db, shared.MetricScopeFromFilter(filter), filter.StartUTC, filter.EndUTC, filter.GroupBy,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	operationalRows, err := r.FinancialTrend(filter)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ledgerCollected, ledgerRefunded := 0.0, 0.0
+	for _, row := range ledgerRows {
+		ledgerCollected += row.Collected
+		ledgerRefunded += row.Refunded
+	}
+	operationalCollected, operationalRefunded := 0.0, 0.0
+	for _, row := range operationalRows {
+		// trendSeriesRow is reused from the sales trend, so its field names
+		// do not describe this query: NetSales carries collected and
+		// SalesCount carries refunded (see financialTrendSQL).
+		operationalCollected += row.NetSales
+		operationalRefunded += row.SalesCount
+	}
+
+	warnings := ledgerDriftWarnings([]ledgerDriftCheck{
+		{Metric: "trend_total_collected", Ledger: roundMoney(ledgerCollected), Operational: roundMoney(operationalCollected)},
+		{Metric: "trend_total_refunded", Ledger: roundMoney(ledgerRefunded), Operational: roundMoney(operationalRefunded)},
+	})
+	return ledgerRows, warnings, nil
+}
+
 func (r *Repository) salesSummary(filter *shared.ResolvedFilter) (*SalesSummary, error) {
 	report, err := r.salesReportSummaryForRange(filter, filter.StartUTC, filter.EndUTC)
 	if err != nil {

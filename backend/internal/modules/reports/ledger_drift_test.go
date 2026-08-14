@@ -62,6 +62,7 @@ func TestFinancialSummaryAndDashboardBothReadLedgerTotals(t *testing.T) {
 		"paymentsSummary":           "shared.LedgerFinancialTotals(",
 		"OutstandingBalancesHeader": "shared.LedgerMappedBalance(",
 		"SupplierPayablesHeader":    "shared.LedgerMappedBalance(",
+		"FinancialTrendFromLedger":  "shared.LedgerFinancialTotalsByPeriod(",
 	}
 	for name, ledgerCall := range required {
 		index := strings.Index(text, "func (r *Repository) "+name+"(")

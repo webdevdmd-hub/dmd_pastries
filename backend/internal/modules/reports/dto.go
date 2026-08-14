@@ -1,5 +1,7 @@
 package reports
 
+import "pastries-pos/internal/modules/reports/shared"
+
 type DashboardSummaryResponse struct {
 	Sales               SalesSummary               `json:"sales"`
 	Inventory           InventorySummary           `json:"inventory"`
@@ -534,6 +536,19 @@ type SupplierPayableReportItem struct {
 	PayableBalance     float64 `json:"payable_balance"`
 	OpenCreditAmount   float64 `json:"open_credit_amount"`
 	OldestDueDate      *string `json:"oldest_due_date"`
+}
+
+// FinancialTrendResponse is a superset of shared.ChartResponse (Phase 6 / W2).
+//
+// The labels/datasets shape is kept exactly as it was so the existing chart
+// parser keeps working; provenance and drift are added alongside. Reshaping
+// this into buckets would leave the frontend silently rendering an empty
+// chart rather than failing.
+type FinancialTrendResponse struct {
+	Labels              []string                   `json:"labels"`
+	Datasets            []shared.ChartDataset      `json:"datasets"`
+	SourceOfTruth       string                     `json:"source_of_truth"`
+	ConsistencyWarnings []ReportConsistencyWarning `json:"consistency_warnings,omitempty"`
 }
 
 // ReportBalanceHeader is the ledger-backed control-account total for a

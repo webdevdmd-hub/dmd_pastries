@@ -581,12 +581,12 @@ func (s *Service) FinancialReconciliation(currentUser *utils.AuthContext, values
 	return &PaginatedResponse[ReconciliationReportItem]{Items: items, Pagination: shared.NewPagination(filter.Page, filter.Limit, total)}, nil
 }
 
-func (s *Service) FinancialTrend(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*shared.ChartResponse, error) {
+func (s *Service) FinancialTrend(currentUser *utils.AuthContext, values url.Values, ipAddress, userAgent string) (*FinancialTrendResponse, error) {
 	filter, err := shared.Resolve(currentUser, shared.ParseQuery(values))
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.repo.FinancialTrend(filter)
+	rows, warnings, err := s.repo.FinancialTrendFromLedger(filter)
 	if err != nil {
 		return nil, apperrors.Internal("failed to generate financial trend report")
 	}
@@ -595,12 +595,23 @@ func (s *Service) FinancialTrend(currentUser *utils.AuthContext, values url.Valu
 	refunded := make([]float64, 0, len(rows))
 	net := make([]float64, 0, len(rows))
 	for _, row := range rows {
-		labels = append(labels, row.Bucket.Format("2006-01-02"))
-		collected = append(collected, row.NetSales)
-		refunded = append(refunded, row.SalesCount)
-		net = append(net, row.NetSales-row.SalesCount)
+		// Labels used to be day-formatted at every granularity, so a monthly
+		// trend plotted "2026-01-01" for January.
+		labels = append(labels, formatBucket(row.Bucket, filter.GroupBy))
+		collected = append(collected, row.Collected)
+		refunded = append(refunded, row.Refunded)
+		net = append(net, roundMoney(row.Collected-row.Refunded))
 	}
-	return &shared.ChartResponse{Labels: labels, Datasets: []shared.ChartDataset{{Label: "Collected", Data: collected}, {Label: "Refunded", Data: refunded}, {Label: "Net Collected", Data: net}}}, nil
+	return &FinancialTrendResponse{
+		Labels: labels,
+		Datasets: []shared.ChartDataset{
+			{Label: "Collected", Data: collected},
+			{Label: "Refunded", Data: refunded},
+			{Label: "Net Collected", Data: net},
+		},
+		SourceOfTruth:       journalSourceOfTruth,
+		ConsistencyWarnings: warnings,
+	}, nil
 }
 
 func (s *Service) ExportCSV(currentUser *utils.AuthContext, reportType string, values url.Values, ipAddress, userAgent string) (*shared.CSVFile, error) {

@@ -549,6 +549,84 @@ func ExpiringItemsCount(db *gorm.DB, scope MetricScope, todayDate string, days i
 	return total, err
 }
 
+// LedgerPeriodTotal is one bucket of a time series read from the ledger.
+type LedgerPeriodTotal struct {
+	Bucket    time.Time
+	Collected float64
+	Refunded  float64
+}
+
+// LedgerPeriodGranularity maps a report's group_by to a DATE_TRUNC unit.
+// entry_date is a plain DATE, so unlike the operational trend -- which
+// truncates a timestamptz in the Postgres session timezone and can therefore
+// straddle midnight in the business's own timezone -- this needs no
+// conversion.
+func LedgerPeriodGranularity(groupBy string) string {
+	switch strings.TrimSpace(groupBy) {
+	case "week":
+		return "week"
+	case "month":
+		return "month"
+	default:
+		return "day"
+	}
+}
+
+// LedgerFinancialTotalsByPeriod buckets collections and refunds from the
+// ledger (Phase 6 / W2).
+//
+// Deliberately one grouped query rather than calling LedgerFinancialTotals
+// per bucket: that helper issues eight queries, so a 90-day daily trend would
+// cost 720 round trips.
+//
+// Only flow metrics belong in a trend. The outstanding-customer and
+// supplier-payable figures LedgerFinancialTotals also returns are cumulative
+// as-of balances, which per bucket would be running totals -- a different
+// question from the one this chart asks.
+func LedgerFinancialTotalsByPeriod(db *gorm.DB, scope MetricScope, startUTC, endUTC time.Time, groupBy string) ([]LedgerPeriodTotal, error) {
+	dateFrom, dateTo := LedgerDateRange(startUTC, endUTC)
+	granularity := LedgerPeriodGranularity(groupBy)
+
+	// The union is the query's own source filter; the two FILTER clauses then
+	// split it. Because both sets are allow-lists, structural journals such
+	// as year_end_close can never reach a bucket (asserted by test).
+	sourceTypes := append(append([]string{}, CollectionJournalSources...), RefundJournalSources...)
+
+	branchClause, branchArgs := ledgerBranchClause(scope)
+	args := []interface{}{
+		CollectionJournalSources, RefundJournalSources,
+		scope.BusinessID, dateFrom, dateTo, sourceTypes,
+	}
+	args = append(args, branchArgs...)
+
+	rows := []LedgerPeriodTotal{}
+	err := db.Raw(`
+		SELECT DATE_TRUNC('`+granularity+`', je.entry_date) AS bucket,
+		       COALESCE(SUM(jel.debit_amount) FILTER (WHERE je.source_type IN ?), 0) AS collected,
+		       COALESCE(SUM(jel.credit_amount) FILTER (WHERE je.source_type IN ?), 0) AS refunded
+		FROM journal_entry_lines jel
+		JOIN journal_entries je ON je.id = jel.journal_entry_id AND je.business_id = jel.business_id
+		JOIN payment_accounts pa ON pa.chart_account_id = jel.account_id AND pa.business_id = jel.business_id AND pa.deleted_at IS NULL
+		WHERE jel.business_id = ?
+		  AND jel.deleted_at IS NULL
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted', 'reversed')
+		  AND je.entry_date >= ?
+		  AND je.entry_date <= ?
+		  AND je.source_type IN ?
+		  `+branchClause+`
+		GROUP BY bucket
+		ORDER BY bucket ASC`, args...).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for index := range rows {
+		rows[index].Collected = roundMetricMoney(rows[index].Collected)
+		rows[index].Refunded = roundMetricMoney(rows[index].Refunded)
+	}
+	return rows, nil
+}
+
 // CounterpartyOpeningTotal sums the go-live opening balances attributed to
 // customers or suppliers (Phase 6 / W1).
 //
