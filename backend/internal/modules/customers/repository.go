@@ -324,7 +324,7 @@ func (r *Repository) Stats(businessID, branchID, customerID string) (*CustomerSt
 		Scan(&stats.TotalPaidAmount).Error; err != nil {
 		return nil, err
 	}
-	var bakeryPaid float64
+	var bakeryPaid money.Amount
 	if err := r.db.Table("bakery_order_payments bop").
 		Joins("JOIN bakery_orders bo ON bo.id = bop.bakery_order_id AND bo.business_id = bop.business_id").
 		Select("COALESCE(SUM(bop.amount), 0)").
@@ -332,7 +332,7 @@ func (r *Repository) Stats(businessID, branchID, customerID string) (*CustomerSt
 		Scan(&bakeryPaid).Error; err != nil {
 		return nil, err
 	}
-	stats.TotalPaidAmount += bakeryPaid
+	stats.TotalPaidAmount = stats.TotalPaidAmount.Add(bakeryPaid)
 	if err := r.db.Table("payment_refunds pr").
 		Joins("JOIN sales s ON s.id = pr.sale_id AND s.business_id = pr.business_id AND s.branch_id = pr.branch_id").
 		Select("COALESCE(SUM(pr.refund_amount), 0)").
@@ -340,7 +340,7 @@ func (r *Repository) Stats(businessID, branchID, customerID string) (*CustomerSt
 		Scan(&stats.TotalRefundedAmount).Error; err != nil {
 		return nil, err
 	}
-	var saleRefunded float64
+	var saleRefunded money.Amount
 	if err := r.db.Table("sale_refunds sr").
 		Joins("JOIN sales s ON s.id = sr.sale_id AND s.business_id = sr.business_id").
 		Select("COALESCE(SUM(sr.refund_amount), 0)").
@@ -348,19 +348,19 @@ func (r *Repository) Stats(businessID, branchID, customerID string) (*CustomerSt
 		Scan(&saleRefunded).Error; err != nil {
 		return nil, err
 	}
-	stats.TotalRefundedAmount += saleRefunded
+	stats.TotalRefundedAmount = stats.TotalRefundedAmount.Add(saleRefunded)
 	// Same predicate as the AR reconciliation and the financial reports, so
 	// a customer's outstanding balance cannot disagree with the totals they
 	// roll up into (Phase 5 / W4).
 	customerScope := "business_id = ? AND branch_id = ? AND customer_id = ? AND deleted_at IS NULL AND "
-	var posOutstanding float64
+	var posOutstanding money.Amount
 	if err := r.db.Table("sales").
 		Select("COALESCE(SUM(total_amount - paid_amount), 0)").
 		Where(customerScope+reportshared.OutstandingSaleCondition(""), businessID, branchID, customerID).
 		Scan(&posOutstanding).Error; err != nil {
 		return nil, err
 	}
-	var bakeryOutstanding float64
+	var bakeryOutstanding money.Amount
 	if err := r.db.Table("bakery_orders").
 		Select("COALESCE(SUM(balance_amount), 0)").
 		Where(customerScope+reportshared.OutstandingBakeryOrderCondition(""), businessID, branchID, customerID).
@@ -370,7 +370,7 @@ func (r *Repository) Stats(businessID, branchID, customerID string) (*CustomerSt
 	// A go-live opening balance is a receivable with no sale behind it
 	// (Phase 6 / W1). It belongs in the customer's outstanding balance, or
 	// this figure disagrees with the AR ledger it rolls up into.
-	var openingOutstanding float64
+	var openingOutstanding money.Amount
 	if err := r.db.Table("counterparty_opening_balances").
 		Select("COALESCE(SUM(amount), 0)").
 		Where("business_id = ? AND branch_id = ? AND party_type = 'customer' AND party_id = ? AND deleted_at IS NULL",
@@ -390,18 +390,18 @@ func (r *Repository) Stats(businessID, branchID, customerID string) (*CustomerSt
 		return nil, err
 	}
 	stats.CustomerID = customerID
-	stats.TotalSalesAmount = stats.POSSalesAmount + stats.BakeryOrdersAmount
+	stats.TotalSalesAmount = stats.POSSalesAmount.Add(stats.BakeryOrdersAmount)
 	stats.TotalOrdersCount = stats.POSSalesCount + stats.BakeryOrdersCount
 	stats.LastPurchaseAt = latestCustomerTime(stats.LastPurchaseAt, stats.LastOrderAt)
-	stats.TotalSalesAmount = roundCustomerMoney(stats.TotalSalesAmount)
-	stats.POSSalesAmount = roundCustomerMoney(stats.POSSalesAmount)
-	stats.BakeryOrdersAmount = roundCustomerMoney(stats.BakeryOrdersAmount)
-	stats.TotalPaidAmount = roundCustomerMoney(stats.TotalPaidAmount)
-	stats.TotalRefundedAmount = roundCustomerMoney(stats.TotalRefundedAmount)
-	stats.NetSpent = roundCustomerMoney(stats.TotalPaidAmount - stats.TotalRefundedAmount)
-	stats.OutstandingBalance = roundCustomerMoney(posOutstanding + bakeryOutstanding + openingOutstanding)
-	if stats.OutstandingBalance < 0 {
-		stats.OutstandingBalance = 0
+	stats.TotalSalesAmount = stats.TotalSalesAmount.Round2()
+	stats.POSSalesAmount = stats.POSSalesAmount.Round2()
+	stats.BakeryOrdersAmount = stats.BakeryOrdersAmount.Round2()
+	stats.TotalPaidAmount = stats.TotalPaidAmount.Round2()
+	stats.TotalRefundedAmount = stats.TotalRefundedAmount.Round2()
+	stats.NetSpent = stats.TotalPaidAmount.Sub(stats.TotalRefundedAmount).Round2()
+	stats.OutstandingBalance = money.Sum(posOutstanding, bakeryOutstanding, openingOutstanding).Round2()
+	if stats.OutstandingBalance.IsNegative() {
+		stats.OutstandingBalance = money.Zero
 	}
 	stats.PendingPayments = posPending + bakeryPending
 	transactions, err := r.CustomerRecentTransactions(businessID, branchID, customerID, 10)
@@ -599,5 +599,3 @@ func uniqueStrings(values []string) []string {
 	}
 	return result
 }
-
-func roundCustomerMoney(value float64) float64 { return money.Round2(value) }

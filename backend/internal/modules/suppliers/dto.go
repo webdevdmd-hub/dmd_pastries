@@ -1,6 +1,10 @@
 package suppliers
 
-import "time"
+import (
+	"time"
+
+	"pastries-pos/internal/shared/money"
+)
 
 type SupplierListQuery struct {
 	Search    string
@@ -152,33 +156,33 @@ type SupplierStatementResponse struct {
 	SupplierName   string                          `json:"supplier_name"`
 	DateFrom       string                          `json:"date_from"`
 	DateTo         string                          `json:"date_to"`
-	OpeningBalance float64                         `json:"opening_balance"`
-	TotalDebit     float64                         `json:"total_debit"`
-	TotalCredit    float64                         `json:"total_credit"`
-	ClosingBalance float64                         `json:"closing_balance"`
+	OpeningBalance money.Amount                    `json:"opening_balance"`
+	TotalDebit     money.Amount                    `json:"total_debit"`
+	TotalCredit    money.Amount                    `json:"total_credit"`
+	ClosingBalance money.Amount                    `json:"closing_balance"`
 	Items          []SupplierStatementItemResponse `json:"items"`
 }
 
 type SupplierStatementItemResponse struct {
-	ID                string    `json:"id"`
-	DocumentID        string    `json:"document_id"`
-	DocumentNumber    string    `json:"document_number"`
-	TransactionType   string    `json:"transaction_type"`
-	TransactionDate   time.Time `json:"transaction_date"`
-	BranchID          string    `json:"branch_id"`
-	BranchName        string    `json:"branch_name"`
-	DebitAmount       float64   `json:"debit_amount"`
-	CreditAmount      float64   `json:"credit_amount"`
-	RunningBalance    float64   `json:"running_balance"`
-	Status            string    `json:"status"`
-	PaymentStatus     string    `json:"payment_status"`
-	ReferenceNumber   string    `json:"reference_number"`
-	Notes             string    `json:"notes"`
-	PurchaseOrderID   *string   `json:"purchase_order_id,omitempty"`
-	PurchaseInvoiceID *string   `json:"purchase_invoice_id,omitempty"`
-	PurchaseReceiptID *string   `json:"purchase_receipt_id,omitempty"`
-	PurchaseReturnID  *string   `json:"purchase_return_id,omitempty"`
-	PaymentID         *string   `json:"payment_id,omitempty"`
+	ID                string       `json:"id"`
+	DocumentID        string       `json:"document_id"`
+	DocumentNumber    string       `json:"document_number"`
+	TransactionType   string       `json:"transaction_type"`
+	TransactionDate   time.Time    `json:"transaction_date"`
+	BranchID          string       `json:"branch_id"`
+	BranchName        string       `json:"branch_name"`
+	DebitAmount       money.Amount `json:"debit_amount"`
+	CreditAmount      money.Amount `json:"credit_amount"`
+	RunningBalance    money.Amount `json:"running_balance"`
+	Status            string       `json:"status"`
+	PaymentStatus     string       `json:"payment_status"`
+	ReferenceNumber   string       `json:"reference_number"`
+	Notes             string       `json:"notes"`
+	PurchaseOrderID   *string      `json:"purchase_order_id,omitempty"`
+	PurchaseInvoiceID *string      `json:"purchase_invoice_id,omitempty"`
+	PurchaseReceiptID *string      `json:"purchase_receipt_id,omitempty"`
+	PurchaseReturnID  *string      `json:"purchase_return_id,omitempty"`
+	PaymentID         *string      `json:"payment_id,omitempty"`
 }
 
 type PaginationResponse struct {
@@ -189,12 +193,12 @@ type PaginationResponse struct {
 }
 
 type SupplierStatsResponse struct {
-	SupplierID          string  `json:"supplier_id"`
-	TotalPurchaseOrders int64   `json:"total_purchase_orders"`
-	TotalBills          int64   `json:"total_bills"`
-	TotalPurchaseAmount float64 `json:"total_purchase_amount"`
-	TotalPaidAmount     float64 `json:"total_paid_amount"`
-	LastPurchaseDate    *string `json:"last_purchase_date"`
-	OutstandingBalance  float64 `json:"outstanding_balance"`
-	OutstandingPayables float64 `json:"outstanding_payables"`
+	SupplierID          string       `json:"supplier_id"`
+	TotalPurchaseOrders int64        `json:"total_purchase_orders"`
+	TotalBills          int64        `json:"total_bills"`
+	TotalPurchaseAmount money.Amount `json:"total_purchase_amount"`
+	TotalPaidAmount     money.Amount `json:"total_paid_amount"`
+	LastPurchaseDate    *string      `json:"last_purchase_date"`
+	OutstandingBalance  money.Amount `json:"outstanding_balance"`
+	OutstandingPayables money.Amount `json:"outstanding_payables"`
 }

@@ -1,6 +1,7 @@
 package suppliers
 
 import (
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"testing"
 	"time"
@@ -54,10 +55,10 @@ func TestSupplierStatsResponseCalculatesPaidOutstandingAndLastPurchaseDate(t *te
 		SupplierID:           "supplier-1",
 		TotalPurchaseOrders:  3,
 		TotalBills:           2,
-		TotalPurchaseAmount:  1200.125,
-		SupplierPaymentsPaid: 350.444,
-		InvoicePaymentsPaid:  100.111,
-		VendorCredits:        25.222,
+		TotalPurchaseAmount:  money.FromFloat(1200.125),
+		SupplierPaymentsPaid: money.FromFloat(350.444),
+		InvoicePaymentsPaid:  money.FromFloat(100.111),
+		VendorCredits:        money.FromFloat(25.222),
 		LastPurchaseDate:     &lastPurchase,
 	})
 
@@ -70,17 +71,17 @@ func TestSupplierStatsResponseCalculatesPaidOutstandingAndLastPurchaseDate(t *te
 	if response.TotalBills != 2 {
 		t.Fatalf("TotalBills = %d, want 2", response.TotalBills)
 	}
-	if response.TotalPurchaseAmount != 1200.13 {
-		t.Fatalf("TotalPurchaseAmount = %.2f, want 1200.13", response.TotalPurchaseAmount)
+	if !response.TotalPurchaseAmount.Equal(money.FromFloat(1200.13)) {
+		t.Fatalf("TotalPurchaseAmount = %s, want 1200.13", response.TotalPurchaseAmount)
 	}
-	if response.TotalPaidAmount != 450.56 {
-		t.Fatalf("TotalPaidAmount = %.2f, want 450.56", response.TotalPaidAmount)
+	if !response.TotalPaidAmount.Equal(money.FromFloat(450.56)) {
+		t.Fatalf("TotalPaidAmount = %s, want 450.56", response.TotalPaidAmount)
 	}
-	if response.OutstandingBalance != 724.34 {
-		t.Fatalf("OutstandingBalance = %.2f, want 724.34", response.OutstandingBalance)
+	if !response.OutstandingBalance.Equal(money.FromFloat(724.34)) {
+		t.Fatalf("OutstandingBalance = %s, want 724.34", response.OutstandingBalance)
 	}
-	if response.OutstandingPayables != response.OutstandingBalance {
-		t.Fatalf("OutstandingPayables = %.2f, want same as outstanding balance", response.OutstandingPayables)
+	if !response.OutstandingPayables.Equal(response.OutstandingBalance) {
+		t.Fatalf("OutstandingPayables = %s, want same as outstanding balance", response.OutstandingPayables)
 	}
 	if response.LastPurchaseDate == nil || *response.LastPurchaseDate != "2026-07-09" {
 		t.Fatalf("LastPurchaseDate = %v, want 2026-07-09", response.LastPurchaseDate)
@@ -90,12 +91,12 @@ func TestSupplierStatsResponseCalculatesPaidOutstandingAndLastPurchaseDate(t *te
 func TestSupplierStatsResponseAllowsSupplierCreditBalance(t *testing.T) {
 	response := supplierStatsResponse(supplierStatsRow{
 		SupplierID:           "supplier-1",
-		TotalPurchaseAmount:  100,
-		SupplierPaymentsPaid: 125,
-		VendorCredits:        10,
+		TotalPurchaseAmount:  money.FromFloat(100),
+		SupplierPaymentsPaid: money.FromFloat(125),
+		VendorCredits:        money.FromFloat(10),
 	})
 
-	if response.OutstandingBalance != -35 {
-		t.Fatalf("OutstandingBalance = %.2f, want -35.00 supplier credit", response.OutstandingBalance)
+	if !response.OutstandingBalance.Equal(money.FromFloat(-35)) {
+		t.Fatalf("OutstandingBalance = %s, want -35.00 supplier credit", response.OutstandingBalance)
 	}
 }

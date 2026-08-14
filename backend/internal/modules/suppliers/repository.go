@@ -3,6 +3,7 @@ package suppliers
 import (
 	"fmt"
 	"math"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -23,8 +24,8 @@ type supplierStatementRow struct {
 	TransactionDate   time.Time
 	BranchID          string
 	BranchName        string
-	DebitAmount       float64
-	CreditAmount      float64
+	DebitAmount       money.Amount
+	CreditAmount      money.Amount
 	Status            string
 	PaymentStatus     string
 	ReferenceNumber   string
@@ -40,11 +41,11 @@ type supplierStatsRow struct {
 	SupplierID           string
 	TotalPurchaseOrders  int64
 	TotalBills           int64
-	TotalPurchaseAmount  float64
-	SupplierPaymentsPaid float64
-	InvoicePaymentsPaid  float64
-	VendorCredits        float64
-	OpeningBalance       float64
+	TotalPurchaseAmount  money.Amount
+	SupplierPaymentsPaid money.Amount
+	InvoicePaymentsPaid  money.Amount
+	VendorCredits        money.Amount
+	OpeningBalance       money.Amount
 	LastPurchaseDate     *time.Time
 }
 
@@ -305,8 +306,8 @@ func supplierStatsArgs(businessID, branchID, supplierID string) []interface{} {
 }
 
 func supplierStatsResponse(row supplierStatsRow) *SupplierStatsResponse {
-	totalPaid := roundSupplierMoney(row.SupplierPaymentsPaid + row.InvoicePaymentsPaid)
-	outstanding := roundSupplierMoney(row.TotalPurchaseAmount - totalPaid - row.VendorCredits + row.OpeningBalance)
+	totalPaid := row.SupplierPaymentsPaid.Add(row.InvoicePaymentsPaid).Round2()
+	outstanding := row.TotalPurchaseAmount.Sub(totalPaid).Sub(row.VendorCredits).Add(row.OpeningBalance).Round2()
 	var lastPurchaseDate *string
 	if row.LastPurchaseDate != nil {
 		formatted := row.LastPurchaseDate.Format("2006-01-02")
@@ -316,7 +317,7 @@ func supplierStatsResponse(row supplierStatsRow) *SupplierStatsResponse {
 		SupplierID:          row.SupplierID,
 		TotalPurchaseOrders: row.TotalPurchaseOrders,
 		TotalBills:          row.TotalBills,
-		TotalPurchaseAmount: roundSupplierMoney(row.TotalPurchaseAmount),
+		TotalPurchaseAmount: row.TotalPurchaseAmount.Round2(),
 		TotalPaidAmount:     totalPaid,
 		LastPurchaseDate:    lastPurchaseDate,
 		OutstandingBalance:  outstanding,

@@ -394,11 +394,11 @@ func (s *Service) Statement(currentUser *utils.AuthContext, supplierID string, q
 		DateTo:       strings.TrimSpace(query.DateTo),
 		Items:        make([]SupplierStatementItemResponse, 0, len(rows)),
 	}
-	balance := 0.0
+	balance := money.Zero
 	for _, row := range rows {
 		rowDate := dateOnly(row.TransactionDate)
 		if dateFrom != nil && rowDate.Before(*dateFrom) {
-			balance = roundSupplierMoney(balance + row.DebitAmount - row.CreditAmount)
+			balance = balance.Add(row.DebitAmount).Sub(row.CreditAmount).Round2()
 			response.OpeningBalance = balance
 			continue
 		}
@@ -406,12 +406,12 @@ func (s *Service) Statement(currentUser *utils.AuthContext, supplierID string, q
 			continue
 		}
 		if transactionType != "" && transactionType != "all" && row.TransactionType != transactionType {
-			balance = roundSupplierMoney(balance + row.DebitAmount - row.CreditAmount)
+			balance = balance.Add(row.DebitAmount).Sub(row.CreditAmount).Round2()
 			continue
 		}
-		balance = roundSupplierMoney(balance + row.DebitAmount - row.CreditAmount)
-		response.TotalDebit = roundSupplierMoney(response.TotalDebit + row.DebitAmount)
-		response.TotalCredit = roundSupplierMoney(response.TotalCredit + row.CreditAmount)
+		balance = balance.Add(row.DebitAmount).Sub(row.CreditAmount).Round2()
+		response.TotalDebit = response.TotalDebit.Add(row.DebitAmount).Round2()
+		response.TotalCredit = response.TotalCredit.Add(row.CreditAmount).Round2()
 		response.Items = append(response.Items, SupplierStatementItemResponse{
 			ID:                row.ID,
 			DocumentID:        row.DocumentID,
@@ -420,8 +420,8 @@ func (s *Service) Statement(currentUser *utils.AuthContext, supplierID string, q
 			TransactionDate:   row.TransactionDate,
 			BranchID:          row.BranchID,
 			BranchName:        row.BranchName,
-			DebitAmount:       roundSupplierMoney(row.DebitAmount),
-			CreditAmount:      roundSupplierMoney(row.CreditAmount),
+			DebitAmount:       row.DebitAmount.Round2(),
+			CreditAmount:      row.CreditAmount.Round2(),
 			RunningBalance:    balance,
 			Status:            row.Status,
 			PaymentStatus:     row.PaymentStatus,
@@ -435,10 +435,10 @@ func (s *Service) Statement(currentUser *utils.AuthContext, supplierID string, q
 		})
 	}
 	response.ClosingBalance = balance
-	response.OpeningBalance = roundSupplierMoney(response.OpeningBalance)
-	response.TotalDebit = roundSupplierMoney(response.TotalDebit)
-	response.TotalCredit = roundSupplierMoney(response.TotalCredit)
-	response.ClosingBalance = roundSupplierMoney(response.ClosingBalance)
+	response.OpeningBalance = response.OpeningBalance.Round2()
+	response.TotalDebit = response.TotalDebit.Round2()
+	response.TotalCredit = response.TotalCredit.Round2()
+	response.ClosingBalance = response.ClosingBalance.Round2()
 	return response, nil
 }
 
@@ -559,8 +559,6 @@ func dateOnly(value time.Time) time.Time {
 func validSupplierStatementTransactionType(value string) bool {
 	return value == "bill" || value == "payment_made" || value == "vendor_credit"
 }
-
-func roundSupplierMoney(value float64) float64 { return money.Round2(value) }
 
 func setString(updates map[string]interface{}, key, value string) {
 	if strings.TrimSpace(value) != "" {

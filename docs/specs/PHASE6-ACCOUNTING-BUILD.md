@@ -286,6 +286,19 @@ It matters more here than anywhere else. `money.Amount` implements `sql.Scanner`
 
 A silent read-back of zero on money is the worst outcome this migration could produce. **Before converting further modules, stand up a DB-backed integration test** covering write-then-read of a converted model. Until then, each converted module needs a manual smoke check against a real database.
 
+### W4 step 3 progress and a corrected conversion order
+
+**Converted:** `expenses`, `packaging`, `ingredients`, `customers`, `suppliers`. Every module that can convert on its own is done.
+
+**The spec's "leaf modules" list was wrong twice, both found by checking dependencies rather than trusting it:**
+
+- **`charges` is not a leaf.** It is imported by ten files across `pos`, `bakeryorders`, `purchasing` and `salesreturns`. It converts with the transactional bulk. It is also the highest-value single module left — `calculateTax` extracts inclusive VAT with a division, which is the classic float-error generator.
+- **`dashboard` is not a leaf either.** Its money is derived entirely from `reports.DashboardSummaryResponse`; it is a presentation layer over `reports`. Converting it alone would add a shim per field and gain no exactness, because the values arrive already float-rounded. It converts **with or after `reports`**, which is last.
+
+**Corrected order for the rest:** inventory + products/pricing → transactional bulk (`charges` first, then `pos`, `salesreturns`, `bakeryorders`, `payments`, `purchasing`, `manufacturing`, `recipes`) → `accounting` → `reports` + `dashboard` → cleanup.
+
+**Verified by the harness, so the remaining conversions are lower risk than they were:** GORM routes both model fields and bare scalar `Scan` destinations through `money.Amount`'s `Scanner`, amounts round-trip at the column scale, and Go and Postgres sums agree exactly.
+
 3. Convert the remaining modules **module by module**: leaf modules (charges, expenses, ingredients, packaging, customers, suppliers, dashboard) → inventory + products/pricing (fixing the `:1703` bug) → transactional bulk (pos, salesreturns, bakeryorders, payments, purchasing, manufacturing, recipes) → accounting → reports/shared + audit.
 4. **Quantities convert too**, in the same pass. Keeping them `float64` forces a conversion at ~170 mixed-arithmetic sites and reintroduces float error at exactly the `unit_cost × quantity` multiplication that matters.
 5. `audit/metadata.go:112-115` type-switches on `case float64:` — add `case decimal.Decimal:` or audit metadata silently stops normalizing. This is the one reflection-shaped landmine.
