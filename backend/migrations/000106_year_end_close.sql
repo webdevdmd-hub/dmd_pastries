@@ -13,14 +13,14 @@
 -- requiredMappedAccount self-heals a missing one, but seeding it here keeps
 -- the mappings screen truthful.
 
-INSERT INTO account_mappings (id, business_id, branch_id, mapping_key, chart_account_id, description, created_at, updated_at)
+INSERT INTO accounting_account_mappings (id, business_id, branch_id, mapping_key, chart_account_id, description, created_at, updated_at)
 SELECT gen_random_uuid(), coa.business_id, coa.branch_id, 'retained_earnings', coa.id,
        'Accumulated profits from closed financial years', now(), now()
 FROM chart_of_accounts coa
 WHERE coa.account_code = '3100'
   AND coa.deleted_at IS NULL
   AND NOT EXISTS (
-      SELECT 1 FROM account_mappings am
+      SELECT 1 FROM accounting_account_mappings am
       WHERE am.business_id = coa.business_id
         AND am.branch_id = coa.branch_id
         AND am.mapping_key = 'retained_earnings'

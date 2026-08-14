@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	apperrors "pastries-pos/internal/shared/errors"
@@ -28,8 +29,22 @@ import (
 
 // yearEndCloseSourceID keys a close journal per branch and financial year, so
 // re-closing an already-closed year is a no-op instead of a duplicate.
+//
+// journal_entries.source_id is a uuid column, so the key cannot be the
+// readable "<branch>-FY2025" it looks like it wants to be -- Postgres rejects
+// that outright. Instead the branch UUID becomes a UUIDv5 namespace and the
+// financial year is the name, which is deterministic (the same branch and year
+// always derive the same id, which is what the idempotency index needs) while
+// staying a valid uuid.
 func yearEndCloseSourceID(branchID string, financialYearEnd time.Time) string {
-	return fmt.Sprintf("%s-FY%d", strings.TrimSpace(branchID), financialYearEnd.Year())
+	namespace, err := uuid.Parse(strings.TrimSpace(branchID))
+	if err != nil {
+		// Not reachable through the service (branch ids come from the
+		// database), but a non-uuid branch must not silently collide with
+		// another branch's key.
+		namespace = uuid.NewSHA1(uuid.NameSpaceOID, []byte(strings.TrimSpace(branchID)))
+	}
+	return uuid.NewSHA1(namespace, []byte(fmt.Sprintf("year_end_close-FY%d", financialYearEnd.Year()))).String()
 }
 
 // financialYearWindowFor returns the financial year that ENDS on the given

@@ -3,6 +3,8 @@ package accounting
 import (
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestFinancialYearWindowForCalendarYear(t *testing.T) {
@@ -33,9 +35,12 @@ func TestFinancialYearWindowForRejectsNonBoundaryDate(t *testing.T) {
 }
 
 func TestYearEndCloseSourceIDIsUniquePerBranchAndYear(t *testing.T) {
-	first := yearEndCloseSourceID("branch-a", dateUTC(2025, time.December, 31))
-	second := yearEndCloseSourceID("branch-b", dateUTC(2025, time.December, 31))
-	third := yearEndCloseSourceID("branch-a", dateUTC(2026, time.December, 31))
+	branchA := "3f4c6d8e-1a2b-4c5d-8e9f-0a1b2c3d4e5f"
+	branchB := "7a8b9c0d-2e3f-4a5b-9c0d-1e2f3a4b5c6d"
+
+	first := yearEndCloseSourceID(branchA, dateUTC(2025, time.December, 31))
+	second := yearEndCloseSourceID(branchB, dateUTC(2025, time.December, 31))
+	third := yearEndCloseSourceID(branchA, dateUTC(2026, time.December, 31))
 
 	if first == second {
 		t.Fatal("different branches must not share a close source id")
@@ -43,8 +48,24 @@ func TestYearEndCloseSourceIDIsUniquePerBranchAndYear(t *testing.T) {
 	if first == third {
 		t.Fatal("different financial years must not share a close source id")
 	}
-	if first != "branch-a-FY2025" {
-		t.Fatalf("unexpected source id: %q", first)
+	if again := yearEndCloseSourceID(branchA, dateUTC(2025, time.December, 31)); again != first {
+		t.Fatalf("source id must be deterministic: %q then %q", first, again)
+	}
+}
+
+// journal_entries.source_id is a uuid column. A readable key like
+// "<branch>-FY2025" builds and unit-tests happily but Postgres rejects it, so
+// every close would fail at runtime. Assert the shape the database requires.
+func TestYearEndCloseSourceIDIsAValidUUID(t *testing.T) {
+	for _, branchID := range []string{
+		"3f4c6d8e-1a2b-4c5d-8e9f-0a1b2c3d4e5f",
+		"not-a-uuid",
+		"",
+	} {
+		got := yearEndCloseSourceID(branchID, dateUTC(2025, time.December, 31))
+		if _, err := uuid.Parse(got); err != nil {
+			t.Fatalf("source id for branch %q is not a uuid: %q (%v)", branchID, got, err)
+		}
 	}
 }
 
