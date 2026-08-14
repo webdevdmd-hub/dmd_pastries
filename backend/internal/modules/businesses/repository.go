@@ -54,7 +54,7 @@ func (r *Repository) EnsureSettings(tx *gorm.DB, businessID string) (*BusinessSe
 		AllowNegativeStock: false,
 		DefaultTaxRate:     0,
 		PriceIncludesTax:   false,
-		DefaultTaxMode:     "inclusive",
+		DefaultTaxMode:     r.derivedDefaultTaxMode(tx, businessID),
 		LowStockAlert:      true,
 		DefaultLanguage:    "en",
 		DateFormat:         "YYYY-MM-DD",
@@ -63,6 +63,28 @@ func (r *Repository) EnsureSettings(tx *gorm.DB, businessID string) (*BusinessSe
 		return nil, err
 	}
 	return &settings, nil
+}
+
+// derivedDefaultTaxMode mirrors migration 000101's backfill rule for NEW
+// businesses: the document tax-mode default follows the governing tax rate's
+// is_inclusive flag. A blanket 'inclusive' default while the seeded UAE VAT
+// rate is exclusive-flagged makes the server's Default-mode totals disagree
+// with every client preview — non-cash checkouts then fail as phantom
+// overpayments (found by /qa on 2026-08-14, ISSUE-003).
+func (r *Repository) derivedDefaultTaxMode(tx *gorm.DB, businessID string) string {
+	var isInclusive *bool
+	if err := tx.Raw(
+		`SELECT is_inclusive FROM tax_rates
+		 WHERE business_id = ? AND deleted_at IS NULL AND status = 'active'
+		 ORDER BY is_default DESC, created_at ASC
+		 LIMIT 1`, businessID,
+	).Scan(&isInclusive).Error; err != nil || isInclusive == nil {
+		return "inclusive"
+	}
+	if *isInclusive {
+		return "inclusive"
+	}
+	return "exclusive"
 }
 
 func (r *Repository) UpdateSettings(tx *gorm.DB, businessID string, updates map[string]interface{}) error {
