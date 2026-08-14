@@ -466,6 +466,7 @@ export type PaymentAccountType =
   | "card_clearing"
   | "platform_clearing"
   | "wallet"
+  | "store_credit"
   | "other";
 
 export type PaymentAccount = {

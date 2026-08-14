@@ -199,6 +199,7 @@ function isPaymentAccountType(value: unknown): value is PaymentAccountType {
     value === "card_clearing" ||
     value === "platform_clearing" ||
     value === "wallet" ||
+    value === "store_credit" ||
     value === "other"
   );
 }
