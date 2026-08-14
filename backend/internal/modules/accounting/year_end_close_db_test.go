@@ -1,6 +1,7 @@
 package accounting_test
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 
 	"pastries-pos/internal/modules/accounting"
 	"pastries-pos/internal/modules/audit"
+	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/testsupport/testdb"
 )
 
@@ -199,16 +201,14 @@ func TestClosingLocksTheYearItClosed(t *testing.T) {
 	}
 }
 
-// Re-closing an already closed year must not post a second close journal or
-// double retained earnings.
+// Re-closing an already closed year is refused with a 409, and must not post
+// a second close journal or double retained earnings.
 //
-// It is a silent no-op rather than a refusal: nothing validates that the year
-// is already closed, so the guard is the idempotency index from migration
-// 000096, which makes the second post return the first journal. The safety
-// property holds, but the caller gets a success response quoting a net profit
-// as though it had closed again -- worth knowing before wiring a Close button
-// to it.
-func TestReClosingAYearDoesNotDoubleRetainedEarnings(t *testing.T) {
+// The ledger was never at risk -- the idempotency index from migration 000096
+// makes a repeated post return the first journal -- but before the refusal the
+// caller got a success response quoting a net profit, so a Close button looked
+// like it had worked twice.
+func TestReClosingAYearIsRefusedAsAConflict(t *testing.T) {
 	// The close manages its own transaction, so this needs a committed
 	// connection; testdb.Seed removes what it creates.
 	db := testdb.Connect(t)
@@ -222,9 +222,18 @@ func TestReClosingAYearDoesNotDoubleRetainedEarnings(t *testing.T) {
 	if _, err := service.CloseFinancialYear(seed.AuthContext(), request, "127.0.0.1", "test"); err != nil {
 		t.Fatalf("first close: %v", err)
 	}
-	// Whether this refuses or no-ops, what must never happen is a second
-	// close journal.
-	_, _ = service.CloseFinancialYear(seed.AuthContext(), request, "127.0.0.1", "test")
+	_, err := service.CloseFinancialYear(seed.AuthContext(), request, "127.0.0.1", "test")
+	if err == nil {
+		t.Fatal("closing an already closed year must be refused")
+	}
+	appErr, ok := err.(*apperrors.AppError)
+	if !ok {
+		t.Fatalf("expected an application error, got %T: %v", err, err)
+	}
+	if appErr.StatusCode != http.StatusConflict {
+		t.Fatalf("re-closing should be a %d conflict, got %d: %s",
+			http.StatusConflict, appErr.StatusCode, appErr.Message)
+	}
 
 	var closeJournals int64
 	if err := db.Raw(`SELECT COUNT(*) FROM journal_entries

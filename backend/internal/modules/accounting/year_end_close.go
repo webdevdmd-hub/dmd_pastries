@@ -232,11 +232,42 @@ func (s *Service) resolveYearEndCloseWindow(currentUser *utils.AuthContext, fina
 		if !end.Before(dateOnlyUTC(time.Now().UTC())) {
 			return nil, apperrors.BadRequest("the financial year must be complete before it can be closed", nil)
 		}
+		if err := s.ensureYearNotAlreadyClosed(currentUser, end); err != nil {
+			return nil, err
+		}
 		if err := s.ensureEarlierYearsClosed(currentUser, start); err != nil {
 			return nil, err
 		}
 	}
 	return &yearEndCloseWindow{Start: start, End: end}, nil
+}
+
+// ensureYearNotAlreadyClosed refuses a second close of the same year.
+//
+// The ledger was never at risk: the idempotency index from migration 000096
+// makes the repeated post return the first journal, so retained earnings
+// cannot double. But that made re-closing a silent no-op returning success and
+// quoting a net profit, so a Close button looked like it had worked twice.
+// Saying so is the difference between "already done" and "done again".
+//
+// Matched on the exact year-end date rather than the calendar year, because a
+// financial year ending 31 March shares its year number with the one that
+// starts the next day.
+func (s *Service) ensureYearNotAlreadyClosed(currentUser *utils.AuthContext, end time.Time) error {
+	closed, err := s.repo.ListYearEndCloseJournals(s.db, currentUser.BusinessID)
+	if err != nil {
+		return apperrors.Internal("failed to load year-end close journals")
+	}
+	for _, row := range closed {
+		if !dateOnlyUTC(row.EntryDate).Equal(end) {
+			continue
+		}
+		return apperrors.Conflict(
+			"financial year ending "+end.Format("2006-01-02")+" is already closed; reopen it first to close it again",
+			map[string]interface{}{"financial_year_end": end.Format("2006-01-02")},
+		)
+	}
+	return nil
 }
 
 // ensureEarlierYearsClosed enforces oldest-first closing: each year's profit
