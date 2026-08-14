@@ -157,6 +157,11 @@ function accountOptions(accounts: ChartAccount[]): SearchableComboboxOption[] {
   }));
 }
 
+// Mirrors the backend's isSettleableClearingType rule: a settlement drains a
+// platform/card clearing account and deposits anywhere else. Offering other
+// account types in the settlement dropdowns only leads to a server rejection.
+const SETTLEABLE_CLEARING_TYPES = new Set(["platform_clearing", "card_clearing"]);
+
 function paymentAccountOptions(accounts: PaymentAccount[]): SearchableComboboxOption[] {
   return accounts
     .filter((account) => account.status === "active")
@@ -1019,8 +1024,18 @@ function PlatformSettlementDialog({
 }): JSX.Element {
   const [form, setForm] = useState<SettlementFormState>(emptySettlementForm);
   const branchesOptions = useMemo(() => branchOptions(branches), [branches]);
-  const accountSelectorOptions = useMemo(
-    () => paymentAccountOptions(paymentAccounts),
+  const clearingAccountOptions = useMemo(
+    () =>
+      paymentAccountOptions(
+        paymentAccounts.filter((account) => SETTLEABLE_CLEARING_TYPES.has(account.accountType)),
+      ),
+    [paymentAccounts],
+  );
+  const depositAccountOptions = useMemo(
+    () =>
+      paymentAccountOptions(
+        paymentAccounts.filter((account) => !SETTLEABLE_CLEARING_TYPES.has(account.accountType)),
+      ),
     [paymentAccounts],
   );
   const expenseOptions = useMemo(() => accountOptions(expenseAccounts), [expenseAccounts]);
@@ -1077,7 +1092,8 @@ function PlatformSettlementDialog({
           <div className="grid gap-2">
             <Label>Clearing account</Label>
             <SearchableCombobox
-              options={accountSelectorOptions}
+              emptyMessage="No platform or card clearing payment accounts found."
+              options={clearingAccountOptions}
               placeholder="Select platform or card clearing account"
               value={form.platformPaymentAccountId}
               onValueChange={(platformPaymentAccountId) => update({ platformPaymentAccountId })}
@@ -1086,7 +1102,8 @@ function PlatformSettlementDialog({
           <div className="grid gap-2">
             <Label>Deposit account</Label>
             <SearchableCombobox
-              options={accountSelectorOptions}
+              emptyMessage="No non-clearing payment accounts found."
+              options={depositAccountOptions}
               placeholder="Select deposit account"
               value={form.depositPaymentAccountId}
               onValueChange={(depositPaymentAccountId) => update({ depositPaymentAccountId })}
