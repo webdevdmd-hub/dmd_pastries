@@ -3332,7 +3332,7 @@ func journalEntryFilterConditions(query JournalEntryListQuery) []journalEntryFil
 		like := "%" + strings.ToLower(strings.TrimSpace(query.Search)) + "%"
 		// id/source_id matching lets receipt "View Journal" deep-links
 		// (?search=<journal uuid>) resolve (/qa 2026-08-14, ISSUE-002).
-		conditions = append(conditions, journalEntryFilterCondition{Clause: "LOWER(entry_number) LIKE ? OR LOWER(reference_number) LIKE ? OR LOWER(narration) LIKE ? OR LOWER(id::text) LIKE ? OR LOWER(COALESCE(source_id, '')) LIKE ?", Args: []interface{}{like, like, like, like, like}})
+		conditions = append(conditions, journalEntryFilterCondition{Clause: "LOWER(entry_number) LIKE ? OR LOWER(reference_number) LIKE ? OR LOWER(narration) LIKE ? OR LOWER(id::text) LIKE ? OR LOWER(COALESCE(source_id::text, '')) LIKE ?", Args: []interface{}{like, like, like, like, like}})
 	}
 	if query.BranchID != "" {
 		conditions = append(conditions, journalEntryFilterCondition{Clause: "branch_id = ?", Args: []interface{}{query.BranchID}})
