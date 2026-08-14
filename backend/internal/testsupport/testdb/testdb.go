@@ -71,8 +71,13 @@ var (
 // Tx returns a database handle bound to a transaction that is rolled back when
 // the test finishes, so tests neither see nor leave each other's rows.
 //
-// Code under test that opens its own transaction still works: GORM nests it as
-// a savepoint.
+// Use it for repositories and for code that takes a *gorm.DB and runs
+// statements on it directly.
+//
+// It does NOT work for service methods that call db.Begin() themselves --
+// GORM refuses to begin a transaction on a handle that is already one, and the
+// call fails with "failed to start transaction". Those need Connect, which
+// commits; testdb.Seed removes its own rows either way.
 func Tx(t *testing.T) *gorm.DB {
 	t.Helper()
 	db := Connect(t)
@@ -89,8 +94,10 @@ func Tx(t *testing.T) *gorm.DB {
 	return tx
 }
 
-// Connect returns the shared migrated test database. Prefer Tx unless the test
-// genuinely needs to commit.
+// Connect returns the shared migrated test database, committing what it
+// writes. Use it for service methods that manage their own transactions;
+// prefer Tx everywhere else. Pair it with testdb.Seed, which removes its rows
+// when the test finishes.
 func Connect(t *testing.T) *gorm.DB {
 	t.Helper()
 	once.Do(setup)

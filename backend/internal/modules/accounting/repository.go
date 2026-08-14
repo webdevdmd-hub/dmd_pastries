@@ -2946,8 +2946,16 @@ func (r *Repository) ListBalanceSheetRows(businessID string, query BalanceSheetQ
 }
 
 func (r *Repository) LedgerBalanceForAccount(businessID, accountID, normalBalance, branchID, asOfDate string) (float64, error) {
+	args := []interface{}{strings.TrimSpace(normalBalance), businessID, accountID}
+	// An empty as-of date means "no upper bound", not "up to the empty
+	// string": Postgres rejects '' as a date, so passing it through produced
+	// an error rather than a balance.
+	asOfFilter := ""
+	if trimmed := strings.TrimSpace(asOfDate); trimmed != "" {
+		asOfFilter = "AND je.entry_date <= ?"
+		args = append(args, trimmed)
+	}
 	branchFilter := ""
-	args := []interface{}{strings.TrimSpace(normalBalance), businessID, accountID, asOfDate}
 	if strings.TrimSpace(branchID) != "" {
 		branchFilter = "AND je.branch_id = ?"
 		args = append(args, strings.TrimSpace(branchID))
@@ -2967,7 +2975,7 @@ func (r *Repository) LedgerBalanceForAccount(businessID, accountID, normalBalanc
 		  AND jel.deleted_at IS NULL
 		  AND je.deleted_at IS NULL
 		  AND je.status IN ('posted', 'reversed')
-		  AND je.entry_date <= ?
+		  `+asOfFilter+`
 		  `+branchFilter+`
 	`, args...).Scan(&balance).Error
 	return roundMoney(balance), err
