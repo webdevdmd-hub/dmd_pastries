@@ -244,6 +244,28 @@ Open decision §6. Money is `float64` in Go against `NUMERIC(14,4)` operational 
 
 ## Progress
 
+**Step 3b — exact arithmetic ahead of the type conversion (2026-08-14).** The
+money-critical *math* was made exact without changing any signature, so no
+consumer changed and none of it has to be undone when the transactional
+modules convert as a bulk:
+
+- `charges.calculateTax` (`49efc49`) — the single VAT derivation for every
+  selling and buying module. A sweep of 1,000,000 amount/rate combinations
+  found the float path rounding to a different fils than the exact value in
+  **21,180 inclusive and 2,453 exclusive cases (~2%)**. e.g. 2.90 at 5%
+  exclusive is exactly 0.145 and must be 0.15; float64 returned 0.14.
+- `pos.calculateDiscount` percentage branch (`43b5f00`) — same class of error
+  on money taken off a customer's bill. Also deleted `pos.calculateTax`, a
+  zero-caller duplicate of the old inexact formula left behind by W3.
+- `salesreturns` charge-refund tax proration (`68641cb`) — was a float ratio
+  then a float multiply; now one exact expression rounded once.
+
+Each is covered by regression tests pinning real divergences plus property
+tests over tens of thousands of combinations. This does **not** replace the
+type conversion below; it removes the largest sources of error first.
+
+
+
 **Step 1 is DONE.** `backend/internal/shared/money` exists and every module routes through it: the 18 `roundMoney` copies, the 9 `roundQuantity` copies, the 5 differently-named variants (`roundCustomerMoney`, `roundDashboardMoney`, `roundExpenseMoney`, `roundMetricMoney`, `roundSupplierMoney`) and the reflection-based rounding in `audit/metadata.go` now delegate to `money.Round2`/`money.Round4`. Each module keeps its local name, so no call site changed and no figure moved — the package reproduces `math.Round` exactly, pinned by test. A guard test (`internal/shared/money/no_local_copies_test.go`) fails the build if a module reimplements the rounding.
 
 This means the type swap in the remaining steps changes **this package and the struct fields**, not ~934 call sites across 94 files.
