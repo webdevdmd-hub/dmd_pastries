@@ -27,12 +27,15 @@ import {
   getAllChartAccounts,
   getBalanceSheetReport,
   getChartAccountById,
+  getChartAccountOpenings,
   getChartAccounts,
+  getCounterpartyOpenings,
   getFinancialYears,
   getGeneralLedgerReport,
   getJournalEntries,
   getJournalEntryById,
   getLedgerDetails,
+  getOpeningBalanceSummary,
   getPaymentAccountById,
   getPaymentAccounts,
   getPlatformSettlementById,
@@ -44,6 +47,8 @@ import {
   reopenFinancialYear,
   reverseJournalEntry,
   runAccountingBackfill,
+  saveChartAccountOpening,
+  saveCounterpartyOpening,
   seedDefaultAccountMappings,
   seedDefaultChartAccounts,
   seedDefaultPaymentAccounts,
@@ -74,8 +79,12 @@ import type {
   BalanceSheetFilters,
   BalanceSheetResponse,
   ChartAccount,
+  ChartAccountOpening,
+  ChartAccountOpeningPayload,
   ChartAccountsFilters,
   ChartAccountsResponse,
+  CounterpartyOpening,
+  CounterpartyOpeningPayload,
   CreateChartAccountPayload,
   CreateJournalEntryPayload,
   FinancialYear,
@@ -86,6 +95,7 @@ import type {
   JournalEntry,
   LedgerDetailsFilters,
   LedgerDetailsResponse,
+  OpeningBalanceSummary,
   PaymentAccount,
   PaymentAccountPayload,
   PaymentAccountsFilters,
@@ -670,6 +680,54 @@ export function useCreatePlatformSettlement() {
 
   return useMutation<PlatformSettlement, Error, PlatformSettlementPayload>({
     mutationFn: async (payload) => createPlatformSettlement(payload),
+    onSuccess: async () => {
+      await invalidateAccounting(queryClient);
+    },
+  });
+}
+
+// --- Opening balances (Phase 6 / W1) ---------------------------------------
+
+export function useChartAccountOpenings(branchId: string, enabled = true) {
+  return useQuery<ChartAccountOpening[]>({
+    queryKey: [accountingQueryKey, "opening-balances", "accounts", branchId],
+    queryFn: async () => getChartAccountOpenings(branchId),
+    enabled: enabled && branchId.length > 0,
+  });
+}
+
+export function useCounterpartyOpenings(branchId: string, partyType: string, enabled = true) {
+  return useQuery<CounterpartyOpening[]>({
+    queryKey: [accountingQueryKey, "opening-balances", "counterparties", branchId, partyType],
+    queryFn: async () => getCounterpartyOpenings(branchId, partyType),
+    enabled: enabled && branchId.length > 0,
+  });
+}
+
+export function useOpeningBalanceSummary(branchId: string, enabled = true) {
+  return useQuery<OpeningBalanceSummary>({
+    queryKey: [accountingQueryKey, "opening-balances", "summary", branchId],
+    queryFn: async () => getOpeningBalanceSummary(branchId),
+    enabled: enabled && branchId.length > 0,
+  });
+}
+
+export function useSaveChartAccountOpening() {
+  const queryClient = useQueryClient();
+
+  return useMutation<ChartAccountOpening, Error, ChartAccountOpeningPayload>({
+    mutationFn: async (payload) => saveChartAccountOpening(payload),
+    onSuccess: async () => {
+      await invalidateAccounting(queryClient);
+    },
+  });
+}
+
+export function useSaveCounterpartyOpening() {
+  const queryClient = useQueryClient();
+
+  return useMutation<CounterpartyOpening, Error, CounterpartyOpeningPayload>({
+    mutationFn: async (payload) => saveCounterpartyOpening(payload),
     onSuccess: async () => {
       await invalidateAccounting(queryClient);
     },

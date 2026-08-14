@@ -4040,6 +4040,14 @@ func (s *Service) GetAPReconciliation(currentUser *utils.AuthContext, query Reco
 	if err != nil {
 		return nil, apperrors.Internal("failed to calculate operational accounts payable")
 	}
+	// Go-live openings post straight to 2000 and have no bill behind them, so
+	// the operational side has to add them back or every opened supplier
+	// shows up as drift (Phase 6 / W1).
+	supplierOpenings, err := s.repo.SumCounterpartyOpeningBalances(currentUser.BusinessID, query.BranchID, PartyTypeSupplier, query.AsOfDate)
+	if err != nil {
+		return nil, apperrors.Internal("failed to total supplier opening balances")
+	}
+	operational = roundMoney(operational + supplierOpenings)
 	ledger, err := s.mappedLedgerBalance(currentUser.BusinessID, "accounts_payable", "2000", query.BranchID, query.AsOfDate)
 	if err != nil {
 		return nil, err
@@ -4062,6 +4070,12 @@ func (s *Service) GetARReconciliation(currentUser *utils.AuthContext, query Reco
 	if err != nil {
 		return nil, apperrors.Internal("failed to calculate operational accounts receivable")
 	}
+	// Openings debit 1100 with no sale behind them (Phase 6 / W1).
+	customerOpenings, err := s.repo.SumCounterpartyOpeningBalances(currentUser.BusinessID, query.BranchID, PartyTypeCustomer, query.AsOfDate)
+	if err != nil {
+		return nil, apperrors.Internal("failed to total customer opening balances")
+	}
+	operational = roundMoney(operational + customerOpenings)
 	ledger, err := s.mappedLedgerBalance(currentUser.BusinessID, "accounts_receivable", "1100", query.BranchID, query.AsOfDate)
 	if err != nil {
 		return nil, err

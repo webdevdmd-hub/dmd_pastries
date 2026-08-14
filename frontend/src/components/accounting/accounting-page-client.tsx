@@ -161,6 +161,13 @@ const accountingSections = [
         permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingAccountsManage],
       },
       {
+        description: "Enter go-live balances for accounts, customers and suppliers against 3400.",
+        href: ROUTES.accountingOpeningBalances,
+        icon: Scale,
+        label: "Opening Balances",
+        permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingAccountsManage],
+      },
+      {
         description: "Compare operational balances with posted journal ledgers.",
         href: ROUTES.accountingReconciliation,
         icon: ShieldCheck,

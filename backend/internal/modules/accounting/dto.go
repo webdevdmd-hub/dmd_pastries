@@ -358,6 +358,87 @@ type PaymentAccountResponse struct {
 	UpdatedAt                      time.Time `json:"updated_at"`
 }
 
+// --- Opening balances (Phase 6 / W1) ---------------------------------------
+
+// ChartAccountOpeningRow is a stored opening joined to its account, as read
+// back for the editor.
+type ChartAccountOpeningRow struct {
+	ID             string    `json:"id"`
+	ChartAccountID string    `json:"chart_account_id"`
+	BranchID       string    `json:"branch_id"`
+	AccountCode    string    `json:"account_code"`
+	AccountName    string    `json:"account_name"`
+	AccountType    string    `json:"account_type"`
+	NormalBalance  string    `json:"normal_balance"`
+	Amount         float64   `json:"amount"`
+	OpeningDate    time.Time `json:"-"`
+	JournalEntryID *string   `json:"journal_entry_id"`
+}
+
+type CounterpartyOpeningRow struct {
+	ID             string    `json:"id"`
+	PartyType      string    `json:"party_type"`
+	PartyID        string    `json:"party_id"`
+	PartyName      string    `json:"party_name"`
+	BranchID       string    `json:"branch_id"`
+	Amount         float64   `json:"amount"`
+	OpeningDate    time.Time `json:"-"`
+	JournalEntryID *string   `json:"journal_entry_id"`
+}
+
+type ChartAccountOpeningResponse struct {
+	ID             string  `json:"id"`
+	ChartAccountID string  `json:"chart_account_id"`
+	BranchID       string  `json:"branch_id"`
+	AccountCode    string  `json:"account_code"`
+	AccountName    string  `json:"account_name"`
+	AccountType    string  `json:"account_type"`
+	NormalBalance  string  `json:"normal_balance"`
+	Amount         float64 `json:"amount"`
+	OpeningDate    string  `json:"opening_date"`
+	JournalEntryID *string `json:"journal_entry_id"`
+}
+
+type CounterpartyOpeningResponse struct {
+	ID             string  `json:"id"`
+	PartyType      string  `json:"party_type"`
+	PartyID        string  `json:"party_id"`
+	PartyName      string  `json:"party_name"`
+	BranchID       string  `json:"branch_id"`
+	Amount         float64 `json:"amount"`
+	OpeningDate    string  `json:"opening_date"`
+	JournalEntryID *string `json:"journal_entry_id"`
+}
+
+type SaveChartAccountOpeningRequest struct {
+	ChartAccountID string  `json:"chart_account_id" binding:"required,uuid"`
+	Amount         float64 `json:"amount"`
+	OpeningDate    string  `json:"opening_date" binding:"required"`
+}
+
+type SaveCounterpartyOpeningRequest struct {
+	PartyType   string  `json:"party_type" binding:"required,oneof=customer supplier"`
+	PartyID     string  `json:"party_id" binding:"required,uuid"`
+	Amount      float64 `json:"amount"`
+	OpeningDate string  `json:"opening_date" binding:"required"`
+}
+
+// OpeningBalanceSummaryResponse reports how much of 3400 Opening Balance
+// Equity is still unexplained. Every opening balance credits or debits 3400,
+// so once the whole opening trial balance has been entered the account nets
+// to zero. A non-zero figure is the part nobody has accounted for yet, and is
+// the number an operator works down to zero at go-live.
+type OpeningBalanceSummaryResponse struct {
+	BranchID                   string  `json:"branch_id"`
+	OpeningBalanceEquity       float64 `json:"opening_balance_equity"`
+	ChartAccountOpeningTotal   float64 `json:"chart_account_opening_total"`
+	CustomerOpeningTotal       float64 `json:"customer_opening_total"`
+	SupplierOpeningTotal       float64 `json:"supplier_opening_total"`
+	PaymentAccountOpeningTotal float64 `json:"payment_account_opening_total"`
+	UnallocatedOpeningEquity   float64 `json:"unallocated_opening_equity"`
+	IsBalanced                 bool    `json:"is_balanced"`
+}
+
 type AccountTransferResponse struct {
 	ID                     string    `json:"id"`
 	BusinessID             string    `json:"business_id"`

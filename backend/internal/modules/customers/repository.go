@@ -366,6 +366,17 @@ func (r *Repository) Stats(businessID, branchID, customerID string) (*CustomerSt
 		Scan(&bakeryOutstanding).Error; err != nil {
 		return nil, err
 	}
+	// A go-live opening balance is a receivable with no sale behind it
+	// (Phase 6 / W1). It belongs in the customer's outstanding balance, or
+	// this figure disagrees with the AR ledger it rolls up into.
+	var openingOutstanding float64
+	if err := r.db.Table("counterparty_opening_balances").
+		Select("COALESCE(SUM(amount), 0)").
+		Where("business_id = ? AND branch_id = ? AND party_type = 'customer' AND party_id = ? AND deleted_at IS NULL",
+			businessID, branchID, customerID).
+		Scan(&openingOutstanding).Error; err != nil {
+		return nil, err
+	}
 	var posPending, bakeryPending int64
 	if err := r.db.Table("sales").
 		Where(customerScope+reportshared.OutstandingSaleCondition(""), businessID, branchID, customerID).
@@ -387,7 +398,7 @@ func (r *Repository) Stats(businessID, branchID, customerID string) (*CustomerSt
 	stats.TotalPaidAmount = roundCustomerMoney(stats.TotalPaidAmount)
 	stats.TotalRefundedAmount = roundCustomerMoney(stats.TotalRefundedAmount)
 	stats.NetSpent = roundCustomerMoney(stats.TotalPaidAmount - stats.TotalRefundedAmount)
-	stats.OutstandingBalance = roundCustomerMoney(posOutstanding + bakeryOutstanding)
+	stats.OutstandingBalance = roundCustomerMoney(posOutstanding + bakeryOutstanding + openingOutstanding)
 	if stats.OutstandingBalance < 0 {
 		stats.OutstandingBalance = 0
 	}

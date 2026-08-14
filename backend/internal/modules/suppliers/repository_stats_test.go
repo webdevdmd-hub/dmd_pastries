@@ -31,8 +31,12 @@ func TestSupplierStatsSQLUsesBranchSupplierAndStatusFilters(t *testing.T) {
 
 func TestSupplierStatsArgsRepeatScopeForEachAggregate(t *testing.T) {
 	args := supplierStatsArgs("business-1", "branch-1", "supplier-1")
-	if len(args) != 28 {
-		t.Fatalf("len(args) = %d, want 28", len(args))
+	// Derived from the query rather than hardcoded: a new correlated
+	// subquery must come with its own scope triple, and a stale constant
+	// here would let the two drift apart silently.
+	placeholders := strings.Count(supplierStatsSQL(), "?")
+	if len(args) != placeholders {
+		t.Fatalf("len(args) = %d, want %d (one per ? in supplierStatsSQL)", len(args), placeholders)
 	}
 	if args[0] != "supplier-1" {
 		t.Fatalf("args[0] = %v, want supplier id projection", args[0])

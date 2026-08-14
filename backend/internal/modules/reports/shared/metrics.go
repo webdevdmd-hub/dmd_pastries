@@ -2,6 +2,7 @@ package shared
 
 import (
 	"math"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -546,6 +547,37 @@ func ExpiringItemsCount(db *gorm.DB, scope MetricScope, todayDate string, days i
 	var total int64
 	err := db.Raw(query, args...).Scan(&total).Error
 	return total, err
+}
+
+// CounterpartyOpeningTotal sums the go-live opening balances attributed to
+// customers or suppliers (Phase 6 / W1).
+//
+// These post to the AR and AP control accounts, so the ledger carries them
+// from the moment they are entered. Every operational AR/AP figure has to add
+// them back, or the reconciliation screens, the financial summary, and the
+// receivables and payables headers all report drift that is not real. This is
+// the single implementation; callers must not re-derive it.
+//
+// asOfDate is optional; when set, only openings dated on or before it count,
+// which matches the as-of semantics of the ledger balance they are compared
+// against.
+func CounterpartyOpeningTotal(db *gorm.DB, scope MetricScope, partyType, asOfDate string) (float64, error) {
+	query := `
+		SELECT COALESCE(SUM(amount), 0)
+		FROM counterparty_opening_balances
+		WHERE business_id = ? AND party_type = ? AND deleted_at IS NULL`
+	args := []interface{}{scope.BusinessID, strings.TrimSpace(partyType)}
+	if !scope.AllBranches && strings.TrimSpace(scope.BranchID) != "" {
+		query += " AND branch_id = ?"
+		args = append(args, strings.TrimSpace(scope.BranchID))
+	}
+	if strings.TrimSpace(asOfDate) != "" {
+		query += " AND opening_date <= ?"
+		args = append(args, strings.TrimSpace(asOfDate))
+	}
+	var total float64
+	err := db.Raw(query, args...).Scan(&total).Error
+	return roundMetricMoney(total), err
 }
 
 func LedgerDateRange(startUTC, endUTC time.Time) (string, string) {

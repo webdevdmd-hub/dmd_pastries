@@ -684,3 +684,58 @@ export type PlatformSettlementPayload = {
   referenceNumber: string;
   settlementDate: string;
 };
+
+/**
+ * Opening balances (Phase 6 / W1).
+ *
+ * Every opening books against 3400 Opening Balance Equity, so once the whole
+ * opening trial balance is entered 3400 nets to zero. `unallocatedOpeningEquity`
+ * is what is left — the figure an operator works down at go-live.
+ */
+export type ChartAccountOpening = {
+  accountCode: string;
+  accountName: string;
+  accountType: string;
+  amount: number;
+  branchId: string;
+  chartAccountId: string;
+  id: string;
+  journalEntryId: string | null;
+  normalBalance: string;
+  openingDate: string;
+};
+
+export type CounterpartyOpening = {
+  amount: number;
+  branchId: string;
+  id: string;
+  journalEntryId: string | null;
+  openingDate: string;
+  partyId: string;
+  partyName: string;
+  partyType: "customer" | "supplier";
+};
+
+export type OpeningBalanceSummary = {
+  branchId: string;
+  chartAccountOpeningTotal: number;
+  customerOpeningTotal: number;
+  isBalanced: boolean;
+  openingBalanceEquity: number;
+  paymentAccountOpeningTotal: number;
+  supplierOpeningTotal: number;
+  unallocatedOpeningEquity: number;
+};
+
+export type ChartAccountOpeningPayload = {
+  amount: number;
+  chartAccountId: string;
+  openingDate: string;
+};
+
+export type CounterpartyOpeningPayload = {
+  amount: number;
+  openingDate: string;
+  partyId: string;
+  partyType: "customer" | "supplier";
+};

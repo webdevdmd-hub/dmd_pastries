@@ -2188,7 +2188,19 @@ func (r *Repository) FinancialSummary(filter *shared.ResolvedFilter) (*Financial
 	// W4: the ledger is the source of truth for these figures; the
 	// operational sums above are kept as a cross-check so drift is reported
 	// rather than silently deciding the answer.
-	ledger, err := shared.LedgerFinancialTotals(r.db, shared.MetricScopeFromFilter(filter), filter.StartUTC, filter.EndUTC)
+	scope := shared.MetricScopeFromFilter(filter)
+	ledger, err := shared.LedgerFinancialTotals(r.db, scope, filter.StartUTC, filter.EndUTC)
+	if err != nil {
+		return nil, err
+	}
+	// Go-live openings post to 1100/2000 with no document behind them, so the
+	// operational sums have to add them back (Phase 6 / W1).
+	_, asOf := shared.LedgerDateRange(filter.StartUTC, filter.EndUTC)
+	customerOpenings, err := shared.CounterpartyOpeningTotal(r.db, scope, "customer", asOf)
+	if err != nil {
+		return nil, err
+	}
+	supplierOpenings, err := shared.CounterpartyOpeningTotal(r.db, scope, "supplier", asOf)
 	if err != nil {
 		return nil, err
 	}
@@ -2196,8 +2208,8 @@ func (r *Repository) FinancialSummary(filter *shared.ResolvedFilter) (*Financial
 		{Metric: "gross_sales", Ledger: ledger.GrossRevenue, Operational: roundMoney(grossSales)},
 		{Metric: "total_collected", Ledger: ledger.Collected, Operational: roundMoney(collected.TotalCollected)},
 		{Metric: "total_refunded", Ledger: ledger.Refunded, Operational: roundMoney(refunded.TotalRefunded)},
-		{Metric: "outstanding_customer_balance", Ledger: ledger.OutstandingCustomer, Operational: roundMoney(outstandingCustomerBalance)},
-		{Metric: "supplier_payable_balance", Ledger: ledger.SupplierPayable, Operational: roundMoney(supplierPayableBalance)},
+		{Metric: "outstanding_customer_balance", Ledger: ledger.OutstandingCustomer, Operational: roundMoney(outstandingCustomerBalance + customerOpenings)},
+		{Metric: "supplier_payable_balance", Ledger: ledger.SupplierPayable, Operational: roundMoney(supplierPayableBalance + supplierOpenings)},
 		{Metric: "purchase_total", Ledger: ledger.PurchaseTotal, Operational: roundMoney(purchaseTotal)},
 	})...)
 
@@ -2304,14 +2316,18 @@ func (r *Repository) OutstandingBalancesHeader(filter *shared.ResolvedFilter) (R
 	if err := r.db.Raw(query, args...).Scan(&operational).Error; err != nil {
 		return ReportBalanceHeader{}, nil, err
 	}
-	ledger, err := shared.LedgerMappedBalance(
-		r.db, shared.MetricScopeFromFilter(filter),
-		"accounts_receivable", "1100", filter.DateTo.Format("2006-01-02"),
-	)
+	scope := shared.MetricScopeFromFilter(filter)
+	asOf := filter.DateTo.Format("2006-01-02")
+	ledger, err := shared.LedgerMappedBalance(r.db, scope, "accounts_receivable", "1100", asOf)
 	if err != nil {
 		return ReportBalanceHeader{}, nil, err
 	}
-	operational = roundMoney(operational)
+	// Go-live openings debit 1100 with no document behind them (Phase 6 / W1).
+	openings, err := shared.CounterpartyOpeningTotal(r.db, scope, "customer", asOf)
+	if err != nil {
+		return ReportBalanceHeader{}, nil, err
+	}
+	operational = roundMoney(operational + openings)
 	warnings := ledgerDriftWarnings([]ledgerDriftCheck{
 		{Metric: "outstanding_customer_balance", Ledger: ledger, Operational: operational},
 	})
@@ -2336,7 +2352,12 @@ func (r *Repository) SupplierPayablesHeader(filter *shared.ResolvedFilter) (Repo
 	if err != nil {
 		return ReportBalanceHeader{}, 0, nil, err
 	}
-	operational = roundMoney(operational)
+	// Go-live openings credit 2000 with no bill behind them (Phase 6 / W1).
+	openings, err := shared.CounterpartyOpeningTotal(r.db, scope, "supplier", asOf)
+	if err != nil {
+		return ReportBalanceHeader{}, 0, nil, err
+	}
+	operational = roundMoney(operational + openings)
 	warnings := ledgerDriftWarnings([]ledgerDriftCheck{
 		{Metric: "supplier_payable_balance", Ledger: ledger, Operational: operational},
 	})

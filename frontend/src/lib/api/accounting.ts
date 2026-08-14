@@ -26,8 +26,12 @@ import type {
   BalanceSheetResponse,
   BalanceSheetSection,
   ChartAccount,
+  ChartAccountOpening,
+  ChartAccountOpeningPayload,
   ChartAccountsFilters,
   ChartAccountsResponse,
+  CounterpartyOpening,
+  CounterpartyOpeningPayload,
   CreateChartAccountPayload,
   CreateJournalEntryPayload,
   FinancialYear,
@@ -42,6 +46,7 @@ import type {
   LedgerDetailsFilters,
   LedgerDetailsResponse,
   LedgerDetailsTransaction,
+  OpeningBalanceSummary,
   PaymentAccount,
   PaymentAccountPayload,
   PaymentAccountsFilters,
@@ -2113,5 +2118,125 @@ export async function getLedgerDetails(
     },
   );
 
+  return response.data;
+}
+
+// --- Opening balances (Phase 6 / W1) ---------------------------------------
+
+function parseChartAccountOpening(value: unknown): ChartAccountOpening {
+  const row = (value ?? {}) as Record<string, unknown>;
+  return {
+    accountCode: stringValue(row.account_code),
+    accountName: stringValue(row.account_name),
+    accountType: stringValue(row.account_type),
+    amount: numberValue(row.amount, 0),
+    branchId: stringValue(row.branch_id),
+    chartAccountId: stringValue(row.chart_account_id),
+    id: stringValue(row.id),
+    journalEntryId: optionalString(row.journal_entry_id),
+    normalBalance: stringValue(row.normal_balance),
+    openingDate: stringValue(row.opening_date),
+  };
+}
+
+function parseCounterpartyOpening(value: unknown): CounterpartyOpening {
+  const row = (value ?? {}) as Record<string, unknown>;
+  return {
+    amount: numberValue(row.amount, 0),
+    branchId: stringValue(row.branch_id),
+    id: stringValue(row.id),
+    journalEntryId: optionalString(row.journal_entry_id),
+    openingDate: stringValue(row.opening_date),
+    partyId: stringValue(row.party_id),
+    partyName: stringValue(row.party_name),
+    partyType: stringValue(row.party_type) === "supplier" ? "supplier" : "customer",
+  };
+}
+
+function parseOpeningBalanceSummary(value: unknown): OpeningBalanceSummary {
+  const row = (value ?? {}) as Record<string, unknown>;
+  return {
+    branchId: stringValue(row.branch_id),
+    chartAccountOpeningTotal: numberValue(row.chart_account_opening_total, 0),
+    customerOpeningTotal: numberValue(row.customer_opening_total, 0),
+    isBalanced: row.is_balanced === true,
+    openingBalanceEquity: numberValue(row.opening_balance_equity, 0),
+    paymentAccountOpeningTotal: numberValue(row.payment_account_opening_total, 0),
+    supplierOpeningTotal: numberValue(row.supplier_opening_total, 0),
+    unallocatedOpeningEquity: numberValue(row.unallocated_opening_equity, 0),
+  };
+}
+
+function parseItems<TItem>(value: unknown, parse: (item: unknown) => TItem): TItem[] {
+  const payload = (value ?? {}) as Record<string, unknown>;
+  return Array.isArray(payload.items) ? payload.items.map(parse) : [];
+}
+
+export async function getChartAccountOpenings(branchId: string): Promise<ChartAccountOpening[]> {
+  const response = await apiRequest<ChartAccountOpening[]>(
+    `/api/v1/accounting/opening-balances/accounts${toQueryString({ branch_id: branchId })}`,
+    { authMode: "appwrite", parse: (value) => parseItems(value, parseChartAccountOpening) },
+  );
+  return response.data;
+}
+
+export async function saveChartAccountOpening(
+  payload: ChartAccountOpeningPayload,
+): Promise<ChartAccountOpening> {
+  const response = await apiRequest<
+    ChartAccountOpening,
+    { amount: number; chart_account_id: string; opening_date: string }
+  >("/api/v1/accounting/opening-balances/accounts", {
+    authMode: "appwrite",
+    body: {
+      amount: payload.amount,
+      chart_account_id: payload.chartAccountId,
+      opening_date: payload.openingDate,
+    },
+    method: "PUT",
+    parse: parseChartAccountOpening,
+  });
+  return response.data;
+}
+
+export async function getCounterpartyOpenings(
+  branchId: string,
+  partyType: string,
+): Promise<CounterpartyOpening[]> {
+  const response = await apiRequest<CounterpartyOpening[]>(
+    `/api/v1/accounting/opening-balances/counterparties${toQueryString({
+      branch_id: branchId,
+      party_type: partyType,
+    })}`,
+    { authMode: "appwrite", parse: (value) => parseItems(value, parseCounterpartyOpening) },
+  );
+  return response.data;
+}
+
+export async function saveCounterpartyOpening(
+  payload: CounterpartyOpeningPayload,
+): Promise<CounterpartyOpening> {
+  const response = await apiRequest<
+    CounterpartyOpening,
+    { amount: number; opening_date: string; party_id: string; party_type: string }
+  >("/api/v1/accounting/opening-balances/counterparties", {
+    authMode: "appwrite",
+    body: {
+      amount: payload.amount,
+      opening_date: payload.openingDate,
+      party_id: payload.partyId,
+      party_type: payload.partyType,
+    },
+    method: "PUT",
+    parse: parseCounterpartyOpening,
+  });
+  return response.data;
+}
+
+export async function getOpeningBalanceSummary(branchId: string): Promise<OpeningBalanceSummary> {
+  const response = await apiRequest<OpeningBalanceSummary>(
+    `/api/v1/accounting/opening-balances/summary${toQueryString({ branch_id: branchId })}`,
+    { authMode: "appwrite", parse: parseOpeningBalanceSummary },
+  );
   return response.data;
 }

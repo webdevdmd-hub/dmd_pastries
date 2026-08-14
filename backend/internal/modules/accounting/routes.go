@@ -48,6 +48,14 @@ func RegisterRoutes(
 	group.PATCH("/payment-accounts/:id/status", manage, handler.UpdatePaymentAccountStatus)
 	group.DELETE("/payment-accounts/:id", manage, handler.DeletePaymentAccount)
 
+	// Opening balances reuse accounting.accounts.manage: entering a go-live
+	// balance is chart-of-accounts setup, not a period-lock operation.
+	group.GET("/opening-balances/accounts", view, handler.ListChartAccountOpenings)
+	group.PUT("/opening-balances/accounts", manage, handler.SaveChartAccountOpening)
+	group.GET("/opening-balances/counterparties", view, handler.ListCounterpartyOpenings)
+	group.PUT("/opening-balances/counterparties", manage, handler.SaveCounterpartyOpening)
+	group.GET("/opening-balances/summary", view, handler.GetOpeningBalanceSummary)
+
 	group.GET("/account-transfers", view, handler.ListAccountTransfers)
 	group.POST("/account-transfers", manage, handler.CreateAccountTransfer)
 	group.GET("/account-transfers/:id", view, handler.GetAccountTransfer)

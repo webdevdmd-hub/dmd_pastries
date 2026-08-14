@@ -44,6 +44,7 @@ type supplierStatsRow struct {
 	SupplierPaymentsPaid float64
 	InvoicePaymentsPaid  float64
 	VendorCredits        float64
+	OpeningBalance       float64
 	LastPurchaseDate     *time.Time
 }
 
@@ -261,6 +262,15 @@ func supplierStatsSQL() string {
 				WHERE pr.business_id = ? AND pr.branch_id = ? AND pr.supplier_id = ?
 					AND pr.status = 'posted' AND pr.deleted_at IS NULL
 			) AS vendor_credits,
+			(
+				-- A go-live opening balance is a payable with no bill behind
+				-- it (Phase 6 / W1); without it this figure disagrees with
+				-- the AP ledger it rolls up into.
+				SELECT COALESCE(SUM(cob.amount), 0)
+				FROM counterparty_opening_balances cob
+				WHERE cob.business_id = ? AND cob.branch_id = ? AND cob.party_id = ?
+					AND cob.party_type = 'supplier' AND cob.deleted_at IS NULL
+			) AS opening_balance,
 			GREATEST(
 				(
 					SELECT MAX(po.order_date)
@@ -286,7 +296,9 @@ func supplierStatsSQL() string {
 
 func supplierStatsArgs(businessID, branchID, supplierID string) []interface{} {
 	args := []interface{}{supplierID}
-	for i := 0; i < 9; i++ {
+	// One (business, branch, supplier) triple per correlated subquery in
+	// supplierStatsSQL. Keep this count in step when adding one.
+	for i := 0; i < 10; i++ {
 		args = append(args, businessID, branchID, supplierID)
 	}
 	return args
@@ -294,7 +306,7 @@ func supplierStatsArgs(businessID, branchID, supplierID string) []interface{} {
 
 func supplierStatsResponse(row supplierStatsRow) *SupplierStatsResponse {
 	totalPaid := roundSupplierMoney(row.SupplierPaymentsPaid + row.InvoicePaymentsPaid)
-	outstanding := roundSupplierMoney(row.TotalPurchaseAmount - totalPaid - row.VendorCredits)
+	outstanding := roundSupplierMoney(row.TotalPurchaseAmount - totalPaid - row.VendorCredits + row.OpeningBalance)
 	var lastPurchaseDate *string
 	if row.LastPurchaseDate != nil {
 		formatted := row.LastPurchaseDate.Format("2006-01-02")

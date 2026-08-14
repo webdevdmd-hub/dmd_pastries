@@ -284,6 +284,61 @@ func (h *Handler) ListPaymentAccounts(c *gin.Context) {
 	response.Success(c, 200, "payment accounts fetched successfully", result)
 }
 
+func (h *Handler) ListChartAccountOpenings(c *gin.Context) {
+	result, err := h.service.ListChartAccountOpenings(utils.MustAuthContext(c), c.Query("branch_id"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "opening balances retrieved successfully", gin.H{"items": result})
+}
+
+func (h *Handler) SaveChartAccountOpening(c *gin.Context) {
+	var req SaveChartAccountOpeningRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.SaveChartAccountOpening(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "opening balance saved successfully", result)
+}
+
+func (h *Handler) ListCounterpartyOpenings(c *gin.Context) {
+	result, err := h.service.ListCounterpartyOpenings(utils.MustAuthContext(c), c.Query("branch_id"), c.Query("party_type"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "opening balances retrieved successfully", gin.H{"items": result})
+}
+
+func (h *Handler) SaveCounterpartyOpening(c *gin.Context) {
+	var req SaveCounterpartyOpeningRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.SaveCounterpartyOpening(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "opening balance saved successfully", result)
+}
+
+func (h *Handler) GetOpeningBalanceSummary(c *gin.Context) {
+	result, err := h.service.GetOpeningBalanceSummary(utils.MustAuthContext(c), c.Query("branch_id"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "opening balance summary retrieved successfully", result)
+}
+
 func (h *Handler) CreatePaymentAccount(c *gin.Context) {
 	var req CreatePaymentAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

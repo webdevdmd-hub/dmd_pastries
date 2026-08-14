@@ -3296,6 +3296,155 @@ func (r *Repository) SumAccountsReceivableOperational(businessID, branchID strin
 	return roundMoney(posTotal + bakeryTotal), nil
 }
 
+// --- Opening balances (Phase 6 / W1) ---------------------------------------
+
+// IsChartAccountUsedByPaymentAccount reports whether a chart account already
+// carries its opening balance through the payment-account mechanism, which
+// would make a generic opening a second credit to 3400 for the same money.
+func (r *Repository) IsChartAccountUsedByPaymentAccount(tx *gorm.DB, businessID, chartAccountID string) (bool, error) {
+	var count int64
+	err := tx.Model(&PaymentAccount{}).
+		Where("business_id = ? AND chart_account_id = ? AND deleted_at IS NULL", businessID, chartAccountID).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *Repository) FindChartAccountOpening(tx *gorm.DB, businessID, branchID, chartAccountID string) (*ChartAccountOpeningBalance, error) {
+	var row ChartAccountOpeningBalance
+	err := tx.Where(
+		"business_id = ? AND branch_id = ? AND chart_account_id = ? AND deleted_at IS NULL",
+		businessID, branchID, chartAccountID,
+	).First(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *Repository) SaveChartAccountOpening(tx *gorm.DB, row *ChartAccountOpeningBalance) error {
+	return tx.Save(row).Error
+}
+
+func (r *Repository) SoftDeleteChartAccountOpening(tx *gorm.DB, businessID, id string) error {
+	return tx.Where("business_id = ? AND id = ?", businessID, id).
+		Delete(&ChartAccountOpeningBalance{}).Error
+}
+
+func (r *Repository) ListChartAccountOpenings(businessID, branchID string) ([]ChartAccountOpeningRow, error) {
+	rows := []ChartAccountOpeningRow{}
+	db := r.db.Table("chart_account_opening_balances o").
+		Select(`o.id, o.chart_account_id, o.branch_id, o.amount, o.opening_date, o.journal_entry_id,
+			coa.account_code, coa.account_name, coa.account_type, coa.normal_balance`).
+		Joins("JOIN chart_of_accounts coa ON coa.id = o.chart_account_id").
+		Where("o.business_id = ? AND o.deleted_at IS NULL", businessID)
+	if strings.TrimSpace(branchID) != "" {
+		db = db.Where("o.branch_id = ?", strings.TrimSpace(branchID))
+	}
+	err := db.Order("coa.account_code ASC").Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) FindCounterpartyOpening(tx *gorm.DB, businessID, branchID, partyType, partyID string) (*CounterpartyOpeningBalance, error) {
+	var row CounterpartyOpeningBalance
+	err := tx.Where(
+		"business_id = ? AND branch_id = ? AND party_type = ? AND party_id = ? AND deleted_at IS NULL",
+		businessID, branchID, partyType, partyID,
+	).First(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *Repository) SaveCounterpartyOpening(tx *gorm.DB, row *CounterpartyOpeningBalance) error {
+	return tx.Save(row).Error
+}
+
+func (r *Repository) SoftDeleteCounterpartyOpening(tx *gorm.DB, businessID, id string) error {
+	return tx.Where("business_id = ? AND id = ?", businessID, id).
+		Delete(&CounterpartyOpeningBalance{}).Error
+}
+
+func (r *Repository) ListCounterpartyOpenings(businessID, branchID, partyType string) ([]CounterpartyOpeningRow, error) {
+	rows := []CounterpartyOpeningRow{}
+	db := r.db.Table("counterparty_opening_balances o").
+		Select(`o.id, o.party_type, o.party_id, o.branch_id, o.amount, o.opening_date, o.journal_entry_id,
+			COALESCE(c.full_name, s.supplier_name, '') AS party_name`).
+		Joins("LEFT JOIN customers c ON o.party_type = ? AND c.id = o.party_id", PartyTypeCustomer).
+		Joins("LEFT JOIN suppliers s ON o.party_type = ? AND s.id = o.party_id", PartyTypeSupplier).
+		Where("o.business_id = ? AND o.deleted_at IS NULL", businessID)
+	if strings.TrimSpace(branchID) != "" {
+		db = db.Where("o.branch_id = ?", strings.TrimSpace(branchID))
+	}
+	if strings.TrimSpace(partyType) != "" {
+		db = db.Where("o.party_type = ?", strings.TrimSpace(partyType))
+	}
+	err := db.Order("party_name ASC").Scan(&rows).Error
+	return rows, err
+}
+
+// SumCounterpartyOpeningBalances totals the opening subledger so the
+// operational AR/AP figures can include it. Without this the ledger side
+// carries the opening and the operational side does not, and every
+// reconciliation screen reports drift that is not real.
+//
+// asOfDate is optional: when set, only openings dated on or before it count,
+// matching the as-of ledger balance they are compared against.
+func (r *Repository) SumCounterpartyOpeningBalances(businessID, branchID, partyType, asOfDate string) (float64, error) {
+	scope := reportshared.MetricScope{
+		BusinessID:  businessID,
+		BranchID:    strings.TrimSpace(branchID),
+		AllBranches: strings.TrimSpace(branchID) == "",
+	}
+	return reportshared.CounterpartyOpeningTotal(r.db, scope, partyType, asOfDate)
+}
+
+// FindCounterpartyForOpening resolves a customer or supplier to its display
+// name and branch. Customers and suppliers are branch-scoped, so the opening
+// takes the counterparty's branch rather than trusting one from the request.
+func (r *Repository) FindCounterpartyForOpening(tx *gorm.DB, businessID, partyType, partyID string) (string, string, error) {
+	table, nameColumn := "customers", "full_name"
+	if strings.TrimSpace(partyType) == PartyTypeSupplier {
+		table, nameColumn = "suppliers", "supplier_name"
+	}
+	var row struct {
+		Name     string
+		BranchID string
+	}
+	err := tx.Table(table).
+		Select(nameColumn+" AS name, branch_id").
+		Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, partyID).
+		Take(&row).Error
+	if err != nil {
+		return "", "", err
+	}
+	return row.Name, row.BranchID, nil
+}
+
+func (r *Repository) SumChartAccountOpenings(businessID, branchID string) (float64, error) {
+	var total float64
+	db := r.db.Table("chart_account_opening_balances").
+		Select("COALESCE(SUM(amount), 0)").
+		Where("business_id = ? AND deleted_at IS NULL", businessID)
+	if strings.TrimSpace(branchID) != "" {
+		db = db.Where("branch_id = ?", strings.TrimSpace(branchID))
+	}
+	err := db.Scan(&total).Error
+	return roundMoney(total), err
+}
+
+func (r *Repository) SumPaymentAccountOpenings(businessID, branchID string) (float64, error) {
+	var total float64
+	db := r.db.Table("payment_accounts").
+		Select("COALESCE(SUM(opening_balance), 0)").
+		Where("business_id = ? AND deleted_at IS NULL", businessID)
+	if strings.TrimSpace(branchID) != "" {
+		db = db.Where("branch_id = ?", strings.TrimSpace(branchID))
+	}
+	err := db.Scan(&total).Error
+	return roundMoney(total), err
+}
+
 func (r *Repository) ListPaymentAccountReconciliationRows(businessID, branchID string) ([]PaymentAccountReconciliationItem, error) {
 	var rows []PaymentAccountReconciliationItem
 	db := r.db.Table("payment_accounts pa").

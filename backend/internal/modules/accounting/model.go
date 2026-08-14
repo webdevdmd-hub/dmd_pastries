@@ -69,6 +69,55 @@ type PaymentAccount struct {
 
 func (PaymentAccount) TableName() string { return "payment_accounts" }
 
+// ChartAccountOpeningBalance is a go-live balance on any chart account
+// (Phase 6 / W1). Payment accounts and inventory keep their own dedicated
+// mechanisms; this covers everything else.
+type ChartAccountOpeningBalance struct {
+	ID              string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID      string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID        string         `gorm:"type:uuid;not null;index" json:"branch_id"`
+	ChartAccountID  string         `gorm:"type:uuid;not null;index" json:"chart_account_id"`
+	Amount          float64        `gorm:"type:numeric(14,2);not null;default:0" json:"amount"`
+	OpeningDate     time.Time      `gorm:"type:date;not null" json:"opening_date"`
+	JournalEntryID  *string        `gorm:"type:uuid" json:"journal_entry_id"`
+	CreatedByUserID *string        `gorm:"type:uuid" json:"created_by_user_id"`
+	UpdatedByUserID *string        `gorm:"type:uuid" json:"updated_by_user_id"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (ChartAccountOpeningBalance) TableName() string { return "chart_account_opening_balances" }
+
+// CounterpartyOpeningBalance is the per-customer / per-supplier subledger
+// behind the AR and AP control accounts. Journal lines cannot carry a party,
+// so the control-account balance is attributed here, the same way
+// customer_credits backs 2200 Customer Advance.
+type CounterpartyOpeningBalance struct {
+	ID         string `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID string `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID   string `gorm:"type:uuid;not null;index" json:"branch_id"`
+	PartyType  string `gorm:"size:20;not null;index" json:"party_type"`
+	PartyID    string `gorm:"type:uuid;not null;index" json:"party_id"`
+	// Positive means the customer owes the business, or the business owes the
+	// supplier. Negative mirrors the entry.
+	Amount          float64        `gorm:"type:numeric(14,2);not null;default:0" json:"amount"`
+	OpeningDate     time.Time      `gorm:"type:date;not null" json:"opening_date"`
+	JournalEntryID  *string        `gorm:"type:uuid" json:"journal_entry_id"`
+	CreatedByUserID *string        `gorm:"type:uuid" json:"created_by_user_id"`
+	UpdatedByUserID *string        `gorm:"type:uuid" json:"updated_by_user_id"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (CounterpartyOpeningBalance) TableName() string { return "counterparty_opening_balances" }
+
+const (
+	PartyTypeCustomer = "customer"
+	PartyTypeSupplier = "supplier"
+)
+
 type AccountTransfer struct {
 	ID                   string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID           string         `gorm:"type:uuid;not null;index" json:"business_id"`

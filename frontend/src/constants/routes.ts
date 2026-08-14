@@ -21,6 +21,7 @@ export const ROUTES = {
   accountingChartOfAccounts: "/accounting/chart-of-accounts",
   accountingGeneralLedger: "/accounting/reports/general-ledger",
   accountingJournalEntries: "/accounting/journal-entries",
+  accountingOpeningBalances: "/accounting/opening-balances",
   accountingPaymentAccounts: "/accounting/payment-accounts",
   accountingPlatformSettlements: "/accounting/platform-settlements",
   accountingProfitLoss: "/accounting/reports/profit-loss",

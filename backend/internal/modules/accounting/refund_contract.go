@@ -58,6 +58,8 @@ const (
 	SourcePlatformSettlement         = "platform_settlement"
 	SourcePaymentAccount             = "payment_account"
 	SourceYearEndClose               = "year_end_close"
+	SourceAccountOpeningBalance      = "account_opening_balance"
+	SourceCounterpartyOpeningBalance = "counterparty_opening_balance"
 )
 
 // ReversalContract declares how the financial effect of a posting
@@ -111,6 +113,11 @@ var reversalContracts = map[string]ReversalContract{
 	SourcePlatformSettlement:    {Rationale: "a wrong settlement is corrected with a manual journal reversal until a dedicated reversal flow ships"},
 	SourcePaymentAccount:        {Rationale: "opening-balance entry; corrected by editing the opening balance, which reposts"},
 	SourceYearEndClose:          {Rationale: "a closed year is reopened by soft-deleting its close journal, which frees the idempotency slot for re-closing; reversing instead would occupy that slot forever"},
+	// Both opening-balance types follow the payment_account contract rather
+	// than the inventory_opening_stock one: a wrong go-live figure is a typo
+	// to correct, not an event to counter-post, so editing reposts.
+	SourceAccountOpeningBalance:      {Rationale: "opening-balance entry; corrected by editing the opening balance, which reposts"},
+	SourceCounterpartyOpeningBalance: {Rationale: "opening-balance entry; corrected by editing the counterparty's opening balance, which reposts"},
 }
 
 // RefundChargeSlice is one document charge's share of a refund, debited to
