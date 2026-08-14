@@ -24,7 +24,7 @@ func NewRepository(db *gorm.DB) *Repository {
 
 type pendingAccountingSummary struct {
 	Count int64
-	Value float64
+	Value money.Amount
 }
 
 func (r *Repository) pendingAccountingSummaries(businessID string, itemIDs []string) (map[string]pendingAccountingSummary, error) {
@@ -49,7 +49,7 @@ func (r *Repository) pendingAccountingSummaries(businessID string, itemIDs []str
 	var rows []struct {
 		InventoryItemID string
 		Count           int64
-		Value           float64
+		Value           money.Amount
 	}
 	err := r.db.Table("stock_movements sm").
 		Select("sm.inventory_item_id, COUNT(*) AS count, COALESCE(SUM(sm.total_cost), 0) AS value").
@@ -86,8 +86,8 @@ func (r *Repository) pendingAccountingSummaries(businessID string, itemIDs []str
 
 func applyPendingAccountingSummary(response *InventoryItemResponse, summary pendingAccountingSummary) {
 	response.PendingAccountingCount = summary.Count
-	response.PendingAccountingValue = roundMoney(summary.Value)
-	if summary.Count > 0 || roundMoney(summary.Value) > 0 {
+	response.PendingAccountingValue = summary.Value.Round2()
+	if summary.Count > 0 || summary.Value.Round2().IsPositive() {
 		response.AccountingStatus = "pending_bill_posting"
 		response.AccountingStatusLabel = "Pending Bill Posting"
 		response.AccountingStatusDetail = "Stock is in operational inventory. Accounting inventory updates when the supplier bill is posted."
@@ -131,8 +131,8 @@ func (r *Repository) FindInventoryItemForUpdate(tx *gorm.DB, id, businessID stri
 // variant inventory item, used only as a valuation fallback when the item has
 // no cost history. A variant with no cost of its own falls back to its parent
 // product's cost_price. Returns 0 when no cost is defined.
-func (r *Repository) FindProductCostBasis(tx *gorm.DB, businessID, productID string, productVariantID *string) (float64, error) {
-	var basis float64
+func (r *Repository) FindProductCostBasis(tx *gorm.DB, businessID, productID string, productVariantID *string) (money.Amount, error) {
+	var basis money.Amount
 	if productVariantID != nil && strings.TrimSpace(*productVariantID) != "" {
 		err := tx.Raw(`
 			SELECT COALESCE(pv.cost_price, p.cost_price, 0)
@@ -450,9 +450,9 @@ func (r *Repository) ListLocationBalances(businessID string, query LocationBalan
 		Limit(query.Limit).
 		Scan(&rows).Error
 	for i := range rows {
-		rows[i].CurrentQuantity = roundQuantity(rows[i].CurrentQuantity)
-		rows[i].ReservedQuantity = roundQuantity(rows[i].ReservedQuantity)
-		rows[i].AvailableQuantity = roundQuantity(rows[i].AvailableQuantity)
+		rows[i].CurrentQuantity = rows[i].CurrentQuantity.Round4()
+		rows[i].ReservedQuantity = rows[i].ReservedQuantity.Round4()
+		rows[i].AvailableQuantity = rows[i].AvailableQuantity.Round4()
 	}
 	return rows, total, err
 }
@@ -472,9 +472,9 @@ func (r *Repository) ItemLocationBreakdown(businessID, inventoryItemID string) (
 		Order("sl.is_default DESC, sl.location_name ASC").
 		Scan(&rows).Error
 	for i := range rows {
-		rows[i].CurrentQuantity = roundQuantity(rows[i].CurrentQuantity)
-		rows[i].ReservedQuantity = roundQuantity(rows[i].ReservedQuantity)
-		rows[i].AvailableQuantity = roundQuantity(rows[i].AvailableQuantity)
+		rows[i].CurrentQuantity = rows[i].CurrentQuantity.Round4()
+		rows[i].ReservedQuantity = rows[i].ReservedQuantity.Round4()
+		rows[i].AvailableQuantity = rows[i].AvailableQuantity.Round4()
 	}
 	return rows, err
 }
@@ -584,15 +584,15 @@ func (r *Repository) MovementSummary(businessID string, query MovementListQuery)
 	for _, row := range rows {
 		response.MovementCount += row.Count
 		if row.Direction == "in" {
-			response.TotalInQuantity += row.TotalQuantity
+			response.TotalInQuantity = response.TotalInQuantity.Add(row.TotalQuantity)
 		}
 		if row.Direction == "out" {
-			response.TotalOutQuantity += row.TotalQuantity
+			response.TotalOutQuantity = response.TotalOutQuantity.Add(row.TotalQuantity)
 		}
 	}
-	response.TotalInQuantity = roundQuantity(response.TotalInQuantity)
-	response.TotalOutQuantity = roundQuantity(response.TotalOutQuantity)
-	response.NetQuantity = roundQuantity(response.TotalInQuantity - response.TotalOutQuantity)
+	response.TotalInQuantity = response.TotalInQuantity.Round4()
+	response.TotalOutQuantity = response.TotalOutQuantity.Round4()
+	response.NetQuantity = response.TotalInQuantity.Sub(response.TotalOutQuantity).Round4()
 	return &response, nil
 }
 
@@ -602,8 +602,8 @@ func (r *Repository) LedgerAudit(businessID, inventoryItemID string) (*Inventory
 		return nil, err
 	}
 	var row struct {
-		TotalIn  float64
-		TotalOut float64
+		TotalIn  money.Amount
+		TotalOut money.Amount
 		Count    int64
 	}
 	if err := r.db.Model(&StockMovement{}).
@@ -616,17 +616,18 @@ func (r *Repository) LedgerAudit(businessID, inventoryItemID string) (*Inventory
 		Scan(&row).Error; err != nil {
 		return nil, err
 	}
-	calculated := roundQuantity(row.TotalIn - row.TotalOut)
-	difference := roundQuantity(item.CurrentQuantity - calculated)
+	calculated := row.TotalIn.Sub(row.TotalOut).Round4()
+	difference := item.CurrentQuantity.Sub(calculated).Round4()
 	return &InventoryLedgerAuditResponse{
 		InventoryItemID:                 inventoryItemID,
-		CurrentQuantity:                 roundQuantity(item.CurrentQuantity),
+		CurrentQuantity:                 item.CurrentQuantity.Round4(),
 		CalculatedQuantityFromMovements: calculated,
 		Difference:                      difference,
-		IsBalanced:                      math.Abs(difference) < 0.0001,
-		TotalIn:                         roundQuantity(row.TotalIn),
-		TotalOut:                        roundQuantity(row.TotalOut),
-		MovementCount:                   row.Count,
+		// Exact decimals make this a real equality rather than a tolerance.
+		IsBalanced:    difference.IsZero(),
+		TotalIn:       row.TotalIn.Round4(),
+		TotalOut:      row.TotalOut.Round4(),
+		MovementCount: row.Count,
 	}, nil
 }
 
@@ -676,7 +677,7 @@ type expiryBatchAlertRow struct {
 	SupplierName            string
 	PurchaseReferenceNumber string
 	BatchNumber             string
-	Quantity                float64
+	Quantity                money.Amount
 	ExpiryDate              time.Time
 	ReceivedDate            time.Time
 	Status                  string
@@ -915,14 +916,14 @@ func (r *Repository) loadInventoryResponseBase(businessID string, item Inventory
 		ItemName:           itemName,
 		SKU:                sku,
 		Barcode:            barcode,
-		CurrentQuantity:    roundQuantity(item.CurrentQuantity),
-		ReservedQuantity:   roundQuantity(item.ReservedQuantity),
-		AvailableQuantity:  roundQuantity(item.AvailableQuantity),
-		AverageUnitCost:    roundMoney(item.AverageUnitCost),
-		InventoryValue:     roundMoney(item.InventoryValue),
-		ReorderLevel:       roundQuantity(item.ReorderLevel),
+		CurrentQuantity:    item.CurrentQuantity.Round4(),
+		ReservedQuantity:   item.ReservedQuantity.Round4(),
+		AvailableQuantity:  item.AvailableQuantity.Round4(),
+		AverageUnitCost:    item.AverageUnitCost.Round2(),
+		InventoryValue:     item.InventoryValue.Round2(),
+		ReorderLevel:       item.ReorderLevel.Round4(),
 		Unit:               unit,
-		LowStock:           item.AvailableQuantity <= item.ReorderLevel,
+		LowStock:           !item.AvailableQuantity.GreaterThan(item.ReorderLevel),
 		LocationBalances:   locationBalances,
 		IsExpiryTracked:    item.IsExpiryTracked,
 		Status:             item.Status,
@@ -978,14 +979,14 @@ func (r *Repository) inventoryCatalogRowResponse(row inventoryCatalogRow) Invent
 		ItemName:           row.ItemName,
 		SKU:                row.SKU,
 		Barcode:            row.Barcode,
-		CurrentQuantity:    roundQuantity(row.CurrentQuantity),
-		ReservedQuantity:   roundQuantity(row.ReservedQuantity),
-		AvailableQuantity:  roundQuantity(row.AvailableQuantity),
-		AverageUnitCost:    roundMoney(row.AverageUnitCost),
-		InventoryValue:     roundMoney(row.InventoryValue),
-		ReorderLevel:       roundQuantity(row.ReorderLevel),
+		CurrentQuantity:    row.CurrentQuantity.Round4(),
+		ReservedQuantity:   row.ReservedQuantity.Round4(),
+		AvailableQuantity:  row.AvailableQuantity.Round4(),
+		AverageUnitCost:    row.AverageUnitCost.Round2(),
+		InventoryValue:     row.InventoryValue.Round2(),
+		ReorderLevel:       row.ReorderLevel.Round4(),
 		Unit:               UnitInfo{ID: row.UnitID, UnitName: row.UnitName, Symbol: row.UnitSymbol},
-		LowStock:           row.AvailableQuantity <= row.ReorderLevel,
+		LowStock:           !row.AvailableQuantity.GreaterThan(row.ReorderLevel),
 		IsExpiryTracked:    row.IsExpiryTracked,
 		Status:             row.Status,
 		InventoryStatus:    row.InventoryStatus,
@@ -1078,7 +1079,7 @@ func (r *Repository) LoadStockTransferResponse(transfer StockTransfer) (StockTra
 		FromStockLocationName: r.stockLocationName(&fromID, transfer.BusinessID),
 		ToStockLocationID:     toID,
 		ToStockLocationName:   r.stockLocationName(&toID, transfer.BusinessID),
-		Quantity:              roundQuantity(transfer.Quantity),
+		Quantity:              transfer.Quantity.Round4(),
 		Unit:                  unit,
 		Reason:                transfer.Reason,
 		Notes:                 transfer.Notes,
@@ -1217,12 +1218,12 @@ type inventoryCatalogRow struct {
 	ItemName           string
 	SKU                string
 	Barcode            string
-	CurrentQuantity    float64
-	ReservedQuantity   float64
-	AvailableQuantity  float64
-	AverageUnitCost    float64
-	InventoryValue     float64
-	ReorderLevel       float64
+	CurrentQuantity    money.Amount
+	ReservedQuantity   money.Amount
+	AvailableQuantity  money.Amount
+	AverageUnitCost    money.Amount
+	InventoryValue     money.Amount
+	ReorderLevel       money.Amount
 	UnitID             string
 	UnitName           string
 	UnitSymbol         string
@@ -1563,11 +1564,11 @@ func toStockMovementResponse(movement StockMovement, unit UnitInfo, itemName str
 		SourceModuleLabel:        display.SourceModuleLabel,
 		SourceReferenceLabel:     display.SourceReferenceLabel,
 		MovementDescription:      display.MovementDescription,
-		Quantity:                 roundQuantity(movement.Quantity),
-		BeforeQuantity:           roundQuantity(movement.BeforeQuantity),
-		AfterQuantity:            roundQuantity(movement.AfterQuantity),
-		UnitCostSnapshot:         roundMoney(movement.UnitCostSnapshot),
-		TotalCost:                roundMoney(movement.TotalCost),
+		Quantity:                 movement.Quantity.Round4(),
+		BeforeQuantity:           movement.BeforeQuantity.Round4(),
+		AfterQuantity:            movement.AfterQuantity.Round4(),
+		UnitCostSnapshot:         movement.UnitCostSnapshot.Round2(),
+		TotalCost:                movement.TotalCost.Round2(),
 		ValuationMethod:          movement.ValuationMethod,
 		AccountingJournalEntryID: movement.AccountingJournalEntryID,
 		Unit:                     unit,
@@ -1630,7 +1631,3 @@ func totalPages(total int64, limit int) int {
 	}
 	return int(math.Ceil(float64(total) / float64(limit)))
 }
-
-func roundQuantity(value float64) float64 { return money.Round4(value) }
-
-func roundMoney(value float64) float64 { return money.Round2(value) }

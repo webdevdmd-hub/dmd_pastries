@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"pastries-pos/internal/shared/money"
 	"time"
 
 	"gorm.io/gorm"
@@ -15,12 +16,12 @@ type InventoryItem struct {
 	IngredientID      *string        `gorm:"type:uuid;index" json:"ingredient_id"`
 	PackagingItemID   *string        `gorm:"type:uuid;index" json:"packaging_item_id"`
 	ItemType          string         `gorm:"size:50;not null" json:"item_type"`
-	CurrentQuantity   float64        `gorm:"not null;default:0" json:"current_quantity"`
-	ReservedQuantity  float64        `gorm:"not null;default:0" json:"reserved_quantity"`
-	AvailableQuantity float64        `gorm:"not null;default:0" json:"available_quantity"`
-	AverageUnitCost   float64        `gorm:"not null;default:0" json:"average_unit_cost"`
-	InventoryValue    float64        `gorm:"not null;default:0" json:"inventory_value"`
-	ReorderLevel      float64        `gorm:"not null;default:0" json:"reorder_level"`
+	CurrentQuantity   money.Amount   `gorm:"not null;default:0" json:"current_quantity"`
+	ReservedQuantity  money.Amount   `gorm:"not null;default:0" json:"reserved_quantity"`
+	AvailableQuantity money.Amount   `gorm:"not null;default:0" json:"available_quantity"`
+	AverageUnitCost   money.Amount   `gorm:"not null;default:0" json:"average_unit_cost"`
+	InventoryValue    money.Amount   `gorm:"not null;default:0" json:"inventory_value"`
+	ReorderLevel      money.Amount   `gorm:"not null;default:0" json:"reorder_level"`
 	UnitID            string         `gorm:"type:uuid;not null;index" json:"unit_id"`
 	IsExpiryTracked   bool           `gorm:"not null;default:false" json:"is_expiry_tracked"`
 	Status            string         `gorm:"size:50;not null;default:active" json:"status"`
@@ -34,35 +35,35 @@ func (InventoryItem) TableName() string {
 }
 
 type StockMovement struct {
-	ID                       string    `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID               string    `gorm:"type:uuid;not null;index" json:"business_id"`
-	BranchID                 string    `gorm:"type:uuid;not null;index" json:"branch_id"`
-	InventoryItemID          string    `gorm:"type:uuid;not null;index" json:"inventory_item_id"`
-	StockLocationID          *string   `gorm:"type:uuid;index" json:"stock_location_id"`
-	FromStockLocationID      *string   `gorm:"type:uuid;index" json:"from_stock_location_id"`
-	ToStockLocationID        *string   `gorm:"type:uuid;index" json:"to_stock_location_id"`
-	ItemType                 string    `gorm:"size:50;not null" json:"item_type"`
-	MovementType             string    `gorm:"size:50;not null" json:"movement_type"`
-	MovementDirection        string    `gorm:"size:20;not null" json:"movement_direction"`
-	Quantity                 float64   `gorm:"not null" json:"quantity"`
-	BeforeQuantity           float64   `gorm:"not null" json:"before_quantity"`
-	AfterQuantity            float64   `gorm:"not null" json:"after_quantity"`
-	UnitCostSnapshot         float64   `gorm:"not null;default:0" json:"unit_cost_snapshot"`
-	TotalCost                float64   `gorm:"not null;default:0" json:"total_cost"`
-	ValuationMethod          string    `gorm:"size:50;not null;default:weighted_average" json:"valuation_method"`
-	AccountingJournalEntryID *string   `gorm:"type:uuid;index" json:"accounting_journal_entry_id"`
-	UnitID                   string    `gorm:"type:uuid;not null;index" json:"unit_id"`
-	ReferenceType            string    `gorm:"size:100" json:"reference_type"`
-	ReferenceID              *string   `gorm:"type:uuid" json:"reference_id"`
-	ReferenceNumber          string    `gorm:"size:150" json:"reference_number"`
-	Reason                   string    `json:"reason"`
-	Notes                    string    `json:"notes"`
-	IsReversal               bool      `gorm:"not null;default:false" json:"is_reversal"`
-	ReversedMovementID       *string   `gorm:"type:uuid" json:"reversed_movement_id"`
-	IsReversed               bool      `gorm:"not null;default:false" json:"is_reversed"`
-	ReversedByMovementID     *string   `gorm:"type:uuid" json:"reversed_by_movement_id"`
-	CreatedByUserID          string    `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
-	CreatedAt                time.Time `json:"created_at"`
+	ID                       string       `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID               string       `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID                 string       `gorm:"type:uuid;not null;index" json:"branch_id"`
+	InventoryItemID          string       `gorm:"type:uuid;not null;index" json:"inventory_item_id"`
+	StockLocationID          *string      `gorm:"type:uuid;index" json:"stock_location_id"`
+	FromStockLocationID      *string      `gorm:"type:uuid;index" json:"from_stock_location_id"`
+	ToStockLocationID        *string      `gorm:"type:uuid;index" json:"to_stock_location_id"`
+	ItemType                 string       `gorm:"size:50;not null" json:"item_type"`
+	MovementType             string       `gorm:"size:50;not null" json:"movement_type"`
+	MovementDirection        string       `gorm:"size:20;not null" json:"movement_direction"`
+	Quantity                 money.Amount `gorm:"not null" json:"quantity"`
+	BeforeQuantity           money.Amount `gorm:"not null" json:"before_quantity"`
+	AfterQuantity            money.Amount `gorm:"not null" json:"after_quantity"`
+	UnitCostSnapshot         money.Amount `gorm:"not null;default:0" json:"unit_cost_snapshot"`
+	TotalCost                money.Amount `gorm:"not null;default:0" json:"total_cost"`
+	ValuationMethod          string       `gorm:"size:50;not null;default:weighted_average" json:"valuation_method"`
+	AccountingJournalEntryID *string      `gorm:"type:uuid;index" json:"accounting_journal_entry_id"`
+	UnitID                   string       `gorm:"type:uuid;not null;index" json:"unit_id"`
+	ReferenceType            string       `gorm:"size:100" json:"reference_type"`
+	ReferenceID              *string      `gorm:"type:uuid" json:"reference_id"`
+	ReferenceNumber          string       `gorm:"size:150" json:"reference_number"`
+	Reason                   string       `json:"reason"`
+	Notes                    string       `json:"notes"`
+	IsReversal               bool         `gorm:"not null;default:false" json:"is_reversal"`
+	ReversedMovementID       *string      `gorm:"type:uuid" json:"reversed_movement_id"`
+	IsReversed               bool         `gorm:"not null;default:false" json:"is_reversed"`
+	ReversedByMovementID     *string      `gorm:"type:uuid" json:"reversed_by_movement_id"`
+	CreatedByUserID          string       `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
+	CreatedAt                time.Time    `json:"created_at"`
 }
 
 func (StockMovement) TableName() string {
@@ -91,16 +92,16 @@ func (StockLocation) TableName() string {
 }
 
 type InventoryLocationBalance struct {
-	ID                string    `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID        string    `gorm:"type:uuid;not null;index" json:"business_id"`
-	BranchID          string    `gorm:"type:uuid;not null;index" json:"branch_id"`
-	InventoryItemID   string    `gorm:"type:uuid;not null;index" json:"inventory_item_id"`
-	StockLocationID   string    `gorm:"type:uuid;not null;index" json:"stock_location_id"`
-	CurrentQuantity   float64   `gorm:"not null;default:0" json:"current_quantity"`
-	ReservedQuantity  float64   `gorm:"not null;default:0" json:"reserved_quantity"`
-	AvailableQuantity float64   `gorm:"not null;default:0" json:"available_quantity"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                string       `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID        string       `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID          string       `gorm:"type:uuid;not null;index" json:"branch_id"`
+	InventoryItemID   string       `gorm:"type:uuid;not null;index" json:"inventory_item_id"`
+	StockLocationID   string       `gorm:"type:uuid;not null;index" json:"stock_location_id"`
+	CurrentQuantity   money.Amount `gorm:"not null;default:0" json:"current_quantity"`
+	ReservedQuantity  money.Amount `gorm:"not null;default:0" json:"reserved_quantity"`
+	AvailableQuantity money.Amount `gorm:"not null;default:0" json:"available_quantity"`
+	CreatedAt         time.Time    `json:"created_at"`
+	UpdatedAt         time.Time    `json:"updated_at"`
 }
 
 func (InventoryLocationBalance) TableName() string {
@@ -115,7 +116,7 @@ type StockTransfer struct {
 	InventoryItemID     string         `gorm:"type:uuid;not null;index" json:"inventory_item_id"`
 	FromStockLocationID string         `gorm:"type:uuid;not null;index" json:"from_stock_location_id"`
 	ToStockLocationID   string         `gorm:"type:uuid;not null;index" json:"to_stock_location_id"`
-	Quantity            float64        `gorm:"not null" json:"quantity"`
+	Quantity            money.Amount   `gorm:"not null" json:"quantity"`
 	UnitID              string         `gorm:"type:uuid;not null;index" json:"unit_id"`
 	Reason              string         `json:"reason"`
 	Notes               string         `json:"notes"`
@@ -134,16 +135,16 @@ func (StockTransfer) TableName() string {
 }
 
 type InventoryAdjustment struct {
-	ID              string    `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID      string    `gorm:"type:uuid;not null;index" json:"business_id"`
-	BranchID        string    `gorm:"type:uuid;not null;index" json:"branch_id"`
-	InventoryItemID string    `gorm:"type:uuid;not null;index" json:"inventory_item_id"`
-	AdjustmentType  string    `gorm:"size:50;not null" json:"adjustment_type"`
-	Quantity        float64   `gorm:"not null" json:"quantity"`
-	Reason          string    `gorm:"not null" json:"reason"`
-	CreatedByUserID string    `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID              string       `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID      string       `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID        string       `gorm:"type:uuid;not null;index" json:"branch_id"`
+	InventoryItemID string       `gorm:"type:uuid;not null;index" json:"inventory_item_id"`
+	AdjustmentType  string       `gorm:"size:50;not null" json:"adjustment_type"`
+	Quantity        money.Amount `gorm:"not null" json:"quantity"`
+	Reason          string       `gorm:"not null" json:"reason"`
+	CreatedByUserID string       `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
+	CreatedAt       time.Time    `json:"created_at"`
+	UpdatedAt       time.Time    `json:"updated_at"`
 }
 
 func (InventoryAdjustment) TableName() string {
@@ -156,7 +157,7 @@ type ExpiryBatch struct {
 	BranchID        string         `gorm:"type:uuid;not null;index" json:"branch_id"`
 	InventoryItemID string         `gorm:"type:uuid;not null;index" json:"inventory_item_id"`
 	BatchNumber     string         `gorm:"size:100" json:"batch_number"`
-	Quantity        float64        `gorm:"not null" json:"quantity"`
+	Quantity        money.Amount   `gorm:"not null" json:"quantity"`
 	ExpiryDate      time.Time      `gorm:"type:date;not null" json:"expiry_date"`
 	ReceivedDate    time.Time      `gorm:"type:date;not null" json:"received_date"`
 	Status          string         `gorm:"size:50;not null;default:active" json:"status"`

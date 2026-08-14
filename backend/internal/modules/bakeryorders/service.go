@@ -3,6 +3,7 @@ package bakeryorders
 import (
 	"encoding/json"
 	"errors"
+	"pastries-pos/internal/shared/money"
 	"strconv"
 	"strings"
 	"time"
@@ -336,7 +337,7 @@ func (s *Service) consumeInventoryForCompletion(tx *gorm.DB, currentUser *utils.
 			BusinessID:      currentUser.BusinessID,
 			InventoryItemID: *stock.InventoryItemID,
 			MovementType:    "sale_out",
-			Quantity:        item.Quantity,
+			Quantity:        money.FromFloat(item.Quantity),
 			ReferenceType:   "bakery_order",
 			ReferenceID:     &order.ID,
 			ReferenceNumber: order.OrderNumber,
@@ -373,7 +374,7 @@ func (s *Service) consumeInventoryForCompletion(tx *gorm.DB, currentUser *utils.
 			BusinessID:      currentUser.BusinessID,
 			InventoryItemID: *stock.InventoryItemID,
 			MovementType:    "sale_out",
-			Quantity:        pack.QuantityRequired,
+			Quantity:        money.FromFloat(pack.QuantityRequired),
 			ReferenceType:   "bakery_order",
 			ReferenceID:     &order.ID,
 			ReferenceNumber: order.OrderNumber,
@@ -405,8 +406,8 @@ func (s *Service) restockInventoryForCancellation(tx *gorm.DB, currentUser *util
 			BusinessID:         currentUser.BusinessID,
 			InventoryItemID:    movement.InventoryItemID,
 			MovementType:       "return_in",
-			Quantity:           movement.Quantity,
-			UnitCost:           unitCost,
+			Quantity:           money.FromFloat(movement.Quantity),
+			UnitCost:           money.FromFloat(unitCost),
 			ReferenceType:      "bakery_order_cancelled",
 			ReferenceID:        &order.ID,
 			ReferenceNumber:    order.OrderNumber,

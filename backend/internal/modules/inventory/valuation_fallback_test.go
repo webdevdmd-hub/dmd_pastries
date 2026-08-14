@@ -1,6 +1,10 @@
 package inventory
 
-import "testing"
+import (
+	"testing"
+
+	"pastries-pos/internal/shared/money"
+)
 
 // The defect this guards: products sold before any purchase/production had
 // average_unit_cost = 0, so sale_out movements were recorded at zero cost and
@@ -22,8 +26,9 @@ func TestOutboundUnitCostBasis(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := outboundUnitCostBasis(tt.input, tt.average, tt.costBase); got != tt.want {
-				t.Fatalf("outboundUnitCostBasis(%v, %v, %v) = %v, want %v", tt.input, tt.average, tt.costBase, got, tt.want)
+			got := outboundUnitCostBasis(money.FromFloat(tt.input), money.FromFloat(tt.average), money.FromFloat(tt.costBase))
+			if !got.Equal(money.FromFloat(tt.want)) {
+				t.Fatalf("outboundUnitCostBasis(%v, %v, %v) = %s, want %v", tt.input, tt.average, tt.costBase, got, tt.want)
 			}
 		})
 	}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -1838,15 +1839,15 @@ func (s *Service) reverseBillInventory(tx *gorm.DB, currentUser *utils.AuthConte
 				return nil, "", apperrors.Conflict("bill stock movement was already reversed", map[string]interface{}{"reason": "bill_stock_already_reversed", "stock_movement_id": original.ID})
 			}
 			unitCost := original.UnitCostSnapshot
-			if unitCost <= 0 {
-				unitCost = item.UnitCost
+			if !unitCost.IsPositive() {
+				unitCost = money.FromFloat(item.UnitCost)
 			}
 			movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{
 				BusinessID:         currentUser.BusinessID,
 				InventoryItemID:    item.InventoryItemID,
 				StockLocationID:    original.StockLocationID,
 				MovementType:       "purchase_bill_cancel_out",
-				Quantity:           item.QuantityReceived,
+				Quantity:           money.FromFloat(item.QuantityReceived),
 				UnitCost:           unitCost,
 				ReferenceType:      "purchase_invoice_cancel",
 				ReferenceID:        &invoice.ID,
@@ -2170,7 +2171,7 @@ func (s *Service) CancelReceipt(currentUser *utils.AuthContext, id, ipAddress, u
 				BusinessID:         currentUser.BusinessID,
 				InventoryItemID:    item.InventoryItemID,
 				MovementType:       "adjustment_out",
-				Quantity:           item.QuantityReceived,
+				Quantity:           money.FromFloat(item.QuantityReceived),
 				ReferenceType:      "purchase_receipt_cancelled",
 				ReferenceID:        &receipt.ID,
 				ReferenceNumber:    receipt.ReceiptNumber,
@@ -2383,7 +2384,7 @@ func (s *Service) PostReturn(currentUser *utils.AuthContext, id, ipAddress, user
 				InventoryItemID: item.InventoryItemID,
 				StockLocationID: locationID,
 				MovementType:    "purchase_return_out",
-				Quantity:        item.Quantity,
+				Quantity:        money.FromFloat(item.Quantity),
 				ReferenceType:   "purchase_return",
 				ReferenceID:     &purchaseReturn.ID,
 				ReferenceNumber: purchaseReturn.ReturnNumber,
@@ -2534,7 +2535,7 @@ func (s *Service) ReverseReturn(currentUser *utils.AuthContext, id string, req R
 				InventoryItemID:    item.InventoryItemID,
 				StockLocationID:    original.StockLocationID,
 				MovementType:       "adjustment_in",
-				Quantity:           item.Quantity,
+				Quantity:           money.FromFloat(item.Quantity),
 				UnitCost:           original.UnitCostSnapshot,
 				ReferenceType:      "purchase_return_reversal",
 				ReferenceID:        &purchaseReturn.ID,
@@ -3295,7 +3296,7 @@ func (s *Service) applyReceiptStock(tx *gorm.DB, currentUser *utils.AuthContext,
 				return err
 			}
 		}
-		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: item.InventoryItemID, MovementType: "purchase_in", Quantity: item.QuantityReceived, UnitCost: item.UnitCost, ReferenceType: "purchase_receipt", ReferenceID: &receipt.ID, ReferenceNumber: receipt.ReceiptNumber, Reason: "Purchase received", CreatedByUserID: currentUser.UserID})
+		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: item.InventoryItemID, MovementType: "purchase_in", Quantity: money.FromFloat(item.QuantityReceived), UnitCost: money.FromFloat(item.UnitCost), ReferenceType: "purchase_receipt", ReferenceID: &receipt.ID, ReferenceNumber: receipt.ReceiptNumber, Reason: "Purchase received", CreatedByUserID: currentUser.UserID})
 		if err != nil {
 			return err
 		}
@@ -3315,7 +3316,7 @@ func (s *Service) applyReceiptStock(tx *gorm.DB, currentUser *utils.AuthContext,
 			}
 		}
 		if item.ExpiryDate != nil {
-			batch := &inventory.ExpiryBatch{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BranchID: receipt.BranchID, InventoryItemID: item.InventoryItemID, BatchNumber: strings.TrimSpace(item.BatchNumber), Quantity: item.QuantityReceived, ExpiryDate: *item.ExpiryDate, ReceivedDate: receipt.ReceivedDate, Status: "active"}
+			batch := &inventory.ExpiryBatch{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BranchID: receipt.BranchID, InventoryItemID: item.InventoryItemID, BatchNumber: strings.TrimSpace(item.BatchNumber), Quantity: money.FromFloat(item.QuantityReceived), ExpiryDate: *item.ExpiryDate, ReceivedDate: receipt.ReceivedDate, Status: "active"}
 			if err := s.inventoryRepo.CreateExpiryBatch(tx, batch); err != nil {
 				return err
 			}
@@ -3498,7 +3499,7 @@ func (s *Service) findOrCreateInventoryItem(tx *gorm.DB, businessID, branchID st
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
-	inventoryItem := &inventory.InventoryItem{ID: utils.NewUUID(), BusinessID: businessID, BranchID: branchID, ProductID: item.ProductID, ItemType: item.ItemType, UnitID: item.UnitID, CurrentQuantity: 0, ReservedQuantity: 0, AvailableQuantity: 0, ReorderLevel: 0, IsExpiryTracked: true, Status: "active"}
+	inventoryItem := &inventory.InventoryItem{ID: utils.NewUUID(), BusinessID: businessID, BranchID: branchID, ProductID: item.ProductID, ItemType: item.ItemType, UnitID: item.UnitID, CurrentQuantity: money.Zero, ReservedQuantity: money.Zero, AvailableQuantity: money.Zero, ReorderLevel: money.Zero, IsExpiryTracked: true, Status: "active"}
 	if err := s.inventoryRepo.CreateInventoryItem(tx, inventoryItem); err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package manufacturing
 
 import (
 	"errors"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -631,20 +632,20 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 		if line.ActualQuantity <= 0 {
 			return apperrors.BadRequest("all component actual quantities must be greater than zero", productionLineIssueDetails("invalid_component_quantity", batch, line.ID, line.ItemNameSnapshot))
 		}
-		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: line.InventoryItemID, MovementType: "production_out", Quantity: line.ActualQuantity, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production component consumed", CreatedByUserID: currentUser.UserID})
+		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: line.InventoryItemID, MovementType: "production_out", Quantity: money.FromFloat(line.ActualQuantity), ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production component consumed", CreatedByUserID: currentUser.UserID})
 		if err != nil {
 			return err
 		}
-		consumedCost = roundMoney(consumedCost + movement.TotalCost)
+		consumedCost = roundMoney(consumedCost + movement.TotalCost.Float64())
 		if line.WastageQuantity > 0 {
-			if _, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: line.InventoryItemID, MovementType: "wastage", Quantity: line.WastageQuantity, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production component wastage", CreatedByUserID: currentUser.UserID}); err != nil {
+			if _, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: line.InventoryItemID, MovementType: "wastage", Quantity: money.FromFloat(line.WastageQuantity), ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production component wastage", CreatedByUserID: currentUser.UserID}); err != nil {
 				return err
 			}
 		}
 		if err := s.repo.UpdateIngredient(tx, line.ID, id, currentUser.BusinessID, map[string]interface{}{
 			"stock_movement_id":  movement.ID,
 			"unit_cost_snapshot": movement.UnitCostSnapshot,
-			"total_cost":         movement.TotalCost,
+			"total_cost":         movement.TotalCost.Float64(),
 			"updated_at":         time.Now().UTC(),
 		}); err != nil {
 			return err
@@ -664,15 +665,15 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 		if inventoryItem.UnitID != line.UnitID {
 			return apperrors.BadRequest("unit conversion is not available yet; packaging unit must match inventory unit", productionLineIssueDetails("packaging_unit_mismatch", batch, line.ID, line.PackagingNameSnapshot))
 		}
-		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: inventoryItem.ID, MovementType: "production_out", Quantity: line.ActualQuantity, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production packaging consumed", CreatedByUserID: currentUser.UserID})
+		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: inventoryItem.ID, MovementType: "production_out", Quantity: money.FromFloat(line.ActualQuantity), ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production packaging consumed", CreatedByUserID: currentUser.UserID})
 		if err != nil {
 			return err
 		}
-		consumedCost = roundMoney(consumedCost + movement.TotalCost)
+		consumedCost = roundMoney(consumedCost + movement.TotalCost.Float64())
 		if err := s.repo.UpdatePackaging(tx, line.ID, id, currentUser.BusinessID, map[string]interface{}{
 			"stock_movement_id":  movement.ID,
 			"unit_cost_snapshot": movement.UnitCostSnapshot,
-			"total_cost":         movement.TotalCost,
+			"total_cost":         movement.TotalCost.Float64(),
 			"updated_at":         time.Now().UTC(),
 		}); err != nil {
 			return err
@@ -686,7 +687,7 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	if producedQuantity > 0 {
 		outputUnitCost = roundMoney(consumedCost / producedQuantity)
 	}
-	movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: outputItem.ID, MovementType: "production_in", Quantity: producedQuantity, UnitCost: outputUnitCost, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production finished goods received", CreatedByUserID: currentUser.UserID})
+	movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: outputItem.ID, MovementType: "production_in", Quantity: money.FromFloat(producedQuantity), UnitCost: money.FromFloat(outputUnitCost), ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production finished goods received", CreatedByUserID: currentUser.UserID})
 	if err != nil {
 		return err
 	}
@@ -711,7 +712,7 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 		}
 	}
 	if expiryDate != nil {
-		expiry := &inventory.ExpiryBatch{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BranchID: batch.BranchID, InventoryItemID: outputItem.ID, BatchNumber: strings.TrimSpace(req.BatchNumber), Quantity: producedQuantity, ExpiryDate: *expiryDate, ReceivedDate: time.Now().UTC(), Status: "active"}
+		expiry := &inventory.ExpiryBatch{ID: utils.NewUUID(), BusinessID: currentUser.BusinessID, BranchID: batch.BranchID, InventoryItemID: outputItem.ID, BatchNumber: strings.TrimSpace(req.BatchNumber), Quantity: money.FromFloat(producedQuantity), ExpiryDate: *expiryDate, ReceivedDate: time.Now().UTC(), Status: "active"}
 		if err := s.inventoryRepo.CreateExpiryBatch(tx, expiry); err != nil {
 			return err
 		}
@@ -984,10 +985,10 @@ func (s *Service) resolveRecipeIngredientInventoryItem(tx *gorm.DB, businessID, 
 		BranchID:          branchID,
 		IngredientID:      recipeLine.IngredientID,
 		ItemType:          "ingredient",
-		CurrentQuantity:   0,
-		ReservedQuantity:  0,
-		AvailableQuantity: 0,
-		ReorderLevel:      ingredient.ReorderLevel,
+		CurrentQuantity:   money.Zero,
+		ReservedQuantity:  money.Zero,
+		AvailableQuantity: money.Zero,
+		ReorderLevel:      money.FromFloat(ingredient.ReorderLevel),
 		UnitID:            ingredient.UnitID,
 		IsExpiryTracked:   ingredient.IsExpiryTracked,
 		Status:            "active",
@@ -1091,7 +1092,7 @@ func (s *Service) findOrCreateProductInventoryItem(tx *gorm.DB, businessID, bran
 		return nil, apperrors.BadRequest("product variant must be active", nil)
 	}
 	productIDPtr := productID
-	item = &inventory.InventoryItem{ID: utils.NewUUID(), BusinessID: businessID, BranchID: branchID, ProductID: &productIDPtr, ProductVariantID: productVariantID, ItemType: itemType, CurrentQuantity: 0, ReservedQuantity: 0, AvailableQuantity: 0, ReorderLevel: 0, UnitID: unitID, IsExpiryTracked: product.IsExpiryTracked, Status: "active"}
+	item = &inventory.InventoryItem{ID: utils.NewUUID(), BusinessID: businessID, BranchID: branchID, ProductID: &productIDPtr, ProductVariantID: productVariantID, ItemType: itemType, CurrentQuantity: money.Zero, ReservedQuantity: money.Zero, AvailableQuantity: money.Zero, ReorderLevel: money.Zero, UnitID: unitID, IsExpiryTracked: product.IsExpiryTracked, Status: "active"}
 	if err := s.inventoryRepo.CreateInventoryItem(tx, item); err != nil {
 		return nil, err
 	}
@@ -1278,8 +1279,8 @@ func (s *Service) previewIngredientLines(businessID, branchID, recipeID string, 
 		available := 0.0
 		unitCost := line.UnitCostSnapshot
 		if item != nil {
-			available = item.AvailableQuantity
-			unitCost = item.AverageUnitCost
+			available = item.AvailableQuantity.Float64()
+			unitCost = item.AverageUnitCost.Float64()
 		}
 		if productName == "" {
 			productName = line.ItemNameSnapshot
@@ -1316,8 +1317,8 @@ func (s *Service) previewPackagingLines(businessID, branchID, recipeID string, r
 		available := 0.0
 		unitCost := line.UnitCostSnapshot
 		if item != nil {
-			available = item.AvailableQuantity
-			unitCost = item.AverageUnitCost
+			available = item.AvailableQuantity.Float64()
+			unitCost = item.AverageUnitCost.Float64()
 		}
 		if productName == "" {
 			productName = line.PackagingNameSnapshot
@@ -1399,11 +1400,11 @@ func (s *Service) validateProductionHasValuedInputs(tx *gorm.DB, businessID, bra
 		if item.BranchID != branchID || item.Status != "active" {
 			return apperrors.BadRequest("component inventory item must be active and belong to the production branch", map[string]interface{}{"reason": "component_inventory_invalid", "line_id": line.ID, "item_name": line.ItemNameSnapshot, "branch_id": branchID, "inventory_item_id": line.InventoryItemID})
 		}
-		if item.AvailableQuantity < requiredQuantity {
+		if item.AvailableQuantity.LessThan(money.FromFloat(requiredQuantity)) {
 			stockShortages = append(stockShortages, map[string]interface{}{"line_id": line.ID, "item_name": line.ItemNameSnapshot, "required_quantity": requiredQuantity, "available_quantity": item.AvailableQuantity})
 			continue
 		}
-		if item.AverageUnitCost <= 0 {
+		if !item.AverageUnitCost.IsPositive() {
 			zeroCostLines = append(zeroCostLines, line.ItemNameSnapshot)
 		}
 	}
@@ -1422,11 +1423,11 @@ func (s *Service) validateProductionHasValuedInputs(tx *gorm.DB, businessID, bra
 		if item.BranchID != branchID || item.Status != "active" {
 			return apperrors.BadRequest("packaging inventory item must be active and belong to the production branch", map[string]interface{}{"reason": "packaging_inventory_invalid", "line_id": line.ID, "item_name": line.PackagingNameSnapshot, "branch_id": branchID, "inventory_item_id": *line.InventoryItemID})
 		}
-		if item.AvailableQuantity < line.ActualQuantity {
+		if item.AvailableQuantity.LessThan(money.FromFloat(line.ActualQuantity)) {
 			stockShortages = append(stockShortages, map[string]interface{}{"line_id": line.ID, "item_name": line.PackagingNameSnapshot, "required_quantity": line.ActualQuantity, "available_quantity": item.AvailableQuantity})
 			continue
 		}
-		if item.AverageUnitCost <= 0 {
+		if !item.AverageUnitCost.IsPositive() {
 			zeroCostLines = append(zeroCostLines, line.PackagingNameSnapshot)
 		}
 	}

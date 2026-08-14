@@ -2,6 +2,7 @@ package packaging
 
 import (
 	"errors"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -395,15 +396,13 @@ func (s *Service) ensureInventoryItem(tx *gorm.DB, item *PackagingItem) error {
 		BranchID:          item.BranchID,
 		PackagingItemID:   &item.ID,
 		ItemType:          "packaging",
-		CurrentQuantity:   0,
-		ReservedQuantity:  0,
-		AvailableQuantity: 0,
-		// The inventory module still carries quantities as float64; it
-		// converts in a later step of this migration (Phase 6 / W4).
-		ReorderLevel:    item.ReorderLevel.Float64(),
-		UnitID:          item.UnitID,
-		IsExpiryTracked: false,
-		Status:          "active",
+		CurrentQuantity:   money.Zero,
+		ReservedQuantity:  money.Zero,
+		AvailableQuantity: money.Zero,
+		ReorderLevel:      item.ReorderLevel,
+		UnitID:            item.UnitID,
+		IsExpiryTracked:   false,
+		Status:            "active",
 	}
 	return s.inventoryRepo.CreateInventoryItem(tx, inventoryItem)
 }

@@ -3,6 +3,7 @@ package inventory
 import (
 	"errors"
 	"log"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -388,7 +389,7 @@ func (s *Service) GetInventoryItemLocationBalances(currentUser *utils.AuthContex
 		ItemType:            item.ItemType,
 		BranchID:            item.BranchID,
 		BranchName:          branchName,
-		BranchTotalQuantity: roundQuantity(item.CurrentQuantity),
+		BranchTotalQuantity: item.CurrentQuantity.Round4(),
 		Locations:           locations,
 	}, nil
 }
@@ -503,7 +504,7 @@ func (s *Service) CompleteStockTransfer(currentUser *utils.AuthContext, id, ipAd
 		if err != nil {
 			return mapNotFound(err, "source location has no stock balance")
 		}
-		if source.AvailableQuantity < transfer.Quantity {
+		if source.AvailableQuantity.LessThan(transfer.Quantity) {
 			return apperrors.BadRequest("source location has insufficient available stock", nil)
 		}
 		target, err := s.repo.FindLocationBalanceForUpdate(tx, currentUser.BusinessID, transfer.InventoryItemID, transfer.ToStockLocationID)
@@ -514,9 +515,9 @@ func (s *Service) CompleteStockTransfer(currentUser *utils.AuthContext, id, ipAd
 				BranchID:          transfer.BranchID,
 				InventoryItemID:   transfer.InventoryItemID,
 				StockLocationID:   transfer.ToStockLocationID,
-				CurrentQuantity:   0,
-				ReservedQuantity:  0,
-				AvailableQuantity: 0,
+				CurrentQuantity:   money.Zero,
+				ReservedQuantity:  money.Zero,
+				AvailableQuantity: money.Zero,
 			}
 			if err := s.repo.CreateLocationBalance(tx, target); err != nil {
 				return err
@@ -524,10 +525,10 @@ func (s *Service) CompleteStockTransfer(currentUser *utils.AuthContext, id, ipAd
 		} else if err != nil {
 			return err
 		}
-		source.CurrentQuantity = roundQuantity(source.CurrentQuantity - transfer.Quantity)
-		source.AvailableQuantity = roundQuantity(source.CurrentQuantity - source.ReservedQuantity)
-		target.CurrentQuantity = roundQuantity(target.CurrentQuantity + transfer.Quantity)
-		target.AvailableQuantity = roundQuantity(target.CurrentQuantity - target.ReservedQuantity)
+		source.CurrentQuantity = source.CurrentQuantity.Sub(transfer.Quantity).Round4()
+		source.AvailableQuantity = source.CurrentQuantity.Sub(source.ReservedQuantity).Round4()
+		target.CurrentQuantity = target.CurrentQuantity.Add(transfer.Quantity).Round4()
+		target.AvailableQuantity = target.CurrentQuantity.Sub(target.ReservedQuantity).Round4()
 		if err := s.repo.UpdateLocationBalance(tx, source); err != nil {
 			return err
 		}
@@ -645,9 +646,9 @@ func (s *Service) CreateOpeningStock(currentUser *utils.AuthContext, req Opening
 				ProductID:         nullableString(req.ProductID),
 				ProductVariantID:  nullableString(req.ProductVariantID),
 				ItemType:          req.ItemType,
-				CurrentQuantity:   0,
-				ReservedQuantity:  0,
-				AvailableQuantity: 0,
+				CurrentQuantity:   money.Zero,
+				ReservedQuantity:  money.Zero,
+				AvailableQuantity: money.Zero,
 				ReorderLevel:      req.ReorderLevel,
 				UnitID:            req.UnitID,
 				IsExpiryTracked:   req.IsExpiryTracked,
@@ -690,7 +691,7 @@ func (s *Service) CreateOpeningStock(currentUser *utils.AuthContext, req Opening
 			}
 		}
 		item.CurrentQuantity = movement.AfterQuantity
-		item.AvailableQuantity = movement.AfterQuantity - item.ReservedQuantity
+		item.AvailableQuantity = movement.AfterQuantity.Sub(item.ReservedQuantity)
 		if req.ExpiryDate != "" {
 			expiryDate, err := parseDate(req.ExpiryDate, "expiry_date")
 			if err != nil {
@@ -724,7 +725,7 @@ func (s *Service) CreateOpeningStock(currentUser *utils.AuthContext, req Opening
 }
 
 func (s *Service) AdjustStock(currentUser *utils.AuthContext, id string, req AdjustStockRequest, ipAddress, userAgent string) (*InventoryItemResponse, error) {
-	if req.Quantity <= 0 {
+	if !req.Quantity.IsPositive() {
 		return nil, apperrors.BadRequest("quantity must be greater than zero", nil)
 	}
 	if req.AdjustmentType != "increase" && req.AdjustmentType != "decrease" {
@@ -780,7 +781,7 @@ func (s *Service) AdjustStock(currentUser *utils.AuthContext, id string, req Adj
 			}
 		}
 		item.CurrentQuantity = movement.AfterQuantity
-		item.AvailableQuantity = movement.AfterQuantity - item.ReservedQuantity
+		item.AvailableQuantity = movement.AfterQuantity.Sub(item.ReservedQuantity)
 		if err := s.auditStockMovement(tx, currentUser, "inventory.adjusted", movement.ID, "Inventory adjusted", ipAddress, userAgent); err != nil {
 			return err
 		}
@@ -892,7 +893,7 @@ func (s *Service) ManualStockMovement(currentUser *utils.AuthContext, req Manual
 	if !allowedManualMovementType(req.MovementType) {
 		return nil, apperrors.BadRequest("movement_type is not allowed for manual creation", nil)
 	}
-	if req.Quantity <= 0 {
+	if !req.Quantity.IsPositive() {
 		return nil, apperrors.BadRequest("quantity must be greater than zero", nil)
 	}
 	if strings.TrimSpace(req.Reason) == "" {
@@ -1115,7 +1116,7 @@ func (s *Service) ListExpiryBatches(currentUser *utils.AuthContext, inventoryIte
 }
 
 func (s *Service) CreateExpiryBatch(currentUser *utils.AuthContext, inventoryItemID string, req ExpiryBatchRequest, ipAddress, userAgent string) (*ExpiryBatchResponse, error) {
-	if req.Quantity <= 0 {
+	if !req.Quantity.IsPositive() {
 		return nil, apperrors.BadRequest("quantity must be greater than zero", nil)
 	}
 	receivedDate, err := parseDate(req.ReceivedDate, "received_date")
@@ -1179,7 +1180,7 @@ func (s *Service) UpdateExpiryBatch(currentUser *utils.AuthContext, batchID stri
 		updates["batch_number"] = strings.TrimSpace(*req.BatchNumber)
 	}
 	if req.Quantity != nil {
-		if *req.Quantity <= 0 {
+		if !req.Quantity.IsPositive() {
 			return nil, apperrors.BadRequest("quantity must be greater than zero", nil)
 		}
 		updates["quantity"] = *req.Quantity
@@ -1258,16 +1259,16 @@ func (s *Service) validateOpeningStock(businessID string, req OpeningStockReques
 	if !validOpeningStockItemType(req.ItemType) {
 		return apperrors.BadRequest("invalid item_type", nil)
 	}
-	if req.Quantity < 0 {
+	if req.Quantity.IsNegative() {
 		return apperrors.BadRequest("quantity must be greater than or equal to zero", nil)
 	}
-	if req.Quantity == 0 {
+	if req.Quantity.IsZero() {
 		return apperrors.BadRequest("quantity must be greater than zero for opening stock movement", nil)
 	}
-	if req.UnitCost <= 0 {
+	if !req.UnitCost.IsPositive() {
 		return apperrors.BadRequest("unit_cost must be greater than zero for opening stock valuation", nil)
 	}
-	if req.ReorderLevel < 0 {
+	if req.ReorderLevel.IsNegative() {
 		return apperrors.BadRequest("reorder_level must be greater than or equal to zero", nil)
 	}
 	if err := validateUUID(req.BranchID, "branch_id"); err != nil {
@@ -1320,7 +1321,7 @@ func (s *Service) validateOpeningStock(businessID string, req OpeningStockReques
 }
 
 func (s *Service) ApplyMovement(tx *gorm.DB, input ApplyStockMovementInput) (*StockMovement, error) {
-	if input.Quantity <= 0 {
+	if !input.Quantity.IsPositive() {
 		return nil, apperrors.BadRequest("quantity must be greater than zero", nil)
 	}
 	direction, err := movementDirection(input.MovementType)
@@ -1341,21 +1342,21 @@ func (s *Service) ApplyMovement(tx *gorm.DB, input ApplyStockMovementInput) (*St
 	after := before
 	switch direction {
 	case "in":
-		after = before + input.Quantity
+		after = before.Add(input.Quantity)
 	case "out":
-		after = before - input.Quantity
+		after = before.Sub(input.Quantity)
 	case "neutral":
 		after = before
 	}
-	if after < 0 {
+	if after.IsNegative() {
 		return nil, apperrors.BadRequest("stock cannot go below zero", nil)
 	}
-	available := after - item.ReservedQuantity
-	if available < 0 {
+	available := after.Sub(item.ReservedQuantity)
+	if available.IsNegative() {
 		return nil, apperrors.BadRequest("available stock cannot go below zero", nil)
 	}
 	effectiveUnitCost := input.UnitCost
-	if direction == "out" && effectiveUnitCost <= 0 && item.AverageUnitCost <= 0 &&
+	if direction == "out" && !effectiveUnitCost.IsPositive() && !item.AverageUnitCost.IsPositive() &&
 		(item.ItemType == "product" || item.ItemType == "product_variant") && item.ProductID != nil {
 		// The item has no cost history (never received via purchase, production,
 		// or valued opening stock), so the movement would be recorded at zero
@@ -1366,9 +1367,9 @@ func (s *Service) ApplyMovement(tx *gorm.DB, input ApplyStockMovementInput) (*St
 		if basisErr != nil {
 			log.Printf("inventory: cost-basis lookup failed for %s movement (business_id=%s inventory_item_id=%s): %v",
 				input.MovementType, item.BusinessID, item.ID, basisErr)
-		} else if resolved := outboundUnitCostBasis(input.UnitCost, item.AverageUnitCost, basis); resolved > 0 {
+		} else if resolved := outboundUnitCostBasis(input.UnitCost, item.AverageUnitCost, basis); resolved.IsPositive() {
 			effectiveUnitCost = resolved
-			log.Printf("inventory: using product cost_price fallback for zero-cost %s movement (business_id=%s inventory_item_id=%s unit_cost=%.4f)",
+			log.Printf("inventory: using product cost_price fallback for zero-cost %s movement (business_id=%s inventory_item_id=%s unit_cost=%s)",
 				input.MovementType, item.BusinessID, item.ID, resolved)
 		}
 	}
@@ -1438,7 +1439,7 @@ func (s *Service) resolveMovementStockLocation(tx *gorm.DB, item *InventoryItem,
 	return &locationID, nil
 }
 
-func (s *Service) applyLocationMovement(tx *gorm.DB, item *InventoryItem, stockLocationID *string, direction string, quantity float64) error {
+func (s *Service) applyLocationMovement(tx *gorm.DB, item *InventoryItem, stockLocationID *string, direction string, quantity money.Amount) error {
 	if stockLocationID == nil || direction == "neutral" || direction == "transfer" {
 		return nil
 	}
@@ -1453,9 +1454,9 @@ func (s *Service) applyLocationMovement(tx *gorm.DB, item *InventoryItem, stockL
 			BranchID:          item.BranchID,
 			InventoryItemID:   item.ID,
 			StockLocationID:   *stockLocationID,
-			CurrentQuantity:   0,
-			ReservedQuantity:  0,
-			AvailableQuantity: 0,
+			CurrentQuantity:   money.Zero,
+			ReservedQuantity:  money.Zero,
+			AvailableQuantity: money.Zero,
 		}
 		if err := s.repo.CreateLocationBalance(tx, balance); err != nil {
 			return err
@@ -1465,15 +1466,15 @@ func (s *Service) applyLocationMovement(tx *gorm.DB, item *InventoryItem, stockL
 	}
 	switch direction {
 	case "in":
-		balance.CurrentQuantity = roundQuantity(balance.CurrentQuantity + quantity)
+		balance.CurrentQuantity = balance.CurrentQuantity.Add(quantity).Round4()
 	case "out":
-		if balance.AvailableQuantity < quantity {
+		if balance.AvailableQuantity.LessThan(quantity) {
 			return apperrors.BadRequest("stock location has insufficient available stock", nil)
 		}
-		balance.CurrentQuantity = roundQuantity(balance.CurrentQuantity - quantity)
+		balance.CurrentQuantity = balance.CurrentQuantity.Sub(quantity).Round4()
 	}
-	balance.AvailableQuantity = roundQuantity(balance.CurrentQuantity - balance.ReservedQuantity)
-	if balance.CurrentQuantity < 0 || balance.AvailableQuantity < 0 {
+	balance.AvailableQuantity = balance.CurrentQuantity.Sub(balance.ReservedQuantity).Round4()
+	if balance.CurrentQuantity.IsNegative() || balance.AvailableQuantity.IsNegative() {
 		return apperrors.BadRequest("stock location cannot go below zero", nil)
 	}
 	return s.repo.UpdateLocationBalance(tx, balance)
@@ -1672,51 +1673,60 @@ func movementDirection(movementType string) (string, error) {
 // outboundUnitCostBasis picks the unit cost for an outbound movement in
 // priority order: explicit input cost, then the item's weighted average, then
 // the product/variant master-data cost_price. Returns 0 when nothing applies.
-func outboundUnitCostBasis(inputUnitCost, averageUnitCost, productCostBasis float64) float64 {
-	if inputUnitCost > 0 {
+func outboundUnitCostBasis(inputUnitCost, averageUnitCost, productCostBasis money.Amount) money.Amount {
+	if inputUnitCost.IsPositive() {
 		return inputUnitCost
 	}
-	if averageUnitCost > 0 {
+	if averageUnitCost.IsPositive() {
 		return averageUnitCost
 	}
-	if productCostBasis > 0 {
+	if productCostBasis.IsPositive() {
 		return productCostBasis
 	}
-	return 0
+	return money.Zero
 }
 
-func calculateValuation(direction string, beforeQuantity, beforeValue, beforeAverageCost, quantity, inputUnitCost float64) (float64, float64, float64, float64) {
+// calculateValuation carries the weighted-average cost forward. It is the one
+// place in the codebase where a rounded result feeds back in as the basis for
+// the next computation, so float error here compounded across a movement
+// series rather than staying put -- which is the single strongest reason this
+// module holds exact decimals.
+//
+// The scales are deliberate and unchanged: values at two decimals, quantities
+// and unit costs at four, because unit costs are stored in NUMERIC(12,4) and
+// rounding a cost basis to cents would lose precision on every movement.
+func calculateValuation(direction string, beforeQuantity, beforeValue, beforeAverageCost, quantity, inputUnitCost money.Amount) (money.Amount, money.Amount, money.Amount, money.Amount) {
 	unitCost := inputUnitCost
-	if unitCost <= 0 {
+	if !unitCost.IsPositive() {
 		unitCost = beforeAverageCost
 	}
-	if unitCost < 0 {
-		unitCost = 0
+	if unitCost.IsNegative() {
+		unitCost = money.Zero
 	}
 	switch direction {
 	case "in":
-		totalCost := roundMoney(unitCost * quantity)
-		afterQuantity := roundQuantity(beforeQuantity + quantity)
-		afterValue := roundMoney(beforeValue + totalCost)
-		averageCost := 0.0
-		if afterQuantity > 0 {
-			averageCost = roundQuantity(afterValue / afterQuantity)
+		totalCost := unitCost.Mul(quantity).Round2()
+		afterQuantity := beforeQuantity.Add(quantity).Round4()
+		afterValue := beforeValue.Add(totalCost).Round2()
+		averageCost := money.Zero
+		if afterQuantity.IsPositive() {
+			averageCost = afterValue.Div(afterQuantity).Round4()
 		}
-		return roundQuantity(unitCost), totalCost, averageCost, afterValue
+		return unitCost.Round4(), totalCost, averageCost, afterValue
 	case "out":
-		totalCost := roundMoney(unitCost * quantity)
-		afterQuantity := roundQuantity(beforeQuantity - quantity)
-		afterValue := roundMoney(beforeValue - totalCost)
-		if afterValue < 0 {
-			afterValue = 0
+		totalCost := unitCost.Mul(quantity).Round2()
+		afterQuantity := beforeQuantity.Sub(quantity).Round4()
+		afterValue := beforeValue.Sub(totalCost).Round2()
+		if afterValue.IsNegative() {
+			afterValue = money.Zero
 		}
 		averageCost := beforeAverageCost
-		if afterQuantity <= 0 {
-			averageCost = 0
+		if !afterQuantity.IsPositive() {
+			averageCost = money.Zero
 		}
-		return roundQuantity(unitCost), totalCost, roundQuantity(averageCost), afterValue
+		return unitCost.Round4(), totalCost, averageCost.Round4(), afterValue
 	default:
-		return roundQuantity(unitCost), roundMoney(unitCost * quantity), roundQuantity(beforeAverageCost), roundMoney(beforeValue)
+		return unitCost.Round4(), unitCost.Mul(quantity).Round2(), beforeAverageCost.Round4(), beforeValue.Round2()
 	}
 }
 
@@ -1804,7 +1814,7 @@ func (s *Service) validateStockTransferRequest(currentUser *utils.AuthContext, r
 	if req.FromStockLocationID == req.ToStockLocationID {
 		return apperrors.BadRequest("source and target locations must be different", nil)
 	}
-	if req.Quantity <= 0 {
+	if !req.Quantity.IsPositive() {
 		return apperrors.BadRequest("quantity must be greater than zero", nil)
 	}
 	item, err := s.repo.FindInventoryItem(req.InventoryItemID, currentUser.BusinessID)
@@ -1912,7 +1922,7 @@ func toExpiryBatchResponse(batch ExpiryBatch) ExpiryBatchResponse {
 		BranchID:         batch.BranchID,
 		InventoryItemID:  batch.InventoryItemID,
 		BatchNumber:      batch.BatchNumber,
-		Quantity:         roundQuantity(batch.Quantity),
+		Quantity:         batch.Quantity.Round4(),
 		ExpiryDate:       batch.ExpiryDate,
 		ReceivedDate:     batch.ReceivedDate,
 		Status:           batch.Status,
@@ -1957,7 +1967,7 @@ func toExpiryAlertResponses(batches []expiryBatchAlertRow, today time.Time, stat
 			SupplierName:            batch.SupplierName,
 			PurchaseReferenceNumber: batch.PurchaseReferenceNumber,
 			BatchNumber:             batch.BatchNumber,
-			Quantity:                roundQuantity(batch.Quantity),
+			Quantity:                batch.Quantity.Round4(),
 			ExpiryDate:              batch.ExpiryDate,
 			ReceivedDate:            batch.ReceivedDate,
 			Status:                  batch.Status,
