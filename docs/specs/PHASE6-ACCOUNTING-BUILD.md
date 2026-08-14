@@ -230,6 +230,37 @@ Revert; `is_header` is additive and `parent_account_id` was already nullable and
 
 # W4 — float64 → decimal money
 
+> ## STOPPED BY DECISION, 2026-08-14. Do not restart without the owner asking for it.
+>
+> The remaining float64 → `money.Amount` type conversion (936 sites on the
+> ledger critical path, 135 more for tidiness, ~7-9 focused sessions) is
+> **cancelled**. It is not blocked or deferred pending anything; the owner
+> decided the cost outweighs the remaining benefit.
+>
+> **Why this is a defensible stop, not a shortcut:** the money errors that
+> actually reached customers came from the *arithmetic*, not the storage type,
+> and those were fixed at source (see Progress below) — VAT derivation, POS
+> percentage discounts, and refund tax proration now compute in exact decimals
+> behind unchanged float64 signatures. A 1,000,000-combination sweep that
+> previously found ~2% wrong-fils results is clean.
+>
+> **What consciously stays, and must not be flagged as debt:**
+> `absorbRoundingResidue` and `systemBalanceEpsilon` (accounting/service.go),
+> `ledgerDriftEpsilon` (reports/ledger_drift.go) and the ~22 inline tolerance
+> literals remain **by design**. They are the accommodation for float storage,
+> and float storage is now the accepted end state.
+>
+> **What stays because it is load-bearing and already paid for:**
+> `internal/shared/money` (single rounding implementation + the `Amount` type),
+> the 7 converted modules (inventory, customers, suppliers, expenses,
+> packaging, ingredients, audit), the guard test banning re-implemented
+> rounding, and the `internal/testsupport/testdb` harness. None of that is
+> reverted — it works, and later work depends on it.
+>
+> The plan below is retained only as a record of what a restart would involve.
+
+
+
 **Recommended as its own phase with a dedicated QA window. Specified here so the decision is documented.**
 
 ## Context
