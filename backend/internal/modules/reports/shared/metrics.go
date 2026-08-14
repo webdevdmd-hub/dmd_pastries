@@ -1,7 +1,7 @@
 package shared
 
 import (
-	"math"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -693,6 +693,4 @@ func addConsistencyBranchFilter(query string, args []interface{}, scope MetricSc
 	return query, args
 }
 
-func roundMetricMoney(value float64) float64 {
-	return math.Round(value*100) / 100
-}
+func roundMetricMoney(value float64) float64 { return money.Round2(value) }

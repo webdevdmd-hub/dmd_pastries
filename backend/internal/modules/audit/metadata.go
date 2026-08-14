@@ -1,10 +1,11 @@
 package audit
 
 import (
-	"math"
 	"reflect"
 	"strings"
 	"time"
+
+	"pastries-pos/internal/shared/money"
 )
 
 type AuditChange struct {
@@ -109,10 +110,15 @@ func auditDisplayValue(value interface{}) interface{} {
 			return nil
 		}
 		return typed.UTC().Format(time.RFC3339)
+	// Amounts reach audit metadata as bare floats through reflection. When
+	// money becomes a decimal type (Phase 6 / W4) this switch stops matching
+	// it and silently drops the normalisation, so it needs a decimal case at
+	// that point -- it is the one place the type change is invisible to the
+	// compiler.
 	case float64:
-		return math.Round(typed*10000) / 10000
+		return money.Round4(typed)
 	case float32:
-		return math.Round(float64(typed)*10000) / 10000
+		return money.Round4(float64(typed))
 	case string:
 		return strings.TrimSpace(typed)
 	default:

@@ -3,6 +3,7 @@ package pos
 import (
 	"fmt"
 	"math"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -1724,9 +1725,7 @@ func proportionalAmount(total, part, base float64) float64 {
 	return roundMoney(total * part / base)
 }
 
-func roundMoney(value float64) float64 {
-	return math.Round(value*100) / 100
-}
+func roundMoney(value float64) float64 { return money.Round2(value) }
 
 func rollbackIfOpen(tx *gorm.DB) {
 	if tx != nil {

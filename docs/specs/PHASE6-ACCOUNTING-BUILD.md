@@ -242,8 +242,18 @@ Open decision §6. Money is `float64` in Go against `NUMERIC(14,4)` operational 
 - Frontend risk: `numberValue()` is duplicated in **16 files** with 333 call sites, each falling back to `0` for a non-number. String-serialized money would silently zero every figure with no error anywhere.
 - Genuine pre-existing bugs this migration should fix: `inventory/service.go:1703` divides money by quantity and rounds with the **quantity** helper (4dp) before storing it back as the cost basis, compounding error across movements; `accounting/service.go:1144` gates a user-facing 400 on an exact float `!=`.
 
-## Proposed change
-1. **`backend/internal/shared/money`** wrapping `shopspring/decimal`: `Money`, `Round2`, `Round4`, `Zero`, `FromString`. Delete the 18+9 duplicated helpers as each module converts.
+## Progress
+
+**Step 1 is DONE.** `backend/internal/shared/money` exists and every module routes through it: the 18 `roundMoney` copies, the 9 `roundQuantity` copies, the 5 differently-named variants (`roundCustomerMoney`, `roundDashboardMoney`, `roundExpenseMoney`, `roundMetricMoney`, `roundSupplierMoney`) and the reflection-based rounding in `audit/metadata.go` now delegate to `money.Round2`/`money.Round4`. Each module keeps its local name, so no call site changed and no figure moved — the package reproduces `math.Round` exactly, pinned by test. A guard test (`internal/shared/money/no_local_copies_test.go`) fails the build if a module reimplements the rounding.
+
+This means the type swap in the remaining steps changes **this package and the struct fields**, not ~934 call sites across 94 files.
+
+Also fixed en route: the platform-settlement balance check compared a rounded left side against raw request input with `!=`, which rejected settlements that balance to the cent. It now uses `money.Equal`.
+
+**Corrected finding:** the scoping report called `inventory/service.go` weighted-average costing a precision bug for rounding a money-per-unit value with the 4-decimal helper. On inspection that is correct, not a bug — unit costs are stored in `NUMERIC(12,4)`, and rounding a cost basis to cents would compound error through a movement series rather than contain it. `money.Round4` documents this. **No costing change was made**, and none should be made without a data comparison.
+
+## Remaining change
+1. ~~**`backend/internal/shared/money`**~~ — done (float-backed). Next: add `shopspring/decimal` and introduce the `Money` type here; the package is already the only seam.
 2. **`decimal.MarshalJSONWithoutQuotes = true` in `cmd/api/main.go`** — pins the wire format identical to today so the frontend needs zero changes. Golden-JSON test per module asserting byte-identical payloads. This is the highest-leverage step in the plan.
 3. Convert **module by module**: leaf modules (charges, expenses, ingredients, packaging, customers, suppliers, dashboard) → inventory + products/pricing (fixing the `:1703` bug) → transactional bulk (pos, salesreturns, bakeryorders, payments, purchasing, manufacturing, recipes) → accounting → reports/shared + audit.
 4. **Quantities convert too**, in the same pass. Keeping them `float64` forces a conversion at ~170 mixed-arithmetic sites and reintroduces float error at exactly the `unit_cost × quantity` multiplication that matters.

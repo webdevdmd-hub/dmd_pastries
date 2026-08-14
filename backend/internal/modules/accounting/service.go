@@ -3,6 +3,7 @@ package accounting
 import (
 	"log"
 	"math"
+	"pastries-pos/internal/shared/money"
 	"sort"
 	"strings"
 	"time"
@@ -1142,7 +1143,11 @@ func (s *Service) CreatePlatformSettlement(currentUser *utils.AuthContext, req C
 	if err != nil {
 		return nil, err
 	}
-	if roundMoney(netReceived+deductionsTotal) != grossAmount {
+	// Compared with a tolerance, not ==. The left side is rounded and the
+	// right side is raw request input, and the deductions total is itself
+	// built by rounding each line as it accumulates, so an exact comparison
+	// rejected settlements that balance to the cent.
+	if !money.Equal(netReceived+deductionsTotal, grossAmount) {
 		return nil, apperrors.BadRequest("net_received_amount plus deductions must equal gross_amount", map[string]interface{}{"gross_amount": grossAmount, "net_received_amount": netReceived, "deductions_total": deductionsTotal})
 	}
 	var createdID string

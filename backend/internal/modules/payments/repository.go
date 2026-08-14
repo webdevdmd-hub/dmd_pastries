@@ -2,6 +2,7 @@ package payments
 
 import (
 	"math"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -696,9 +697,7 @@ func totalPages(total int64, limit int) int {
 	return int(math.Ceil(float64(total) / float64(limit)))
 }
 
-func roundMoney(value float64) float64 {
-	return math.Round(value*100) / 100
-}
+func roundMoney(value float64) float64 { return money.Round2(value) }
 
 func (row paymentScanRow) toResponse() PaymentResponse {
 	paymentID := row.PaymentID

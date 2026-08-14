@@ -2,7 +2,7 @@ package products
 
 import (
 	"database/sql"
-	"math"
+	"pastries-pos/internal/shared/money"
 	"strconv"
 	"strings"
 	"time"
@@ -810,13 +810,9 @@ func normalizePricingType(value string) string {
 	}
 }
 
-func roundMoney(value float64) float64 {
-	return math.Round(value*100) / 100
-}
+func roundMoney(value float64) float64 { return money.Round2(value) }
 
-func roundQuantity(value float64) float64 {
-	return math.Round(value*10000) / 10000
-}
+func roundQuantity(value float64) float64 { return money.Round4(value) }
 
 func validatePreparationTime(value *int) error {
 	if value != nil && *value < 0 {

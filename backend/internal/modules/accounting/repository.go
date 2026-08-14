@@ -3,6 +3,7 @@ package accounting
 import (
 	"fmt"
 	"math"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -3756,6 +3757,4 @@ func toJournalEntryResponse(entry JournalEntry, branchName string) JournalEntryR
 	}
 }
 
-func roundMoney(value float64) float64 {
-	return math.Round(value*100) / 100
-}
+func roundMoney(value float64) float64 { return money.Round2(value) }

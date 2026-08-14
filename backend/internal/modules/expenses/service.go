@@ -3,6 +3,7 @@ package expenses
 import (
 	"errors"
 	"math"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -690,9 +691,7 @@ func normalizePositive(value, fallback int) int {
 	return value
 }
 
-func roundMoney(value float64) float64 {
-	return math.Round(value*100) / 100
-}
+func roundMoney(value float64) float64 { return money.Round2(value) }
 
 func sameDate(left, right time.Time) bool {
 	return left.Format("2006-01-02") == right.Format("2006-01-02")
@@ -715,6 +714,4 @@ func mapNotFound(err error, message string) error {
 
 // roundExpenseMoney matches the ledger's two-decimal precision, so the header
 // totals and the two lines cannot disagree.
-func roundExpenseMoney(value float64) float64 {
-	return math.Round(value*100) / 100
-}
+func roundExpenseMoney(value float64) float64 { return money.Round2(value) }

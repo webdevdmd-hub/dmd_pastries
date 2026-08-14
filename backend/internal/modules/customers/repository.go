@@ -3,6 +3,7 @@ package customers
 import (
 	"fmt"
 	"math"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -599,6 +600,4 @@ func uniqueStrings(values []string) []string {
 	return result
 }
 
-func roundCustomerMoney(value float64) float64 {
-	return math.Round(value*100) / 100
-}
+func roundCustomerMoney(value float64) float64 { return money.Round2(value) }

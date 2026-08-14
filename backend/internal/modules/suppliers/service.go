@@ -1,7 +1,7 @@
 package suppliers
 
 import (
-	"math"
+	"pastries-pos/internal/shared/money"
 	"regexp"
 	"strings"
 	"time"
@@ -560,9 +560,7 @@ func validSupplierStatementTransactionType(value string) bool {
 	return value == "bill" || value == "payment_made" || value == "vendor_credit"
 }
 
-func roundSupplierMoney(value float64) float64 {
-	return math.Round(value*100) / 100
-}
+func roundSupplierMoney(value float64) float64 { return money.Round2(value) }
 
 func setString(updates map[string]interface{}, key, value string) {
 	if strings.TrimSpace(value) != "" {

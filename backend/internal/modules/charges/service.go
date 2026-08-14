@@ -1,7 +1,7 @@
 package charges
 
 import (
-	"math"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -259,6 +259,4 @@ func calculateTax(amount, rate float64, inclusive bool) float64 {
 	return roundMoney(amount * rate / 100)
 }
 
-func roundMoney(value float64) float64 {
-	return math.Round(value*100) / 100
-}
+func roundMoney(value float64) float64 { return money.Round2(value) }

@@ -1,7 +1,7 @@
 package dashboard
 
 import (
-	"math"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -406,6 +406,4 @@ func dashboardMetricScope(scope Scope) reportshared.MetricScope {
 	}
 }
 
-func roundDashboardMoney(value float64) float64 {
-	return math.Round(value*100) / 100
-}
+func roundDashboardMoney(value float64) float64 { return money.Round2(value) }

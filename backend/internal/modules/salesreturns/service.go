@@ -3,6 +3,7 @@ package salesreturns
 import (
 	"errors"
 	"math"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -988,13 +989,9 @@ func normalizeLimit(value int) int {
 	return value
 }
 
-func roundMoney(value float64) float64 {
-	return math.Round(value*100) / 100
-}
+func roundMoney(value float64) float64 { return money.Round2(value) }
 
-func roundQuantity(value float64) float64 {
-	return math.Round(value*10000) / 10000
-}
+func roundQuantity(value float64) float64 { return money.Round4(value) }
 
 func (s *Service) saleStockMovementUnitCost(tx *gorm.DB, businessID, saleID, inventoryItemID string) (float64, error) {
 	var unitCost float64

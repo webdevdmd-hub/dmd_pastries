@@ -3,7 +3,7 @@ package reports
 import (
 	"errors"
 	"fmt"
-	"math"
+	"pastries-pos/internal/shared/money"
 	"strconv"
 	"strings"
 	"time"
@@ -3887,6 +3887,4 @@ func fmtFloat(value float64) string {
 	return strconv.FormatFloat(value, 'f', 2, 64)
 }
 
-func roundMoney(value float64) float64 {
-	return math.Round(value*100) / 100
-}
+func roundMoney(value float64) float64 { return money.Round2(value) }

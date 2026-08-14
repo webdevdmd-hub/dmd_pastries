@@ -3,6 +3,7 @@ package purchasing
 import (
 	"fmt"
 	"math"
+	"pastries-pos/internal/shared/money"
 	"strings"
 	"time"
 
@@ -1697,13 +1698,9 @@ func totalPages(total int64, limit int) int {
 	return int(math.Ceil(float64(total) / float64(limit)))
 }
 
-func roundMoney(value float64) float64 {
-	return math.Round(value*100) / 100
-}
+func roundMoney(value float64) float64 { return money.Round2(value) }
 
-func roundQuantity(value float64) float64 {
-	return math.Round(value*10000) / 10000
-}
+func roundQuantity(value float64) float64 { return money.Round4(value) }
 
 type TaxRateInfo struct {
 	ID             string
