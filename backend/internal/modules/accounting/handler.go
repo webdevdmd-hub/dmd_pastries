@@ -105,6 +105,52 @@ func (h *Handler) UpdatePeriodLock(c *gin.Context) {
 	response.Success(c, 200, "accounting period lock updated successfully", result)
 }
 
+func (h *Handler) ListFinancialYears(c *gin.Context) {
+	result, err := h.service.ListFinancialYears(utils.MustAuthContext(c))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "financial years fetched successfully", result)
+}
+
+func (h *Handler) PreviewYearEndClose(c *gin.Context) {
+	result, err := h.service.PreviewYearEndClose(utils.MustAuthContext(c), c.Query("financial_year_end_date"))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "year-end close preview generated successfully", result)
+}
+
+func (h *Handler) CloseFinancialYear(c *gin.Context) {
+	var req CloseFinancialYearRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.CloseFinancialYear(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "financial year closed successfully", result)
+}
+
+func (h *Handler) ReopenFinancialYear(c *gin.Context) {
+	var req CloseFinancialYearRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+	result, err := h.service.ReopenFinancialYear(utils.MustAuthContext(c), req, c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "financial year reopened successfully", result)
+}
+
 func (h *Handler) BackfillJournals(c *gin.Context) {
 	var req BackfillJournalsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

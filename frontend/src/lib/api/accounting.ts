@@ -30,6 +30,7 @@ import type {
   ChartAccountsResponse,
   CreateChartAccountPayload,
   CreateJournalEntryPayload,
+  FinancialYear,
   GeneralLedgerFilters,
   GeneralLedgerItem,
   GeneralLedgerResponse,
@@ -65,6 +66,9 @@ import type {
   UpdateChartAccountStatusPayload,
   UpdateJournalEntryPayload,
   UpdatePeriodLockPayload,
+  YearEndCloseBranch,
+  YearEndClosePreview,
+  YearEndCloseResult,
 } from "@/types/accounting";
 
 type BackendListResponse = {
@@ -1395,6 +1399,136 @@ export async function updatePeriodLock(
     method: "PUT",
     parse: parseAccountingSettings,
   });
+
+  return response.data;
+}
+
+function parseYearEndCloseBranch(value: unknown): YearEndCloseBranch {
+  if (!isObject(value)) {
+    throw new Error("Backend year-end close branch payload is invalid.");
+  }
+
+  return {
+    branchId: stringValue(value.branch_id),
+    branchName: stringValue(value.branch_name),
+    journalEntryId: stringValue(value.journal_entry_id),
+    entryNumber: stringValue(value.entry_number),
+    netProfit: numberValue(value.net_profit, 0),
+  };
+}
+
+function parseFinancialYear(value: unknown): FinancialYear {
+  if (!isObject(value)) {
+    throw new Error("Backend financial year payload is invalid.");
+  }
+
+  const status = stringValue(value.status, "open");
+
+  return {
+    financialYearStart: stringValue(value.financial_year_start),
+    financialYearEnd: stringValue(value.financial_year_end),
+    status:
+      status === "closed" || status === "current" ? (status) : "open",
+    branches: Array.isArray(value.branches) ? value.branches.map(parseYearEndCloseBranch) : [],
+  };
+}
+
+function parseFinancialYears(value: unknown): FinancialYear[] {
+  if (!isObject(value)) {
+    throw new Error("Backend financial years payload is invalid.");
+  }
+
+  return Array.isArray(value.items) ? value.items.map(parseFinancialYear) : [];
+}
+
+function parseYearEndClosePreview(value: unknown): YearEndClosePreview {
+  if (!isObject(value)) {
+    throw new Error("Backend year-end close preview payload is invalid.");
+  }
+
+  return {
+    financialYearStart: stringValue(value.financial_year_start),
+    financialYearEnd: stringValue(value.financial_year_end),
+    branches: Array.isArray(value.branches)
+      ? value.branches.map((branch: unknown) => {
+          if (!isObject(branch)) {
+            throw new Error("Backend year-end close preview branch payload is invalid.");
+          }
+
+          return {
+            branchId: stringValue(branch.branch_id),
+            branchName: stringValue(branch.branch_name),
+            netProfit: numberValue(branch.net_profit, 0),
+            lineCount: numberValue(branch.line_count, 0),
+          };
+        })
+      : [],
+  };
+}
+
+function parseYearEndCloseResult(value: unknown): YearEndCloseResult {
+  if (!isObject(value)) {
+    throw new Error("Backend year-end close payload is invalid.");
+  }
+
+  return {
+    financialYearStart: stringValue(value.financial_year_start),
+    financialYearEnd: stringValue(value.financial_year_end),
+    branches: Array.isArray(value.branches) ? value.branches.map(parseYearEndCloseBranch) : [],
+  };
+}
+
+export async function getFinancialYears(): Promise<FinancialYear[]> {
+  const response = await apiRequest<FinancialYear[]>("/api/v1/accounting/year-end-close", {
+    authMode: "appwrite",
+    parse: parseFinancialYears,
+  });
+
+  return response.data;
+}
+
+export async function getYearEndClosePreview(
+  financialYearEndDate: string,
+): Promise<YearEndClosePreview> {
+  const response = await apiRequest<YearEndClosePreview>(
+    `/api/v1/accounting/year-end-close/preview?financial_year_end_date=${encodeURIComponent(financialYearEndDate)}`,
+    {
+      authMode: "appwrite",
+      parse: parseYearEndClosePreview,
+    },
+  );
+
+  return response.data;
+}
+
+export async function closeFinancialYear(
+  financialYearEndDate: string,
+): Promise<YearEndCloseResult> {
+  const response = await apiRequest<YearEndCloseResult, { financial_year_end_date: string }>(
+    "/api/v1/accounting/year-end-close",
+    {
+      authMode: "appwrite",
+      body: { financial_year_end_date: financialYearEndDate },
+      method: "POST",
+      parse: parseYearEndCloseResult,
+    },
+  );
+
+  return response.data;
+}
+
+export async function reopenFinancialYear(
+  financialYearEndDate: string,
+): Promise<YearEndCloseResult> {
+  const response = await apiRequest<YearEndCloseResult, { financial_year_end_date: string }>(
+    "/api/v1/accounting/year-end-close/reopen",
+    {
+      authMode: "appwrite",
+      body: { financial_year_end_date: financialYearEndDate },
+      method: "POST",
+      parse: parseYearEndCloseResult,
+    },
+  );
 
   return response.data;
 }

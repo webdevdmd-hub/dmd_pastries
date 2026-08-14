@@ -57,6 +57,7 @@ const (
 	SourceAccountTransfer            = "account_transfer"
 	SourcePlatformSettlement         = "platform_settlement"
 	SourcePaymentAccount             = "payment_account"
+	SourceYearEndClose               = "year_end_close"
 )
 
 // ReversalContract declares how the financial effect of a posting
@@ -109,6 +110,7 @@ var reversalContracts = map[string]ReversalContract{
 	SourceAccountTransfer:       {Rationale: "a wrong transfer is corrected by a counter-transfer"},
 	SourcePlatformSettlement:    {Rationale: "a wrong settlement is corrected with a manual journal reversal until a dedicated reversal flow ships"},
 	SourcePaymentAccount:        {Rationale: "opening-balance entry; corrected by editing the opening balance, which reposts"},
+	SourceYearEndClose:          {Rationale: "a closed year is reopened by soft-deleting its close journal, which frees the idempotency slot for re-closing; reversing instead would occupy that slot forever"},
 }
 
 // RefundChargeSlice is one document charge's share of a refund, debited to

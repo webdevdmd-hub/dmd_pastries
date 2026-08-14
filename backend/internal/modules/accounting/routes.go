@@ -35,6 +35,11 @@ func RegisterRoutes(
 	group.PATCH("/settings", manage, handler.UpdateAccountingSettings)
 	group.PUT("/period-lock", periodLock, handler.UpdatePeriodLock)
 
+	group.GET("/year-end-close", view, handler.ListFinancialYears)
+	group.GET("/year-end-close/preview", view, handler.PreviewYearEndClose)
+	group.POST("/year-end-close", periodLock, handler.CloseFinancialYear)
+	group.POST("/year-end-close/reopen", periodLock, handler.ReopenFinancialYear)
+
 	group.GET("/payment-accounts", view, handler.ListPaymentAccounts)
 	group.POST("/payment-accounts/seed-defaults", manage, handler.SeedDefaultPaymentAccounts)
 	group.POST("/payment-accounts", manage, handler.CreatePaymentAccount)

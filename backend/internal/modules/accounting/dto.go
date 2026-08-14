@@ -77,6 +77,48 @@ type UpdatePeriodLockRequest struct {
 	Reason        string  `json:"reason"`
 }
 
+type CloseFinancialYearRequest struct {
+	FinancialYearEndDate string `json:"financial_year_end_date" binding:"required"`
+}
+
+type YearEndCloseBranchResponse struct {
+	BranchID       string  `json:"branch_id"`
+	BranchName     string  `json:"branch_name"`
+	JournalEntryID string  `json:"journal_entry_id"`
+	EntryNumber    string  `json:"entry_number,omitempty"`
+	NetProfit      float64 `json:"net_profit"`
+}
+
+type YearEndCloseResponse struct {
+	FinancialYearStart string                       `json:"financial_year_start"`
+	FinancialYearEnd   string                       `json:"financial_year_end"`
+	Branches           []YearEndCloseBranchResponse `json:"branches"`
+}
+
+type YearEndClosePreviewBranchResponse struct {
+	BranchID   string  `json:"branch_id"`
+	BranchName string  `json:"branch_name"`
+	NetProfit  float64 `json:"net_profit"`
+	LineCount  int     `json:"line_count"`
+}
+
+type YearEndClosePreviewResponse struct {
+	FinancialYearStart string                              `json:"financial_year_start"`
+	FinancialYearEnd   string                              `json:"financial_year_end"`
+	Branches           []YearEndClosePreviewBranchResponse `json:"branches"`
+}
+
+type FinancialYearResponse struct {
+	FinancialYearStart string                       `json:"financial_year_start"`
+	FinancialYearEnd   string                       `json:"financial_year_end"`
+	Status             string                       `json:"status"`
+	Branches           []YearEndCloseBranchResponse `json:"branches"`
+}
+
+type FinancialYearListResponse struct {
+	Items []FinancialYearResponse `json:"items"`
+}
+
 type PurchasingPostingIntegrityIssue struct {
 	CheckKey string                 `json:"check_key"`
 	Severity string                 `json:"severity"`

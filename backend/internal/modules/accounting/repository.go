@@ -2773,6 +2773,11 @@ func (r *Repository) ListProfitLossRows(businessID string, query ProfitLossQuery
 		  AND je.entry_date >= ?
 		  AND je.entry_date <= ?
 		  AND coa.account_type IN ('income', 'cogs', 'expense')
+		  -- The year-end close zeroes income and expense into retained
+		  -- earnings. Including it here would net every closed year's P&L to
+		  -- nil, so historical statements must exclude it (the trial balance
+		  -- and balance sheet still include it -- that is its purpose).
+		  AND COALESCE(je.source_type, '') <> 'year_end_close'
 		  `+branchFilter+`
 		GROUP BY coa.id, coa.account_code, coa.account_name, coa.account_type, coa.account_group
 		HAVING ABS(CASE
@@ -2787,6 +2792,114 @@ func (r *Repository) ListProfitLossRows(businessID string, query ProfitLossQuery
 		rows[i].Amount = roundMoney(rows[i].Amount)
 	}
 	return rows, err
+}
+
+// EarliestJournalEntryDate anchors the financial-year list at the first date
+// the business has any posted history for.
+func (r *Repository) EarliestJournalEntryDate(tx *gorm.DB, businessID string) (*time.Time, error) {
+	var row struct {
+		EarliestEntryDate *time.Time
+	}
+	err := tx.Table("journal_entries").
+		Select("MIN(entry_date) AS earliest_entry_date").
+		Where("business_id = ? AND deleted_at IS NULL AND status IN ('posted','reversed')", businessID).
+		Take(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	return row.EarliestEntryDate, nil
+}
+
+type yearEndCloseJournalRow struct {
+	BranchID       string
+	BranchName     string
+	JournalEntryID string
+	EntryNumber    string
+	EntryDate      time.Time
+	NetProfit      float64
+}
+
+// ListYearEndCloseJournals returns every live close journal with the net
+// profit it moved into retained earnings (the retained-earnings leg's
+// credit-minus-debit).
+func (r *Repository) ListYearEndCloseJournals(tx *gorm.DB, businessID string) ([]yearEndCloseJournalRow, error) {
+	var rows []yearEndCloseJournalRow
+	err := tx.Raw(`
+		SELECT je.branch_id,
+		       COALESCE(b.branch_name, '') AS branch_name,
+		       je.id AS journal_entry_id,
+		       je.entry_number,
+		       je.entry_date,
+		       COALESCE((
+		           SELECT SUM(jel.credit_amount - jel.debit_amount)
+		           FROM journal_entry_lines jel
+		           JOIN chart_of_accounts coa ON coa.id = jel.account_id AND coa.business_id = jel.business_id
+		           WHERE jel.journal_entry_id = je.id
+		             AND jel.business_id = je.business_id
+		             AND jel.deleted_at IS NULL
+		             AND coa.account_code = '3100'
+		       ), 0) AS net_profit
+		FROM journal_entries je
+		LEFT JOIN branches b ON b.id = je.branch_id AND b.business_id = je.business_id
+		WHERE je.business_id = ?
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted','reversed')
+		  AND je.source_type = ?
+		ORDER BY je.entry_date ASC, je.entry_number ASC
+	`, businessID, SourceYearEndClose).Scan(&rows).Error
+	return rows, err
+}
+
+// LatestYearEndCloseDate is the boundary the balance sheet's synthetic
+// current-year-profit row starts after.
+func (r *Repository) LatestYearEndCloseDate(tx *gorm.DB, businessID, branchID string, asOf time.Time) (*time.Time, error) {
+	var row struct {
+		LatestEntryDate *time.Time
+	}
+	query := tx.Table("journal_entries").
+		Select("MAX(entry_date) AS latest_entry_date").
+		Where("business_id = ? AND deleted_at IS NULL AND status IN ('posted','reversed') AND source_type = ? AND entry_date <= ?",
+			businessID, SourceYearEndClose, asOf)
+	if strings.TrimSpace(branchID) != "" {
+		query = query.Where("branch_id = ?", strings.TrimSpace(branchID))
+	}
+	if err := query.Take(&row).Error; err != nil {
+		return nil, err
+	}
+	return row.LatestEntryDate, nil
+}
+
+type branchWithJournalsRow struct {
+	BranchID   string
+	BranchName string
+}
+
+// ListBranchIDsWithJournals returns the branches that have posted activity in
+// a window, so the close only touches branches that need one.
+func (r *Repository) ListBranchIDsWithJournals(tx *gorm.DB, businessID string, from, to time.Time) ([]branchWithJournalsRow, error) {
+	var rows []branchWithJournalsRow
+	err := tx.Raw(`
+		SELECT DISTINCT je.branch_id, COALESCE(b.branch_name, '') AS branch_name
+		FROM journal_entries je
+		LEFT JOIN branches b ON b.id = je.branch_id AND b.business_id = je.business_id
+		WHERE je.business_id = ?
+		  AND je.deleted_at IS NULL
+		  AND je.status IN ('posted','reversed')
+		  AND je.branch_id IS NOT NULL
+		  AND je.entry_date >= ?
+		  AND je.entry_date <= ?
+		ORDER BY branch_name ASC
+	`, businessID, from, to).Scan(&rows).Error
+	return rows, err
+}
+
+func (r *Repository) HasJournalsInWindow(tx *gorm.DB, businessID string, from, to time.Time) (bool, error) {
+	var count int64
+	err := tx.Table("journal_entries").
+		Where("business_id = ? AND deleted_at IS NULL AND status IN ('posted','reversed') AND entry_date >= ? AND entry_date <= ? AND COALESCE(source_type, '') <> ?",
+			businessID, from, to, SourceYearEndClose).
+		Count(&count).Error
+	return count > 0, err
 }
 
 func (r *Repository) ListBalanceSheetRows(businessID string, query BalanceSheetQuery) ([]BalanceSheetAccountRowResponse, error) {

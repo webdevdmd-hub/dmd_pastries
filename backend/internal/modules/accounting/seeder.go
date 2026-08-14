@@ -163,6 +163,7 @@ func DefaultAccountMappingSeeds() []defaultAccountMappingSeed {
 		{Key: "inventory_adjustment_gain", AccountCode: "4100", Description: "Inventory adjustment gains"},
 		{Key: "inventory_adjustment_loss", AccountCode: "5090", Description: "Inventory adjustment losses"},
 		{Key: "opening_balance_equity", AccountCode: "3400", Description: "Opening stock/equity offset"},
+		{Key: "retained_earnings", AccountCode: "3100", Description: "Accumulated profits from closed financial years"},
 		{Key: "grni", AccountCode: "2050", Description: "Goods received not invoiced"},
 		{Key: "platform_commission_expense", AccountCode: "6240", Description: "Delivery platform commissions"},
 		{Key: "delivery_charge_income", AccountCode: "4050", Description: "Customer delivery charge income"},

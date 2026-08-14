@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import {
+  closeFinancialYear,
   createAccountTransfer,
   createChartAccount,
   createJournalEntry,
@@ -27,6 +28,7 @@ import {
   getBalanceSheetReport,
   getChartAccountById,
   getChartAccounts,
+  getFinancialYears,
   getGeneralLedgerReport,
   getJournalEntries,
   getJournalEntryById,
@@ -37,7 +39,9 @@ import {
   getPlatformSettlements,
   getProfitLossReport,
   getTrialBalanceReport,
+  getYearEndClosePreview,
   postJournalEntry,
+  reopenFinancialYear,
   reverseJournalEntry,
   runAccountingBackfill,
   seedDefaultAccountMappings,
@@ -74,6 +78,7 @@ import type {
   ChartAccountsResponse,
   CreateChartAccountPayload,
   CreateJournalEntryPayload,
+  FinancialYear,
   GeneralLedgerFilters,
   GeneralLedgerResponse,
   JournalEntriesFilters,
@@ -100,6 +105,8 @@ import type {
   UpdateChartAccountStatusPayload,
   UpdateJournalEntryPayload,
   UpdatePeriodLockPayload,
+  YearEndClosePreview,
+  YearEndCloseResult,
 } from "@/types/accounting";
 
 const accountingQueryKey = "accounting";
@@ -226,6 +233,50 @@ export function useUpdatePeriodLock() {
 
   return useMutation<AccountingSettings, Error, UpdatePeriodLockPayload>({
     mutationFn: async (payload) => updatePeriodLock(payload),
+    onSuccess: async () => {
+      await invalidateAccounting(queryClient);
+    },
+  });
+}
+
+export function useFinancialYears(enabled = true) {
+  return useQuery<FinancialYear[]>({
+    queryKey: [accountingQueryKey, "year-end-close"],
+    queryFn: async () => getFinancialYears(),
+    enabled,
+  });
+}
+
+export function useYearEndClosePreview(financialYearEndDate: string | null, enabled = true) {
+  return useQuery<YearEndClosePreview>({
+    queryKey: [accountingQueryKey, "year-end-close", "preview", financialYearEndDate],
+    queryFn: async () => {
+      if (!financialYearEndDate) {
+        throw new Error("A financial year end date is required.");
+      }
+
+      return getYearEndClosePreview(financialYearEndDate);
+    },
+    enabled: enabled && financialYearEndDate !== null,
+  });
+}
+
+export function useCloseFinancialYear() {
+  const queryClient = useQueryClient();
+
+  return useMutation<YearEndCloseResult, Error, string>({
+    mutationFn: async (financialYearEndDate) => closeFinancialYear(financialYearEndDate),
+    onSuccess: async () => {
+      await invalidateAccounting(queryClient);
+    },
+  });
+}
+
+export function useReopenFinancialYear() {
+  const queryClient = useQueryClient();
+
+  return useMutation<YearEndCloseResult, Error, string>({
+    mutationFn: async (financialYearEndDate) => reopenFinancialYear(financialYearEndDate),
     onSuccess: async () => {
       await invalidateAccounting(queryClient);
     },

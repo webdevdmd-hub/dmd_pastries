@@ -41,11 +41,15 @@ import {
   useAccountingSettings,
   useAccountMappings,
   useChartAccounts,
+  useCloseFinancialYear,
+  useFinancialYears,
+  useReopenFinancialYear,
   useRunAccountingBackfill,
   useSeedDefaultAccountMappings,
   useUpdateAccountingSettings,
   useUpdateAccountMappings,
   useUpdatePeriodLock,
+  useYearEndClosePreview,
 } from "@/hooks/use-accounting";
 import { useBranches } from "@/hooks/use-branches";
 import { usePermission } from "@/hooks/use-permission";
@@ -397,7 +401,153 @@ export function AccountingSettingsPageClient(): JSX.Element {
         </div>
         {updateLock.isError ? <ErrorNotice message={updateLock.error.message} /> : null}
       </RecoveryCard>
+
+      <YearEndCloseCard canManagePeriods={canLockPeriods} enabled={canView} />
     </div>
+  );
+}
+
+function YearEndCloseCard({
+  canManagePeriods,
+  enabled,
+}: {
+  canManagePeriods: boolean;
+  enabled: boolean;
+}): JSX.Element {
+  const yearsQuery = useFinancialYears(enabled);
+  const closeYear = useCloseFinancialYear();
+  const reopenYear = useReopenFinancialYear();
+  const [confirmingYearEnd, setConfirmingYearEnd] = useState<string | null>(null);
+  const previewQuery = useYearEndClosePreview(confirmingYearEnd, enabled);
+
+  const years = yearsQuery.data ?? [];
+  // Only the most recently closed year can be reopened: earlier ones sit
+  // behind it in the oldest-first close order.
+  const latestClosedEnd =
+    years.filter((year) => year.status === "closed").at(-1)?.financialYearEnd ?? null;
+
+  return (
+    <RecoveryCard title="Year-end close">
+      <p className="mb-4 text-sm text-muted-foreground">
+        Closing a year moves its income and expenses into Retained Earnings (3100) for each branch,
+        then locks the books through the year end. Close years oldest first.
+      </p>
+
+      {yearsQuery.isError ? <ErrorNotice message={yearsQuery.error.message} /> : null}
+      {!yearsQuery.isLoading && years.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No posted accounting history yet, so there is nothing to close.
+        </p>
+      ) : null}
+
+      <div className="flex flex-col gap-3">
+        {years.map((year) => {
+          const closedProfit = year.branches.reduce((total, branch) => total + branch.netProfit, 0);
+
+          return (
+            <div
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3"
+              key={year.financialYearEnd}
+            >
+              <div>
+                <p className="font-medium text-foreground">
+                  {year.financialYearStart} to {year.financialYearEnd}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {year.status === "closed"
+                    ? `Closed · ${String(year.branches.length)} branch journal(s) · net ${formatNumber(closedProfit)}`
+                    : year.status === "current"
+                      ? "Current year — closes once it ends"
+                      : "Open"}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {year.status === "open" ? (
+                  <Button
+                    disabled={!canManagePeriods || closeYear.isPending}
+                    onClick={() => setConfirmingYearEnd(year.financialYearEnd)}
+                  >
+                    Close year
+                  </Button>
+                ) : null}
+                {year.status === "closed" && year.financialYearEnd === latestClosedEnd ? (
+                  <Button
+                    disabled={!canManagePeriods || reopenYear.isPending}
+                    onClick={() => reopenYear.mutate(year.financialYearEnd)}
+                    variant="outline"
+                  >
+                    Reopen
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {closeYear.isError ? <ErrorNotice message={closeYear.error.message} /> : null}
+      {reopenYear.isError ? <ErrorNotice message={reopenYear.error.message} /> : null}
+
+      <Dialog
+        open={confirmingYearEnd !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmingYearEnd(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Close financial year</DialogTitle>
+            <DialogDescription>
+              This posts a close journal per branch and locks the books through{" "}
+              {confirmingYearEnd}. You can reopen the most recent closed year afterwards.
+            </DialogDescription>
+          </DialogHeader>
+
+          {previewQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Calculating each branch&apos;s result...</p>
+          ) : null}
+          {previewQuery.isError ? <ErrorNotice message={previewQuery.error.message} /> : null}
+          {previewQuery.data ? (
+            <div className="flex flex-col gap-2">
+              {previewQuery.data.branches.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No branch has income or expense activity in this year — nothing will be posted.
+                </p>
+              ) : (
+                previewQuery.data.branches.map((branch) => (
+                  <div
+                    className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm"
+                    key={branch.branchId}
+                  >
+                    <span>{branch.branchName || "Branch"}</span>
+                    <span className="font-medium">
+                      {formatNumber(branch.netProfit)} · {branch.lineCount} lines
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button onClick={() => setConfirmingYearEnd(null)} variant="outline">
+              Cancel
+            </Button>
+            <Button
+              disabled={closeYear.isPending || !confirmingYearEnd}
+              onClick={() => {
+                if (!confirmingYearEnd) return;
+                closeYear.mutate(confirmingYearEnd, {
+                  onSuccess: () => setConfirmingYearEnd(null),
+                });
+              }}
+            >
+              Close year
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </RecoveryCard>
   );
 }
 

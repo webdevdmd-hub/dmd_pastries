@@ -355,6 +355,42 @@ export type UpdatePeriodLockPayload = {
   reason: string;
 };
 
+export type YearEndCloseBranch = {
+  branchId: string;
+  branchName: string;
+  journalEntryId: string;
+  entryNumber: string;
+  netProfit: number;
+};
+
+export type FinancialYearStatus = "closed" | "open" | "current";
+
+export type FinancialYear = {
+  financialYearStart: string;
+  financialYearEnd: string;
+  status: FinancialYearStatus;
+  branches: YearEndCloseBranch[];
+};
+
+export type YearEndClosePreviewBranch = {
+  branchId: string;
+  branchName: string;
+  netProfit: number;
+  lineCount: number;
+};
+
+export type YearEndClosePreview = {
+  financialYearStart: string;
+  financialYearEnd: string;
+  branches: YearEndClosePreviewBranch[];
+};
+
+export type YearEndCloseResult = {
+  financialYearStart: string;
+  financialYearEnd: string;
+  branches: YearEndCloseBranch[];
+};
+
 export type AccountMapping = {
   mappingKey: string;
   description: string;

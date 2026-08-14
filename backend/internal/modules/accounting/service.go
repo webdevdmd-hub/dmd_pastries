@@ -4148,7 +4148,24 @@ func (s *Service) currentYearProfitLossForBalanceSheet(businessID, branchID stri
 		return BalanceSheetAccountRowResponse{}, "", apperrors.Internal("failed to load accounting settings")
 	}
 	financialYearStart := financialYearStartFor(asOfDate, settings.FinancialYearStartMonth, settings.FinancialYearStartDay)
+	// A closed year's result already lives in real 3100 Retained Earnings, so
+	// the synthetic row must only cover the stub since the last close --
+	// otherwise the same profit is counted twice at the year boundary.
+	lastClose, err := s.lastYearEndCloseBefore(businessID, branchID, asOfDate)
+	if err != nil {
+		return BalanceSheetAccountRowResponse{}, "", apperrors.Internal("failed to load the last year-end close")
+	}
+	if lastClose != nil {
+		dayAfterClose := dateOnlyUTC(*lastClose).AddDate(0, 0, 1)
+		if dayAfterClose.After(financialYearStart) {
+			financialYearStart = dayAfterClose
+		}
+	}
 	dateFrom := financialYearStart.Format("2006-01-02")
+	if financialYearStart.After(dateOnlyUTC(asOfDate)) {
+		// The window closed exactly on as-of: nothing has happened since.
+		return BalanceSheetAccountRowResponse{}, dateFrom, nil
+	}
 	rows, err := s.repo.ListProfitLossRows(businessID, ProfitLossQuery{
 		BranchID: query.BranchID,
 		DateFrom: dateFrom,
