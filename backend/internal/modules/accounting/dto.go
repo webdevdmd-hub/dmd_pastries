@@ -193,9 +193,16 @@ type CreatePlatformSettlementRequest struct {
 }
 
 type UpdateChartAccountRequest struct {
-	ParentAccountID    *string `json:"parent_account_id" binding:"omitempty,uuid"`
-	AccountName        *string `json:"account_name"`
-	AccountGroup       *string `json:"account_group"`
+	ParentAccountID *string `json:"parent_account_id" binding:"omitempty,uuid"`
+	AccountName     *string `json:"account_name"`
+	AccountGroup    *string `json:"account_group"`
+	// AccountCode, AccountType and NormalBalance are the classification of the
+	// account. They are only editable while it has never been posted to; once
+	// it carries journal lines they are refused, because changing them would
+	// silently restate history.
+	AccountCode        *string `json:"account_code"`
+	AccountType        *string `json:"account_type"`
+	NormalBalance      *string `json:"normal_balance"`
 	Description        *string `json:"description"`
 	IsControlAccount   *bool   `json:"is_control_account"`
 	AllowManualPosting *bool   `json:"allow_manual_posting"`
@@ -301,24 +308,28 @@ type ReverseJournalEntryRequest struct {
 }
 
 type ChartAccountResponse struct {
-	ID                 string    `json:"id"`
-	BusinessID         string    `json:"business_id"`
-	BranchID           string    `json:"branch_id"`
-	ParentAccountID    *string   `json:"parent_account_id"`
-	ParentAccountName  string    `json:"parent_account_name"`
-	AccountCode        string    `json:"account_code"`
-	AccountName        string    `json:"account_name"`
-	AccountType        string    `json:"account_type"`
-	AccountGroup       string    `json:"account_group"`
-	NormalBalance      string    `json:"normal_balance"`
-	Description        string    `json:"description"`
-	IsSystemAccount    bool      `json:"is_system_account"`
-	IsControlAccount   bool      `json:"is_control_account"`
-	IsHeader           bool      `json:"is_header"`
-	AllowManualPosting bool      `json:"allow_manual_posting"`
-	Status             string    `json:"status"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ID                 string  `json:"id"`
+	BusinessID         string  `json:"business_id"`
+	BranchID           string  `json:"branch_id"`
+	ParentAccountID    *string `json:"parent_account_id"`
+	ParentAccountName  string  `json:"parent_account_name"`
+	AccountCode        string  `json:"account_code"`
+	AccountName        string  `json:"account_name"`
+	AccountType        string  `json:"account_type"`
+	AccountGroup       string  `json:"account_group"`
+	NormalBalance      string  `json:"normal_balance"`
+	Description        string  `json:"description"`
+	IsSystemAccount    bool    `json:"is_system_account"`
+	IsControlAccount   bool    `json:"is_control_account"`
+	IsHeader           bool    `json:"is_header"`
+	AllowManualPosting bool    `json:"allow_manual_posting"`
+	// HasPostings drives whether the classification fields are editable. The
+	// API is the authority; this only lets the UI lock them up front instead
+	// of failing the save.
+	HasPostings bool      `json:"has_postings"`
+	Status      string    `json:"status"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type AccountMappingResponse struct {

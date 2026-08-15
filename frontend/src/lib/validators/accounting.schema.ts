@@ -21,6 +21,9 @@ export const chartAccountCreateSchema = z.object({
 export const chartAccountUpdateSchema = z.object({
   accountGroup: z.string().trim().min(1, "Account group is required."),
   accountName: z.string().trim().min(1, "Account name is required."),
+  accountCode: z.string().trim().min(1, "Account code is required.").optional(),
+  accountType: z.enum(["asset", "liability", "equity", "income", "cogs", "expense"]).optional(),
+  normalBalance: z.enum(["debit", "credit"]).optional(),
   allowManualPosting: z.boolean(),
   description: z.string(),
   isControlAccount: z.boolean(),

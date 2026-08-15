@@ -422,14 +422,77 @@ func (s *Service) UpdateChartAccount(currentUser *utils.AuthContext, id string, 
 		return nil, mapChartAccountNotFound(err)
 	}
 	updates := map[string]interface{}{"updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
+	hasUpdate := false
+
+	// Classification (code, type, normal balance) is editable only while the
+	// account has never been posted to. Correcting a miscategorized account is
+	// a legitimate need; restating history is not.
+	reclassifying := req.AccountType != nil || req.AccountCode != nil || req.NormalBalance != nil
+	effectiveType := account.AccountType
+	if reclassifying {
+		if err := s.ensureAccountReclassifiable(account); err != nil {
+			return nil, err
+		}
+		if req.AccountType != nil {
+			accountType := strings.TrimSpace(*req.AccountType)
+			if !validAccountType(accountType) {
+				return nil, apperrors.BadRequest("invalid account_type", nil)
+			}
+			effectiveType = accountType
+			updates["account_type"] = accountType
+			hasUpdate = true
+		}
+		if req.NormalBalance != nil {
+			// Deliberately not cross-checked against account_type: contra
+			// accounts legitimately invert it (1840 asset/credit, 4040 and
+			// 4080 income/debit, 5020 cogs/credit).
+			normalBalance := strings.TrimSpace(*req.NormalBalance)
+			if !validNormalBalance(normalBalance) {
+				return nil, apperrors.BadRequest("invalid normal_balance", nil)
+			}
+			updates["normal_balance"] = normalBalance
+			hasUpdate = true
+		}
+		if req.AccountCode != nil {
+			accountCode := strings.TrimSpace(*req.AccountCode)
+			if accountCode == "" {
+				return nil, apperrors.BadRequest("account_code cannot be empty", nil)
+			}
+			// Codes are unique per business+branch, case-insensitively; only
+			// look for a clash when the code actually changes.
+			if !strings.EqualFold(accountCode, account.AccountCode) {
+				exists, err := s.repo.AccountCodeExistsForBranch(s.db, currentUser.BusinessID, account.BranchID, accountCode)
+				if err != nil {
+					return nil, apperrors.Internal("failed to validate account code")
+				}
+				if exists {
+					return nil, apperrors.Conflict("account_code already exists", nil)
+				}
+			}
+			updates["account_code"] = accountCode
+			hasUpdate = true
+		}
+		// A changed type invalidates a parent chosen for the old type. Require
+		// the caller to resolve it rather than silently detaching the account
+		// from a hierarchy the statements group by.
+		if effectiveType != account.AccountType && req.ParentAccountID == nil && account.ParentAccountID != nil {
+			return nil, apperrors.BadRequest(
+				"changing account_type requires parent_account_id to be re-selected or cleared, because a parent must match the account's type",
+				map[string]interface{}{"account_type": effectiveType},
+			)
+		}
+	}
+
 	if req.ParentAccountID != nil {
 		parentID := cleanStringPointer(req.ParentAccountID)
-		// Chart account types are immutable after creation, so the stored type
-		// is the effective one for the parent compatibility rule.
-		if err := s.validateParentAccount(currentUser.BusinessID, account.BranchID, parentID, id, account.AccountType); err != nil {
+		// Validate against the type this account will HAVE once saved, not the
+		// one it had, so a reclassification cannot land under a wrong-typed
+		// header.
+		if err := s.validateParentAccount(currentUser.BusinessID, account.BranchID, parentID, id, effectiveType); err != nil {
 			return nil, err
 		}
 		updates["parent_account_id"] = parentID
+		hasUpdate = true
 	}
 	if req.AccountName != nil {
 		name := strings.TrimSpace(*req.AccountName)
@@ -437,6 +500,7 @@ func (s *Service) UpdateChartAccount(currentUser *utils.AuthContext, id string, 
 			return nil, apperrors.BadRequest("account_name cannot be empty", nil)
 		}
 		updates["account_name"] = name
+		hasUpdate = true
 	}
 	if req.AccountGroup != nil {
 		group := strings.TrimSpace(*req.AccountGroup)
@@ -444,24 +508,61 @@ func (s *Service) UpdateChartAccount(currentUser *utils.AuthContext, id string, 
 			return nil, apperrors.BadRequest("invalid account_group", nil)
 		}
 		updates["account_group"] = group
+		hasUpdate = true
 	}
 	if req.Description != nil {
 		updates["description"] = strings.TrimSpace(*req.Description)
+		hasUpdate = true
 	}
 	if req.IsControlAccount != nil {
 		updates["is_control_account"] = *req.IsControlAccount
+		hasUpdate = true
 	}
 	if req.AllowManualPosting != nil {
 		updates["allow_manual_posting"] = *req.AllowManualPosting
+		hasUpdate = true
 	}
-	if len(updates) == 2 {
+	// A type change without a matching group would leave a nonsense pairing
+	// such as expense + current_liability, and the group whitelist is global
+	// rather than per-type, so require the caller to state the new group.
+	if effectiveType != account.AccountType && req.AccountGroup == nil {
+		return nil, apperrors.BadRequest("changing account_type requires account_group to be provided", nil)
+	}
+	if !hasUpdate {
 		return nil, apperrors.BadRequest("no updatable fields provided", nil)
 	}
+
+	// A reclassification is the one chart-account edit where the before/after
+	// values are the point, so record them rather than just "updated".
+	summary := "Chart account updated."
+	var auditChanges []audit.AuditChange
+	if reclassifying {
+		summary = "Chart account reclassified."
+		for _, candidate := range []struct {
+			field    string
+			label    string
+			oldValue interface{}
+			newValue interface{}
+		}{
+			{"account_code", "Account code", account.AccountCode, updates["account_code"]},
+			{"account_type", "Account type", account.AccountType, updates["account_type"]},
+			{"normal_balance", "Normal balance", account.NormalBalance, updates["normal_balance"]},
+			{"account_group", "Account group", account.AccountGroup, updates["account_group"]},
+		} {
+			if candidate.newValue == nil {
+				continue
+			}
+			if change, changed := audit.Change(candidate.field, candidate.label, candidate.oldValue, candidate.newValue); changed {
+				auditChanges = append(auditChanges, change)
+			}
+		}
+	}
+
 	if err := s.withTransaction(func(tx *gorm.DB) error {
 		if err := s.repo.Update(tx, currentUser.BusinessID, account.ID, updates); err != nil {
 			return mapChartAccountNotFound(err)
 		}
-		return s.writeAudit(tx, currentUser, "accounting.chart_account_updated", account.ID, "Chart account updated.", ipAddress, userAgent)
+		return s.writeAuditWithChanges(tx, currentUser, "accounting.chart_account_updated", account.ID, summary, auditChanges, ipAddress, userAgent)
 	}); err != nil {
 		return nil, err
 	}
@@ -4601,6 +4702,40 @@ func (s *Service) buildJournalLines(tx *gorm.DB, businessID string, branchID *st
 	return lines, totalDebit, totalCredit, nil
 }
 
+// ensureAccountReclassifiable gates edits to an account's code, type and
+// normal balance. Correcting an account created with the wrong classification
+// is legitimate; doing it once the account carries meaning elsewhere is not,
+// because every one of these would silently restate something already
+// recorded.
+func (s *Service) ensureAccountReclassifiable(account *ChartAccount) error {
+	// Headers are checked first: a seeded header satisfies both rules, and
+	// "this is a header" is the more useful answer.
+	if account.IsHeader {
+		return apperrors.BadRequest("header accounts cannot be reclassified; their type places every account grouped under them", map[string]interface{}{"account_code": account.AccountCode})
+	}
+	if account.IsSystemAccount {
+		return apperrors.BadRequest("seeded system accounts cannot be reclassified", map[string]interface{}{"account_code": account.AccountCode})
+	}
+	hasChildren, err := s.repo.HasChildren(s.db, account.BusinessID, account.ID)
+	if err != nil {
+		return apperrors.Internal("failed to check account children")
+	}
+	if hasChildren {
+		return apperrors.BadRequest("accounts with children cannot be reclassified; re-parent the children first", map[string]interface{}{"account_code": account.AccountCode})
+	}
+	hasPostings, err := s.repo.HasJournalLines(s.db, account.BusinessID, account.ID)
+	if err != nil {
+		return apperrors.Internal("failed to check account postings")
+	}
+	if hasPostings {
+		return apperrors.BadRequest(
+			"account_code, account_type and normal_balance cannot change once an account has been posted to",
+			map[string]interface{}{"account_code": account.AccountCode},
+		)
+	}
+	return nil
+}
+
 // validateParentAccount enforces the hierarchy rules (Phase 6 / W3): a parent
 // must be an active header on the same branch and of the same account type,
 // and the chain it belongs to must stay acyclic. childType is the effective
@@ -6032,9 +6167,17 @@ func (s *Service) withTransaction(fn func(tx *gorm.DB) error) error {
 }
 
 func (s *Service) writeAudit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {
+	return s.writeAuditWithChanges(tx, currentUser, eventType, entityID, summary, nil, ipAddress, userAgent)
+}
+
+// writeAuditWithChanges records an accounting audit entry that also carries the
+// specific before/after values. The default metadata only identifies the
+// entity, which is enough for most events but not for a reclassification —
+// there, what changed IS the record worth keeping.
+func (s *Service) writeAuditWithChanges(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary string, changes []audit.AuditChange, ipAddress, userAgent string) error {
 	entityType := accountingAuditEntityType(eventType)
 	metadata := s.accountingAuditMetadata(tx, currentUser.BusinessID, entityType, entityID)
-	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: entityType, EntityID: entityID, Summary: summary, Metadata: audit.Metadata(metadata, nil), IPAddress: ipAddress, UserAgent: userAgent}); err != nil {
+	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{BusinessID: currentUser.BusinessID, ActorUserID: currentUser.UserID, EventType: eventType, EntityType: entityType, EntityID: entityID, Summary: summary, Metadata: audit.Metadata(metadata, changes), IPAddress: ipAddress, UserAgent: userAgent}); err != nil {
 		return apperrors.Internal("failed to create activity log")
 	}
 	return nil

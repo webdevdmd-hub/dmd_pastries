@@ -26,6 +26,8 @@ export type ChartAccount = {
   isControlAccount: boolean;
   /** Grouping row: subtotals its children on statements, never posted to. */
   isHeader: boolean;
+  /** True once the account carries journal lines; locks its classification. */
+  hasPostings: boolean;
   allowManualPosting: boolean;
   status: AccountingAccountStatus;
   createdAt: string;
@@ -69,6 +71,10 @@ export type UpdateChartAccountPayload = {
   allowManualPosting: boolean;
   accountGroup: string;
   accountName: string;
+  /** Classification. Only accepted while the account has no postings. */
+  accountCode?: string | undefined;
+  accountType?: AccountingAccountType | undefined;
+  normalBalance?: AccountingNormalBalance | undefined;
   description: string;
   isControlAccount: boolean;
   parentAccountId: string | null;

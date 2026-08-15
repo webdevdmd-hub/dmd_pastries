@@ -119,6 +119,9 @@ type BackendChartAccountPayload = {
 type BackendChartAccountUpdatePayload = {
   account_group: string;
   account_name: string;
+  account_code?: string;
+  account_type?: string;
+  normal_balance?: string;
   allow_manual_posting: boolean;
   description: string;
   is_control_account: boolean;
@@ -345,6 +348,7 @@ function parseChartAccount(value: unknown): ChartAccount {
     isSystemAccount: booleanValue(value.is_system_account),
     isControlAccount: booleanValue(value.is_control_account),
     isHeader: booleanValue(value.is_header),
+    hasPostings: booleanValue(value.has_postings),
     allowManualPosting: booleanValue(value.allow_manual_posting, true),
     status: isAccountStatus(value.status) ? value.status : "active",
     createdAt: stringValue(value.created_at),
@@ -1101,6 +1105,11 @@ function updatePayload(payload: UpdateChartAccountPayload): BackendChartAccountU
   return {
     account_group: payload.accountGroup,
     account_name: payload.accountName,
+    // Sent only when the dialog let the user change them, so an ordinary edit
+    // of a posted account never trips the reclassification guards.
+    ...(payload.accountCode === undefined ? {} : { account_code: payload.accountCode }),
+    ...(payload.accountType === undefined ? {} : { account_type: payload.accountType }),
+    ...(payload.normalBalance === undefined ? {} : { normal_balance: payload.normalBalance }),
     allow_manual_posting: payload.allowManualPosting,
     description: payload.description,
     is_control_account: payload.isControlAccount,
@@ -1437,8 +1446,7 @@ function parseFinancialYear(value: unknown): FinancialYear {
   return {
     financialYearStart: stringValue(value.financial_year_start),
     financialYearEnd: stringValue(value.financial_year_end),
-    status:
-      status === "closed" || status === "current" ? (status) : "open",
+    status: status === "closed" || status === "current" ? status : "open",
     branches: Array.isArray(value.branches) ? value.branches.map(parseYearEndCloseBranch) : [],
   };
 }

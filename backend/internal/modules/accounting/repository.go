@@ -518,6 +518,43 @@ func (r *Repository) HasChildren(tx *gorm.DB, businessID, id string) (bool, erro
 	return count > 0, err
 }
 
+// HasJournalLines reports whether an account has ever carried a posting.
+//
+// Soft-deleted lines count. Editing a journal soft-deletes and replaces its
+// lines, and the safe-delete policy keeps deleted journals for the audit
+// trail, so a soft-deleted line still means this account has history that a
+// reclassification would silently restate. Indexed by
+// idx_journal_entry_lines_account.
+func (r *Repository) HasJournalLines(tx *gorm.DB, businessID, accountID string) (bool, error) {
+	var count int64
+	err := tx.Table("journal_entry_lines").
+		Where("business_id = ? AND account_id = ?", businessID, accountID).
+		Limit(1).Count(&count).Error
+	return count > 0, err
+}
+
+// AccountIDsWithJournalLines answers the same question for a page of accounts
+// in one query, so the list endpoint can flag which rows are still
+// reclassifiable without an N+1.
+func (r *Repository) AccountIDsWithJournalLines(businessID string, accountIDs []string) (map[string]bool, error) {
+	posted := make(map[string]bool, len(accountIDs))
+	if len(accountIDs) == 0 {
+		return posted, nil
+	}
+	var ids []string
+	err := r.db.Table("journal_entry_lines").
+		Distinct("account_id").
+		Where("business_id = ? AND account_id IN ?", businessID, accountIDs).
+		Pluck("account_id", &ids).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range ids {
+		posted[id] = true
+	}
+	return posted, nil
+}
+
 func (r *Repository) ValidateActiveAccountForBranch(tx *gorm.DB, businessID, branchID, accountID string) (*ChartAccount, error) {
 	var account ChartAccount
 	err := tx.Where("business_id = ? AND branch_id = ? AND id = ? AND status = ? AND deleted_at IS NULL", businessID, branchID, accountID, "active").First(&account).Error
@@ -1950,13 +1987,21 @@ func (r *Repository) LoadResponses(businessID string, accounts []ChartAccount) (
 			parentNames[parent.ID] = parent.AccountName
 		}
 	}
+	accountIDs := make([]string, 0, len(accounts))
+	for _, account := range accounts {
+		accountIDs = append(accountIDs, account.ID)
+	}
+	posted, err := r.AccountIDsWithJournalLines(businessID, accountIDs)
+	if err != nil {
+		return nil, err
+	}
 	responses := make([]ChartAccountResponse, 0, len(accounts))
 	for _, account := range accounts {
 		parentName := ""
 		if account.ParentAccountID != nil {
 			parentName = parentNames[*account.ParentAccountID]
 		}
-		responses = append(responses, toChartAccountResponse(account, parentName))
+		responses = append(responses, toChartAccountResponse(account, parentName, posted[account.ID]))
 	}
 	return responses, nil
 }
@@ -1966,7 +2011,11 @@ func (r *Repository) LoadResponse(businessID string, account ChartAccount) (Char
 	if account.ParentAccountID != nil {
 		_ = r.db.Table("chart_of_accounts").Select("account_name").Where("business_id = ? AND id = ? AND deleted_at IS NULL", businessID, *account.ParentAccountID).Scan(&parentName).Error
 	}
-	return toChartAccountResponse(account, parentName), nil
+	hasPostings, err := r.HasJournalLines(r.db, businessID, account.ID)
+	if err != nil {
+		return ChartAccountResponse{}, err
+	}
+	return toChartAccountResponse(account, parentName, hasPostings), nil
 }
 
 func (r *Repository) CreatePaymentAccount(tx *gorm.DB, account *PaymentAccount) error {
@@ -3698,7 +3747,7 @@ func totalPages(total int64, limit int) int {
 	return int(math.Ceil(float64(total) / float64(limit)))
 }
 
-func toChartAccountResponse(account ChartAccount, parentName string) ChartAccountResponse {
+func toChartAccountResponse(account ChartAccount, parentName string, hasPostings bool) ChartAccountResponse {
 	return ChartAccountResponse{
 		ID:                 account.ID,
 		BusinessID:         account.BusinessID,
@@ -3715,6 +3764,7 @@ func toChartAccountResponse(account ChartAccount, parentName string) ChartAccoun
 		IsControlAccount:   account.IsControlAccount,
 		IsHeader:           account.IsHeader,
 		AllowManualPosting: account.AllowManualPosting,
+		HasPostings:        hasPostings,
 		Status:             account.Status,
 		CreatedAt:          account.CreatedAt,
 		UpdatedAt:          account.UpdatedAt,

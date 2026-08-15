@@ -159,17 +159,21 @@ export function ChartAccountFormDialog({
   const [formState, setFormState] = useState<FormState>(emptyFormState());
   const [error, setError] = useState<string | null>(null);
   const isEditing = account !== null;
+  // Code, type and normal balance are correctable only while the account has
+  // never been posted to; seeded and header accounts are never correctable.
+  // The API is the authority — this just avoids offering an edit that fails.
+  const isClassificationLocked =
+    isEditing && (account.hasPostings || account.isSystemAccount || account.isHeader);
   // Only headers can parent an account, and only within the same account type
   // — the backend enforces both, so offering anything else just produces a 400.
   const parentOptions = accounts.filter(
     (option) =>
-      option.id !== account?.id &&
-      option.isHeader &&
-      option.accountType === formState.accountType,
+      option.id !== account?.id && option.isHeader && option.accountType === formState.accountType,
   );
   const defaultAccountGroupOptions = accountGroupsByType[formState.accountType];
-  const displayNormalBalance =
-    account?.normalBalance ?? getNormalBalanceForAccountType(formState.accountType);
+  const displayNormalBalance = isClassificationLocked
+    ? account.normalBalance
+    : getNormalBalanceForAccountType(formState.accountType);
   const accountGroupOptions =
     formState.accountGroup !== "" &&
     !defaultAccountGroupOptions.some((option) => option.value === formState.accountGroup)
@@ -195,7 +199,18 @@ export function ChartAccountFormDialog({
 
   const submitForm = async (): Promise<void> => {
     if (account) {
-      const updateResult = chartAccountUpdateSchema.safeParse(formState);
+      // Send the classification only when it was actually editable. Otherwise
+      // an ordinary rename would look like a reclassification request and be
+      // refused on any account that has postings.
+      //
+      // normalBalance is deliberately never sent: deriving it from the type
+      // would silently flip a contra account (asset/credit, income/debit),
+      // and the UI has no control for it.
+      const updateResult = chartAccountUpdateSchema.safeParse({
+        ...formState,
+        accountCode: isClassificationLocked ? undefined : formState.accountCode,
+        accountType: isClassificationLocked ? undefined : formState.accountType,
+      });
 
       if (!updateResult.success) {
         setError(updateResult.error.issues[0]?.message ?? "Please check the account form.");
@@ -240,7 +255,7 @@ export function ChartAccountFormDialog({
             <div className="grid gap-2">
               <Label htmlFor="accountCode">Account code</Label>
               <Input
-                disabled={isEditing}
+                disabled={isClassificationLocked}
                 id="accountCode"
                 onChange={(event) => updateForm({ accountCode: event.target.value })}
                 value={formState.accountCode}
@@ -257,9 +272,16 @@ export function ChartAccountFormDialog({
             <div className="grid gap-2">
               <Label>Account type</Label>
               <Select
-                disabled={isEditing}
+                disabled={isClassificationLocked}
                 onValueChange={(accountType: AccountingAccountType) => {
                   const nextGroups = accountGroupsByType[accountType];
+                  // A parent belongs to one account type, so a parent chosen
+                  // for the old type cannot survive the change; the backend
+                  // refuses it outright rather than silently detaching.
+                  const parentStillValid = accounts.some(
+                    (option) =>
+                      option.id === formState.parentAccountId && option.accountType === accountType,
+                  );
 
                   updateForm({
                     accountGroup: nextGroups.some(
@@ -268,6 +290,7 @@ export function ChartAccountFormDialog({
                       ? formState.accountGroup
                       : "",
                     accountType,
+                    parentAccountId: parentStillValid ? formState.parentAccountId : null,
                   });
                 }}
                 value={formState.accountType}
