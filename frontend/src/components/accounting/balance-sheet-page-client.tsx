@@ -193,9 +193,7 @@ function BalanceSheetRows({
             </tr>
           ))}
           <tr className="border-b border-slate-200">
-            <td className="px-10 py-3 font-bold text-slate-950">
-              Total for {group.group}
-            </td>
+            <td className="px-10 py-3 font-bold text-slate-950">Total for {group.group}</td>
             <AmountCell strong value={group.amount} />
           </tr>
         </Fragment>

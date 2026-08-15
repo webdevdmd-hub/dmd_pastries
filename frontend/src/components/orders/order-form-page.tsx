@@ -662,9 +662,7 @@ export function OrderFormPage({
                     ) : (
                       <select
                         className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs"
-                        onChange={(event) =>
-                          setTaxMode(event.target.value as typeof taxMode)
-                        }
+                        onChange={(event) => setTaxMode(event.target.value as typeof taxMode)}
                         value={taxMode}
                       >
                         <option value="">Business default</option>

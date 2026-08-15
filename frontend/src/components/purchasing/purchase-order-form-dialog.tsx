@@ -102,7 +102,8 @@ function resolveErrorField(path: (number | string)[] | undefined): FormFieldName
 
 function lockedFieldReason(isPartialAdjustment: boolean, isCorrectionEdit: boolean): string | null {
   if (isPartialAdjustment) return "Locked while adjusting a partially received order.";
-  if (isCorrectionEdit) return "Locked for correction edits — only items, delivery date, and notes can change.";
+  if (isCorrectionEdit)
+    return "Locked for correction edits — only items, delivery date, and notes can change.";
   return null;
 }
 
@@ -150,7 +151,15 @@ function FormSection({
   );
 }
 
-function StepBadge({ active, label, step }: { active: boolean; label: string; step: number }): JSX.Element {
+function StepBadge({
+  active,
+  label,
+  step,
+}: {
+  active: boolean;
+  label: string;
+  step: number;
+}): JSX.Element {
   return (
     <span
       className={cn(
@@ -339,7 +348,8 @@ export function PurchaseOrderFormDialog({
       });
 
       if (invalidLine) {
-        const message = "Correction quantities cannot be reduced below the already received quantity.";
+        const message =
+          "Correction quantities cannot be reduced below the already received quantity.";
         setLineErrors({ [invalidLine.lineId]: message });
         setError({ field: "items", message });
         return;
@@ -397,7 +407,8 @@ export function PurchaseOrderFormDialog({
   const branchFieldError = error?.field === "branchId" ? error.message : undefined;
   const supplierFieldError = error?.field === "supplierId" ? error.message : undefined;
   const orderDateFieldError = error?.field === "orderDate" ? error.message : undefined;
-  const expectedDeliveryFieldError = error?.field === "expectedDeliveryDate" ? error.message : undefined;
+  const expectedDeliveryFieldError =
+    error?.field === "expectedDeliveryDate" ? error.message : undefined;
   const notesFieldError = error?.field === "notes" ? error.message : undefined;
   const itemsFieldError = error?.field === "items" ? error.message : undefined;
   const generalFieldError = error?.field === null ? error.message : undefined;
@@ -475,8 +486,14 @@ export function PurchaseOrderFormDialog({
               title="Review revision impact"
             >
               <div className="grid gap-4 sm:grid-cols-3">
-                <ReviewFigure label="Original PO total" value={formatCurrency(order?.totalAmount ?? 0)} />
-                <ReviewFigure label="New estimated total" value={formatCurrency(estimatedRevisedTotal)} />
+                <ReviewFigure
+                  label="Original PO total"
+                  value={formatCurrency(order?.totalAmount ?? 0)}
+                />
+                <ReviewFigure
+                  label="New estimated total"
+                  value={formatCurrency(estimatedRevisedTotal)}
+                />
                 <ReviewFigure
                   label="Difference"
                   tone={revisionDifference >= 0 ? "increase" : "decrease"}
@@ -488,11 +505,14 @@ export function PurchaseOrderFormDialog({
                 {order?.purchaseOrderNumber ?? "this order"}.
               </p>
               <div className="mt-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
-                <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                <AlertTriangle
+                  aria-hidden="true"
+                  className="mt-0.5 h-4 w-4 shrink-0 text-amber-700"
+                />
                 <p className="text-sm text-amber-900">
-                  Posted GRNs, stock movements, bills, journals, and payments will not be
-                  rewritten. The backend will save a PO revision and keep correction impact
-                  visible for follow-up.
+                  Posted GRNs, stock movements, bills, journals, and payments will not be rewritten.
+                  The backend will save a PO revision and keep correction impact visible for
+                  follow-up.
                 </p>
               </div>
             </FormSection>

@@ -22,7 +22,9 @@ export function BreadcrumbLabelProvider({ children }: { children: ReactNode }): 
   const [label, setLabel] = useState<string | null>(null);
   const value = useMemo<BreadcrumbLabelContextValue>(() => ({ label, setLabel }), [label]);
 
-  return <BreadcrumbLabelContext.Provider value={value}>{children}</BreadcrumbLabelContext.Provider>;
+  return (
+    <BreadcrumbLabelContext.Provider value={value}>{children}</BreadcrumbLabelContext.Provider>
+  );
 }
 
 /** Read the currently published label (used by the header breadcrumb). */

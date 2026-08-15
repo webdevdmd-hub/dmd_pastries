@@ -7,14 +7,16 @@ import simpleImportSortPlugin from "eslint-plugin-simple-import-sort";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+import { designRules } from "./eslint.design-rules.mjs";
+
 const config = tseslint.config(
   {
     ignores: [
-      ".husky/**",
       ".next/**",
       "coverage/**",
       "dist/**",
       "eslint.config.mjs",
+      "eslint.design-rules.mjs",
       "next-env.d.ts",
       "node_modules/**",
       "postcss.config.mjs",
@@ -72,6 +74,15 @@ const config = tseslint.config(
       "simple-import-sort/exports": "error",
       "import/first": "error",
       "import/newline-after-import": "error",
+    },
+  },
+  {
+    // Design system guardrails. All at "warn" during the migration; each rule
+    // flips to "error" in the phase that clears it. See eslint.design-rules.mjs
+    // and docs/design/MIGRATION.md.
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": ["warn", ...designRules],
     },
   },
   prettierConfig,

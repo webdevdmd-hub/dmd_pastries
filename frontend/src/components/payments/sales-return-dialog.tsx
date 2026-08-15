@@ -381,7 +381,9 @@ export function SalesReturnDialog({
                   </div>
                   <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4">
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
-                      {refundMode === "store_credit" ? "Estimated store credit" : "Estimated refund"}
+                      {refundMode === "store_credit"
+                        ? "Estimated store credit"
+                        : "Estimated refund"}
                     </p>
                     <p className="mt-1 text-2xl font-black text-brand-espresso">
                       {formatMoney(

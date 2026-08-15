@@ -135,10 +135,7 @@ export function InventoryPageClient(): JSX.Element {
     () => ({ ...filters, search: debouncedSearch }),
     [debouncedSearch, filters],
   );
-  const inventoryQuery = useInventory(
-    inventoryQueryFilters,
-    canView && branchScope.hasBranchScope,
-  );
+  const inventoryQuery = useInventory(inventoryQueryFilters, canView && branchScope.hasBranchScope);
   const expiryAlertsQuery = useExpiryAlerts(
     {
       branchId: filters.branchId,

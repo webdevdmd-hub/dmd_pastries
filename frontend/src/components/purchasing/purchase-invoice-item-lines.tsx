@@ -52,11 +52,7 @@ function lineSecondaryDetail(line: PurchaseInvoiceItem): ReactNode {
   return <span className="text-[0.7rem] text-workspace-muted">{parts.join(" · ")}</span>;
 }
 
-export function PurchaseInvoiceItemLines({
-  items,
-}: {
-  items: PurchaseInvoiceItem[];
-}): JSX.Element {
+export function PurchaseInvoiceItemLines({ items }: { items: PurchaseInvoiceItem[] }): JSX.Element {
   return (
     <div className="overflow-x-auto">
       <Table className="min-w-[880px]">

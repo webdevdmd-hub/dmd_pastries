@@ -52,8 +52,8 @@ export function FinancialSummaryCards({
       ) : null}
       {summary?.sourceOfTruth === "journal_entries" ? (
         <p className="text-xs text-muted-foreground">
-          These totals are read from the accounting ledger and cross-checked against the
-          operational records.
+          These totals are read from the accounting ledger and cross-checked against the operational
+          records.
         </p>
       ) : null}
       {shouldShowCards ? (

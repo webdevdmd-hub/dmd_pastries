@@ -1119,7 +1119,8 @@ function PlatformSettlementDialog({
         <DialogHeader>
           <DialogTitle>Create settlement</DialogTitle>
           <DialogDescription>
-            Move a platform or card clearing balance to bank/cash and record commissions or processing fees.
+            Move a platform or card clearing balance to bank/cash and record commissions or
+            processing fees.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">

@@ -1,0 +1,1355 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pastries POS — Design System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ============================================================
+       * TOKENS — achromatic oklch neutrals, shadcn ramp.
+       * Every ratio in this file is measured, not estimated.
+       * ============================================================ */
+      :root {
+        --background: oklch(0.99 0 0); /* #FCFCFC */
+        --card: oklch(1 0 0); /* #FFFFFF */
+        --muted: oklch(0.97 0 0); /* #F5F5F5 */
+        --border: oklch(0.922 0 0); /* #E5E5E5 */
+        --foreground: oklch(0.145 0 0); /* #0A0A0A  19.3:1 */
+        --foreground-muted: oklch(0.556 0 0); /* #737373   4.6:1 */
+        --foreground-disabled: oklch(0.65 0 0); /* #8F8F8F   3.2:1 */
+        --primary: oklch(0.205 0 0); /* #171717  17.5:1 */
+        --primary-foreground: oklch(0.985 0 0);
+
+        --accent-solid: oklch(0.48 0.13 155); /* #00723B  white on it 6.1:1 */
+        --accent-hover: oklch(0.42 0.11 155);
+        --accent-text: oklch(0.42 0.11 155); /* #005E31   7.9:1 */
+        --accent-tint: oklch(0.965 0.02 155); /* #EAF8EE */
+
+        --warning-solid: oklch(0.58 0.13 75); /* #A66D00 */
+        --warning-text: oklch(0.45 0.11 70); /* #7B4800   7.4:1 */
+        --warning-tint: oklch(0.97 0.03 85); /* #FEF4DF */
+
+        --danger-solid: oklch(0.55 0.2 27); /* #CC2827 */
+        --danger-text: oklch(0.45 0.17 27); /* #9E1618   7.9:1 */
+        --danger-tint: oklch(0.965 0.02 20); /* #FFEFEE */
+
+        --info-solid: oklch(0.55 0.14 255); /* #3072C1 */
+        --info-text: oklch(0.45 0.13 255); /* #17559B   7.3:1 */
+        --info-tint: oklch(0.965 0.02 255); /* #EBF4FF */
+
+        --ring: oklch(0.55 0.14 255);
+
+        --radius: 0.625rem; /* 10px — shadcn default */
+        --radius-sm: 0.375rem;
+        --radius-lg: 0.875rem;
+
+        --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.05);
+        --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.06), 0 1px 2px oklch(0 0 0 / 0.04);
+        --shadow-md: 0 8px 24px oklch(0 0 0 / 0.08);
+
+        --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+        --mono: "Geist Mono", ui-monospace, monospace;
+        --serif: "Instrument Serif", Georgia, serif;
+        --ease: cubic-bezier(0.2, 0, 0, 1);
+      }
+
+      [data-theme="dark"] {
+        --background: oklch(0.145 0 0);
+        --card: oklch(0.205 0 0);
+        --muted: oklch(0.269 0 0);
+        --border: oklch(0.31 0 0);
+        --foreground: oklch(0.985 0 0);
+        --foreground-muted: oklch(0.708 0 0);
+        --foreground-disabled: oklch(0.55 0 0);
+        --primary: oklch(0.985 0 0);
+        --primary-foreground: oklch(0.205 0 0);
+
+        --accent-solid: oklch(0.62 0.15 155);
+        --accent-hover: oklch(0.68 0.16 155);
+        --accent-text: oklch(0.78 0.15 155);
+        --accent-tint: oklch(0.28 0.05 155);
+
+        --warning-solid: oklch(0.7 0.14 75);
+        --warning-text: oklch(0.82 0.13 80);
+        --warning-tint: oklch(0.29 0.05 75);
+
+        --danger-solid: oklch(0.62 0.2 27);
+        --danger-text: oklch(0.78 0.15 25);
+        --danger-tint: oklch(0.29 0.07 25);
+
+        --info-solid: oklch(0.62 0.15 255);
+        --info-text: oklch(0.78 0.12 255);
+        --info-tint: oklch(0.29 0.06 255);
+
+        --ring: oklch(0.62 0.15 255);
+        --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.4);
+        --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.5);
+        --shadow-md: 0 8px 24px oklch(0 0 0 / 0.6);
+      }
+
+      /* ============================================================ BASE */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+      body {
+        margin: 0;
+        background: var(--background);
+        color: var(--foreground);
+        font-family: var(--sans);
+        font-size: 14px;
+        line-height: 1.5;
+        font-feature-settings: "cv11", "ss01";
+        transition:
+          background 200ms var(--ease),
+          color 200ms var(--ease);
+      }
+      .tnum {
+        font-variant-numeric: tabular-nums;
+      }
+      button {
+        font: inherit;
+      }
+
+      .wrap {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 72px 32px 120px;
+      }
+
+      /* ============================================================ CHROME */
+      .toggle {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 50;
+        height: 34px;
+        padding: 0 14px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--foreground-muted);
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        box-shadow: var(--shadow-xs);
+        transition: all 150ms var(--ease);
+      }
+      .toggle:hover {
+        color: var(--foreground);
+      }
+
+      .hero {
+        margin-bottom: 96px;
+      }
+      .kicker {
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--foreground-muted);
+        margin: 0 0 24px;
+      }
+      .hero h1 {
+        font-size: clamp(40px, 6vw, 64px);
+        line-height: 1.02;
+        font-weight: 600;
+        letter-spacing: -0.04em;
+        margin: 0 0 24px;
+        max-width: 16ch;
+      }
+      .hero h1 em {
+        font-family: var(--serif);
+        font-style: italic;
+        font-weight: 400;
+        letter-spacing: -0.02em;
+      }
+      .hero p {
+        font-size: 17px;
+        line-height: 1.6;
+        color: var(--foreground-muted);
+        max-width: 60ch;
+        margin: 0;
+        letter-spacing: -0.011em;
+      }
+      .hero p strong {
+        color: var(--foreground);
+        font-weight: 500;
+      }
+
+      section {
+        margin-bottom: 88px;
+      }
+      .sec-label {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--foreground-muted);
+        margin: 0 0 10px;
+      }
+      section > h2 {
+        font-size: 28px;
+        line-height: 1.15;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+        margin: 0 0 12px;
+      }
+      .note {
+        color: var(--foreground-muted);
+        margin: 0 0 32px;
+        max-width: 68ch;
+        font-size: 14.5px;
+        line-height: 1.65;
+        letter-spacing: -0.006em;
+      }
+      .note code,
+      code.c {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        background: var(--muted);
+        padding: 2px 6px;
+        border-radius: 5px;
+        color: var(--foreground);
+      }
+
+      /* ============================================================ SURFACES */
+      .frame {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+      }
+      .frame-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
+      }
+      .frame-bar h3 {
+        font-size: 13.5px;
+        font-weight: 500;
+        margin: 0;
+        letter-spacing: -0.008em;
+      }
+      .frame-tag {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--foreground-muted);
+      }
+
+      /* ============================================================ POS */
+      .pos {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+      }
+      .pos-main {
+        padding: 16px;
+        background: var(--background);
+      }
+      .rail {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+      .pill {
+        height: 40px;
+        padding: 0 16px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        background: var(--muted);
+        color: var(--foreground-muted);
+        font-size: 13.5px;
+        font-weight: 500;
+        cursor: pointer;
+        letter-spacing: -0.008em;
+        transition: all 150ms var(--ease);
+      }
+      .pill:hover {
+        color: var(--foreground);
+      }
+      .pill.on {
+        background: var(--primary);
+        color: var(--primary-foreground);
+      }
+
+      .tiles {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .tile {
+        position: relative;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        transition: all 150ms var(--ease);
+      }
+      .tile:hover {
+        box-shadow: var(--shadow-sm);
+        transform: translateY(-1px);
+      }
+      .tile .thumb {
+        height: 78px;
+        background: var(--muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+      }
+      .tile .body {
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        flex: 1;
+      }
+      .tile .nm {
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 1.3;
+        letter-spacing: -0.011em;
+      }
+      .tile .row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: auto;
+      }
+      .tile .cat {
+        font-size: 12.5px;
+        color: var(--foreground-muted);
+        letter-spacing: -0.006em;
+      }
+      .tile .amt {
+        font-family: var(--mono);
+        font-size: 14px;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+      }
+      .tile .var {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        height: 48px;
+        min-width: 48px;
+        padding: 0 10px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--foreground-muted);
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        box-shadow: var(--shadow-xs);
+      }
+      .tile .var:hover {
+        color: var(--foreground);
+      }
+
+      .cart {
+        background: var(--card);
+        border-left: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+      }
+      .cart-body {
+        flex: 1;
+        padding: 8px 16px;
+      }
+      .li {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 2px 12px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .li:last-child {
+        border-bottom: 0;
+      }
+      .li .d {
+        font-size: 14px;
+        font-weight: 500;
+        letter-spacing: -0.011em;
+      }
+      .li .q {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--foreground-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .li .v {
+        font-family: var(--mono);
+        font-size: 14px;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        align-self: center;
+        grid-row: span 2;
+        letter-spacing: -0.02em;
+      }
+
+      .sum {
+        padding: 16px;
+        border-top: 1px solid var(--border);
+      }
+      .sum-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: 4px 0;
+        font-size: 13.5px;
+        color: var(--foreground-muted);
+        letter-spacing: -0.008em;
+      }
+      .sum-row .v {
+        font-family: var(--mono);
+        font-variant-numeric: tabular-nums;
+        color: var(--foreground);
+      }
+      .grand {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: 16px 0 18px;
+        margin-top: 8px;
+        border-top: 1px solid var(--border);
+      }
+      .grand .k {
+        font-size: 13.5px;
+        color: var(--foreground-muted);
+        letter-spacing: -0.008em;
+      }
+      .grand .v {
+        font-family: var(--mono);
+        font-size: 32px;
+        line-height: 1;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.045em;
+      }
+      .seg {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        padding: 4px;
+        background: var(--muted);
+        border-radius: var(--radius);
+        margin-bottom: 8px;
+      }
+      .seg button {
+        height: 40px;
+        border: 0;
+        border-radius: calc(var(--radius) - 4px);
+        background: transparent;
+        color: var(--foreground-muted);
+        font-size: 13.5px;
+        font-weight: 500;
+        cursor: pointer;
+        letter-spacing: -0.008em;
+        transition: all 150ms var(--ease);
+      }
+      .seg button.on {
+        background: var(--card);
+        color: var(--foreground);
+        box-shadow: var(--shadow-xs);
+      }
+      .commit {
+        width: 100%;
+        height: 48px;
+        border: 0;
+        border-radius: var(--radius);
+        background: var(--accent-solid);
+        color: #fff;
+        font-size: 14.5px;
+        font-weight: 500;
+        cursor: pointer;
+        letter-spacing: -0.011em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        transition: background 150ms var(--ease);
+      }
+      .commit:hover {
+        background: var(--accent-hover);
+      }
+      .commit .n {
+        font-family: var(--mono);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+      }
+
+      /* ============================================================ KPI */
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .kpi {
+        background: var(--muted);
+        border-radius: var(--radius);
+        padding: 18px;
+      }
+      .kpi .k {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--foreground-muted);
+        letter-spacing: -0.008em;
+        margin-bottom: 10px;
+      }
+      .kpi .v {
+        font-size: 28px;
+        line-height: 1.05;
+        font-weight: 500;
+        letter-spacing: -0.04em;
+        font-variant-numeric: tabular-nums;
+      }
+      .kpi .sub {
+        font-size: 12.5px;
+        color: var(--foreground-muted);
+        margin-top: 8px;
+        letter-spacing: -0.006em;
+      }
+      .delta {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        font-weight: 500;
+        padding: 2px 7px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        font-variant-numeric: tabular-nums;
+      }
+      .delta.up {
+        color: var(--accent-text);
+      }
+      .delta.dn {
+        color: var(--danger-text);
+      }
+
+      /* ============================================================ TABLE */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      thead th {
+        font-size: 12.5px;
+        font-weight: 500;
+        color: var(--foreground-muted);
+        text-align: left;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+        letter-spacing: -0.006em;
+      }
+      tbody td {
+        font-size: 13.5px;
+        padding: 0 16px;
+        height: 44px;
+        border-bottom: 1px solid var(--border);
+        letter-spacing: -0.008em;
+        white-space: nowrap;
+      }
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+      tbody tr:hover td {
+        background: var(--muted);
+      }
+      td.n,
+      th.n {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+      }
+      td.ref {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        color: var(--foreground-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      tfoot td {
+        font-size: 13.5px;
+        font-weight: 500;
+        padding: 14px 16px;
+        border-top: 1px solid var(--border);
+        background: var(--muted);
+        letter-spacing: -0.008em;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 22px;
+        padding: 0 9px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: -0.006em;
+        white-space: nowrap;
+      }
+      .tag i {
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: currentColor;
+        flex: none;
+      }
+      .t-ok {
+        background: var(--accent-tint);
+        color: var(--accent-text);
+      }
+      .t-warn {
+        background: var(--warning-tint);
+        color: var(--warning-text);
+      }
+      .t-bad {
+        background: var(--danger-tint);
+        color: var(--danger-text);
+      }
+      .t-info {
+        background: var(--info-tint);
+        color: var(--info-text);
+      }
+      .t-neutral {
+        background: var(--muted);
+        color: var(--foreground-muted);
+      }
+
+      /* ============================================================ SWATCH */
+      .ramp {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .sw {
+        border-radius: var(--radius);
+        overflow: hidden;
+        border: 1px solid var(--border);
+        background: var(--card);
+      }
+      .sw .c {
+        height: 60px;
+      }
+      .sw .m {
+        padding: 9px 10px 11px;
+      }
+      .sw .n {
+        font-size: 12.5px;
+        font-weight: 500;
+        display: block;
+        letter-spacing: -0.008em;
+      }
+      .sw .h {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        color: var(--foreground-muted);
+        display: block;
+        margin-top: 2px;
+      }
+      .sw .r {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--foreground-muted);
+        display: block;
+        margin-top: 5px;
+      }
+
+      /* ============================================================ TYPE */
+      .tr {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 28px;
+        padding: 16px;
+        border-bottom: 1px solid var(--border);
+        align-items: baseline;
+      }
+      .tr:last-child {
+        border-bottom: 0;
+      }
+      .ts {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--foreground-muted);
+        line-height: 1.6;
+      }
+      .ts b {
+        display: block;
+        color: var(--foreground);
+        font-weight: 500;
+      }
+
+      /* ============================================================ BUTTONS */
+      .btns {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        padding: 16px;
+      }
+      .btn {
+        height: 36px;
+        padding: 0 14px;
+        border-radius: var(--radius);
+        font-size: 13.5px;
+        font-weight: 500;
+        letter-spacing: -0.008em;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: all 150ms var(--ease);
+      }
+      .btn:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+      }
+      .v-primary {
+        background: var(--primary);
+        color: var(--primary-foreground);
+      }
+      .v-primary:hover {
+        opacity: 0.9;
+      }
+      .v-commit {
+        background: var(--accent-solid);
+        color: #fff;
+      }
+      .v-commit:hover {
+        background: var(--accent-hover);
+      }
+      .v-outline {
+        background: var(--card);
+        border-color: var(--border);
+        color: var(--foreground);
+      }
+      .v-outline:hover {
+        background: var(--muted);
+      }
+      .v-ghost {
+        background: transparent;
+        color: var(--foreground-muted);
+      }
+      .v-ghost:hover {
+        background: var(--muted);
+        color: var(--foreground);
+      }
+      .v-danger {
+        background: var(--card);
+        border-color: var(--border);
+        color: var(--danger-text);
+      }
+      .v-danger:hover {
+        background: var(--danger-tint);
+      }
+      .big {
+        height: 48px;
+        padding: 0 20px;
+        font-size: 14.5px;
+      }
+
+      /* ============================================================ MISC */
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .box {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px;
+        background: var(--card);
+      }
+      .box h4 {
+        margin: 0 0 14px;
+        font-size: 13.5px;
+        font-weight: 500;
+        letter-spacing: -0.008em;
+      }
+      .box ul {
+        margin: 0;
+        padding-left: 17px;
+        font-size: 13.5px;
+        line-height: 1.8;
+        color: var(--foreground-muted);
+        letter-spacing: -0.006em;
+      }
+      .brandmark {
+        background: var(--muted);
+        border-radius: var(--radius-lg);
+        padding: 88px 40px;
+        text-align: center;
+      }
+      .brandmark .w {
+        font-family: var(--serif);
+        font-size: 68px;
+        line-height: 1;
+        letter-spacing: -0.03em;
+        margin: 0 0 18px;
+        font-weight: 400;
+      }
+      .brandmark p {
+        color: var(--foreground-muted);
+        font-size: 15px;
+        max-width: 44ch;
+        margin: 0 auto;
+        letter-spacing: -0.008em;
+        line-height: 1.6;
+      }
+      footer {
+        border-top: 1px solid var(--border);
+        padding-top: 28px;
+        color: var(--foreground-muted);
+        font-size: 13px;
+        line-height: 1.75;
+        letter-spacing: -0.006em;
+      }
+      footer a {
+        color: var(--foreground);
+      }
+
+      @media (max-width: 900px) {
+        .pos,
+        .grid2 {
+          grid-template-columns: 1fr;
+        }
+        .kpis {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .tiles {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .wrap {
+          padding: 56px 20px 88px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <button class="toggle" onclick="
+      const r=document.documentElement;
+      const d=r.dataset.theme==='dark';
+      r.dataset.theme=d?'light':'dark';
+      this.textContent=d?'Dark':'Light';
+    ">Dark</button>
+
+    <div class="wrap">
+      <header class="hero">
+        <p class="kicker">Pastries POS — design system v2</p>
+        <h1>Monochrome by default. <em>Color means money.</em></h1>
+        <p>
+          Neutrals carry zero chroma, so the only saturated thing on any screen is the thing that
+          moves money or warns you. Two densities over one token set: the counter gets 48px targets
+          and a mono readout, the ledger gets 44px rows and tabular figures.
+          <strong>The total is the memorable thing</strong> — readable across a counter, tied to the
+          ledger.
+        </p>
+      </header>
+
+      <!-- ================= COUNTER ================= -->
+      <section>
+        <p class="sec-label">01 / counter</p>
+        <h2>Point of sale</h2>
+        <p class="note">
+          Every target is at least 48&times;48px, including the variants button that is
+          <code>h-7</code> (28px) today. Cards lift on hover instead of changing border color.
+          Payment method is a segmented control, not two competing buttons. One green button on the
+          screen, and it is the one that takes the money.
+        </p>
+        <div class="frame">
+          <div class="frame-bar">
+            <h3>Counter</h3>
+            <span class="frame-tag">data-density="counter"</span>
+          </div>
+          <div class="pos">
+            <div class="pos-main">
+              <div class="rail">
+                <button class="pill on">All</button>
+                <button class="pill">Croissants</button>
+                <button class="pill">Cakes</button>
+                <button class="pill">Breads</button>
+                <button class="pill">Drinks</button>
+              </div>
+              <div class="tiles">
+                <div class="tile">
+                  <div class="thumb">🥐</div>
+                  <div class="body">
+                    <span class="nm">Butter Croissant</span>
+                    <div class="row"><span class="cat">Croissants</span><span class="amt">8.50</span></div>
+                  </div>
+                </div>
+                <div class="tile">
+                  <button class="var">3 sizes</button>
+                  <div class="thumb">🍰</div>
+                  <div class="body">
+                    <span class="nm">Pistachio Cheesecake</span>
+                    <div class="row"><span class="cat">Cakes</span><span class="amt">34.00</span></div>
+                  </div>
+                </div>
+                <div class="tile" style="opacity: 0.55">
+                  <div class="thumb">🥖</div>
+                  <div class="body">
+                    <span class="nm">Sourdough Loaf</span>
+                    <div class="row">
+                      <span class="tag t-bad"><i></i>Out of stock</span><span class="amt">22.00</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="tile">
+                  <div class="thumb">🍫</div>
+                  <div class="body">
+                    <span class="nm">Pain au Chocolat</span>
+                    <div class="row"><span class="cat">Croissants</span><span class="amt">10.00</span></div>
+                  </div>
+                </div>
+                <div class="tile">
+                  <div class="thumb">☕</div>
+                  <div class="body">
+                    <span class="nm">Flat White</span>
+                    <div class="row"><span class="cat">Drinks</span><span class="amt">18.00</span></div>
+                  </div>
+                </div>
+                <div class="tile">
+                  <div class="thumb">🧁</div>
+                  <div class="body">
+                    <span class="nm">Date &amp; Walnut Muffin</span>
+                    <div class="row"><span class="cat">Cakes</span><span class="amt">12.00</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <aside class="cart">
+              <div class="cart-body">
+                <div class="li">
+                  <span class="d">Butter Croissant</span><span class="v">17.00</span
+                  ><span class="q">2 × 8.50</span>
+                </div>
+                <div class="li">
+                  <span class="d">Pistachio Cheesecake</span><span class="v">34.00</span
+                  ><span class="q">1 × 34.00 · Slice</span>
+                </div>
+                <div class="li">
+                  <span class="d">Flat White</span><span class="v">36.00</span
+                  ><span class="q">2 × 18.00</span>
+                </div>
+              </div>
+              <div class="sum">
+                <div class="sum-row"><span>Subtotal</span><span class="v">87.00</span></div>
+                <div class="sum-row"><span>Discount 5%</span><span class="v">−4.35</span></div>
+                <div class="sum-row"><span>VAT 5%</span><span class="v">4.13</span></div>
+                <div class="grand"><span class="k">Total</span><span class="v">86.78</span></div>
+                <div class="seg">
+                  <button class="on">Cash</button><button>Card</button>
+                </div>
+                <button class="commit">Charge <span class="n">AED 86.78</span></button>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= LEDGER ================= -->
+      <section>
+        <p class="sec-label">02 / ledger</p>
+        <h2>Accounting</h2>
+        <p class="note">
+          KPI cards are <code>bg-muted</code> fills with no border, which is the shadcn signature and
+          the thing my first pass missed. No vertical rules in the table. Numbers are tabular and
+          negatively tracked so columns lock. Status is a tint plus a dot, never color alone.
+        </p>
+
+        <div class="kpis">
+          <div class="kpi">
+            <div class="k">Revenue <span class="delta up">+12.4%</span></div>
+            <div class="v">128,406.55</div>
+            <div class="sub">August, month to date</div>
+          </div>
+          <div class="kpi">
+            <div class="k">Gross margin <span class="delta up">+2.1pt</span></div>
+            <div class="v">61.8%</div>
+            <div class="sub">After bakery COGS</div>
+          </div>
+          <div class="kpi">
+            <div class="k">VAT payable <span class="delta dn">−3.2%</span></div>
+            <div class="v">6,120.28</div>
+            <div class="sub">Due 28 Sep 2026</div>
+          </div>
+          <div class="kpi">
+            <div class="k">Unreconciled <span class="delta dn">4 items</span></div>
+            <div class="v">3,377.25</div>
+            <div class="sub">Card settlements</div>
+          </div>
+        </div>
+
+        <div class="frame">
+          <div class="frame-bar">
+            <h3>General ledger</h3>
+            <span class="frame-tag">44px rows · tabular</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 118px">Date</th>
+                <th style="width: 130px">Reference</th>
+                <th>Account</th>
+                <th style="width: 128px">Status</th>
+                <th class="n" style="width: 112px">Debit</th>
+                <th class="n" style="width: 112px">Credit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>01 Aug 2026</td>
+                <td class="ref">JE-2026-0841</td>
+                <td>4100 · Sales revenue</td>
+                <td><span class="tag t-ok"><i></i>Posted</span></td>
+                <td class="n">—</td>
+                <td class="n">12,480.00</td>
+              </tr>
+              <tr>
+                <td>01 Aug 2026</td>
+                <td class="ref">JE-2026-0841</td>
+                <td>1010 · Cash on hand</td>
+                <td><span class="tag t-ok"><i></i>Posted</span></td>
+                <td class="n">9,102.75</td>
+                <td class="n">—</td>
+              </tr>
+              <tr>
+                <td>03 Aug 2026</td>
+                <td class="ref">JE-2026-0847</td>
+                <td>5200 · Bakery COGS</td>
+                <td><span class="tag t-neutral"><i></i>Draft</span></td>
+                <td class="n">4,318.20</td>
+                <td class="n">—</td>
+              </tr>
+              <tr>
+                <td>07 Aug 2026</td>
+                <td class="ref">JE-2026-0863</td>
+                <td>2110 · VAT payable</td>
+                <td><span class="tag t-warn"><i></i>Unreconciled</span></td>
+                <td class="n">—</td>
+                <td class="n">624.00</td>
+              </tr>
+              <tr>
+                <td>09 Aug 2026</td>
+                <td class="ref">JE-2026-0871</td>
+                <td>4900 · Refunds and returns</td>
+                <td><span class="tag t-bad"><i></i>Voided</span></td>
+                <td class="n">186.50</td>
+                <td class="n">—</td>
+              </tr>
+              <tr>
+                <td>12 Aug 2026</td>
+                <td class="ref">JE-2026-0884</td>
+                <td>1200 · Card settlements receivable</td>
+                <td><span class="tag t-info"><i></i>Pending</span></td>
+                <td class="n">3,377.25</td>
+                <td class="n">—</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4">6 entries</td>
+                <td class="n">16,984.70</td>
+                <td class="n">13,104.00</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= COLOR ================= -->
+      <section>
+        <p class="sec-label">03 / color</p>
+        <h2>Achromatic base, one accent</h2>
+        <p class="note">
+          Neutrals are <code>oklch(L 0 0)</code>. Zero chroma means no warm cast fighting a trial
+          balance, and it is why shadcn reads clean. Every ratio below was measured in a browser, not
+          estimated. Toggle dark mode above and nothing here breaks, because dark redefines the same
+          eleven tokens.
+        </p>
+
+        <div class="ramp">
+          <div class="sw">
+            <div class="c" style="background: var(--background)"></div>
+            <div class="m"><span class="n">background</span><span class="h">#FCFCFC</span></div>
+          </div>
+          <div class="sw">
+            <div class="c" style="background: var(--card)"></div>
+            <div class="m"><span class="n">card</span><span class="h">#FFFFFF</span></div>
+          </div>
+          <div class="sw">
+            <div class="c" style="background: var(--muted)"></div>
+            <div class="m"><span class="n">muted</span><span class="h">#F5F5F5</span></div>
+          </div>
+          <div class="sw">
+            <div class="c" style="background: var(--border)"></div>
+            <div class="m"><span class="n">border</span><span class="h">#E5E5E5</span></div>
+          </div>
+          <div class="sw">
+            <div class="c" style="background: var(--foreground-muted)"></div>
+            <div class="m">
+              <span class="n">fg-muted</span><span class="h">#737373</span
+              ><span class="r">4.62 : 1 · AA</span>
+            </div>
+          </div>
+          <div class="sw">
+            <div class="c" style="background: var(--foreground)"></div>
+            <div class="m">
+              <span class="n">foreground</span><span class="h">#0A0A0A</span
+              ><span class="r">19.3 : 1 · AAA</span>
+            </div>
+          </div>
+          <div class="sw">
+            <div class="c" style="background: var(--primary)"></div>
+            <div class="m">
+              <span class="n">primary</span><span class="h">#171717</span
+              ><span class="r">17.5 : 1 · AAA</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ramp">
+          <div class="sw">
+            <div class="c" style="background: var(--accent-solid)"></div>
+            <div class="m">
+              <span class="n">accent</span><span class="h">#00723B</span
+              ><span class="r">white 6.05 : 1</span>
+            </div>
+          </div>
+          <div class="sw">
+            <div class="c" style="background: var(--accent-tint)"></div>
+            <div class="m">
+              <span class="n">accent tint</span><span class="h">#EAF8EE</span
+              ><span class="r">pair 7.24 : 1</span>
+            </div>
+          </div>
+          <div class="sw">
+            <div class="c" style="background: var(--warning-solid)"></div>
+            <div class="m">
+              <span class="n">warning</span><span class="h">#A66D00</span
+              ><span class="r">text 7.39 : 1</span>
+            </div>
+          </div>
+          <div class="sw">
+            <div class="c" style="background: var(--warning-tint)"></div>
+            <div class="m">
+              <span class="n">warning tint</span><span class="h">#FEF4DF</span
+              ><span class="r">pair 6.94 : 1</span>
+            </div>
+          </div>
+          <div class="sw">
+            <div class="c" style="background: var(--danger-solid)"></div>
+            <div class="m">
+              <span class="n">danger</span><span class="h">#CC2827</span
+              ><span class="r">white 5.38 : 1</span>
+            </div>
+          </div>
+          <div class="sw">
+            <div class="c" style="background: var(--danger-tint)"></div>
+            <div class="m">
+              <span class="n">danger tint</span><span class="h">#FFEFEE</span
+              ><span class="r">pair 7.29 : 1</span>
+            </div>
+          </div>
+          <div class="sw">
+            <div class="c" style="background: var(--info-solid)"></div>
+            <div class="m">
+              <span class="n">info / ring</span><span class="h">#3072C1</span
+              ><span class="r">text 7.29 : 1</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="frame">
+          <div class="frame-bar"><h3>Status</h3><span class="frame-tag">tint + dot + label</span></div>
+          <div class="btns">
+            <span class="tag t-ok"><i></i>Paid</span>
+            <span class="tag t-ok"><i></i>Reconciled</span>
+            <span class="tag t-ok"><i></i>Closed</span>
+            <span class="tag t-warn"><i></i>Held</span>
+            <span class="tag t-warn"><i></i>Low stock</span>
+            <span class="tag t-warn"><i></i>Expiring</span>
+            <span class="tag t-bad"><i></i>Voided</span>
+            <span class="tag t-bad"><i></i>Out of stock</span>
+            <span class="tag t-bad"><i></i>Unbalanced</span>
+            <span class="tag t-info"><i></i>Pending</span>
+            <span class="tag t-neutral"><i></i>Draft</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TYPE ================= -->
+      <section>
+        <p class="sec-label">04 / type</p>
+        <h2>Geist, Geist Mono, Instrument Serif</h2>
+        <p class="note">
+          Geist is a modern grotesk with a matched mono, which solves the money problem in one
+          family instead of pairing two unrelated ones. Negative tracking on everything above 14px,
+          scaling to −0.045em on the total. No uppercase, no letterspacing, no weight above 600 —
+          those three are the dated tells in the current build, where
+          <code>font-black</code> appears 78 times.
+        </p>
+        <div class="frame">
+          <div class="tr">
+            <div class="ts"><b>meta</b>12.5 / 16 · 400</div>
+            <div style="font-size: 12.5px; color: var(--foreground-muted)">
+              Batch B-2026-114 · 220 units · produced 08:40
+            </div>
+          </div>
+          <div class="tr">
+            <div class="ts"><b>cell</b>13.5 / 18 · 400<br />−0.008em</div>
+            <div style="font-size: 13.5px; letter-spacing: -0.008em">
+              4100 · Sales revenue — Al Barsha, August 2026
+            </div>
+          </div>
+          <div class="tr">
+            <div class="ts"><b>body</b>14.5 / 22 · 400<br />−0.011em</div>
+            <div style="font-size: 14.5px; line-height: 22px; letter-spacing: -0.011em">
+              Closing this period locks all journal entries dated on or before 31 Aug 2026.
+            </div>
+          </div>
+          <div class="tr">
+            <div class="ts"><b>title</b>18 / 24 · 500<br />−0.02em</div>
+            <div style="font-size: 18px; font-weight: 500; letter-spacing: -0.02em">
+              Trial balance
+            </div>
+          </div>
+          <div class="tr">
+            <div class="ts"><b>page</b>28 / 32 · 600<br />−0.03em</div>
+            <div style="font-size: 28px; font-weight: 600; letter-spacing: -0.03em">
+              Chart of accounts
+            </div>
+          </div>
+          <div class="tr">
+            <div class="ts"><b>kpi</b>28 / 30 · 500<br />−0.04em · tabular</div>
+            <div style="font-size: 28px; font-weight: 500; letter-spacing: -0.04em" class="tnum">
+              128,406.55
+            </div>
+          </div>
+          <div class="tr">
+            <div class="ts"><b>total</b>32 / 32 · 500<br />mono · −0.045em</div>
+            <div
+              style="
+                font-family: var(--mono);
+                font-size: 32px;
+                font-weight: 500;
+                letter-spacing: -0.045em;
+              "
+              class="tnum"
+            >
+              86.78
+            </div>
+          </div>
+          <div class="tr">
+            <div class="ts"><b>display</b>Instrument Serif<br />threshold only</div>
+            <div style="font-family: var(--serif); font-size: 34px; letter-spacing: -0.02em">
+              Pastries
+            </div>
+          </div>
+        </div>
+
+        <div class="grid2" style="margin-top: 12px">
+          <div class="box">
+            <h4>What v1 got wrong</h4>
+            <ul>
+              <li>Cream <code class="c">#FBFAF8</code> canvas, warm chroma in every neutral</li>
+              <li>Uppercase labels with <code class="c">0.12em</code> tracking</li>
+              <li>A tan accent at 3.2:1 that could never carry text</li>
+              <li>A visible border on every card</li>
+              <li>Cormorant Garamond, a 2016 display serif</li>
+            </ul>
+          </div>
+          <div class="box">
+            <h4>What v2 does</h4>
+            <ul>
+              <li>Zero-chroma neutrals, exactly shadcn's ramp</li>
+              <li>Sentence case, negative tracking, no letterspacing</li>
+              <li>One accent, reserved for money and success</li>
+              <li><code class="c">bg-muted</code> fills instead of borders</li>
+              <li>Geist + Geist Mono, one family, matched widths</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= CONTROLS ================= -->
+      <section>
+        <p class="sec-label">05 / controls</p>
+        <h2>Buttons and density</h2>
+        <p class="note">
+          <code>--radius: 0.625rem</code>, shadcn's default, down from the current
+          <code>0.875rem</code>. 36px in the ledger, 48px at the counter. Focus is always the blue
+          ring, never the brand — a brand ring on a brand button is what the current build has, and
+          it is invisible.
+        </p>
+        <div class="frame">
+          <div class="btns">
+            <button class="btn v-primary">Primary</button>
+            <button class="btn v-commit">Post journal entry</button>
+            <button class="btn v-outline">Outline</button>
+            <button class="btn v-ghost">Ghost</button>
+            <button class="btn v-danger">Void sale</button>
+          </div>
+          <div class="btns" style="border-top: 1px solid var(--border)">
+            <button class="btn v-primary big">Add to cart</button>
+            <button class="btn v-commit big">Charge AED 86.78</button>
+            <button class="btn v-outline big">Hold sale</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= THRESHOLD ================= -->
+      <section>
+        <p class="sec-label">06 / threshold</p>
+        <h2>Where the bakery shows up</h2>
+        <p class="note">
+          Login, receipt header, marketing. Identity lives in one serif wordmark and a lot of space,
+          not in a tinted background. This replaces the two 18rem blurred gradient orbs drifting on
+          an 11-second loop behind the current login screen.
+        </p>
+        <div class="brandmark">
+          <p class="w">Pastries</p>
+          <p>Production-based point of sale and accounting for bakery operations.</p>
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          System documented in <a href="../../DESIGN.md">DESIGN.md</a> · tokens in
+          <code class="c">docs/design/tokens.css</code> · Tailwind wiring in
+          <code class="c">docs/design/tailwind.config.proposed.ts</code> · adoption in
+          <code class="c">docs/design/MIGRATION.md</code>
+        </p>
+        <p>
+          Nothing here is applied to app code. Contrast ratios were computed in-browser against the
+          rendered oklch values. Reference research: shadcn blocks, Midday, Linear, Attio.
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>

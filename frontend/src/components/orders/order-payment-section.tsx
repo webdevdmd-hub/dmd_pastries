@@ -34,7 +34,7 @@ export function OrderPaymentSection({
   const addPaymentMutation = useAddOrderPayment();
   const refundMutation = useRefundOrderPayment();
   // Completed orders refund against collected money net of prior refunds;
-  // any other status refunds the advance balance held in Customer Advance.
+  // every other status refunds the advance balance held in Customer Advance.
   const refundableAmount = order
     ? order.orderStatus === "completed"
       ? Math.max(order.paidAmount - order.refundedAmount, 0)

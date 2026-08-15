@@ -286,7 +286,9 @@ export function PurchaseInvoiceFormDialog({
             value={dueDate}
           />
           <Select
-            onValueChange={(value) => setTaxMode(value === "default" ? "" : (value as typeof taxMode))}
+            onValueChange={(value) =>
+              setTaxMode(value === "default" ? "" : (value as typeof taxMode))
+            }
             value={taxMode === "" ? "default" : taxMode}
           >
             <SelectTrigger aria-label="VAT mode" className="h-9 text-xs">

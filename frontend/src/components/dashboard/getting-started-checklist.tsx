@@ -1,7 +1,15 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { ArrowRight, Building2, CheckCircle2, Circle, Croissant, ReceiptText, X } from "lucide-react";
+import {
+  ArrowRight,
+  Building2,
+  CheckCircle2,
+  Circle,
+  Croissant,
+  ReceiptText,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -94,7 +102,9 @@ export function GettingStartedChecklist({
   // Default unknown/blocked signals to "complete" so we never nag the user with
   // a step they cannot see or act on (e.g. missing settings/products access).
   const setupComplete = onboardingQuery.data ? onboardingQuery.data.complete : true;
-  const hasProduct = productsQuery.data ? productsQuery.data.total > 0 : Boolean(productsQuery.error);
+  const hasProduct = productsQuery.data
+    ? productsQuery.data.total > 0
+    : Boolean(productsQuery.error);
 
   const steps = useMemo<ChecklistStep[]>(
     () => [
@@ -201,9 +211,7 @@ export function GettingStartedChecklist({
                 <span
                   className={cn(
                     "block text-sm font-semibold",
-                    step.complete
-                      ? "text-workspace-muted line-through"
-                      : "text-brand-espresso",
+                    step.complete ? "text-workspace-muted line-through" : "text-brand-espresso",
                   )}
                 >
                   {step.title}

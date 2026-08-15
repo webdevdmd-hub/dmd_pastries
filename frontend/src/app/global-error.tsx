@@ -49,7 +49,9 @@ export default function GlobalError({ error, reset }: GlobalErrorProps): JSX.Ele
             <h1 style={{ fontSize: "1.25rem", fontWeight: 600, margin: "0 0 0.5rem" }}>
               Something went wrong
             </h1>
-            <p style={{ fontSize: "0.875rem", lineHeight: 1.6, opacity: 0.8, margin: "0 0 1.5rem" }}>
+            <p
+              style={{ fontSize: "0.875rem", lineHeight: 1.6, opacity: 0.8, margin: "0 0 1.5rem" }}
+            >
               The application ran into an unexpected error. Try again, or reload if the problem
               continues.
             </p>

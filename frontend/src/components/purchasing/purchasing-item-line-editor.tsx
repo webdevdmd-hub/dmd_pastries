@@ -422,7 +422,9 @@ export function PurchasingItemLineEditor({
                   <tr
                     className={cn(
                       "border-b border-workspace-border align-top",
-                      accountLine ? "border-l-2 border-l-amber-400 bg-amber-50/30" : "border-l-2 border-l-brand-caramel/60",
+                      accountLine
+                        ? "border-l-2 border-l-amber-400 bg-amber-50/30"
+                        : "border-l-2 border-l-brand-caramel/60",
                       lineError ? "bg-red-50/60" : undefined,
                     )}
                     key={line.lineId}

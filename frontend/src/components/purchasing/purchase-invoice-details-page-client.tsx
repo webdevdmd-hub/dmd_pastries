@@ -70,9 +70,7 @@ function formatDateTime(value: string | null): string {
   if (!value) return "Not recorded";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Not recorded";
-  return new Intl.DateTimeFormat("en-AE", { dateStyle: "medium", timeStyle: "short" }).format(
-    date,
-  );
+  return new Intl.DateTimeFormat("en-AE", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
 function today(): string {
@@ -85,9 +83,10 @@ function balanceTone(paymentStatus: PurchasePaymentStatus, balanceAmount: number
   return "text-amber-600";
 }
 
-function receiveStatusMeta(
-  status: PurchaseInvoice["receiveStatus"],
-): { label: string; tone: "muted" | "warning" | "success" } {
+function receiveStatusMeta(status: PurchaseInvoice["receiveStatus"]): {
+  label: string;
+  tone: "muted" | "warning" | "success";
+} {
   if (status === "received") return { label: "Received", tone: "success" };
   if (status === "partially_received") return { label: "Partially received", tone: "warning" };
   return { label: "Not received", tone: "muted" };
@@ -116,9 +115,7 @@ function SectionHeader({
 function InfoField({ label, value }: { label: string; value: ReactNode }): JSX.Element {
   return (
     <div className="min-w-0">
-      <p className="text-xs font-semibold uppercase tracking-wide text-workspace-muted">
-        {label}
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-workspace-muted">{label}</p>
       <div className="mt-1 text-sm font-semibold text-brand-espresso">{value}</div>
     </div>
   );

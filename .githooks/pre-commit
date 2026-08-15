@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Pre-commit gate for the frontend workspace.
+#
+# Installed into .git/hooks/pre-commit by frontend/scripts/install-hooks.mjs.
+# We install a single hook file rather than setting core.hooksPath, because
+# core.hooksPath would make git ignore .git/hooks entirely, which is where
+# Git LFS keeps post-checkout, post-commit, post-merge and pre-push. Pointing
+# hooksPath elsewhere silently disables LFS for this repo.
+#
+# This runs lint-staged (changed files only) so committing stays fast.
+# For the full sweep before pushing or merging, run: cd frontend && pnpm verify
+
+set -e
+
+# Only run when frontend files are staged.
+if ! git diff --cached --name-only | grep -q '^frontend/'; then
+  exit 0
+fi
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root/frontend"
+
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "pre-commit: pnpm not found on PATH, skipping frontend checks" >&2
+  exit 0
+fi
+
+pnpm lint-staged

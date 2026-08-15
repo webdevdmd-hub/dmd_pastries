@@ -218,9 +218,7 @@ export function usePOSCart() {
       );
       const inclusive = effectiveInclusive(item.taxRateIsInclusive, taxMode);
       const lineTax =
-        taxMode === "no_tax"
-          ? 0
-          : calculateTax(discountedLine, item.taxRatePercentage, inclusive);
+        taxMode === "no_tax" ? 0 : calculateTax(discountedLine, item.taxRatePercentage, inclusive);
       taxAmount += lineTax;
       itemsTotal += inclusive || taxMode === "no_tax" ? discountedLine : discountedLine + lineTax;
     });

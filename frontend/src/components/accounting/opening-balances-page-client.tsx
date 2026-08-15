@@ -270,9 +270,9 @@ export function OpeningBalancesPageClient(): JSX.Element {
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <p className="text-xs text-muted-foreground">
-              Cash and bank balances are set on the payment account itself, and inventory comes
-              from opening stock, so those accounts are not offered here. Enter zero to remove an
-              opening balance.
+              Cash and bank balances are set on the payment account itself, and inventory comes from
+              opening stock, so those accounts are not offered here. Enter zero to remove an opening
+              balance.
             </p>
             {canManage ? (
               <div className="grid gap-3 md:grid-cols-4">

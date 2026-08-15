@@ -391,9 +391,7 @@ export function AccountingSettingsPageClient(): JSX.Element {
             </Button>
             <Button
               disabled={!canLockPeriods || updateLock.isPending || !lockDate}
-              onClick={() =>
-                updateLock.mutate({ closedThrough: lockDate, reason: lockReason })
-              }
+              onClick={() => updateLock.mutate({ closedThrough: lockDate, reason: lockReason })}
             >
               {settings?.booksClosedThrough ? "Update lock" : "Close the books"}
             </Button>
@@ -498,13 +496,15 @@ function YearEndCloseCard({
           <DialogHeader>
             <DialogTitle>Close financial year</DialogTitle>
             <DialogDescription>
-              This posts a close journal per branch and locks the books through{" "}
-              {confirmingYearEnd}. You can reopen the most recent closed year afterwards.
+              This posts a close journal per branch and locks the books through {confirmingYearEnd}.
+              You can reopen the most recent closed year afterwards.
             </DialogDescription>
           </DialogHeader>
 
           {previewQuery.isLoading ? (
-            <p className="text-sm text-muted-foreground">Calculating each branch&apos;s result...</p>
+            <p className="text-sm text-muted-foreground">
+              Calculating each branch&apos;s result...
+            </p>
           ) : null}
           {previewQuery.isError ? <ErrorNotice message={previewQuery.error.message} /> : null}
           {previewQuery.data ? (

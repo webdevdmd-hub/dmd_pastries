@@ -1,0 +1,202 @@
+/* ---------------------------------------------------------------------------
+ * Pastries POS — design tokens (v2)
+ *
+ * PROPOSED. Not yet wired into the app.
+ * See DESIGN.md for reasoning. Open docs/design/preview.html to see it.
+ *
+ * Built on shadcn's current foundation: achromatic oklch neutrals,
+ * --radius: 0.625rem. Every ratio in the comments was measured in a browser
+ * against the rendered oklch value, not estimated.
+ *
+ * Colors are stored as bare oklch triplets so Tailwind can apply
+ * `/ <alpha-value>`: `oklch(var(--foreground) / <alpha-value>)`.
+ * ------------------------------------------------------------------------- */
+
+@layer base {
+  :root {
+    /* --- Neutrals: zero chroma ---------------------------------------------
+     * L 0 0 means no hue cast. This is why shadcn reads clean, and it is the
+     * single biggest difference from the warm-grey v1 of this system: a cream
+     * canvas fights a trial balance. */
+    --background: 0.99 0 0; /* #FCFCFC  page                                  */
+    --card: 1 0 0; /* #FFFFFF        cards, panels, table                     */
+    --muted: 0.97 0 0; /* #F5F5F5    fills, KPI cards, zebra, inputs          */
+    --border: 0.922 0 0; /* #E5E5E5  hairlines                               */
+
+    --foreground: 0.145 0 0; /* #0A0A0A          19.30 : 1  AAA              */
+    --foreground-muted: 0.556 0 0; /* #737373     4.62 : 1  AA               */
+    --foreground-disabled: 0.65 0 0; /* #8F8F8F   3.15 : 1  NOT for content  */
+
+    --primary: 0.205 0 0; /* #171717             17.47 : 1  AAA              */
+    --primary-foreground: 0.985 0 0;
+
+    /* --- The one accent ----------------------------------------------------
+     * Reserved for money-committing actions and success. If two things on a
+     * screen are green, one of them is wrong. */
+    --accent-solid: 0.48 0.13 155; /* #00723B   white on it  6.05 : 1        */
+    --accent-hover: 0.42 0.11 155;
+    --accent-text: 0.42 0.11 155; /* #005E31              7.94 : 1           */
+    --accent-tint: 0.965 0.02 155; /* #EAF8EE   pair       7.24 : 1          */
+
+    /* --- Semantic ----------------------------------------------------------
+     * Each has -solid (fills, icons, borders) and -text (7:1+ on its tint).
+     * Never use -solid as a text color; that is what the pairs are for. */
+    --warning-solid: 0.58 0.13 75; /* #A66D00                                */
+    --warning-text: 0.45 0.11 70; /* #7B4800     pair     6.94 : 1           */
+    --warning-tint: 0.97 0.03 85; /* #FEF4DF                                 */
+
+    --danger-solid: 0.55 0.2 27; /* #CC2827      white on it  5.38 : 1       */
+    --danger-text: 0.45 0.17 27; /* #9E1618      pair    7.29 : 1            */
+    --danger-tint: 0.965 0.02 20; /* #FFEFEE                                 */
+
+    --info-solid: 0.55 0.14 255; /* #3072C1                                  */
+    --info-text: 0.45 0.13 255; /* #17559B       pair    6.73 : 1            */
+    --info-tint: 0.965 0.02 255; /* #EBF4FF                                  */
+
+    /* Focus is blue and only blue. A brand-colored ring on a brand-colored
+     * button is invisible, which is what `focus-visible:ring-brand-caramel`
+     * on `bg-brand-caramel` currently does. */
+    --ring: 0.55 0.14 255;
+
+    /* --- Radius: shadcn default -------------------------------------------- */
+    --radius-sm: 0.375rem; /* 6px   chips, badges, inline controls            */
+    --radius: 0.625rem; /* 10px     buttons, cards, inputs                    */
+    --radius-lg: 0.875rem; /* 14px  dialogs, frames, panels                   */
+
+    /* --- Elevation: barely there ------------------------------------------
+     * Modern depth is a 1px hairline plus a whisper of shadow. The previous
+     * `shadow-workspace` inset white bevel is retired. */
+    --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.05);
+    --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.06), 0 1px 2px oklch(0 0 0 / 0.04);
+    --shadow-md: 0 8px 24px oklch(0 0 0 / 0.08);
+
+    /* --- Motion ------------------------------------------------------------ */
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+    --duration-fast: 150ms; /* hover, focus, color                            */
+    --duration-panel: 200ms; /* drawers, dropdowns, dialogs                   */
+  }
+
+  /* --- Dark ----------------------------------------------------------------
+   * First-class, not an afterthought. Redefines the same tokens and nothing
+   * else, which is the whole point of the contract. */
+  .dark,
+  [data-theme="dark"] {
+    --background: 0.145 0 0;
+    --card: 0.205 0 0;
+    --muted: 0.269 0 0;
+    --border: 0.31 0 0;
+
+    --foreground: 0.985 0 0;
+    --foreground-muted: 0.708 0 0;
+    --foreground-disabled: 0.55 0 0;
+
+    --primary: 0.985 0 0;
+    --primary-foreground: 0.205 0 0;
+
+    --accent-solid: 0.62 0.15 155;
+    --accent-hover: 0.68 0.16 155;
+    --accent-text: 0.78 0.15 155;
+    --accent-tint: 0.28 0.05 155;
+
+    --warning-solid: 0.7 0.14 75;
+    --warning-text: 0.82 0.13 80;
+    --warning-tint: 0.29 0.05 75;
+
+    --danger-solid: 0.62 0.2 27;
+    --danger-text: 0.78 0.15 25;
+    --danger-tint: 0.29 0.07 25;
+
+    --info-solid: 0.62 0.15 255;
+    --info-text: 0.78 0.12 255;
+    --info-tint: 0.29 0.06 255;
+
+    --ring: 0.62 0.15 255;
+
+    --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.4);
+    --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.5);
+    --shadow-md: 0 8px 24px oklch(0 0 0 / 0.6);
+  }
+
+  /* --- Density registers ---------------------------------------------------
+   * data-density="counter" on the (pos) route group, "ledger" elsewhere. */
+  :root,
+  [data-density="ledger"] {
+    --control-h: 2.25rem; /* 36px */
+    --field-h: 2.25rem; /* 36px  */
+    --tap-min: 2rem; /* 32px    */
+    --gutter: 1.5rem; /* 24px   */
+    --card-pad: 1.125rem; /* 18px */
+    --grid-gap: 0.75rem; /* 12px  */
+  }
+
+  [data-density="counter"] {
+    --control-h: 3rem; /* 48px  Material 48dp + Hoober rage-tap research */
+    --field-h: 3rem;
+    --tap-min: 3rem;
+    --gutter: 1rem;
+    --card-pad: 0.75rem;
+    --grid-gap: 0.625rem;
+  }
+
+  /* --- Table density: user-selectable, persisted per user ------------------ */
+  [data-table-density="compact"] {
+    --row-h: 2.25rem; /* 36px */
+    --cell-pad-x: 0.875rem;
+  }
+  :root,
+  [data-table-density="default"] {
+    --row-h: 2.75rem; /* 44px */
+    --cell-pad-x: 1rem;
+  }
+  [data-table-density="comfortable"] {
+    --row-h: 3.5rem; /* 56px */
+    --cell-pad-x: 1rem;
+  }
+
+  /* --- Base ---------------------------------------------------------------- */
+  body {
+    background: oklch(var(--background));
+    color: oklch(var(--foreground));
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Geist stylistic sets: cv11 gives a single-storey a in some contexts,
+     * ss01 tightens the mono-adjacent forms. Drop if you prefer defaults. */
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  /* Any number that can change without its row changing MUST be tabular, or
+   * the column shifts and the eye loses its place. */
+  .tnum,
+  td[data-numeric],
+  th[data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  td[data-numeric],
+  th[data-numeric] {
+    text-align: right;
+    letter-spacing: -0.02em;
+  }
+
+  /* Identifiers get compared character by character. */
+  .identifier {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* NOTE: remove `html { scroll-behavior: smooth }` from globals.css. It
+   * applies to the POS product grid, where a cashier flicking through 200
+   * items fights an animation on every scroll. Scope it to marketing. */
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

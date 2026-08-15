@@ -189,9 +189,7 @@ export function POSReceiptDialog({
               {config.showBusinessName ? (
                 <p className="text-2xl font-black tracking-tight">{receipt.businessName}</p>
               ) : null}
-              {config.showBranchName ? (
-                <p className="text-zinc-600">{receipt.branchName}</p>
-              ) : null}
+              {config.showBranchName ? <p className="text-zinc-600">{receipt.branchName}</p> : null}
               {config.showAddress ? <p className="text-xs text-zinc-600">Branch address</p> : null}
               {config.showPhone ? <p className="text-xs text-zinc-600">Phone number</p> : null}
               {config.showTaxNumber ? (

@@ -11,3 +11,8 @@ yarn-debug.log*
 yarn-error.log*
 .DS_Store
 *.tsbuildinfo
+
+# Visual regression captures (large, machine-specific, regenerated on demand).
+# Leading slash anchors this to frontend/visual/ only. Unanchored `visual/`
+# would also swallow scripts/visual/, which is the harness source.
+/visual/
