@@ -17,7 +17,6 @@ WORKDIR /app
 COPY --from=builder /bin/api /app/api
 COPY --from=builder /bin/migrate /app/migrate
 COPY migrations /app/migrations
-COPY .env.example /app/.env.example
 
 EXPOSE 8080
 
