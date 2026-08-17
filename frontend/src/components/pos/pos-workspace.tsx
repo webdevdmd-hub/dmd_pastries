@@ -887,7 +887,12 @@ export function POSWorkspace(): JSX.Element {
   );
 
   return (
-    <div className="flex h-screen min-h-[42rem] w-full flex-col overflow-hidden bg-canvas font-sans text-foreground">
+    // h-full, not h-screen. The (pos) layout owns the viewport and may put a
+    // persistent bar above this (E5's offline notice), so claiming 100vh here
+    // made the workspace overflow by exactly the bar's height and pushed the
+    // Charge button off the bottom of the screen — on the one surface where the
+    // money control must always be reachable.
+    <div className="flex h-full min-h-[42rem] w-full flex-col overflow-hidden bg-canvas font-sans text-foreground">
       <POSTopBar branchName={branchName} cashierName={user?.fullName ?? "Cashier"} />
       <main className="grid min-h-0 flex-1 border-y border-border lg:grid-cols-[144px_minmax(0,1fr)_480px] xl:grid-cols-[152px_minmax(0,1fr)_520px]">
         {!branchScope.hasBranchScope ? (

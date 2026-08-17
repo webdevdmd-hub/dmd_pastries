@@ -1,6 +1,7 @@
 import { ArrowRight, PauseCircle, RotateCcw, Store } from "lucide-react";
 import type { JSX } from "react";
 
+import { useConnectivity } from "@/components/connectivity/connectivity-provider";
 import { POSCartItem } from "@/components/pos/pos-cart-item";
 import { POSCustomerSelector } from "@/components/pos/pos-customer-selector";
 import { POSEmptyCartState } from "@/components/pos/pos-empty-cart-state";
@@ -84,6 +85,7 @@ export function POSCartPanel({
   taxRates,
   totals,
 }: POSCartPanelProps): JSX.Element {
+  const { isOffline } = useConnectivity();
   const itemCountLabel = items.length === 1 ? "1 item" : `${String(items.length)} items`;
   const selectedChannel = salesChannels.find((channel) => channel.id === salesChannelId) ?? null;
 
@@ -304,7 +306,7 @@ export function POSCartPanel({
             the button against the customer's receipt, not just the word. */}
         <Button
           className="text-body h-14 w-full rounded bg-money font-medium text-primary-foreground shadow-none hover:bg-money-hover disabled:bg-muted disabled:text-foreground-disabled"
-          disabled={!canSell || items.length === 0 || isCheckingOut}
+          disabled={!canSell || items.length === 0 || isCheckingOut || isOffline}
           onClick={onCheckout}
           type="button"
         >
@@ -312,6 +314,8 @@ export function POSCartPanel({
             "Processing..."
           ) : !canSell ? (
             "Sell permission required"
+          ) : isOffline ? (
+            "Charging unavailable while offline"
           ) : items.length === 0 ? (
             "Charge"
           ) : (
