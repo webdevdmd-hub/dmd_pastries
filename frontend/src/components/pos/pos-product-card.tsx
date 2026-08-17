@@ -86,14 +86,14 @@ export function POSProductCard({
             </div>
           )}
           <div className="flex flex-1 flex-col justify-between p-3">
-            <p className="line-clamp-2 whitespace-normal text-sm font-black leading-tight tracking-tight">
+            <p className="line-clamp-2 whitespace-normal text-sm font-medium leading-tight tracking-tight">
               {product.productName}
             </p>
             <div className="mt-2 flex min-w-0 items-end justify-between gap-2">
-              <span className="min-w-0 truncate text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+              <span className="min-w-0 truncate text-xs font-normal text-zinc-500">
                 {product.categoryName}
               </span>
-              <span className="min-h-5 shrink-0 text-right font-mono text-sm font-black leading-none text-zinc-950">
+              <span className="min-h-5 shrink-0 text-right font-mono text-sm font-medium leading-none tabular-nums text-zinc-950">
                 {showPrices ? (
                   <span aria-label={`${product.productName} price`}>
                     {formatMoney(product.salePrice)}
@@ -105,13 +105,15 @@ export function POSProductCard({
         </div>
       </Button>
       {isOutOfStock ? (
-        <span className="absolute left-3 top-3 rounded-full bg-red-100 px-2 py-0.5 text-[0.62rem] font-black uppercase tracking-[0.12em] text-red-700">
+        <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">
+          <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
           Out of stock
         </span>
       ) : null}
       {hasVariants ? (
         <Button
-          className="absolute right-3 top-3 h-7 rounded-md bg-black px-2.5 font-mono text-[0.62rem] font-black uppercase tracking-[0.12em] text-white shadow-none hover:bg-zinc-900"
+          aria-label={`Choose a variant of ${product.productName}`}
+          className="absolute right-3 top-3 h-12 min-w-12 rounded-md bg-black px-3 text-xs font-medium text-white shadow-none hover:bg-zinc-900"
           onClick={(event) => {
             event.stopPropagation();
             openVariants();
