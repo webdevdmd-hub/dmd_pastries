@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { PageHeader } from "@/components/shared/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -1811,6 +1812,7 @@ function CategoryCopyDialog({
 }
 
 export function MasterDataPageClient({ collection }: MasterDataPageClientProps): JSX.Element {
+  const confirm = useConfirm();
   const searchParams = useSearchParams();
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
@@ -2028,9 +2030,16 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
       (branch) => branch.id === copySourceBranchId,
     );
     const sourceBranchName = sourceBranch?.name ?? "selected branch";
-    const confirmed = window.confirm(
-      `Copy ${copyLabel.short} from ${sourceBranchName} into ${currentBranchName}? Duplicate categories will be skipped.`,
-    );
+    // Not destructive: nothing is removed and duplicates are skipped. So this is
+    // tone="default", not danger — reserving red for actions that actually lose
+    // something is what keeps red meaningful (DESIGN.md §3.2).
+    const confirmed = await confirm({
+      cancelLabel: "Don't copy",
+      confirmLabel: `Copy ${copyLabel.short}`,
+      consequence: `This copies ${copyLabel.short} from ${sourceBranchName} into ${currentBranchName}. Nothing is removed, and any that already exist are skipped.`,
+      title: `Copy ${copyLabel.short} into ${currentBranchName}?`,
+      tone: "default",
+    });
 
     if (!confirmed) {
       return;
@@ -2107,9 +2116,16 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
   };
 
   const handleUnitDeactivate = async (unit: Unit): Promise<void> => {
-    const confirmed = window.confirm(
-      `Deactivate ${unit.unitName}? The backend keeps the record and marks it inactive.`,
-    );
+    // Reversible — the backend keeps the record and marks it inactive. Danger tone
+    // and "cannot be undone" would both be false here, and a dialog that overstates
+    // its stakes trains people to dismiss the ones that matter.
+    const confirmed = await confirm({
+      cancelLabel: "Keep active",
+      confirmLabel: "Deactivate unit",
+      consequence: `${unit.unitName} stops being offered on new records. Existing records that use it are unchanged, and it can be reactivated later.`,
+      title: `Deactivate ${unit.unitName}?`,
+      tone: "default",
+    });
 
     if (!confirmed) {
       return;
@@ -2209,9 +2225,13 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
   };
 
   const handleProductCategoryDeactivate = async (category: ProductCategory): Promise<void> => {
-    const confirmed = window.confirm(
-      `Deactivate ${category.categoryName}? The backend keeps the record and marks it inactive.`,
-    );
+    const confirmed = await confirm({
+      cancelLabel: "Keep active",
+      confirmLabel: "Deactivate category",
+      consequence: `${category.categoryName} stops being offered on new products. Products already in it are unchanged, and it can be reactivated later.`,
+      title: `Deactivate ${category.categoryName}?`,
+      tone: "default",
+    });
 
     if (!confirmed) {
       return;
@@ -2295,9 +2315,13 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
       activeSimpleCollection === "ingredient-categories"
         ? "ingredient category"
         : "packaging category";
-    const confirmed = window.confirm(
-      `Deactivate ${category.categoryName}? The backend keeps the record and marks it inactive.`,
-    );
+    const confirmed = await confirm({
+      cancelLabel: "Keep active",
+      confirmLabel: `Deactivate ${label}`,
+      consequence: `${category.categoryName} stops being offered on new records. Anything already using it is unchanged, and it can be reactivated later.`,
+      title: `Deactivate ${category.categoryName}?`,
+      tone: "default",
+    });
 
     if (!confirmed) {
       return;

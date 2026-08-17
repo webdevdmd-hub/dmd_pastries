@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import { forwardRef } from "react";
 
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
@@ -29,11 +29,17 @@ const toneClasses: Record<AppButtonTone, string> = {
   danger: "border-border bg-card text-danger-text hover:border-danger hover:bg-danger-tint",
 };
 
-export function AppButton({
-  className,
-  tone = "default",
-  variant,
-  ...props
-}: AppButtonProps): JSX.Element {
-  return <Button className={cn(toneClasses[tone], className)} variant={variant} {...props} />;
-}
+/**
+ * Forwards its ref. `ui/Button` already did; this wrapper was swallowing it, which
+ * made AppButton unusable anywhere focus has to be moved deliberately — the
+ * safe-action focus on a destructive confirm being the case that surfaced it — and
+ * would equally have broken tooltip and popover anchors.
+ */
+export const AppButton = forwardRef<HTMLButtonElement, AppButtonProps>(function AppButton(
+  { className, tone = "default", variant, ...props },
+  ref,
+) {
+  return (
+    <Button className={cn(toneClasses[tone], className)} ref={ref} variant={variant} {...props} />
+  );
+});

@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { PageHeader } from "@/components/shared/page-header";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
@@ -1253,6 +1254,7 @@ export function SettingsDataPageClient({
   embedded = false,
   kind,
 }: SettingsDataPageClientProps): JSX.Element {
+  const confirm = useConfirm();
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.settingsView]);
   const canManagePaymentMethods = hasAnyPermission([PERMISSIONS.settingsPaymentMethodsManage]);
@@ -1355,9 +1357,16 @@ export function SettingsDataPageClient({
   };
 
   const handleTaxRateDeactivate = async (taxRate: TaxRate): Promise<void> => {
-    const confirmed = window.confirm(
-      `Deactivate ${taxRate.taxName}? The backend keeps the record and marks it inactive.`,
-    );
+    // Reversible — the record is kept and marked inactive — so tone="default".
+    // The consequence names the part that actually matters to an accountant:
+    // historical documents keep the rate they were posted with.
+    const confirmed = await confirm({
+      cancelLabel: "Keep active",
+      confirmLabel: "Deactivate tax rate",
+      consequence: `${taxRate.taxName} stops being offered on new documents. Documents already posted with it keep their rate, and it can be reactivated later.`,
+      title: `Deactivate ${taxRate.taxName}?`,
+      tone: "default",
+    });
 
     if (!confirmed) {
       return;
@@ -1419,9 +1428,13 @@ export function SettingsDataPageClient({
   };
 
   const handlePaymentMethodDeactivate = async (method: PaymentMethod): Promise<void> => {
-    const confirmed = window.confirm(
-      `Deactivate ${method.methodName}? The backend keeps the record and marks it inactive.`,
-    );
+    const confirmed = await confirm({
+      cancelLabel: "Keep active",
+      confirmLabel: "Deactivate method",
+      consequence: `${method.methodName} stops appearing at the counter and on new payments. Payments already taken with it are unchanged, and it can be reactivated later.`,
+      title: `Deactivate ${method.methodName}?`,
+      tone: "default",
+    });
 
     if (!confirmed) {
       return;

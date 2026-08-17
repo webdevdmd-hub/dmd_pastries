@@ -1,6 +1,6 @@
 "use client";
 
-import type { JSX, ReactNode } from "react";
+import { type JSX, type ReactNode, useRef } from "react";
 
 import { AppButton } from "@/components/app/app-button";
 import {
@@ -69,9 +69,26 @@ export function AppConfirmDialog({
   title,
   tone = "danger",
 }: AppConfirmDialogProps): JSX.Element {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="max-w-md gap-3" role="alertdialog" showCloseButton={false}>
+      <DialogContent
+        className="max-w-md gap-3"
+        // Focus the SAFE action explicitly. React's `autoFocus` is not enough:
+        // Radix fires onOpenAutoFocus after mount and moves focus to the first
+        // tabbable element, which is the destructive button. The two raced, and the
+        // safe button only won by accident — it held focus when the dialog opened
+        // from a plain button, and lost it when the dialog opened from a dropdown
+        // menu. Since "a stray Enter keeps the sale" is the entire safety argument
+        // for this component, it cannot rest on ordering luck.
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          cancelRef.current?.focus();
+        }}
+        role="alertdialog"
+        showCloseButton={false}
+      >
         <DialogHeader className="gap-2">
           <DialogTitle className="text-title">{title}</DialogTitle>
           <DialogDescription className="text-body text-foreground-muted">
@@ -111,9 +128,9 @@ export function AppConfirmDialog({
             {confirmLabel}
           </AppButton>
           <AppButton
-            autoFocus
             className="min-h-tap text-body border-border bg-card px-4 font-medium text-foreground hover:bg-muted"
             onClick={() => onOpenChange(false)}
+            ref={cancelRef}
             type="button"
             variant="outline"
           >

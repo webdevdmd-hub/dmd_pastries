@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseEmptyState } from "@/components/purchasing/purchase-empty-state";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
@@ -93,7 +94,13 @@ function mergeEditableInvoices(
     );
 }
 
+/** AED, matching the counter and the ledger tables. */
+function formatAed(value: number): string {
+  return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
+}
+
 export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
+  const confirm = useConfirm();
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
   const { normalizeBranchId } = branchScope;
@@ -253,10 +260,24 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   };
 
   const deletePayment = async (payment: SupplierPayment): Promise<void> => {
-    const confirmed = window.confirm(
-      "This will permanently delete the supplier payment and remove its effect from supplier outstanding, bill balances, supplier advance, and accounting records. This cannot be undone.",
-    );
-    if (!confirmed) return;
+    // The only genuinely irreversible action of the seven converted here, so the
+    // only one that keeps tone="danger". The old copy described the effects but
+    // never said WHICH payment — the operator had clicked a row and had no way to
+    // confirm they had clicked the row they meant. Amount and supplier now lead,
+    // and the accounting effects move to the detail row where they read as a
+    // consequence rather than a wall of prose.
+    const confirmed = await confirm({
+      cancelLabel: "Keep payment",
+      confirmLabel: "Delete payment",
+      consequence: `This permanently deletes the ${formatAed(payment.amount)} payment to ${payment.supplierName} on invoice ${payment.invoiceNumber}. It cannot be undone.`,
+      detail:
+        "Reverses its effect on supplier outstanding, bill balances, supplier advance and the accounting records.",
+      title: "Delete this payment?",
+    });
+
+    if (!confirmed) {
+      return;
+    }
 
     try {
       await deletePaymentMutation.mutateAsync(payment.id);
