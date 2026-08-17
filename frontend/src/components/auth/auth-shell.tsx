@@ -1,57 +1,54 @@
 "use client";
 
-import {
-  ArrowUpRight,
-  ChevronRight,
-  Croissant,
-  Layers3,
-  LockKeyhole,
-  Network,
-  ScanLine,
-  ShieldCheck,
-  Sparkles,
-} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { JSX, ReactNode } from "react";
 import { useEffect } from "react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { LedgerMotif } from "@/components/auth/ledger-motif";
 import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/hooks/use-auth";
 import { authenticatedHomeRoute } from "@/lib/auth/routes";
 
+/**
+ * Shell for all six auth routes, on the Threshold register (DESIGN.md §7, plan
+ * item D5): the form on `--card`, paired with the ledger motif on a `--muted`
+ * field.
+ *
+ * ONE LAYOUT, WHERE THERE WERE TWO
+ *
+ * This previously branched. Login and signup got a plain centred column; the other
+ * four got a marketing layout with a 6.4rem headline ("Enter the bakery operating
+ * cockpit with confidence"), a glass-card grid of "operating signals", and a
+ * "workspace graph" of module names. Two consequences worth naming:
+ *
+ * - The elaborate half rendered on verify-email and accept-invitation — screens
+ *   reached from an email link by someone who has ALREADY decided — while the two
+ *   screens a prospect actually judges got the plain one. Exactly backwards.
+ * - It was 54 hardcoded hexes and ~90 lines of copy nobody maintained.
+ *
+ * Signup keeps a wider column because its form is genuinely longer; that is the only
+ * per-route difference left, and it is a width, not a layout.
+ *
+ * WHY THE MOTIF SITS BESIDE THE FORM RATHER THAN BEHIND IT
+ *
+ * Behind the form is where the orbs were, and anything back there competes with the
+ * fields for attention while adding nothing to the task. Beside it, on its own
+ * `--muted` panel, it is legible as what it is — a statement about the product — and
+ * the form keeps an uncontested `--card` surface. It also drops out entirely below
+ * `lg`, where the form should have the whole screen.
+ */
 type AuthShellProps = {
   children: ReactNode;
   title: string;
   description: string;
 };
 
-const operatingSignals = [
-  { label: "Branch context", value: "Scoped" },
-  { label: "Role access", value: "Granular" },
-  { label: "Session sync", value: "Secure" },
-];
-
-const platformNodes = [
-  "POS",
-  "Products",
-  "Payments",
-  "Customers",
-  "Inventory",
-  "Orders",
-  "Recipes",
-  "Branches",
-];
-
 export function AuthShell({ children, title, description }: AuthShellProps): JSX.Element {
   const pathname = usePathname();
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
-  const isLoginPage = pathname === ROUTES.login;
   const isSignupPage = pathname === ROUTES.signup;
-  const usesMinimalAuthLayout = isLoginPage || isSignupPage;
 
   useEffect(() => {
     if (
@@ -66,212 +63,39 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
     }
   }, [isAuthenticated, pathname, router, user]);
 
-  if (usesMinimalAuthLayout) {
-    return (
-      <div className="min-h-screen bg-canvas text-foreground">
-        <main className="mx-auto flex min-h-screen w-full max-w-7xl items-center justify-center px-6 py-12 sm:px-8 lg:px-10">
+  return (
+    <div className="min-h-screen bg-canvas text-foreground">
+      <div
+        className={`mx-auto grid min-h-screen ${
+          isSignupPage ? "max-w-[72rem]" : "max-w-[64rem]"
+        } lg:grid-cols-[1fr_0.85fr]`}
+      >
+        <main className="flex items-center bg-card px-6 py-12 sm:px-10 lg:px-14">
           <section
-            className={isSignupPage ? "w-full max-w-[44rem]" : "w-full max-w-[27rem]"}
             aria-labelledby="auth-heading"
+            className={`w-full ${isSignupPage ? "max-w-[38rem]" : "max-w-[26rem]"}`}
           >
-            <div className="mb-9">
-              <p className="mb-3 text-xs font-semibold uppercase text-foreground-muted">
-                Account access
-              </p>
-              <h1 className="text-3xl font-semibold leading-tight sm:text-4xl" id="auth-heading">
-                {title}
-              </h1>
-              {!isSignupPage ? (
-                <p className="mt-3 max-w-sm text-sm leading-6 text-foreground-muted">
-                  {description}
-                </p>
-              ) : null}
-            </div>
+            {/* The wordmark is the whole of the bakery identity now (DESIGN.md §1),
+                and threshold surfaces are the only place it appears. */}
+            <Link className="font-serif text-title text-foreground" href={ROUTES.home}>
+              Pastries POS
+            </Link>
 
-            {children}
+            <h1 className="text-page mt-8 text-foreground" id="auth-heading">
+              {title}
+            </h1>
+
+            {/* Signup's own form carries its explanation, so repeating it here just
+                pushed the first field further down the screen. */}
+            {!isSignupPage ? (
+              <p className="text-body mt-3 max-w-[46ch] text-foreground-muted">{description}</p>
+            ) : null}
+
+            <div className="mt-9">{children}</div>
           </section>
         </main>
-      </div>
-    );
-  }
 
-  return (
-    <div className="relative min-h-screen overflow-hidden bg-primary text-primary-foreground">
-      {/* D1: the drifting orbs and the scanline sweep are gone, along with the
-          four-stop radial-gradient wash and the grid overlay they sat on. That
-          stack was 20 hardcoded colour values, three of them the v1 coffee palette
-          in rgba form, and two infinite animations behind a form whose only job is
-          to be typed into.
-
-          D5 replaces this with the Threshold treatment proper (serif wordmark on a
-          calm field, DESIGN.md §7). Until then the frame below carries itself on a
-          plain --primary ground, which is quieter than what it replaces. */}
-
-      <div className="relative mx-auto grid min-h-screen max-w-[100rem] lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="hidden min-h-screen flex-col border-r border-card/10 px-10 py-8 xl:flex">
-          <div className="space-y-10">
-            <nav className="flex items-center justify-between rounded-full border border-card/10 bg-card/[0.065] px-4 py-3 shadow-[0_24px_80px_rgba(0,0,0,0.24)] backdrop-blur-2xl">
-              <Link className="group flex items-center gap-3" href={ROUTES.home}>
-                <div className="relative flex h-11 w-11 items-center justify-center rounded-full border border-brand-latte/15 bg-brand-caramel/18 shadow-[0_0_45px_rgba(176,137,104,0.34)] transition group-hover:scale-105 group-hover:bg-brand-caramel/30">
-                  <Croissant className="h-5 w-5 text-brand-latte" />
-                </div>
-                <div>
-                  <p className="font-serif text-xl leading-none text-brand-latte">KCHEF</p>
-                  <p className="text-[0.65rem] text-brand-cappuccino/80">Secure operations OS</p>
-                </div>
-              </Link>
-              <Button
-                asChild
-                className="rounded-full border-card/10 bg-card/[0.06] text-brand-latte hover:bg-card/[0.12]"
-                size="sm"
-                variant="outline"
-              >
-                <Link href={ROUTES.home}>
-                  Foundation
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            </nav>
-
-            <div className="max-w-4xl space-y-8">
-              <div className="inline-flex items-center gap-2 rounded-full border border-brand-caramel/40 bg-brand-caramel/12 px-4 py-2 text-sm text-brand-latte shadow-[0_0_36px_rgba(176,137,104,0.22)] backdrop-blur-xl">
-                <Sparkles className="h-4 w-4" />
-                Premium access layer
-              </div>
-              <h1 className="font-sans text-6xl font-semibold leading-[0.94] tracking-[-0.07em] text-brand-latte xl:text-[6.4rem]">
-                Enter the bakery operating cockpit with confidence.
-              </h1>
-              <p className="max-w-2xl text-lg leading-8 text-brand-latte/70">
-                Login restores your Appwrite session, backend profile, current branch, granted
-                permissions, and live workspace context without exposing operational control to the
-                browser.
-              </p>
-            </div>
-
-            <div className="grid max-w-3xl gap-4 md:grid-cols-3">
-              {operatingSignals.map((signal) => (
-                <div
-                  className="auth-glass-card rounded-3xl border border-card/10 p-5"
-                  key={signal.label}
-                >
-                  <p className="font-serif text-3xl text-brand-latte">{signal.value}</p>
-                  <p className="mt-2 text-xs text-brand-cappuccino/75">{signal.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-12 grid gap-4 lg:grid-cols-[0.96fr_0.82fr]">
-            <div className="auth-glass-card rounded-[1.6rem] border border-card/10 p-4">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[0.65rem] text-brand-cappuccino">Workspace graph</p>
-                  <h2 className="mt-1 text-xl font-semibold text-brand-latte">
-                    One secure entry point
-                  </h2>
-                </div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-brand-caramel/25 bg-brand-caramel/16">
-                  <Network className="h-4 w-4 text-brand-caramel" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {platformNodes.map((node) => (
-                  <div
-                    className="rounded-xl border border-card/10 bg-card/[0.055] px-3 py-1.5 text-xs text-brand-latte/72"
-                    key={node}
-                  >
-                    {node}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid gap-4">
-              <div className="auth-glass-card rounded-[1.6rem] border border-card/10 p-4">
-                <ShieldCheck className="mb-3 h-4 w-4 text-brand-caramel" />
-                <h2 className="text-sm font-semibold text-brand-latte">Backend-trusted session</h2>
-                <p className="mt-2 text-xs leading-5 text-brand-latte/62">
-                  Permissions, branch isolation, and profile state are synced from the backend.
-                </p>
-              </div>
-              <div className="auth-glass-card rounded-[1.6rem] border border-card/10 p-4">
-                <Layers3 className="mb-3 h-4 w-4 text-brand-caramel" />
-                <h2 className="text-sm font-semibold text-brand-latte">Operational continuity</h2>
-                <p className="mt-2 text-xs leading-5 text-brand-latte/62">
-                  Return directly into POS, inventory, orders, purchasing, and production work.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-10">
-          <div className="w-full max-w-xl">
-            <div className="mb-8 flex items-center justify-between xl:hidden">
-              <Link className="flex items-center gap-3" href={ROUTES.home}>
-                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-brand-latte/15 bg-brand-caramel/24 text-brand-latte shadow-[0_0_34px_rgba(176,137,104,0.36)]">
-                  <Croissant className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="font-serif text-2xl text-brand-latte">KCHEF</p>
-                  <p className="text-xs text-brand-cappuccino">Secure operations OS</p>
-                </div>
-              </Link>
-              <Badge className="border-card/10 bg-card/10 text-brand-latte">Secure</Badge>
-            </div>
-
-            <div className="auth-login-frame relative rounded-[2.1rem] border border-card/14 bg-card/[0.08] p-[1px] shadow-[0_40px_120px_rgba(0,0,0,0.48)] backdrop-blur-2xl">
-              <div className="rounded-[calc(2.1rem-1px)] bg-primary/[0.86] p-5 backdrop-blur-2xl sm:p-7">
-                <div className="mb-7 flex items-start justify-between gap-4 border-b border-card/10 pb-6">
-                  <div className="space-y-3">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-brand-caramel/30 bg-brand-caramel/12 px-3 py-1 text-[0.65rem] text-brand-cappuccino">
-                      <ScanLine className="h-3.5 w-3.5" />
-                      Access gateway
-                    </div>
-                    <div className="space-y-2">
-                      <h2 className="font-sans text-4xl font-semibold leading-none tracking-[-0.055em] text-brand-latte sm:text-5xl">
-                        {title}
-                      </h2>
-                      <p className="max-w-md text-sm leading-6 text-brand-latte/64">
-                        {description}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="hidden h-13 w-13 shrink-0 items-center justify-center rounded-2xl border border-card/10 bg-brand-latte/10 text-brand-latte shadow-[0_0_38px_rgba(243,233,215,0.13)] sm:flex">
-                    <LockKeyhole className="h-5 w-5" />
-                  </div>
-                </div>
-
-                {children}
-              </div>
-            </div>
-
-            <div className="mt-7 flex flex-wrap items-center justify-center gap-3 text-sm text-brand-latte/70">
-              <Button
-                asChild
-                className="rounded-full border-card/10 bg-card/[0.08] text-brand-latte hover:bg-card/[0.14]"
-                size="sm"
-                variant="outline"
-              >
-                <Link href={ROUTES.login}>
-                  Login
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button
-                asChild
-                className="rounded-full text-brand-cappuccino hover:bg-card/[0.08] hover:text-brand-latte"
-                size="sm"
-                variant="ghost"
-              >
-                <Link href={ROUTES.signup}>
-                  Create account
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </section>
+        <LedgerMotif />
       </div>
     </div>
   );

@@ -218,43 +218,10 @@
    * `prefers-reduced-motion` did not cover because these were decoration rather
    * than transitions.
    *
-   * NOTE: .auth-glass-card and .auth-login-frame are deliberately still here. They
-   * are structural rather than decorative, and the plan (§9.7) retires them with D5
-   * when the auth routes move onto the Threshold register — deleting them now would
-   * leave the login form unstyled in the meantime.
+   * D5 (2026-08-17): .auth-glass-card and .auth-login-frame are gone too. The
+   * auth routes are on the Threshold register now, so the glass/backdrop-blur
+   * frame they provided has no consumer — plan §9.7 scheduled exactly this.
    * */
-
-  .auth-glass-card {
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.035)),
-      rgba(255, 255, 255, 0.04);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-    backdrop-filter: blur(18px);
-  }
-
-  .auth-login-frame {
-    overflow: hidden;
-    box-shadow:
-      0 30px 90px rgba(0, 0, 0, 0.42),
-      0 0 0 1px rgba(243, 233, 215, 0.08),
-      0 0 70px rgba(176, 137, 104, 0.18);
-  }
-
-  .auth-login-frame::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background:
-      linear-gradient(135deg, rgba(243, 233, 215, 0.18), transparent 38%),
-      radial-gradient(circle at 50% 0%, rgba(176, 137, 104, 0.28), transparent 32%);
-    pointer-events: none;
-  }
-
-  .auth-login-frame > * {
-    position: relative;
-    z-index: 1;
-  }
 
   .scrollbar-hidden {
     -ms-overflow-style: none;
