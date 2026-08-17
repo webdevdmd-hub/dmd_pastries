@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import type { JSX, ReactNode } from "react";
 import { useEffect } from "react";
 
+import { ConfirmProvider } from "@/components/app/confirm-provider";
 import { DensityProvider } from "@/components/density/density-provider";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ROUTES } from "@/constants/routes";
@@ -41,12 +42,14 @@ export default function POSLayout({
   // pos-checkout-dialog, which is where money is actually taken.
   return (
     <DensityProvider value="counter">
-      <div
-        className="h-screen w-screen overflow-hidden bg-canvas text-foreground"
-        data-density="counter"
-      >
-        {children}
-      </div>
+      <ConfirmProvider>
+        <div
+          className="h-screen w-screen overflow-hidden bg-canvas text-foreground"
+          data-density="counter"
+        >
+          {children}
+        </div>
+      </ConfirmProvider>
     </DensityProvider>
   );
 }

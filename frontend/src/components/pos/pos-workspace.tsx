@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { POSBarcodeInput } from "@/components/pos/pos-barcode-input";
 import { POSCartPanel } from "@/components/pos/pos-cart-panel";
 import { POSCategorySidebar } from "@/components/pos/pos-category-sidebar";
@@ -71,6 +72,22 @@ import type {
 import type { PaymentMethod, ReceiptLayout, SalesChannel } from "@/types/settings";
 
 const POS_SHOW_PRICES_STORAGE_KEY = "pos.showPrices";
+
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
+}
+
+/**
+ * Consequence copy for discarding the current cart.
+ *
+ * The old `window.confirm("Clear current POS cart?")` could not say how much was
+ * being thrown away, so a cashier answered it identically for a 1-item cart and a
+ * 20-item one. The count and the total are the whole point of asking.
+ */
+function describeCartDiscard(itemCount: number, total: number): string {
+  const items = itemCount === 1 ? "1 item" : `${String(itemCount)} items`;
+  return `This removes ${items} totalling ${formatMoney(total)} from the current sale. It cannot be undone.`;
+}
 
 function getCartReceiptItemName(item: CartItem): string {
   return item.variantName ? `${item.productName} - ${item.variantName}` : item.productName;
@@ -153,6 +170,7 @@ export function POSWorkspace(): JSX.Element {
   const { user } = useAuth();
   const branchScope = useBranchScope();
   const { hasAnyPermission, hasPermission } = usePermission();
+  const confirm = useConfirm();
   const canSell = hasPermission(PERMISSIONS.posSell);
   const canCreateBakeryOrder = hasAnyPermission([PERMISSIONS.ordersCreate, PERMISSIONS.posSell]);
   const barcodeInputRef = useRef<HTMLInputElement | null>(null);
@@ -278,18 +296,39 @@ export function POSWorkspace(): JSX.Element {
 
       if ((event.ctrlKey || event.metaKey) && event.key === "Backspace") {
         event.preventDefault();
-        if (cart.items.length > 0 && window.confirm("Clear current POS cart?")) {
+
+        if (cart.items.length === 0) {
+          return;
+        }
+
+        // A keyboard shortcut is the easiest way to discard a cart by accident,
+        // so this is the one path that most needs the amount stated.
+        void (async () => {
+          const confirmed = await confirm({
+            cancelLabel: "Keep sale",
+            confirmLabel: "Discard sale",
+            consequence: describeCartDiscard(cart.items.length, cart.totals.total),
+            detail: "Nothing is posted to the ledger — the sale was never completed.",
+            title: "Discard this sale?",
+          });
+
+          if (!confirmed) {
+            return;
+          }
+
           setCheckoutReference(null);
           setAutoSelectedPaymentMethodId(null);
           setPaymentAutoSelectionSuppressedChannelId(null);
           cart.clearCart();
-        }
+        })();
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [cart]);
+    // `confirm` is stable (useCallback with no deps in ConfirmProvider), so this
+    // does not re-bind the listener on every render.
+  }, [cart, confirm]);
 
   const addProduct = (product: POSProduct, variant?: POSProductVariant): void => {
     const displayName = variant
@@ -520,8 +559,18 @@ export function POSWorkspace(): JSX.Element {
   };
 
   const resumeHeldSale = async (heldSaleId: string): Promise<void> => {
-    if (cart.items.length > 0 && !window.confirm("Replace current cart with this held sale?")) {
-      return;
+    if (cart.items.length > 0) {
+      const confirmed = await confirm({
+        cancelLabel: "Keep current sale",
+        confirmLabel: "Replace sale",
+        consequence: describeCartDiscard(cart.items.length, cart.totals.total),
+        detail: "The held sale you picked will be loaded in its place.",
+        title: "Replace the current sale?",
+      });
+
+      if (!confirmed) {
+        return;
+      }
     }
 
     try {
@@ -550,7 +599,29 @@ export function POSWorkspace(): JSX.Element {
   };
 
   const cancelHeldSale = async (heldSaleId: string): Promise<void> => {
-    if (!window.confirm("Cancel this held sale?")) {
+    // Name the specific held sale. "Cancel this held sale?" was ambiguous in a
+    // list of them — the cashier had already clicked a row, but the prompt gave
+    // no way to check they had clicked the row they meant.
+    const heldSale = (heldSalesQuery.data ?? []).find((entry) => entry.id === heldSaleId) ?? null;
+    const items = heldSale
+      ? heldSale.itemCount === 1
+        ? "1 item"
+        : `${String(heldSale.itemCount)} items`
+      : null;
+
+    const confirmed = await confirm({
+      cancelLabel: "Keep it held",
+      confirmLabel: "Cancel held sale",
+      consequence: heldSale
+        ? `This cancels held sale ${heldSale.holdNumber}${
+            heldSale.customerName ? ` for ${heldSale.customerName}` : ""
+          } — ${String(items)} totalling ${formatMoney(heldSale.total)}. It cannot be undone.`
+        : "This cancels the held sale. It cannot be undone.",
+      detail: "Nothing is posted to the ledger — the sale was never completed.",
+      title: "Cancel this held sale?",
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -748,13 +819,25 @@ export function POSWorkspace(): JSX.Element {
         cart.setCharges(charges);
       }}
       onClear={() => {
-        if (window.confirm("Clear current POS cart?")) {
+        void (async () => {
+          const confirmed = await confirm({
+            cancelLabel: "Keep sale",
+            confirmLabel: "Discard sale",
+            consequence: describeCartDiscard(cart.items.length, cart.totals.total),
+            detail: "Nothing is posted to the ledger — the sale was never completed.",
+            title: "Discard this sale?",
+          });
+
+          if (!confirmed) {
+            return;
+          }
+
           clearCheckoutFeedback();
           resetCheckoutReference();
           setAutoSelectedPaymentMethodId(null);
           setPaymentAutoSelectionSuppressedChannelId(null);
           cart.clearCart();
-        }
+        })();
       }}
       onCustomerChange={(value) => {
         clearCheckoutFeedback();
