@@ -49,5 +49,8 @@ repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root/frontend"
 
 echo "pre-push: running frontend verify + tests..."
+# `verify` now ends with `pnpm test`, so this single call covers both. Before
+# 2026-08-17 it did not, which meant the tap-target and contrast assertions
+# never ran anywhere except here — and any other caller of `pnpm verify`
+# (a human, an editor task, a future CI job) silently skipped them.
 pnpm verify
-pnpm test

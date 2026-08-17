@@ -24,7 +24,8 @@
  * learns to ignore it, which is worse than not having it.
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -101,6 +102,10 @@ function chain(steps) {
 function settleScript(scheme) {
   return `
 (() => {
+  // Chrome's network-error page is a real document that screenshots cleanly,
+  // so nothing downstream can tell it from the app. Bail loudly instead.
+  if (document.querySelector("#main-frame-error")) return "CAPTURE_ERROR_PAGE";
+
   const root = document.documentElement;
   ${scheme === "dark" ? `root.dataset.theme = "dark"; root.classList.add("dark");` : `root.dataset.theme = "light"; root.classList.remove("dark");`}
 
@@ -121,10 +126,26 @@ function settleScript(scheme) {
 
   // Two frames for layout, then a beat for chart libraries that animate via
   // requestAnimationFrame and ignore CSS overrides.
+  // Wait for real content before settling. \`wait --networkidle\` can return
+  // while a client-side route is still resolving, which is how /accounting and
+  // /dashboard/production first captured as blank white pages showing nothing
+  // but the top loading bar. A blank baseline is not as obviously wrong as an
+  // error page, so it survives review — worse, not better.
+  const hasContent = () => (((document.body && document.body.innerText) || "").trim().length > 200);
+
   return new Promise((done) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      setTimeout(() => done("settled"), 600);
-    }));
+    const deadline = Date.now() + 8000;
+    const settle = () =>
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        setTimeout(() => done("settled"), 600);
+      }));
+
+    const check = () => {
+      if (hasContent()) return settle();
+      if (Date.now() > deadline) return done("CAPTURE_BLANK");
+      setTimeout(check, 200);
+    };
+    check();
   });
 })()`;
 }
@@ -151,7 +172,50 @@ if (!existsSync(browseBin)) {
   process.exit(1);
 }
 
-if (existsSync(outDir)) {
+// ----------------------------------------------------------------- preflight
+/**
+ * Confirm the origin actually answers before anything else happens.
+ *
+ * This is the check whose absence produced 35 committed
+ * ERR_CONNECTION_REFUSED baselines (commit 7f637b1, 8 distinct images across
+ * 35 files). With the dev server down, `goto` still renders Chrome's
+ * network-error page, `screenshot` still writes a valid PNG, and the trailing
+ * `url` step still reports the requested localhost URL — so every route logged
+ * `ok` and the run exited 0.
+ *
+ * Deliberately ordered BEFORE the rmSync below: a failed preflight must not
+ * take the existing baselines down with it.
+ */
+try {
+  const response = await fetch(baseUrl, { redirect: "manual" });
+  if (response.status >= 500) {
+    console.error(
+      `${baseUrl} answered ${response.status}.\n` +
+        `The server is up but erroring. Fix that first — a 500 page screenshots as cleanly as your app.`,
+    );
+    process.exit(1);
+  }
+} catch (error) {
+  console.error(
+    `${baseUrl} is not answering (${error.cause?.code ?? error.message}).\n\n` +
+      `Start the dev server first:  cd frontend && pnpm dev\n\n` +
+      `Refusing to capture. A dead origin screenshots Chrome's error page as if it were\n` +
+      `your app, which is how commit 7f637b1 came to hold 35 identical error screens.`,
+  );
+  process.exit(1);
+}
+
+/**
+ * Full runs start clean. `--only` runs do NOT.
+ *
+ * `--only` means "refresh these routes", so wiping the dir would delete every
+ * route not named. That made retrying a flaky capture impossible: the browse
+ * daemon fails a handful of routes per run with "Server failed to start" or a
+ * taskkill race, and the only recovery was re-running all 35 and hoping a
+ * different handful failed. Incremental retry is the whole reason `--only`
+ * exists on a `--out baseline` run.
+ */
+if (existsSync(outDir) && only.length === 0) {
   rmSync(outDir, { recursive: true, force: true });
 }
 mkdirSync(outDir, { recursive: true });
@@ -190,9 +254,22 @@ for (const route of selected) {
       // A redirect to /login means the session expired. Without this check the
       // harness happily baselines 30 identical login screens and reports green.
       const landedOnLogin = /\/login/.test(stdout) && route.auth !== false;
+      const errorPage = stdout.includes("CAPTURE_ERROR_PAGE");
+      const blankPage = stdout.includes("CAPTURE_BLANK");
       const captured = existsSync(file);
 
-      if (landedOnLogin) {
+      if (errorPage || blankPage) {
+        // Delete it. A retained error-page or blank PNG is worse than a missing
+        // file, because the next `visual:diff` treats it as a valid reference.
+        rmSync(file, { force: true });
+        failures.push({
+          label,
+          reason: errorPage
+            ? "Chrome error page, not the app (origin died mid-run?)"
+            : "never rendered content — still resolving after 8s",
+        });
+        console.log(`${progress} ${errorPage ? "ERRPG" : "BLANK"} ${label}`);
+      } else if (landedOnLogin) {
         failures.push({ label, reason: "redirected to /login (session expired?)" });
         console.log(`${progress} AUTH  ${label}`);
       } else if (!captured) {
@@ -214,6 +291,44 @@ for (const route of selected) {
 }
 
 console.log(`\nWrote ${shot - failures.length}/${total} screenshots to visual/${outName}`);
+
+// ------------------------------------------------------- degenerate-set check
+/**
+ * Backstop for "every route captured the same thing", whatever the cause.
+ *
+ * 7f637b1 committed 35 files holding 8 distinct images: login, pos,
+ * dashboard-cashier and acc-trial-balance were byte-identical. Distinct routes
+ * render distinct pixels, so if fewer than half of them do, this run captured
+ * something other than the app and must not become a reference.
+ *
+ * Unlike the preflight and the error-page guard, this one is cause-agnostic —
+ * it catches the next failure mode nobody predicted.
+ */
+const written = [];
+for (const route of selected) {
+  for (const viewportName of route.viewports ?? ["ledger"]) {
+    for (const scheme of schemes) {
+      const file = join(outDir, `${route.name}__${viewportName}__${scheme}.png`);
+      if (existsSync(file)) written.push(file);
+    }
+  }
+}
+
+if (written.length > 4) {
+  const hashes = new Set(
+    written.map((file) => createHash("sha256").update(readFileSync(file)).digest("hex")),
+  );
+  console.log(`${hashes.size} distinct images across ${written.length} captures`);
+
+  if (hashes.size * 2 < written.length) {
+    console.error(
+      `\nDegenerate capture: ${hashes.size} distinct images across ${written.length} files.\n` +
+        `Distinct routes should render distinct pixels. This run captured something other\n` +
+        `than the app — do not commit it as a baseline.`,
+    );
+    process.exit(1);
+  }
+}
 
 if (failures.length > 0) {
   console.error(`\n${failures.length} capture failure(s):`);

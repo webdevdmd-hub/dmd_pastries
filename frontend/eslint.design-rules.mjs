@@ -124,9 +124,16 @@ export const designRuleGroups = {
   ),
 
   // Also near-clean today, so also ships at "error".
+  //
+  // The negative lookbehind is load-bearing. This rule permits the token behind a
+  // `disabled:` or `placeholder:` variant — that is its one sanctioned use — and
+  // bans it only as a bare content colour. Without the lookbehind it fired on
+  // `disabled:text-foreground-disabled`, i.e. on exactly the usage its own
+  // message calls allowed, which made styling a disabled control impossible at
+  // `error` severity. Found while making the POS Charge button's disabled state.
   "no-disabled-as-content": guard(
-    "\\btext-foreground-disabled\\b",
-    "foreground-disabled is ~3.1:1 and fails WCAG AA. Placeholders and disabled state only, never content. Use text-foreground-muted.",
+    "(?<!\\b(?:disabled|placeholder|aria-disabled|group-disabled|peer-disabled):)\\btext-foreground-disabled\\b",
+    "foreground-disabled is ~3.1:1 and fails WCAG AA. Allowed only behind a disabled:/placeholder: variant, never as a content colour. Use text-foreground-muted.",
   ),
 };
 
