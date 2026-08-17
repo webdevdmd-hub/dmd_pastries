@@ -341,7 +341,7 @@ Add to `eslint.config.mjs`:
 
 All-errors on day one makes `pnpm lint` unusable. Each rule flips `warn` → `error` in the phase that clears it, and `--max-warnings 0` goes on last. **This table is the contract** — without it the rules stay decorative, which is exactly what happened after `ce01f74`.
 
-> **Status, 2026-08-17: `no-raw-palette` and `no-heavy-weight` are now at `error`.**
+> **Status, 2026-08-17: `no-raw-palette`, `no-heavy-weight` and `no-hex-in-class` are now at `error`.**
 >
 > Raw palette utilities across `frontend/src` went **1949 → 0** and `font-black`
 > went **78 → 0**, so both flipped in the commit that finished clearing them —
@@ -350,11 +350,20 @@ All-errors on day one makes `pnpm lint` unusable. Each rule flips `warn` → `er
 > ESLint with code 1, fails `lint-staged`, and is reverted before it can be
 > committed.
 >
-> Three rules stay at `warn` because what remains is not drift a codemod can clear:
-> `no-hex-in-class` (57 — Recharts and react-three-fiber literals, which cannot read
-> CSS custom properties and need the `palette.ts` bridge in Phase 6),
-> `no-uppercase` (40 — table headers without the wide tracking, so a copy pass), and
-> `no-sub-12px` (39 — each one a layout decision).
+> `no-hex-in-class` reached zero from 291 by three different routes, which is why it
+> took longest: Phase 6 replaced the 124 Recharts literals with the `palette.ts`
+> bridge, D1 and D4 **deleted** the auth orb decoration and the WebGL door scene
+> rather than migrating them (this document always said those were deletions), and D3
+> rebuilt the landing page on the Threshold register, which took the last 20.
+>
+> Two rules stay at `warn` because what remains is not drift a codemod can clear:
+> `no-uppercase` (35 — table headers without the wide tracking, so a copy pass) and
+> `no-sub-12px` (38 — each one a layout decision).
+>
+> One legitimate exception is live, and it is the model for any future one: the single
+> permitted threshold eyebrow (DESIGN.md §7 item 1) carries an
+> `eslint-disable-next-line` with a stated reason. Disable narrowly; never weaken a
+> rule.
 >
 > Live severities are in `frontend/eslint.design-plugin.mjs`; that file is the
 > source of truth, this table is the schedule.

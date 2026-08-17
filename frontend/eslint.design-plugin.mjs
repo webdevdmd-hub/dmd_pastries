@@ -59,12 +59,12 @@ export const designPlugin = {
  * blocks every commit touching an affected file, and the escape hatch people
  * reach for is `--no-verify`, which disables all of them at once.
  *
- * Counts in src/, measured 2026-08-17 after the Track B sweep:
+ * Counts in src/, measured 2026-08-17 after B5, D1, D3 and D4:
  *   no-raw-palette               0  (was 1949 across ~300 files)  -> ERROR
  *   no-heavy-weight              0  (was 78)                      -> ERROR
- *   no-hex-in-class             57  Recharts + react-three-fiber   -> after B5
- *   no-uppercase                40  no wide tracking; copy pass    -> after B4
- *   no-sub-12px                 39  each one a layout decision     -> after B4
+ *   no-hex-in-class              0  (was 291)                     -> ERROR
+ *   no-uppercase                35  copy pass on table headers    -> after B4
+ *   no-sub-12px                 38  each one a layout decision     -> after B4
  *   no-solid-as-text             0                                 -> ERROR
  *   no-disabled-as-content       0                                 -> ERROR
  *
@@ -78,21 +78,31 @@ export const designPlugin = {
  * no-heavy-weight flips with it: font-black and font-extrabold are gone (78 -> 0),
  * and 500 is the workhorse weight per DESIGN.md 2.
  *
- * The three still at "warn" are not drift a codemod can clear:
- *   - hex-in-class is canvas and WebGL literals, which cannot read CSS custom
- *     properties. They need the palette.ts bridge (B5), not a utility.
- *   - uppercase is mostly table headers without the wide tracking the sweep
- *     targeted; converting them is a copy pass.
- *   - sub-12px is a layout decision per site: the text grows or the container does.
+ * no-hex-in-class flips too, 291 -> 0. It got there by three different routes,
+ * which is why it took until now: B5 replaced the 124 Recharts literals with the
+ * palette.ts bridge, D1 and D4 DELETED the auth orb decoration and the WebGL door
+ * scene rather than migrating them (MIGRATION.md always said those were deletions),
+ * and D3 rebuilt the landing page on the Threshold register, which took the last 20.
  *
- * The escape hatch for a genuine exception stays `eslint-disable-next-line` with a
- * reason comment, per the plan's section 5. If you find yourself reaching for
- * `--no-verify` instead, that is the signal a rule was flipped too early - and note
- * that `--no-verify` also disables the Git LFS chaining in .githooks/pre-push.
+ * The two still at "warn" are the ones a codemod genuinely cannot clear:
+ *   - uppercase is mostly table headers without the wide tracking the sweep
+ *     targeted. Rewriting them is a copy pass, and DESIGN.md §4 wants them as
+ *     text-meta sentence case.
+ *   - sub-12px is a layout decision per site: either the text grows or the
+ *     container changes to fit it.
+ *
+ * One legitimate exception is live and is worth knowing about, because it is the
+ * model for any future one: the single permitted threshold eyebrow on the landing
+ * page (DESIGN.md §7 item 1) carries an `eslint-disable-next-line` with a reason,
+ * per the plan's §5 escape hatch. Disable with a stated reason; do not weaken a rule.
+ *
+ * If you find yourself reaching for `--no-verify` instead of a scoped disable, that
+ * is the signal a rule was flipped too early - and note that `--no-verify` also
+ * disables the Git LFS chaining in .githooks/pre-push.
  */
 export const designRuleSeverity = {
   "design/no-raw-palette": "error",
-  "design/no-hex-in-class": "warn",
+  "design/no-hex-in-class": "error",
   "design/no-heavy-weight": "error",
   "design/no-uppercase": "warn",
   "design/no-sub-12px": "warn",

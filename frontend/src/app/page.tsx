@@ -1,19 +1,43 @@
-import {
-  ArrowRight,
-  BarChart3,
-  Boxes,
-  Factory,
-  Landmark,
-  PackageSearch,
-  ReceiptText,
-  ShoppingBasket,
-  Store,
-  Users,
-} from "lucide-react";
+import { ArrowRight, Factory, Landmark, PackageSearch, ShoppingBasket } from "lucide-react";
 import Link from "next/link";
 import type { JSX } from "react";
 
 import { ROUTES } from "@/constants/routes";
+
+/**
+ * Landing page, Threshold register (DESIGN.md §7, plan item D3).
+ *
+ * The structure is prescribed: Geist Mono eyebrow, Fraunces headline at
+ * `text-display`, a Geist sub-paragraph, ONE `--primary` CTA, then the
+ * photograph. It is Square's structure and Midday's structure, arrived at
+ * independently by the POS category leader and the accounting-SaaS reference.
+ *
+ * WHAT CHANGED FROM THE PREVIOUS VERSION
+ *
+ * - 20 hardcoded hexes, and six off-system accents among them: a #45b894 mint dot,
+ *   #45a987, #67d0ad, #f2735b coral, #f58a75, and a #dcefe8 mint band. The system
+ *   has one accent and it means money.
+ * - Five uppercase eyebrows. §7 allows exactly one per page, and §2 bans the
+ *   pattern everywhere else because at ~10px with wide tracking it is both the most
+ *   dating detail in the build and unreadable.
+ * - Two competing hero CTAs ("Start owner onboarding" and "See how it works").
+ *   §7 is explicit: one --primary CTA, not two competing ones. A second link at
+ *   equal weight is the visitor's cue that neither is the thing to do.
+ * - font-bold / font-semibold throughout. 500 is the workhorse, 600 for page
+ *   titles, nothing above (§2).
+ * - No Fraunces anywhere, despite this being the one register that calls for it.
+ *
+ * THE PHOTOGRAPH IS STILL MISSING, DELIBERATELY
+ *
+ * §7 item 5 is one real photograph of a real counter — product, hands, a person —
+ * and the plan blocks D3 on it while saying "ship type-only until it exists; still
+ * better than the door scene." So this ships type-only, and the hero is a single
+ * generous column rather than a two-column grid with an empty half, which is what
+ * it looked like after D4 removed the WebGL scene.
+ *
+ * When the photograph arrives it goes full-bleed below the hero, and the hero stays
+ * exactly as it is. That is the whole reason to build it this way now.
+ */
 
 const operatingFlow = [
   ["01", "Sell", "POS billing and bakery orders"],
@@ -55,96 +79,98 @@ const moduleGroups = [
 
 export default function HomePage(): JSX.Element {
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#f4f6f5] text-[#171918]">
-      <section className="relative min-h-[96svh] overflow-hidden border-b border-primary/10 lg:min-h-[88svh]">
-        {/* D4: the react-three-fiber door scene is deleted (901 lines, 87 hexes,
-            four WebGL dependencies). D3 rebuilds this hero on the Threshold
-            structure; until then it is type on a calm field, which the plan
-            calls for explicitly — "ship type-only until [the photograph]
-            exists; still better than the door scene". */}
+    <main className="min-h-screen overflow-x-hidden bg-canvas text-foreground">
+      <header className="mx-auto flex h-20 max-w-[78rem] items-center justify-between px-5 sm:px-8 lg:px-12">
+        <Link className="flex items-baseline gap-2" href={ROUTES.home}>
+          {/* Fraunces wordmark. Per DESIGN.md §1 the bakery identity now lives in
+              exactly one serif wordmark on threshold surfaces and in nothing else —
+              which is both more modern and more honest than a cream background on a
+              screen that runs a trial balance. */}
+          <span className="font-serif text-title leading-none">Pastries POS</span>
+          <span className="text-meta text-foreground-muted">Bakery operations</span>
+        </Link>
 
-        <header className="relative z-20 mx-auto flex h-20 max-w-[90rem] items-center justify-between px-5 sm:px-8 lg:px-12">
-          <Link className="flex items-center gap-3" href={ROUTES.home}>
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#171918] text-primary-foreground">
-              <Store className="h-4 w-4" />
-            </span>
-            <span>
-              <span className="block whitespace-nowrap text-sm font-bold leading-none">
-                Pastries POS
-              </span>
-              <span className="mt-1 hidden text-[0.64rem] uppercase text-[#646a67] sm:block">
-                Bakery operations
-              </span>
-            </span>
+        {/* Both of these are deliberately quiet. A filled --primary button here
+            would sit in the same viewport as the hero CTA — measured at y=20 and
+            y=484 on a 900px screen — and §7 item 4 is explicit: one --primary CTA,
+            not two competing ones. Someone arriving should have exactly one obvious
+            next action, and it is the one next to the headline. */}
+        <nav aria-label="Account access" className="flex items-center gap-1">
+          <Link
+            className="text-body inline-flex h-10 items-center rounded px-3 font-medium text-foreground-muted transition-colors hover:text-foreground"
+            href={ROUTES.login}
+          >
+            Login
           </Link>
+          <Link
+            className="text-body inline-flex h-10 items-center gap-2 whitespace-nowrap rounded border border-border bg-card px-4 font-medium text-foreground transition-colors hover:bg-muted"
+            href={ROUTES.signup}
+          >
+            Create account
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </nav>
+      </header>
 
-          <nav className="flex items-center gap-2" aria-label="Account access">
-            <Link
-              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-md bg-[#171918] px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-[#343836] sm:px-4 sm:text-sm"
-              href={ROUTES.signup}
-            >
-              <span className="sm:hidden">Sign up</span>
-              <span className="hidden sm:inline">Create account</span>
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </nav>
-        </header>
+      <section className="mx-auto max-w-[78rem] px-5 pb-20 pt-16 sm:px-8 sm:pb-28 sm:pt-24 lg:px-12">
+        {/* The one permitted uppercase eyebrow on the site (DESIGN.md §7 item 1).
+            Everywhere else this pattern is banned, so the rule is disabled here with
+            a reason rather than weakened — which is the escape hatch the plan's §5
+            specifies for exactly this case. */}
+        {/* eslint-disable-next-line design/no-uppercase -- DESIGN.md §7 item 1: the single permitted threshold eyebrow, Geist Mono at 12.5px */}
+        <p className="text-meta flex items-center gap-2 font-mono uppercase tracking-[0.1em] text-foreground-muted">
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-money" />
+          Production-based bakery ERP
+        </p>
 
-        <div className="pointer-events-none relative z-10 mx-auto grid min-h-[calc(96svh-5rem)] max-w-[90rem] items-start px-5 pb-24 pt-8 sm:items-center sm:px-8 sm:pt-10 lg:min-h-[calc(88svh-5rem)] lg:grid-cols-[0.82fr_1.18fr] lg:px-12 lg:pb-16 lg:pt-0">
-          <div className="pointer-events-auto max-w-2xl">
-            <p className="mb-5 flex items-center gap-2 text-xs font-bold uppercase text-[#646a67]">
-              <span className="h-2 w-2 rounded-full bg-[#45b894]" />
-              Production-based bakery ERP
-            </p>
-            <h1 className="text-4xl font-semibold leading-[1.04] sm:text-6xl sm:leading-[0.98] lg:text-7xl">
-              Run your bakery from one system.
-            </h1>
-            <p className="mt-5 max-w-xl text-sm leading-6 text-[#555b58] sm:mt-6 sm:text-lg sm:leading-8">
-              Pastries POS connects counter sales, purchasing, inventory, recipes, production,
-              bakery orders, accounting, and reports across every branch.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                className="inline-flex h-12 items-center gap-2 rounded-md bg-[#171918] px-5 text-sm font-semibold text-primary-foreground transition-transform hover:-translate-y-0.5"
-                href={ROUTES.signup}
-              >
-                Start owner onboarding
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                className="inline-flex h-12 items-center px-4 text-sm font-semibold text-[#3e4340] hover:text-foreground"
-                href="#how-it-works"
-              >
-                See how it works
-              </Link>
-            </div>
-          </div>
-        </div>
+        {/* Fraunces, text-display (68px/1, -0.03em, weight 400), sentence case,
+            ~16ch so it breaks into a stack rather than running as one long line. */}
+        <h1 className="text-display mt-6 max-w-[16ch] font-serif text-foreground">
+          Run your bakery from one system.
+        </h1>
+
+        <p className="text-body mt-7 max-w-[54ch] text-foreground-muted sm:text-lg sm:leading-8">
+          Pastries POS connects counter sales, purchasing, inventory, recipes, production, bakery
+          orders, accounting, and reports across every branch.
+        </p>
+
+        {/* One CTA. The previous "See how it works" link sat beside this at equal
+            weight, which told a visitor that neither was the thing to do. */}
+        <Link
+          className="text-body mt-10 inline-flex h-12 items-center gap-2 rounded bg-primary px-5 font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          href={ROUTES.signup}
+        >
+          Start owner onboarding
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </section>
 
-      <section className="border-b border-primary/10 bg-card" id="how-it-works">
-        <div className="mx-auto max-w-[90rem] px-5 py-14 sm:px-8 lg:px-12 lg:py-20">
-          <div className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr]">
+      <section className="border-t border-border bg-card" id="how-it-works">
+        <div className="mx-auto max-w-[78rem] px-5 py-16 sm:px-8 lg:px-12 lg:py-20">
+          <div className="grid gap-12 lg:grid-cols-[0.7fr_1.3fr]">
             <div>
-              <p className="text-xs font-bold uppercase text-[#45a987]">One connected workflow</p>
-              <h2 className="mt-3 max-w-md text-3xl font-semibold leading-tight sm:text-4xl">
+              <h2 className="text-page max-w-md text-foreground">
                 From first sale to final report.
               </h2>
-              <p className="mt-4 max-w-md text-sm leading-6 text-[#646a67]">
+              <p className="text-body mt-4 max-w-md text-foreground-muted">
                 Every operational step shares the same branch, product, stock, customer, and
                 financial context.
               </p>
             </div>
 
-            <ol className="grid border-y border-primary/10 sm:grid-cols-2 lg:grid-cols-4 lg:border-y-0 lg:border-l">
+            {/* Numbered because this genuinely is a sequence — sell, source, make,
+                control — rather than as decoration. */}
+            <ol className="grid border-t border-border sm:grid-cols-2 lg:grid-cols-4 lg:border-l lg:border-t-0">
               {operatingFlow.map(([number, title, detail]) => (
                 <li
-                  className="border-b border-primary/10 py-5 sm:px-5 lg:border-b-0 lg:border-r"
+                  className="border-b border-border py-6 sm:px-6 lg:border-b-0 lg:border-r"
                   key={number}
                 >
-                  <span className="text-xs font-bold text-[#f2735b]">{number}</span>
-                  <h3 className="mt-5 text-lg font-semibold">{title}</h3>
-                  <p className="mt-2 text-sm leading-5 text-[#646a67]">{detail}</p>
+                  <span className="text-meta font-mono tabular-nums text-foreground-muted">
+                    {number}
+                  </span>
+                  <h3 className="text-title mt-4 text-foreground">{title}</h3>
+                  <p className="text-cell mt-2 text-foreground-muted">{detail}</p>
                 </li>
               ))}
             </ol>
@@ -152,43 +178,36 @@ export default function HomePage(): JSX.Element {
         </div>
       </section>
 
-      <section className="bg-[#171918] text-primary-foreground">
-        <div className="mx-auto max-w-[90rem] px-5 py-16 sm:px-8 lg:px-12 lg:py-24">
-          <div className="mb-12 flex flex-col justify-between gap-5 border-b border-card/15 pb-8 lg:flex-row lg:items-end">
-            <div>
-              <p className="text-xs font-bold uppercase text-[#67d0ad]">What the app manages</p>
-              <h2 className="mt-3 max-w-2xl text-3xl font-semibold leading-tight sm:text-4xl">
-                Daily operations, without disconnected tools.
-              </h2>
-            </div>
-            <div className="flex items-center gap-5 text-sm text-primary-foreground/60">
-              <span className="flex items-center gap-2">
-                <Boxes className="h-4 w-4" /> Branch aware
-              </span>
-              <span className="flex items-center gap-2">
-                <Users className="h-4 w-4" /> Role controlled
-              </span>
-            </div>
-          </div>
+      <section className="border-t border-border bg-primary text-primary-foreground">
+        <div className="mx-auto max-w-[78rem] px-5 py-16 sm:px-8 lg:px-12 lg:py-24">
+          <h2 className="text-page max-w-2xl border-b border-primary-foreground/15 pb-8">
+            Daily operations, without disconnected tools.
+          </h2>
 
           <div className="grid lg:grid-cols-2">
             {moduleGroups.map((group, index) => {
               const Icon = group.icon;
               return (
                 <article
-                  className={`border-card/15 py-8 lg:min-h-64 lg:p-9 ${
+                  className={`border-primary-foreground/15 py-8 lg:min-h-60 lg:p-9 ${
                     index < 2 ? "border-b" : ""
                   } ${index % 2 === 0 ? "lg:border-r" : ""}`}
                   key={group.label}
                 >
                   <div className="flex items-start gap-4">
-                    <Icon className="mt-1 h-5 w-5 shrink-0 text-[#67d0ad]" />
+                    {/* Muted on an inverted surface has to come from
+                        --primary-foreground, not --foreground-muted: the latter is
+                        tuned for light grounds and lands around 2.5:1 on #171717. */}
+                    <Icon
+                      aria-hidden
+                      className="mt-1 h-5 w-5 shrink-0 text-primary-foreground/70"
+                    />
                     <div>
-                      <h3 className="text-xl font-semibold">{group.label}</h3>
-                      <p className="mt-3 max-w-xl text-sm leading-6 text-primary-foreground/64">
+                      <h3 className="text-title text-primary-foreground">{group.label}</h3>
+                      <p className="text-body mt-3 max-w-xl text-primary-foreground/70">
                         {group.detail}
                       </p>
-                      <p className="mt-7 text-xs font-bold uppercase text-[#f58a75]">
+                      <p className="text-meta mt-6 font-mono text-primary-foreground/60">
                         {group.modules}
                       </p>
                     </div>
@@ -200,32 +219,18 @@ export default function HomePage(): JSX.Element {
         </div>
       </section>
 
-      <section className="bg-[#dcefe8]">
-        <div className="mx-auto flex max-w-[90rem] flex-col justify-between gap-8 px-5 py-14 sm:px-8 lg:flex-row lg:items-center lg:px-12 lg:py-16">
-          <div>
-            <div className="flex items-center gap-4 text-[#3e4340]">
-              <ReceiptText className="h-5 w-5" />
-              <BarChart3 className="h-5 w-5" />
-            </div>
-            <h2 className="mt-5 max-w-2xl text-3xl font-semibold leading-tight">
-              One place to sell, make, track, and understand your bakery.
-            </h2>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              className="inline-flex h-11 items-center rounded-md border border-primary/20 px-5 text-sm font-semibold hover:bg-card/50"
-              href={ROUTES.login}
-            >
-              Login
-            </Link>
-            <Link
-              className="inline-flex h-11 items-center gap-2 rounded-md bg-[#171918] px-5 text-sm font-semibold text-primary-foreground hover:bg-[#343836]"
-              href={ROUTES.signup}
-            >
-              Create owner account
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
+      <section className="border-t border-border bg-muted">
+        <div className="mx-auto flex max-w-[78rem] flex-col justify-between gap-8 px-5 py-16 sm:px-8 lg:flex-row lg:items-center lg:px-12">
+          <h2 className="text-page max-w-2xl text-foreground">
+            One place to sell, make, track, and understand your bakery.
+          </h2>
+          <Link
+            className="text-body inline-flex h-12 shrink-0 items-center gap-2 self-start rounded bg-primary px-5 font-medium text-primary-foreground transition-colors hover:bg-primary/90 lg:self-auto"
+            href={ROUTES.signup}
+          >
+            Create owner account
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
     </main>
