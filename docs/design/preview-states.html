@@ -1,0 +1,1224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>Six Missing States</title>
+<style>
+/* ---------------------------------------------------------------------------
+ * Pastries POS — the six interaction states with no design.
+ * Rendered in the v3 token layer (docs/design/tokens.css). Every colour below
+ * is a v3 token value, not a new choice. Light is :root; dark uses v3's own
+ * measured dark block, which exists so the layer is dark-ready (TODOS T-A).
+ * ------------------------------------------------------------------------- */
+
+:root {
+  /* v3 light — barely-warm neutrals */
+  --canvas: #FAF9F7;
+  --card: #FFFFFF;
+  --muted: #F2F0EC;
+  --border: #E5E2DC;
+  --fg: #0A0A0A;
+  --fg-muted: #6E6A64;
+  --fg-disabled: #918D87;
+  --primary: #171717;
+  --primary-fg: #FAF9F7;
+
+  --money-solid: #00723B;
+  --money-text: #005E31;
+  --money-tint: #EAF7EE;
+
+  --warning-solid: #A66D00;
+  --warning-text: #7B4800;
+  --warning-tint: #FCF3E1;
+
+  --danger-solid: #CC2827;
+  --danger-text: #9E1618;
+  --danger-tint: #FDEEEC;
+
+  --info-solid: #3072C1;
+  --info-text: #17559B;
+  --info-tint: #EBF3FD;
+
+  --ring: #3072C1;
+
+  --radius-sm: 0.375rem;
+  --radius: 0.625rem;
+  --radius-lg: 0.875rem;
+
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.07), 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-md: 0 8px 24px rgb(0 0 0 / 0.08);
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Production is Geist / Geist Mono. The artifact CSP blocks font CDNs, so
+   * these stacks stand in; metrics differ slightly from shipped type. */
+  --sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+
+  --skel: #EDEAE4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #0B0B0B;
+    --card: #141414;
+    --muted: #1C1C1C;
+    --border: #2A2A2A;
+    --fg: #F4F1EC;
+    --fg-muted: #A39E96;
+    --fg-disabled: #6B665F;
+    --primary: #F4F1EC;
+    --primary-fg: #0B0B0B;
+
+    --money-solid: #00723B;
+    --money-text: #2FAE71;
+    --money-tint: #0E2A1B;
+
+    --warning-solid: #A66D00;
+    --warning-text: #E0A030;
+    --warning-tint: #2A1F0B;
+
+    --danger-solid: #CC2827;
+    --danger-text: #F87171;
+    --danger-tint: #2E1414;
+
+    --info-solid: #3072C1;
+    --info-text: #7DB3F7;
+    --info-tint: #0F1E30;
+
+    --ring: #7DB3F7;
+
+    --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 8px 24px rgb(0 0 0 / 0.55);
+
+    --skel: #232323;
+  }
+}
+
+:root[data-theme="dark"] {
+  --canvas: #0B0B0B;
+  --card: #141414;
+  --muted: #1C1C1C;
+  --border: #2A2A2A;
+  --fg: #F4F1EC;
+  --fg-muted: #A39E96;
+  --fg-disabled: #6B665F;
+  --primary: #F4F1EC;
+  --primary-fg: #0B0B0B;
+
+  --money-solid: #00723B;
+  --money-text: #2FAE71;
+  --money-tint: #0E2A1B;
+
+  --warning-solid: #A66D00;
+  --warning-text: #E0A030;
+  --warning-tint: #2A1F0B;
+
+  --danger-solid: #CC2827;
+  --danger-text: #F87171;
+  --danger-tint: #2E1414;
+
+  --info-solid: #3072C1;
+  --info-text: #7DB3F7;
+  --info-tint: #0F1E30;
+
+  --ring: #7DB3F7;
+
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 8px 24px rgb(0 0 0 / 0.55);
+
+  --skel: #232323;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 14.5px;
+  line-height: 1.55;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 56px 28px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+/* --- masthead ----------------------------------------------------------- */
+
+.masthead { display: flex; flex-direction: column; gap: 14px; }
+
+.eyebrow {
+  font-size: 12.5px;
+  letter-spacing: 0;
+  color: var(--fg-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.eyebrow code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+}
+
+h1 {
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.032em;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.standfirst {
+  font-size: 16px;
+  color: var(--fg-muted);
+  margin: 0;
+  max-width: 62ch;
+}
+
+/* --- callout ------------------------------------------------------------ */
+
+.callout {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--danger-solid);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow-xs);
+}
+
+.callout-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+  font-size: 15px;
+}
+
+.callout p { margin: 0; color: var(--fg-muted); max-width: 74ch; }
+.callout p strong { color: var(--fg); font-weight: 500; }
+
+.chip {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  border-radius: 999px;
+  padding: 2px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.chip .dot { width: 5px; height: 5px; border-radius: 999px; flex: none; }
+
+.chip-danger { background: var(--danger-tint); color: var(--danger-text); }
+.chip-danger .dot { background: var(--danger-solid); }
+.chip-warning { background: var(--warning-tint); color: var(--warning-text); }
+.chip-warning .dot { background: var(--warning-solid); }
+.chip-money { background: var(--money-tint); color: var(--money-text); }
+.chip-money .dot { background: var(--money-solid); }
+.chip-neutral { background: var(--muted); color: var(--fg-muted); }
+.chip-neutral .dot { background: var(--fg-muted); }
+
+/* --- state sections ----------------------------------------------------- */
+
+.state {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 40px;
+  border-top: 1px solid var(--border);
+}
+
+.state-head { display: flex; flex-direction: column; gap: 9px; }
+
+.state-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 12.5px;
+  color: var(--fg-muted);
+}
+
+.track {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 7px;
+}
+
+h2 {
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.028em;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.today {
+  margin: 0;
+  color: var(--fg-muted);
+  max-width: 74ch;
+}
+.today b { color: var(--fg); font-weight: 500; }
+
+/* --- specimen frame ----------------------------------------------------- */
+
+.specimen {
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-x: auto;
+}
+
+.specimen-label {
+  font-size: 12px;
+  color: var(--fg-muted);
+  font-family: var(--mono);
+  letter-spacing: 0;
+}
+
+.specimen.counter { background: var(--muted); }
+
+/* --- rules list --------------------------------------------------------- */
+
+.rules { display: flex; flex-direction: column; gap: 9px; margin: 0; padding: 0; list-style: none; }
+
+.rules li {
+  display: grid;
+  grid-template-columns: 15px 1fr;
+  gap: 10px;
+  color: var(--fg-muted);
+  max-width: 78ch;
+}
+.rules li::before {
+  content: "";
+  width: 5px; height: 5px;
+  border-radius: 999px;
+  background: var(--border);
+  margin-top: 9px;
+}
+.rules li b { color: var(--fg); font-weight: 500; }
+.rules code, .today code, .callout code, .accept code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: var(--muted);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.accept {
+  background: var(--muted);
+  border-radius: var(--radius);
+  padding: 13px 16px;
+  font-size: 13.5px;
+  color: var(--fg-muted);
+  max-width: 78ch;
+}
+.accept b { color: var(--fg); font-weight: 500; }
+
+/* =========================================================================
+ * COMPONENT SPECIMENS — production markup, v3 tokens
+ * ====================================================================== */
+
+/* Buttons ---------------------------------------------------------------- */
+.btn {
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: -0.011em;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  padding: 0 18px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background-color 150ms var(--ease), color 150ms var(--ease), border-color 150ms var(--ease);
+  white-space: nowrap;
+}
+.btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+.btn-counter { height: 48px; min-width: 48px; }
+.btn-ledger  { height: 36px; min-width: 36px; }
+
+.btn-outline { background: var(--card); border-color: var(--border); color: var(--fg); }
+.btn-outline:hover { background: var(--muted); }
+
+.btn-danger { background: var(--card); border-color: var(--border); color: var(--danger-text); }
+.btn-danger:hover { background: var(--danger-tint); border-color: var(--danger-solid); }
+
+.btn-commit { background: var(--money-solid); color: #FFFFFF; border-color: transparent; }
+.btn-commit:hover { background: var(--money-text); }
+.btn-commit:disabled { background: var(--muted); color: var(--fg-disabled); cursor: not-allowed; border-color: var(--border); }
+
+.btn-primary { background: var(--primary); color: var(--primary-fg); }
+
+/* the focus ring, shown statically so it reads in a screenshot */
+.btn-focused { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* Dialog ----------------------------------------------------------------- */
+.scrim {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 34px 20px;
+  display: flex;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.scrim::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(90deg, var(--muted) 0 88px, transparent 88px 100px),
+    repeating-linear-gradient(0deg, var(--muted) 0 68px, transparent 68px 80px);
+  opacity: 0.5;
+}
+.scrim::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.28);
+}
+
+.dialog {
+  position: relative;
+  z-index: 1;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  width: 100%;
+  max-width: 452px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dialog h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.33;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.dialog p { margin: 0; color: var(--fg-muted); }
+.dialog .num { font-family: var(--mono); font-weight: 500; color: var(--fg); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+.consequence {
+  background: var(--danger-tint);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  font-size: 12.5px;
+  color: var(--danger-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.consequence .dot { width: 5px; height: 5px; border-radius: 999px; background: var(--danger-solid); flex: none; }
+.consequence .ref { font-family: var(--mono); }
+
+.dialog-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* Toast ------------------------------------------------------------------ */
+.toast {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--danger-solid);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 16px 18px;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.toast-title { font-weight: 500; display: flex; align-items: center; gap: 9px; }
+.toast p { margin: 0; color: var(--fg-muted); font-size: 13.5px; }
+.toast .verdict { color: var(--fg); font-weight: 500; }
+.toast-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+
+/* Offline bar ------------------------------------------------------------ */
+.offline-bar {
+  background: var(--danger-tint);
+  border: 1px solid var(--danger-solid);
+  border-radius: var(--radius);
+  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+  color: var(--danger-text);
+}
+.offline-bar .dot {
+  width: 7px; height: 7px; border-radius: 999px;
+  background: var(--danger-solid); flex: none;
+}
+.offline-bar .lead { font-weight: 500; }
+.offline-bar .detail { color: var(--danger-text); opacity: 0.85; font-size: 13.5px; }
+.offline-bar .spacer { flex: 1 1 auto; }
+
+/* a miniature counter surface to show the bar in place */
+.till {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 460px;
+}
+.till-head {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.till-head .who { font-weight: 500; font-size: 13.5px; }
+.till-head .sale { font-family: var(--mono); font-size: 12.5px; color: var(--fg-muted); }
+.till-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+.cart-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13.5px;
+}
+.cart-line .qty { color: var(--fg-muted); font-family: var(--mono); }
+.cart-line .amt { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+.till-total {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+.till-total .label { color: var(--fg-muted); font-size: 13.5px; }
+.till-total .value {
+  font-family: var(--mono);
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+}
+
+.blocked-reason {
+  font-size: 12.5px;
+  color: var(--danger-text);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.blocked-reason .dot { width: 5px; height: 5px; border-radius: 999px; background: var(--danger-solid); flex: none; }
+
+/* Table ------------------------------------------------------------------ */
+.tbl-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  min-width: 520px;
+}
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+thead th {
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--fg-muted);
+  padding: 0 16px;
+  height: 36px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+tbody td { padding: 0 16px; height: 44px; border-bottom: 1px solid var(--border); letter-spacing: -0.008em; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:nth-child(even) td { background: var(--canvas); }
+.num-cell { text-align: right; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.id-cell { font-family: var(--mono); }
+
+.partial-strip {
+  background: var(--warning-tint);
+  border-top: 1px solid var(--border);
+  padding: 11px 16px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+  color: var(--warning-text);
+  font-size: 13.5px;
+}
+.partial-strip .dot { width: 5px; height: 5px; border-radius: 999px; background: var(--warning-solid); flex: none; }
+.partial-strip .lead { font-weight: 500; }
+.partial-strip .spacer { flex: 1 1 auto; }
+.partial-strip .count { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Skeletons -------------------------------------------------------------- */
+.skel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(146px, 1fr)); gap: 10px; }
+.skel-tile {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  height: 168px;
+}
+.bar { background: var(--skel); border-radius: 4px; height: 11px; }
+.bar.tall { flex: 1 1 auto; border-radius: var(--radius-sm); }
+.bar.w70 { width: 70%; }
+.bar.w45 { width: 45%; }
+.bar.w30 { width: 30%; }
+.bar.w85 { width: 85%; }
+
+.pulse { animation: pulse 1400ms var(--ease) infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) {
+  .pulse { animation: none; opacity: 0.85; }
+}
+
+.skel-rows { display: flex; flex-direction: column; }
+.skel-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 0.8fr 0.8fr;
+  gap: 16px;
+  align-items: center;
+  height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+.skel-row:last-child { border-bottom: 0; }
+
+/* Empty / filtered / failed trio ----------------------------------------- */
+.trio { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 14px; }
+
+.state-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 26px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+  min-height: 210px;
+}
+.state-card .glyph {
+  width: 30px; height: 30px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  margin-bottom: 3px;
+  flex: none;
+}
+.state-card h4 { margin: 0; font-size: 15px; font-weight: 500; letter-spacing: -0.014em; }
+.state-card p { margin: 0; font-size: 13.5px; color: var(--fg-muted); }
+.state-card .grow { flex: 1 1 auto; }
+.state-card .q { font-family: var(--mono); color: var(--fg); }
+
+.glyph-empty { background: var(--muted); color: var(--fg-muted); }
+.glyph-filtered { background: var(--muted); color: var(--fg-muted); }
+.glyph-failed { background: var(--danger-tint); color: var(--danger-text); }
+
+.sr-note {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--fg-muted);
+  background: var(--muted);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  width: 100%;
+}
+
+/* --- close -------------------------------------------------------------- */
+.closing {
+  border-top: 1px solid var(--border);
+  padding-top: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.closing h2 { font-size: 20px; }
+.ledger-list { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--card); }
+.ledger-row {
+  display: grid;
+  grid-template-columns: 78px 1fr;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  align-items: start;
+}
+.ledger-row:last-child { border-bottom: 0; }
+.ledger-row .k { font-family: var(--mono); font-size: 12.5px; color: var(--fg-muted); padding-top: 2px; }
+.ledger-row .v { color: var(--fg-muted); }
+.ledger-row .v b { color: var(--fg); font-weight: 500; }
+
+.footnote { font-size: 12.5px; color: var(--fg-muted); max-width: 74ch; }
+
+@media (max-width: 640px) {
+  .page { padding: 36px 18px 72px; gap: 36px; }
+  h1 { font-size: 27px; }
+  .specimen { padding: 16px; }
+  .dialog-actions { justify-content: stretch; }
+  .dialog-actions .btn { flex: 1 1 auto; }
+}
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <div class="eyebrow">
+      <span>Pastries POS</span>
+      <span>·</span>
+      <code>design-system-v3</code>
+      <span>·</span>
+      <span>design review, 17 Aug 2026</span>
+    </div>
+    <h1>Six states that decide whether a cashier makes a mistake</h1>
+    <p class="standfirst">
+      The UI rebuild plan names these six states and assigns each an owner. None of them has a
+      design. This is that design, drawn at v3 token values so it can be built from rather than
+      interpreted. Ordered worst-consequence first.
+    </p>
+  </header>
+
+  <section class="callout">
+    <div class="callout-head">
+      <span class="chip chip-danger"><span class="dot"></span>P0</span>
+      <span>The visual baselines are Chrome error pages</span>
+    </div>
+    <p>
+      All 35 files in <code>frontend/visual/baseline/</code> are
+      <code>ERR_CONNECTION_REFUSED</code> screenshots — the dev server was down when
+      <code>pnpm visual:baseline</code> ran, and <code>capture.mjs</code> wrote them anyway and
+      exited 0. There are <strong>8 distinct images across 35 routes</strong>;
+      <code>login</code>, <code>pos</code>, <code>dashboard-cashier</code> and
+      <code>acc-trial-balance</code> are byte-identical.
+    </p>
+    <p>
+      A0.4 was the plan's declared one-way door and <strong>A1′ has already landed on top of
+      it</strong>, so DoD&nbsp;#5 reads as satisfied while no pre-migration record exists.
+      <strong>Recoverable:</strong> <code>ce01f74</code> is still the pre-A1′ tree — check it out
+      with the dev server up and re-capture. That window lasts exactly as long as the history does.
+    </p>
+  </section>
+
+  <!-- ================================================================= -->
+  <section class="state">
+    <div class="state-head">
+      <div class="state-meta">
+        <span class="track">C0.6</span>
+        <span class="chip chip-danger"><span class="dot"></span>Irreversible</span>
+        <span>Counter register · 48px</span>
+      </div>
+      <h2>Confirm before something irreversible</h2>
+      <p class="today">
+        Today: <b>zero <code>AlertDialog</code> usages across 584 components.</b> Void, refund,
+        post a journal entry, close a period and delete a product all fire immediately or confirm
+        through ad-hoc markup. This is the one surface that exists solely to prevent a mistake.
+      </p>
+    </div>
+
+    <div class="specimen">
+      <div class="specimen-label">void a sale — counter</div>
+      <div class="scrim">
+        <div class="dialog" role="alertdialog" aria-labelledby="d1t" aria-describedby="d1b">
+          <h3 id="d1t">Void this sale?</h3>
+          <p id="d1b">
+            This voids sale <span class="num">#1042</span> for
+            <span class="num">AED&nbsp;75.60</span> and posts a reversing journal entry.
+            It cannot be undone.
+          </p>
+          <div class="consequence">
+            <span class="dot"></span>
+            <span>Reversing entry — <span class="ref">4100 Sales Returns</span> / <span class="ref">1010 Cash</span></span>
+          </div>
+          <div class="dialog-actions">
+            <button type="button" class="btn btn-counter btn-danger">Void sale</button>
+            <button type="button" class="btn btn-counter btn-outline btn-focused">Keep sale</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ul class="rules">
+      <li><b>State the consequence, with the money in it.</b> "Are you sure?" tells a cashier
+        nothing. The sale number and the amount are what they check against the receipt in their
+        hand, so both are in the body, in Geist Mono with tabular figures.</li>
+      <li><b>Name the accounting effect.</b> A void is not a delete — it posts a reversing entry.
+        Showing the two accounts means the owner reconciling that evening already knows what
+        happened.</li>
+      <li><b>The safe action is focused, and sits last.</b> <code>Keep sale</code> carries the
+        <code>--ring</code> focus and the rightmost position, so a stray Enter or a blind tap at
+        the natural thumb rest keeps the sale.</li>
+      <li><b>The destructive action is outline, never a filled red button.</b> A solid red button
+        reads as the primary action and invites the tap it is meant to slow down. Danger lives in
+        <code>--danger-text</code> on <code>--card</code>, with the tint arriving only on hover.</li>
+      <li><b>Both buttons are 48px.</b> Equal size, because making the destructive one smaller to
+        "discourage" it just makes it easier to mis-hit the wrong one.</li>
+      <li><b>No green.</b> Green is money-committing only. Confirming a void is not taking payment.</li>
+    </ul>
+
+    <p class="accept">
+      <b>Acceptance:</b> every destructive action in the app routes through this primitive; the
+      body always contains the identifier and the amount; the destructive control is never
+      <code>autoFocus</code> and never the filled variant. Add an ESLint selector banning
+      <code>onClick</code> handlers named <code>void*</code>/<code>delete*</code>/<code>refund*</code>
+      outside a confirm wrapper.
+    </p>
+  </section>
+
+  <!-- ================================================================= -->
+  <section class="state">
+    <div class="state-head">
+      <div class="state-meta">
+        <span class="track">C0.7</span>
+        <span class="chip chip-danger"><span class="dot"></span>Money</span>
+        <span>Counter register</span>
+      </div>
+      <h2>The charge failed</h2>
+      <p class="today">
+        Today: <b>one of 103 unstyled toasts, four seconds, then gone.</b> The cart looks unchanged
+        and the cashier cannot tell whether the customer was charged. That ambiguity is how a sale
+        gets rung twice.
+      </p>
+    </div>
+
+    <div class="specimen counter">
+      <div class="specimen-label">failed charge — counter</div>
+      <div class="toast" role="alert" aria-live="assertive">
+        <div class="toast-title">
+          <span class="chip chip-danger"><span class="dot"></span>Charge failed</span>
+        </div>
+        <p>
+          <span class="verdict">No payment was taken.</span>
+          The card reader did not respond. The cart is unchanged — sale
+          <span class="num" style="font-family:var(--mono)">#1043</span>,
+          <span class="num" style="font-family:var(--mono)">AED&nbsp;75.60</span>.
+        </p>
+        <div class="toast-actions">
+          <button type="button" class="btn btn-counter btn-commit">Try charge again</button>
+          <button type="button" class="btn btn-counter btn-outline">Change payment method</button>
+        </div>
+      </div>
+    </div>
+
+    <ul class="rules">
+      <li><b>Answer the only question that matters first: was money taken?</b>
+        "No payment was taken" is the first line, in <code>--foreground</code> while the rest of
+        the message is muted. A cashier reads one line before looking back at the customer.</li>
+      <li><b>Money failures do not auto-dismiss.</b> The plan says ≥6s; that is still a timer on
+        a question about money. This one persists until acknowledged or resolved. A four-second
+        toast that vanished is indistinguishable from no toast at all.</li>
+      <li><b>Confirm the cart survived.</b> The second-worst outcome after a double charge is a
+        cashier re-ringing eight items they still have.</li>
+      <li><b>Retry is the <code>commit</code> variant.</b> It is the one action here that moves
+        money, so it is the one green thing on the screen.</li>
+      <li><b>Never the only report of a lost-data failure.</b> If the sale cannot be recovered,
+        it belongs in the till surface, not only in a transient.</li>
+    </ul>
+
+    <p class="accept">
+      <b>Acceptance:</b> audit all 103 <code>toast</code> call sites into three classes — money
+      (persistent, danger, states the money verdict), operational (6s), and confirmation (3s).
+      Any toast reporting a failed mutation on a money path must be persistent; assert it in a test
+      rather than in review.
+    </p>
+  </section>
+
+  <!-- ================================================================= -->
+  <section class="state">
+    <div class="state-head">
+      <div class="state-meta">
+        <span class="track">E5</span>
+        <span class="chip chip-danger"><span class="dot"></span>Blocks work</span>
+        <span>Counter register · persistent</span>
+      </div>
+      <h2>The till is offline</h2>
+      <p class="today">
+        Today: <b>nothing.</b> 25 files reference <code>onLine</code>/<code>offline</code> ad hoc.
+        The plan's own words: "a cashier who does not know the till is offline will keep ringing
+        sales."
+      </p>
+    </div>
+
+    <div class="specimen counter">
+      <div class="specimen-label">offline — counter</div>
+      <div class="till">
+        <div class="till-head">
+          <span class="who">Counter 1 · Amina</span>
+          <span class="sale">Sale #1044</span>
+        </div>
+        <div class="till-body">
+          <div class="offline-bar" role="status" aria-live="polite">
+            <span class="dot"></span>
+            <span class="lead">Offline</span>
+            <span class="detail">Sales can't be completed until the connection returns.</span>
+            <span class="spacer"></span>
+            <button type="button" class="btn btn-ledger btn-danger">Retry now</button>
+          </div>
+          <div class="cart-line"><span><span class="qty">2×</span>&nbsp; Almond croissant</span><span class="amt">21.00</span></div>
+          <div class="cart-line"><span><span class="qty">1×</span>&nbsp; Sourdough loaf</span><span class="amt">18.00</span></div>
+          <div class="cart-line"><span><span class="qty">4×</span>&nbsp; Date maamoul</span><span class="amt">36.60</span></div>
+          <div class="till-total">
+            <span class="label">Total</span>
+            <span class="value">75.60</span>
+          </div>
+          <button type="button" class="btn btn-counter btn-commit" disabled>Charge AED 75.60</button>
+          <div class="blocked-reason">
+            <span class="dot"></span>
+            <span>Charging is off while the till is offline. The cart is saved.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ul class="rules">
+      <li><b>Warning is not enough — stop the sale.</b> A bar a cashier can look past still lets
+        them ring eight sales into nothing. <code>Charge</code> is disabled while offline, with the
+        reason stated directly under it rather than in a tooltip nobody hovers on a touchscreen.</li>
+      <li><b>Say what it means, not what it is.</b> "Offline" is the system's word.
+        "Sales can't be completed" is the cashier's.</li>
+      <li><b>Persistent, undismissable, and it survives navigation.</b> It belongs in the counter
+        layout, not in a route. A dismissable offline warning is a warning that gets dismissed at
+        the start of a rush.</li>
+      <li><b>Promise the cart.</b> "The cart is saved" is the difference between waiting and
+        re-ringing.</li>
+      <li><b>Dot plus text.</b> Colour never carries this alone.</li>
+      <li><b>Retry is manual and visible.</b> Silent background retries leave the cashier guessing;
+        one button and a status they can act on beats a spinner.</li>
+    </ul>
+
+    <p class="accept">
+      <b>Acceptance:</b> one provider owns connectivity; the bar renders in the counter layout;
+      every money-committing control subscribes to it and disables with a stated reason. Test:
+      with the network offline, <code>Charge</code> is disabled on <code>/pos</code> and in
+      <code>pos-checkout-dialog</code>.
+    </p>
+  </section>
+
+  <!-- ================================================================= -->
+  <section class="state">
+    <div class="state-head">
+      <div class="state-meta">
+        <span class="track">E5</span>
+        <span class="chip chip-warning"><span class="dot"></span>Silent today</span>
+        <span>Ledger register</span>
+      </div>
+      <h2>Page 1 loaded, page 2 failed</h2>
+      <p class="today">
+        Today: <b>silence, or a spinner that never ends.</b> The reader has no way to know the
+        list is incomplete — which, on a trial balance or a stock list, means a decision made on
+        partial data.
+      </p>
+    </div>
+
+    <div class="specimen">
+      <div class="specimen-label">partial collection — ledger</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>SKU</th>
+              <th class="num-cell">On hand</th>
+              <th class="num-cell">Value (AED)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Almond croissant</td><td class="id-cell">BK-0114</td><td class="num-cell">42</td><td class="num-cell">441.00</td></tr>
+            <tr><td>Sourdough loaf</td><td class="id-cell">BK-0208</td><td class="num-cell">17</td><td class="num-cell">306.00</td></tr>
+            <tr><td>Date maamoul</td><td class="id-cell">BK-0331</td><td class="num-cell">96</td><td class="num-cell">878.40</td></tr>
+            <tr><td>Pistachio baklava</td><td class="id-cell">BK-0427</td><td class="num-cell">8</td><td class="num-cell">184.00</td></tr>
+          </tbody>
+        </table>
+        <div class="partial-strip" role="status" aria-live="polite">
+          <span class="dot"></span>
+          <span class="lead">Showing <span class="count">50</span> of <span class="count">214</span>.</span>
+          <span>Couldn't load the rest — totals below are incomplete.</span>
+          <span class="spacer"></span>
+          <button type="button" class="btn btn-ledger btn-outline">Load the rest</button>
+        </div>
+      </div>
+    </div>
+
+    <ul class="rules">
+      <li><b>It belongs in the list, at the seam.</b> The failure is about these rows, so it
+        renders where the rows stop. A toast detaches the message from the thing it describes,
+        and toasts leave.</li>
+      <li><b>Warning, not danger.</b> Something did load. Danger would misrepresent the severity
+        and devalue the colour where it means "no payment was taken".</li>
+      <li><b>Count both numbers.</b> <code>50 of 214</code> tells the reader how wrong the view
+        is. "Some items failed to load" does not.</li>
+      <li><b>Say the totals are incomplete.</b> This is the part that prevents a wrong decision.
+        A partial list with a confident-looking total is worse than an error, and any totals row
+        must visibly inherit the warning.</li>
+      <li><b>Retry loads forward, never restarts.</b> The 50 rows already read stay put and
+        keep scroll position.</li>
+    </ul>
+
+    <p class="accept">
+      <b>Acceptance:</b> any paginated or incrementally-loaded collection can render partial;
+      a totals row on a partial collection carries the warning treatment. Audit every route with
+      a totals row against this.
+    </p>
+  </section>
+
+  <!-- ================================================================= -->
+  <section class="state">
+    <div class="state-head">
+      <div class="state-meta">
+        <span class="track">C0.5 + E4</span>
+        <span class="chip chip-neutral"><span class="dot"></span>Two languages today</span>
+        <span>Both registers</span>
+      </div>
+      <h2>Loading</h2>
+      <p class="today">
+        Today: <b>96 files with two ad-hoc treatments</b> — <code>Skeleton</code> in some,
+        <code>animate-pulse</code> in others. On counter hardware over bakery wifi this is the
+        most-seen transient state in the app. Building C0.5 without the E4 sweep adds a third
+        language rather than replacing two.
+      </p>
+    </div>
+
+    <div class="specimen counter">
+      <div class="specimen-label">counter — tile-shaped, matches the real grid</div>
+      <div class="skel-grid">
+        <div class="skel-tile"><div class="bar tall pulse"></div><div class="bar w70 pulse"></div><div class="bar w30 pulse"></div></div>
+        <div class="skel-tile"><div class="bar tall pulse"></div><div class="bar w85 pulse"></div><div class="bar w45 pulse"></div></div>
+        <div class="skel-tile"><div class="bar tall pulse"></div><div class="bar w70 pulse"></div><div class="bar w30 pulse"></div></div>
+        <div class="skel-tile"><div class="bar tall pulse"></div><div class="bar w45 pulse"></div><div class="bar w30 pulse"></div></div>
+      </div>
+    </div>
+
+    <div class="specimen">
+      <div class="specimen-label">ledger — row-shaped, 44px rows, column widths preserved</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>Account</th><th>Code</th><th class="num-cell">Debit</th><th class="num-cell">Credit</th></tr>
+          </thead>
+        </table>
+        <div class="skel-rows">
+          <div class="skel-row"><div class="bar w85 pulse"></div><div class="bar w45 pulse"></div><div class="bar w70 pulse"></div><div class="bar w70 pulse"></div></div>
+          <div class="skel-row"><div class="bar w70 pulse"></div><div class="bar w45 pulse"></div><div class="bar w85 pulse"></div><div class="bar w45 pulse"></div></div>
+          <div class="skel-row"><div class="bar w85 pulse"></div><div class="bar w30 pulse"></div><div class="bar w45 pulse"></div><div class="bar w70 pulse"></div></div>
+          <div class="skel-row"><div class="bar w45 pulse"></div><div class="bar w45 pulse"></div><div class="bar w70 pulse"></div><div class="bar w85 pulse"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <ul class="rules">
+      <li><b>The skeleton is the shape of the thing that arrives.</b> Counter gets tiles at the
+        real 146px minimum and 168px height; Ledger gets 44px rows at the real column widths.
+        A generic grey block is why the page jumps when data lands.</li>
+      <li><b>No spinners in either register.</b> A spinner says "something is happening"; a
+        skeleton says "here is what is coming and where".</li>
+      <li><b>One tint, <code>--muted</code> stepped down.</b> No shimmer sweep — a moving
+        gradient across a full product grid is the animation a cashier is trying to flick past.</li>
+      <li><b>Honour <code>prefers-reduced-motion</code>.</b> The pulse becomes a flat tint, not
+        nothing — the placeholder must still read as pending.</li>
+      <li><b>The sweep is the deliverable, not the primitive.</b> E4 replaces all 96 sites, or
+        this section made things worse.</li>
+    </ul>
+
+    <p class="accept">
+      <b>Acceptance:</b> zero <code>animate-pulse</code> outside the primitive, enforced by an
+      ESLint selector once E4 lands. Loading a collection route causes no layout shift when data
+      arrives.
+    </p>
+  </section>
+
+  <!-- ================================================================= -->
+  <section class="state">
+    <div class="state-head">
+      <div class="state-meta">
+        <span class="track">E1 + E2</span>
+        <span class="chip chip-neutral"><span class="dot"></span>Indistinguishable today</span>
+        <span>Ledger register</span>
+      </div>
+      <h2>Empty, filtered, failed</h2>
+      <p class="today">
+        Today: <b>mostly "No items found."</b> for all three. The plan requires five visibly
+        distinct treatments per collection route. The three below are the ones that get confused
+        with each other, because they look identical and differ entirely in what the user should
+        do next.
+      </p>
+    </div>
+
+    <div class="specimen">
+      <div class="specimen-label">the three that get confused — ledger</div>
+      <div class="trio">
+
+        <div class="state-card">
+          <div class="glyph glyph-empty" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+              <rect x="2.5" y="4.5" width="11" height="9" rx="1.5"></rect><path d="M5.5 4.5V3a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.5"></path>
+            </svg>
+          </div>
+          <h4>No products yet</h4>
+          <p>Add your first product and it will show up here, ready to sell at the counter.</p>
+          <div class="grow"></div>
+          <button type="button" class="btn btn-ledger btn-primary">Add product</button>
+          <div class="sr-note">announces: "No products yet. Add your first product."</div>
+        </div>
+
+        <div class="state-card">
+          <div class="glyph glyph-filtered" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+              <path d="M2.5 3.5h11l-4.2 5v4l-2.6-1.3v-2.7z"></path>
+            </svg>
+          </div>
+          <h4>No products match <span class="q">"sourd"</span></h4>
+          <p>214 products exist. Try a shorter search, or clear the category filter.</p>
+          <div class="grow"></div>
+          <button type="button" class="btn btn-ledger btn-outline">Clear filters</button>
+          <div class="sr-note">announces: "No results for sourd. 214 products exist."</div>
+        </div>
+
+        <div class="state-card">
+          <div class="glyph glyph-failed" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+              <path d="M8 2.5v7"></path><circle cx="8" cy="12.5" r="0.9" fill="currentColor" stroke="none"></circle>
+            </svg>
+          </div>
+          <h4>Couldn't load products</h4>
+          <p>The request failed. Nothing has changed — your products are still there.</p>
+          <div class="grow"></div>
+          <button type="button" class="btn btn-ledger btn-outline">Try again</button>
+          <div class="sr-note">announces: "Couldn't load products. Nothing has changed."</div>
+        </div>
+
+      </div>
+    </div>
+
+    <ul class="rules">
+      <li><b>Empty is the only warm one, and the only one with a primary action.</b> Nothing
+        is wrong — the user has arrived somewhere new, and the design's job is to get them started.</li>
+      <li><b>Filtered must never offer "Add product".</b> That is the wrong action, and offering it
+        implies the catalogue is empty when 214 items exist. It echoes the query back and offers
+        the only useful move: undo the filter.</li>
+      <li><b>Failed must say nothing was lost.</b> An error where a list should be reads as
+        "my data is gone". One sentence fixes that, and it is the sentence most often missing.</li>
+      <li><b>Distinct at a glance and distinct to a screen reader.</b> Three states that announce
+        identically is the regression <code>T-H</code> names; the accessible text differs here by
+        construction, not as a follow-up.</li>
+      <li><b>No illustrations.</b> A drawing in an empty state is the clearest AI-slop tell in
+        this category, and it delays the one control that matters.</li>
+    </ul>
+
+    <p class="accept">
+      <b>Acceptance:</b> for each of the 147 routes rendering a collection, five treatments are
+      reachable and visibly different, and each announces differently. Track it as a checklist per
+      module group, per E2.
+    </p>
+  </section>
+
+  <!-- ================================================================= -->
+  <section class="closing">
+    <h2>What this changes in the plan</h2>
+    <div class="ledger-list">
+      <div class="ledger-row">
+        <span class="k">A0.4</span>
+        <span class="v"><b>Reopen it.</b> Marked <code>pending</code> but shipped as
+          <code>7f637b1</code> with 35 error-page screenshots. Re-capture from
+          <code>ce01f74</code> with the dev server up. Make <code>capture.mjs</code> assert a
+          200 and one expected selector before writing, and fail loudly.</span>
+      </div>
+      <div class="ledger-row">
+        <span class="k">DoD #5</span>
+        <span class="v"><b>Currently false.</b> Baselines exist as files, not as a record.
+          Restate as "baselines exist and each is verified non-error".</span>
+      </div>
+      <div class="ledger-row">
+        <span class="k">§9.5</span>
+        <span class="v"><b>Still open.</b> <code>verify</code> is
+          <code>typecheck &amp;&amp; lint &amp;&amp; check:no-any &amp;&amp; format:check</code>.
+          A0.3 shipped without adding <code>pnpm test</code>, so DoD #2's "cannot regress" is
+          untrue.</span>
+      </div>
+      <div class="ledger-row">
+        <span class="k">Docs</span>
+        <span class="v"><b>A fourth document contradicts DESIGN.md.</b>
+          <code>frontend/docs/frontend-design-system.md</code> calls itself "the frontend UI
+          contract" and specifies Creamy Latte <code>#F3E9D7</code> page backgrounds and Caramel
+          Roast primary actions. Delete it or reduce it to a pointer — it is outside CLAUDE.md's
+          precedence list and actively teaches the drift Track B is paying 10.5 days to undo.</span>
+      </div>
+      <div class="ledger-row">
+        <span class="k">Status</span>
+        <span class="v"><b>Stale.</b> The A1′ brief still reads "next up"; A1′ shipped as
+          <code>bd417b6</code>.</span>
+      </div>
+      <div class="ledger-row">
+        <span class="k">C0.7</span>
+        <span class="v"><b>Tighten.</b> "≥6s for anything money-related" becomes "persistent
+          until acknowledged, and states the money verdict".</span>
+      </div>
+      <div class="ledger-row">
+        <span class="k">E5</span>
+        <span class="v"><b>Widen.</b> Offline disables money-committing controls with a stated
+          reason. An indicator alone does not stop a cashier ringing sales into nothing.</span>
+      </div>
+    </div>
+    <p class="footnote">
+      Specimens use v3 tokens from <code>docs/design/tokens.css</code>; no colour here is a new
+      choice. This copy loads real Geist and Geist Mono from Google Fonts, matching production.
+      Dark mode is deferred (<code>T-A</code>) — it renders here only because the token layer is
+      already dark-ready, which is the point.
+    </p>
+  </section>
+
+</div>
+<style>
+/* Repo copy: real production type, unlike the sandboxed artifact version. */
+:root { --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+        --mono: "Geist Mono", ui-monospace, Consolas, monospace; }
+</style>
+</html>

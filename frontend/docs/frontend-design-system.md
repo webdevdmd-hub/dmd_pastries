@@ -1,31 +1,31 @@
-# Frontend Design System Plan
+# Frontend component selection guide
 
-This document is the frontend UI contract for Pastries POS. Every new module should follow this plan before adding or choosing components.
+> **This is NOT the design contract.** [DESIGN.md](../../DESIGN.md) is, and it wins on tokens,
+> colour, type, spacing, motion and component rules — see CLAUDE.md's document-precedence rule.
+> This file is narrower: **which component to reach for**, not what it should look like.
+>
+> Its "Brand Tokens" section was deleted on 2026-08-17. It specified a Creamy Latte `#F3E9D7` page
+> background, Caramel Roast `#B08968` primary actions and Caramel Roast focus rings — all three
+> reversed by DESIGN.md v3, which is monochrome by default with green reserved for money and focus
+> rings blue and only blue. Worse, it named the exact browns MIGRATION.md identifies as the root
+> cause of the 298 hardcoded hexes: developers reached for a colour the token layer did not have,
+> because this file told them to.
+>
+> **For any colour, size, weight, radius, shadow or motion question, read DESIGN.md.** If this file
+> and DESIGN.md ever disagree again, DESIGN.md is right and this file is a bug.
 
 ## Goals
 
-- Build one consistent interface system for bakery, retail, restaurant, supermarket, grocery, fashion, electronics, inventory, purchasing, and future manufacturing workflows.
+- Build one consistent interface system across POS, inventory, purchasing, accounting, manufacturing and reporting workflows.
 - Use `shadcn/ui` as the core operational component system.
-- Use `magicui` only for premium motion moments: landing, onboarding, empty states, dashboard highlights, subscription, and marketing-style screens.
 - Keep POS and back-office workflows fast, accessible, responsive, and predictable.
-- Preserve the brand palette and avoid generic blue SaaS styling.
+- Take every visual value from the DESIGN.md token layer. Never introduce a colour here.
 
-## Brand Tokens
+## Colour, type, spacing
 
-- Creamy Latte: `#F3E9D7`
-- Warm Cappuccino: `#D6BFA6`
-- Caramel Roast: `#B08968`
-- Mocha Bean: `#7A553A`
-- Espresso Shot: `#3B2A22`
-
-Usage rules:
-
-- Page background: Creamy Latte.
-- Cards and panels: soft white, Warm Cappuccino tint, or latte variants.
-- Primary actions: Caramel Roast.
-- Hover and secondary emphasis: Mocha Bean.
-- Main text and icons: Espresso Shot.
-- Focus rings: Caramel Roast with strong visible contrast.
+Deleted. See [DESIGN.md](../../DESIGN.md) §2 (type), §3 (colour), §4 (spacing, radius, elevation),
+§5 (motion). The token layer lives in `docs/design/tokens.css`; `docs/design/preview-v3.html` and
+`docs/design/preview-states.html` are the visual references.
 
 ## shadcn/ui Usage Strategy
 
@@ -63,7 +63,7 @@ Forms:
 Feedback:
 
 - `Alert`: inline warnings and notices.
-- `Alert Dialog`: destructive confirmations once installed. Until then, use `AppConfirmDialog` backed by `Dialog`.
+- `Alert Dialog`: destructive confirmations once installed. Until then, use `AppConfirmDialog` backed by `Dialog`. **`AppConfirmDialog` exists and has zero call sites** — every destructive action in the app still fires immediately or confirms through ad-hoc markup. Wiring it up is plan item C0.6; the design it must implement is in `docs/design/preview-states.html`.
 - `Sonner`: success/error notifications.
 - `Progress`: setup/upload/stock progress once installed.
 - `Spinner`: button loading states once installed.
@@ -126,7 +126,8 @@ Wrappers created:
 
 Wrapper responsibilities:
 
-- Apply the brand palette.
+- Apply the DESIGN.md token layer. Never a literal colour, never a raw Tailwind palette utility — both are lint errors as the guardrails flip.
+- Consume the density variables (`h-control`, `h-field`, `h-row`, `min-h-tap`) rather than literal heights, so a wrapper works in both the Counter and Ledger registers.
 - Keep spacing consistent.
 - Preserve accessibility behavior from the underlying shadcn primitive.
 - Provide variants for admin, POS, danger, success, warning, and muted states where relevant.
@@ -185,16 +186,23 @@ Reports:
 
 Use `magicui` only where polish improves comprehension or conversion.
 
-Allowed areas:
+Allowed areas — **narrowed 2026-08-17 to match DESIGN.md §5:**
 
 - Landing page.
-- Auth/onboarding.
-- Empty states.
-- Dashboard KPI animation.
-- Setup completion screens.
 - Marketing pages.
 - Subscription page.
-- Welcome screens.
+
+Removed, and why:
+
+- **Dashboard KPI animation / Number Ticker.** DESIGN.md §5: _never animate a number changing._ A KPI
+  that counts up is unreadable while it moves, and on a financial dashboard it invites the reader to
+  mistrust the figure.
+- **Empty states.** They now have a specified design (E1, `docs/design/preview-states.html`) built on
+  a primary action, not decoration. An animated or illustrated empty state delays the one control
+  that matters.
+- **Auth/onboarding, setup completion, welcome screens.** These are the Threshold register
+  (DESIGN.md §7), whose treatment is a serif wordmark and generous space. The blurred drifting
+  gradient orbs currently on `/login` came from this permission and are being deleted (plan D1).
 
 Preferred components:
 
@@ -278,4 +286,4 @@ MagicUI batch:
 - Do not add a component because it looks interesting. Add it because it solves a specific UX problem.
 - Keep business logic in hooks/API modules, not visual components.
 - Keep module-specific components small and composable.
-- Run `pnpm typecheck`, `pnpm lint`, `pnpm check:no-any`, and `pnpm format:check` after UI foundation changes.
+- Run `pnpm verify` after UI foundation changes. It chains typecheck, lint, `check:no-any`, `check:tokens`, `format:check` and the tests.
