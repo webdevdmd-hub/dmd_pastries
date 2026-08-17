@@ -139,6 +139,67 @@ pnpm verify && pnpm test
 
 **Gate:** `pnpm build` passes, all 147 routes render, A0.4 baselines diff cleanly except for the expected type change.
 
+### A1′ execution brief — read this before touching anything
+
+**Status: next up. Track A0 is complete (6 commits on `design-system-v3`).**
+
+This is the highest-risk commit in the plan. Its failure mode is silent: an
+undefined custom property inside `oklch()` or `rgb()` is invalid at
+computed-value time, so the browser drops the whole declaration. No build
+error, no lint error, no console warning. `pnpm build` goes green and Dokploy
+serves a blank surface, because a failed build there leaves the previous
+container answering 200 anyway.
+
+**Prerequisite: the dev server must be running.** The only detector for the
+failure above is loading a page and looking at it.
+
+#### Everything in ONE commit. Splitting it is the bug.
+
+| | Change | Why it cannot be a separate commit |
+| --- | --- | --- |
+| a | v3 token values into `globals.css` `:root` | — |
+| b | `docs/design/tailwind.config.proposed.ts` → `frontend/tailwind.config.ts` | The alias layer is (a)'s entire safety net. One commit later and every `brand-*`/`workspace-*` utility in 584 components is invalid. |
+| c | Delete the hand-written utilities (**26 classes**, `globals.css` ~242-346) and `.font-display`/`.font-sans` (~410-416) | They read `rgb(var(--brand-*))`. After (a) those are oklch triplets, so `rgb(0.98 0.003 84.6)` is invalid. |
+| d | Rewrite the `body` rule (~83-87) | It holds `background-color: rgb(var(--workspace-canvas))` and `@apply text-brand-espresso`, **outside every range this plan originally named**. Replace with `background: oklch(var(--canvas)); color: oklch(var(--foreground));` — the exact rule already written in `tokens.css`. This is the single highest-probability silent break. |
+| e | Font swap: Manrope + Cormorant → Geist + Geist Mono + Fraunces | The new config maps `font-serif` → `var(--font-serif)`, which does not exist until this lands. This was originally sequenced as a separate A3 and that ordering was wrong. |
+| f | Codemod 24 live `font-display` usages → `font-serif` | Depends on (e). The proposed config defines no `display` family, and Tailwind emits nothing for an unknown class — the 24 headings would silently fall back to sans. |
+| g | Delete the pistachio variable block (~42-73) **and** its override block (~348-408) together | Splitting them across A1′ and B3 leaves a hardcoded `#102418` sidebar forced over light tokens for the whole intervening window. Check no tenant is on `data-theme="pistachio"` first. |
+
+Scope Fraunces to the threshold layouts with `preload: false` rather than
+putting all three font variables on `<html>` — it is threshold-only per
+DESIGN.md §2, and preloading a two-axis variable serif on `/pos` over bakery
+wifi is the wrong trade.
+
+#### Line numbers in the table above are indicative, not authoritative
+
+Three of the four ranges this document originally carried were already wrong
+against the file. Locate each block by its content, and consider replacing the
+ranges with anchor comments while you are in there.
+
+#### Verification, in order
+
+1. `cd frontend && pnpm check:tokens` — every `var(--x)` the config wants is declared. Should pass before you start and after you finish.
+2. `pnpm build` — proves nothing about CSS validity, but catches the PostCSS parse errors that mis-cut ranges produce.
+3. `pnpm visual:diff` against the committed baselines. Advisory, not a gate: `compare.mjs` exits 0 on changed pixels by design. Expect a visible type change everywhere — that is (e) working. Look for *missing backgrounds*, which is (a)/(c)/(d) failing.
+4. **Load `/pos`, `/accounting/reports/trial-balance`, `/login` in a browser.** Confirm backgrounds actually paint and the sidebar is styled. Nothing else catches a dropped declaration.
+5. `pnpm lint` — the two `error`-severity design rules must still report zero.
+
+#### Known traps
+
+- **Bulk in-place rewrites break the Tailwind 3.4 watcher.** The dev server 500s on every route with a `statSync` ENOENT that touching `globals.css` does not clear. Only a restart does. Do not chase it as a code bug.
+- `workspace-panel-border` is used 18 times and has never existed in any config. Deliberately not aliased — adding it would be a visual change smuggled into a migration-neutral commit. Decide it here, with eyes on the screens.
+- `shadow-workspace` has 0 usages in `src/` despite the config comment claiming otherwise in the other direction. Safe to drop.
+
+#### After A1′
+
+Track B codemods, starting with B1 — which is **blocked on a contradiction**:
+MIGRATION.md maps `text-red-600` → `text-danger`, and `design/no-solid-as-text`
+now bans exactly that at `error` severity. The rule is right and the mapping is
+wrong; fix the mapping to `text-danger-text` before running B1, or the codemod
+will fail the commit it is trying to make.
+
+---
+
 ### Track B — Codemods (mechanical, high volume, low risk)
 
 | # | Item | Effort |
