@@ -1,0 +1,23 @@
+# TODOS
+
+Deferred work with a reason. Items land here when they are real but outside the current plan's blast radius.
+
+## Deferred from the UI/UX rebuild plan (2026-08-17)
+
+| # | What | Why deferred | Effort (human → CC) | Priority | Blocked by |
+| --- | --- | --- | --- | --- | --- |
+| T-A | **Dark mode.** MIGRATION.md Phase 8 in full: `.dark` block with the measured v3 values, `themes.ts` → light/dark/system, `pastries-pos-theme` localStorage migration with a forward-compatible reader, pre-paint script, `palette(mode)`. | Cut from the DoD by owner decision. Nobody at a bakery counter needs it and it doubles QA across 147 routes. Token layer is already dark-ready, so this is an addition, not a rewrite. | L → M | P2 when the sellable phase starts | B3 |
+| T-B | **Frozen seed dataset + staging tenant** for the visual harness. | >1 day, new infrastructure. Without it `visual:diff` reports noise on live data and gets abandoned — `capture.mjs` predicts this in its own header. | L → M | P2 | — |
+| T-C | Expand `scripts/visual/routes.mjs` from 34 → 147 routes. | Moves together with T-B. 147 noisy baselines is worse than 34 noisy baselines, so do not do this one alone. | M → S | P3 | T-B |
+| T-D | GitHub Actions CI running `pnpm verify`. | New infra; interacts with the Dokploy auto-deploy path. The pre-push hook covers most of it and is bypassable with `--no-verify`. | S → S | P2 | — |
+| T-E | Rewrite `scripts/check-no-any.mjs` onto one shared debt-counting chassis. | Two bespoke debt scripts is the DRY violation that surfaces in six months. Outside the rebuild's blast radius. | M → S | P3 | A0.2 |
+| T-F | `pnpm design:status` — one command printing utilities remaining, per-directory breakdown, which rules are at `error`, which routes have baselines. | Every number already exists somewhere; nothing aggregates them. Makes the migration a countdown instead of a vibe. | S → S | P2 | A0.2 |
+| T-G | Mobile breakpoints for the 146 non-POS routes. | Genuinely adjacent scope. An owner checking yesterday's sales on a phone is a real use case that no track covers. | XL → L | P3 | Track C |
+| T-H | Screen-reader semantics for the empty / filtered / failed trio. | Three visually distinct states that announce identically is a real regression. | S → S | P2 | E1 |
+| T-I | Chart empty state. | A chart with no data is a distinct, common, ugly state and DESIGN.md does not cover it. | S → S | P2 | B5 |
+| T-J | Keyboard navigation and focus-order pass. | C0.1 changes the focus ring across all 584 components with no verification step attached. | M → S | P2 | C0.1 |
+| T-K | Runbooks for "visual diff is red everywhere" (→ dataset drift, not CSS), "a page lost its background after A1" (→ check the alias layer for a missing utility name), "session expired mid-capture". | R4's Tailwind-watcher runbook shows the right standard; these three peers lack it. | S → S | P3 | — |
+| T-L | POS tile: out-of-stock badge and Variants button can collide horizontally on a narrow tile — both are `absolute top-3`, opposite corners, on a 146px minimum tile. Pre-existing, not introduced by the A0.1 tap-target fix. | Needs a card layout decision, not a one-line fix. | S → S | P2 | C1 |
+| T-M | Command-palette navigation for the Ledger register. | Proposed during the v3 design consultation and deferred there (DESIGN.md §10). Navigation architecture, not design system. | L → M | P3 | — |
+| T-N | RTL / Arabic. | Confirmed out of scope by the owner. Separate workstream: bidirectional layout across 147 routes, Arabic type, RTL tables, Arabic tax invoices. | XL → L | P3 | — |
+| T-O | Thermal receipt print stylesheet (58/80mm, no colour, no grey). | Own constraints, own spec. | M → S | P3 | — |

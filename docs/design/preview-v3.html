@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pastries POS — Design System v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,400;9..144,500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --canvas:#FAF9F7; --card:#FFFFFF; --muted:#F2F0EC; --border:#E5E2DC;
+  --fg:#0A0A0A; --fg-muted:#6E6A64; --fg-disabled:#A8A29A;
+  --primary:#171717; --primary-fg:#FFFFFF;
+  --money:#00723B; --money-text:#005E31; --money-tint:#EAF7EE;
+  --danger:#CC2827; --danger-text:#9E1618; --danger-tint:#FDEEEC;
+  --warning:#A66D00; --warning-text:#7B4800; --warning-tint:#FCF3E1;
+  --info:#3072C1; --info-text:#17559B; --info-tint:#EBF3FD;
+  --ring:#3072C1;
+  --radius-sm:6px; --radius:10px; --radius-lg:14px;
+  --shadow-xs:0 1px 2px rgb(0 0 0 / .05);
+  --shadow-sm:0 1px 3px rgb(0 0 0 / .07), 0 1px 2px rgb(0 0 0 / .04);
+  --shadow-md:0 8px 24px rgb(0 0 0 / .08);
+}
+:root[data-theme="dark"]{
+  --canvas:#0B0B0B; --card:#141414; --muted:#1C1C1C; --border:#2A2A2A;
+  --fg:#F4F1EC; --fg-muted:#A39E96; --fg-disabled:#5E5A55;
+  --primary:#F4F1EC; --primary-fg:#0B0B0B;
+  --money:#00723B; --money-text:#2FAE71; --money-tint:#0E2A1B;
+  --danger:#CC2827; --danger-text:#F87171; --danger-tint:#2E1414;
+  --warning:#A66D00; --warning-text:#E0A030; --warning-tint:#2A1F0B;
+  --info:#3072C1; --info-text:#7DB3F7; --info-tint:#0F1E30;
+  --ring:#7DB3F7;
+  --shadow-xs:0 1px 2px rgb(0 0 0 / .4);
+  --shadow-sm:0 1px 3px rgb(0 0 0 / .5);
+  --shadow-md:0 8px 24px rgb(0 0 0 / .6);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--canvas); color:var(--fg);
+  font-family:"Geist",system-ui,sans-serif; font-weight:400;
+  font-size:14.5px; line-height:22px; letter-spacing:-.011em;
+  -webkit-font-smoothing:antialiased;
+  transition:background .15s cubic-bezier(.2,0,0,1), color .15s cubic-bezier(.2,0,0,1);
+}
+.mono{font-family:"Geist Mono",ui-monospace,monospace}
+.serif{font-family:"Fraunces",Georgia,serif;font-weight:400}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.02em;text-align:right}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+section{padding:56px 0;border-top:1px solid var(--border)}
+section:first-of-type{border-top:0}
+h2{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.03em;margin-bottom:6px}
+h3{font-size:18px;line-height:24px;font-weight:500;letter-spacing:-.02em;margin-bottom:14px}
+.lede{color:var(--fg-muted);max-width:62ch;margin-bottom:28px}
+.meta{font-size:12.5px;line-height:16px;letter-spacing:0;color:var(--fg-muted)}
+
+/* header */
+header{position:sticky;top:0;z-index:10;background:var(--canvas);border-bottom:1px solid var(--border)}
+.hbar{display:flex;align-items:center;justify-content:space-between;height:60px}
+.wordmark{font-family:"Fraunces",Georgia,serif;font-size:22px;letter-spacing:-.02em}
+.toggle{height:36px;padding:0 14px;border:1px solid var(--border);background:var(--card);color:var(--fg);
+  border-radius:var(--radius);font:inherit;font-weight:500;cursor:pointer;transition:background .15s cubic-bezier(.2,0,0,1)}
+.toggle:hover{background:var(--muted)}
+.toggle:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+
+/* hero */
+.hero{padding:88px 0 64px}
+.eyebrow{font-family:"Geist Mono",monospace;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:20px}
+.hero h1{font-family:"Fraunces",Georgia,serif;font-weight:400;font-size:clamp(44px,7vw,72px);line-height:1.02;letter-spacing:-.03em;max-width:16ch}
+.hero p{margin-top:20px;color:var(--fg-muted);max-width:54ch;font-size:16px;line-height:26px}
+
+/* type scale */
+.scale-row{display:grid;grid-template-columns:118px 1fr;gap:20px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--border)}
+.scale-row:last-child{border-bottom:0}
+.t-meta{font-size:12.5px;line-height:16px;letter-spacing:0}
+.t-cell{font-size:13.5px;line-height:18px;letter-spacing:-.008em}
+.t-body{font-size:14.5px;line-height:22px;letter-spacing:-.011em}
+.t-title{font-size:18px;line-height:24px;font-weight:500;letter-spacing:-.02em}
+.t-page{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.03em}
+.t-kpi{font-size:28px;line-height:30px;font-weight:500;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.t-total{font-family:"Geist Mono",monospace;font-size:32px;line-height:32px;font-weight:500;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
+.t-display{font-family:"Fraunces",Georgia,serif;font-size:56px;line-height:1;letter-spacing:-.03em}
+
+/* swatches */
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:12px}
+.sw{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--card)}
+.sw .chip{height:56px}
+.sw .lbl{padding:10px 12px}
+.sw .name{font-size:13.5px;font-weight:500;letter-spacing:-.008em}
+.sw .val{font-family:"Geist Mono",monospace;font-size:12px;color:var(--fg-muted);margin-top:2px}
+.ratio{font-family:"Geist Mono",monospace;font-size:12px;color:var(--fg-muted)}
+
+/* components */
+.btn{height:36px;padding:0 14px;border-radius:var(--radius);font:inherit;font-weight:500;font-size:14.5px;
+  letter-spacing:-.011em;cursor:pointer;border:1px solid transparent;display:inline-flex;align-items:center;gap:8px;
+  transition:background .15s cubic-bezier(.2,0,0,1),box-shadow .15s cubic-bezier(.2,0,0,1)}
+.btn:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.btn-primary{background:var(--primary);color:var(--primary-fg)}
+.btn-commit{background:var(--money);color:#fff}
+.btn-outline{background:var(--card);border-color:var(--border);color:var(--fg)}
+.btn-outline:hover{background:var(--muted)}
+.btn-ghost{background:transparent;color:var(--fg-muted)}
+.btn-ghost:hover{background:var(--muted)}
+.btn-danger{background:var(--card);border-color:var(--border);color:var(--danger-text)}
+.btn-danger:hover{background:var(--danger-tint)}
+.btn-counter{height:48px;padding:0 20px;font-size:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+.badge{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:999px;
+  font-size:12px;font-weight:500;letter-spacing:0}
+.badge .dot{width:5px;height:5px;border-radius:999px;background:currentColor;flex:none}
+.b-money{background:var(--money-tint);color:var(--money-text)}
+.b-danger{background:var(--danger-tint);color:var(--danger-text)}
+.b-warning{background:var(--warning-tint);color:var(--warning-text)}
+.b-info{background:var(--info-tint);color:var(--info-text)}
+.b-draft{background:var(--muted);color:var(--fg-muted)}
+
+.seg{display:inline-flex;background:var(--muted);border-radius:var(--radius);padding:3px;gap:2px}
+.seg button{height:30px;padding:0 14px;border:0;background:transparent;color:var(--fg-muted);
+  font:inherit;font-weight:500;font-size:13.5px;border-radius:7px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--fg);box-shadow:var(--shadow-xs)}
+.seg button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+
+/* mockups */
+.frame{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--card);box-shadow:var(--shadow-sm)}
+.frame-cap{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.tag{font-family:"Geist Mono",monospace;font-size:12px;color:var(--fg-muted)}
+
+/* POS */
+.pos{display:grid;grid-template-columns:1fr 320px;min-height:440px}
+@media(max-width:820px){.pos{grid-template-columns:1fr}}
+.pos-main{padding:16px;background:var(--canvas)}
+.pos-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(146px,1fr));gap:10px}
+.tile{background:var(--card);border-radius:var(--radius);overflow:hidden;cursor:pointer;
+  border:1px solid var(--border);transition:transform .15s cubic-bezier(.2,0,0,1),box-shadow .15s cubic-bezier(.2,0,0,1);position:relative}
+.tile:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.tile .img{height:78px;background:var(--muted);display:flex;align-items:center;justify-content:center;color:var(--fg-disabled)}
+.tile .body{padding:10px 12px}
+.tile .nm{font-size:14.5px;font-weight:500;letter-spacing:-.011em;line-height:19px}
+.tile .ft{display:flex;justify-content:space-between;align-items:flex-end;margin-top:8px;gap:8px}
+.tile .cat{font-size:12.5px;color:var(--fg-muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile .pr{font-family:"Geist Mono",monospace;font-size:14.5px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap;flex:none}
+.tile .variants{position:absolute;right:8px;top:8px;height:48px;min-width:48px;padding:0 12px;border-radius:var(--radius);
+  background:var(--primary);color:var(--primary-fg);border:0;font:inherit;font-weight:500;font-size:13.5px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center}
+.tile .oos{position:absolute;left:8px;top:8px}
+.tile.out{opacity:.55}
+.cart{border-left:1px solid var(--border);padding:16px;display:flex;flex-direction:column;background:var(--card)}
+@media(max-width:820px){.cart{border-left:0;border-top:1px solid var(--border)}}
+.cart h4{font-size:18px;font-weight:500;letter-spacing:-.02em;margin-bottom:14px}
+.line{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
+.line .q{font-family:"Geist Mono",monospace;color:var(--fg-muted);font-size:13.5px}
+.line .amt{font-family:"Geist Mono",monospace;font-variant-numeric:tabular-nums;letter-spacing:-.02em;font-size:14.5px}
+.totals{margin-top:auto;padding-top:14px}
+.trow{display:flex;justify-content:space-between;padding:5px 0;color:var(--fg-muted);font-size:13.5px}
+.trow .v{font-family:"Geist Mono",monospace;font-variant-numeric:tabular-nums}
+.grand{display:flex;justify-content:space-between;align-items:baseline;padding:14px 0 16px;margin-top:8px;border-top:1px solid var(--border)}
+.grand .lb{font-size:14.5px;font-weight:500}
+
+/* ledger table */
+table{width:100%;border-collapse:collapse}
+thead th{font-size:12.5px;font-weight:400;color:var(--fg-muted);text-align:left;padding:10px 16px;
+  border-bottom:1px solid var(--border);background:var(--card);position:sticky;top:0}
+thead th.num{text-align:right}
+tbody td{font-size:13.5px;letter-spacing:-.008em;padding:0 16px;height:44px;border-bottom:1px solid var(--border)}
+tbody tr:hover{background:var(--muted)}
+td.num{font-variant-numeric:tabular-nums;letter-spacing:-.02em;text-align:right}
+td.code{font-family:"Geist Mono",monospace;font-size:13px;color:var(--fg-muted)}
+tfoot td{font-size:13.5px;font-weight:500;padding:0 16px;height:48px;background:var(--muted);border-top:1px solid var(--border)}
+tfoot td.num{font-variant-numeric:tabular-nums;letter-spacing:-.02em;text-align:right}
+
+/* kpi */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.kpi{background:var(--muted);border-radius:var(--radius);padding:18px}
+.kpi .k{font-size:12.5px;color:var(--fg-muted)}
+.kpi .v{font-size:28px;line-height:30px;font-weight:500;letter-spacing:-.04em;font-variant-numeric:tabular-nums;margin-top:8px}
+
+/* login */
+.login{display:grid;grid-template-columns:1fr 1fr;min-height:400px}
+@media(max-width:820px){.login{grid-template-columns:1fr}}
+.login-form{padding:44px 40px;display:flex;flex-direction:column;justify-content:center;background:var(--card)}
+.login-art{background:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:32px}
+.balance{font-family:"Geist Mono",monospace;font-size:34px;font-weight:500;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
+.rule{width:132px;height:1px;background:var(--border)}
+label{display:block;font-size:13.5px;font-weight:500;margin:14px 0 6px}
+input{width:100%;height:36px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--card);color:var(--fg);font:inherit;font-size:14.5px}
+input::placeholder{color:var(--fg-disabled)}
+input:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-color:transparent}
+
+/* empty state */
+.empty{border:1px dashed var(--border);border-radius:var(--radius);padding:40px 28px;text-align:left;background:var(--card)}
+.empty h4{font-size:18px;font-weight:500;letter-spacing:-.02em;margin-bottom:6px}
+.empty p{color:var(--fg-muted);max-width:52ch;margin-bottom:18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+.note{background:var(--muted);border-radius:var(--radius);padding:16px 18px;color:var(--fg-muted);font-size:13.5px;line-height:20px}
+.note strong{color:var(--fg);font-weight:500}
+ul.tight{margin:10px 0 0 18px}
+ul.tight li{margin:5px 0;color:var(--fg-muted);font-size:13.5px;line-height:20px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap hbar">
+    <span class="wordmark">Pastries</span>
+    <button class="toggle" id="tt" type="button">Dark</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+<section class="hero">
+  <p class="eyebrow">Design system v3</p>
+  <h1 class="serif">Monochrome by default. Color means money.</h1>
+  <p>One token set, two densities. The counter and the ledger are different jobs, and only spacing, type size, and tap target change between them. Every contrast value below was measured, not estimated.</p>
+</section>
+
+<section>
+  <h2>Typography</h2>
+  <p class="lede">Geist for the interface, Geist Mono for money at the counter and every identifier, Fraunces for the wordmark and threshold surfaces. Tracking tightens as size grows and never goes positive.</p>
+  <div class="scale-row"><span class="meta mono">text-meta</span><span class="t-meta">12.5/16 — metadata, captions, badges. 12px is the hard floor.</span></div>
+  <div class="scale-row"><span class="meta mono">text-cell</span><span class="t-cell">13.5/18 — table body, the densest readable size in the Ledger register</span></div>
+  <div class="scale-row"><span class="meta mono">text-body</span><span class="t-body">14.5/22 — prose, inputs, labels</span></div>
+  <div class="scale-row"><span class="meta mono">text-title</span><span class="t-title">18/24 — card and panel titles</span></div>
+  <div class="scale-row"><span class="meta mono">text-page</span><span class="t-page">28/32 — page headings</span></div>
+  <div class="scale-row"><span class="meta mono">text-kpi</span><span class="t-kpi">1,284.50</span></div>
+  <div class="scale-row"><span class="meta mono">text-total</span><span class="t-total">AED 148.75</span></div>
+  <div class="scale-row"><span class="meta mono">text-display</span><span class="t-display">Pastries</span></div>
+  <div class="note" style="margin-top:24px">
+    <strong>Weight 500 is the workhorse.</strong> 400 for body and table cells, 500 for labels, buttons, product names, KPI values, totals and table headers, 600 for page titles only. Nothing above 600 exists in the system. The current build uses <span class="mono">font-black</span> 78 times, which is why everything shouts and the total does not stand out.
+  </div>
+</section>
+
+<section>
+  <h2>Color</h2>
+  <p class="lede">Barely-warm neutrals carry every surface. The only saturated things on a screen are the action that takes payment, the thing that warns you, and the thing that broke. Toggle dark mode above — every value below is redefined, not inverted.</p>
+
+  <h3>Neutrals</h3>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:var(--canvas)"></div><div class="lbl"><div class="name">canvas</div><div class="val" id="v-canvas">#FAF9F7</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--card);border-bottom:1px solid var(--border)"></div><div class="lbl"><div class="name">card</div><div class="val" id="v-card">#FFFFFF</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--muted)"></div><div class="lbl"><div class="name">muted</div><div class="val" id="v-muted">#F2F0EC</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--border)"></div><div class="lbl"><div class="name">border</div><div class="val" id="v-border">#E5E2DC</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--fg)"></div><div class="lbl"><div class="name">foreground</div><div class="val" id="v-fg">#0A0A0A</div><div class="ratio" id="r-fg">18.82 : 1</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--fg-muted)"></div><div class="lbl"><div class="name">foreground-muted</div><div class="val" id="v-fgm">#6E6A64</div><div class="ratio" id="r-fgm">5.11 : 1</div></div></div>
+  </div>
+
+  <h3 style="margin-top:32px">Semantic</h3>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:var(--money)"></div><div class="lbl"><div class="name">money</div><div class="val">#00723B</div><div class="ratio">white on it 6.05 : 1</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--danger)"></div><div class="lbl"><div class="name">danger</div><div class="val">#CC2827</div><div class="ratio" id="r-dn">text pair 7.21 : 1</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--warning)"></div><div class="lbl"><div class="name">warning</div><div class="val">#A66D00</div><div class="ratio" id="r-wn">text pair 6.88 : 1</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--info)"></div><div class="lbl"><div class="name">info</div><div class="val">#3072C1</div><div class="ratio" id="r-in">text pair 6.68 : 1</div></div></div>
+  </div>
+
+  <div class="note" style="margin-top:24px">
+    <strong>Dark mode is not an inversion.</strong> Measured on a dark card, v2's four semantic text values score 2.32, 2.26, 2.43 and 2.46 against a 4.5 floor — every one fails. Dark redefines each pair: money <span class="mono">#2FAE71</span> (6.50), danger <span class="mono">#F87171</span> (6.66), warning <span class="mono">#E0A030</span> (8.11), info <span class="mono">#7DB3F7</span> (8.48). The money <em>fill</em> is the exception: white on <span class="mono">#00723B</span> is 6.05 on any surface, so the Charge button does not change.
+  </div>
+</section>
+
+<section>
+  <h2>Counter register</h2>
+  <p class="lede">48px minimum tap target, mono readout, larger type, zero motion on anything that blocks a tap. The Variants control is 48px here; in the current build it is 28px, in the card corner, on a screen where a mis-tap charges a paying customer for the wrong item.</p>
+  <div class="frame-cap"><span class="tag">/pos</span><span class="tag">data-density="counter"</span></div>
+  <div class="frame">
+    <div class="pos">
+      <div class="pos-main">
+        <div class="pos-bar">
+          <div class="seg">
+            <button aria-pressed="true" type="button">All</button>
+            <button aria-pressed="false" type="button">Breads</button>
+            <button aria-pressed="false" type="button">Pastries</button>
+            <button aria-pressed="false" type="button">Cakes</button>
+          </div>
+          <span class="meta">42 items</span>
+        </div>
+        <div class="tiles">
+          <div class="tile">
+            <button class="variants" type="button">Variants</button>
+            <div class="img">▦</div>
+            <div class="body"><div class="nm">Butter croissant</div>
+              <div class="ft"><span class="cat">Pastries</span><span class="pr">AED 8.50</span></div></div>
+          </div>
+          <div class="tile">
+            <div class="img">▦</div>
+            <div class="body"><div class="nm">Pain au chocolat</div>
+              <div class="ft"><span class="cat">Pastries</span><span class="pr">AED 10.00</span></div></div>
+          </div>
+          <div class="tile out">
+            <span class="badge b-danger oos"><span class="dot"></span>Out of stock</span>
+            <div class="img">▦</div>
+            <div class="body"><div class="nm">Sourdough loaf</div>
+              <div class="ft"><span class="cat">Breads</span><span class="pr">AED 22.00</span></div></div>
+          </div>
+          <div class="tile">
+            <div class="img">▦</div>
+            <div class="body"><div class="nm">Date maamoul, box of six</div>
+              <div class="ft"><span class="cat">Cakes</span><span class="pr">AED 45.00</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="cart">
+        <h4>Cart</h4>
+        <div class="line"><span><span class="q">2 ×</span> Butter croissant</span><span class="amt">17.00</span></div>
+        <div class="line"><span><span class="q">1 ×</span> Pain au chocolat</span><span class="amt">10.00</span></div>
+        <div class="line"><span><span class="q">1 ×</span> Date maamoul</span><span class="amt">45.00</span></div>
+        <div class="totals">
+          <div class="trow"><span>Subtotal</span><span class="v">72.00</span></div>
+          <div class="trow"><span>VAT 5%</span><span class="v">3.60</span></div>
+          <div class="grand"><span class="lb">Total</span><span class="t-total">AED 75.60</span></div>
+          <button class="btn btn-commit btn-counter" style="width:100%;justify-content:center" type="button">Charge</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top:16px"><strong>One green per screen.</strong> Charge is the only saturated element in the whole register. If two things are green, one of them is wrong.</div>
+</section>
+
+<section>
+  <h2>Ledger register</h2>
+  <p class="lede">36px controls, 44px rows, tabular figures, account codes in mono, no vertical rules. The totals row fills muted with a top border. Numbers right-aligned with −0.02em tracking so decimal points line up.</p>
+  <div class="frame-cap"><span class="tag">/accounting/reports/trial-balance</span><span class="tag">data-density="ledger"</span></div>
+  <div class="kpis" style="margin-bottom:16px">
+    <div class="kpi"><div class="k">Total debits</div><div class="v">184,220.00</div></div>
+    <div class="kpi"><div class="k">Total credits</div><div class="v">184,220.00</div></div>
+    <div class="kpi"><div class="k">Difference</div><div class="v" style="color:var(--money-text)">0.00</div></div>
+    <div class="kpi"><div class="k">Period</div><div class="v" style="font-size:18px;line-height:30px">Jul 2026</div></div>
+  </div>
+  <div class="frame">
+    <table>
+      <thead><tr><th style="width:110px">Code</th><th>Account</th><th>Status</th><th class="num">Debit</th><th class="num">Credit</th></tr></thead>
+      <tbody>
+        <tr><td class="code">1010</td><td>Cash on hand</td><td><span class="badge b-money"><span class="dot"></span>Reconciled</span></td><td class="num">12,480.00</td><td class="num">—</td></tr>
+        <tr><td class="code">1020</td><td>Bank — current account</td><td><span class="badge b-money"><span class="dot"></span>Reconciled</span></td><td class="num">64,310.50</td><td class="num">—</td></tr>
+        <tr><td class="code">1300</td><td>Inventory — ingredients</td><td><span class="badge b-warning"><span class="dot"></span>Low stock</span></td><td class="num">28,905.25</td><td class="num">—</td></tr>
+        <tr><td class="code">2010</td><td>Accounts payable</td><td><span class="badge b-draft"><span class="dot"></span>Draft</span></td><td class="num">—</td><td class="num">31,140.75</td></tr>
+        <tr><td class="code">2200</td><td>VAT payable</td><td><span class="badge b-info"><span class="dot"></span>Pending</span></td><td class="num">—</td><td class="num">7,244.00</td></tr>
+        <tr><td class="code">4000</td><td>Sales revenue</td><td><span class="badge b-money"><span class="dot"></span>Posted</span></td><td class="num">—</td><td class="num">145,835.25</td></tr>
+        <tr><td class="code">5000</td><td>Cost of goods sold</td><td><span class="badge b-danger"><span class="dot"></span>Unbalanced</span></td><td class="num">78,524.25</td><td class="num">—</td></tr>
+      </tbody>
+      <tfoot><tr><td></td><td>Total</td><td></td><td class="num">184,220.00</td><td class="num">184,220.00</td></tr></tfoot>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Threshold register</h2>
+  <p class="lede">Login pairs the form with the ledger motif: a running total that resolves once to a balanced figure and holds. No loop, no blur, no drift. It respects reduced-motion by rendering the final frame directly.</p>
+  <div class="frame">
+    <div class="login">
+      <div class="login-form">
+        <div class="wordmark serif" style="font-size:26px;margin-bottom:4px">Pastries</div>
+        <p class="meta" style="margin-bottom:8px">Sign in to your bakery</p>
+        <label for="e">Email</label>
+        <input id="e" type="email" placeholder="you@bakery.ae">
+        <label for="p">Password</label>
+        <input id="p" type="password" placeholder="••••••••">
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:18px" type="button">Sign in</button>
+      </div>
+      <div class="login-art">
+        <span class="meta">Trial balance</span>
+        <span class="balance" id="bal">AED 0.00</span>
+        <span class="rule"></span>
+        <span class="meta">Balanced</span>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top:16px">
+    <strong>What this replaces.</strong> Two 18–22rem blurred gradient orbs drifting on an 11-second loop plus a scanline sweep, and 901 lines of react-three-fiber bakery-door art on the landing page. The landing hero becomes one real photograph of a real counter, which is what Square and Mercury both do, over a Fraunces headline.
+  </div>
+</section>
+
+<section>
+  <h2>Components</h2>
+  <div class="grid2">
+    <div>
+      <h3>Buttons</h3>
+      <div class="row">
+        <button class="btn btn-primary" type="button">Save changes</button>
+        <button class="btn btn-commit" type="button">Post entry</button>
+        <button class="btn btn-outline" type="button">Cancel</button>
+        <button class="btn btn-ghost" type="button">More</button>
+        <button class="btn btn-danger" type="button">Void</button>
+      </div>
+      <p class="meta" style="margin-top:12px">Sizes: sm 32, default 36 (Ledger), lg 44, counter 48. There is no filled secondary; a muted fill and an outline do the same job.</p>
+    </div>
+    <div>
+      <h3>Status badges</h3>
+      <div class="row">
+        <span class="badge b-money"><span class="dot"></span>Paid</span>
+        <span class="badge b-warning"><span class="dot"></span>Expiring</span>
+        <span class="badge b-danger"><span class="dot"></span>Void</span>
+        <span class="badge b-info"><span class="dot"></span>Pending</span>
+        <span class="badge b-draft"><span class="dot"></span>Draft</span>
+      </div>
+      <p class="meta" style="margin-top:12px">The dot carries the meaning for colour-blind users. Draft is deliberately neutral: it is the absence of a state, not a state.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Empty states</h2>
+  <p class="lede">147 routes, and a trial tenant sees almost all of them empty. An empty screen is the first impression of every module, so it is a designed surface, not a fallback. The two registers get different treatments.</p>
+  <div class="grid2">
+    <div>
+      <div class="frame-cap"><span class="tag">Ledger — instructive</span></div>
+      <div class="empty">
+        <h4>No journal entries yet</h4>
+        <p>Entries post here automatically when you record a sale, receive a purchase, or run production. You can also post one by hand.</p>
+        <div class="row">
+          <button class="btn btn-primary" type="button">New journal entry</button>
+          <button class="btn btn-outline" type="button">Import opening balances</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="frame-cap"><span class="tag">Counter — terse</span></div>
+      <div class="empty" style="text-align:center;padding:56px 28px">
+        <h4>Cart is empty</h4>
+        <p style="margin:0 auto 0">Tap a product to start an order.</p>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top:16px">
+    <strong>The rule.</strong> A Ledger empty state names what will fill it, why it is empty, and the one action that changes that. A Counter empty state is one line and nothing else, because the cashier is not reading. Neither uses an illustration.
+  </div>
+</section>
+
+<section>
+  <h2>Motion, elevation, radius</h2>
+  <div class="grid2">
+    <div>
+      <h3>Motion</h3>
+      <ul class="tight">
+        <li>Tap feedback: 0ms.</li>
+        <li>Hover, focus, colour: 150ms <span class="mono">cubic-bezier(.2,0,0,1)</span>.</li>
+        <li>Panel, dropdown, dialog: 200ms, same curve.</li>
+        <li>Anything blocking a tap: 0ms.</li>
+        <li>Never animate a number changing.</li>
+        <li>The global <span class="mono">scroll-behavior: smooth</span> is removed; it currently fights the cashier on every flick through the POS grid.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Elevation and radius</h3>
+      <ul class="tight">
+        <li><span class="mono">--radius-sm</span> 6px chips and badges, <span class="mono">--radius</span> 10px buttons, cards, inputs, <span class="mono">--radius-lg</span> 14px dialogs and frames.</li>
+        <li>Three shadows only: xs for a segmented thumb, sm for card hover, md for dialogs.</li>
+        <li>Fills over borders. Reserve borders for structural boundaries.</li>
+        <li><span class="mono">shadow-workspace</span> and its inner white bevel are retired; it is invisible on any non-white surface.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section style="padding-bottom:80px">
+  <h2>Accessibility floor</h2>
+  <ul class="tight">
+    <li>Body text ≥ 4.5:1, large text ≥ 3:1. Every value in this page was measured in both modes.</li>
+    <li>No text below 12px, in either register.</li>
+    <li>Counter tap targets ≥ 48 × 48.</li>
+    <li>Visible ring on every focusable element: <span class="mono">#3072C1</span> light, <span class="mono">#7DB3F7</span> dark, 2px at 2px offset.</li>
+    <li>Colour is never the only carrier of state; every badge has a dot.</li>
+    <li>Semantic solid values are fills, never text. Use the <span class="mono">-text</span> pair.</li>
+    <li><span class="mono">foreground-disabled</span> is placeholder and disabled state only, never content.</li>
+    <li><span class="mono">prefers-reduced-motion</span> is respected, including by the login motif.</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+(function(){
+  var root=document.documentElement, btn=document.getElementById('tt');
+  var L={canvas:'#FAF9F7',card:'#FFFFFF',muted:'#F2F0EC',border:'#E5E2DC',fg:'#0A0A0A',fgm:'#6E6A64',
+         rfg:'18.82 : 1',rfgm:'5.11 : 1',dn:'text pair 7.21 : 1',wn:'text pair 6.88 : 1',in:'text pair 6.68 : 1'};
+  var D={canvas:'#0B0B0B',card:'#141414',muted:'#1C1C1C',border:'#2A2A2A',fg:'#F4F1EC',fgm:'#A39E96',
+         rfg:'17.47 : 1',rfgm:'7.39 : 1',dn:'text pair 6.19 : 1',wn:'text pair 7.11 : 1',in:'text pair 7.74 : 1'};
+  function paint(t){
+    var s=t==='dark'?D:L;
+    document.getElementById('v-canvas').textContent=s.canvas;
+    document.getElementById('v-card').textContent=s.card;
+    document.getElementById('v-muted').textContent=s.muted;
+    document.getElementById('v-border').textContent=s.border;
+    document.getElementById('v-fg').textContent=s.fg;
+    document.getElementById('v-fgm').textContent=s.fgm;
+    document.getElementById('r-fg').textContent=s.rfg;
+    document.getElementById('r-fgm').textContent=s.rfgm;
+    document.getElementById('r-dn').textContent=s.dn;
+    document.getElementById('r-wn').textContent=s.wn;
+    document.getElementById('r-in').textContent=s.in;
+    btn.textContent=t==='dark'?'Light':'Dark';
+  }
+  btn.addEventListener('click',function(){
+    var t=root.getAttribute('data-theme')==='dark'?'light':'dark';
+    root.setAttribute('data-theme',t); paint(t);
+  });
+  paint('light');
+  // Login motif: resolves once, then holds. Skipped entirely under reduced motion.
+  var el=document.getElementById('bal');
+  if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    var steps=[ '184,220.00','92,110.00','41,006.25','8,204.50','0.00' ], i=0;
+    var iv=setInterval(function(){
+      el.textContent='AED '+steps[i]; i++;
+      if(i>=steps.length){ clearInterval(iv); }
+    },170);
+  }
+})();
+</script>
+</body>
+</html>

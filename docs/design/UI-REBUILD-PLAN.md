@@ -1,0 +1,422 @@
+<!-- /autoplan restore point: ~/.gstack/projects/webdevdmd-hub-dmd_pastries/main-autoplan-restore-20260817-101718.md -->
+
+# UI/UX rebuild — execution plan
+
+Status: **draft, under review**
+Branch: `main` · Created: 2026-08-17
+
+Wraps [DESIGN.md](../../DESIGN.md) (what it should look like) and [MIGRATION.md](MIGRATION.md) (how to move the token layer). This document is the third thing neither covers: **the order in which 147 routes and 584 components actually get rebuilt, by whom, and how we know it worked.**
+
+---
+
+## 1. Goal
+
+**Near-term: our own bakery staff make fewer mistakes on this product.**
+**Later: it looks like something another bakery would pay for.**
+
+This ordering is deliberate and it is the single most important thing in this document. Pastries POS is currently dogfooded internally — we run our own operation on it, and there is no payment gateway, pricing page, or sales funnel because we are not selling yet. That is by design, not an oversight.
+
+Two consequences:
+
+- Anything that causes a **wrong charge, wrong number, or wrong action** at our own counter is urgent today, not at the end of a 41-day sequence.
+- Anything only a **prospect** would notice — dark mode, marketing polish, empty-state copy on modules our tenant already has data in — is real work with a deferred payoff. It stays in the plan; it does not go first.
+
+### Definition of done
+
+1. Zero raw Tailwind palette utilities, zero hardcoded hex in `className`. Enforced, not aspirational (§6).
+2. Counter register has no tap target under 48px, asserted by a test so it cannot regress. **"Counter register" includes the six POS dialogs and `/dashboard/cashier`, not just the `(pos)` route group** (§9.1). The assertion runs in CI-equivalent tooling: `pnpm test` is added to `pnpm verify`, which today runs typecheck/lint/no-any/format and would never execute this test (§9.5).
+3. Every route that renders a collection has **five** visibly distinct treatments: loading, empty, filtered, failed, and partial. "Visibly distinct" is the acceptance criterion; "designed" is not checkable.
+4. Landing and login carry the threshold treatment. `three` is gone from `package.json`.
+5. Visual regression baselines exist for the 34 routes the harness covers, in light mode, captured **before** the first token change.
+6. Token layer is dark-ready. Dark mode itself is explicitly **not** in this plan (see Non-goals).
+
+### Non-goals
+
+- **Dark mode.** Cut from the DoD deliberately. Nobody at a bakery counter needs it, and it doubles QA across 147 routes. The v3 token layer already carries measured dark values (DESIGN.md §3.5), so this is a later addition, not a later rewrite. Revisit when the sellable phase starts.
+- Rewriting business logic, data fetching, or backend contracts. Presentation only, **with two named exceptions**: the `(pos)` tap-target changes alter cashier error rates and get behavioural review, and table-density persistence needs a storage decision (§4, C-prereqs).
+- Command-palette navigation. Deferred to its own spec (DESIGN.md §10).
+- RTL / Arabic. Confirmed out of scope by the owner. It is a separate workstream (bidirectional layout across 147 routes, Arabic type, RTL tables), not a polish item folded in here.
+- Thermal receipt print stylesheet. Own constraints, own spec.
+- Mobile breakpoints for the 146 non-POS routes. Real and unfunded; recorded in TODOS.md.
+- Payment gateway, pricing page, analytics. Not this plan, and not needed while dogfooding.
+
+---
+
+## 2. What already exists
+
+Do not rebuild these.
+
+| Asset | State |
+| --- | --- |
+| `DESIGN.md` v3 | Complete. Every token measured in both modes. |
+| `docs/design/tokens.css` | Exists, holds v2 values. Needs the v3 numbers. |
+| `docs/design/tailwind.config.proposed.ts` | Exists. Aliases `brand-*`/`workspace-*` to new tokens so `components/ui/*` renders unchanged. |
+| `docs/design/preview-v3.html` | Working reference for both registers, both modes. |
+| `frontend/eslint.design-rules.mjs` | 7 rules written. All at `"warn"`, enforcing nothing. |
+| `frontend/scripts/visual/` | `capture.mjs`, `compare.mjs`, `routes.mjs` + baseline/current dirs. Harness exists, unused. |
+| `frontend/src/components/ui/` | 21 shadcn primitives. Restyle, do not replace. |
+| `getting-started-checklist.tsx` | First-run UX already built. Restyle only. |
+| Global error boundary + chunk-reload provider | Shipped 2026-08-11. Leave alone. |
+
+**The single most important fact:** the design system has been specced twice and applied zero times. v2 landed 2026-08-14 and moved nothing in three days while drift grew by 38 utilities. This plan is judged on whether code changes, not on whether a document is written.
+
+---
+
+## 3. Where the drift actually is
+
+Measured 2026-08-17. This reorders MIGRATION.md's priorities.
+
+| Directory | Raw palette utils | Hex | Files | Note |
+| --- | --- | --- | --- | --- |
+| `components/pos/` | **355** | 4 | 25 | Worst offender, and it is the Counter register |
+| `components/manufacturing/` | 271 | 1 | 22 | |
+| `components/accounting/` | 181 | 1 | 16 | |
+| `components/purchasing/` | 172 | 0 | 47 | |
+| `components/reports/` | 158 | **83** | 137 | Largest dir; hexes are Recharts literals |
+| `components/super-admin/` | 141 | 3 | 11 | Internal-only, lowest priority |
+| `components/settings/` | 101 | 0 | 12 | |
+| `components/orders/` | 92 | 0 | 26 | |
+| everything else | ~478 | ~200 | ~288 | `app/page.tsx` + `components/home/` hold the 3D hexes |
+
+**Two things this changes versus MIGRATION.md:**
+
+1. **POS is its own workstream, not a line item in Phase 7.** 355 utilities in 25 files, plus the 48px tap-target work, plus the highest business risk in the app.
+2. **Reports is 137 files and 55 of the 147 routes.** It needs its own pass with its own owner, and the chart-palette bridge is a hard dependency for it.
+
+---
+
+## 4. Workstreams
+
+Five tracks. A, B, C are sequential. D and E run in parallel with them by a second person.
+
+### Track A0 — Ship something today (before anything else)
+
+The pattern this plan is judged against is that v2 and v3 produced documents, not diffs. A0 breaks it: the first commit of this effort changes app code and makes the guardrails real.
+
+| # | Item | Status | Effort (human / CC) |
+| --- | --- | --- | --- |
+| A0.1 | **POS card safety fix.** `pos-product-card.tsx`: `h-7`→48px on the Variants button, `font-black`→500 (×4), the 9.9px uppercase labels→`text-xs` sentence case, `tabular-nums` on the price, dot + `aria-label` on the out-of-stock badge. No token layer needed. | **shipped 2026-08-17** (18→8 lint warnings) | 1h / 10m |
+| A0.2 | **Make the ratchet real — as a 7-rule plugin, not a flag.** Split `designRules` into a local flat-config plugin with seven independently named rules (`design/no-raw-palette`, `no-hex-in-class`, `no-heavy-weight`, `no-uppercase`, `no-sub-12px`, `no-solid-as-text`, `no-disabled-as-content`), each a thin wrapper over the existing selector array. Rules a phase has cleared → `"error"`, which fails `eslint` with exit 1 and blocks the commit through `lint-staged` **for free, per rule, on MIGRATION.md's actual flip schedule**. Rules not yet cleared stay `"warn"`. `--max-warnings 0` becomes the *last* step, after E2, when the warn set is empty. Ship `no-solid-as-text` and `no-disabled-as-content` at `error` immediately — both are near-clean today, so the ratchet is real and blocking on day one. | pending | 1h / 15m |
+| A0.3 | **`pnpm verify && pnpm test` in a new `.githooks/pre-push`, chaining Git LFS first.** | pending | 1.5h / 20m |
+| A0.4 | **Capture baselines now**, on the 34 routes the harness covers, before any token change. After A1 lands there is no recoverable record of the pre-migration appearance. One-way door — and `capture.mjs:154` `rmSync`s the output dir unconditionally, so a stray `pnpm visual:baseline` re-opens the door in the wrong direction. **Commit `frontend/visual/baseline/` to git immediately after.** | pending | 2h / — |
+| A0.5 | Create `TODOS.md`. | **shipped 2026-08-17** (15 items, T-A…T-O) | — |
+| A0.6 | **Reconcile `tokens.css` and `tailwind.config.proposed.ts` to v3 names and values** before A1 runs. See A2.1 for why; this is the pure-docs half, done first so A1 becomes mechanical. | pending | 45m / 10m |
+
+**Note on A0.2 — two rejected designs, and why.**
+
+The first draft proposed a `.design-debt.json` counter script run from `pnpm verify`. Rejected: `pnpm verify` is invoked by nothing in this repo — not the pre-commit hook (which runs `lint-staged`), not CI (there is none), not the Dokploy deploy. It reproduced the exact enforcement model that failed between 2026-08-14 and 2026-08-17.
+
+The second draft proposed `--max-warnings 0` on the `lint-staged` eslint call. Also rejected, for a subtler reason: all seven guards live in **one** `no-restricted-syntax` entry (`eslint.config.mjs:84`), ESLint resolves one severity per rule id, and `--max-warnings 0` is a single global integer. There is no per-rule granularity, so it cannot phase — it turns all seven on at once. Measured: **300 of 938 `.ts`/`.tsx` files under `src/` (32%)**, and **22 of 25 files in `components/pos/`**, would become un-committable on day one. The third time someone hits that during an unrelated accounting fix, they type `--no-verify`, and the ratchet is dead by exactly the mechanism `capture.mjs` warns about for the visual harness.
+
+The plugin has real per-rule severity, is ~30 lines, costs *less* than the flag's estimate, and matches the flip table MIGRATION.md calls "the contract."
+
+**Note on A0.3 — this is not "zero installer changes."** `.git/hooks/pre-push` currently **is** the Git LFS hook, and `install-hooks.mjs:47` does an unconditional `copyFileSync` over every file in `.githooks/`. Dropping a naive `pre-push` there silently stops LFS object upload — pointer files land on the remote with no blobs, discovered later when a tracked file won't check out elsewhere. The installer's own header comment names this exact hazard for `core.hooksPath`; the copy path reaches the same outcome. The new hook must chain LFS first:
+
+```sh
+#!/bin/sh
+set -e
+command -v git-lfs >/dev/null 2>&1 && git lfs pre-push "$@"
+git diff --name-only @{u}.. 2>/dev/null | grep -q '^frontend/' || exit 0
+cd "$(git rev-parse --show-toplevel)/frontend"
+command -v pnpm >/dev/null 2>&1 || exit 0
+pnpm verify && pnpm test
+```
+
+`pnpm test` is included deliberately: `verify` is `typecheck && lint && check:no-any && format:check` and has never run the five existing test scripts, nor the tap-target test DoD #2 depends on.
+
+### Track A — Foundation (blocking)
+
+| # | Item | Effort (human / CC) |
+| --- | --- | --- |
+| A1′ | **One commit. Tokens, config, and every dependent deletion together.** Splitting them is what breaks the app. Contents: (a) land v3 token values in `globals.css`; (b) copy `tailwind.config.proposed.ts` over `tailwind.config.ts` — *the alias layer is A1's entire safety net, so it cannot land a commit later*; (c) delete the hand-written utilities (**26 classes, not ~120** — counted: 15 `brand-*`, 10 `workspace-*`, 1 `shadow-workspace`) and `.font-display`/`.font-sans`; (d) **rewrite the `body` rule at `globals.css:83-87`** — it holds `background-color: rgb(var(--workspace-canvas))`, which sits outside every range the plan previously named and would silently drop the page background app-wide; (e) codemod the **24 live `font-display` usages** to `font-serif`, since the proposed config defines no `display` family and Tailwind emits nothing for an unknown class; (f) delete the pistachio variable block (`42-73`) *and* its override block (`348-408`) together — splitting them across A1 and B3 leaves a hardcoded `#102418` sidebar forced over light tokens for the whole B1→B3 window. **Acceptance criterion, mechanized (see §6):** `check-utility-coverage.mjs` resolves every deleted name against the new theme. | 3h / 40m |
+| A2 | *(merged into A1′)* | — |
+| A2.1 | **Reconcile token names before A1/A2 run. This is a second silent-failure path of exactly R2's kind and R2 does not cover it.** Three documents use two naming sets. DESIGN.md v3 §3.1/§3.2 names `--canvas` and `--money-solid` / `--money-text` / `--money-tint`. `docs/design/tokens.css` (still headed "v2") and `tailwind.config.proposed.ts` name `--background` and `--accent-solid` / `--accent-hover` / `--accent-text` / `--accent-tint`, and carry v2's *values* (`#FCFCFC`, `#737373`, `#8F8F8F`). If A1 lands v3 names and A2 copies the v2-named config, every colour utility resolves to `oklch(var(--canvas))` where the var is undefined — invalid CSS, no build error, no lint error. **Decision, per CLAUDE.md document precedence (DESIGN.md wins on tokens): v3 names are canonical.** Rewrite `tokens.css` to v3 names and v3 values; in the Tailwind config keep `background` and `accent.*` as deprecated aliases pointing at `--canvas` / `--money-*`, exactly as `brand-*` is aliased, because shadcn's `components/ui/*` references `accent-foreground`. Acceptance: `grep -o 'var(--[a-z-]*)' tailwind.config.ts` and the `--` declarations in `globals.css` produce identical sets. | 0.5d / 20m |
+| A3 | Font swap: Manrope + Cormorant → Geist + Geist Mono + Fraunces (`subsets: ["latin"]`). Fixes the 31 files where `font-mono` resolves to nothing. | 0.5d / 15m |
+| A4 | Remove global `html { scroll-behavior: smooth }` (`globals.css:80`); scope to marketing. | 0.5h / 5m |
+| A5 | Contrast-assertion script over the token pairs. §6 promised this and no track built it. **Three corrections.** (a) *Light mode only* — dark mode is cut, the `.dark` block will not exist, and a script that asserts both modes fails on a missing block. Write the mode as a parameter so T-A turns it on with no rewrite. (b) The allowlisted `foreground-disabled` figure **3.15:1 is v2's `#8F8F8F`**; v3's value is `#A8A29A` at **2.40:1** (DESIGN.md §3.1). Allowlist the token, not the number. (c) Assert each semantic `-text` against **its own tint and against `--card` and `--muted`**, not against `--canvas` — the v2 defect this whole exercise corrected (`#737373` passing on white and failing at 4.35:1 on `--muted`) is invisible to a canvas-only script, so a canvas-only script would have shipped the bug it exists to catch. | 0.5d / 20m |
+
+**Gate:** `pnpm build` passes, all 147 routes render, A0.4 baselines diff cleanly except for the expected type change.
+
+### Track B — Codemods (mechanical, high volume, low risk)
+
+| # | Item | Effort |
+| --- | --- | --- |
+| B1 | Semantic codemod: the 514-occurrence red/amber/green/blue cluster → `danger`/`warning`/`money`/`info` tint+text pairs. Biggest single win. **Blocked on a contradiction:** MIGRATION.md's Phase 2 table maps `text-red-600`→`text-danger`, which design rule 6 bans (`-solid` values are fills, never text). Reconcile before running, or the codemod emits 100+ new violations that are invisible at `warn`. | 1d / 30m |
+| B2 | Neutrals codemod, **one PR per colour family** (`zinc`, then `neutral`, then `slate`/`gray`). A single 1,900-line diff is unreviewable. | 3d / 1.5h |
+| B3 | Retire `brand-*` (2,641 refs) and `workspace-*`. Delete the ~50 pistachio override lines and the ~120 hand-written `.bg-brand-*` utilities. | 1.5d / 45m |
+| B4 | Typography: 78 `font-black` → 500; kill in-app uppercase+tracking; sub-12px → `text-meta`; `tabular-nums` on every money/count/date/percent cell. | 2d / 1h |
+| B5 | `src/lib/design/palette.ts` bridge; replace the 83 Recharts hexes in `components/reports/` and 41 in `components/dashboard/`. **Add a verification step:** `chartSeries` is commented "distinguishable under deuteranopia and protanopia" with nothing checking it, and it is the one place in the system where colour genuinely is the only carrier of meaning (a line chart has no dot to fall back on). Simulate the six series through a deuteranope/protanope transform and assert adjacent-pair ΔE, or give every series a dash pattern or marker shape as well. | 1.5d / 45m |
+| B6 | **Motion, elevation, and the mono/sans money split** — three DESIGN.md sections no track implemented (§9.3). Motion (§5): card hover becomes a 1px lift + `--shadow-sm`, not a border-colour change; 150ms `cubic-bezier(.2,0,0,1)` on hover/focus/colour, 200ms on panels, **0ms on anything that blocks a tap**. Elevation (§4): repoint `shadow-float` (15 files) and `shadow-panel` (3) onto `--shadow-md`/`--shadow-xs`. MIGRATION.md orphans these to Phase 8, which is dark mode, which is cut — so today nobody owns them. Radius `0.875rem`→`0.625rem` is a global visual change riding inside A1; call it out at the A0.4 baseline diff rather than discovering it. Mono rule (§2): money **in a table** is Geist + `tabular-nums`, money **at the counter** is Geist Mono, identifiers are Geist Mono left-aligned. B4 adds `tabular-nums` but never makes this split, so a codemod that mono-izes every price makes the Ledger tables wider for no reason. | 1.5d / 45m |
+
+**Gate after each:** visual diff against A6 baselines. Codemods should be pixel-neutral except where a token intentionally differs.
+
+### Track C — Screens (the actual rebuild)
+
+Ordered by business risk, not by file count.
+
+| # | Module | Files | Effort |
+| --- | --- | --- | --- |
+| C1 | **POS / Counter register.** 48px targets, `data-density="counter"`, mono readout, segmented payment control. **Scope corrected — see §9.1.** The register is not the `(pos)` route group: it is `(pos)` **plus the six portalled POS dialogs** (`pos-checkout-dialog`, `pos-create-order-dialog`, `pos-hold-sale-dialog`, `pos-quick-customer-dialog`, `pos-receipt-dialog`, the variants sheet) **plus `app/(dashboard)/dashboard/cashier`**, which MIGRATION.md Phase 7 currently hands to `data-density="ledger"` in contradiction of DESIGN.md §1. Also replace `bg-[#f9f9fa] text-zinc-950` on `app/(pos)/layout.tsx:34`. | 25 + 1 | 4d / 2h |
+| C2 | Accounting + its 5 report routes. `data-density="ledger"`, table density modes, mono account codes, totals rows. | 16 | 2d / 1h |
+| C3 | Reports (55 routes, 137 components). Table density, chart palette, export surfaces. | 137 | 5d / 2.5h |
+| C4 | Purchasing + Orders + Payments. | 97 | 3d / 1.5h |
+| C5 | Inventory + Manufacturing + Recipes + Ingredients + Packaging. | 92 | 3d / 1.5h |
+| C6 | Products, Customers, Suppliers, Settings, Users, Roles, Branches. | 105 | 3d / 1.5h |
+| C7 | Super-admin. Internal-only; last. | 11 | 1d / 30m |
+
+**Component prerequisites (C0), built once at the head of Track C.** These were a prose bullet with no estimate in the first draft, which hid unbudgeted work inside the largest track.
+
+| # | Component | Effort |
+| --- | --- | --- |
+| C0.1 | `button.tsx` rebuilt: `commit` variant, drop filled `secondary`, focus ring `ring-brand-caramel`→`ring-ring`, `font-semibold`→500, `rounded-xl`→`rounded`. **Two things the 0.5d estimate hid.** (a) Today's `default` size is `h-11` (44px) and `lg` is `h-12`; DESIGN.md §6 makes default 36px. That is a global vertical-rhythm change across every screen in the app, not a variant tweak — it belongs behind the A0.4 baselines and its own visual pass. (b) There is no `counter` (48px) size at all, and C1's DoD depends on one. Sizes become `sm` 32 / `default` `h-control` / `lg` 44 / `counter` 48. **Keyboard-navigation verification is now C0.1b, not T-J** — a focus-ring change across 584 components with no verification step is the definition of an unowned regression. | 1d / 40m |
+| C0.1b | Keyboard-navigation and focus-order pass on the routes C1 and C2 cover, plus the six POS dialogs (focus trap, initial focus, Escape, restore-on-close). Promoted out of TODOS.md T-J because C0.1 causes the regression it verifies. | 0.5d / 20m |
+| C0.2 | Segmented control primitive (POS payment method, table density, date range). | 0.5d / 20m |
+| C0.3 | Three-mode `table.tsx`. **Decided: `localStorage`,** key `pastries-pos-table-density`, with a forward-compatible reader (unknown value → `"default"`, never throw) — the same contract §5 specifies for the theme key. Keeps C0.3 inside the presentation-only boundary: no backend contract, no migration, no contention with the accounting roadmap. Density becomes a property of the terminal rather than the person, which is right for shared counter hardware. Revisit only if accountants routinely switch machines. | 1d / 30m |
+| C0.4 | Badge with dot (the dot carries state for colour-blind users, so it is not decoration). | 2h / 10m |
+| C0.5 | Skeleton/loading treatment, one per register. **Loading appears in zero of the five tracks in the first draft** — and on counter hardware over bakery wifi it is the most-seen transient state in the app. **Correction: this is not greenfield.** 96 files already render `Skeleton` or `animate-pulse` ad hoc (`pos-product-grid-skeleton.tsx`, `components/shared/loading-state.tsx`, and 94 others). Building the primitive without sweeping them leaves two loading languages. The sweep is E4. | 0.5d / 20m |
+| C0.6 | **Confirm-before-irreversible primitive.** The app has **zero** `AlertDialog` usages and 103 `toast` call sites: every destructive action — void a sale, refund, post a journal entry, close a period, delete a product — either fires immediately or confirms through ad-hoc markup. The plan's stated near-term goal is "our own staff make fewer mistakes," and this is the one surface that exists solely to prevent a mistake. `danger` variant, the consequence stated in the body ("This voids sale #1042 for AED 75.60 and posts a reversing entry"), destructive action never the default-focused button. | 0.5d / 20m |
+| C0.7 | **Toast/notification token pass.** 103 call sites are the app's real failure surface. A failed charge at the counter is a toast, not the `failed-state` panel E1 builds. Success/danger/warning variants on the semantic pairs, ≥6s for anything money-related, and never the only report of a failure that lost data. | 0.5d / 20m |
+
+### Track D — Threshold (split by decision, 2026-08-17)
+
+**D1 and D4 stay at the front. D2, D3 and D5 move below Track E.** Under "our own staff make fewer mistakes," the landing page has an audience of zero and login is four seconds a shift, so ~3.5 days there buys nothing internal while C0.6 and E5 buy exactly the stated goal. D1+D4 stay because they are ~1h of pure subtraction that removes 87 hexes, four dependencies, and a CSS range that currently breaks the build if mis-deleted.
+
+**Correction to D4's framing:** `bakery-door-scene` is already `next/dynamic` with `ssr: false` and is imported only from `app/page.tsx`, so webpack already splits it into a chunk fetched on `/` alone. The authenticated app shell carries **zero bytes** of three.js today. D4 is a landing-page win and a dependency/build win — not the app-shell win MIGRATION.md and the first draft both claimed. Keep it; just don't expect `/pos` to get faster.
+
+**Correction to D1's range:** deleting exactly `globals.css:95-160` orphans `animation: auth-scan 8s…; }` at lines 161-162 and breaks the PostCSS parse. The range is 95-162, or 95-194 if `.auth-glass-card` / `.auth-login-frame` go with D5. More generally: every line-number range in this document is a bug waiting for the next edit to the file it points at — three of four were already wrong. Replace them with anchor comments.
+
+| # | Item | Effort |
+| --- | --- | --- |
+
+| # | Item | Effort |
+| --- | --- | --- |
+| D1 | Delete auth orbs + scanline (`globals.css:95-160`). | 1h / 5m |
+| D2 | Login ledger motif per DESIGN.md §7. Resolves once, holds, honours reduced-motion. | 0.5d / 20m |
+| D3 | Rebuild `app/page.tsx` on the threshold structure. | 1.5d / 45m |
+| D4 | Delete `components/home/` (901 lines, 4 files); drop `three`, `@react-three/fiber`, `@react-three/drei`, `@types/three`. | 0.5d / 15m |
+| D5 | Auth routes (login, signup, forgot, reset, verify, accept-invitation) on the threshold register. | 1d / 30m |
+
+**Blocked on:** one photograph of a real counter. Ship type-only until it exists; still better than the door scene.
+
+### Track E — States (parallel, independent)
+
+| # | Item | Effort |
+| --- | --- | --- |
+| E1 | `empty-state.tsx` with `register` prop, plus `filtered-state` and `failed-state` siblings. | 1d / 30m |
+| E2 | Sweep all 147 routes. One PR per module group, tracked against a checklist. | 4d / 2h |
+| E3 | Restyle `getting-started-checklist.tsx` to tokens. | 0.5d / 15m |
+| E4 | **Loading sweep.** Replace the ad-hoc `Skeleton` / `animate-pulse` treatments in the 96 files that already have one with C0.5's register-aware primitive. Same PR-per-module-group shape as E2. Without this, C0.5 adds a third loading language rather than replacing two. | 2d / 1h |
+| E5 | **Partial and offline states.** Two states nothing in the plan covers and both hit the counter hardest: a list that loaded page 1 of N and failed on page 2 (today: silence or a spinner that never ends), and a request made with no network. 25 files already reference `onLine`/`offline` ad hoc. One inline `--warning-tint` strip with Retry for partial; one persistent `--danger-tint` bar for offline, because a cashier who does not know the till is offline will keep ringing sales. | 1d / 30m |
+
+---
+
+## 5. Sequencing
+
+```
+A0.1 ─► A0.2 ─► A0.3 ─► A0.4 ─► A0.5     (ship today; A0.4 is a one-way door)
+  │                                ║
+  └─ shipped 2026-08-17            ║
+                                   ▼
+              A1 ─► A2 ─► A3 ─► A4 ─► A5  ═══╗  (foundation gate)
+                                              ║
+                             ┌────────────────╨────────────────┐
+                             │                                 │
+            B1 ─► B2 ─► B3 ─► B4 ─► B5                D1..D5   E1 ─► E2 ─► E3
+                             │  (codemods)            (thresh)  (states)
+                             ▼
+       C0.1..C0.5 ─► C1 ─► C2 ─► C3 ─► C4 ─► C5 ─► C6 ─► C7
+                                   ▲
+                                   └── B5 (palette bridge) required
+```
+
+**Hard dependencies:** A0.4 baselines before A1, or no pre-migration record ever exists. C after B and after C0. B5 before C3. Everything after A.
+
+**Dark mode is not in this graph.** Cut from the DoD (§1). When it returns it goes after B3, because redefining tokens is only safe once nothing bypasses them, and it carries MIGRATION.md Phase 8 in full — including the `pastries-pos-theme` localStorage migration, which is this plan's only irreversible change and needs a forward-compatible reader (unknown value → `light`, never throw).
+
+**Guardrail flips** (from MIGRATION.md): palette rule → `error` after B2. `font-black`, uppercase, sub-12px → after B4. hex → after B5. `--max-warnings 0` repo-wide → after E2. **Restated to match A0.2's correction:** all seven selectors share one `no-restricted-syntax` entry and therefore one severity, so a "flip" is really two moves — the selector enters A0.2's lint-staged array when its fix exists, and the whole entry goes `warn`→`error` once the last selector has cleared. Between those points the per-file ratchet is the only enforcement, which is the intended behaviour, not a gap.
+
+**Escape hatch, decided now so the final flip isn't postponed forever:** legitimate exceptions (the one permitted threshold eyebrow, chart literals in `palette.ts`) use `eslint-disable-next-line` with a required reason comment.
+
+---
+
+## 6. Verification
+
+| Layer | Mechanism | Runs where | When |
+| --- | --- | --- | --- |
+| Mechanical | `--max-warnings 0` on the `lint-staged` eslint call | pre-commit hook, already installed | Every commit, from A0.2 |
+| Mechanical | `pnpm verify` | new `.githooks/pre-push` | Every push, from A0.3 |
+| Contrast | Script over token pairs vs WCAG AA | `pnpm verify` | From A5 |
+| Tap target | jsdom test asserting nothing under 48px in `(pos)` | `pnpm test` | From C1 |
+| Visual | `pnpm visual:diff` against A0.4 baselines | manual, headed session | Each codemod PR — **see caveat** |
+| Manual | Walk the routes MIGRATION.md Phase 1 names, plus `/pos` | manual | After A1, after each codemod |
+| Post-deploy | Load `/pos`, `/accounting/reports/trial-balance`, `/login` and confirm backgrounds actually paint | manual | Every deploy |
+| Review | `/design-review` | — | After C7 |
+
+**Visual-diff caveat, stated plainly rather than assumed away.** The harness covers **34 routes, not 147** — deliberately, per its own docstring ("biased toward money, dense tables, and the two density extremes rather than toward coverage for its own sake"). More importantly, `capture.mjs` warns in its own header that it renders live data, and *"if the dataset changes between two runs, the diff is red for reasons that have nothing to do with CSS… without that, this tool reports noise and everyone learns to ignore it, which is worse than not having it."* No frozen dataset exists. On Windows it also needs a hand-established headed session, so it cannot run unattended.
+
+So: the visual gate is a **manual ritual against moving data**, and the first unexplained red diff will kill it. Two honest options, and this needs a decision rather than a wish:
+
+- **Accept it as advisory.** Run it, treat red as "go look," never as a gate. Costs nothing, catches the large breakages, which is most of what A1 risks.
+- **Fund a frozen seed dataset** (>1 day, new infrastructure) and expand `routes.mjs`. Only then does "gate on every codemod PR" become true. Note these move together: 147 noisy baselines is strictly worse than 34.
+
+**Why post-deploy verification is not optional here:** pushes to `main` auto-deploy via Dokploy, and a failed frontend build leaves the previous container serving HTTP 200. A green deploy proves nothing. A1's failure mode is invalid CSS that produces no build error and no lint error, so the only thing that catches it is loading a page and looking at it.
+
+---
+
+## 7. Risks
+
+| # | Risk | Mitigation |
+| --- | --- | --- |
+| R1 | **This plan joins v2 and v3 unapplied on the shelf.** Highest-probability failure by a wide margin; it has already happened twice. | A0 ships app code on day one. A0.2 puts the ratchet in `lint-staged`, which already runs on every commit — unlike `pnpm verify`, which nothing in this repo invokes. |
+| R2 | Token deletion breaks styling silently. `rgb(0.97 0 0)` is invalid CSS with no build error and no lint error. | **Corrected from the first draft, which sequenced the mitigation after the risk.** A0.4 captures baselines *before* A1. A1's acceptance criterion is a name-by-name check that every deleted utility has a generated counterpart. Post-deploy page load confirms backgrounds paint. |
+| R3 | 1,949-utility diff is unreviewable. | One PR per colour family. Codemods pixel-neutral against A0.4 baselines. |
+| R4 | Bulk in-place rewrites break the Tailwind 3.4 watcher — dev server 500s on every route with a `statSync` ENOENT that touching `globals.css` does not clear. Only a restart does. | Documented, and the codemod scripts print the reminder rather than relying on someone re-reading this table. Do not chase it as a code bug. |
+| R5 | Landing photograph never arrives, D3 stalls. | Ship type-only. D3 blocks nothing. The photograph does not need a customer — any bakery that allows twenty minutes behind the counter will do. |
+| R6 | Reports (C3) is 137 files and could swallow the schedule. | B5 lands the palette bridge first. C3 is one owner, its own PR series. |
+| R7 | **Capacity, not enforcement, is the real reason v2 didn't ship.** 229 of 234 commits are by one author. Every "parallel" track in §4 is in fact serial, and the accounting roadmap competes for the same person. | Honest wall-clock below assumes one person. A ratchet stops drift; it does not create working days. If the schedule slips, the pre-negotiated cut line is §8. |
+| R8 | Codemod regex matches inside string literals, comments, or test fixtures. | Golden-file unit test per codemod before it runs on the tree. Per-file change log so a bad replacement is greppable rather than archaeology in a 1,900-line diff. |
+| R9 | `palette.ts` duplicates `tokens.css` values as literals, synced only by a comment. Becomes actively wrong the day dark mode lands. | Export `palette(mode)` from the start, not a single light-mode object. Cheap now, expensive after 124 call sites exist. |
+
+---
+
+## 8. Effort
+
+| Track | Human | CC |
+| --- | --- | --- |
+| A0 Ship today | ~0.75d | ~0.75h |
+| A Foundation | ~3d | ~1.5h |
+| B Codemods | ~10.5d | ~5.5h |
+| C0 Component prereqs | ~4.75d | ~2.5h |
+| C Screens | ~21d | ~10.5h |
+| D Threshold | ~4d | ~2h |
+| E States | ~8.5d | ~4.25h |
+| **Total** | **~52.5d** | **~27h** |
+
+**The total moved from ~44d to ~52.5d in design review**, entirely from work the first two drafts assumed away: token-name reconciliation (A2.1), the motion/elevation/mono-split sections nobody owned (B6), keyboard verification of a focus change across 584 components (C0.1b), confirm and toast surfaces (C0.6, C0.7), the loading sweep (E4), and partial/offline (E5). None of it is new scope — it is scope that was going to surface during implementation instead of during planning. Read it against R7: this is now ~11 weeks of one person's wall clock, which makes §8's pre-negotiated cut line the operative document, not the aspiration.
+
+**Wall-clock is ~44 days, not 31.** The first draft claimed D and E run "in parallel by a second person." 229 of 234 commits on this repo are by one author. There is no second person, so nothing is parallel and the totals add.
+
+**Read the two columns honestly.** The CC multiplier is real for Track B — codemods are exactly what an agent is good at. It is not real for Track C, where the work is judgement about 584 components on screens someone has to look at. And neither column includes the manual gates in §6. Treat ~22h CC as the floor for the mechanical half, not as an alternative total.
+
+### Pre-negotiated cut line
+
+If the schedule slips, cut in this order rather than improvising. This is roughly 40% of the effort for most of the perceived change:
+
+**Keep:** A0, A1-A5, B1-B3 (the 514-cluster plus neutrals plus brand retirement is the visible majority of 1,949), C0, C1 (POS), D1 + D4 (deleting the orbs and `components/home/` is pure subtraction, ~1h, and removes 87 hexes with no design decision), E1 + E2 on list routes only.
+
+**Cut first:** C7 super-admin (11 files, internal-only), then C6, then C3's long tail of report routes, then D3 if the photograph hasn't arrived.
+
+---
+
+## 9. Design review corrections (2026-08-17)
+
+Added by `/plan-design-review`. Everything here is a structural gap — a missing state, a broken register boundary, or a mechanism that does not work as described. Aesthetic calls were left alone.
+
+### 9.1 `data-density` is right, but a layout attribute does not reach a portal
+
+The mechanism is sound: `tokens.css:121-138` defines `--control-h` / `--field-h` / `--tap-min` / `--gutter` / `--card-pad` / `--grid-gap` per register, `:root` safely defaults to `ledger`, and `tailwind.config.proposed.ts` maps them to `h-control`, `h-field`, `min-h-tap`, `p-card`, `gap-grid`. Two things break it in practice.
+
+**A. Portals escape the register.** MIGRATION.md Phase 7 puts `data-density="counter"` on the `(pos)` layout — a `<div>` (`app/(pos)/layout.tsx:33`). Radix portals `dialog`, `sheet`, `popover`, `select`, and `dropdown-menu` to `document.body`, outside that div, where they inherit `:root`'s **ledger** values. Six POS surfaces are dialogs, and `pos-checkout-dialog.tsx` is where money is actually taken. As written, the DoD's "no tap target under 48px in the Counter register" is false on the highest-risk screen in the app, and it fails silently because the vars resolve to *something*.
+
+Fix, explicitly: a `DensityProvider` context that the route-group layout sets, and `dialog.tsx` / `sheet.tsx` / `popover.tsx` / `select.tsx` / `dropdown-menu.tsx` stamp `data-density={useDensity()}` onto their portal content. Setting the attribute on `<html>` instead also works and is one line, but it breaks the moment any counter surface renders inside a dashboard route. Do the provider.
+
+**B. Nothing states the authoring rule, so nothing enforces it.** A density register only works if controls consume the variables. Today `button.tsx:24-27` hardcodes `h-11 / h-9 / h-12 / h-11 w-11`, and a rebuilt button that hardcodes `h-9` is just as density-blind. **Rule: inside `components/ui/*`, control heights and tap minimums come from `h-control`, `h-field`, `h-row`, `min-h-tap`, `min-w-tap` — never a literal `h-*`.** Add it as an eighth ESLint selector scoped to `src/components/ui/`, flipped to `error` after C0. And C0.1 covers one primitive; the register needs all 21 that render a control.
+
+### 9.2 Interaction state coverage
+
+C0.5 and E1 closed loading and the empty/filtered/failed trio. What the plan still does not cover, worst first:
+
+| State | Covered? | What the user gets today | Where it lands |
+| --- | --- | --- | --- |
+| Loading | C0.5 primitive only | 96 files with two ad-hoc treatments | C0.5 + **E4 sweep** |
+| Empty | E1 | mostly "No items found." | E1/E2 |
+| Filtered | E1 | identical to empty | E1/E2 |
+| Failed (collection) | E1 | blank screen or raw error | E1/E2 |
+| **Failed (mutation)** | **no** | one of 103 toasts, unstyled, 4s, gone | **C0.7** |
+| **Partial** | **no** | page 2 fails; silence | **E5** |
+| **Offline** | **no** | cashier keeps ringing sales into nothing | **E5** |
+| **Destructive confirm** | **no** | zero `AlertDialog` in 584 components | **C0.6** |
+| Success | partial | toast | C0.7 |
+| Chart empty | TODOS T-I | axes with no data | T-I (accept) |
+| Screen-reader parity | TODOS T-H | three visual states, one announcement | T-H (accept) |
+
+The last two stay deferred; they are genuinely smaller than the six above.
+
+### 9.3 DESIGN.md sections the plan silently dropped
+
+| DESIGN.md | Status before review | Now |
+| --- | --- | --- |
+| §1 registers | C1, C2 | corrected — see 9.1 |
+| §2 families, mono bug | A3 | ok |
+| §2 tracking ladder, semantic scale | **dropped** | arrives with A2's `fontSize` block; state it, because B4 never applies the tokens |
+| §2 mono vs sans money split | **dropped** | **B6** |
+| §3 colour, §3.4 focus | A1, B1, C0.1 | ok |
+| §3.5 dark | cut by owner | TODOS T-A — correct |
+| §4 density, table density | C0.3, C1, C2 | ok |
+| §4 radius `0.875`→`0.625` | **unstated, ships inside A1** | **B6** — call it out at the baseline diff |
+| §4 elevation, retire `shadow-float`/`shadow-panel` | **orphaned to MIGRATION Phase 8 = dark mode = cut** | **B6** |
+| §5 motion (hover lift, 150ms curve, 0ms on tap) | **only A4's `scroll-behavior`** | **B6** |
+| §6 buttons, segmented, badges, POS tile | C0.1-C0.4 | corrected sizes — see C0.1 |
+| §7 threshold | D | ok |
+| §8 empty / first-run | E | extended — see 9.2 |
+| §9 a11y floor | A5, C1 test | corrected — see 9.4 |
+
+### 9.4 The 48px assertion cannot be a jsdom test
+
+DoD #2 says "asserted by a test." §6 says "jsdom test asserting nothing under 48px in `(pos)`." **jsdom has no layout engine and does not process Tailwind**, so `getBoundingClientRect()` returns zeros and a `className` of `h-control` carries no computed height. The test as specified can only assert on class strings, which means it asserts that someone wrote `h-control` — not that anything is 48px.
+
+Two honest options, pick one rather than discovering this at C1:
+
+- **Static assertion (cheap, ~1h).** Parse `components/pos/**` plus the six dialogs, fail on any literal `h-[0-9]`/`w-[0-9]` below 12 (48px) and on any interactive element with no `min-h-tap`. Catches regressions of the A0.1 class, which is the actual failure mode. Runs in `pnpm test` today.
+- **Real measurement (~1d, new infra).** Playwright against `/pos` and each dialog, `getBoundingClientRect()` on every `button`/`a`/`[role=button]`. Actually true, needs the headed session §6 already says cannot run unattended on Windows.
+
+Recommend the static assertion now and the Playwright version bundled with T-B, when a frozen dataset makes a headed run worth standing up.
+
+### 9.5 `pnpm verify` does not run the tests
+
+`frontend/package.json:20` — `verify` is `typecheck && lint && check:no-any && format:check`. `test` is a separate script (line 21). A0.3 puts `verify` in pre-push, so the tap-target test, the contrast script, and every existing test never run on push. Add `pnpm test` to `verify` as part of A0.3, or DoD #2's "so it cannot regress" is untrue.
+
+### 9.6 User journey — the near-term goal has no track tracing it
+
+The plan's goal is "our own staff make fewer mistakes." Every track is organised by *drift volume and file count*; none is organised by *error path*. The one mistake this plan was started over — a 28px button that charges the wrong item — was found by reading a component, not by walking a journey. The journey below is what C1, C0.6, and C0.7 should be checked against.
+
+| # | Cashier does | Feels | Where it currently breaks | Owner |
+| --- | --- | --- | --- | --- |
+| 1 | Opens `/pos`, queue of three | rushed | grid loads with an ad-hoc skeleton; `scroll-behavior: smooth` fights the flick | A4, C0.5 |
+| 2 | Taps a tile | confident | 28px Variants in the corner (fixed A0.1); out-of-stock badge and Variants can still collide on a 146px tile | T-L |
+| 3 | Adds a variant | uncertain | variants sheet is portalled → ledger density → 36px rows (9.1) | C1 |
+| 4 | Reads the running total | wants certainty | `font-mono` resolves to the OS default; the same till shows different digits on Windows and Mac | A3 |
+| 5 | Takes payment | committed | payment method is two adjacent buttons, the selected one fully black, reading as two primaries | C0.2 |
+| 6 | Charge fails (wifi) | alarmed | a 4s unstyled toast, then the cart looks unchanged; no offline indicator | C0.7, E5 |
+| 7 | Rang the wrong item | needs an undo | void fires with no confirmation and no statement of consequence | C0.6 |
+| 8 | Owner reconciles that evening | wants it to add up | trial balance renders without `tabular-nums`; decimals do not align | B4 |
+
+Steps 3, 6, and 7 were the three states with no owner before this review. They are now C1, E5, and C0.6.
+
+### 9.7 Unresolved decisions
+
+The plan already surfaced three (table-density storage in C0.3; visual gate advisory vs funded in §6; the B1/rule-6 contradiction). These are the ones it did not:
+
+| Decision | If deferred |
+| --- | --- |
+| Token naming: v3 `--canvas`/`--money-*` vs the files' v2 `--background`/`--accent-*` | **Decided in A2.1: v3 wins, v2 names survive as aliases.** Left open, A1+A2 land invalid CSS with no error |
+| Density on portals: provider vs `<html>` attribute | **Decided in 9.1: provider.** Left open, POS dialogs ship at 36px |
+| Button `default` 44px → 36px, app-wide | Engineer picks one, and either the whole app shifts vertically in an unrelated PR or POS keeps 44px controls |
+| Tap-target test: static parse vs Playwright | **Recommended in 9.4: static now.** Left open, DoD #2 is unverifiable |
+| `shadow-float` / `shadow-panel` (18 files) retirement, now that Phase 8 is cut | They live forever as deprecated aliases nobody deletes |
+| Whether `chartSeries` needs non-colour encoding | Colour-blind users read the wrong line on 55 report routes |
+| Whether Track D runs before Track E at all, now the audience is internal | See the open question below |
+
+### 9.8 Open question for the owner — Track D's position
+
+Not auto-decided, because it reverses a stated ordering.
+
+**What the plan says.** Track D (threshold: login motif, landing rebuild, auth routes, ~4d) runs "in parallel" with B/C/E, and DoD #4 makes it a gate. The cut line cuts D3 only if the photograph never arrives.
+
+**What the review recommends.** Split D. Keep **D1 + D4** exactly where they are — deleting the orbs and `components/home/` is ~1h of pure subtraction that removes 87 hexes, drops four WebGL dependencies, and needs no design decision. Move **D2, D3, D5** (~3.5d) below Track E, and drop DoD #4 from the definition of done to a follow-on milestone.
+
+**Why.** Under "our own staff make fewer mistakes," the landing page has an audience of zero and login is seen once a shift for four seconds. Those 3.5 days buy nothing internal, while E5 (offline at the counter) and C0.6 (confirm before void) buy exactly the stated goal. Track D is the *sellability* investment, and the plan's own §1 says sellability is later.
+
+**What this might be missing.** Three things, any of which makes the recommendation wrong. The owner may already have the photograph, or a shoot booked, in which case D3 is cheap and perishable. The owner may be closer to showing this to another bakery than "later" implies. And there is a morale argument the review cannot price: after two design systems that shipped nothing, a landing page you can look at may be worth more to finishing this than three days of correctness work nobody can see.
+
+**Cost if wrong.** Small and reversible either way. Deferring D costs a few weeks of an ugly landing page seen by nobody. Keeping D costs ~3.5 days at the front of a 44-day schedule that R7 already says is capacity-bound by one person.
