@@ -59,49 +59,79 @@ const TAILWIND_HUES =
 // NOTE on escaping: esquery builds a RegExp from the literal text between the
 // slashes, so these strings need ONE level of escaping, not two. `"\\b"` in
 // this source produces `\b`, which is what esquery must see.
-export const designRules = [
-  // Cleared by migration phases 5-7 (semantic + neutral codemods).
-  ...guard(
+/**
+ * Selectors grouped by rule, so each can carry its OWN severity.
+ *
+ * This grouping is the whole point. Previously all seven shipped as one
+ * `no-restricted-syntax` entry, and ESLint resolves a single severity per
+ * rule id — so there was no way to make "raw palette" a warning while making
+ * "semantic solid as text" an error. `--max-warnings 0` did not help either:
+ * it is one global integer with no rule granularity, and switching it on with
+ * all seven live would have blocked commits on 300 of 938 files (32%), and 22
+ * of the 25 files in components/pos. The third time that bites during an
+ * unrelated fix, someone types `--no-verify` and the guardrail is dead.
+ *
+ * eslint.design-plugin.mjs turns each group below into a real named rule, so
+ * a phase that clears a rule can flip that rule to "error" on its own. An
+ * error fails ESLint with exit 1 regardless of --max-warnings, which means
+ * lint-staged blocks the commit for free.
+ *
+ * See docs/design/MIGRATION.md for the flip schedule.
+ */
+export const designRuleGroups = {
+  // Cleared by the semantic + neutral codemods (MIGRATION phases 2-3).
+  "no-raw-palette": guard(
     `\\b${TAILWIND_PREFIX}-${TAILWIND_HUES}-\\d{2,3}\\b`,
-    "No raw Tailwind palette colors. Use design tokens: foreground, foreground-muted, card, muted, border, accent, warning, danger, info. See DESIGN.md section 3.",
+    "No raw Tailwind palette colors. Use design tokens: foreground, foreground-muted, card, muted, border, money, warning, danger, info. See DESIGN.md section 3.",
   ),
 
-  // Cleared by migration phase 9 (chart + 3D palette bridge).
-  ...guard(
+  // Cleared by the chart + 3D palette bridge (MIGRATION phase 6).
+  "no-hex-in-class": guard(
     "#[0-9a-fA-F]{3,8}\\b",
     "No hardcoded hex in class strings. Use a design token. Canvas and WebGL colors, which cannot read CSS variables, import from @/lib/design/palette.",
   ),
 
-  // Cleared by migration phase 8 (typography discipline).
-  ...guard(
+  // Cleared by typography discipline (MIGRATION phase 5).
+  "no-heavy-weight": guard(
     "\\bfont-(black|extrabold)\\b",
     "Weights above 600 are not in the type system; 500 is the workhorse. See DESIGN.md section 2.",
   ),
 
-  // DESIGN.md section 2: "No uppercase. No positive letterspacing. Ever."
+  // DESIGN.md section 2: no uppercase in-app. The one permitted exception is
+  // a single mono eyebrow on a threshold screen, which takes an inline
+  // eslint-disable-next-line with a reason.
+  //
   // Banned outright rather than paired with a tracking check, because
   // cn("uppercase", cond && "tracking-[0.12em]") splits the two utilities
   // across separate nodes and no single-node lookahead can see both.
-  ...guard(
+  "no-uppercase": guard(
     "\\buppercase\\b",
     "Uppercase is not in the type system. Use sentence case at text-meta in text-foreground-muted. See DESIGN.md section 2.",
   ),
 
   // Matches only sub-12px: 0.0-0.74rem, 0-9px, 10-11px. text-[14px] is fine.
-  ...guard(
+  "no-sub-12px": guard(
     "text-\\[0\\.[0-6]\\d*rem\\]|text-\\[0\\.7[0-4]\\d*rem\\]|text-\\[[0-9]px\\]|text-\\[1[01]px\\]",
     "12px is the minimum readable size. Use text-meta or larger. See DESIGN.md section 2.",
   ),
 
   // The -solid values are fills, icons and borders. Each semantic role has a
-  // -text pair that clears 6.7:1 on its own tint.
-  ...guard(
+  // -text pair that clears 6.5:1 on its own tint. Near-clean today, which is
+  // why this one ships at "error" immediately.
+  "no-solid-as-text": guard(
     "\\btext-(warning|danger|info)\\b(?!-)",
     "Semantic solid values are fills, not text. Use text-danger-text, text-warning-text or text-info-text. See DESIGN.md section 3.",
   ),
 
-  ...guard(
+  // Also near-clean today, so also ships at "error".
+  "no-disabled-as-content": guard(
     "\\btext-foreground-disabled\\b",
-    "foreground-disabled is 3.15:1 and fails WCAG AA. Placeholders and disabled state only, never content. Use text-foreground-muted.",
+    "foreground-disabled is ~3.1:1 and fails WCAG AA. Placeholders and disabled state only, never content. Use text-foreground-muted.",
   ),
-];
+};
+
+/**
+ * Flattened form, kept for anything that still wants a single
+ * `no-restricted-syntax` array. The plugin is the supported path.
+ */
+export const designRules = Object.values(designRuleGroups).flat();

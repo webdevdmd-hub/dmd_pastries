@@ -1,0 +1,53 @@
+#!/bin/sh
+#
+# Pre-push gate.
+#
+# ORDER MATTERS. Git LFS owns .git/hooks/pre-push by default, and
+# frontend/scripts/install-hooks.mjs copies every file in this directory over
+# .git/hooks/ unconditionally. So the moment this file exists, it REPLACES the
+# LFS hook. If it does not call LFS itself, pushes silently stop uploading LFS
+# objects: pointer files land on the remote with no blobs behind them, and
+# nobody finds out until a tracked file fails to check out somewhere else.
+# .gitattributes tracks *.psd, so this is live, not theoretical.
+#
+# install-hooks.mjs's own header warns about this same hazard for
+# core.hooksPath. The copy path reaches the identical outcome.
+#
+# Everything below LFS is best-effort and must never block a push for
+# environmental reasons — no pnpm, no frontend changes, not a frontend repo.
+# A gate that fires spuriously gets bypassed with --no-verify, and --no-verify
+# turns off the LFS chaining above too.
+
+set -e
+
+# 1. Git LFS first, always, whatever happens after.
+if command -v git-lfs >/dev/null 2>&1; then
+  git lfs pre-push "$@"
+fi
+
+# 2. Skip the frontend gate entirely when this push has no frontend changes.
+#    @{u} fails on a branch with no upstream (the first push of a new branch),
+#    in which case we fall back to comparing against the default branch.
+if range=$(git rev-parse --verify --quiet '@{u}' 2>/dev/null); then
+  changed=$(git diff --name-only '@{u}..' 2>/dev/null || echo "")
+else
+  changed=$(git diff --name-only origin/main... 2>/dev/null || echo "")
+fi
+
+# Empty means we could not work out a range. Run the checks rather than skip
+# them: a false positive costs a minute, a false negative costs a broken main.
+if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -q '^frontend/'; then
+  exit 0
+fi
+
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "pre-push: pnpm not found on PATH, skipping frontend checks" >&2
+  exit 0
+fi
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root/frontend"
+
+echo "pre-push: running frontend verify + tests..."
+pnpm verify
+pnpm test

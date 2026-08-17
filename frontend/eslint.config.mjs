@@ -7,7 +7,7 @@ import simpleImportSortPlugin from "eslint-plugin-simple-import-sort";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-import { designRules } from "./eslint.design-rules.mjs";
+import { designPlugin, designRuleSeverity } from "./eslint.design-plugin.mjs";
 
 const config = tseslint.config(
   {
@@ -16,6 +16,7 @@ const config = tseslint.config(
       "coverage/**",
       "dist/**",
       "eslint.config.mjs",
+      "eslint.design-plugin.mjs",
       "eslint.design-rules.mjs",
       "next-env.d.ts",
       "node_modules/**",
@@ -77,13 +78,15 @@ const config = tseslint.config(
     },
   },
   {
-    // Design system guardrails. All at "warn" during the migration; each rule
-    // flips to "error" in the phase that clears it. See eslint.design-rules.mjs
-    // and docs/design/MIGRATION.md.
+    // Design system guardrails, one named rule each so severity is per-rule.
+    // A rule flips to "error" in the commit that lands the phase clearing it;
+    // an error fails eslint with exit 1, so lint-staged blocks the commit
+    // without needing --max-warnings. Severities live in
+    // eslint.design-plugin.mjs; the flip schedule is in
+    // docs/design/MIGRATION.md.
     files: ["src/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-syntax": ["warn", ...designRules],
-    },
+    plugins: { design: designPlugin },
+    rules: designRuleSeverity,
   },
   prettierConfig,
 );
