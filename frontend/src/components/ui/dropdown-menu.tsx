@@ -4,6 +4,7 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronRight, Circle } from "lucide-react";
 import * as React from "react";
 
+import { useDensity } from "@/components/density/density-provider";
 import { cn } from "@/lib/utils/cn";
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
@@ -55,6 +56,7 @@ const DropdownMenuContent = React.forwardRef<
 >(({ className, sideOffset = 8, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
     <DropdownMenuPrimitive.Content
+      data-density={useDensity()}
       ref={ref}
       sideOffset={sideOffset}
       className={cn(

@@ -54,12 +54,10 @@ export function POSQuickCustomerDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent className="rounded-lg border-zinc-300 bg-white text-zinc-950 shadow-lg">
+      <DialogContent className="rounded-lg border-border bg-card text-foreground shadow-lg">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-black tracking-tight">
-            Quick create customer
-          </DialogTitle>
-          <DialogDescription className="text-zinc-600">
+          <DialogTitle className="text-title">Quick create customer</DialogTitle>
+          <DialogDescription className="text-foreground-muted">
             Create a customer during billing and select them for this cart.
           </DialogDescription>
         </DialogHeader>
@@ -72,45 +70,51 @@ export function POSQuickCustomerDialog({
           <label className="grid gap-2">
             <Label htmlFor="pos-customer-name">Full name</Label>
             <Input
-              className="rounded-md border-zinc-300 bg-white shadow-none focus-visible:ring-black"
+              className="rounded-md border-border bg-card shadow-none focus-visible:ring-black"
               id="pos-customer-name"
               {...form.register("fullName")}
             />
             {form.formState.errors.fullName?.message ? (
-              <span className="text-sm text-red-700">{form.formState.errors.fullName.message}</span>
+              <span className="text-sm text-danger-text">
+                {form.formState.errors.fullName.message}
+              </span>
             ) : null}
           </label>
           <label className="grid gap-2">
             <Label htmlFor="pos-customer-phone">Phone</Label>
             <Input
-              className="rounded-md border-zinc-300 bg-white shadow-none focus-visible:ring-black"
+              className="rounded-md border-border bg-card shadow-none focus-visible:ring-black"
               id="pos-customer-phone"
               {...form.register("phone")}
             />
             {form.formState.errors.phone?.message ? (
-              <span className="text-sm text-red-700">{form.formState.errors.phone.message}</span>
+              <span className="text-sm text-danger-text">
+                {form.formState.errors.phone.message}
+              </span>
             ) : null}
           </label>
           <label className="grid gap-2">
             <Label htmlFor="pos-customer-email">Email</Label>
             <Input
-              className="rounded-md border-zinc-300 bg-white shadow-none focus-visible:ring-black"
+              className="rounded-md border-border bg-card shadow-none focus-visible:ring-black"
               id="pos-customer-email"
               type="email"
               {...form.register("email")}
             />
             {form.formState.errors.email?.message ? (
-              <span className="text-sm text-red-700">{form.formState.errors.email.message}</span>
+              <span className="text-sm text-danger-text">
+                {form.formState.errors.email.message}
+              </span>
             ) : null}
           </label>
-          <p className="text-xs leading-5 text-zinc-600">
+          <p className="text-xs leading-5 text-foreground-muted">
             Phone or email is optional for quick walk-in capture, but recommended for future lookup.
             If an active customer already exists with the same contact, the backend returns that
             profile and it will be selected.
           </p>
           <DialogFooter>
             <Button
-              className="rounded-md border-zinc-300 bg-white text-zinc-950 hover:bg-zinc-100"
+              className="rounded-md border-border bg-card text-foreground hover:bg-muted"
               disabled={isSubmitting}
               onClick={onClose}
               type="button"
@@ -119,7 +123,7 @@ export function POSQuickCustomerDialog({
               Cancel
             </Button>
             <Button
-              className="rounded-md bg-black text-white hover:bg-zinc-900"
+              className="rounded-md bg-primary text-primary-foreground hover:bg-primary"
               disabled={isSubmitting}
               type="submit"
             >

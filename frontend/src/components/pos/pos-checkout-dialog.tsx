@@ -51,15 +51,15 @@ function formatMoney(value: number): string {
 
 function feedbackClassName(feedback: CheckoutFeedback): string {
   if (feedback.tone === "success") {
-    return "border-green-200 bg-green-50 text-green-800";
+    return "border-money/30 bg-money-tint text-money-text";
   }
   if (feedback.tone === "warning") {
-    return "border-amber-200 bg-amber-50 text-amber-800";
+    return "border-warning/30 bg-warning-tint text-warning-text";
   }
   if (feedback.tone === "info") {
-    return "border-blue-200 bg-blue-50 text-blue-800";
+    return "border-info/30 bg-info-tint text-info-text";
   }
-  return "border-red-200 bg-red-50 text-red-800";
+  return "border-danger/30 bg-danger-tint text-danger-text";
 }
 
 export function POSCheckoutDialog({
@@ -88,16 +88,16 @@ export function POSCheckoutDialog({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="scrollbar-hidden bottom-5 left-auto right-5 top-auto max-h-[calc(100vh-7rem)] w-[calc(100vw-2.5rem)] max-w-[440px] translate-x-0 translate-y-0 overflow-y-auto rounded-lg border-zinc-300 bg-white p-5 text-zinc-950 shadow-lg xl:max-w-[460px] 2xl:max-w-[480px]">
+      <DialogContent className="scrollbar-hidden bottom-5 left-auto right-5 top-auto max-h-[calc(100vh-7rem)] w-[calc(100vw-2.5rem)] max-w-[440px] translate-x-0 translate-y-0 overflow-y-auto rounded-lg border-border bg-card p-5 text-foreground shadow-lg xl:max-w-[460px] 2xl:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-black tracking-tight">Checkout</DialogTitle>
-          <DialogDescription className="text-zinc-600">
+          <DialogTitle className="text-title">Checkout</DialogTitle>
+          <DialogDescription className="text-foreground-muted">
             Apply sale discount, split payment methods, and confirm the final checkout.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="rounded-lg border border-zinc-300 bg-zinc-50 p-4">
+          <div className="rounded-lg border border-border bg-muted p-4">
             <POSDiscountControl
               label="Sale discount"
               onChange={onSaleDiscountChange}
@@ -106,7 +106,7 @@ export function POSCheckoutDialog({
             />
           </div>
 
-          <div className="rounded-lg border border-zinc-300 bg-zinc-50 p-4">
+          <div className="rounded-lg border border-border bg-muted p-4">
             <DocumentChargesEditor
               charges={charges}
               compact
@@ -126,7 +126,7 @@ export function POSCheckoutDialog({
             total={totals.total}
           />
 
-          <div className="rounded-lg border border-zinc-300 bg-white p-4 font-mono text-sm">
+          <div className="rounded-lg border border-border bg-card p-4 font-mono text-sm">
             <div className="flex justify-between">
               <span>Subtotal</span>
               <strong>{formatMoney(totals.subtotal)}</strong>
@@ -151,7 +151,7 @@ export function POSCheckoutDialog({
                 </div>
               </>
             ) : null}
-            <div className="mt-3 flex justify-between border-t border-zinc-300 pt-3 text-lg">
+            <div className="mt-3 flex justify-between border-t border-border pt-3 text-lg">
               <span>Total</span>
               <strong>{formatMoney(totals.total)}</strong>
             </div>
@@ -163,7 +163,7 @@ export function POSCheckoutDialog({
               <span>Balance</span>
               <strong>{formatMoney(totals.balanceDue)}</strong>
             </div>
-            <div className="flex justify-between text-green-800">
+            <div className="flex justify-between text-money-text">
               <span>Change</span>
               <strong>{formatMoney(totals.changeAmount)}</strong>
             </div>
@@ -175,14 +175,14 @@ export function POSCheckoutDialog({
             className={`rounded-md border px-3 py-2 text-sm font-semibold ${feedbackClassName(feedback)}`}
             role={feedback.tone === "error" ? "alert" : "status"}
           >
-            <p className="font-black">{feedback.title}</p>
+            <p className="font-medium">{feedback.title}</p>
             <p className="mt-1 leading-5">{feedback.message}</p>
           </div>
         ) : null}
 
         <DialogFooter>
           <Button
-            className="rounded-md border-zinc-300 bg-white text-zinc-950 hover:bg-zinc-100"
+            className="rounded-md border-border bg-card text-foreground hover:bg-muted"
             onClick={() => onOpenChange(false)}
             type="button"
             variant="outline"
@@ -190,7 +190,7 @@ export function POSCheckoutDialog({
             Cancel
           </Button>
           <Button
-            className="rounded-md bg-black text-white hover:bg-zinc-900"
+            className="rounded-md bg-primary text-primary-foreground hover:bg-primary"
             disabled={cannotConfirm}
             onClick={onConfirm}
             type="button"

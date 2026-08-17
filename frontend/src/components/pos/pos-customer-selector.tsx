@@ -81,10 +81,10 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
   return (
     <div className="grid h-full min-w-0 grid-rows-[24px_36px] gap-1">
       <div className="flex h-6 items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">
+        <span className="text-meta flex items-center gap-2 text-foreground-muted">
           Customer
           {value && creditBalance > 0 ? (
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-bold normal-case tracking-normal text-emerald-800">
+            <span className="text-meta rounded-full bg-money-tint px-2 py-0.5 font-medium tabular-nums text-money-text">
               Credit{" "}
               {new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(
                 creditBalance,
@@ -93,7 +93,7 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
           ) : null}
         </span>
         <Button
-          className="h-6 rounded-md px-2 text-xs text-zinc-950 hover:bg-zinc-100"
+          className="text-meta h-6 rounded px-2 text-foreground hover:bg-muted"
           onClick={() => setQuickCreateOpen(true)}
           type="button"
           variant="ghost"
@@ -105,7 +105,7 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
 
       <SearchableSelect
         ariaLabel="Select POS customer"
-        contentClassName="rounded-md border-zinc-300 bg-white"
+        contentClassName="rounded-md border-border bg-card"
         emptyMessage={
           search.trim().length < 2
             ? "Type at least 2 characters to search customers."
@@ -134,7 +134,7 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
         searchPlaceholder="Search by name, code, phone, or email..."
         searchValue={search}
         showSelectedDescription={false}
-        triggerClassName="h-9 min-h-9 rounded-md border-zinc-300 bg-white text-sm shadow-none hover:bg-zinc-50 focus-visible:ring-black"
+        triggerClassName="h-9 min-h-9 rounded-md border-border bg-card text-sm shadow-none hover:bg-muted focus-visible:ring-black"
         value={value}
       />
 

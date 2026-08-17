@@ -35,11 +35,11 @@ export function POSProductGrid({
 
   if (error) {
     return (
-      <div className="flex min-h-80 flex-col items-center justify-center rounded-lg border border-red-200 bg-red-50 p-8 text-center text-red-800">
+      <div className="flex min-h-80 flex-col items-center justify-center rounded-lg border border-danger/30 bg-danger-tint p-8 text-center text-danger-text">
         <p className="font-semibold">Unable to load POS products</p>
         <p className="mt-1 text-sm">{error.message}</p>
         <Button
-          className="mt-4 rounded-md border-red-200 bg-white text-red-800 hover:bg-red-50"
+          className="mt-4 rounded-md border-danger/30 bg-card text-danger-text hover:bg-danger-tint"
           onClick={onRetry}
           type="button"
           variant="outline"
@@ -53,10 +53,10 @@ export function POSProductGrid({
 
   if (products.length === 0) {
     return (
-      <div className="flex min-h-80 items-center justify-center rounded-lg border border-dashed border-[#c8c5ca] bg-white p-8 text-center">
+      <div className="flex min-h-80 items-center justify-center rounded-lg border border-dashed border-border bg-card p-8 text-center">
         <div>
-          <p className="font-semibold text-zinc-950">No POS products found.</p>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="font-semibold text-foreground">No POS products found.</p>
+          <p className="mt-1 text-sm text-foreground-muted">
             Active POS-visible products will appear here.
           </p>
         </div>
@@ -77,13 +77,13 @@ export function POSProductGrid({
       ))}
       {canCreateOrder && onCreateOrder ? (
         <Button
-          className="flex min-h-[14.5rem] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-400 bg-zinc-50 text-zinc-600 shadow-none hover:border-black hover:bg-white hover:text-black"
+          className="flex min-h-[14.5rem] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted text-foreground-muted shadow-none hover:border-black hover:bg-card hover:text-foreground"
           onClick={onCreateOrder}
           type="button"
           variant="outline"
         >
           <CalendarPlus className="h-8 w-8" />
-          <span className="text-sm font-black">Create Order</span>
+          <span className="text-body font-medium">Create Order</span>
         </Button>
       ) : null}
     </div>

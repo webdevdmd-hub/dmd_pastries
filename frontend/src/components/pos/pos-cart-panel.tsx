@@ -88,23 +88,21 @@ export function POSCartPanel({
   const selectedChannel = salesChannels.find((channel) => channel.id === salesChannelId) ?? null;
 
   return (
-    <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-zinc-950">
-      <div className="grid shrink-0 grid-cols-1 gap-2 border-b border-zinc-300 p-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="min-w-0 rounded-md border border-zinc-300 bg-white p-2.5">
+    <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-card text-foreground">
+      <div className="grid shrink-0 grid-cols-1 gap-2 border-b border-border p-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="min-w-0 rounded-md border border-border bg-card p-2.5">
           <POSCustomerSelector onChange={onCustomerChange} value={customerId} />
         </div>
 
-        <div className="grid min-w-0 grid-rows-[24px_36px] gap-1 rounded-md border border-zinc-300 bg-white p-2.5">
-          <div className="flex h-6 items-center gap-2 text-zinc-600">
+        <div className="grid min-w-0 grid-rows-[24px_36px] gap-1 rounded-md border border-border bg-card p-2.5">
+          <div className="flex h-6 items-center gap-2 text-foreground-muted">
             <Store className="h-4 w-4" />
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-zinc-500">
-              Sales Channel
-            </p>
+            <p className="text-meta text-foreground-muted">Sales channel</p>
           </div>
           <SearchableSelect
             ariaLabel="Select sales channel"
             clearable={false}
-            contentClassName="rounded-md border-zinc-300 bg-white"
+            contentClassName="rounded-md border-border bg-card"
             emptyMessage="No sales channels found."
             onValueChange={(value) =>
               onSalesChannelChange(!value || value === defaultChannelValue ? "" : value)
@@ -133,13 +131,13 @@ export function POSCartPanel({
             placeholder="Default channel"
             searchPlaceholder="Search channels..."
             showSelectedDescription={false}
-            triggerClassName="h-9 min-h-9 rounded-md border-zinc-300 bg-zinc-50 text-sm font-semibold shadow-none hover:bg-white focus-visible:ring-black"
+            triggerClassName="h-9 min-h-9 rounded-md border-border bg-muted text-sm font-semibold shadow-none hover:bg-card focus-visible:ring-ring"
             value={salesChannelId || defaultChannelValue}
           />
         </div>
         {selectedChannel?.requiresExternalOrderNumber ? (
           <Input
-            className="h-9 rounded-md border-zinc-300 bg-white font-mono text-sm shadow-none focus-visible:ring-black sm:col-span-2"
+            className="h-9 rounded-md border-border bg-card font-mono text-sm shadow-none focus-visible:ring-ring sm:col-span-2"
             onChange={(event) => onExternalOrderNumberChange(event.target.value)}
             placeholder="External order number"
             value={externalOrderNumber}
@@ -148,12 +146,12 @@ export function POSCartPanel({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex shrink-0 items-center justify-between border-b border-zinc-300 bg-zinc-50 px-4 py-2.5">
+        <div className="flex shrink-0 items-center justify-between border-b border-border bg-muted px-4 py-2.5">
           <div>
-            <p className="text-sm font-black text-zinc-950">Cart</p>
-            <p className="text-xs text-zinc-500">Active billing session</p>
+            <p className="text-body font-medium text-foreground">Cart</p>
+            <p className="text-xs text-foreground-muted">Active billing session</p>
           </div>
-          <p className="font-mono text-sm font-black text-zinc-950">{itemCountLabel}</p>
+          <p className="font-mono text-body font-medium text-foreground">{itemCountLabel}</p>
         </div>
 
         <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3">
@@ -175,27 +173,33 @@ export function POSCartPanel({
         </div>
       </div>
 
-      <div className="shrink-0 space-y-2 border-t border-zinc-300 bg-white p-3">
+      <div className="shrink-0 space-y-2 border-t border-border bg-card p-3">
         {items.length > 0 ? (
           <DocumentChargesEditor
             charges={charges}
-            className="border-b border-zinc-300 pb-2"
+            className="border-b border-border pb-2"
             compact
             onChange={onChargesChange}
             taxRates={taxRates}
           />
         ) : null}
-        <div className="flex items-center justify-between gap-2 border-b border-zinc-300 pb-2">
-          <span className="text-xs font-bold uppercase tracking-[0.14em] text-zinc-500">VAT</span>
-          <div className="flex gap-1">
+        <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
+          <span className="text-meta text-foreground-muted">VAT</span>
+          {/* Segmented control, not a row of buttons. Previously the selected
+              option was a solid black fill and the rest were outlines, so a
+              mode *indicator* read as several competing primary actions next to
+              the real one. A muted track with a raised card thumb says "one of
+              these is current" instead. DESIGN.md §6. */}
+          <div className="inline-flex gap-0.5 rounded-md bg-muted p-0.5" role="group">
             {taxModeOptions
               .filter((option) => option.value !== "no_tax" || canApplyNoTax)
               .map((option) => (
                 <button
-                  className={`rounded-md border px-2 py-1 text-[0.68rem] font-bold ${
+                  aria-pressed={taxMode === option.value}
+                  className={`text-meta rounded px-2.5 py-1 font-medium transition-colors ${
                     taxMode === option.value
-                      ? "border-zinc-950 bg-zinc-950 text-white"
-                      : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-100"
+                      ? "bg-card text-foreground shadow-xs"
+                      : "text-foreground-muted hover:text-foreground"
                   }`}
                   key={option.label}
                   onClick={() => onTaxModeChange(option.value)}
@@ -206,59 +210,64 @@ export function POSCartPanel({
               ))}
           </div>
         </div>
-        <div className="space-y-1.5 border-b border-zinc-300 pb-2.5">
+        <div className="space-y-1.5 border-b border-border pb-2.5">
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between">
-              <span className="text-zinc-600">Subtotal</span>
-              <span className="font-mono font-bold text-zinc-950">
+              <span className="text-foreground-muted">Subtotal</span>
+              <span className="font-mono font-medium tabular-nums text-foreground">
                 {formatMoney(totals.subtotal)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-zinc-600">Discount</span>
-              <span className="font-mono font-bold text-zinc-950">
+              <span className="text-foreground-muted">Discount</span>
+              <span className="font-mono font-medium tabular-nums text-foreground">
                 {formatMoney(totals.discountAmount)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-zinc-600">Item tax</span>
-              <span className="font-mono font-bold text-zinc-950">
+              <span className="text-foreground-muted">Item tax</span>
+              <span className="font-mono font-medium tabular-nums text-foreground">
                 {formatMoney(totals.taxAmount)}
               </span>
             </div>
             {totals.chargeAmount > 0 || totals.chargeTaxAmount > 0 ? (
               <>
                 <div className="flex justify-between">
-                  <span className="text-zinc-600">Charges</span>
-                  <span className="font-mono font-bold text-zinc-950">
+                  <span className="text-foreground-muted">Charges</span>
+                  <span className="font-mono font-medium tabular-nums text-foreground">
                     {formatMoney(totals.chargeAmount)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-600">Charge tax</span>
-                  <span className="font-mono font-bold text-zinc-950">
+                  <span className="text-foreground-muted">Charge tax</span>
+                  <span className="font-mono font-medium tabular-nums text-foreground">
                     {formatMoney(totals.chargeTaxAmount)}
                   </span>
                 </div>
               </>
             ) : null}
-            <div className="mt-2 flex items-center justify-between border-t border-zinc-300 pt-2">
-              <span className="text-base font-black text-zinc-950">Total Payable</span>
-              <span className="font-mono text-lg font-black text-zinc-950">
+            {/* The total is the one thing on this screen a cashier reads from a
+                metre away, so it gets the size instead of the weight: 32px mono
+                at -0.045em tracking, weight 500. Previously it was 18px at
+                weight 900 competing with five other font-medium elements.
+                DESIGN.md §2 (text-total). */}
+            <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-border pt-2">
+              <span className="text-body font-medium text-foreground">Total payable</span>
+              <span className="text-total font-mono tabular-nums text-foreground">
                 {formatMoney(totals.total)}
               </span>
             </div>
             {totals.paidAmount > 0 ? (
-              <div className="grid grid-cols-2 gap-2 border-t border-zinc-300 pt-1.5 text-xs">
-                <div className="flex justify-between text-zinc-600">
+              <div className="grid grid-cols-2 gap-2 border-t border-border pt-1.5 text-xs">
+                <div className="flex justify-between text-foreground-muted">
                   <span>Paid</span>
-                  <span className="font-mono font-semibold text-zinc-950">
+                  <span className="font-mono font-medium tabular-nums text-foreground">
                     {formatMoney(totals.paidAmount)}
                   </span>
                 </div>
-                <div className="flex justify-between text-zinc-600">
+                <div className="flex justify-between text-foreground-muted">
                   <span>Change</span>
-                  <span className="font-mono font-semibold text-zinc-950">
+                  <span className="font-mono font-medium tabular-nums text-foreground">
                     {formatMoney(totals.changeAmount)}
                   </span>
                 </div>
@@ -268,7 +277,7 @@ export function POSCartPanel({
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Button
-            className="h-10 rounded-md border-zinc-300 bg-white text-sm font-black text-zinc-950 shadow-none hover:bg-zinc-100"
+            className="min-h-tap text-body rounded border-border bg-card font-medium text-foreground shadow-none hover:bg-muted"
             onClick={onHoldSale}
             type="button"
             variant="outline"
@@ -277,7 +286,7 @@ export function POSCartPanel({
             Hold / Resume
           </Button>
           <Button
-            className="h-10 rounded-md border-zinc-300 bg-white text-sm font-black text-red-700 shadow-none hover:bg-red-50"
+            className="min-h-tap text-body rounded border-border bg-card font-medium text-danger-text shadow-none hover:border-danger hover:bg-danger-tint"
             disabled={items.length === 0}
             onClick={onClear}
             type="button"
@@ -287,17 +296,29 @@ export function POSCartPanel({
             Clear
           </Button>
         </div>
+        {/* The commit action: the one saturated thing on the screen, because it
+            is the one control that moves money (DESIGN.md §3.2, §6). It was a
+            black fill, identical in weight to Exit POS in the header, so nothing
+            marked the difference between leaving the till and taking payment.
+            The label now carries the amount — a cashier confirms the figure on
+            the button against the customer's receipt, not just the word. */}
         <Button
-          className="h-14 w-full rounded-md bg-black text-base font-black text-white shadow-none hover:bg-zinc-900"
+          className="text-body h-14 w-full rounded bg-money font-medium text-primary-foreground shadow-none hover:bg-money-hover disabled:bg-muted disabled:text-foreground-disabled"
           disabled={!canSell || items.length === 0 || isCheckingOut}
           onClick={onCheckout}
           type="button"
         >
-          {isCheckingOut
-            ? "Processing..."
-            : canSell
-              ? "Complete checkout"
-              : "Sell permission required"}
+          {isCheckingOut ? (
+            "Processing..."
+          ) : !canSell ? (
+            "Sell permission required"
+          ) : items.length === 0 ? (
+            "Charge"
+          ) : (
+            <>
+              Charge <span className="font-mono tabular-nums">{formatMoney(totals.total)}</span>
+            </>
+          )}
           <ArrowRight className="ml-3 h-6 w-6" />
         </Button>
       </div>

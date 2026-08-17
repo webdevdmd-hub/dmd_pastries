@@ -804,9 +804,9 @@ export function POSWorkspace(): JSX.Element {
   );
 
   return (
-    <div className="flex h-screen min-h-[42rem] w-full flex-col overflow-hidden bg-[#f9f9fa] font-sans text-zinc-950">
+    <div className="flex h-screen min-h-[42rem] w-full flex-col overflow-hidden bg-canvas font-sans text-foreground">
       <POSTopBar branchName={branchName} cashierName={user?.fullName ?? "Cashier"} />
-      <main className="grid min-h-0 flex-1 border-y border-zinc-300 lg:grid-cols-[144px_minmax(0,1fr)_480px] xl:grid-cols-[152px_minmax(0,1fr)_520px]">
+      <main className="grid min-h-0 flex-1 border-y border-border lg:grid-cols-[144px_minmax(0,1fr)_480px] xl:grid-cols-[152px_minmax(0,1fr)_520px]">
         {!branchScope.hasBranchScope ? (
           <section className="col-span-full flex items-center justify-center">
             <div className="w-full max-w-2xl">
@@ -823,8 +823,16 @@ export function POSWorkspace(): JSX.Element {
               />
             </div>
 
-            <section className="scrollbar-hidden min-h-0 overflow-y-auto border-r border-zinc-300 bg-[#f9f9fa]">
-              <div className="sticky top-0 z-10 grid gap-2 border-b border-zinc-300 bg-white px-3 py-2.5 md:grid-cols-4">
+            <section className="scrollbar-hidden min-h-0 overflow-y-auto border-r border-border bg-canvas">
+              {/* `md:grid-cols-4` gave the two text inputs the same width as a
+                  button. At counter width the product column is only ~400px, so
+                  each cell was ~95px and both fields clipped their own
+                  placeholders mid-word ("Searc", "Barco").
+                  Four controls do not fit on one row at that width, so they wrap
+                  to two: the fields share row 1, the two toggles share row 2.
+                  Only at 2xl, where the column is genuinely wide, do all four sit
+                  inline with the fields taking the slack. */}
+              <div className="sticky top-0 z-10 grid gap-2 border-b border-border bg-card px-3 py-2.5 md:grid-cols-2 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
                 <POSProductSearch onChange={setSearch} value={search} />
                 <POSBarcodeInput
                   inputRef={barcodeInputRef}
@@ -833,16 +841,16 @@ export function POSWorkspace(): JSX.Element {
                   }}
                 />
                 <Button
-                  className="h-10 w-full justify-center whitespace-nowrap rounded-md border-zinc-300 bg-white px-2.5 text-xs font-black text-zinc-950 shadow-none hover:bg-zinc-100"
+                  className="text-meta min-h-tap w-full justify-center whitespace-nowrap rounded border-border bg-card px-3 font-medium text-foreground shadow-none hover:bg-muted"
                   disabled={!canCreateBakeryOrder}
                   onClick={() => setCreateOrderOpen(true)}
                   type="button"
                   variant="outline"
                 >
                   <CalendarPlus className="h-4 w-4" />
-                  Create Order
+                  Create order
                 </Button>
-                <label className="flex h-10 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-zinc-300 bg-white px-2.5 text-xs font-black text-zinc-700">
+                <label className="text-meta min-h-tap flex w-full items-center justify-center gap-2 whitespace-nowrap rounded border border-border bg-card px-3 font-medium text-foreground-muted">
                   <Checkbox
                     checked={showPrices}
                     onCheckedChange={(checked) => setShowPrices(checked === true)}
@@ -850,9 +858,9 @@ export function POSWorkspace(): JSX.Element {
                   Show prices
                 </label>
               </div>
-              <div className="flex gap-2 overflow-x-auto border-b border-zinc-300 bg-white px-3 py-2 lg:hidden">
+              <div className="flex gap-2 overflow-x-auto border-b border-border bg-card px-3 py-2 lg:hidden">
                 <Button
-                  className="rounded-md border-zinc-300"
+                  className="rounded-md border-border"
                   onClick={() => setCategoryId("all")}
                   type="button"
                   variant={categoryId === "all" ? "default" : "outline"}
@@ -864,7 +872,7 @@ export function POSWorkspace(): JSX.Element {
 
                   return (
                     <Button
-                      className="rounded-md border-zinc-300"
+                      className="rounded-md border-border"
                       key={category.id}
                       onClick={() => setCategoryId(category.id)}
                       type="button"
@@ -902,7 +910,7 @@ export function POSWorkspace(): JSX.Element {
       </main>
 
       <Button
-        className="fixed bottom-4 right-4 z-20 h-14 rounded-md bg-black px-5 font-black text-white shadow-lg hover:bg-zinc-900 lg:hidden"
+        className="fixed bottom-4 right-4 z-20 h-14 rounded-md bg-primary px-5 font-medium text-primary-foreground shadow-lg hover:bg-primary lg:hidden"
         onClick={() => setMobileCartOpen(true)}
         type="button"
       >
@@ -911,7 +919,7 @@ export function POSWorkspace(): JSX.Element {
       </Button>
 
       <Sheet onOpenChange={setMobileCartOpen} open={mobileCartOpen}>
-        <SheetContent className="w-full border-zinc-300 bg-white p-0 sm:max-w-md" side="right">
+        <SheetContent className="w-full border-border bg-card p-0 sm:max-w-md" side="right">
           <SheetHeader className="sr-only">
             <SheetTitle>POS cart</SheetTitle>
             <SheetDescription>Review active cart items and checkout controls.</SheetDescription>
@@ -924,13 +932,11 @@ export function POSWorkspace(): JSX.Element {
         onOpenChange={(open) => !open && setVariantProduct(null)}
         open={variantProduct !== null}
       >
-        <DialogContent className="max-w-[34rem] rounded-lg border-zinc-300 bg-white p-0 text-zinc-950 shadow-lg">
-          <div className="border-b border-zinc-300 bg-zinc-50 px-5 py-4">
+        <DialogContent className="max-w-[34rem] rounded-lg border-border bg-card p-0 text-foreground shadow-lg">
+          <div className="border-b border-border bg-muted px-5 py-4">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tight">
-                Choose a variant
-              </DialogTitle>
-              <DialogDescription className="text-zinc-600">
+              <DialogTitle className="text-title">Choose a variant</DialogTitle>
+              <DialogDescription className="text-foreground-muted">
                 {variantProduct?.productName}
               </DialogDescription>
             </DialogHeader>
@@ -960,7 +966,7 @@ export function POSWorkspace(): JSX.Element {
 
                 return (
                   <Button
-                    className="h-auto items-center justify-between gap-4 rounded-lg border-zinc-300 bg-white p-3 text-left shadow-none transition hover:border-zinc-500 hover:bg-zinc-50 disabled:border-red-200 disabled:bg-red-50 disabled:text-red-800"
+                    className="h-auto items-center justify-between gap-4 rounded-lg border-border bg-card p-3 text-left shadow-none transition hover:border-border hover:bg-muted disabled:border-danger/30 disabled:bg-danger-tint disabled:text-danger-text"
                     disabled={isOutOfStock}
                     key={variant.id}
                     onClick={() => {
@@ -970,7 +976,7 @@ export function POSWorkspace(): JSX.Element {
                     type="button"
                     variant="outline"
                   >
-                    <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-zinc-300 bg-zinc-100 text-zinc-500">
+                    <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted text-foreground-muted">
                       {variantImageUrl ? (
                         <img alt="" className="h-full w-full object-cover" src={variantImageUrl} />
                       ) : (
@@ -978,19 +984,19 @@ export function POSWorkspace(): JSX.Element {
                       )}
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
-                      <span className="line-clamp-1 text-base font-black text-zinc-950">
+                      <span className="line-clamp-1 text-body font-medium text-foreground">
                         {variant.variantName}
                       </span>
                       {metadata ? (
-                        <span className="line-clamp-1 text-xs font-medium text-zinc-500">
+                        <span className="line-clamp-1 text-xs font-medium text-foreground-muted">
                           {metadata}
                         </span>
                       ) : null}
                       <span
                         className={
                           isOutOfStock
-                            ? "rounded-full bg-red-100 px-2 py-0.5 text-[0.68rem] font-black text-red-700"
-                            : "rounded-md bg-zinc-100 px-2 py-0.5 text-[0.68rem] font-black text-zinc-600"
+                            ? "rounded-full bg-danger-tint px-2 py-0.5 text-meta font-medium text-danger-text"
+                            : "rounded-md bg-muted px-2 py-0.5 text-meta font-medium text-foreground-muted"
                         }
                       >
                         {stockLabel}
@@ -998,11 +1004,11 @@ export function POSWorkspace(): JSX.Element {
                     </span>
                     <span className="flex shrink-0 flex-col items-end gap-1">
                       {showPrices ? (
-                        <span className="font-mono text-base font-black text-zinc-950">
+                        <span className="font-mono text-body font-medium text-foreground">
                           AED {variant.salePrice.toFixed(2)}
                         </span>
                       ) : null}
-                      <span className="rounded-md bg-black px-3 py-1 text-[0.68rem] font-black text-white">
+                      <span className="rounded-md bg-primary px-3 py-1 text-meta font-medium text-primary-foreground">
                         Select
                       </span>
                     </span>

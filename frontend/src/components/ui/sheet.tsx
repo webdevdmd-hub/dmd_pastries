@@ -4,6 +4,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import * as React from "react";
 
+import { useDensity } from "@/components/density/density-provider";
 import { cn } from "@/lib/utils/cn";
 
 const Sheet = DialogPrimitive.Root;
@@ -42,26 +43,33 @@ type SheetContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.C
 const SheetContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => (
-  <SheetPortal>
-    <SheetOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed z-50 gap-4 bg-workspace-panel p-6 shadow-float transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out duration-300",
-        sheetVariants[side],
-        className,
-      )}
-      {...props}
-    >
-      {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-2 text-brand-mocha transition-colors hover:bg-brand-latte focus:outline-none focus:ring-2 focus:ring-brand-caramel">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </SheetPortal>
-));
+>(({ side = "right", className, children, ...props }, ref) => {
+  // Portalled to document.body — re-stamp the register. The POS variants surface
+  // is a Sheet, so without this a cashier picking a variant gets 36px rows.
+  const density = useDensity();
+
+  return (
+    <SheetPortal>
+      <SheetOverlay />
+      <DialogPrimitive.Content
+        data-density={density}
+        ref={ref}
+        className={cn(
+          "fixed z-50 gap-4 bg-card p-6 shadow-md transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out duration-300",
+          sheetVariants[side],
+          className,
+        )}
+        {...props}
+      >
+        {children}
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-2 text-foreground-muted transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </SheetPortal>
+  );
+});
 SheetContent.displayName = DialogPrimitive.Content.displayName;
 
 const SheetHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (

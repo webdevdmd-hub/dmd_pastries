@@ -159,14 +159,14 @@ export function POSReceiptDialog({
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent
-        className={`rounded-lg border-zinc-300 bg-white text-zinc-950 shadow-lg ${
+        className={`rounded-lg border-border bg-card text-foreground shadow-lg ${
           receiptType === "a4" ? "sm:max-w-3xl" : "sm:max-w-md"
         }`}
       >
         <DialogHeader>
-          <DialogTitle className="flex flex-wrap items-center gap-2 text-2xl font-black tracking-tight">
+          <DialogTitle className="flex flex-wrap items-center gap-2 text-title">
             Sale receipt
-            <span className="rounded-md border border-zinc-300 bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600">
+            <span className="rounded-md border border-border bg-muted px-3 py-1 text-xs font-semibold text-foreground-muted">
               {layout
                 ? `${layout.layoutName} · ${receiptTypeLabels[receiptType]}`
                 : "Default template"}
@@ -178,30 +178,36 @@ export function POSReceiptDialog({
         </DialogHeader>
         {receipt ? (
           <div
-            className={`${widthClass} ${spacingClass} ${fontClass} ${alignClass} mx-auto rounded-lg border border-zinc-300 bg-white p-4 text-zinc-950 print:shadow-none`}
+            className={`${widthClass} ${spacingClass} ${fontClass} ${alignClass} mx-auto rounded-lg border border-border bg-card p-4 text-foreground print:shadow-none`}
           >
             <div className={spacingClass}>
               {config.showLogo ? (
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                   <Printer className="h-5 w-5" />
                 </div>
               ) : null}
               {config.showBusinessName ? (
-                <p className="text-2xl font-black tracking-tight">{receipt.businessName}</p>
+                <p className="text-title">{receipt.businessName}</p>
               ) : null}
-              {config.showBranchName ? <p className="text-zinc-600">{receipt.branchName}</p> : null}
-              {config.showAddress ? <p className="text-xs text-zinc-600">Branch address</p> : null}
-              {config.showPhone ? <p className="text-xs text-zinc-600">Phone number</p> : null}
+              {config.showBranchName ? (
+                <p className="text-foreground-muted">{receipt.branchName}</p>
+              ) : null}
+              {config.showAddress ? (
+                <p className="text-xs text-foreground-muted">Branch address</p>
+              ) : null}
+              {config.showPhone ? (
+                <p className="text-xs text-foreground-muted">Phone number</p>
+              ) : null}
               {config.showTaxNumber ? (
-                <p className="text-xs text-zinc-600">Tax/VAT number</p>
+                <p className="text-xs text-foreground-muted">Tax/VAT number</p>
               ) : null}
-              <p className="text-xs text-zinc-600">Sale #{receipt.saleNumber}</p>
-              <p className="text-xs text-zinc-600">{formatDateTime(receipt.soldAt)}</p>
+              <p className="text-xs text-foreground-muted">Sale #{receipt.saleNumber}</p>
+              <p className="text-xs text-foreground-muted">{formatDateTime(receipt.soldAt)}</p>
               {config.showCashier ? (
-                <p className="text-xs text-zinc-600">Cashier: {receipt.cashierName}</p>
+                <p className="text-xs text-foreground-muted">Cashier: {receipt.cashierName}</p>
               ) : null}
               {config.showCustomer ? (
-                <p className="text-xs text-zinc-600">Customer: Walk-in</p>
+                <p className="text-xs text-foreground-muted">Customer: Walk-in</p>
               ) : null}
             </div>
             <div className="space-y-2">
@@ -214,14 +220,14 @@ export function POSReceiptDialog({
                     <strong>{formatMoney(item.lineTotal)}</strong>
                   </div>
                   {config.showUnitPrice ? (
-                    <p className="text-left text-xs text-zinc-600">
+                    <p className="text-left text-xs text-foreground-muted">
                       Unit price: {formatMoney(item.unitPrice)}
                     </p>
                   ) : null}
                 </div>
               ))}
             </div>
-            <div className="space-y-1 border-t border-zinc-300 pt-3">
+            <div className="space-y-1 border-t border-border pt-3">
               <div className="flex justify-between">
                 <span>Subtotal</span>
                 <span>{formatMoney(receipt.subtotal)}</span>
@@ -241,7 +247,7 @@ export function POSReceiptDialog({
               {receipt.chargeAmount > 0 || receipt.chargeTaxAmount > 0 ? (
                 <>
                   {receipt.charges.length > 0 ? (
-                    <div className="grid gap-1 text-left text-xs text-zinc-600">
+                    <div className="grid gap-1 text-left text-xs text-foreground-muted">
                       {receipt.charges.map((charge) => (
                         <div
                           className="flex justify-between gap-3"
@@ -263,7 +269,7 @@ export function POSReceiptDialog({
                   </div>
                 </>
               ) : null}
-              <div className="flex justify-between text-lg font-black">
+              <div className="flex justify-between text-title">
                 <span>Total</span>
                 <span>{formatMoney(receipt.total)}</span>
               </div>
@@ -281,12 +287,12 @@ export function POSReceiptDialog({
                 <span>Change</span>
                 <span>{formatMoney(receipt.changeAmount)}</span>
               </div>
-              <div className="flex justify-between text-xs text-zinc-600">
+              <div className="flex justify-between text-xs text-foreground-muted">
                 <span>Payment status</span>
                 <span>{getPaymentStatus(receipt)}</span>
               </div>
               {config.showPaymentMethod ? (
-                <div className="text-left text-xs text-zinc-600">
+                <div className="text-left text-xs text-foreground-muted">
                   {receipt.payments.map((payment) => (
                     <p key={payment.paymentMethodId}>
                       {payment.paymentMethodName}: {formatMoney(payment.amount)}
@@ -297,16 +303,18 @@ export function POSReceiptDialog({
             </div>
             {config.showQrCode ? (
               <div
-                className="mx-auto h-14 w-14 rounded-lg bg-zinc-100"
+                className="mx-auto h-14 w-14 rounded-lg bg-muted"
                 aria-label="Receipt QR code placeholder"
               />
             ) : null}
             {config.footerMessage ? <p>{config.footerMessage}</p> : null}
-            {config.termsText ? <p className="text-xs text-zinc-600">{config.termsText}</p> : null}
+            {config.termsText ? (
+              <p className="text-xs text-foreground-muted">{config.termsText}</p>
+            ) : null}
             {receipt.accountingJournalEntryId ? (
               <Button
                 asChild
-                className="rounded-md border-zinc-300 bg-white text-zinc-950 hover:bg-zinc-100 print:hidden"
+                className="rounded-md border-border bg-card text-foreground hover:bg-muted print:hidden"
                 size="sm"
                 variant="outline"
               >
@@ -323,7 +331,7 @@ export function POSReceiptDialog({
         ) : null}
         <DialogFooter>
           <Button
-            className="rounded-md border-zinc-300 bg-white text-zinc-950 hover:bg-zinc-100"
+            className="rounded-md border-border bg-card text-foreground hover:bg-muted"
             disabled={!receipt}
             onClick={() => {
               if (receipt) {
@@ -337,7 +345,7 @@ export function POSReceiptDialog({
             Download
           </Button>
           <Button
-            className="rounded-md border-zinc-300 bg-white text-zinc-950 hover:bg-zinc-100"
+            className="rounded-md border-border bg-card text-foreground hover:bg-muted"
             onClick={() => window.print()}
             type="button"
             variant="outline"
@@ -346,7 +354,7 @@ export function POSReceiptDialog({
             Print
           </Button>
           <Button
-            className="rounded-md bg-black text-white hover:bg-zinc-900"
+            className="rounded-md bg-primary text-primary-foreground hover:bg-primary"
             onClick={onNewSale}
             type="button"
           >

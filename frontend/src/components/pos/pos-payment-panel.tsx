@@ -124,25 +124,25 @@ export function POSPaymentPanel({
   };
 
   return (
-    <div className="space-y-3 rounded-lg border border-zinc-300 bg-white p-3">
+    <div className="space-y-3 rounded-lg border border-border bg-card p-3">
       <div className="flex items-center justify-between">
-        <p className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-zinc-500">
+        <p className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-foreground-muted">
           Payment
         </p>
-        <p className="font-mono font-bold text-zinc-950">{formatMoney(balanceDue)}</p>
+        <p className="font-mono font-bold text-foreground">{formatMoney(balanceDue)}</p>
       </div>
       {isLoading ? (
-        <p className="rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2 text-[0.7rem] text-zinc-600">
+        <p className="rounded-md border border-border bg-muted px-3 py-2 text-[0.7rem] text-foreground-muted">
           Loading POS payment methods...
         </p>
       ) : null}
       {errorMessage ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[0.7rem] font-semibold text-red-700">
+        <p className="rounded-md border border-danger/30 bg-danger-tint px-3 py-2 text-[0.7rem] font-semibold text-danger-text">
           {errorMessage}
         </p>
       ) : null}
       {!isLoading && !errorMessage && activeMethods.length === 0 ? (
-        <p className="rounded-md border border-dashed border-zinc-400 bg-zinc-50 px-3 py-2 text-[0.7rem] text-zinc-600">
+        <p className="rounded-md border border-dashed border-border bg-muted px-3 py-2 text-[0.7rem] text-foreground-muted">
           No POS payment methods are available for this branch.
         </p>
       ) : null}
@@ -160,7 +160,7 @@ export function POSPaymentPanel({
         </div>
       ) : null}
       {unavailableMethods.length > 0 ? (
-        <p className="rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2 text-[0.7rem] text-zinc-600">
+        <p className="rounded-md border border-border bg-muted px-3 py-2 text-[0.7rem] text-foreground-muted">
           Active POS payment methods need linked default payment accounts before they can be used.
         </p>
       ) : null}
@@ -168,14 +168,14 @@ export function POSPaymentPanel({
         <div className="space-y-2">
           {paymentRows.map((payment) => (
             <div
-              className="rounded-md border border-zinc-300 bg-zinc-50 p-2"
+              className="rounded-md border border-border bg-muted p-2"
               key={payment.paymentMethodId}
             >
               <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-sm font-bold text-zinc-950">{payment.paymentMethodName}</p>
+                <p className="text-sm font-bold text-foreground">{payment.paymentMethodName}</p>
                 <Button
                   aria-label={`Remove ${payment.paymentMethodName} payment`}
-                  className="h-7 w-7 text-zinc-600"
+                  className="h-7 w-7 text-foreground-muted"
                   onClick={() => removePayment(payment.paymentMethodId)}
                   size="icon"
                   type="button"
@@ -185,7 +185,7 @@ export function POSPaymentPanel({
                 </Button>
               </div>
               <POSNumberInput
-                className="h-9 rounded-md border-zinc-300 bg-white font-mono shadow-none focus-visible:ring-black"
+                className="h-9 rounded-md border-border bg-card font-mono shadow-none focus-visible:ring-black"
                 onValueChange={(amount) =>
                   updatePayment(payment.paymentMethodId, {
                     amount: amount ?? 0,
@@ -196,11 +196,11 @@ export function POSPaymentPanel({
               />
               {payment.requiresReference ? (
                 <div className="mt-2 space-y-1">
-                  <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                  <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-foreground-muted">
                     Reference number required
                   </p>
                   <Input
-                    className="h-9 rounded-md border-zinc-300 bg-white font-mono shadow-none focus-visible:ring-black"
+                    className="h-9 rounded-md border-border bg-card font-mono shadow-none focus-visible:ring-black"
                     onChange={(event) =>
                       updatePayment(payment.paymentMethodId, {
                         referenceNumber: event.target.value,
@@ -215,22 +215,22 @@ export function POSPaymentPanel({
           ))}
         </div>
       ) : (
-        <p className="rounded-md border border-dashed border-zinc-400 bg-zinc-50 px-3 py-2 text-[0.7rem] text-zinc-600">
+        <p className="rounded-md border border-dashed border-border bg-muted px-3 py-2 text-[0.7rem] text-foreground-muted">
           Select a payment method to start. Add another method for split payments.
         </p>
       )}
       <div className="grid grid-cols-3 gap-2 text-[0.7rem]">
         <div>
-          <p className="text-zinc-500">Paid</p>
-          <p className="font-mono font-bold text-zinc-950">{formatMoney(paidAmount)}</p>
+          <p className="text-foreground-muted">Paid</p>
+          <p className="font-mono font-bold text-foreground">{formatMoney(paidAmount)}</p>
         </div>
         <div>
-          <p className="text-zinc-500">Balance</p>
-          <p className="font-mono font-bold text-zinc-950">{formatMoney(balanceDue)}</p>
+          <p className="text-foreground-muted">Balance</p>
+          <p className="font-mono font-bold text-foreground">{formatMoney(balanceDue)}</p>
         </div>
         <div>
-          <p className="text-zinc-500">Change</p>
-          <p className="font-mono font-bold text-zinc-950">{formatMoney(changeAmount)}</p>
+          <p className="text-foreground-muted">Change</p>
+          <p className="font-mono font-bold text-foreground">{formatMoney(changeAmount)}</p>
         </div>
       </div>
     </div>

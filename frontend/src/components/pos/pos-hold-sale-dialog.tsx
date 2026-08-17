@@ -60,8 +60,8 @@ function HeldSaleItemCard({ item }: { item: CartItem }): JSX.Element {
   const imageUrl = getProductImagePreviewUrl(item.imageFileId) ?? item.imageUrl;
 
   return (
-    <div className="flex gap-3 rounded-lg border border-zinc-300 bg-white p-2.5">
-      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-zinc-100 text-zinc-500">
+    <div className="flex gap-3 rounded-lg border border-border bg-card p-2.5">
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-foreground-muted">
         {imageUrl ? (
           <img alt="" className="h-full w-full object-cover" src={imageUrl} />
         ) : (
@@ -69,19 +69,21 @@ function HeldSaleItemCard({ item }: { item: CartItem }): JSX.Element {
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="line-clamp-1 text-sm font-black text-zinc-950">{item.productName}</p>
+        <p className="line-clamp-1 text-body font-medium text-foreground">{item.productName}</p>
         {item.variantName ? (
-          <p className="line-clamp-1 text-xs font-bold text-zinc-600">{item.variantName}</p>
+          <p className="line-clamp-1 text-xs font-bold text-foreground-muted">{item.variantName}</p>
         ) : null}
         {item.sku ? (
-          <p className="line-clamp-1 text-[0.68rem] font-semibold text-zinc-500">SKU {item.sku}</p>
+          <p className="line-clamp-1 text-[0.68rem] font-semibold text-foreground-muted">
+            SKU {item.sku}
+          </p>
         ) : null}
         <div className="mt-2 flex items-end justify-between gap-2">
-          <p className="font-mono text-xs font-bold text-zinc-600">
+          <p className="font-mono text-xs font-bold text-foreground-muted">
             {item.quantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} x{" "}
             {formatMoney(item.unitPrice)}
           </p>
-          <p className="font-mono shrink-0 text-sm font-black text-zinc-950">
+          <p className="font-mono shrink-0 text-body font-medium text-foreground">
             {formatMoney(item.lineTotal)}
           </p>
         </div>
@@ -119,32 +121,32 @@ export function POSHoldSaleDialog({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-lg border-zinc-300 bg-white p-0 text-zinc-950 shadow-lg sm:max-w-4xl">
-        <div className="border-b border-zinc-300 bg-zinc-50 px-5 py-4">
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-lg border-border bg-card p-0 text-foreground shadow-lg sm:max-w-4xl">
+        <div className="border-b border-border bg-muted px-5 py-4">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black tracking-tight">Hold / Resume</DialogTitle>
-            <DialogDescription className="text-zinc-600">
+            <DialogTitle className="text-title">Hold / Resume</DialogTitle>
+            <DialogDescription className="text-foreground-muted">
               Save the current cart temporarily or resume a previously held cart.
             </DialogDescription>
           </DialogHeader>
         </div>
 
         <div className="grid gap-4 p-4">
-          <div className="rounded-lg border border-zinc-300 bg-zinc-50 p-4">
+          <div className="rounded-lg border border-border bg-muted p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="flex-1 space-y-1">
-                <label className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">
+                <label className="text-xs font-bold uppercase tracking-[0.16em] text-foreground-muted">
                   Hold current cart
                 </label>
                 <Input
-                  className="rounded-md border-zinc-300 bg-white shadow-none focus-visible:ring-black"
+                  className="rounded-md border-border bg-card shadow-none focus-visible:ring-black"
                   onChange={(event) => setNotes(event.target.value)}
                   placeholder="Optional note, customer name, or pickup reminder"
                   value={notes}
                 />
               </div>
               <Button
-                className="rounded-md bg-black text-white hover:bg-zinc-900"
+                className="rounded-md bg-primary text-primary-foreground hover:bg-primary"
                 disabled={!canHoldCurrentSale || isHolding}
                 onClick={() => {
                   onHoldCurrentSale(notes.trim() ? notes : null);
@@ -156,7 +158,7 @@ export function POSHoldSaleDialog({
               </Button>
             </div>
             {!canHoldCurrentSale ? (
-              <p className="mt-2 text-xs text-zinc-600">
+              <p className="mt-2 text-xs text-foreground-muted">
                 Add items to the cart before holding a sale.
               </p>
             ) : null}
@@ -164,11 +166,11 @@ export function POSHoldSaleDialog({
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-black uppercase tracking-[0.16em] text-zinc-500">
+              <h3 className="text-body font-medium uppercase tracking-[0.16em] text-foreground-muted">
                 Waiting carts
               </h3>
               <Button
-                className="rounded-md border-zinc-300 bg-white text-zinc-950 hover:bg-zinc-100"
+                className="rounded-md border-border bg-card text-foreground hover:bg-muted"
                 onClick={onRetry}
                 type="button"
                 variant="outline"
@@ -178,16 +180,16 @@ export function POSHoldSaleDialog({
             </div>
 
             {isLoading ? (
-              <div className="rounded-lg border border-dashed border-zinc-400 bg-white p-6 text-sm text-zinc-600">
+              <div className="rounded-lg border border-dashed border-border bg-card p-6 text-sm text-foreground-muted">
                 Loading held sales...
               </div>
             ) : null}
 
             {!isLoading && heldSales.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-zinc-400 bg-white p-6 text-center">
-                <Clock className="mx-auto h-8 w-8 text-zinc-500" />
-                <p className="mt-2 font-semibold text-zinc-950">No held sales</p>
-                <p className="text-sm text-zinc-600">
+              <div className="rounded-lg border border-dashed border-border bg-card p-6 text-center">
+                <Clock className="mx-auto h-8 w-8 text-foreground-muted" />
+                <p className="mt-2 font-semibold text-foreground">No held sales</p>
+                <p className="text-sm text-foreground-muted">
                   Held carts will appear here until they are resumed or cancelled.
                 </p>
               </div>
@@ -200,30 +202,30 @@ export function POSHoldSaleDialog({
 
                 return (
                   <div
-                    className="overflow-hidden rounded-lg border border-zinc-300 bg-white"
+                    className="overflow-hidden rounded-lg border border-border bg-card"
                     key={heldSale.id}
                   >
                     <div className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-black text-zinc-950">{heldSale.holdNumber}</p>
-                          <span className="rounded-md bg-zinc-100 px-2 py-0.5 text-[0.68rem] font-black uppercase tracking-[0.12em] text-zinc-600">
+                          <p className="font-medium text-foreground">{heldSale.holdNumber}</p>
+                          <span className="rounded-md bg-muted px-2 py-0.5 text-meta font-medium uppercase tracking-[0.12em] text-foreground-muted">
                             {heldSale.itemCount} items
                           </span>
                         </div>
-                        <p className="font-mono mt-1 text-sm font-black text-zinc-950">
+                        <p className="font-mono mt-1 text-body font-medium text-foreground">
                           {formatMoney(heldSale.total)}
                         </p>
-                        <p className="text-xs font-medium text-zinc-500">
+                        <p className="text-xs font-medium text-foreground-muted">
                           Held {formatHeldAt(heldSale.heldAt)}
                         </p>
                         {heldSale.customerName ? (
-                          <p className="mt-1 text-xs font-bold text-zinc-600">
+                          <p className="mt-1 text-xs font-bold text-foreground-muted">
                             {heldSale.customerName}
                           </p>
                         ) : null}
                         {heldSale.notes ? (
-                          <p className="mt-1 line-clamp-2 text-xs text-zinc-600">
+                          <p className="mt-1 line-clamp-2 text-xs text-foreground-muted">
                             {heldSale.notes}
                           </p>
                         ) : null}
@@ -231,7 +233,7 @@ export function POSHoldSaleDialog({
                       <div className="flex flex-wrap gap-2">
                         <Button
                           aria-expanded={isExpanded}
-                          className="rounded-md border-zinc-300 bg-white text-zinc-950 hover:bg-zinc-100"
+                          className="rounded-md border-border bg-card text-foreground hover:bg-muted"
                           onClick={() =>
                             setExpandedHeldSaleId((current) =>
                               current === heldSale.id ? null : heldSale.id,
@@ -248,7 +250,7 @@ export function POSHoldSaleDialog({
                           {isExpanded ? "Hide items" : "View items"}
                         </Button>
                         <Button
-                          className="rounded-md bg-black text-white hover:bg-zinc-900"
+                          className="rounded-md bg-primary text-primary-foreground hover:bg-primary"
                           disabled={isResuming}
                           onClick={() => onResumeHeldSale(heldSale.id)}
                           type="button"
@@ -257,7 +259,7 @@ export function POSHoldSaleDialog({
                           Resume
                         </Button>
                         <Button
-                          className="rounded-md border-zinc-300 bg-white text-red-700 hover:bg-red-50"
+                          className="rounded-md border-border bg-card text-danger-text hover:bg-danger-tint"
                           disabled={isCancelling}
                           onClick={() => onCancelHeldSale(heldSale.id)}
                           type="button"
@@ -270,16 +272,16 @@ export function POSHoldSaleDialog({
                     </div>
 
                     {isExpanded ? (
-                      <div className="border-t border-zinc-300 bg-zinc-50 p-3">
+                      <div className="border-t border-border bg-muted p-3">
                         {heldSaleDetailsQuery.isLoading ? (
-                          <div className="flex items-center gap-2 rounded-md border border-dashed border-zinc-400 bg-white p-4 text-sm font-semibold text-zinc-600">
+                          <div className="flex items-center gap-2 rounded-md border border-dashed border-border bg-card p-4 text-sm font-semibold text-foreground-muted">
                             <Loader2 className="h-4 w-4 animate-spin" />
                             Loading held items...
                           </div>
                         ) : null}
 
                         {heldSaleDetailsQuery.isError ? (
-                          <div className="flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex flex-col gap-3 rounded-2xl border border-danger/30 bg-danger-tint p-4 text-sm text-danger-text sm:flex-row sm:items-center sm:justify-between">
                             <span className="flex items-center gap-2 font-semibold">
                               <AlertCircle className="h-4 w-4" />
                               Unable to load held items.
@@ -299,7 +301,7 @@ export function POSHoldSaleDialog({
                         {!heldSaleDetailsQuery.isLoading &&
                         !heldSaleDetailsQuery.isError &&
                         detailItems.length === 0 ? (
-                          <div className="rounded-md border border-dashed border-zinc-400 bg-white p-4 text-sm text-zinc-600">
+                          <div className="rounded-md border border-dashed border-border bg-card p-4 text-sm text-foreground-muted">
                             No item details were returned for this held cart.
                           </div>
                         ) : null}
@@ -320,9 +322,9 @@ export function POSHoldSaleDialog({
           </div>
         </div>
 
-        <DialogFooter className="border-t border-zinc-300 bg-white px-4 py-3">
+        <DialogFooter className="border-t border-border bg-card px-4 py-3">
           <Button
-            className="rounded-md border-zinc-300 bg-white text-zinc-950 hover:bg-zinc-100"
+            className="rounded-md border-border bg-card text-foreground hover:bg-muted"
             onClick={() => onOpenChange(false)}
             type="button"
             variant="outline"

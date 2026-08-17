@@ -12,9 +12,9 @@ export function POSBarcodeInput({ inputRef, onLookup }: POSBarcodeInputProps): J
   return (
     <label className="relative block min-w-0">
       <span className="sr-only">Barcode lookup</span>
-      <ScanLine className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+      <ScanLine className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
       <Input
-        className="h-10 w-full min-w-0 rounded-md border-zinc-300 bg-white pl-10 pr-3 text-sm text-zinc-900 shadow-none placeholder:text-zinc-500 focus-visible:ring-2 focus-visible:ring-black"
+        className="h-10 w-full min-w-0 rounded-md border-border bg-card pl-10 pr-3 text-sm text-foreground shadow-none placeholder:text-foreground-muted focus-visible:ring-2 focus-visible:ring-black"
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             const query = event.currentTarget.value.trim();
