@@ -127,7 +127,7 @@ export function PurchaseReceiptDetailsPageClient({
           Back to Receive Goods
         </Link>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-4xl text-brand-espresso">{receipt.receiptNumber}</h1>
+          <h1 className="font-serif text-4xl text-brand-espresso">{receipt.receiptNumber}</h1>
           <PurchaseReceiptStatusBadge status={receipt.status} />
           <PurchaseReceiptAccountingBadge receipt={receipt} />
           {canPostReceipt ? (

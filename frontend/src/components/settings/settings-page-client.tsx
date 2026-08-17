@@ -116,7 +116,7 @@ export function SettingsPageClient(): JSX.Element {
             <CardTitle className="text-sm text-brand-mocha">Company Profile</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="font-display text-3xl text-brand-espresso">
+            <p className="font-serif text-3xl text-brand-espresso">
               {settingsOverviewQuery.data?.companyProfileCompleted ? "Complete" : "Pending"}
             </p>
             <p className="mt-1 text-sm text-brand-mocha">
@@ -130,7 +130,7 @@ export function SettingsPageClient(): JSX.Element {
             <CardTitle className="text-sm text-brand-mocha">Branches</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="font-display text-3xl text-brand-espresso">
+            <p className="font-serif text-3xl text-brand-espresso">
               {settingsOverviewQuery.data?.branchCount ?? 0}
             </p>
             <p className="mt-1 text-sm text-brand-mocha">Configured locations</p>
@@ -141,7 +141,7 @@ export function SettingsPageClient(): JSX.Element {
             <CardTitle className="text-sm text-brand-mocha">Tax & Payments</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="font-display text-3xl text-brand-espresso">
+            <p className="font-serif text-3xl text-brand-espresso">
               {(settingsOverviewQuery.data?.activeTaxRatesCount ?? 0) +
                 (settingsOverviewQuery.data?.activePaymentMethodsCount ?? 0)}
             </p>
@@ -153,7 +153,7 @@ export function SettingsPageClient(): JSX.Element {
             <CardTitle className="text-sm text-brand-mocha">Master Data</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="font-display text-3xl text-brand-espresso">
+            <p className="font-serif text-3xl text-brand-espresso">
               {masterDataOverviewQuery.data
                 ? masterDataOverviewQuery.data.unitsCount +
                   masterDataOverviewQuery.data.productCategoriesCount +

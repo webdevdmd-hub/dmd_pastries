@@ -34,7 +34,7 @@ export function ProfilePageClient(): JSX.Element {
         <Card>
           <CardHeader>
             <CardDescription>Signed-in user</CardDescription>
-            <CardTitle className="font-display text-3xl">{user?.fullName ?? "User"}</CardTitle>
+            <CardTitle className="font-serif text-3xl">{user?.fullName ?? "User"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-3xl border border-brand-cappuccino bg-brand-latte/70 p-4">

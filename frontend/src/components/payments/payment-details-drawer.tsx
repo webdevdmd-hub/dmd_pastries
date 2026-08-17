@@ -71,7 +71,7 @@ export function PaymentDetailsDrawer({
     <Sheet onOpenChange={onOpenChange} open={open}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
         <SheetHeader>
-          <SheetTitle className="font-display text-3xl">Payment details</SheetTitle>
+          <SheetTitle className="font-serif text-3xl">Payment details</SheetTitle>
           <SheetDescription>
             Customer collection details, source data, and refund actions where supported.
           </SheetDescription>

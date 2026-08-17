@@ -350,7 +350,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
                 Back to Purchase Orders
               </Link>
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <h1 className="font-display text-4xl text-brand-espresso">
+                <h1 className="font-serif text-4xl text-brand-espresso">
                   {order.purchaseOrderNumber}
                 </h1>
                 <PurchaseOrderStatusBadge status={order.status} />

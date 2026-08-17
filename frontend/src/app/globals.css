@@ -2,96 +2,216 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+ * Design system v3. Source of truth: DESIGN.md. Token reasoning and the
+ * measured contrast ratios live in docs/design/tokens.css, which this block
+ * mirrors — keep the two in step, and `pnpm check:tokens` asserts that every
+ * variable tailwind.config.ts asks for is declared here.
+ *
+ * Colors are bare oklch triplets so Tailwind can apply `/ <alpha-value>`.
+ * ------------------------------------------------------------------------- */
+
 @layer base {
   :root {
-    --brand-latte: 245 244 241;
-    --brand-cappuccino: 212 208 201;
-    --brand-caramel: 9 9 11;
-    --brand-mocha: 82 82 91;
-    --brand-espresso: 9 9 11;
-    --workspace-canvas: 250 250 249;
-    --workspace-sidebar: 244 244 245;
-    --workspace-sidebar-panel: 255 255 255;
-    --workspace-sidebar-active: 9 9 11;
-    --workspace-sidebar-muted: 113 113 122;
-    --workspace-panel: 255 255 255;
-    --workspace-border: 212 208 201;
-    --workspace-muted: 82 82 91;
-    --background: 60 12% 98%;
-    --foreground: 240 6% 6%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 6% 6%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 6% 6%;
-    --primary: 240 6% 6%;
-    --primary-foreground: 60 20% 96%;
-    --secondary: 40 14% 92%;
-    --secondary-foreground: 240 6% 6%;
-    --muted: 40 14% 92%;
-    --muted-foreground: 240 5% 35%;
-    --accent: 240 6% 6%;
-    --accent-foreground: 60 20% 96%;
-    --destructive: 0 65% 46%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 40 10% 82%;
-    --input: 40 14% 92%;
-    --ring: 240 6% 6%;
-    --radius: 0.875rem;
+    /* --- Neutrals: barely warm --------------------------------------------- */
+    --canvas: 0.9823 0.0029 84.6; /* #FAF9F7  page                            */
+    --card: 1 0 0; /* #FFFFFF                cards, panels, table             */
+    --muted: 0.9556 0.0057 84.6; /* #F2F0EC  fills, KPI cards, zebra, inputs  */
+    --border: 0.9135 0.0087 84.6; /* #E5E2DC hairlines                        */
+
+    --foreground: 0.1448 0 0; /* #0A0A0A            18.82 : 1 on canvas       */
+    --foreground-muted: 0.526 0.0105 78.2; /* #6E6A64  5.11 / 5.37 / 4.72     */
+    --foreground-disabled: 0.645 0.01 78.3; /* #918D87  3.14  NOT for content */
+
+    --primary: 0.2046 0 0; /* #171717             white on it  17.93 : 1      */
+    --primary-foreground: 0.9823 0.0029 84.6;
+
+    /* --- The one accent: money, and only money ----------------------------
+     * Charge, Post, Confirm payment, Close period, and reconciled/paid/posted
+     * states. Nothing else. If two things on a screen are green, one is wrong. */
+    --money-solid: 0.4841 0.1242 153.2; /* #00723B  white on it  6.05 : 1     */
+    --money-hover: 0.4228 0.107 153.9;
+    --money-text: 0.4228 0.107 153.9; /* #005E31   7.94 card / 7.20 tint      */
+    --money-tint: 0.964 0.0181 155.8; /* #EAF7EE                              */
+
+    /* --- Semantic: -solid fills, -text type. Never -solid as a text color. -- */
+    --warning-solid: 0.581 0.1236 73.2; /* #A66D00                            */
+    --warning-text: 0.4518 0.101 65.5; /* #7B4800  7.58 card / 6.88 tint      */
+    --warning-tint: 0.9664 0.0256 84.6; /* #FCF3E1                            */
+
+    --danger-solid: 0.5494 0.1994 27.1; /* #CC2827                            */
+    --danger-text: 0.4498 0.1695 27; /* #9E1618    8.13 card / 7.21 tint      */
+    --danger-tint: 0.9604 0.0165 26.6; /* #FDEEEC                             */
+
+    --info-solid: 0.5501 0.1401 254.9; /* #3072C1                             */
+    --info-text: 0.4508 0.1295 254.8; /* #17559B    7.48 card / 6.68 tint     */
+    --info-tint: 0.961 0.0159 253.9; /* #EBF3FD                               */
+
+    /* Focus is blue and only blue. */
+    --ring: 0.5501 0.1401 254.9; /* #3072C1        4.64 : 1 on canvas         */
+
+    /* --- Radius ------------------------------------------------------------
+     * Down from 0.875rem. This tightens every rounded corner in the app; it
+     * is intentional (DESIGN.md section 4) and it is the most visible part of
+     * this commit after the type change. */
+    --radius-sm: 0.375rem; /* 6px   chips, badges, inline controls            */
+    --radius: 0.625rem; /* 10px     buttons, cards, inputs                    */
+    --radius-lg: 0.875rem; /* 14px  dialogs, frames, panels                   */
+
+    /* --- Elevation ---------------------------------------------------------
+     * A 1px hairline plus a whisper. `shadow-workspace` and its inset white
+     * bevel are retired: invisible on any non-white surface. */
+    --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.05);
+    --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.07), 0 1px 2px oklch(0 0 0 / 0.04);
+    --shadow-md: 0 8px 24px oklch(0 0 0 / 0.08);
+
+    /* --- Motion ------------------------------------------------------------ */
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+    --duration-fast: 150ms;
+    --duration-panel: 200ms;
   }
 
-  :root[data-theme="pistachio"] {
-    --brand-latte: 247 255 249;
-    --brand-cappuccino: 207 232 216;
-    --brand-caramel: 67 182 107;
-    --brand-mocha: 94 116 104;
-    --brand-espresso: 23 37 28;
-    --workspace-canvas: 248 252 249;
-    --workspace-sidebar: 15 31 23;
-    --workspace-sidebar-panel: 27 48 36;
-    --workspace-sidebar-active: 67 182 107;
-    --workspace-sidebar-muted: 168 188 176;
-    --workspace-panel: 255 255 255;
-    --workspace-border: 213 232 220;
-    --workspace-muted: 94 116 104;
-    --background: 136 100% 98%;
-    --foreground: 137 23% 12%;
-    --card: 0 0% 100%;
-    --card-foreground: 137 23% 12%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 137 23% 12%;
-    --primary: 143 43% 49%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 138 49% 91%;
-    --secondary-foreground: 137 23% 12%;
-    --muted: 138 49% 91%;
-    --muted-foreground: 145 11% 41%;
-    --accent: 143 43% 49%;
-    --accent-foreground: 0 0% 100%;
-    --border: 139 35% 86%;
-    --input: 136 100% 98%;
-    --ring: 143 43% 49%;
+  /* --- Dark ----------------------------------------------------------------
+   * NOT SHIPPED. Dark mode is cut from the current plan (TODOS.md T-A). These
+   * values exist so the token layer is dark-ready and the contrast script can
+   * assert both arms; nothing sets .dark today.
+   *
+   * This is NOT a lightness inversion. On a #141414 card, all four of v2's
+   * semantic -text values scored 2.26-2.46:1 against a 4.5 floor. Every pair
+   * below was re-measured against its actual dark surface.
+   *
+   * --money-solid is deliberately UNCHANGED: white on #00723B is 6.05:1 on
+   * any surface, so the Charge button is identical in both modes. */
+  .dark,
+  :root[data-theme="dark"] {
+    --canvas: 0.1496 0 0; /* #0B0B0B */
+    --card: 0.1913 0 0; /* #141414 */
+    --muted: 0.2264 0 0; /* #1C1C1C */
+    --border: 0.285 0 0; /* #2A2A2A */
+
+    --foreground: 0.9591 0.0074 80.7; /* #F4F1EC  warm off-white, never #FFF  */
+    --foreground-muted: 0.7011 0.0129 79.8; /* #A39E96                        */
+    --foreground-disabled: 0.5127 0.0125 76.5; /* #6B665F                     */
+
+    --primary: 0.9591 0.0074 80.7;
+    --primary-foreground: 0.1496 0 0;
+
+    --money-solid: 0.4841 0.1242 153.2; /* unchanged, by design               */
+    --money-hover: 0.5182 0.1304 153;
+    --money-text: 0.6678 0.1421 157.4; /* #2FAE71  6.50 card / 5.43 tint      */
+    --money-tint: 0.2582 0.0446 157.6; /* #0E2A1B                             */
+
+    --warning-solid: 0.581 0.1236 73.2;
+    --warning-text: 0.7494 0.1419 76.5; /* #E0A030                            */
+    --warning-tint: 0.2473 0.0366 80.7; /* #2A1F0B                            */
+
+    --danger-solid: 0.5494 0.1994 27.1;
+    --danger-text: 0.7106 0.1661 22.2; /* #F87171                             */
+    --danger-tint: 0.2296 0.0426 20.9; /* #2E1414                             */
+
+    --info-solid: 0.5501 0.1401 254.9;
+    --info-text: 0.7562 0.1139 254.7; /* #7DB3F7                              */
+    --info-tint: 0.2316 0.0407 253.9; /* #0F1E30                              */
+
+    --ring: 0.7562 0.1139 254.7;
+
+    --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.4);
+    --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.5);
+    --shadow-md: 0 8px 24px oklch(0 0 0 / 0.6);
+  }
+
+  /* --- Density registers ---------------------------------------------------
+   * WARNING: this does NOT reach Radix portals. dialog/sheet/popover/select/
+   * dropdown-menu render into document.body, where the :root rule below
+   * supplies ledger density — including the POS dialogs, one of which takes
+   * payment. A DensityProvider must stamp the attribute onto portalled
+   * content. Tracked in UI-REBUILD-PLAN.md. */
+  :root,
+  [data-density="ledger"] {
+    --control-h: 2.25rem; /* 36px */
+    --field-h: 2.25rem;
+    --tap-min: 2rem; /* 32px  */
+    --gutter: 1.5rem;
+    --card-pad: 1.125rem;
+    --grid-gap: 0.75rem;
+  }
+
+  [data-density="counter"] {
+    --control-h: 3rem; /* 48px  Material 48dp + Hoober rage-tap research */
+    --field-h: 3rem;
+    --tap-min: 3rem;
+    --gutter: 1rem;
+    --card-pad: 0.75rem;
+    --grid-gap: 0.625rem;
+  }
+
+  /* --- Table density -------------------------------------------------------
+   * Persisted in localStorage under `pastries-pos-table-density`, with a
+   * forward-compatible reader: unknown value -> "default", never throw. */
+  [data-table-density="compact"] {
+    --row-h: 2.25rem;
+    --cell-pad-x: 0.875rem;
+  }
+  :root,
+  [data-table-density="default"] {
+    --row-h: 2.75rem;
+    --cell-pad-x: 1rem;
+  }
+  [data-table-density="comfortable"] {
+    --row-h: 3.5rem;
+    --cell-pad-x: 1rem;
   }
 
   * {
     @apply border-border;
   }
 
-  html {
-    scroll-behavior: smooth;
-  }
+  /* `scroll-behavior: smooth` was global and applied to the POS product grid,
+   * where a cashier flicking through 200 items fought an animation on every
+   * scroll. Scope it to marketing routes if it is wanted there. */
 
   body {
-    @apply min-h-screen text-brand-espresso antialiased;
-    background-color: rgb(var(--workspace-canvas));
-    background-image: none;
+    @apply min-h-screen antialiased;
+    background: oklch(var(--canvas));
+    color: oklch(var(--foreground));
+    font-family: var(--font-sans);
+    text-rendering: optimizeLegibility;
+    /* Geist stylistic sets: cv11 gives a single-storey a in some contexts,
+     * ss01 tightens the mono-adjacent forms. */
+    font-feature-settings: "cv11", "ss01";
   }
 
   a {
     @apply outline-none;
   }
+
+  /* Any number that can change without its row changing MUST be tabular, or
+   * the column shifts and the eye loses its place. */
+  .tnum,
+  td[data-numeric],
+  th[data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  td[data-numeric],
+  th[data-numeric] {
+    text-align: right;
+    letter-spacing: -0.02em;
+  }
+
+  /* Identifiers get compared character by character. */
+  .identifier {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 @layer utilities {
+  /* NOTE: the .auth-* and .story-section-reveal-* utilities below are slated
+   * for deletion in tracks D1 and D4 respectively, along with the components
+   * that consume them. They are left intact here so this commit stays a pure
+   * token-layer swap. */
+
   @keyframes auth-orb-drift {
     0%,
     100% {
@@ -219,17 +339,6 @@
     transform: translate3d(0, 0, 0) scale(1);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .auth-orb,
-    .auth-scanline::before,
-    .story-section-reveal {
-      animation: none;
-      opacity: 1;
-      transform: none;
-      transition: none;
-    }
-  }
-
   .scrollbar-hidden {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -239,179 +348,14 @@
     display: none;
   }
 
-  .bg-brand-latte {
-    background-color: rgb(var(--brand-latte));
-  }
-
-  .bg-brand-cappuccino {
-    background-color: rgb(var(--brand-cappuccino));
-  }
-
-  .bg-brand-caramel {
-    background-color: rgb(var(--brand-caramel));
-  }
-
-  .bg-brand-mocha {
-    background-color: rgb(var(--brand-mocha));
-  }
-
-  .bg-brand-espresso {
-    background-color: rgb(var(--brand-espresso));
-  }
-
-  .text-brand-latte {
-    color: rgb(var(--brand-latte));
-  }
-
-  .text-brand-cappuccino {
-    color: rgb(var(--brand-cappuccino));
-  }
-
-  .text-brand-caramel {
-    color: rgb(var(--brand-caramel));
-  }
-
-  .text-brand-mocha {
-    color: rgb(var(--brand-mocha));
-  }
-
-  .text-brand-espresso {
-    color: rgb(var(--brand-espresso));
-  }
-
-  .border-brand-latte {
-    border-color: rgb(var(--brand-latte));
-  }
-
-  .border-brand-cappuccino {
-    border-color: rgb(var(--brand-cappuccino));
-  }
-
-  .border-brand-caramel {
-    border-color: rgb(var(--brand-caramel));
-  }
-
-  .border-brand-mocha {
-    border-color: rgb(var(--brand-mocha));
-  }
-
-  .border-brand-espresso {
-    border-color: rgb(var(--brand-espresso));
-  }
-
-  .bg-workspace-canvas {
-    background-color: rgb(var(--workspace-canvas));
-  }
-
-  .bg-workspace-canvas\/90 {
-    background-color: rgb(var(--workspace-canvas) / 0.9);
-  }
-
-  .bg-workspace-sidebar {
-    background-color: rgb(var(--workspace-sidebar));
-  }
-
-  .bg-workspace-sidebar-active {
-    background-color: rgb(var(--workspace-sidebar-active));
-  }
-
-  .bg-workspace-panel {
-    background-color: rgb(var(--workspace-panel));
-  }
-
-  .text-workspace-sidebar {
-    color: rgb(var(--workspace-sidebar));
-  }
-
-  .text-workspace-sidebar-muted {
-    color: rgb(var(--workspace-sidebar-muted));
-  }
-
-  .text-workspace-muted {
-    color: rgb(var(--workspace-muted));
-  }
-
-  .border-workspace-border {
-    border-color: rgb(var(--workspace-border));
-  }
-
-  .border-workspace-border\/80 {
-    border-color: rgb(var(--workspace-border) / 0.8);
-  }
-
-  .shadow-workspace {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.64),
-      0 1px 2px rgba(0, 0, 0, 0.04);
-  }
-
-  :root[data-theme="pistachio"] aside.bg-workspace-sidebar,
-  :root[data-theme="pistachio"] aside.bg-brand-espresso,
-  :root[data-theme="pistachio"] [data-sidebar-theme="pistachio"] {
-    background:
-      radial-gradient(circle at 48% 8%, rgb(67 182 107 / 0.1), transparent 34%),
-      linear-gradient(180deg, #102418 0%, #11281b 54%, #0f2117 100%);
-    color: #f7fff9;
-  }
-
-  :root[data-theme="pistachio"] aside.bg-brand-espresso .text-brand-latte,
-  :root[data-theme="pistachio"] aside.bg-brand-espresso [class*="text-brand-latte/"] {
-    color: #f7fff9;
-  }
-
-  :root[data-theme="pistachio"] aside.bg-brand-espresso [class*="border-brand-latte/"] {
-    border-color: rgb(247 255 249 / 0.18);
-  }
-
-  :root[data-theme="pistachio"] aside.bg-brand-espresso button[class*="uppercase"] {
-    background-color: #dce9df;
-    color: #4d6256;
-    letter-spacing: 0.26em;
-  }
-
-  :root[data-theme="pistachio"] aside.bg-brand-espresso a.bg-brand-caramel,
-  :root[data-theme="pistachio"] aside.bg-brand-espresso button.bg-brand-caramel {
-    background-color: #62bd78;
-    color: #ffffff;
-    box-shadow: 0 18px 38px rgb(67 182 107 / 0.24);
-  }
-
-  :root[data-theme="pistachio"] aside.bg-brand-espresso a.bg-brand-caramel svg,
-  :root[data-theme="pistachio"] aside.bg-brand-espresso button.bg-brand-caramel svg {
-    color: #ffffff;
-  }
-
-  :root[data-theme="pistachio"] aside.bg-brand-espresso a:not(.bg-brand-caramel),
-  :root[data-theme="pistachio"] aside.bg-brand-espresso button:not(.bg-brand-caramel) {
-    color: #f7fff9;
-  }
-
-  :root[data-theme="pistachio"] aside.bg-brand-espresso a:not(.bg-brand-caramel):hover,
-  :root[data-theme="pistachio"] aside.bg-brand-espresso button:not(.bg-brand-caramel):hover {
-    background-color: rgb(247 255 249 / 0.12);
-    color: #ffffff;
-  }
-
-  :root[data-theme="pistachio"] aside.bg-brand-espresso a.bg-brand-latte {
-    background-color: #2c4938;
-    color: #ffffff;
-  }
-
-  :root[data-theme="pistachio"] aside.bg-brand-espresso .bg-brand-latte\/5,
-  :root[data-theme="pistachio"] aside.bg-brand-espresso .bg-brand-latte\/10 {
-    background-color: rgb(247 255 249 / 0.12);
-  }
-
-  :root[data-theme="pistachio"] aside.bg-brand-espresso button[class*="uppercase"] {
-    background-color: #dce9df;
-    color: #4d6256;
-  }
-
-  .font-display {
-    font-family: var(--font-display);
-  }
-
-  .font-sans {
-    font-family: var(--font-sans);
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

@@ -88,7 +88,7 @@ export function MasterDataOverviewPageClient(): JSX.Element {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="font-display text-4xl text-brand-espresso">
+                <p className="font-serif text-4xl text-brand-espresso">
                   {overviewQuery.data[card.key]}
                 </p>
                 <Button asChild className="mt-4 w-full" variant="outline">

@@ -124,7 +124,7 @@ export function OnboardingPageClient(): JSX.Element {
       <Card className="overflow-hidden">
         <CardHeader className="bg-brand-cappuccino/30">
           <CardDescription>Workspace</CardDescription>
-          <CardTitle className="font-display text-3xl">
+          <CardTitle className="font-serif text-3xl">
             {businessQuery.data?.businessName ?? user?.businessName ?? "Business workspace"}
           </CardTitle>
           {onboardingQuery.data ? (
@@ -220,7 +220,7 @@ export function OnboardingPageClient(): JSX.Element {
           ) : null}
 
           <div>
-            <h2 className="font-display text-2xl text-brand-espresso">Additional setup</h2>
+            <h2 className="font-serif text-2xl text-brand-espresso">Additional setup</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-3">
               {supplementalSteps.map((step) => {
                 const Icon = step.icon;

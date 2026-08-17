@@ -85,7 +85,7 @@ export function CustomerDetailsPageClient({ customerId }: { customerId: string }
             Back to Customers
           </Link>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-4xl text-brand-espresso">{customer.fullName}</h1>
+            <h1 className="font-serif text-4xl text-brand-espresso">{customer.fullName}</h1>
             <CustomerStatusBadge status={customer.status} />
           </div>
           <p className="mt-2 text-sm text-brand-mocha">{customer.customerCode}</p>
