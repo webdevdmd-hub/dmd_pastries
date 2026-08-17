@@ -49,11 +49,13 @@ Do not rebuild these.
 | Asset | State |
 | --- | --- |
 | `DESIGN.md` v3 | Complete. Every token measured in both modes. |
-| `docs/design/tokens.css` | Exists, holds v2 values. Needs the v3 numbers. |
-| `docs/design/tailwind.config.proposed.ts` | Exists. Aliases `brand-*`/`workspace-*` to new tokens so `components/ui/*` renders unchanged. |
+| `docs/design/tokens.css` | **v3 as of A0.6.** Names and values reconciled with DESIGN.md; dark block present but unshipped so the layer is dark-ready. |
+| `docs/design/tailwind.config.proposed.ts` | **v3 as of A0.6.** Aliases `brand-*`/`workspace-*` and keeps `background`/`accent.*` pointing at `--canvas`/`--money-*`, so `components/ui/*` renders unchanged. |
+| `frontend/scripts/check-token-agreement.mjs` | **New in A0.6.** Asserts every `var(--x)` the config wants is declared by the token layer. In `pnpm verify`. |
 | `docs/design/preview-v3.html` | Working reference for both registers, both modes. |
-| `frontend/eslint.design-rules.mjs` | 7 rules written. All at `"warn"`, enforcing nothing. |
-| `frontend/scripts/visual/` | `capture.mjs`, `compare.mjs`, `routes.mjs` + baseline/current dirs. Harness exists, unused. |
+| `frontend/eslint.design-plugin.mjs` | **New in A0.2.** Seven independently named rules with per-rule severity. `no-solid-as-text` and `no-disabled-as-content` are at `error` and blocking; the other five are `warn`. |
+| `.githooks/pre-push` | **New in A0.3.** Chains Git LFS first, then `pnpm verify && pnpm test`. |
+| `frontend/scripts/visual/` | `capture.mjs`, `compare.mjs`, `routes.mjs` + baseline/current dirs. Covers **34 routes, not 147**, deliberately, and `compare.mjs` exits 0 on changed pixels — it is advisory by construction, not a gate. |
 | `frontend/src/components/ui/` | 21 shadcn primitives. Restyle, do not replace. |
 | `getting-started-checklist.tsx` | First-run UX already built. Restyle only. |
 | Global error boundary + chunk-reload provider | Shipped 2026-08-11. Leave alone. |
@@ -96,11 +98,11 @@ The pattern this plan is judged against is that v2 and v3 produced documents, no
 | # | Item | Status | Effort (human / CC) |
 | --- | --- | --- | --- |
 | A0.1 | **POS card safety fix.** `pos-product-card.tsx`: `h-7`→48px on the Variants button, `font-black`→500 (×4), the 9.9px uppercase labels→`text-xs` sentence case, `tabular-nums` on the price, dot + `aria-label` on the out-of-stock badge. No token layer needed. | **shipped 2026-08-17** (18→8 lint warnings) | 1h / 10m |
-| A0.2 | **Make the ratchet real — as a 7-rule plugin, not a flag.** Split `designRules` into a local flat-config plugin with seven independently named rules (`design/no-raw-palette`, `no-hex-in-class`, `no-heavy-weight`, `no-uppercase`, `no-sub-12px`, `no-solid-as-text`, `no-disabled-as-content`), each a thin wrapper over the existing selector array. Rules a phase has cleared → `"error"`, which fails `eslint` with exit 1 and blocks the commit through `lint-staged` **for free, per rule, on MIGRATION.md's actual flip schedule**. Rules not yet cleared stay `"warn"`. `--max-warnings 0` becomes the *last* step, after E2, when the warn set is empty. Ship `no-solid-as-text` and `no-disabled-as-content` at `error` immediately — both are near-clean today, so the ratchet is real and blocking on day one. | pending | 1h / 15m |
-| A0.3 | **`pnpm verify && pnpm test` in a new `.githooks/pre-push`, chaining Git LFS first.** | pending | 1.5h / 20m |
+| A0.2 | **Make the ratchet real — as a 7-rule plugin, not a flag.** Split `designRules` into a local flat-config plugin with seven independently named rules (`design/no-raw-palette`, `no-hex-in-class`, `no-heavy-weight`, `no-uppercase`, `no-sub-12px`, `no-solid-as-text`, `no-disabled-as-content`), each a thin wrapper over the existing selector array. Rules a phase has cleared → `"error"`, which fails `eslint` with exit 1 and blocks the commit through `lint-staged` **for free, per rule, on MIGRATION.md's actual flip schedule**. Rules not yet cleared stay `"warn"`. `--max-warnings 0` becomes the *last* step, after E2, when the warn set is empty. Ship `no-solid-as-text` and `no-disabled-as-content` at `error` immediately — both are near-clean today, so the ratchet is real and blocking on day one. | **shipped 2026-08-17** (2 rules at error, 0 violations) | 1h / 15m |
+| A0.3 | **`pnpm verify && pnpm test` in a new `.githooks/pre-push`, chaining Git LFS first.** | **shipped 2026-08-17** (LFS chained, verified) | 1.5h / 20m |
 | A0.4 | **Capture baselines now**, on the 34 routes the harness covers, before any token change. After A1 lands there is no recoverable record of the pre-migration appearance. One-way door — and `capture.mjs:154` `rmSync`s the output dir unconditionally, so a stray `pnpm visual:baseline` re-opens the door in the wrong direction. **Commit `frontend/visual/baseline/` to git immediately after.** | pending | 2h / — |
 | A0.5 | Create `TODOS.md`. | **shipped 2026-08-17** (15 items, T-A…T-O) | — |
-| A0.6 | **Reconcile `tokens.css` and `tailwind.config.proposed.ts` to v3 names and values** before A1 runs. See A2.1 for why; this is the pure-docs half, done first so A1 becomes mechanical. | pending | 45m / 10m |
+| A0.6 | **Reconcile `tokens.css` and `tailwind.config.proposed.ts` to v3 names and values** before A1 runs. See A2.1 for why; this is the pure-docs half, done first so A1 becomes mechanical. | **shipped 2026-08-17** (`pnpm check:tokens`) | 45m / 10m |
 
 **Note on A0.2 — two rejected designs, and why.**
 
