@@ -199,7 +199,7 @@ function ReceiptMockPreview({ layout }: { layout: ReceiptLayoutSchema }): JSX.El
   const alignClass = layout.layoutConfig.alignment === "center" ? "text-center" : "text-left";
 
   return (
-    <div className="rounded-3xl border border-dashed border-brand-cappuccino bg-white p-5 shadow-sm">
+    <div className="rounded-3xl border border-dashed border-brand-cappuccino bg-card p-5 shadow-sm">
       <div
         className={`mx-auto ${spacingClass} ${textClass} ${alignClass} text-brand-espresso ${
           layout.receiptType === "58mm"
@@ -253,7 +253,7 @@ function ReceiptMockPreview({ layout }: { layout: ReceiptLayoutSchema }): JSX.El
               <span>AED 12.00</span>
             </div>
           ) : null}
-          <div className="flex justify-between text-base font-black">
+          <div className="flex justify-between text-body font-medium">
             <span>Total</span>
             <span>AED 252.00</span>
           </div>
@@ -560,7 +560,7 @@ function ReceiptLayoutDialog({
           </div>
 
           <div className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">Live preview</p>
+            <p className="text-xs text-brand-mocha">Live preview</p>
             <ReceiptMockPreview layout={formState} />
           </div>
         </div>
@@ -602,13 +602,13 @@ function LayoutPreviewDialog({
         </DialogHeader>
         {previewHtml ? (
           <iframe
-            className="h-[32rem] w-full rounded-2xl border border-brand-cappuccino bg-white"
+            className="h-[32rem] w-full rounded-2xl border border-brand-cappuccino bg-card"
             sandbox=""
             srcDoc={previewHtml}
             title="Receipt layout preview"
           />
         ) : (
-          <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-2xl border border-brand-cappuccino bg-white p-4 text-sm text-brand-espresso">
+          <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-2xl border border-brand-cappuccino bg-card p-4 text-sm text-brand-espresso">
             {previewText ?? "The backend did not return preview content for this layout."}
           </pre>
         )}
@@ -665,7 +665,7 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
 
   if (!canView) {
     return (
-      <Alert className="border-red-200 bg-red-50 text-red-950">
+      <Alert className="border-danger/30 bg-danger-tint text-danger-text">
         <ShieldAlert className="h-4 w-4" />
         <AlertTitle>Access denied</AlertTitle>
         <AlertDescription>You need settings.view to view receipt layouts.</AlertDescription>
@@ -698,14 +698,14 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
         <Card>
           <CardContent className="p-5">
             <ReceiptText className="h-5 w-5 text-brand-caramel" />
-            <p className="mt-3 text-xs uppercase tracking-[0.18em] text-brand-mocha">Layouts</p>
+            <p className="mt-3 text-xs text-brand-mocha">Layouts</p>
             <p className="font-serif text-3xl text-brand-espresso">{layouts.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
             <Star className="h-5 w-5 text-brand-caramel" />
-            <p className="mt-3 text-xs uppercase tracking-[0.18em] text-brand-mocha">Defaults</p>
+            <p className="mt-3 text-xs text-brand-mocha">Defaults</p>
             <p className="font-serif text-3xl text-brand-espresso">
               {layouts.filter((layout) => layout.isDefault).length}
             </p>
@@ -714,7 +714,7 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
         <Card>
           <CardContent className="p-5">
             <FileText className="h-5 w-5 text-brand-caramel" />
-            <p className="mt-3 text-xs uppercase tracking-[0.18em] text-brand-mocha">Supported</p>
+            <p className="mt-3 text-xs text-brand-mocha">Supported</p>
             <p className="font-serif text-3xl text-brand-espresso">58 / 80 / A4</p>
           </CardContent>
         </Card>
@@ -729,7 +729,7 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
       ) : null}
 
       {!layoutsQuery.isLoading && layoutsQuery.error ? (
-        <Alert className="border-red-200 bg-red-50 text-red-950">
+        <Alert className="border-danger/30 bg-danger-tint text-danger-text">
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Unable to load receipt layouts</AlertTitle>
           <AlertDescription>{getErrorMessage(layoutsQuery.error)}</AlertDescription>
@@ -827,7 +827,7 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
                                 Set as default
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                className="text-red-700"
+                                className="text-danger-text"
                                 disabled={deleteMutation.isPending}
                                 onSelect={() => {
                                   deleteMutation

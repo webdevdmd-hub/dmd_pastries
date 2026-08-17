@@ -67,12 +67,12 @@ const statusLabels: Record<ApiMonitorStatus, string> = {
 };
 
 const statusClasses: Record<ApiMonitorStatus, string> = {
-  expected_validation: "border-sky-200 bg-sky-50 text-sky-800",
-  failed: "border-red-200 bg-red-50 text-red-800",
-  healthy: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  expected_validation: "border-info/30 bg-info-tint text-info-text",
+  failed: "border-danger/30 bg-danger-tint text-danger-text",
+  healthy: "border-money/30 bg-money-tint text-money-text",
   not_tested: "border-brand-cappuccino bg-brand-latte text-brand-mocha",
   server_error: "border-rose-200 bg-rose-50 text-rose-800",
-  slow: "border-amber-200 bg-amber-50 text-amber-800",
+  slow: "border-warning/30 bg-warning-tint text-warning-text",
   unauthorized: "border-orange-200 bg-orange-50 text-orange-800",
 };
 
@@ -170,14 +170,14 @@ function groupRows(rows: RouteStatusRow[]): ModuleRouteGroup[] {
 function methodBadgeClass(method: string): string {
   switch (method) {
     case "DELETE":
-      return "border-red-200 bg-red-50 text-red-800";
+      return "border-danger/30 bg-danger-tint text-danger-text";
     case "PATCH":
     case "PUT":
-      return "border-blue-200 bg-blue-50 text-blue-800";
+      return "border-info/30 bg-info-tint text-info-text";
     case "POST":
-      return "border-amber-200 bg-amber-50 text-amber-800";
+      return "border-warning/30 bg-warning-tint text-warning-text";
     default:
-      return "border-emerald-200 bg-emerald-50 text-emerald-800";
+      return "border-money/30 bg-money-tint text-money-text";
   }
 }
 
@@ -266,7 +266,7 @@ function RecentEventsPanel({ events }: { events: ApiMonitorEvent[] }): JSX.Eleme
         ) : null}
 
         {events.slice(0, 15).map((event) => (
-          <div className="rounded-xl border border-brand-cappuccino bg-white p-3" key={event.id}>
+          <div className="rounded-xl border border-brand-cappuccino bg-card p-3" key={event.id}>
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="text-sm font-semibold text-brand-espresso">{event.apiName}</p>
@@ -284,7 +284,7 @@ function RecentEventsPanel({ events }: { events: ApiMonitorEvent[] }): JSX.Eleme
               <span>{event.source === "safe_probe" ? "Safe check" : "Live action"}</span>
             </div>
             {event.errorMessage ? (
-              <p className="mt-2 line-clamp-2 text-xs text-red-700">{event.errorMessage}</p>
+              <p className="mt-2 line-clamp-2 text-xs text-danger-text">{event.errorMessage}</p>
             ) : null}
           </div>
         ))}
@@ -327,7 +327,7 @@ function SummaryCards({
       {cards.map((card) => (
         <Card key={card.label}>
           <CardContent className="p-5">
-            <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">{card.label}</p>
+            <p className="text-xs text-brand-mocha">{card.label}</p>
             <p className="mt-3 font-serif text-3xl text-brand-espresso">{card.value}</p>
             <p className="mt-1 text-sm text-brand-mocha">{card.detail}</p>
           </CardContent>
@@ -447,7 +447,7 @@ export function ApiMonitorPageClient(): JSX.Element {
       />
 
       {catalogQuery.isError ? (
-        <Alert className="border-red-200 bg-red-50 text-red-950">
+        <Alert className="border-danger/30 bg-danger-tint text-danger-text">
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Unable to load API catalog</AlertTitle>
           <AlertDescription>{getErrorMessage(catalogQuery.error)}</AlertDescription>

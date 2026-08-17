@@ -505,7 +505,7 @@ export function UserFormDialog({
             >
               <div className="grid gap-5">
                 {isSelfEdit ? (
-                  <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+                  <div className="rounded-md border border-warning/30 bg-warning-tint px-4 py-3 text-sm leading-6 text-warning-text">
                     Your own role, status, branch, and email are protected. Ask another authorized
                     admin to change those fields.
                   </div>

@@ -41,11 +41,9 @@ export function SuperAdminUsersPageClient(): JSX.Element {
     <div className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-            Platform Identity
-          </p>
+          <p className="text-xs font-semibold text-foreground-muted">Platform Identity</p>
           <h2 className="mt-1 text-2xl font-semibold text-brand-espresso">Users</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600">
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-foreground-muted">
             Search every tenant user by name, email, Appwrite ID, or business.
           </p>
         </div>
@@ -63,7 +61,7 @@ export function SuperAdminUsersPageClient(): JSX.Element {
 
       <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
           <Input
             className="pl-9"
             onChange={(event) => setSearch(event.target.value)}
@@ -95,7 +93,7 @@ export function SuperAdminUsersPageClient(): JSX.Element {
       ) : null}
 
       {usersQuery.data ? (
-        <Card className="border-stone-300 shadow-none">
+        <Card className="border-border shadow-none">
           <CardContent className="overflow-x-auto p-0">
             <Table className="min-w-[1180px]">
               <TableHeader>
@@ -116,7 +114,7 @@ export function SuperAdminUsersPageClient(): JSX.Element {
                   <TableRow key={user.id}>
                     <TableCell>
                       <p className="font-semibold text-brand-espresso">{user.fullName}</p>
-                      <p className="text-xs text-stone-500">{user.id}</p>
+                      <p className="text-xs text-foreground-muted">{user.id}</p>
                     </TableCell>
                     <TableCell>
                       <Link

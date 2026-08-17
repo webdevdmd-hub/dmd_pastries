@@ -41,11 +41,9 @@ export function SuperAdminBusinessesPageClient(): JSX.Element {
     <div className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-            Tenant Visibility
-          </p>
+          <p className="text-xs font-semibold text-foreground-muted">Tenant Visibility</p>
           <h2 className="mt-1 text-2xl font-semibold text-brand-espresso">Businesses</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600">
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-foreground-muted">
             Search every tenant and inspect owner, subscription, user, branch, and role setup.
           </p>
         </div>
@@ -63,7 +61,7 @@ export function SuperAdminBusinessesPageClient(): JSX.Element {
 
       <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
           <Input
             className="pl-9"
             onChange={(event) => setSearch(event.target.value)}
@@ -94,7 +92,7 @@ export function SuperAdminBusinessesPageClient(): JSX.Element {
       ) : null}
 
       {businessesQuery.data ? (
-        <Card className="border-stone-300 shadow-none">
+        <Card className="border-border shadow-none">
           <CardContent className="overflow-x-auto p-0">
             <Table className="min-w-[1100px]">
               <TableHeader>
@@ -116,13 +114,13 @@ export function SuperAdminBusinessesPageClient(): JSX.Element {
                     <TableCell>
                       <div>
                         <p className="font-semibold text-brand-espresso">{business.businessName}</p>
-                        <p className="text-xs text-stone-500">{business.id}</p>
+                        <p className="text-xs text-foreground-muted">{business.id}</p>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div>
                         <p>{business.ownerName ?? "No owner"}</p>
-                        <p className="text-xs text-stone-500">
+                        <p className="text-xs text-foreground-muted">
                           {business.ownerEmail ?? "No email"}
                         </p>
                       </div>
@@ -133,7 +131,9 @@ export function SuperAdminBusinessesPageClient(): JSX.Element {
                     <TableCell>
                       <div>
                         <p>{business.subscriptionStatus ?? "No subscription"}</p>
-                        <p className="text-xs text-stone-500">{business.planType ?? "No plan"}</p>
+                        <p className="text-xs text-foreground-muted">
+                          {business.planType ?? "No plan"}
+                        </p>
                       </div>
                     </TableCell>
                     <TableCell>{formatCount(business.usersCount)}</TableCell>

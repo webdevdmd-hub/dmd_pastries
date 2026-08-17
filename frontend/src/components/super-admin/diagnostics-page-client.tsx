@@ -32,11 +32,9 @@ export function SuperAdminDiagnosticsPageClient(): JSX.Element {
     <div className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-            Platform Health
-          </p>
+          <p className="text-xs font-semibold text-foreground-muted">Platform Health</p>
           <h2 className="mt-1 text-2xl font-semibold text-brand-espresso">Diagnostics</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600">
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-foreground-muted">
             Review tenant and access issues that commonly break login, branch routing, and role
             permissions.
           </p>
@@ -69,7 +67,7 @@ export function SuperAdminDiagnosticsPageClient(): JSX.Element {
       ) : null}
 
       {diagnosticsQuery.data ? (
-        <Card className="border-stone-300 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <AlertTriangle className="h-4 w-4" />
@@ -105,7 +103,7 @@ export function SuperAdminDiagnosticsPageClient(): JSX.Element {
                             </Link>
                           </Button>
                         ) : (
-                          <span className="text-stone-500">None</span>
+                          <span className="text-foreground-muted">None</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -117,14 +115,14 @@ export function SuperAdminDiagnosticsPageClient(): JSX.Element {
                             </Link>
                           </Button>
                         ) : (
-                          <span className="text-stone-500">None</span>
+                          <span className="text-foreground-muted">None</span>
                         )}
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell className="py-8 text-center text-stone-500" colSpan={5}>
+                    <TableCell className="py-8 text-center text-foreground-muted" colSpan={5}>
                       No diagnostics found.
                     </TableCell>
                   </TableRow>
@@ -140,9 +138,9 @@ export function SuperAdminDiagnosticsPageClient(): JSX.Element {
 
 function MetricCard({ label, value }: { label: string; value: number }): JSX.Element {
   return (
-    <Card className="border-stone-300 shadow-none">
+    <Card className="border-border shadow-none">
       <CardContent className="p-5">
-        <p className="text-sm text-stone-500">{label}</p>
+        <p className="text-sm text-foreground-muted">{label}</p>
         <p className="mt-2 text-2xl font-semibold text-brand-espresso">{value}</p>
       </CardContent>
     </Card>

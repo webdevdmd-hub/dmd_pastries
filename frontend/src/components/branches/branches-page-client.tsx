@@ -131,7 +131,7 @@ export function BranchesPageClient(): JSX.Element {
   if (!canView) {
     return (
       <div className="mx-auto max-w-3xl">
-        <Alert className="border-brand-cappuccino bg-white/80">
+        <Alert className="border-brand-cappuccino bg-card/80">
           <Store className="h-4 w-4" />
           <AlertTitle>Access denied</AlertTitle>
           <AlertDescription>

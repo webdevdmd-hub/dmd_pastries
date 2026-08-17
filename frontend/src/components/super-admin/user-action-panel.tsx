@@ -182,7 +182,7 @@ export function SuperAdminUserActionPanel({ detail, business }: UserActionPanelP
   }
 
   return (
-    <Card className="border-stone-300 shadow-none">
+    <Card className="border-border shadow-none">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ShieldAlert className="h-4 w-4" />
@@ -190,7 +190,7 @@ export function SuperAdminUserActionPanel({ detail, business }: UserActionPanelP
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+        <Alert className="border-warning/30 bg-warning-tint text-warning-text">
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Audit required</AlertTitle>
           <AlertDescription>
@@ -206,7 +206,7 @@ export function SuperAdminUserActionPanel({ detail, business }: UserActionPanelP
         ) : null}
 
         {isDeleted ? (
-          <Alert className="border-stone-300 bg-stone-50 text-stone-800">
+          <Alert className="border-border bg-muted text-foreground">
             <AlertTitle>User is soft deleted</AlertTitle>
             <AlertDescription>
               Restore this user before changing profile or access fields.
@@ -284,7 +284,7 @@ export function SuperAdminUserActionPanel({ detail, business }: UserActionPanelP
             </Select>
           </Field>
 
-          <div className="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-3">
+          <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
             <Checkbox
               checked={canAccessAllBranches}
               disabled={isDeleted}
@@ -300,7 +300,7 @@ export function SuperAdminUserActionPanel({ detail, business }: UserActionPanelP
           <div className="grid gap-2 md:grid-cols-2">
             {availableBranches.map((branch) => (
               <label
-                className="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-3 text-sm"
+                className="flex items-center gap-3 rounded-md border border-border bg-card p-3 text-sm"
                 key={branch.id}
               >
                 <Checkbox
@@ -310,7 +310,7 @@ export function SuperAdminUserActionPanel({ detail, business }: UserActionPanelP
                 />
                 <span>
                   <span className="block font-medium text-brand-espresso">{branch.branchName}</span>
-                  <span className="text-xs text-stone-500">{branch.code}</span>
+                  <span className="text-xs text-foreground-muted">{branch.code}</span>
                 </span>
               </label>
             ))}
@@ -326,7 +326,7 @@ export function SuperAdminUserActionPanel({ detail, business }: UserActionPanelP
         </Field>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-stone-500">
+          <p className="text-sm text-foreground-muted">
             {hasChanges ? "Changes are ready for audited submit." : "No changes selected."}
           </p>
           <Button disabled={!canSubmit} onClick={submitAction} type="button">
@@ -335,13 +335,13 @@ export function SuperAdminUserActionPanel({ detail, business }: UserActionPanelP
           </Button>
         </div>
 
-        <div className="rounded-md border border-red-200 bg-red-50 p-4">
+        <div className="rounded-md border border-danger/30 bg-danger-tint p-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="font-semibold text-red-950">
+              <p className="font-semibold text-danger-text">
                 {isDeleted ? "Restore user" : "Soft delete user"}
               </p>
-              <p className="mt-1 text-sm leading-6 text-red-900">
+              <p className="mt-1 text-sm leading-6 text-danger-text">
                 Type <span className="font-semibold">{detail.user.email}</span> and provide a
                 reason. This does not hard delete database records.
               </p>
@@ -376,7 +376,7 @@ export function SuperAdminUserActionPanel({ detail, business }: UserActionPanelP
               </Button>
             ) : (
               <Button
-                className="bg-red-700 text-white hover:bg-red-800"
+                className="bg-danger text-primary-foreground hover:bg-danger"
                 disabled={!canSubmitDanger}
                 onClick={() => submitDangerAction("soft_delete")}
                 type="button"
@@ -388,11 +388,11 @@ export function SuperAdminUserActionPanel({ detail, business }: UserActionPanelP
           </div>
         </div>
 
-        <div className="rounded-md border border-red-300 bg-white p-4">
+        <div className="rounded-md border border-danger/30 bg-card p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="font-semibold text-red-950">Hard delete guard</p>
-              <p className="mt-1 text-sm leading-6 text-red-900">
+              <p className="font-semibold text-danger-text">Hard delete guard</p>
+              <p className="mt-1 text-sm leading-6 text-danger-text">
                 Hard delete permanently removes the local user row. It is only enabled after the
                 backend confirms there are no blocking records.
               </p>
@@ -432,7 +432,7 @@ export function SuperAdminUserActionPanel({ detail, business }: UserActionPanelP
               </div>
 
               {hardDeletePreview.requiresSoftDelete ? (
-                <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+                <Alert className="border-warning/30 bg-warning-tint text-warning-text">
                   <AlertTitle>Soft delete required first</AlertTitle>
                   <AlertDescription>
                     Use soft delete before requesting a hard delete preview approval.
@@ -442,7 +442,7 @@ export function SuperAdminUserActionPanel({ detail, business }: UserActionPanelP
 
               {hardDeletePreview.blockingCounts.length > 0 ? (
                 <div>
-                  <p className="text-sm font-semibold text-red-950">Blocking records</p>
+                  <p className="text-sm font-semibold text-danger-text">Blocking records</p>
                   <div className="mt-2 grid gap-2 md:grid-cols-2">
                     {hardDeletePreview.blockingCounts.map((item) => (
                       <RelatedCountItem item={item} key={`${item.module}-${item.table}`} />
@@ -453,7 +453,7 @@ export function SuperAdminUserActionPanel({ detail, business }: UserActionPanelP
 
               {hardDeletePreview.cleanupCounts.length > 0 ? (
                 <div>
-                  <p className="text-sm font-semibold text-stone-800">Cleanup path records</p>
+                  <p className="text-sm font-semibold text-foreground">Cleanup path records</p>
                   <div className="mt-2 grid gap-2 md:grid-cols-2">
                     {hardDeletePreview.cleanupCounts.map((item) => (
                       <RelatedCountItem item={item} key={`${item.module}-${item.table}`} />
@@ -482,7 +482,7 @@ export function SuperAdminUserActionPanel({ detail, business }: UserActionPanelP
 
               <div className="flex justify-end">
                 <Button
-                  className="bg-red-900 text-white hover:bg-red-950"
+                  className="bg-danger text-primary-foreground hover:bg-danger"
                   disabled={!canSubmitHardDelete}
                   onClick={submitHardDelete}
                   type="button"
@@ -510,8 +510,8 @@ function Field({ children, label }: { children: JSX.Element; label: string }): J
 
 function GuardMetric({ label, value }: { label: string; value: string }): JSX.Element {
   return (
-    <div className="rounded-md border border-stone-200 bg-stone-50 p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">{label}</p>
+    <div className="rounded-md border border-border bg-muted p-3">
+      <p className="text-xs font-semibold text-foreground-muted">{label}</p>
       <p className="mt-2 break-words font-semibold text-brand-espresso">{value}</p>
     </div>
   );
@@ -523,9 +523,9 @@ function RelatedCountItem({
   item: { module: string; table: string; count: number };
 }): JSX.Element {
   return (
-    <div className="rounded-md border border-stone-200 bg-white p-3">
+    <div className="rounded-md border border-border bg-card p-3">
       <p className="text-sm font-semibold text-brand-espresso">{item.module}</p>
-      <p className="mt-1 font-mono text-xs text-stone-500">{item.table}</p>
+      <p className="mt-1 font-mono text-xs text-foreground-muted">{item.table}</p>
       <p className="mt-2 text-lg font-semibold">{item.count}</p>
     </div>
   );

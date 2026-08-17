@@ -363,12 +363,12 @@ export function PermissionMatrix({
           </div>
         ) : null}
         {!hasSelectedPermissions ? (
-          <div className="rounded-2xl border border-amber-700/20 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+          <div className="rounded-2xl border border-warning/20 bg-warning-tint p-4 text-sm leading-6 text-warning-text">
             {permissionRequiredMessage}
           </div>
         ) : null}
         {saveDisabledReason ? (
-          <div className="rounded-2xl border border-amber-700/20 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+          <div className="rounded-2xl border border-warning/20 bg-warning-tint p-4 text-sm leading-6 text-warning-text">
             {saveDisabledReason}
           </div>
         ) : null}
@@ -383,7 +383,7 @@ export function PermissionMatrix({
         )}
       </CardHeader>
       <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-        <div className="overflow-hidden rounded-[1.5rem] border border-brand-cappuccino bg-white/80">
+        <div className="overflow-hidden rounded-[1.5rem] border border-brand-cappuccino bg-card/80">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] border-collapse text-left text-sm">
               <thead>
@@ -565,7 +565,7 @@ export function PermissionMatrix({
         ) : null}
       </CardContent>
       {showSave ? (
-        <div className="flex items-center justify-between gap-3 border-t border-brand-cappuccino bg-white/95 px-6 py-4 backdrop-blur">
+        <div className="flex items-center justify-between gap-3 border-t border-brand-cappuccino bg-card/95 px-6 py-4 backdrop-blur">
           <div className="text-sm text-brand-mocha">{footerStatusMessage}</div>
           <Button
             disabled={saveDisabled}

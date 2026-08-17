@@ -40,7 +40,7 @@ export function MasterDataOverviewPageClient(): JSX.Element {
   if (!canView) {
     return (
       <div className="mx-auto max-w-3xl">
-        <Alert className="border-brand-cappuccino bg-white/80">
+        <Alert className="border-brand-cappuccino bg-card/80">
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Access denied</AlertTitle>
           <AlertDescription>
@@ -62,7 +62,7 @@ export function MasterDataOverviewPageClient(): JSX.Element {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {overviewCards.map((card) => (
             <div
-              className="h-40 animate-pulse rounded-3xl border border-brand-cappuccino bg-white/60"
+              className="h-40 animate-pulse rounded-3xl border border-brand-cappuccino bg-card/60"
               key={card.key}
             />
           ))}
@@ -70,7 +70,7 @@ export function MasterDataOverviewPageClient(): JSX.Element {
       ) : null}
 
       {overviewQuery.error ? (
-        <Alert className="border-red-200 bg-red-50 text-red-950">
+        <Alert className="border-danger/30 bg-danger-tint text-danger-text">
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Unable to load master data overview</AlertTitle>
           <AlertDescription>{getErrorMessage(overviewQuery.error)}</AlertDescription>

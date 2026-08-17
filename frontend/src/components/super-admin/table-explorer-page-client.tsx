@@ -163,11 +163,9 @@ export function SuperAdminTableExplorerPageClient(): JSX.Element {
     <div className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-            Controlled Data Surface
-          </p>
+          <p className="text-xs font-semibold text-foreground-muted">Controlled Data Surface</p>
           <h2 className="mt-1 text-2xl font-semibold text-brand-espresso">Table Explorer</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600">
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-foreground-muted">
             Browse allowlisted operational tables and update only backend-approved fields with an
             audit reason.
           </p>
@@ -212,7 +210,7 @@ export function SuperAdminTableExplorerPageClient(): JSX.Element {
         <div>
           <Label htmlFor="super-admin-table-search">Search</Label>
           <div className="relative mt-2">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
             <Input
               id="super-admin-table-search"
               className="pl-9"
@@ -267,9 +265,9 @@ export function SuperAdminTableExplorerPageClient(): JSX.Element {
 
       {rowsQuery.data ? (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <Card className="border-stone-300 shadow-none">
+          <Card className="border-border shadow-none">
             <CardContent className="space-y-4 p-0">
-              <div className="flex flex-col gap-2 border-b border-stone-200 p-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-base font-semibold text-brand-espresso">
@@ -279,9 +277,11 @@ export function SuperAdminTableExplorerPageClient(): JSX.Element {
                       {rowsQuery.data.table.canUpdate ? "Editable fields" : "Read only"}
                     </Badge>
                   </div>
-                  <p className="mt-1 text-sm text-stone-600">{rowsQuery.data.table.description}</p>
+                  <p className="mt-1 text-sm text-foreground-muted">
+                    {rowsQuery.data.table.description}
+                  </p>
                 </div>
-                <p className="text-sm text-stone-500">
+                <p className="text-sm text-foreground-muted">
                   {rowsQuery.data.totalRows} rows · page {rowsQuery.data.page} of{" "}
                   {Math.max(rowsQuery.data.totalPages, 1)}
                 </p>
@@ -306,7 +306,7 @@ export function SuperAdminTableExplorerPageClient(): JSX.Element {
                     {rowsQuery.data.rows.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          className="h-24 text-center text-sm text-stone-500"
+                          className="h-24 text-center text-sm text-foreground-muted"
                           colSpan={columns.length}
                         >
                           No rows found.
@@ -323,7 +323,9 @@ export function SuperAdminTableExplorerPageClient(): JSX.Element {
                           {columns.map((column) => (
                             <TableCell key={column.key} className="max-w-[260px] truncate">
                               <span
-                                className={row[column.key] === null ? "text-stone-400" : undefined}
+                                className={
+                                  row[column.key] === null ? "text-foreground-muted" : undefined
+                                }
                               >
                                 {cellText(row[column.key])}
                               </span>
@@ -336,7 +338,7 @@ export function SuperAdminTableExplorerPageClient(): JSX.Element {
                 </Table>
               </div>
 
-              <div className="flex items-center justify-between border-t border-stone-200 p-4">
+              <div className="flex items-center justify-between border-t border-border p-4">
                 <Button
                   disabled={page <= 1 || rowsQuery.isFetching}
                   onClick={() => {
@@ -348,7 +350,7 @@ export function SuperAdminTableExplorerPageClient(): JSX.Element {
                 >
                   Previous
                 </Button>
-                <span className="text-sm text-stone-500">
+                <span className="text-sm text-foreground-muted">
                   {rowsQuery.isFetching
                     ? "Refreshing..."
                     : [String(rowsQuery.data.rows.length), "visible"].join(" ")}
@@ -372,11 +374,11 @@ export function SuperAdminTableExplorerPageClient(): JSX.Element {
             </CardContent>
           </Card>
 
-          <Card className="border-stone-300 shadow-none">
+          <Card className="border-border shadow-none">
             <CardContent className="space-y-4 p-5">
               <div>
                 <h3 className="text-base font-semibold text-brand-espresso">Selected Row</h3>
-                <p className="mt-1 text-sm text-stone-600">
+                <p className="mt-1 text-sm text-foreground-muted">
                   Choose a row, edit approved fields, then save with a reason.
                 </p>
               </div>
@@ -402,7 +404,7 @@ export function SuperAdminTableExplorerPageClient(): JSX.Element {
 
               {selectedRow && editableColumns.length > 0 ? (
                 <>
-                  <div className="rounded-md border border-stone-200 bg-stone-50 p-3 text-xs text-stone-600">
+                  <div className="rounded-md border border-border bg-muted p-3 text-xs text-foreground-muted">
                     Row ID: <span className="font-mono text-brand-espresso">{selectedRowId}</span>
                   </div>
 
@@ -411,7 +413,7 @@ export function SuperAdminTableExplorerPageClient(): JSX.Element {
                       <div key={column.key}>
                         <Label htmlFor={`table-field-${column.key}`}>
                           {column.label}
-                          <span className="ml-2 text-xs font-normal text-stone-500">
+                          <span className="ml-2 text-xs font-normal text-foreground-muted">
                             {column.type}
                           </span>
                         </Label>
@@ -440,7 +442,7 @@ export function SuperAdminTableExplorerPageClient(): JSX.Element {
                       placeholder="Required. Explain why this row needs the update."
                       value={reason}
                     />
-                    <p className="mt-1 text-xs text-stone-500">Minimum 10 characters.</p>
+                    <p className="mt-1 text-xs text-foreground-muted">Minimum 10 characters.</p>
                   </div>
 
                   <Button

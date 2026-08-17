@@ -394,7 +394,7 @@ export function SalesChannelsPageClient(): JSX.Element {
 
   if (!canView) {
     return (
-      <Alert className="border-red-200 bg-red-50 text-red-950">
+      <Alert className="border-danger/30 bg-danger-tint text-danger-text">
         <RadioTower className="h-4 w-4" />
         <AlertTitle>Access denied</AlertTitle>
         <AlertDescription>You do not have permission to view sales channels.</AlertDescription>
@@ -418,7 +418,7 @@ export function SalesChannelsPageClient(): JSX.Element {
       />
 
       {salesChannelsQuery.error ? (
-        <Alert className="border-red-200 bg-red-50 text-red-950">
+        <Alert className="border-danger/30 bg-danger-tint text-danger-text">
           <RadioTower className="h-4 w-4" />
           <AlertTitle>Unable to load sales channels</AlertTitle>
           <AlertDescription>{getErrorMessage(salesChannelsQuery.error)}</AlertDescription>
@@ -505,7 +505,7 @@ export function SalesChannelsPageClient(): JSX.Element {
                           Mark inactive
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          className="text-red-700 focus:text-red-800"
+                          className="text-danger-text focus:text-danger-text"
                           disabled={!canManage || channel.isDefault}
                           onSelect={() => {
                             void handleDelete(channel);

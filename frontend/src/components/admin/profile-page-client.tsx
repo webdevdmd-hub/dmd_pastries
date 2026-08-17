@@ -38,24 +38,24 @@ export function ProfilePageClient(): JSX.Element {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-3xl border border-brand-cappuccino bg-brand-latte/70 p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Email</p>
+              <p className="text-xs text-brand-mocha">Email</p>
               <p className="mt-2 font-medium text-brand-espresso">{user?.email ?? "Unavailable"}</p>
             </div>
             <div className="rounded-3xl border border-brand-cappuccino bg-brand-latte/70 p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Business</p>
+              <p className="text-xs text-brand-mocha">Business</p>
               <p className="mt-2 font-medium text-brand-espresso">
                 {business?.businessName ?? user?.businessName ?? "Business workspace"}
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-3xl border border-brand-cappuccino bg-brand-latte/70 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Currency</p>
+                <p className="text-xs text-brand-mocha">Currency</p>
                 <p className="mt-2 font-medium text-brand-espresso">
                   {business?.currency ?? (canViewSettings ? "Loading" : "Restricted")}
                 </p>
               </div>
               <div className="rounded-3xl border border-brand-cappuccino bg-brand-latte/70 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Timezone</p>
+                <p className="text-xs text-brand-mocha">Timezone</p>
                 <p className="mt-2 font-medium text-brand-espresso">
                   {business?.timezone ?? (canViewSettings ? "Loading" : "Restricted")}
                 </p>
@@ -63,13 +63,13 @@ export function ProfilePageClient(): JSX.Element {
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-3xl border border-brand-cappuccino bg-brand-latte/70 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">VAT/TRN</p>
+                <p className="text-xs text-brand-mocha">VAT/TRN</p>
                 <p className="mt-2 font-medium text-brand-espresso">
                   {business?.vatNumber ?? "Not set"}
                 </p>
               </div>
               <div className="rounded-3xl border border-brand-cappuccino bg-brand-latte/70 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Default tax</p>
+                <p className="text-xs text-brand-mocha">Default tax</p>
                 <p className="mt-2 font-medium text-brand-espresso">
                   {settings
                     ? `${String(settings.defaultTaxRate)}%`
@@ -80,7 +80,7 @@ export function ProfilePageClient(): JSX.Element {
               </div>
             </div>
             <div className="rounded-3xl border border-brand-cappuccino bg-brand-latte/70 p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Roles</p>
+              <p className="text-xs text-brand-mocha">Roles</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {(user?.roles.length ? user.roles : ["Assigned role unavailable"]).map((role) => (
                   <Badge key={role} variant="secondary">

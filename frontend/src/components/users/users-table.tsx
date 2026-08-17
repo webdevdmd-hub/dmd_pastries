@@ -120,7 +120,9 @@ export function UsersTable({
       <TableBody>
         {users.map((user) => (
           <TableRow
-            className={cn(user.branchId === null ? "bg-amber-50/60 hover:bg-amber-50" : undefined)}
+            className={cn(
+              user.branchId === null ? "bg-warning-tint/60 hover:bg-warning-tint" : undefined,
+            )}
             key={user.id}
           >
             <TableCell>
@@ -143,7 +145,7 @@ export function UsersTable({
                 (branchNameById.get(user.branchId) ?? "Assigned branch")
               ) : (
                 <div className="flex flex-col gap-1">
-                  <Badge className="w-fit border-amber-300 bg-amber-100 text-amber-900">
+                  <Badge className="w-fit border-warning/30 bg-warning-tint text-warning-text">
                     Needs branch setup
                   </Badge>
                   <span className="text-xs text-brand-mocha">No branch assigned</span>

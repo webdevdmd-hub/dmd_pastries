@@ -79,7 +79,7 @@ export function PermissionModuleCard({
                 "flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition-colors",
                 checked
                   ? "border-brand-caramel/70 bg-brand-caramel/10"
-                  : "border-brand-cappuccino/70 bg-white/70",
+                  : "border-brand-cappuccino/70 bg-card/70",
                 changed ? "ring-2 ring-brand-caramel/40" : undefined,
                 disabled ? "cursor-not-allowed opacity-70" : "hover:border-brand-mocha/60",
               )}

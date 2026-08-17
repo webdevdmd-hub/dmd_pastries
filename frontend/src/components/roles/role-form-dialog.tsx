@@ -219,8 +219,8 @@ export function RoleFormDialog({
                   <Alert
                     className={
                       createSubmitMessage
-                        ? "border-red-200 bg-red-50 text-red-950"
-                        : "border-amber-200 bg-amber-50 text-amber-950"
+                        ? "border-danger/30 bg-danger-tint text-danger-text"
+                        : "border-warning/30 bg-warning-tint text-warning-text"
                     }
                     variant={createSubmitMessage ? "destructive" : "default"}
                   >
@@ -371,7 +371,7 @@ export function RoleFormDialog({
             >
               <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
                 {role?.isSystemDefault ? (
-                  <div className="rounded-2xl border border-amber-700/20 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                  <div className="rounded-2xl border border-warning/20 bg-warning-tint p-4 text-sm leading-6 text-warning-text">
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                       <div>

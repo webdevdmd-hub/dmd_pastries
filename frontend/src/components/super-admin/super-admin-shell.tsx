@@ -42,26 +42,24 @@ export function SuperAdminShell({ children }: SuperAdminShellProps): JSX.Element
 
   return (
     <div className="min-h-screen bg-[#f7f4ee] text-brand-espresso">
-      <header className="border-b border-stone-300 bg-[#1f2933] text-white">
+      <header className="border-b border-border bg-[#1f2933] text-primary-foreground">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-caramel text-brand-espresso">
               <ShieldCheck className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-cappuccino">
-                Platform Control
-              </p>
+              <p className="text-xs font-semibold text-brand-cappuccino">Platform Control</p>
               <h1 className="text-lg font-semibold">Super Admin</h1>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-md border border-white/15 px-3 py-2 text-sm text-white/80">
+            <span className="rounded-md border border-card/15 px-3 py-2 text-sm text-primary-foreground/80">
               {user?.email ?? "Platform admin"}
             </span>
             <Button
-              className="border-white/15 bg-white/5 text-white hover:bg-white/10"
+              className="border-card/15 bg-card/5 text-primary-foreground hover:bg-card/10"
               onClick={() => {
                 void handleLogout();
               }}
@@ -76,11 +74,11 @@ export function SuperAdminShell({ children }: SuperAdminShellProps): JSX.Element
       </header>
 
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:px-8">
-        <aside className="h-fit border-b border-stone-300 pb-4 lg:sticky lg:top-6 lg:border-b-0 lg:pb-0">
+        <aside className="h-fit border-b border-border pb-4 lg:sticky lg:top-6 lg:border-b-0 lg:pb-0">
           <nav className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
             {superAdminItems.map((item) => (
               <Link
-                className="flex min-w-fit items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-stone-700 hover:bg-white hover:text-brand-espresso"
+                className="flex min-w-fit items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-foreground-muted hover:bg-card hover:text-brand-espresso"
                 href={item.href}
                 key={item.href}
               >

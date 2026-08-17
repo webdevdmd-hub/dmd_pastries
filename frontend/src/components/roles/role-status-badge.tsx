@@ -16,5 +16,5 @@ export function RoleStatusBadge({ status }: RoleStatusBadgeProps): JSX.Element {
     );
   }
 
-  return <Badge className="border-emerald-700/20 bg-emerald-100 text-emerald-900">Active</Badge>;
+  return <Badge className="border-money/20 bg-money-tint text-money-text">Active</Badge>;
 }

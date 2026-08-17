@@ -103,7 +103,7 @@ export function OnboardingPageClient(): JSX.Element {
   if (!canViewSettings) {
     return (
       <div className="mx-auto max-w-3xl">
-        <Alert className="border-brand-cappuccino bg-white/80">
+        <Alert className="border-brand-cappuccino bg-card/80">
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Business onboarding requires settings access</AlertTitle>
           <AlertDescription>
@@ -153,7 +153,7 @@ export function OnboardingPageClient(): JSX.Element {
         </CardHeader>
         <CardContent className="space-y-6 pt-6">
           {businessQuery.error || onboardingQuery.error ? (
-            <Alert className="border-red-200 bg-red-50 text-red-950">
+            <Alert className="border-danger/30 bg-danger-tint text-danger-text">
               <ShieldAlert className="h-4 w-4" />
               <AlertTitle>Unable to load onboarding status</AlertTitle>
               <AlertDescription>
@@ -166,7 +166,7 @@ export function OnboardingPageClient(): JSX.Element {
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 5 }).map((_, index) => (
                 <div
-                  className="min-h-56 animate-pulse rounded-3xl border border-brand-cappuccino bg-white/60"
+                  className="min-h-56 animate-pulse rounded-3xl border border-brand-cappuccino bg-card/60"
                   key={`onboarding-skeleton-${String(index)}`}
                 />
               ))}
@@ -182,7 +182,7 @@ export function OnboardingPageClient(): JSX.Element {
 
                 return (
                   <article
-                    className="flex min-h-56 flex-col rounded-3xl border border-brand-cappuccino bg-white/70 p-5 shadow-soft"
+                    className="flex min-h-56 flex-col rounded-3xl border border-brand-cappuccino bg-card/70 p-5 shadow-soft"
                     key={step.key}
                   >
                     <div className="mb-4 flex items-start justify-between gap-3">
@@ -205,7 +205,7 @@ export function OnboardingPageClient(): JSX.Element {
                     <p className="mt-2 flex-1 text-sm leading-6 text-brand-mocha">
                       {metadata.description}
                     </p>
-                    <p className="mt-3 text-xs font-medium uppercase tracking-[0.18em] text-brand-mocha/70">
+                    <p className="mt-3 text-xs font-medium text-brand-mocha/70">
                       Backend step: {step.label}
                     </p>
                     {metadata.href ? (

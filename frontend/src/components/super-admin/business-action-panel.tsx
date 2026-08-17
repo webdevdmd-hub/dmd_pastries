@@ -94,7 +94,7 @@ export function SuperAdminBusinessActionPanel({ detail }: BusinessActionPanelPro
   }
 
   return (
-    <Card className="border-stone-300 shadow-none">
+    <Card className="border-border shadow-none">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Building2 className="h-4 w-4" />
@@ -102,7 +102,7 @@ export function SuperAdminBusinessActionPanel({ detail }: BusinessActionPanelPro
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+        <Alert className="border-warning/30 bg-warning-tint text-warning-text">
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Platform audit required</AlertTitle>
           <AlertDescription>
@@ -169,7 +169,7 @@ export function SuperAdminBusinessActionPanel({ detail }: BusinessActionPanelPro
         </Field>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-stone-500">
+          <p className="text-sm text-foreground-muted">
             {hasChanges ? "Business changes are ready for audited submit." : "No changes selected."}
           </p>
           <Button disabled={!canSubmit} onClick={submitAction} type="button">

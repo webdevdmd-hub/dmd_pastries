@@ -160,7 +160,7 @@ function LoadingCard(): JSX.Element {
 
 function ErrorCard({ children }: { children: ReactNode }): JSX.Element {
   return (
-    <Alert className="border-red-200 bg-red-50 text-red-950">
+    <Alert className="border-danger/30 bg-danger-tint text-danger-text">
       <ShieldAlert className="h-4 w-4" />
       <AlertTitle>Unable to load settings data</AlertTitle>
       <AlertDescription>{children}</AlertDescription>
@@ -201,7 +201,7 @@ function CompanyOverviewCards({
       {cards.map((card) => (
         <Card key={card.label}>
           <CardContent className="p-5">
-            <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">{card.label}</p>
+            <p className="text-xs text-brand-mocha">{card.label}</p>
             <p className="mt-3 font-serif text-3xl text-brand-espresso">{card.value}</p>
             <p className="mt-1 text-sm text-brand-mocha">{card.detail}</p>
           </CardContent>
@@ -233,7 +233,7 @@ function CompanySettingsView({ settings }: { settings: CompanySettings }): JSX.E
             className="rounded-3xl border border-brand-cappuccino bg-brand-latte/70 p-4"
             key={label}
           >
-            <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">{label}</p>
+            <p className="text-xs text-brand-mocha">{label}</p>
             <p className="mt-2 font-medium text-brand-espresso">{value}</p>
           </div>
         ))}
@@ -844,7 +844,7 @@ function TaxRatesTable({
                         Mark inactive
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        className="text-red-700 focus:text-red-800"
+                        className="text-danger-text focus:text-danger-text"
                         disabled={!canManage}
                         onSelect={() => onDeactivate(taxRate)}
                       >
@@ -904,9 +904,9 @@ function PaymentMethodsTable({
                   {method.defaultPaymentAccountName ? (
                     method.defaultPaymentAccountName
                   ) : method.showInPos ? (
-                    <span className="text-red-700">Needs payment account</span>
+                    <span className="text-danger-text">Needs payment account</span>
                   ) : method.showInBakeryOrders ? (
-                    <span className="text-red-700">Setup required</span>
+                    <span className="text-danger-text">Setup required</span>
                   ) : (
                     "-"
                   )}
@@ -953,7 +953,7 @@ function PaymentMethodsTable({
                         Mark inactive
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        className="text-red-700 focus:text-red-800"
+                        className="text-danger-text focus:text-danger-text"
                         disabled={!canManage}
                         onSelect={() => onDeactivate(method)}
                       >
@@ -1201,7 +1201,7 @@ function PaymentMethodDialog({
               ))}
             </div>
             {(watchShowInPos || watchShowInBakeryOrders) && !watchPaymentAccountId ? (
-              <Alert className="md:col-span-2 border-amber-200 bg-amber-50 text-amber-950">
+              <Alert className="md:col-span-2 border-warning/30 bg-warning-tint text-warning-text">
                 <ShieldAlert className="h-4 w-4" />
                 <AlertTitle>Payment account required for checkout</AlertTitle>
                 <AlertDescription>
@@ -1212,7 +1212,7 @@ function PaymentMethodDialog({
               </Alert>
             ) : null}
             {submitError ? (
-              <Alert className="md:col-span-2 border-red-200 bg-red-50 text-red-950">
+              <Alert className="md:col-span-2 border-danger/30 bg-danger-tint text-danger-text">
                 <ShieldAlert className="h-4 w-4" />
                 <AlertTitle>Payment method needs attention</AlertTitle>
                 <AlertDescription>{submitError}</AlertDescription>
@@ -1438,7 +1438,7 @@ export function SettingsDataPageClient({
   if (!canView) {
     return (
       <div className="mx-auto max-w-3xl">
-        <Alert className="border-brand-cappuccino bg-white/80">
+        <Alert className="border-brand-cappuccino bg-card/80">
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Access denied</AlertTitle>
           <AlertDescription>You need settings.view permission to view this page.</AlertDescription>
@@ -1467,7 +1467,7 @@ export function SettingsDataPageClient({
         />
         <CompanyOverviewCards overview={overviewQuery.data} />
         {!canManage ? (
-          <Alert className="border-brand-cappuccino bg-white/80">
+          <Alert className="border-brand-cappuccino bg-card/80">
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>View only</AlertTitle>
             <AlertDescription>

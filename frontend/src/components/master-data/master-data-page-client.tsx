@@ -253,7 +253,7 @@ function LoadingCard(): JSX.Element {
 
 function ErrorCard({ children }: { children: ReactNode }): JSX.Element {
   return (
-    <Alert className="border-red-200 bg-red-50 text-red-950">
+    <Alert className="border-danger/30 bg-danger-tint text-danger-text">
       <ShieldAlert className="h-4 w-4" />
       <AlertTitle>Unable to load master data</AlertTitle>
       <AlertDescription>{children}</AlertDescription>
@@ -375,9 +375,7 @@ function ProductCategoryIconPicker({
             value={iconSearch}
           />
         </div>
-        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mocha">
-          {countLabel}
-        </span>
+        <span className="text-xs font-semibold text-brand-mocha">{countLabel}</span>
       </div>
       <div className="max-h-80 overflow-y-auto overscroll-contain pr-1">
         {filteredOptions.length > 0 ? (
@@ -403,7 +401,7 @@ function ProductCategoryIconPicker({
             })}
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-brand-cappuccino bg-white px-4 py-8 text-center text-sm text-brand-mocha">
+          <div className="rounded-xl border border-dashed border-brand-cappuccino bg-card px-4 py-8 text-center text-sm text-brand-mocha">
             No matching icons found.
           </div>
         )}
@@ -1046,7 +1044,7 @@ function UnitsTable({
                     Mark inactive
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    className="text-red-700 focus:text-red-800"
+                    className="text-danger-text focus:text-danger-text"
                     disabled={!canManage || unit.isSystemDefault}
                     onSelect={() => onDeactivate(unit)}
                   >
@@ -1149,7 +1147,7 @@ function ProductCategoriesTable({
                       Mark inactive
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      className="text-red-700 focus:text-red-800"
+                      className="text-danger-text focus:text-danger-text"
                       disabled={!canManage}
                       onSelect={() => onDeactivate(category)}
                     >
@@ -1238,7 +1236,7 @@ function SimpleCategoriesTable({
                       Mark inactive
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      className="text-red-700 focus:text-red-800"
+                      className="text-danger-text focus:text-danger-text"
                       disabled={!canManage}
                       onSelect={() => {
                         onDeactivate(category);
@@ -1909,7 +1907,7 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
   if (!canView) {
     return (
       <div className="mx-auto max-w-3xl">
-        <Alert className="border-brand-cappuccino bg-white/80">
+        <Alert className="border-brand-cappuccino bg-card/80">
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Access denied</AlertTitle>
           <AlertDescription>

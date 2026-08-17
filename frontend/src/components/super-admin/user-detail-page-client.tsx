@@ -52,21 +52,19 @@ export function SuperAdminUserDetailPageClient({ userId }: UserDetailPageClientP
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 border-b border-stone-300 pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <section className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-            User 360
-          </p>
+          <p className="text-xs font-semibold text-foreground-muted">User 360</p>
           <h2 className="mt-1 text-2xl font-semibold text-brand-espresso">
             {detail.user.fullName}
           </h2>
-          <p className="mt-2 text-sm text-stone-600">{detail.user.email}</p>
+          <p className="mt-2 text-sm text-foreground-muted">{detail.user.email}</p>
         </div>
         <StatusBadge status={detail.user.status} />
       </section>
 
       {detail.warnings.length > 0 ? (
-        <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+        <Alert className="border-warning/30 bg-warning-tint text-warning-text">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>User warnings</AlertTitle>
           <AlertDescription>
@@ -85,7 +83,7 @@ export function SuperAdminUserDetailPageClient({ userId }: UserDetailPageClientP
       <SuperAdminUserActionPanel detail={detail} business={businessQuery.data} />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="border-stone-300 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle>Identity</CardTitle>
           </CardHeader>
@@ -98,7 +96,7 @@ export function SuperAdminUserDetailPageClient({ userId }: UserDetailPageClientP
           </CardContent>
         </Card>
 
-        <Card className="border-stone-300 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle>Tenant Access</CardTitle>
           </CardHeader>
@@ -124,18 +122,18 @@ export function SuperAdminUserDetailPageClient({ userId }: UserDetailPageClientP
         </Card>
       </div>
 
-      <Card className="border-stone-300 shadow-none">
+      <Card className="border-border shadow-none">
         <CardHeader>
           <CardTitle>Related Data Counts</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {detail.relatedDataCounts.map((item) => (
             <div
-              className="rounded-md border border-stone-200 bg-white p-3"
+              className="rounded-md border border-border bg-card p-3"
               key={`${item.module}-${item.table}`}
             >
               <p className="text-sm font-semibold text-brand-espresso">{item.module}</p>
-              <p className="mt-1 font-mono text-xs text-stone-500">{item.table}</p>
+              <p className="mt-1 font-mono text-xs text-foreground-muted">{item.table}</p>
               <p className="mt-3 text-2xl font-semibold">{formatCount(item.count)}</p>
             </div>
           ))}
@@ -143,22 +141,22 @@ export function SuperAdminUserDetailPageClient({ userId }: UserDetailPageClientP
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="border-stone-300 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle>Branch Access</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {detail.branchAccess.length === 0 ? (
-              <p className="text-sm text-stone-500">No explicit branch access records.</p>
+              <p className="text-sm text-foreground-muted">No explicit branch access records.</p>
             ) : null}
             {detail.branchAccess.map((branch) => (
               <div
-                className="flex items-center justify-between gap-3 border-b border-stone-200 pb-3"
+                className="flex items-center justify-between gap-3 border-b border-border pb-3"
                 key={branch.id}
               >
                 <div>
                   <p className="font-medium">{branch.branchName}</p>
-                  <p className="text-xs text-stone-500">{branch.code}</p>
+                  <p className="text-xs text-foreground-muted">{branch.code}</p>
                 </div>
                 <StatusBadge status={branch.status} />
               </div>
@@ -166,14 +164,14 @@ export function SuperAdminUserDetailPageClient({ userId }: UserDetailPageClientP
           </CardContent>
         </Card>
 
-        <Card className="border-stone-300 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle>Permissions Snapshot</CardTitle>
           </CardHeader>
           <CardContent className="flex max-h-72 flex-wrap gap-2 overflow-auto">
             {detail.permissions.map((permission) => (
               <Badge
-                className="border-stone-300 bg-stone-50 text-stone-700"
+                className="border-border bg-muted text-foreground-muted"
                 key={permission}
                 variant="outline"
               >
@@ -184,7 +182,7 @@ export function SuperAdminUserDetailPageClient({ userId }: UserDetailPageClientP
         </Card>
       </div>
 
-      <Card className="border-stone-300 shadow-none">
+      <Card className="border-border shadow-none">
         <CardHeader>
           <CardTitle>Recent Audit Events</CardTitle>
         </CardHeader>
@@ -223,9 +221,9 @@ function totalRelatedRows(detail: { relatedDataCounts: { count: number }[] }): n
 
 function MetricCard({ label, value }: { label: string; value: string }): JSX.Element {
   return (
-    <Card className="border-stone-300 shadow-none">
+    <Card className="border-border shadow-none">
       <CardContent className="p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">{label}</p>
+        <p className="text-xs font-semibold text-foreground-muted">{label}</p>
         <p className="mt-2 truncate text-xl font-semibold text-brand-espresso">{value}</p>
       </CardContent>
     </Card>
@@ -235,7 +233,7 @@ function MetricCard({ label, value }: { label: string; value: string }): JSX.Ele
 function KeyValue({ label, value }: { label: string; value: JSX.Element | string }): JSX.Element {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">{label}</p>
+      <p className="text-xs font-semibold text-foreground-muted">{label}</p>
       <div className="mt-1 break-all text-brand-espresso">{value}</div>
     </div>
   );

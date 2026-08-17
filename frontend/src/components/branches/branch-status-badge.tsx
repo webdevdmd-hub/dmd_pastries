@@ -9,7 +9,7 @@ type BranchStatusBadgeProps = {
 };
 
 const statusStyles: Record<BranchStatus, string> = {
-  active: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  active: "border-money/30 bg-money-tint text-money-text",
   inactive: "border-brand-cappuccino bg-brand-cappuccino/35 text-brand-espresso",
 };
 

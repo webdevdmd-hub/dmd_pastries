@@ -266,7 +266,7 @@ function LogsList({
     <div className="space-y-3">
       {items.map((item) => (
         <article
-          className="rounded-3xl border border-brand-cappuccino bg-white/80 p-4 shadow-sm"
+          className="rounded-3xl border border-brand-cappuccino bg-card/80 p-4 shadow-sm"
           key={item.id}
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -284,17 +284,13 @@ function LogsList({
           </div>
           <div className="mt-4 grid gap-3 text-sm text-brand-mocha md:grid-cols-2">
             <div className="rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/50 px-3 py-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
-                Record
-              </p>
+              <p className="text-xs font-semibold text-brand-mocha/70">Record</p>
               <p className="mt-1 font-medium text-brand-espresso">
                 {item.recordLabel || "Unknown record"}
               </p>
             </div>
             <div className="rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/50 px-3 py-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
-                Module
-              </p>
+              <p className="text-xs font-semibold text-brand-mocha/70">Module</p>
               <p className="mt-1 font-medium text-brand-espresso">{item.moduleLabel}</p>
             </div>
           </div>
@@ -310,8 +306,8 @@ function LogsList({
             <p className="mt-3 text-sm text-brand-mocha">{item.summary}</p>
           ) : null}
           {item.changes.length > 0 ? (
-            <div className="mt-3 overflow-hidden rounded-2xl border border-brand-cappuccino/70 bg-white">
-              <div className="bg-brand-latte/50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
+            <div className="mt-3 overflow-hidden rounded-2xl border border-brand-cappuccino/70 bg-card">
+              <div className="bg-brand-latte/50 px-3 py-2 text-xs font-semibold text-brand-mocha/70">
                 Changed values
               </div>
               <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)] border-t border-brand-cappuccino/60 text-xs">
@@ -340,9 +336,7 @@ function LogsList({
           ) : null}
           {visibleMetadataEntries(item.metadata).length > 0 ? (
             <div className="mt-3 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/40 p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
-                Details
-              </p>
+              <p className="text-xs font-semibold text-brand-mocha/70">Details</p>
               <dl className="mt-2 grid gap-2 text-xs text-brand-mocha md:grid-cols-2">
                 {visibleMetadataEntries(item.metadata).map(([key, value]) => (
                   <div key={key}>
@@ -355,9 +349,7 @@ function LogsList({
           ) : null}
           {item.ipAddress || item.userAgent ? (
             <div className="mt-3 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/30 p-3 text-xs text-brand-mocha">
-              <p className="font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
-                Access context
-              </p>
+              <p className="font-semibold text-brand-mocha/70">Access context</p>
               {item.ipAddress ? <p className="mt-1">IP address: {item.ipAddress}</p> : null}
               {item.userAgent ? <p className="mt-1 break-words">Device: {item.userAgent}</p> : null}
             </div>
@@ -487,7 +479,7 @@ export function AuditLogsPageClient(): JSX.Element {
   if (!canViewAuditLogs) {
     return (
       <div className="mx-auto max-w-3xl">
-        <Alert className="border-brand-cappuccino bg-white/80">
+        <Alert className="border-brand-cappuccino bg-card/80">
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Audit logs require admin access</AlertTitle>
           <AlertDescription>

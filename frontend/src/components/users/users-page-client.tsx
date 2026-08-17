@@ -682,7 +682,7 @@ export function UsersPageClient(): JSX.Element {
               Cancel
             </Button>
             <Button
-              className="bg-red-700 text-white hover:bg-red-800"
+              className="bg-danger text-primary-foreground hover:bg-danger"
               disabled={deleteUserMutation.isPending}
               onClick={() => {
                 void confirmDeleteUser();

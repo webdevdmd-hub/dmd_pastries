@@ -144,22 +144,20 @@ function OverviewCard({
 }): JSX.Element {
   const toneClass =
     tone === "warning"
-      ? "border-red-200 bg-red-50 text-red-950"
+      ? "border-danger/30 bg-danger-tint text-danger-text"
       : tone === "success"
-        ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+        ? "border-money/30 bg-money-tint text-money-text"
         : "border-workspace-border bg-workspace-panel text-brand-espresso";
 
   return (
     <Card className={toneClass}>
       <CardContent className="flex items-start justify-between gap-4 p-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-current/70">
-            {label}
-          </p>
+          <p className="text-xs font-semibold text-current/70">{label}</p>
           <p className="mt-3 text-3xl font-semibold">{value}</p>
           <p className="mt-2 text-sm text-current/70">{detail}</p>
         </div>
-        <div className="rounded-full border border-current/15 bg-white/60 p-3">{icon}</div>
+        <div className="rounded-full border border-current/15 bg-card/60 p-3">{icon}</div>
       </CardContent>
     </Card>
   );
@@ -252,7 +250,7 @@ function PaymentSetupOverview({
       </div>
 
       {methodsError ? (
-        <Alert className="border-red-200 bg-red-50 text-red-950">
+        <Alert className="border-danger/30 bg-danger-tint text-danger-text">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Unable to load payment methods</AlertTitle>
           <AlertDescription>{getErrorMessage(methodsError)}</AlertDescription>
@@ -260,7 +258,7 @@ function PaymentSetupOverview({
       ) : null}
 
       {accountsError ? (
-        <Alert className="border-red-200 bg-red-50 text-red-950">
+        <Alert className="border-danger/30 bg-danger-tint text-danger-text">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Unable to load payment accounts</AlertTitle>
           <AlertDescription>{getErrorMessage(accountsError)}</AlertDescription>
@@ -268,7 +266,7 @@ function PaymentSetupOverview({
       ) : null}
 
       {setupReadinessError ? (
-        <Alert className="border-red-200 bg-red-50 text-red-950">
+        <Alert className="border-danger/30 bg-danger-tint text-danger-text">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Unable to load accounting setup readiness</AlertTitle>
           <AlertDescription>{getErrorMessage(setupReadinessError)}</AlertDescription>
@@ -276,7 +274,7 @@ function PaymentSetupOverview({
       ) : null}
 
       {seedPaymentAccountsError ? (
-        <Alert className="border-red-200 bg-red-50 text-red-950">
+        <Alert className="border-danger/30 bg-danger-tint text-danger-text">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Unable to set up default payment accounts</AlertTitle>
           <AlertDescription>{getErrorMessage(seedPaymentAccountsError)}</AlertDescription>
@@ -284,7 +282,7 @@ function PaymentSetupOverview({
       ) : null}
 
       {seedAccountMappingsError ? (
-        <Alert className="border-red-200 bg-red-50 text-red-950">
+        <Alert className="border-danger/30 bg-danger-tint text-danger-text">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Unable to set up default account mappings</AlertTitle>
           <AlertDescription>{getErrorMessage(seedAccountMappingsError)}</AlertDescription>
@@ -331,10 +329,10 @@ function PaymentSetupOverview({
           <AlertDescription>Loading the backend readiness check.</AlertDescription>
         </Alert>
       ) : blockingSetupIssues.length > 0 ? (
-        <Card className="border-red-200">
+        <Card className="border-danger/30">
           <CardHeader>
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <CardTitle className="text-red-950">Accounting setup issues</CardTitle>
+              <CardTitle className="text-danger-text">Accounting setup issues</CardTitle>
               {canManageAccounts && blockingPaymentCoverageIssues.length > 0 ? (
                 <Button
                   disabled={isSeedingPaymentAccounts}
@@ -366,13 +364,13 @@ function PaymentSetupOverview({
 
               return (
                 <div
-                  className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-950"
+                  className="rounded-2xl border border-danger/30 bg-danger-tint p-4 text-sm text-danger-text"
                   key={`${issue.code}-${issue.message}-${details}`}
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                       <p className="font-semibold">{issue.message}</p>
-                      {details ? <p className="mt-1 text-xs text-red-800">{details}</p> : null}
+                      {details ? <p className="mt-1 text-xs text-danger-text">{details}</p> : null}
                     </div>
                     <Button asChild size="sm" variant="outline">
                       <Link href={action.href}>{action.label}</Link>
@@ -384,7 +382,7 @@ function PaymentSetupOverview({
           </CardContent>
         </Card>
       ) : setupReadiness?.ready ? (
-        <Alert className="border-emerald-200 bg-emerald-50 text-emerald-950">
+        <Alert className="border-money/30 bg-money-tint text-money-text">
           <CheckCircle2 className="h-4 w-4" />
           <AlertTitle>Payment setup is ready</AlertTitle>
           <AlertDescription>
@@ -420,9 +418,9 @@ function BranchMappingView({
         <AccessNotice title="Accounting access is required to verify linked accounts" />
       ) : null}
       {canViewAccounts && branchPaymentIssues.length > 0 ? (
-        <Card className="border-red-200">
+        <Card className="border-danger/30">
           <CardHeader>
-            <CardTitle className="text-red-950">Branch checkout mapping issues</CardTitle>
+            <CardTitle className="text-danger-text">Branch checkout mapping issues</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
@@ -466,11 +464,11 @@ function BranchMappingView({
                             </div>
                           </>
                         ) : (
-                          <span className="text-red-700">No effective account</span>
+                          <span className="text-danger-text">No effective account</span>
                         )}
                       </TableCell>
                       <TableCell>{source ? formatStatus(source) : "-"}</TableCell>
-                      <TableCell className="text-red-700">{issue.message}</TableCell>
+                      <TableCell className="text-danger-text">{issue.message}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -479,7 +477,7 @@ function BranchMappingView({
           </CardContent>
         </Card>
       ) : canViewAccounts && setupReadiness?.ready ? (
-        <Alert className="border-emerald-200 bg-emerald-50 text-emerald-950">
+        <Alert className="border-money/30 bg-money-tint text-money-text">
           <CheckCircle2 className="h-4 w-4" />
           <AlertTitle>Branch checkout mappings are ready</AlertTitle>
           <AlertDescription>

@@ -53,21 +53,19 @@ export function SuperAdminBusinessDetailPageClient({
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 border-b border-stone-300 pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <section className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-            Business Detail
-          </p>
+          <p className="text-xs font-semibold text-foreground-muted">Business Detail</p>
           <h2 className="mt-1 text-2xl font-semibold text-brand-espresso">
             {detail.business.businessName}
           </h2>
-          <p className="mt-2 text-sm text-stone-600">{detail.business.id}</p>
+          <p className="mt-2 text-sm text-foreground-muted">{detail.business.id}</p>
         </div>
         <StatusBadge status={detail.business.status} />
       </section>
 
       {detail.warnings.length > 0 ? (
-        <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+        <Alert className="border-warning/30 bg-warning-tint text-warning-text">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Setup warnings</AlertTitle>
           <AlertDescription>
@@ -89,18 +87,22 @@ export function SuperAdminBusinessDetailPageClient({
       <SuperAdminBusinessActionPanel detail={detail} />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="border-stone-300 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle>Owner</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p>{detail.business.ownerName ?? "No owner assigned"}</p>
-            <p className="text-stone-500">{detail.business.ownerEmail ?? "No owner email"}</p>
-            <p className="text-stone-500">Created {formatDateTime(detail.business.createdAt)}</p>
+            <p className="text-foreground-muted">
+              {detail.business.ownerEmail ?? "No owner email"}
+            </p>
+            <p className="text-foreground-muted">
+              Created {formatDateTime(detail.business.createdAt)}
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="border-stone-300 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle>Subscription</CardTitle>
           </CardHeader>
@@ -115,7 +117,7 @@ export function SuperAdminBusinessDetailPageClient({
         </Card>
       </div>
 
-      <Card className="border-stone-300 shadow-none">
+      <Card className="border-border shadow-none">
         <CardHeader>
           <CardTitle>Users</CardTitle>
         </CardHeader>
@@ -135,7 +137,7 @@ export function SuperAdminBusinessDetailPageClient({
                 <TableRow key={user.id}>
                   <TableCell>
                     <p className="font-medium">{user.fullName}</p>
-                    <p className="text-xs text-stone-500">{user.email}</p>
+                    <p className="text-xs text-foreground-muted">{user.email}</p>
                   </TableCell>
                   <TableCell>{user.roleName}</TableCell>
                   <TableCell>{user.branchName ?? "No branch"}</TableCell>
@@ -158,19 +160,19 @@ export function SuperAdminBusinessDetailPageClient({
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="border-stone-300 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle>Branches</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {detail.branches.map((branch) => (
               <div
-                className="flex items-center justify-between gap-3 border-b border-stone-200 pb-3"
+                className="flex items-center justify-between gap-3 border-b border-border pb-3"
                 key={branch.id}
               >
                 <div>
                   <p className="font-medium">{branch.branchName}</p>
-                  <p className="text-xs text-stone-500">{branch.code}</p>
+                  <p className="text-xs text-foreground-muted">{branch.code}</p>
                 </div>
                 <StatusBadge status={branch.status} />
               </div>
@@ -178,21 +180,23 @@ export function SuperAdminBusinessDetailPageClient({
           </CardContent>
         </Card>
 
-        <Card className="border-stone-300 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle>Roles</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {detail.roles.map((role) => (
               <div
-                className="flex items-center justify-between gap-3 border-b border-stone-200 pb-3"
+                className="flex items-center justify-between gap-3 border-b border-border pb-3"
                 key={role.id}
               >
                 <div>
                   <p className="font-medium">{role.roleName}</p>
-                  <p className="text-xs text-stone-500">{role.description || "No description"}</p>
+                  <p className="text-xs text-foreground-muted">
+                    {role.description || "No description"}
+                  </p>
                 </div>
-                <span className="text-sm text-stone-600">{role.usersCount} users</span>
+                <span className="text-sm text-foreground-muted">{role.usersCount} users</span>
               </div>
             ))}
           </CardContent>
@@ -204,9 +208,9 @@ export function SuperAdminBusinessDetailPageClient({
 
 function MetricCard({ label, value }: { label: string; value: string }): JSX.Element {
   return (
-    <Card className="border-stone-300 shadow-none">
+    <Card className="border-border shadow-none">
       <CardContent className="p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">{label}</p>
+        <p className="text-xs font-semibold text-foreground-muted">{label}</p>
         <p className="mt-2 text-2xl font-semibold text-brand-espresso">{value}</p>
       </CardContent>
     </Card>
