@@ -1,73 +1,90 @@
 /* ---------------------------------------------------------------------------
- * Pastries POS — design tokens (v2)
+ * Pastries POS — design tokens (v3)
  *
  * PROPOSED. Not yet wired into the app.
- * See DESIGN.md for reasoning. Open docs/design/preview.html to see it.
- *
- * Built on shadcn's current foundation: achromatic oklch neutrals,
- * --radius: 0.625rem. Every ratio in the comments was measured in a browser
- * against the rendered oklch value, not estimated.
+ * See DESIGN.md for reasoning. Open docs/design/preview-v3.html to see it.
  *
  * Colors are stored as bare oklch triplets so Tailwind can apply
  * `/ <alpha-value>`: `oklch(var(--foreground) / <alpha-value>)`.
+ *
+ * NAMES ARE LOad-BEARING. `--canvas` (not `--background`) and `--money-*`
+ * (not `--accent-*`) are canonical per DESIGN.md §3. The Tailwind config
+ * keeps `background` and `accent.*` as deprecated aliases pointing here,
+ * because shadcn's components/ui/* references `accent-foreground`. Renaming
+ * on one side only produces `oklch(var(--canvas))` against an undefined
+ * variable: invalid CSS, no build error, no lint error, blank app.
+ *
+ * Every hex in the comments was measured with a WCAG relative-luminance
+ * calculation against the surface it actually sits on, in both modes.
  * ------------------------------------------------------------------------- */
 
 @layer base {
   :root {
-    /* --- Neutrals: zero chroma ---------------------------------------------
-     * L 0 0 means no hue cast. This is why shadcn reads clean, and it is the
-     * single biggest difference from the warm-grey v1 of this system: a cream
-     * canvas fights a trial balance. */
-    --background: 0.99 0 0; /* #FCFCFC  page                                  */
-    --card: 1 0 0; /* #FFFFFF        cards, panels, table                     */
-    --muted: 0.97 0 0; /* #F5F5F5    fills, KPI cards, zebra, inputs          */
-    --border: 0.922 0 0; /* #E5E5E5  hairlines                               */
+    /* --- Neutrals: barely warm ---------------------------------------------
+     * A near-imperceptible warm cast, visible only against true white. It
+     * costs 0.48 of a contrast point versus a zero-chroma ramp (18.82 vs
+     * 19.30) and is what stops the app reading as every other shadcn build.
+     * v1's #FBFAF8 cream read dated because of the type and borders around
+     * it, not the warmth. */
+    --canvas: 0.9823 0.0029 84.6; /* #FAF9F7  page                            */
+    --card: 1 0 0; /* #FFFFFF                cards, panels, table             */
+    --muted: 0.9556 0.0057 84.6; /* #F2F0EC  fills, KPI cards, zebra, inputs  */
+    --border: 0.9135 0.0087 84.6; /* #E5E2DC hairlines                        */
 
-    --foreground: 0.145 0 0; /* #0A0A0A          19.30 : 1  AAA              */
-    --foreground-muted: 0.556 0 0; /* #737373     4.62 : 1  AA               */
-    --foreground-disabled: 0.65 0 0; /* #8F8F8F   3.15 : 1  NOT for content  */
+    --foreground: 0.1448 0 0; /* #0A0A0A            18.82 : 1 on canvas       */
+    /* v2 used #737373 and quoted 4.62:1 — measured against WHITE. On the
+     * --muted fills v2 itself prescribes for KPI cards it is 4.35:1, under
+     * its own AA floor. This value clears 4.5 on canvas, card AND muted. */
+    --foreground-muted: 0.526 0.0105 78.2; /* #6E6A64  5.11 / 5.37 / 4.72     */
+    /* Warming the neutrals dropped this to 2.40:1 in the first v3 draft, a
+     * regression against v2's 3.15. Disabled state is WCAG-exempt but
+     * placeholders carry information, so v2 parity is the floor. */
+    --foreground-disabled: 0.645 0.01 78.3; /* #918D87  3.14  NOT for content */
 
-    --primary: 0.205 0 0; /* #171717             17.47 : 1  AAA              */
-    --primary-foreground: 0.985 0 0;
+    --primary: 0.2046 0 0; /* #171717             white on it  17.93 : 1      */
+    --primary-foreground: 0.9823 0.0029 84.6;
 
-    /* --- The one accent ----------------------------------------------------
-     * Reserved for money-committing actions and success. If two things on a
-     * screen are green, one of them is wrong. */
-    --accent-solid: 0.48 0.13 155; /* #00723B   white on it  6.05 : 1        */
-    --accent-hover: 0.42 0.11 155;
-    --accent-text: 0.42 0.11 155; /* #005E31              7.94 : 1           */
-    --accent-tint: 0.965 0.02 155; /* #EAF8EE   pair       7.24 : 1          */
+    /* --- The one accent: money, and only money -----------------------------
+     * Charge, Post, Confirm payment, Close period, and reconciled/paid/posted
+     * states. Nothing else. There is deliberately no separate brand hue —
+     * identity comes from the Fraunces wordmark. If a brand colour is ever
+     * added it goes in as --brand-*, never by overloading --money-*.
+     * If two things on a screen are green, one of them is wrong. */
+    --money-solid: 0.4841 0.1242 153.2; /* #00723B  white on it  6.05 : 1     */
+    --money-hover: 0.4228 0.107 153.9;
+    --money-text: 0.4228 0.107 153.9; /* #005E31   7.94 card / 7.20 tint      */
+    --money-tint: 0.964 0.0181 155.8; /* #EAF7EE                              */
 
     /* --- Semantic ----------------------------------------------------------
-     * Each has -solid (fills, icons, borders) and -text (7:1+ on its tint).
+     * Each has -solid (fills, icons, borders) and -text (6.5:1+ on its tint).
      * Never use -solid as a text color; that is what the pairs are for. */
-    --warning-solid: 0.58 0.13 75; /* #A66D00                                */
-    --warning-text: 0.45 0.11 70; /* #7B4800     pair     6.94 : 1           */
-    --warning-tint: 0.97 0.03 85; /* #FEF4DF                                 */
+    --warning-solid: 0.581 0.1236 73.2; /* #A66D00                            */
+    --warning-text: 0.4518 0.101 65.5; /* #7B4800  7.58 card / 6.88 tint      */
+    --warning-tint: 0.9664 0.0256 84.6; /* #FCF3E1                            */
 
-    --danger-solid: 0.55 0.2 27; /* #CC2827      white on it  5.38 : 1       */
-    --danger-text: 0.45 0.17 27; /* #9E1618      pair    7.29 : 1            */
-    --danger-tint: 0.965 0.02 20; /* #FFEFEE                                 */
+    --danger-solid: 0.5494 0.1994 27.1; /* #CC2827                            */
+    --danger-text: 0.4498 0.1695 27; /* #9E1618    8.13 card / 7.21 tint      */
+    --danger-tint: 0.9604 0.0165 26.6; /* #FDEEEC                             */
 
-    --info-solid: 0.55 0.14 255; /* #3072C1                                  */
-    --info-text: 0.45 0.13 255; /* #17559B       pair    6.73 : 1            */
-    --info-tint: 0.965 0.02 255; /* #EBF4FF                                  */
+    --info-solid: 0.5501 0.1401 254.9; /* #3072C1                             */
+    --info-text: 0.4508 0.1295 254.8; /* #17559B    7.48 card / 6.68 tint     */
+    --info-tint: 0.961 0.0159 253.9; /* #EBF3FD                               */
 
     /* Focus is blue and only blue. A brand-colored ring on a brand-colored
      * button is invisible, which is what `focus-visible:ring-brand-caramel`
      * on `bg-brand-caramel` currently does. */
-    --ring: 0.55 0.14 255;
+    --ring: 0.5501 0.1401 254.9; /* #3072C1        4.64 : 1 on canvas         */
 
-    /* --- Radius: shadcn default -------------------------------------------- */
+    /* --- Radius ------------------------------------------------------------ */
     --radius-sm: 0.375rem; /* 6px   chips, badges, inline controls            */
     --radius: 0.625rem; /* 10px     buttons, cards, inputs                    */
     --radius-lg: 0.875rem; /* 14px  dialogs, frames, panels                   */
 
     /* --- Elevation: barely there ------------------------------------------
-     * Modern depth is a 1px hairline plus a whisper of shadow. The previous
-     * `shadow-workspace` inset white bevel is retired. */
+     * A 1px hairline plus a whisper. The old `shadow-workspace` inset white
+     * bevel is retired — it is invisible on any non-white surface. */
     --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.05);
-    --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.06), 0 1px 2px oklch(0 0 0 / 0.04);
+    --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.07), 0 1px 2px oklch(0 0 0 / 0.04);
     --shadow-md: 0 8px 24px oklch(0 0 0 / 0.08);
 
     /* --- Motion ------------------------------------------------------------ */
@@ -77,48 +94,67 @@
   }
 
   /* --- Dark ----------------------------------------------------------------
-   * First-class, not an afterthought. Redefines the same tokens and nothing
-   * else, which is the whole point of the contract. */
+   * NOT SHIPPED. Dark mode is cut from the current plan by owner decision
+   * (see TODOS.md T-A). These values exist so the token layer is dark-ready
+   * and so the contrast script can assert both arms today — turning dark on
+   * later is an addition, not a rewrite.
+   *
+   * This is NOT a lightness inversion. Measured on a #141414 card, all four
+   * of v2's semantic -text values score 2.26-2.46:1 against a 4.5 floor.
+   * Every pair below was re-measured against its actual dark surface.
+   *
+   * --money-solid is deliberately UNCHANGED: white on #00723B is 6.05:1 on
+   * any surface, so the Charge button looks identical in both modes. The one
+   * control a cashier must recognise instantly does not move. */
   .dark,
   [data-theme="dark"] {
-    --background: 0.145 0 0;
-    --card: 0.205 0 0;
-    --muted: 0.269 0 0;
-    --border: 0.31 0 0;
+    --canvas: 0.1496 0 0; /* #0B0B0B                                          */
+    --card: 0.1913 0 0; /* #141414                                            */
+    --muted: 0.2264 0 0; /* #1C1C1C                                           */
+    --border: 0.285 0 0; /* #2A2A2A                                           */
 
-    --foreground: 0.985 0 0;
-    --foreground-muted: 0.708 0 0;
-    --foreground-disabled: 0.55 0 0;
+    /* Warm off-white, never pure #FFFFFF — pure white on near-black halates,
+     * and the warmth keeps one temperature across both modes. */
+    --foreground: 0.9591 0.0074 80.7; /* #F4F1EC  17.47 canvas / 16.35 card   */
+    --foreground-muted: 0.7011 0.0129 79.8; /* #A39E96  7.39 / 6.92           */
+    --foreground-disabled: 0.5127 0.0125 76.5; /* #6B665F  3.24 card          */
 
-    --primary: 0.985 0 0;
-    --primary-foreground: 0.205 0 0;
+    --primary: 0.9591 0.0074 80.7; /* #F4F1EC   #0B0B0B on it  17.47 : 1      */
+    --primary-foreground: 0.1496 0 0;
 
-    --accent-solid: 0.62 0.15 155;
-    --accent-hover: 0.68 0.16 155;
-    --accent-text: 0.78 0.15 155;
-    --accent-tint: 0.28 0.05 155;
+    --money-solid: 0.4841 0.1242 153.2; /* #00723B  unchanged, by design      */
+    --money-hover: 0.5182 0.1304 153;
+    --money-text: 0.6678 0.1421 157.4; /* #2FAE71  6.50 card / 5.43 tint      */
+    --money-tint: 0.2582 0.0446 157.6; /* #0E2A1B                             */
 
-    --warning-solid: 0.7 0.14 75;
-    --warning-text: 0.82 0.13 80;
-    --warning-tint: 0.29 0.05 75;
+    --warning-solid: 0.581 0.1236 73.2;
+    --warning-text: 0.7494 0.1419 76.5; /* #E0A030  8.11 card / 7.11 tint     */
+    --warning-tint: 0.2473 0.0366 80.7; /* #2A1F0B                            */
 
-    --danger-solid: 0.62 0.2 27;
-    --danger-text: 0.78 0.15 25;
-    --danger-tint: 0.29 0.07 25;
+    --danger-solid: 0.5494 0.1994 27.1;
+    --danger-text: 0.7106 0.1661 22.2; /* #F87171   6.66 card / 6.19 tint     */
+    --danger-tint: 0.2296 0.0426 20.9; /* #2E1414                             */
 
-    --info-solid: 0.62 0.15 255;
-    --info-text: 0.78 0.12 255;
-    --info-tint: 0.29 0.06 255;
+    --info-solid: 0.5501 0.1401 254.9;
+    --info-text: 0.7562 0.1139 254.7; /* #7DB3F7    8.48 card / 7.74 tint     */
+    --info-tint: 0.2316 0.0407 253.9; /* #0F1E30                              */
 
-    --ring: 0.62 0.15 255;
+    --ring: 0.7562 0.1139 254.7; /* #7DB3F7         9.06 : 1 on canvas        */
 
+    /* Light-mode shadow opacity is invisible on near-black. */
     --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.4);
     --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.5);
     --shadow-md: 0 8px 24px oklch(0 0 0 / 0.6);
   }
 
   /* --- Density registers ---------------------------------------------------
-   * data-density="counter" on the (pos) route group, "ledger" elsewhere. */
+   * data-density="counter" on the (pos) route group, "ledger" elsewhere.
+   *
+   * WARNING: setting this on a layout <div> does NOT reach Radix portals.
+   * dialog/sheet/popover/select/dropdown-menu render into document.body,
+   * where the :root rule below supplies ledger density — including the six
+   * POS dialogs, one of which takes payment. A DensityProvider must stamp
+   * the attribute onto portalled content. See UI-REBUILD-PLAN.md §9.1. */
   :root,
   [data-density="ledger"] {
     --control-h: 2.25rem; /* 36px */
@@ -138,7 +174,11 @@
     --grid-gap: 0.625rem;
   }
 
-  /* --- Table density: user-selectable, persisted per user ------------------ */
+  /* --- Table density -------------------------------------------------------
+   * Persisted in localStorage under `pastries-pos-table-density`, with a
+   * forward-compatible reader: unknown value -> "default", never throw.
+   * Per-device rather than per-user, which is right for shared counter
+   * hardware. See UI-REBUILD-PLAN.md C0.3. */
   [data-table-density="compact"] {
     --row-h: 2.25rem; /* 36px */
     --cell-pad-x: 0.875rem;
@@ -153,9 +193,13 @@
     --cell-pad-x: 1rem;
   }
 
-  /* --- Base ---------------------------------------------------------------- */
+  /* --- Base ----------------------------------------------------------------
+   * globals.css:83-87 currently sets `background-color: rgb(var(--workspace-
+   * canvas))`, which sits outside every deletion range the migration names.
+   * After the token swap that is invalid CSS and the page background drops
+   * app-wide, silently. A1' must replace that rule with this one. */
   body {
-    background: oklch(var(--background));
+    background: oklch(var(--canvas));
     color: oklch(var(--foreground));
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
@@ -185,9 +229,10 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* NOTE: remove `html { scroll-behavior: smooth }` from globals.css. It
-   * applies to the POS product grid, where a cashier flicking through 200
-   * items fights an animation on every scroll. Scope it to marketing. */
+  /* NOTE: remove `html { scroll-behavior: smooth }` from globals.css (the
+   * whole rule at 79-81, not just the declaration). It applies to the POS
+   * product grid, where a cashier flicking through 200 items fights an
+   * animation on every scroll. Scope it to marketing. */
 
   @media (prefers-reduced-motion: reduce) {
     *,
