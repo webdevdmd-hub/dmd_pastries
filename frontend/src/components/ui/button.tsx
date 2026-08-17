@@ -5,7 +5,13 @@ import * as React from "react";
 import { cn } from "@/lib/utils/cn";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  // Focus is blue and only blue (DESIGN.md §3.4). This was
+  // `focus-visible:ring-brand-caramel`, and `brand-caramel` aliases to
+  // `--primary` (#171717) — so every focusable control in the app carried a
+  // near-black focus ring, and on a black primary button it was invisible.
+  // Keyboard and switch users had no way to see which control was focused,
+  // including the safe-by-default button on a destructive confirm dialog.
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
