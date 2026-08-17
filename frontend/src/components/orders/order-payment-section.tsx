@@ -51,7 +51,7 @@ export function OrderPaymentSection({
   const hasUnconfiguredMethods = visiblePaymentMethods.length > usablePaymentMethods.length;
 
   return (
-    <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
+    <section className="rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-brand-espresso">Payments</h2>
@@ -99,12 +99,12 @@ export function OrderPaymentSection({
           </span>
         </div>
         {order && order.refundedAmount > 0 ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <div className="rounded-2xl border border-warning/30 bg-warning-tint p-3 text-sm text-warning-text">
             Refunded after completion: {formatCurrency(order.refundedAmount)}
           </div>
         ) : null}
         {order && (order.chargeAmount > 0 || order.chargeTaxAmount > 0) ? (
-          <div className="rounded-2xl border border-brand-cappuccino/60 bg-white/80 p-4 text-sm">
+          <div className="rounded-2xl border border-brand-cappuccino/60 bg-card/80 p-4 text-sm">
             <div className="flex justify-between">
               <span className="text-brand-mocha">Subtotal</span>
               <strong className="text-brand-espresso">
@@ -161,7 +161,7 @@ export function OrderPaymentSection({
           </p>
         ) : null}
         {hasUnconfiguredMethods ? (
-          <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <p className="rounded-2xl border border-warning/30 bg-warning-tint p-4 text-sm text-warning-text">
             Some bakery payment methods need a default payment account before they can be used.
           </p>
         ) : null}

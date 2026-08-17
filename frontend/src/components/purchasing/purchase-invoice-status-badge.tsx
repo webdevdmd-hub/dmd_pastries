@@ -11,9 +11,9 @@ const labels: Record<PurchaseInvoiceStatus, string> = {
 };
 
 const toneByStatus: Record<PurchaseInvoiceStatus, string> = {
-  cancelled: "border-red-300 bg-red-50 text-red-800",
-  draft: "border-zinc-300 bg-zinc-50 text-zinc-700",
-  posted: "border-emerald-300 bg-emerald-50 text-emerald-800",
+  cancelled: "border-danger/30 bg-danger-tint text-danger-text",
+  draft: "border-border bg-muted text-foreground-muted",
+  posted: "border-money/30 bg-money-tint text-money-text",
 };
 
 export function PurchaseInvoiceStatusBadge({

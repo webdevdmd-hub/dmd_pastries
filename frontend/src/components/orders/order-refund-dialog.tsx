@@ -150,7 +150,7 @@ export function OrderRefundDialog({
             <Label htmlFor="orderRefundReference">
               Reference number
               {selectedMethod?.requiresReference ? (
-                <span aria-hidden="true" className="ml-1 text-red-700">
+                <span aria-hidden="true" className="ml-1 text-danger-text">
                   *
                 </span>
               ) : null}
@@ -166,7 +166,7 @@ export function OrderRefundDialog({
               value={referenceNumber}
             />
           </div>
-          {error ? <p className="text-xs text-red-700">{error}</p> : null}
+          {error ? <p className="text-xs text-danger-text">{error}</p> : null}
         </div>
         <DialogFooter>
           <Button onClick={onClose} type="button" variant="outline">

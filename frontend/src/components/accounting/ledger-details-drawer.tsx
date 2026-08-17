@@ -120,10 +120,10 @@ export function LedgerDetailsDrawer({
           <Skeleton className="mt-6 h-72 rounded-2xl" />
         ) : (
           <div className="mt-6 grid gap-5">
-            <Card className="border-brand-cappuccino/70 bg-white/85">
+            <Card className="border-brand-cappuccino/70 bg-card/85">
               <CardContent className="grid gap-4 p-4 md:grid-cols-[1.4fr_repeat(3,1fr)]">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Account</p>
+                  <p className="text-xs text-brand-mocha">Account</p>
                   <p className="mt-1 font-bold text-brand-espresso">
                     {displayAccount.accountCode} - {displayAccount.accountName}
                   </p>
@@ -133,13 +133,13 @@ export function LedgerDetailsDrawer({
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Group</p>
+                  <p className="text-xs text-brand-mocha">Group</p>
                   <p className="mt-1 font-semibold text-brand-espresso">
                     {displayAccount.accountGroup || "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Normal</p>
+                  <p className="text-xs text-brand-mocha">Normal</p>
                   <p className="mt-1 font-semibold capitalize text-brand-espresso">
                     {displayAccount.normalBalance}
                   </p>
@@ -155,7 +155,7 @@ export function LedgerDetailsDrawer({
             <div className="grid gap-3 md:grid-cols-4">
               <Card>
                 <CardContent className="p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Opening</p>
+                  <p className="text-xs text-brand-mocha">Opening</p>
                   <p className="mt-1 text-xl font-bold text-brand-espresso">
                     {money(ledger?.summary.openingBalance ?? 0)}
                   </p>
@@ -163,7 +163,7 @@ export function LedgerDetailsDrawer({
               </Card>
               <Card>
                 <CardContent className="p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Debit</p>
+                  <p className="text-xs text-brand-mocha">Debit</p>
                   <p className="mt-1 text-xl font-bold text-brand-espresso">
                     {money(ledger?.summary.periodDebit ?? 0)}
                   </p>
@@ -171,7 +171,7 @@ export function LedgerDetailsDrawer({
               </Card>
               <Card>
                 <CardContent className="p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Credit</p>
+                  <p className="text-xs text-brand-mocha">Credit</p>
                   <p className="mt-1 text-xl font-bold text-brand-espresso">
                     {money(ledger?.summary.periodCredit ?? 0)}
                   </p>
@@ -179,7 +179,7 @@ export function LedgerDetailsDrawer({
               </Card>
               <Card>
                 <CardContent className="p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Closing</p>
+                  <p className="text-xs text-brand-mocha">Closing</p>
                   <p className="mt-1 text-xl font-bold text-brand-espresso">
                     {money(ledger?.summary.closingBalance ?? 0)}{" "}
                     <span className="text-sm text-brand-mocha">{ledger?.summary.balanceLabel}</span>
@@ -188,7 +188,7 @@ export function LedgerDetailsDrawer({
               </Card>
             </div>
 
-            <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-white/80 p-4 lg:grid-cols-[1fr_1fr_1fr_0.8fr]">
+            <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-card/80 p-4 lg:grid-cols-[1fr_1fr_1fr_0.8fr]">
               <Select
                 disabled={!canLoadBranches}
                 onValueChange={(value) =>
@@ -237,7 +237,7 @@ export function LedgerDetailsDrawer({
             {ledgerQuery.isLoading ? <Skeleton className="h-72 rounded-3xl" /> : null}
 
             {!ledgerQuery.isLoading && ledgerQuery.error ? (
-              <Card className="border-red-200 bg-red-50/70">
+              <Card className="border-danger/30 bg-danger-tint/70">
                 <CardContent className="flex min-h-48 flex-col items-center justify-center gap-3 text-center">
                   <p className="font-semibold text-brand-espresso">Unable to load ledger details</p>
                   <p className="text-sm text-brand-mocha">{getErrorMessage(ledgerQuery.error)}</p>
@@ -254,7 +254,7 @@ export function LedgerDetailsDrawer({
 
             {!ledgerQuery.isLoading && !ledgerQuery.error && ledger ? (
               ledger.transactions.length === 0 ? (
-                <Card className="border-brand-cappuccino/70 bg-white/80">
+                <Card className="border-brand-cappuccino/70 bg-card/80">
                   <CardContent className="flex min-h-48 flex-col items-center justify-center gap-3 text-center">
                     <BookOpenText className="h-10 w-10 text-brand-mocha" />
                     <p className="font-semibold text-brand-espresso">
@@ -266,9 +266,9 @@ export function LedgerDetailsDrawer({
                   </CardContent>
                 </Card>
               ) : (
-                <Card className="overflow-hidden border-brand-cappuccino/70 bg-white/85">
+                <Card className="overflow-hidden border-brand-cappuccino/70 bg-card/85">
                   <CardContent className="overflow-hidden p-0">
-                    <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 bg-white/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 bg-card/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-sm font-semibold text-brand-espresso">
                           Ledger transactions
@@ -281,7 +281,7 @@ export function LedgerDetailsDrawer({
                         Page {currentPage} of {totalPages}
                       </p>
                     </div>
-                    <div className="overflow-x-auto bg-white/75 [&>div]:rounded-none">
+                    <div className="overflow-x-auto bg-card/75 [&>div]:rounded-none">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -336,7 +336,7 @@ export function LedgerDetailsDrawer({
                         </TableBody>
                       </Table>
                     </div>
-                    <div className="flex flex-col gap-3 border-t border-brand-cappuccino/70 bg-white/80 px-4 py-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col gap-3 border-t border-brand-cappuccino/70 bg-card/80 px-4 py-3 md:flex-row md:items-center md:justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-brand-mocha">Rows per page</span>
                         <Select

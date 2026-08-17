@@ -110,13 +110,13 @@ export function OrdersCardGrid({
 
           <div className="grid grid-cols-2 border-t border-workspace-border bg-brand-latte/30">
             <div className="border-r border-workspace-border px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.18em] text-workspace-muted">Total</p>
+              <p className="text-xs text-workspace-muted">Total</p>
               <p className="mt-1 text-sm font-semibold text-brand-espresso">
                 {formatMoney(order.totalAmount)}
               </p>
             </div>
             <div className="px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.18em] text-workspace-muted">Balance</p>
+              <p className="text-xs text-workspace-muted">Balance</p>
               <p className="mt-1 text-sm font-semibold text-brand-espresso">
                 {formatMoney(order.balanceAmount)}
               </p>

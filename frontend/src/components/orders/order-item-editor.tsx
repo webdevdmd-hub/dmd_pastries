@@ -25,8 +25,7 @@ type ProductOptionMeta = {
   productId: string | null;
 };
 
-const fieldLabelClassName =
-  "text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-brand-mocha";
+const fieldLabelClassName = "text-[0.68rem] font-semibold text-brand-mocha";
 const unitPlaceholderValue = "__unit_placeholder__";
 
 function parentProductValue(productId: string): string {
@@ -182,10 +181,10 @@ export function OrderItemEditor({
             <span className="rounded-md bg-brand-latte px-2 py-0.5 font-mono text-brand-espresso">
               AED {money(product.salePrice)}
             </span>
-            <span className="max-w-[12rem] truncate rounded-md bg-neutral-100 px-2 py-0.5">
+            <span className="max-w-[12rem] truncate rounded-md bg-muted px-2 py-0.5">
               {product.categoryName}
             </span>
-            <span className="rounded-md bg-neutral-100 px-2 py-0.5">
+            <span className="rounded-md bg-muted px-2 py-0.5">
               {stockLabel(product.isStockTracked)}
             </span>
           </div>
@@ -201,7 +200,7 @@ export function OrderItemEditor({
   };
 
   return (
-    <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-white/80 p-4">
+    <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-card/80 p-4">
       <div className="grid gap-2.5 md:grid-cols-12">
         <label className="grid gap-1.5 md:col-span-2">
           <span className={fieldLabelClassName}>Item type</span>
@@ -318,7 +317,7 @@ export function OrderItemEditor({
           type="button"
           variant="ghost"
         >
-          <Trash2 className="h-4 w-4 text-red-700" />
+          <Trash2 className="h-4 w-4 text-danger-text" />
         </Button>
       </div>
       <div className="grid gap-3 md:grid-cols-12">

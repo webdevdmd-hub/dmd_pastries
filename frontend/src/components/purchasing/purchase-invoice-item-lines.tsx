@@ -97,7 +97,7 @@ export function PurchaseInvoiceItemLines({ items }: { items: PurchaseInvoiceItem
                 <TableCell
                   className={cn(
                     "text-right tabular-nums",
-                    line.discountAmount > 0 ? "text-red-700" : "text-workspace-muted",
+                    line.discountAmount > 0 ? "text-danger-text" : "text-workspace-muted",
                   )}
                 >
                   {line.discountAmount > 0 ? `-${formatCurrency(line.discountAmount)}` : "-"}

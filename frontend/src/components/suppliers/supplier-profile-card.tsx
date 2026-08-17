@@ -39,7 +39,7 @@ function ProfileRow({
     <div className="flex gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-4">
       <div className="text-brand-mocha">{icon}</div>
       <div>
-        <p className="text-xs uppercase tracking-[0.16em] text-brand-mocha">{label}</p>
+        <p className="text-xs text-brand-mocha">{label}</p>
         <p className="mt-1 text-sm font-semibold text-brand-espresso">{value}</p>
       </div>
     </div>
@@ -48,7 +48,7 @@ function ProfileRow({
 
 export function SupplierProfileCard({ supplier }: { supplier: Supplier }): JSX.Element {
   return (
-    <Card className="bg-white/80">
+    <Card className="bg-card/80">
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -60,7 +60,7 @@ export function SupplierProfileCard({ supplier }: { supplier: Supplier }): JSX.E
       </CardHeader>
       <CardContent className="grid gap-3">
         {supplier.status === "blocked" ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <div className="rounded-2xl border border-danger/30 bg-danger-tint p-4 text-sm text-danger-text">
             This supplier is blocked and should not be used for purchasing workflows.
           </div>
         ) : null}
@@ -86,19 +86,19 @@ export function SupplierProfileCard({ supplier }: { supplier: Supplier }): JSX.E
         />
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-4">
-            <p className="text-xs uppercase tracking-[0.16em] text-brand-mocha">Tax number</p>
+            <p className="text-xs text-brand-mocha">Tax number</p>
             <p className="mt-1 font-semibold text-brand-espresso">
               {supplier.taxNumber ?? "Not set"}
             </p>
           </div>
           <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-4">
-            <p className="text-xs uppercase tracking-[0.16em] text-brand-mocha">Created</p>
+            <p className="text-xs text-brand-mocha">Created</p>
             <p className="mt-1 font-semibold text-brand-espresso">
               {formatDate(supplier.createdAt)}
             </p>
           </div>
           <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-4">
-            <p className="text-xs uppercase tracking-[0.16em] text-brand-mocha">Updated</p>
+            <p className="text-xs text-brand-mocha">Updated</p>
             <p className="mt-1 font-semibold text-brand-espresso">
               {formatDate(supplier.updatedAt)}
             </p>
@@ -106,7 +106,7 @@ export function SupplierProfileCard({ supplier }: { supplier: Supplier }): JSX.E
         </div>
         {supplier.notes ? (
           <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-4">
-            <p className="text-xs uppercase tracking-[0.16em] text-brand-mocha">Notes</p>
+            <p className="text-xs text-brand-mocha">Notes</p>
             <p className="mt-2 text-sm leading-6 text-brand-espresso">{supplier.notes}</p>
           </div>
         ) : null}

@@ -95,9 +95,9 @@ function OrderFormSection({
   title: string;
 }): JSX.Element {
   return (
-    <section className="border-b border-neutral-200 pb-8 last:border-b-0 last:pb-0">
+    <section className="border-b border-border pb-8 last:border-b-0 last:pb-0">
       <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-sm font-black uppercase tracking-[0.18em] text-neutral-900">
+        <h2 className="text-body font-medium text-foreground">
           {index}. {title}
         </h2>
         {action}
@@ -453,28 +453,28 @@ export function OrderFormPage({
       className={
         presentation === "modal"
           ? "h-full min-h-0 bg-transparent"
-          : "min-h-dvh bg-neutral-950/35 px-3 py-4 backdrop-blur-sm sm:px-6 lg:py-8"
+          : "min-h-dvh bg-primary/35 px-3 py-4 backdrop-blur-sm sm:px-6 lg:py-8"
       }
     >
       <div
         className={
           presentation === "modal"
-            ? "mx-auto flex h-full min-h-0 max-h-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-neutral-300 bg-white shadow-2xl"
-            : "mx-auto flex max-h-[calc(100dvh-2rem)] max-w-7xl flex-col overflow-hidden rounded-2xl border border-neutral-300 bg-white shadow-2xl lg:max-h-[calc(100dvh-4rem)]"
+            ? "mx-auto flex h-full min-h-0 max-h-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+            : "mx-auto flex max-h-[calc(100dvh-2rem)] max-w-7xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl lg:max-h-[calc(100dvh-4rem)]"
         }
       >
-        <header className="flex items-start justify-between gap-6 border-b border-neutral-200 px-6 py-5 sm:px-8">
+        <header className="flex items-start justify-between gap-6 border-b border-border px-6 py-5 sm:px-8">
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-black sm:text-3xl">
+            <h1 className="text-title text-foreground sm:text-3xl">
               {isEdit ? "Edit Bakery Order" : "Create Bakery Order"}
             </h1>
-            <p className="mt-1 text-sm text-neutral-600">
+            <p className="mt-1 text-sm text-foreground-muted">
               Design a custom cake or managed artisan order flow.
             </p>
           </div>
           <button
             aria-label="Close bakery order form"
-            className="rounded-full p-2 text-neutral-700 transition hover:bg-neutral-100 hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black"
+            className="rounded-full p-2 text-foreground-muted transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black"
             onClick={closeForm}
             type="button"
           >
@@ -487,7 +487,7 @@ export function OrderFormPage({
             <div className="space-y-8">
               <OrderFormSection
                 action={
-                  <span className="rounded-full border border-neutral-200 px-3 py-1 text-xs font-bold text-neutral-700">
+                  <span className="rounded-full border border-border px-3 py-1 text-xs font-bold text-foreground-muted">
                     {customerName ?? "Walk-in customer"}
                   </span>
                 }
@@ -510,7 +510,7 @@ export function OrderFormPage({
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="grid gap-2">
                     <label
-                      className="text-sm font-semibold text-neutral-900"
+                      className="text-sm font-semibold text-foreground"
                       htmlFor="bakeryOrderBranch"
                     >
                       Branch
@@ -526,7 +526,7 @@ export function OrderFormPage({
                   </div>
                   <div className="grid gap-2">
                     <label
-                      className="text-sm font-semibold text-neutral-900"
+                      className="text-sm font-semibold text-foreground"
                       htmlFor="bakeryOrderChannel"
                     >
                       Sales Channel
@@ -540,7 +540,7 @@ export function OrderFormPage({
                       value={salesChannelId}
                     />
                     <button
-                      className="w-fit text-xs font-bold text-neutral-600 underline-offset-4 hover:text-black hover:underline"
+                      className="w-fit text-xs font-bold text-foreground-muted underline-offset-4 hover:text-foreground hover:underline"
                       onClick={() => {
                         setSalesChannelId("");
                         setExternalOrderNumber("");
@@ -553,7 +553,7 @@ export function OrderFormPage({
                   {selectedSalesChannel?.requiresExternalOrderNumber ? (
                     <div className="grid gap-2 md:col-span-2">
                       <label
-                        className="text-sm font-semibold text-neutral-900"
+                        className="text-sm font-semibold text-foreground"
                         htmlFor="bakeryOrderExternalNumber"
                       >
                         External order number
@@ -565,7 +565,7 @@ export function OrderFormPage({
                         placeholder="Platform / partner order number"
                         value={externalOrderNumber}
                       />
-                      <p className="text-xs text-neutral-500">
+                      <p className="text-xs text-foreground-muted">
                         Required for {selectedSalesChannel.channelName}.
                       </p>
                     </div>
@@ -601,7 +601,7 @@ export function OrderFormPage({
               </OrderFormSection>
 
               <OrderFormSection index={4} title="Charges">
-                <div className="rounded-2xl border border-neutral-200 bg-white p-5">
+                <div className="rounded-2xl border border-border bg-card p-5">
                   <DocumentChargesEditor
                     charges={charges}
                     onChange={setCharges}
@@ -627,32 +627,30 @@ export function OrderFormPage({
             </div>
           </section>
 
-          <aside className="min-h-0 overflow-y-auto overscroll-contain border-t border-neutral-200 bg-neutral-50 px-5 py-5 lg:border-l lg:border-t-0">
+          <aside className="min-h-0 overflow-y-auto overscroll-contain border-t border-border bg-muted px-5 py-5 lg:border-l lg:border-t-0">
             <div className="sticky top-0 space-y-5">
-              <section className="overflow-hidden rounded-2xl border border-neutral-300 bg-white">
-                <div className="border-b border-neutral-300 bg-neutral-100 px-5 py-4">
+              <section className="overflow-hidden rounded-2xl border border-border bg-card">
+                <div className="border-b border-border bg-muted px-5 py-4">
                   <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-sm font-black uppercase tracking-[0.18em] text-black">
-                      Order Summary
-                    </h2>
+                    <h2 className="text-body font-medium text-foreground">Order Summary</h2>
                     {showPreviewLoading ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-neutral-600">
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-foreground-muted">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         Previewing
                       </span>
                     ) : null}
                   </div>
                 </div>
-                <div className="space-y-3 px-5 py-5 text-sm text-neutral-700">
+                <div className="space-y-3 px-5 py-5 text-sm text-foreground-muted">
                   {showPreviewError ? (
-                    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800">
+                    <div className="rounded-xl border border-danger/30 bg-danger-tint px-3 py-2 text-xs font-medium text-danger-text">
                       Draft preview failed: {getErrorMessage(previewQuery.error)}
                     </div>
                   ) : null}
                   <div className="flex items-center justify-between gap-4">
                     <span>VAT mode</span>
                     {order ? (
-                      <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-700">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-foreground-muted">
                         {order.taxMode === "no_tax"
                           ? "No tax"
                           : order.taxMode === "exclusive"
@@ -661,7 +659,7 @@ export function OrderFormPage({
                       </span>
                     ) : (
                       <select
-                        className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs"
+                        className="rounded-md border border-border bg-card px-2 py-1 text-xs"
                         onChange={(event) => setTaxMode(event.target.value as typeof taxMode)}
                         value={taxMode}
                       >
@@ -676,41 +674,41 @@ export function OrderFormPage({
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <span>Subtotal ({formatCurrency(itemQuantity)} items)</span>
-                    <span className="font-mono text-black">
+                    <span className="font-mono text-foreground">
                       {formatCurrency(summarySubtotal)} AED
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <span>Discount</span>
-                    <span className="font-mono text-black">
+                    <span className="font-mono text-foreground">
                       {formatCurrency(summaryDiscount)} AED
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <span>Item tax</span>
-                    <span className="font-mono text-black">{formatCurrency(summaryTax)} AED</span>
+                    <span className="font-mono text-foreground">
+                      {formatCurrency(summaryTax)} AED
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <span>Charges</span>
-                    <span className="font-mono text-black">
+                    <span className="font-mono text-foreground">
                       {formatCurrency(summaryChargeAmount)} AED
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <span>Charge tax</span>
-                    <span className="font-mono text-black">
+                    <span className="font-mono text-foreground">
                       {formatCurrency(summaryChargeTax)} AED
                     </span>
                   </div>
-                  <div className="border-t border-neutral-300 pt-4">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-neutral-700">
-                      Total Amount
-                    </p>
+                  <div className="border-t border-border pt-4">
+                    <p className="text-meta font-medium text-foreground-muted">Total Amount</p>
                     <div className="mt-2 flex items-end justify-between gap-4">
-                      <span className="font-mono text-2xl font-black tracking-tight text-black">
+                      <span className="font-mono text-title text-foreground">
                         {formatCurrency(summaryTotal)} AED
                       </span>
-                      <span className="rounded-full border border-neutral-300 px-2 py-1 text-xs font-bold uppercase text-neutral-700">
+                      <span className="rounded-full border border-border px-2 py-1 text-xs font-bold uppercase text-foreground-muted">
                         {order?.paymentStatus ?? "Draft"}
                       </span>
                     </div>
@@ -721,17 +719,17 @@ export function OrderFormPage({
               {isEdit ? (
                 <OrderPaymentSection canManage={canManage} order={order} />
               ) : (
-                <section className="rounded-2xl border border-neutral-300 bg-white p-5">
+                <section className="rounded-2xl border border-border bg-card p-5">
                   <div className="flex items-center justify-between gap-3">
-                    <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-black">
+                    <h2 className="flex items-center gap-2 text-body font-medium text-foreground">
                       <CircleDollarSign className="h-4 w-4" />
                       Payment Status
                     </h2>
-                    <span className="rounded-full bg-neutral-200 px-3 py-1 text-xs font-black uppercase text-neutral-700">
+                    <span className="rounded-full bg-muted px-3 py-1 text-meta font-medium uppercase text-foreground-muted">
                       Draft
                     </span>
                   </div>
-                  <p className="mt-4 text-sm leading-6 text-neutral-600">
+                  <p className="mt-4 text-sm leading-6 text-foreground-muted">
                     Payments can be recorded once the order draft is saved. Use partial deposits for
                     custom cake bookings.
                   </p>
@@ -740,7 +738,7 @@ export function OrderFormPage({
 
               <div className="space-y-3">
                 <Button
-                  className="h-14 w-full rounded-lg bg-black text-base font-black text-white shadow-lg shadow-black/15 hover:bg-neutral-800"
+                  className="h-14 w-full rounded-lg bg-primary text-body font-medium text-primary-foreground shadow-lg shadow-black/15 hover:bg-primary"
                   disabled={!canManage || saving}
                   onClick={() => void save()}
                   type="button"
@@ -753,7 +751,7 @@ export function OrderFormPage({
                   {isEdit ? "Save Changes" : "Save Bakery Order"}
                 </Button>
                 <Button
-                  className="h-12 w-full rounded-lg border-neutral-300 bg-white text-base font-bold text-neutral-900 hover:bg-neutral-100"
+                  className="h-12 w-full rounded-lg border-border bg-card text-base font-bold text-foreground hover:bg-muted"
                   onClick={closeForm}
                   type="button"
                   variant="outline"
@@ -762,13 +760,13 @@ export function OrderFormPage({
                 </Button>
               </div>
 
-              <div className="flex flex-wrap gap-3 text-xs font-black uppercase text-neutral-500">
+              <div className="flex flex-wrap gap-3 text-meta font-medium uppercase text-foreground-muted">
                 <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span className="h-2 w-2 rounded-full bg-money" />
                   Inventory: Valid
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-blue-500" />
+                  <span className="h-2 w-2 rounded-full bg-info" />
                   Branch:{" "}
                   {branchOptions.find((branch) => branch.value === branchId)?.label ?? "Main"}
                 </span>

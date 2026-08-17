@@ -16,7 +16,9 @@ export function PurchaseReceiptStatusBadge({
 }): JSX.Element {
   return (
     <Badge
-      className={status === "cancelled" ? "border-red-300 bg-red-50 text-red-800" : undefined}
+      className={
+        status === "cancelled" ? "border-danger/30 bg-danger-tint text-danger-text" : undefined
+      }
       variant="outline"
     >
       {labels[status]}

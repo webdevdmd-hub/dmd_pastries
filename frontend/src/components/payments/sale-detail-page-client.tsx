@@ -211,8 +211,8 @@ export function SaleDetailPageClient({ saleId }: SaleDetailPageClientProps): JSX
       ) : null}
 
       {receiptQuery.error ? (
-        <Card className="border-red-200 bg-red-50/60">
-          <CardContent className="p-6 text-red-900">
+        <Card className="border-danger/30 bg-danger-tint/60">
+          <CardContent className="p-6 text-danger-text">
             Unable to load sale receipt: {getErrorMessage(receiptQuery.error)}
           </CardContent>
         </Card>
@@ -223,39 +223,31 @@ export function SaleDetailPageClient({ saleId }: SaleDetailPageClientProps): JSX
           <div className="grid gap-4 md:grid-cols-4">
             <Card>
               <CardContent className="p-5">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
-                  Total
-                </p>
-                <p className="mt-1 text-2xl font-black text-brand-espresso">
+                <p className="text-xs font-bold text-brand-mocha">Total</p>
+                <p className="mt-1 text-2xl font-medium text-brand-espresso">
                   {formatMoney(receipt.total)}
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-5">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
-                  Paid
-                </p>
-                <p className="mt-1 text-2xl font-black text-brand-espresso">
+                <p className="text-xs font-bold text-brand-mocha">Paid</p>
+                <p className="mt-1 text-2xl font-medium text-brand-espresso">
                   {formatMoney(receipt.paidAmount)}
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-5">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
-                  Balance Due
-                </p>
-                <p className="mt-1 text-2xl font-black text-brand-espresso">
+                <p className="text-xs font-bold text-brand-mocha">Balance Due</p>
+                <p className="mt-1 text-2xl font-medium text-brand-espresso">
                   {formatMoney(receipt.balanceDue)}
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-5">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
-                  Sold At
-                </p>
+                <p className="text-xs font-bold text-brand-mocha">Sold At</p>
                 <p className="mt-1 text-sm font-bold text-brand-espresso">
                   {formatDateTime(receipt.soldAt)}
                 </p>
@@ -307,7 +299,9 @@ export function SaleDetailPageClient({ saleId }: SaleDetailPageClientProps): JSX
               <div className="p-6 text-sm text-brand-mocha">Loading payments...</div>
             ) : null}
             {paymentsQuery.error ? (
-              <div className="p-6 text-sm text-red-800">{getErrorMessage(paymentsQuery.error)}</div>
+              <div className="p-6 text-sm text-danger-text">
+                {getErrorMessage(paymentsQuery.error)}
+              </div>
             ) : null}
             {!paymentsQuery.isLoading && !paymentsQuery.error ? (
               <Table>
@@ -350,7 +344,7 @@ export function SaleDetailPageClient({ saleId }: SaleDetailPageClientProps): JSX
               <div className="p-6 text-sm text-brand-mocha">Loading returnable items...</div>
             ) : null}
             {returnableItemsQuery.error ? (
-              <div className="p-6 text-sm text-red-800">
+              <div className="p-6 text-sm text-danger-text">
                 {getErrorMessage(returnableItemsQuery.error)}
               </div>
             ) : null}
@@ -391,7 +385,7 @@ export function SaleDetailPageClient({ saleId }: SaleDetailPageClientProps): JSX
             <div className="p-6 text-sm text-brand-mocha">Loading credit notes...</div>
           ) : null}
           {saleReturnsQuery.error ? (
-            <div className="p-6 text-sm text-red-800">
+            <div className="p-6 text-sm text-danger-text">
               {getErrorMessage(saleReturnsQuery.error)}
             </div>
           ) : null}

@@ -31,7 +31,7 @@ export function OrdersToolbar({
   };
 
   return (
-    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino/60 bg-white/80 p-4 lg:grid-cols-[1.5fr_repeat(5,minmax(0,1fr))]">
+    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino/60 bg-card/80 p-4 lg:grid-cols-[1.5fr_repeat(5,minmax(0,1fr))]">
       <Input
         aria-label="Search orders"
         onChange={(event) => update({ search: event.target.value })}

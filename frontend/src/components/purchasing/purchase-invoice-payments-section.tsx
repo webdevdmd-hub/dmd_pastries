@@ -48,7 +48,7 @@ export function PurchaseInvoicePaymentsSection({
   };
 
   return (
-    <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+    <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
       <div className="flex flex-col gap-3 border-b border-workspace-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-brand-espresso">Payments made</h2>
@@ -71,12 +71,12 @@ export function PurchaseInvoicePaymentsSection({
       </div>
       <div className="p-5">
         {invoice.status !== "posted" ? (
-          <p className="rounded-md border border-dashed border-workspace-border bg-zinc-50 p-4 text-sm text-workspace-muted">
+          <p className="rounded-md border border-dashed border-workspace-border bg-muted p-4 text-sm text-workspace-muted">
             Post the bill before recording payments.
           </p>
         ) : null}
         {invoice.status === "posted" && invoice.balanceAmount <= 0 ? (
-          <p className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+          <p className="rounded-md border border-money/30 bg-money-tint p-4 text-sm text-money-text">
             This bill is fully paid.
           </p>
         ) : null}

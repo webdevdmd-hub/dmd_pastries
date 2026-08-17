@@ -84,11 +84,11 @@ export function PaymentsSummaryCards({
             const Icon = card.icon;
 
             return (
-              <Card className="bg-white/80" key={card.label}>
+              <Card className="bg-card/80" key={card.label}>
                 <CardContent className="flex items-center justify-between p-5">
                   <div>
                     <p className="text-sm text-brand-mocha">{card.label}</p>
-                    <p className="mt-2 text-2xl font-black text-brand-espresso">{card.value}</p>
+                    <p className="mt-2 text-2xl font-medium text-brand-espresso">{card.value}</p>
                     <p className="mt-1 text-xs text-brand-mocha">{card.detail}</p>
                   </div>
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-cappuccino/40 text-brand-mocha">

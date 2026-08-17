@@ -18,7 +18,7 @@ export function OrderTimeline({ status }: { status: OrderStatus }): JSX.Element 
   const activeIndex = steps.findIndex((step) => step.status === status);
 
   return (
-    <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
+    <section className="rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-5">
       <h2 className="text-xl font-semibold text-brand-espresso">Order Timeline</h2>
       <div className="mt-5 grid gap-3">
         {steps.map((step, index) => {
@@ -26,7 +26,7 @@ export function OrderTimeline({ status }: { status: OrderStatus }): JSX.Element 
           return (
             <div className="flex items-center gap-3 text-sm" key={step.status}>
               {isReached ? (
-                <CheckCircle2 className="h-5 w-5 text-green-700" />
+                <CheckCircle2 className="h-5 w-5 text-money-text" />
               ) : (
                 <Circle className="h-5 w-5 text-brand-mocha/60" />
               )}
@@ -39,7 +39,7 @@ export function OrderTimeline({ status }: { status: OrderStatus }): JSX.Element 
           );
         })}
         {status === "cancelled" ? (
-          <p className="text-sm font-semibold text-red-700">Order cancelled.</p>
+          <p className="text-sm font-semibold text-danger-text">Order cancelled.</p>
         ) : null}
       </div>
     </section>

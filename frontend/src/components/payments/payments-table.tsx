@@ -98,9 +98,7 @@ export function PaymentsTable({
           <TableRow key={payment.id}>
             <TableCell>
               <span className="block font-bold text-brand-espresso">{payment.sourceNumber}</span>
-              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-brand-mocha">
-                {sourceLabel(payment)}
-              </span>
+              <span className="text-xs font-semibold text-brand-mocha">{sourceLabel(payment)}</span>
             </TableCell>
             <TableCell>{payment.customerName ?? "Walk-in customer"}</TableCell>
             <TableCell>
@@ -110,7 +108,7 @@ export function PaymentsTable({
               />
             </TableCell>
             <TableCell className="capitalize">{paymentTypeLabel(payment)}</TableCell>
-            <TableCell className="font-black">{formatMoney(payment.amount)}</TableCell>
+            <TableCell className="font-medium">{formatMoney(payment.amount)}</TableCell>
             <TableCell>
               <PaymentStatusBadge status={payment.paymentStatus} />
             </TableCell>

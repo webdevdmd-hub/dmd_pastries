@@ -395,7 +395,7 @@ export function ChartAccountFormDialog({
             </label>
           </div>
 
-          {error ? <p className="text-sm font-medium text-red-700">{error}</p> : null}
+          {error ? <p className="text-sm font-medium text-danger-text">{error}</p> : null}
 
           <DialogFooter>
             <Button onClick={onClose} type="button" variant="outline">

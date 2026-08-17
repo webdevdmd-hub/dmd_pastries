@@ -136,11 +136,11 @@ function formatBackfillTarget(value: string): string {
 
 function issueBadgeClass(severity: string): string {
   if (readinessIssueBlocks(severity)) {
-    return "border-red-200 bg-red-50 text-red-700";
+    return "border-danger/30 bg-danger-tint text-danger-text";
   }
 
   if (severity === "warning") {
-    return "border-amber-200 bg-amber-50 text-amber-800";
+    return "border-warning/30 bg-warning-tint text-warning-text";
   }
 
   return "";
@@ -171,24 +171,20 @@ function canManageAccounting(hasAnyPermission: (permissions: string[]) => boolea
 
 function ErrorNotice({ message }: { message: string }): JSX.Element {
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+    <div className="rounded-xl border border-danger/30 bg-danger-tint px-4 py-3 text-sm text-danger-text">
       {message}
     </div>
   );
 }
 
 function FieldLabel({ children }: { children: string }): JSX.Element {
-  return (
-    <label className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-      {children}
-    </label>
-  );
+  return <label className="text-xs font-semibold text-muted-foreground">{children}</label>;
 }
 
 function StatusBadge({ matched, status }: { matched: boolean; status: string }): JSX.Element {
   return (
     <Badge
-      className={matched ? "" : "border-red-200 bg-red-50 text-red-700"}
+      className={matched ? "" : "border-danger/30 bg-danger-tint text-danger-text"}
       variant={matched ? "secondary" : "outline"}
     >
       {matched ? "Matched" : formatStatus(status || "unmatched")}
@@ -646,7 +642,7 @@ export function AccountMappingsPageClient(): JSX.Element {
       {updateMappings.isError ? <ErrorNotice message={updateMappings.error.message} /> : null}
 
       <Card className="overflow-hidden border-workspace-panel-border bg-workspace-panel shadow-sm">
-        <div className="grid gap-4 border-b bg-muted/40 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground md:grid-cols-[1.25fr_2fr_1fr_8rem]">
+        <div className="grid gap-4 border-b bg-muted/40 px-4 py-3 text-xs font-semibold text-muted-foreground md:grid-cols-[1.25fr_2fr_1fr_8rem]">
           <span>Mapping</span>
           <span>Chart account</span>
           <span>Type / group</span>
@@ -705,7 +701,9 @@ export function AccountMappingsPageClient(): JSX.Element {
               </p>
               <Badge
                 className={
-                  draftMappings[mapping.mappingKey] ? "" : "border-red-200 bg-red-50 text-red-700"
+                  draftMappings[mapping.mappingKey]
+                    ? ""
+                    : "border-danger/30 bg-danger-tint text-danger-text"
                 }
                 variant={draftMappings[mapping.mappingKey] ? "secondary" : "outline"}
               >
@@ -772,7 +770,7 @@ function ReconciliationSection({
             </p>
           </div>
           <Badge
-            className={unmatchedCount > 0 ? "border-red-200 bg-red-50 text-red-700" : ""}
+            className={unmatchedCount > 0 ? "border-danger/30 bg-danger-tint text-danger-text" : ""}
             variant={unmatchedCount > 0 ? "outline" : "secondary"}
           >
             {unmatchedCount > 0 ? `${String(unmatchedCount)} unmatched` : "All matched"}
@@ -791,7 +789,7 @@ function ReconciliationSection({
         ) : null}
 
         {errorMessage ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger-tint px-4 py-3 text-sm text-danger-text">
             <span>{errorMessage}</span>
             {onRetry ? (
               <Button onClick={onRetry} size="sm" type="button" variant="outline">
@@ -937,7 +935,7 @@ export function AccountingReconciliationPageClient(): JSX.Element {
           <p
             className={
               unmatchedRows.length > 0
-                ? "text-3xl font-semibold text-red-700"
+                ? "text-3xl font-semibold text-danger-text"
                 : "text-3xl font-semibold text-foreground"
             }
           >
@@ -1171,7 +1169,9 @@ export function AccountingBackfillPageClient(): JSX.Element {
           ))}
         </div>
         {selectedTargets.length === 0 ? (
-          <p className="mt-3 text-sm text-red-700">Select at least one target before readiness.</p>
+          <p className="mt-3 text-sm text-danger-text">
+            Select at least one target before readiness.
+          </p>
         ) : null}
       </RecoveryCard>
 
@@ -1182,9 +1182,9 @@ export function AccountingBackfillPageClient(): JSX.Element {
               {readinessQuery.isLoading ? (
                 <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
               ) : readiness?.ready ? (
-                <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                <CheckCircle2 className="h-6 w-6 text-money-text" />
               ) : (
-                <AlertTriangle className="h-6 w-6 text-amber-600" />
+                <AlertTriangle className="h-6 w-6 text-warning-text" />
               )}
               <div>
                 <p className="font-semibold">
@@ -1201,26 +1201,20 @@ export function AccountingBackfillPageClient(): JSX.Element {
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-xl border bg-background p-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Candidates
-                </p>
+                <p className="text-xs font-semibold text-muted-foreground">Candidates</p>
                 <p className="mt-1 text-2xl font-semibold">{candidateCount}</p>
               </div>
               <div className="rounded-xl border bg-background p-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Would post
-                </p>
+                <p className="text-xs font-semibold text-muted-foreground">Would post</p>
                 <p className="mt-1 text-2xl font-semibold">{wouldPostCount}</p>
               </div>
               <div className="rounded-xl border bg-background p-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Blocked
-                </p>
-                <p className="mt-1 text-2xl font-semibold text-red-700">{blockedCount}</p>
+                <p className="text-xs font-semibold text-muted-foreground">Blocked</p>
+                <p className="mt-1 text-2xl font-semibold text-danger-text">{blockedCount}</p>
               </div>
             </div>
             {blockingIssues.length > 0 ? (
-              <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              <p className="rounded-xl border border-danger/30 bg-danger-tint px-4 py-3 text-sm text-danger-text">
                 Fix blocking readiness issues before running a real backfill.
               </p>
             ) : null}
@@ -1303,7 +1297,7 @@ export function AccountingBackfillPageClient(): JSX.Element {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[48rem] text-sm">
               <thead>
-                <tr className="border-b text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                <tr className="border-b text-xs text-muted-foreground">
                   <th className="px-3 py-2 text-left">Target</th>
                   <th className="px-3 py-2 text-right">Scanned</th>
                   <th className="px-3 py-2 text-right">Would post</th>
@@ -1320,7 +1314,7 @@ export function AccountingBackfillPageClient(): JSX.Element {
                     <td className="px-3 py-3 text-right">{result.wouldPostCount}</td>
                     <td className="px-3 py-3 text-right">{result.postedCount}</td>
                     <td className="px-3 py-3 text-right">{result.skippedCount}</td>
-                    <td className="px-3 py-3 text-right text-red-700">{result.failedCount}</td>
+                    <td className="px-3 py-3 text-right text-danger-text">{result.failedCount}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1332,13 +1326,13 @@ export function AccountingBackfillPageClient(): JSX.Element {
                 .filter((result) => result.errors.length > 0)
                 .map((result) => (
                   <div
-                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-3"
+                    className="rounded-xl border border-danger/30 bg-danger-tint px-4 py-3"
                     key={result.target}
                   >
-                    <p className="font-semibold text-red-800">
+                    <p className="font-semibold text-danger-text">
                       {formatBackfillTarget(result.target)}
                     </p>
-                    <ul className="mt-2 list-disc pl-5 text-sm text-red-800">
+                    <ul className="mt-2 list-disc pl-5 text-sm text-danger-text">
                       {result.errors.map((error) => (
                         <li key={error}>{error}</li>
                       ))}

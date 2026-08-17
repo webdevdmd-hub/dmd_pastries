@@ -313,8 +313,8 @@ export function ChartOfAccountsPageClient(): JSX.Element {
         title="Chart of Accounts"
       />
 
-      <div className="grid min-h-[720px] overflow-hidden rounded-3xl border border-brand-cappuccino/70 bg-white shadow-sm lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
-        <aside className="flex min-h-0 flex-col border-b border-brand-cappuccino/70 bg-white lg:border-b-0 lg:border-r">
+      <div className="grid min-h-[720px] overflow-hidden rounded-3xl border border-brand-cappuccino/70 bg-card shadow-sm lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
+        <aside className="flex min-h-0 flex-col border-b border-brand-cappuccino/70 bg-card lg:border-b-0 lg:border-r">
           <div className="flex items-center justify-between gap-3 border-b border-brand-cappuccino/60 px-4 py-4">
             <div>
               <div className="flex items-center gap-2">
@@ -387,7 +387,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
               />
             </div>
             {filters.search ? (
-              <div className="mt-3 rounded-2xl border border-green-200 bg-green-50/80 p-3 text-sm text-green-900">
+              <div className="mt-3 rounded-2xl border border-money/30 bg-money-tint/80 p-3 text-sm text-money-text">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold italic">Search Criteria</p>
@@ -454,7 +454,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
 
             {!accountsQuery.isLoading && accountsQuery.error ? (
               <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-6 text-center">
-                <Landmark className="h-10 w-10 text-red-700" />
+                <Landmark className="h-10 w-10 text-danger-text" />
                 <p className="font-semibold text-brand-espresso">Unable to load accounts</p>
                 <p className="text-sm text-brand-mocha">{getErrorMessage(accountsQuery.error)}</p>
                 <Button
@@ -489,7 +489,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
                   return (
                     <button
                       className={`flex w-full items-start gap-3 border-b border-brand-cappuccino/40 px-4 py-4 text-left transition-colors hover:bg-brand-latte/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-caramel ${
-                        isSelected ? "bg-brand-latte/60" : "bg-white"
+                        isSelected ? "bg-brand-latte/60" : "bg-card"
                       }`}
                       key={account.id}
                       onClick={() => setSelectedAccountId(account.id)}
@@ -499,7 +499,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
                         className={`mt-1 h-4 w-4 rounded border ${
                           isSelected
                             ? "border-brand-caramel bg-brand-caramel"
-                            : "border-brand-cappuccino bg-white"
+                            : "border-brand-cappuccino bg-card"
                         }`}
                       />
                       <span className="min-w-0 flex-1">
@@ -545,7 +545,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
           </div>
         </aside>
 
-        <section className="min-w-0 bg-white">
+        <section className="min-w-0 bg-card">
           {!displayAccount ? (
             <div className="flex min-h-[620px] flex-col items-center justify-center gap-3 p-8 text-center">
               <BookOpenText className="h-12 w-12 text-brand-mocha" />
@@ -558,7 +558,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
             <div className="flex min-h-full flex-col">
               <div className="flex flex-col gap-4 border-b border-brand-cappuccino/60 bg-brand-latte/20 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha">
+                  <p className="text-xs font-semibold text-brand-mocha">
                     {formatAccountingLabel(displayAccount.accountType)}
                   </p>
                   <h2 className="mt-1 text-3xl font-bold tracking-tight text-brand-espresso">
@@ -603,7 +603,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          className="text-red-700 focus:text-red-800"
+                          className="text-danger-text focus:text-danger-text"
                           disabled={displayAccount.isSystemAccount}
                           onClick={() =>
                             setPendingAction({ account: displayAccount, type: "delete" })
@@ -620,9 +620,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
 
               <div className="grid gap-6 px-6 py-6">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha">
-                    Closing Balance
-                  </p>
+                  <p className="text-xs font-semibold text-brand-mocha">Closing Balance</p>
                   {ledgerPreviewQuery.isLoading ? (
                     <Skeleton className="mt-2 h-10 w-64 rounded-xl" />
                   ) : (
@@ -672,9 +670,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
                       className="rounded-2xl border border-brand-cappuccino/60 bg-brand-latte/20 p-4"
                       key={label}
                     >
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha">
-                        {label}
-                      </p>
+                      <p className="text-xs font-semibold text-brand-mocha">{label}</p>
                       <p className="mt-2 text-lg font-bold text-brand-espresso">
                         {money(Number(value))}
                       </p>
@@ -682,7 +678,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
                   ))}
                 </div>
 
-                <Card className="overflow-hidden border-brand-cappuccino/70 bg-white shadow-none">
+                <Card className="overflow-hidden border-brand-cappuccino/70 bg-card shadow-none">
                   <CardContent className="p-0">
                     <div className="flex flex-col gap-3 border-b border-brand-cappuccino/60 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                       <div>

@@ -242,28 +242,22 @@ export function AccountingPageClient(): JSX.Element {
         title="Accounting"
       />
 
-      <div className="rounded-2xl border border-brand-cappuccino/70 bg-white/80 p-4">
+      <div className="rounded-2xl border border-brand-cappuccino/70 bg-card/80 p-4">
         <div className="grid gap-3 md:grid-cols-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha">
-              Account
-            </p>
+            <p className="text-xs font-semibold text-brand-mocha">Account</p>
             <p className="mt-1 text-sm text-brand-espresso">
               The account that receives debit and credit entries.
             </p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha">
-              Ledger
-            </p>
+            <p className="text-xs font-semibold text-brand-mocha">Ledger</p>
             <p className="mt-1 text-sm text-brand-espresso">
               The transaction history and running balance for that account.
             </p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha">
-              Source
-            </p>
+            <p className="text-xs font-semibold text-brand-mocha">Source</p>
             <p className="mt-1 text-sm text-brand-espresso">
               POS, purchase, order, expense, payment, or settlement document that posted the entry.
             </p>
@@ -273,9 +267,7 @@ export function AccountingPageClient(): JSX.Element {
 
       {visibleSections.map((section) => (
         <section className="grid gap-3" key={section.label}>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-mocha">
-            {section.label}
-          </h2>
+          <h2 className="text-sm font-semibold text-brand-mocha">{section.label}</h2>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {section.items.map((item) => (
               <AccountingCard item={item} key={item.href} />

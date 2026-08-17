@@ -32,10 +32,10 @@ function formatDate(value: string): string {
 
 function statusBadge(status: SupplierPaymentStatus): JSX.Element {
   if (status === "completed") {
-    return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">Completed</Badge>;
+    return <Badge className="border-money/30 bg-money-tint text-money-text">Completed</Badge>;
   }
 
-  return <Badge className="border-slate-200 bg-slate-50 text-slate-700">Voided</Badge>;
+  return <Badge className="border-border bg-muted text-foreground-muted">Voided</Badge>;
 }
 
 export function PurchaseSupplierPaymentsTable({
@@ -120,7 +120,7 @@ export function PurchaseSupplierPaymentsTable({
                         ) : null}
                         {onDelete ? (
                           <DropdownMenuItem
-                            className="text-red-700 focus:text-red-700"
+                            className="text-danger-text focus:text-danger-text"
                             onClick={() => onDelete(payment)}
                           >
                             <Trash2 className="h-4 w-4" />

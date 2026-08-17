@@ -71,7 +71,7 @@ function PaymentMethodSelect({
 
 function ToolbarFrame({ children }: { children: ReactNode }): JSX.Element {
   return (
-    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino/70 bg-white/75 p-4 shadow-sm lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_auto]">
+    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino/70 bg-card/75 p-4 shadow-sm lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_auto]">
       {children}
     </div>
   );

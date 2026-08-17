@@ -175,7 +175,7 @@ export function PurchaseReceiptDetailsPageClient({
           </CardContent>
         </Card>
       </div>
-      <Card className="bg-white/85">
+      <Card className="bg-card/85">
         <CardContent className="flex flex-col gap-2 p-5 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm text-brand-mocha">Accounting status</p>
@@ -198,7 +198,7 @@ export function PurchaseReceiptDetailsPageClient({
           }}
         />
       ) : null}
-      <Card className="bg-white/85">
+      <Card className="bg-card/85">
         <CardHeader>
           <CardTitle>Vendor credits</CardTitle>
         </CardHeader>
@@ -207,7 +207,7 @@ export function PurchaseReceiptDetailsPageClient({
             <p className="text-sm text-brand-mocha">Loading vendor credits...</p>
           ) : null}
           {receiptReturnsQuery.error ? (
-            <p className="text-sm text-red-800">{getErrorMessage(receiptReturnsQuery.error)}</p>
+            <p className="text-sm text-danger-text">{getErrorMessage(receiptReturnsQuery.error)}</p>
           ) : null}
           {!receiptReturnsQuery.isLoading &&
           !receiptReturnsQuery.error &&
@@ -245,7 +245,7 @@ export function PurchaseReceiptDetailsPageClient({
           </div>
         </CardContent>
       </Card>
-      <Card className="bg-white/85">
+      <Card className="bg-card/85">
         <CardHeader>
           <CardTitle>Stock movement visibility</CardTitle>
         </CardHeader>

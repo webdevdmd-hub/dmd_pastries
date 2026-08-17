@@ -373,7 +373,7 @@ export function PurchaseReturnFromReceiptDialog({
             />
           </div>
           <div className="rounded-lg border border-brand-cappuccino bg-brand-latte/60 p-4">
-            <p className="text-xs uppercase tracking-[0.22em] text-brand-mocha">Estimated credit</p>
+            <p className="text-xs text-brand-mocha">Estimated credit</p>
             <p className="mt-2 text-2xl font-semibold text-brand-espresso">
               {formatCurrency(estimatedCredit)}
             </p>
@@ -396,7 +396,7 @@ export function PurchaseReturnFromReceiptDialog({
               ? "Please select at least one return line to create the Vendor Credit."
               : `${selectedLineCountText} return line${selectedLines.length === 1 ? "" : "s"} selected.`}
           </div>
-          <div className="grid grid-cols-[7rem_1.6fr_0.8fr_0.8fr_1fr_1.2fr] gap-3 bg-brand-latte px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-brand-mocha">
+          <div className="grid grid-cols-[7rem_1.6fr_0.8fr_0.8fr_1fr_1.2fr] gap-3 bg-brand-latte px-4 py-3 text-xs font-semibold text-brand-mocha">
             <span>Select</span>
             <span>Item</span>
             <span>Returnable</span>
@@ -425,7 +425,7 @@ export function PurchaseReturnFromReceiptDialog({
           ) : null}
 
           {returnableItemsQuery.error ? (
-            <div className="p-6 text-sm text-red-800">
+            <div className="p-6 text-sm text-danger-text">
               {getErrorMessage(returnableItemsQuery.error)}
             </div>
           ) : null}

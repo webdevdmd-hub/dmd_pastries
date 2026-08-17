@@ -60,22 +60,20 @@ function ChainCard({
         "h-full rounded-2xl border p-4 transition",
         isEmpty
           ? "border-dashed border-brand-cappuccino bg-brand-latte/40"
-          : "border-brand-cappuccino bg-white hover:border-brand-caramel/70 hover:shadow-sm",
+          : "border-brand-cappuccino bg-card hover:border-brand-caramel/70 hover:shadow-sm",
       )}
     >
       <div className="flex items-start gap-3">
         <div
           className={cn(
             "rounded-xl p-2",
-            isEmpty ? "bg-white text-brand-mocha" : "bg-brand-latte text-brand-mocha",
+            isEmpty ? "bg-card text-brand-mocha" : "bg-brand-latte text-brand-mocha",
           )}
         >
           {icon}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-brand-mocha">
-            {stage}
-          </p>
+          <p className="text-[0.65rem] font-bold text-brand-mocha">{stage}</p>
           <p className="truncate text-sm font-semibold text-brand-espresso">{title}</p>
           <p className="mt-1 text-xs text-brand-mocha">{description}</p>
           {children ? (
@@ -155,13 +153,11 @@ export function PurchaseDocumentChain({
           : "This purchase timeline has linked downstream documents.";
 
   return (
-    <Card className="overflow-hidden border-brand-cappuccino bg-white/90 shadow-sm">
-      <CardHeader className="border-b border-brand-cappuccino bg-white">
+    <Card className="overflow-hidden border-brand-cappuccino bg-card/90 shadow-sm">
+      <CardHeader className="border-b border-brand-cappuccino bg-card">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-brand-mocha">
-              Purchase timeline
-            </p>
+            <p className="text-xs font-bold text-brand-mocha">Purchase timeline</p>
             <CardTitle className="mt-1 text-xl text-brand-espresso">Purchase Timeline</CardTitle>
             <p className="mt-2 text-sm text-brand-mocha">{nextStep}</p>
           </div>

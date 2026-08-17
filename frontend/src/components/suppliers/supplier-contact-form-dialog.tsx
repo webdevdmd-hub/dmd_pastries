@@ -106,7 +106,7 @@ export function SupplierContactFormDialog({
             <Label htmlFor="supplier-contact-name">Contact name</Label>
             <Input id="supplier-contact-name" {...form.register("contactName")} />
             {fieldError("contactName") ? (
-              <span className="text-sm text-red-700">{fieldError("contactName")}</span>
+              <span className="text-sm text-danger-text">{fieldError("contactName")}</span>
             ) : null}
           </label>
           <label className="grid gap-2">
@@ -122,7 +122,7 @@ export function SupplierContactFormDialog({
               <Label htmlFor="supplier-contact-email">Email</Label>
               <Input id="supplier-contact-email" type="email" {...form.register("email")} />
               {fieldError("email") ? (
-                <span className="text-sm text-red-700">{fieldError("email")}</span>
+                <span className="text-sm text-danger-text">{fieldError("email")}</span>
               ) : null}
             </label>
           </div>

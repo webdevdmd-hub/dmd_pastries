@@ -95,7 +95,7 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
     <main className="min-h-screen bg-brand-latte px-6 py-8">
       <div className="mx-auto grid max-w-7xl gap-6">
         <OrderHeader canManage={canManage} isSaving={false} order={order} />
-        <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
+        <section className="rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h2 className="text-2xl font-semibold text-brand-espresso">
@@ -136,9 +136,7 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
                 <div>
                   <p className="font-semibold text-brand-espresso">{item.itemNameSnapshot}</p>
                   {item.itemSource === "custom" ? (
-                    <p className="text-xs font-medium uppercase tracking-[0.14em] text-brand-mocha">
-                      Custom item
-                    </p>
+                    <p className="text-xs font-medium text-brand-mocha">Custom item</p>
                   ) : null}
                   <p className="text-brand-mocha">
                     Qty {item.quantity} - {item.unitName}
@@ -198,7 +196,9 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
               <Button
                 disabled={!canManage || order.orderStatus === status || statusMutation.isPending}
                 className={
-                  status === "cancelled" ? "border-red-300 text-red-800 hover:bg-red-50" : undefined
+                  status === "cancelled"
+                    ? "border-danger/30 text-danger-text hover:bg-danger-tint"
+                    : undefined
                 }
                 key={status}
                 onClick={() => {

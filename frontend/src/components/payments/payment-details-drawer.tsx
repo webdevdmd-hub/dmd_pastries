@@ -39,8 +39,8 @@ function formatDate(value: string): string {
 
 function DetailRow({ label, value }: { label: string; value: string }): JSX.Element {
   return (
-    <div className="rounded-2xl border border-brand-cappuccino/70 bg-white/80 p-3">
-      <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">{label}</p>
+    <div className="rounded-2xl border border-brand-cappuccino/70 bg-card/80 p-3">
+      <p className="text-xs font-bold text-brand-mocha">{label}</p>
       <p className="mt-1 text-sm font-semibold text-brand-espresso">{value}</p>
     </div>
   );
@@ -79,20 +79,18 @@ export function PaymentDetailsDrawer({
 
         {payment ? (
           <div className="mt-6 space-y-5">
-            <div className="rounded-3xl border border-brand-cappuccino/70 bg-white p-5 shadow-sm">
+            <div className="rounded-3xl border border-brand-cappuccino/70 bg-card p-5 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm text-brand-mocha">{payment.id}</p>
-                  <h3 className="mt-1 text-2xl font-black text-brand-espresso">
+                  <h3 className="mt-1 text-2xl font-medium text-brand-espresso">
                     {payment.sourceNumber}
                   </h3>
-                  <p className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
-                    {sourceLabel}
-                  </p>
+                  <p className="mt-1 text-xs font-bold text-brand-mocha">{sourceLabel}</p>
                 </div>
                 <PaymentStatusBadge status={payment.paymentStatus} />
               </div>
-              <p className="mt-4 text-3xl font-black text-brand-espresso">
+              <p className="mt-4 text-3xl font-medium text-brand-espresso">
                 {formatMoney(payment.amount)}
               </p>
             </div>

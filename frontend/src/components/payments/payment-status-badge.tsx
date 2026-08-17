@@ -11,13 +11,13 @@ function getStatusClass(status: PaymentStatus | RefundStatus | ReconciliationSta
   switch (status) {
     case "completed":
     case "approved":
-      return "border-green-700/30 bg-green-100 text-green-800";
+      return "border-money/30 bg-money-tint text-money-text";
     case "pending":
     case "submitted":
-      return "border-amber-700/30 bg-amber-100 text-amber-900";
+      return "border-warning/30 bg-warning-tint text-warning-text";
     case "failed":
     case "rejected":
-      return "border-red-700/30 bg-red-100 text-red-800";
+      return "border-danger/30 bg-danger-tint text-danger-text";
     case "refunded":
     case "cancelled":
       return "border-brand-mocha/20 bg-brand-cappuccino/40 text-brand-mocha";

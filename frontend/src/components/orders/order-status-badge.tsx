@@ -13,11 +13,11 @@ function label(value: string): string {
 export function OrderStatusBadge({ status }: { status: OrderStatus }): JSX.Element {
   const className =
     status === "cancelled"
-      ? "border-red-200 bg-red-50 text-red-700"
+      ? "border-danger/30 bg-danger-tint text-danger-text"
       : status === "ready" || status === "delivered" || status === "completed"
-        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+        ? "border-money/30 bg-money-tint text-money-text"
         : status === "in_production" || status === "confirmed"
-          ? "border-amber-200 bg-amber-50 text-amber-800"
+          ? "border-warning/30 bg-warning-tint text-warning-text"
           : "border-brand-cappuccino bg-brand-latte text-brand-mocha";
 
   return (
@@ -30,11 +30,11 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }): JSX.Eleme
 export function OrderPaymentStatusBadge({ status }: { status: OrderPaymentStatus }): JSX.Element {
   const className =
     status === "paid"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      ? "border-money/30 bg-money-tint text-money-text"
       : status === "partial"
-        ? "border-amber-200 bg-amber-50 text-amber-800"
+        ? "border-warning/30 bg-warning-tint text-warning-text"
         : status === "refunded"
-          ? "border-red-200 bg-red-50 text-red-700"
+          ? "border-danger/30 bg-danger-tint text-danger-text"
           : "border-brand-cappuccino bg-brand-latte text-brand-mocha";
 
   return (

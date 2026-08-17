@@ -76,20 +76,20 @@ function WorkflowStep({
       className={cn(
         "rounded-2xl border p-4 transition",
         isDone
-          ? "border-brand-espresso bg-brand-espresso text-white"
+          ? "border-brand-espresso bg-brand-espresso text-primary-foreground"
           : isActive
-            ? "border-brand-espresso bg-white text-brand-espresso shadow-sm"
-            : "border-brand-cappuccino bg-white text-brand-mocha",
+            ? "border-brand-espresso bg-card text-brand-espresso shadow-sm"
+            : "border-brand-cappuccino bg-card text-brand-mocha",
       )}
     >
       <div className="flex items-center gap-2">
         <CheckCircle2
-          className={cn("h-4 w-4", isDone ? "text-white" : "text-brand-mocha")}
+          className={cn("h-4 w-4", isDone ? "text-primary-foreground" : "text-brand-mocha")}
           aria-hidden="true"
         />
-        <p className="text-xs font-bold uppercase tracking-[0.2em]">{title}</p>
+        <p className="text-xs font-bold">{title}</p>
       </div>
-      <p className={cn("mt-2 text-sm", isDone ? "text-white/80" : "text-brand-mocha")}>
+      <p className={cn("mt-2 text-sm", isDone ? "text-primary-foreground/80" : "text-brand-mocha")}>
         {description}
       </p>
     </div>
@@ -339,7 +339,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <Card className="overflow-hidden border-brand-cappuccino bg-white shadow-sm">
+      <Card className="overflow-hidden border-brand-cappuccino bg-card shadow-sm">
         <CardContent className="p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -403,13 +403,11 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
         </CardContent>
       </Card>
 
-      <Card className="border-brand-cappuccino bg-white/95 shadow-sm">
+      <Card className="border-brand-cappuccino bg-card/95 shadow-sm">
         <CardHeader className="border-b border-brand-cappuccino">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-brand-mocha">
-                Purchase workflow
-              </p>
+              <p className="text-xs font-bold text-brand-mocha">Purchase workflow</p>
               <CardTitle className="mt-1 text-2xl text-brand-espresso">
                 Ordered - Received - Billed - Paid
               </CardTitle>
@@ -448,7 +446,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <Card className="border-brand-cappuccino bg-white/95 shadow-sm">
+        <Card className="border-brand-cappuccino bg-card/95 shadow-sm">
           <CardHeader>
             <CardTitle>What's next?</CardTitle>
           </CardHeader>
@@ -476,7 +474,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
           </CardContent>
         </Card>
 
-        <Card className="border-brand-cappuccino bg-white/95 shadow-sm">
+        <Card className="border-brand-cappuccino bg-card/95 shadow-sm">
           <CardHeader>
             <CardTitle>Document summary</CardTitle>
           </CardHeader>
@@ -557,7 +555,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
         />
       </div>
 
-      <Card className="bg-white/85">
+      <Card className="bg-card/85">
         <CardHeader>
           <CardTitle>Notes</CardTitle>
         </CardHeader>

@@ -181,7 +181,7 @@ export function OrderPackagingSection({
   };
 
   return (
-    <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
+    <section className="rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-5">
       <h2 className="text-xl font-semibold text-brand-espresso">Packaging</h2>
       <p className="mt-1 text-sm text-brand-mocha">
         Attach boxes, trays, labels, or packaging items.
@@ -263,7 +263,7 @@ export function OrderPackagingSection({
                     type="button"
                     variant="ghost"
                   >
-                    <Trash2 className="h-4 w-4 text-red-700" />
+                    <Trash2 className="h-4 w-4 text-danger-text" />
                   </Button>
                 </span>
               </div>

@@ -31,11 +31,11 @@ export function SuppliersSummaryCards({ suppliers }: SuppliersSummaryCardsProps)
         const Icon = card.icon;
 
         return (
-          <Card className="bg-white/80" key={card.label}>
+          <Card className="bg-card/80" key={card.label}>
             <CardContent className="flex items-center justify-between p-6">
               <div>
                 <p className="text-sm text-brand-mocha">{card.label}</p>
-                <p className="mt-3 text-4xl font-black text-brand-espresso">{card.value}</p>
+                <p className="mt-3 text-4xl font-medium text-brand-espresso">{card.value}</p>
               </div>
               <div className="rounded-2xl bg-brand-cappuccino/35 p-4 text-brand-mocha">
                 <Icon className="h-7 w-7" />

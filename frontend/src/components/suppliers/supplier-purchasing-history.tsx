@@ -197,7 +197,7 @@ function collectPurchasedItems(invoices: PurchaseInvoice[]): PurchaseInvoiceItem
 
 function HistorySkeleton(): JSX.Element {
   return (
-    <Card className="border-brand-cappuccino bg-white/85">
+    <Card className="border-brand-cappuccino bg-card/85">
       <CardHeader>
         <Skeleton className="h-6 w-56" />
       </CardHeader>
@@ -307,13 +307,11 @@ export function SupplierPurchasingHistory({
   const statementRows = statementDisplayRows(statement?.items ?? []);
 
   return (
-    <Card className="overflow-hidden border-brand-cappuccino bg-white/90">
-      <CardHeader className="border-b border-brand-cappuccino bg-white">
+    <Card className="overflow-hidden border-brand-cappuccino bg-card/90">
+      <CardHeader className="border-b border-brand-cappuccino bg-card">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-brand-mocha">
-              Vendor ledger
-            </p>
+            <p className="text-xs font-bold text-brand-mocha">Vendor ledger</p>
             <CardTitle className="mt-1 text-xl text-brand-espresso">Purchasing history</CardTitle>
             <p className="mt-2 text-sm text-brand-mocha">
               Track what was bought, how much is paid, what remains outstanding, and related
@@ -327,7 +325,7 @@ export function SupplierPurchasingHistory({
       </CardHeader>
       <CardContent className="flex flex-col gap-5 p-5">
         {queryError ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <div className="rounded-2xl border border-danger/30 bg-danger-tint p-4 text-sm text-danger-text">
             Unable to load full supplier purchasing history. {getErrorMessage(queryError)}
           </div>
         ) : null}
@@ -343,16 +341,14 @@ export function SupplierPurchasingHistory({
               className="rounded-2xl border border-brand-cappuccino bg-brand-latte/35 p-4"
               key={metric.label}
             >
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-mocha">
-                {metric.label}
-              </p>
+              <p className="text-xs font-bold text-brand-mocha">{metric.label}</p>
               <p className="mt-2 text-2xl font-bold text-brand-espresso">{metric.value}</p>
             </div>
           ))}
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-          <section className="rounded-2xl border border-brand-cappuccino bg-white p-4">
+          <section className="rounded-2xl border border-brand-cappuccino bg-card p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="font-semibold text-brand-espresso">Purchased items</h3>
@@ -392,7 +388,7 @@ export function SupplierPurchasingHistory({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-brand-cappuccino bg-white p-4">
+          <section className="rounded-2xl border border-brand-cappuccino bg-card p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="font-semibold text-brand-espresso">Recent purchase documents</h3>
@@ -407,7 +403,7 @@ export function SupplierPurchasingHistory({
               {recentDocuments.length > 0 ? (
                 recentDocuments.map((document) => (
                   <Link
-                    className="flex items-center justify-between gap-3 rounded-xl border border-brand-cappuccino bg-white p-3 transition hover:border-brand-caramel hover:bg-brand-latte/30"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-brand-cappuccino bg-card p-3 transition hover:border-brand-caramel hover:bg-brand-latte/30"
                     href={document.href}
                     key={document.key}
                   >
@@ -440,7 +436,7 @@ export function SupplierPurchasingHistory({
         </div>
 
         <section
-          className="overflow-hidden rounded-2xl border border-brand-cappuccino bg-white"
+          className="overflow-hidden rounded-2xl border border-brand-cappuccino bg-card"
           id="statement"
         >
           <div className="border-b border-brand-cappuccino p-4">
@@ -463,19 +459,17 @@ export function SupplierPurchasingHistory({
               },
             ].map((metric) => (
               <div
-                className="rounded-xl border border-brand-cappuccino bg-white px-3 py-2"
+                className="rounded-xl border border-brand-cappuccino bg-card px-3 py-2"
                 key={metric.label}
               >
-                <p className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-brand-mocha">
-                  {metric.label}
-                </p>
+                <p className="text-[0.68rem] font-bold text-brand-mocha">{metric.label}</p>
                 <p className="mt-1 text-sm font-semibold text-brand-espresso">{metric.value}</p>
               </div>
             ))}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[48rem] text-sm">
-              <thead className="bg-brand-latte/50 text-left text-xs uppercase tracking-[0.18em] text-brand-mocha">
+              <thead className="bg-brand-latte/50 text-left text-xs text-brand-mocha">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Date</th>
                   <th className="px-4 py-3 font-semibold">Type</th>
@@ -489,7 +483,7 @@ export function SupplierPurchasingHistory({
               <tbody className="divide-y divide-brand-cappuccino">
                 {statementRows.length > 0 ? (
                   statementRows.map((row) => (
-                    <tr className="bg-white" key={row.key}>
+                    <tr className="bg-card" key={row.key}>
                       <td className="px-4 py-3 text-brand-mocha">{formatDate(row.date)}</td>
                       <td className="px-4 py-3 font-semibold text-brand-espresso">{row.type}</td>
                       <td className="px-4 py-3 text-brand-mocha">{row.documentNumber}</td>

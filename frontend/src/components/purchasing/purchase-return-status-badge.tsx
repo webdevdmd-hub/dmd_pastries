@@ -17,11 +17,11 @@ export function PurchaseReturnStatusBadge({
 }): JSX.Element {
   const className =
     status === "cancelled"
-      ? "border-red-300 bg-red-50 text-red-800"
+      ? "border-danger/30 bg-danger-tint text-danger-text"
       : status === "reversed"
-        ? "border-sky-300 bg-sky-50 text-sky-800"
+        ? "border-info/30 bg-info-tint text-info-text"
         : status === "posted"
-          ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+          ? "border-money/30 bg-money-tint text-money-text"
           : undefined;
 
   return (

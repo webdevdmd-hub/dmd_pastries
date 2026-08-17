@@ -231,7 +231,7 @@ export function PurchaseInvoiceFormDialog({
           </DialogDescription>
         </DialogHeader>
         {isPostedEdit ? (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <div className="rounded-lg border border-warning/30 bg-warning-tint px-3 py-2 text-sm text-warning-text">
             Editing a posted bill will update payable/accounting records. Bills with payments,
             vendor credits, or received stock cannot be edited.
           </div>
@@ -324,7 +324,7 @@ export function PurchaseInvoiceFormDialog({
           placeholder="Notes"
           value={notes}
         />
-        {error ? <p className="text-sm font-semibold text-red-700">{error}</p> : null}
+        {error ? <p className="text-sm font-semibold text-danger-text">{error}</p> : null}
         <DialogFooter>
           <Button onClick={onClose} type="button" variant="outline">
             Cancel

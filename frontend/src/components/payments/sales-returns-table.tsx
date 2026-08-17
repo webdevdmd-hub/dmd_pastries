@@ -67,7 +67,7 @@ export function SalesReturnsTable({
               </span>
               <span className="text-xs text-brand-mocha">{salesReturn.reason ?? "No reason"}</span>
               {salesReturn.reversalReturnNumber ? (
-                <span className="mt-1 block text-xs text-sky-800">
+                <span className="mt-1 block text-xs text-info-text">
                   Reversal: {salesReturn.reversalReturnNumber}
                 </span>
               ) : null}

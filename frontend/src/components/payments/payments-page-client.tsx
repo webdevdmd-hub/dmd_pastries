@@ -303,7 +303,7 @@ export function PaymentsPageClient(): JSX.Element {
                   className={
                     isCurrent
                       ? "border-brand-caramel/50 bg-brand-latte/70"
-                      : "bg-white/80 transition-colors group-hover:border-brand-caramel/40 group-hover:bg-brand-latte/50"
+                      : "bg-card/80 transition-colors group-hover:border-brand-caramel/40 group-hover:bg-brand-latte/50"
                   }
                 >
                   <CardContent className="flex items-start gap-4 p-4">

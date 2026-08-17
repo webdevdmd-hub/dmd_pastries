@@ -30,7 +30,7 @@ export function OrdersSummaryCards({
       {cards.map((card) => {
         const Icon = card.icon;
         return (
-          <Card className="border-brand-cappuccino/60 bg-white/85" key={card.key}>
+          <Card className="border-brand-cappuccino/60 bg-card/85" key={card.key}>
             <CardContent className="flex items-center justify-between p-5">
               <div>
                 <p className="text-sm text-brand-mocha">{card.label}</p>

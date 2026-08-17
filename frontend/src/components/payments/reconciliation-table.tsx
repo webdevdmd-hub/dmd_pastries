@@ -61,14 +61,14 @@ export function ReconciliationTable({ reconciliations }: ReconciliationTableProp
             <TableCell>{formatMoney(reconciliation.countedAmount)}</TableCell>
             <TableCell>
               <div className="flex flex-col gap-1">
-                <span className="font-black">{formatMoney(reconciliation.differenceAmount)}</span>
+                <span className="font-medium">{formatMoney(reconciliation.differenceAmount)}</span>
                 <Badge
                   className={
                     reconciliation.differenceAmount === 0
-                      ? "border-green-700/30 bg-green-100 text-green-800"
+                      ? "border-money/30 bg-money-tint text-money-text"
                       : reconciliation.differenceAmount > 0
-                        ? "border-amber-700/30 bg-amber-100 text-amber-900"
-                        : "border-red-700/30 bg-red-100 text-red-800"
+                        ? "border-warning/30 bg-warning-tint text-warning-text"
+                        : "border-danger/30 bg-danger-tint text-danger-text"
                   }
                   variant="outline"
                 >

@@ -16,7 +16,7 @@ export function SuppliersEmptyState({
   onCreate,
 }: SuppliersEmptyStateProps): JSX.Element {
   return (
-    <Card className="bg-white/80">
+    <Card className="bg-card/80">
       <CardContent className="flex flex-col items-center gap-4 p-12 text-center">
         <Truck className="h-12 w-12 text-brand-mocha" />
         <div>

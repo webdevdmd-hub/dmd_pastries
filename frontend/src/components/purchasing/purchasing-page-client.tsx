@@ -80,7 +80,7 @@ export function PurchasingPageClient(): JSX.Element {
           const Icon = action.icon;
           return (
             <Link href={action.href} key={action.label}>
-              <Card className="h-full border-brand-cappuccino bg-white/85 transition hover:-translate-y-0.5 hover:border-brand-caramel hover:shadow-float">
+              <Card className="h-full border-brand-cappuccino bg-card/85 transition hover:-translate-y-0.5 hover:border-brand-caramel hover:shadow-float">
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-3">
                     <span className="rounded-2xl bg-brand-latte p-3 text-brand-mocha">

@@ -78,7 +78,7 @@ function StatementAmount({
     <td
       className={cn(
         "w-44 px-6 py-3 text-right tabular-nums",
-        strong ? "font-bold text-slate-950" : "font-medium text-blue-600",
+        strong ? "font-bold text-foreground" : "font-medium text-info-text",
       )}
     >
       {money(value)}
@@ -123,26 +123,26 @@ function SectionRows({
 
   return (
     <>
-      <tr className="border-b border-slate-100">
-        <td className="px-6 py-3 text-base font-bold text-slate-950">{title}</td>
+      <tr className="border-b border-border">
+        <td className="px-6 py-3 text-base font-bold text-foreground">{title}</td>
         <td />
       </tr>
       {groups.map((group) => (
         <Fragment key={`${title}-${group.group}`}>
           {showGroupHeadings ? (
-            <tr className="border-b border-slate-100">
-              <td className="px-10 py-3 font-bold text-slate-950">{group.group}</td>
+            <tr className="border-b border-border">
+              <td className="px-10 py-3 font-bold text-foreground">{group.group}</td>
               <td />
             </tr>
           ) : null}
           {group.items.map((item: ProfitLossItem) => (
             <tr
-              className="border-b border-slate-100 transition-colors hover:bg-slate-50"
+              className="border-b border-border transition-colors hover:bg-muted"
               key={item.accountId}
             >
               <td
                 className={cn(
-                  "py-3 font-medium text-blue-600",
+                  "py-3 font-medium text-info-text",
                   showGroupHeadings ? "px-14" : "px-10",
                 )}
               >
@@ -152,15 +152,15 @@ function SectionRows({
             </tr>
           ))}
           {showGroupHeadings ? (
-            <tr className="border-b border-slate-200">
-              <td className="px-10 py-3 font-bold text-slate-950">Total for {group.group}</td>
+            <tr className="border-b border-border">
+              <td className="px-10 py-3 font-bold text-foreground">Total for {group.group}</td>
               <StatementAmount strong value={group.amount} />
             </tr>
           ) : null}
         </Fragment>
       ))}
-      <tr className="border-b border-slate-200">
-        <td className="px-6 py-3 font-bold text-slate-950">Total for {title}</td>
+      <tr className="border-b border-border">
+        <td className="px-6 py-3 font-bold text-foreground">Total for {title}</td>
         <StatementAmount strong value={section.total} />
       </tr>
     </>
@@ -260,7 +260,7 @@ export function ProfitLossPageClient(): JSX.Element {
       ) : null}
 
       {!profitLossQuery.isLoading && profitLossQuery.error ? (
-        <Card className="border-red-200 bg-red-50/70">
+        <Card className="border-danger/30 bg-danger-tint/70">
           <CardContent className="flex min-h-64 flex-col items-center justify-center gap-4 text-center">
             <h2 className="text-xl font-semibold text-brand-espresso">
               Unable to load Profit & Loss
@@ -291,16 +291,16 @@ export function ProfitLossPageClient(): JSX.Element {
             <div className="overflow-x-auto px-4 py-10">
               <div className="mx-auto min-w-[42rem] max-w-4xl">
                 <div className="mb-8 text-center">
-                  <p className="text-sm font-medium text-slate-500">Accrual basis</p>
-                  <h2 className="mt-2 text-2xl font-bold text-slate-950">Profit and Loss</h2>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="text-sm font-medium text-foreground-muted">Accrual basis</p>
+                  <h2 className="mt-2 text-2xl font-bold text-foreground">Profit and Loss</h2>
+                  <p className="mt-1 text-sm text-foreground-muted">
                     From {formatDate(profitLoss.dateFrom)} to {formatDate(profitLoss.dateTo)}
                   </p>
                 </div>
 
                 <table className="w-full border-collapse text-sm">
                   <thead>
-                    <tr className="border-y border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr className="border-y border-border bg-muted text-xs uppercase tracking-wide text-foreground-muted">
                       <th className="px-6 py-3 text-left font-bold">Account</th>
                       <th className="px-6 py-3 text-right font-bold">Total</th>
                     </tr>
@@ -308,29 +308,29 @@ export function ProfitLossPageClient(): JSX.Element {
                   <tbody>
                     <SectionRows section={profitLoss.income} title="Operating Income" />
                     <SectionRows section={profitLoss.cogs} title="Cost of Goods Sold" />
-                    <tr className="border-b border-slate-200 bg-slate-50/60">
-                      <td className="px-6 py-3 font-bold text-slate-950">Gross Profit</td>
+                    <tr className="border-b border-border bg-muted/60">
+                      <td className="px-6 py-3 font-bold text-foreground">Gross Profit</td>
                       <StatementAmount strong value={profitLoss.grossProfit} />
                     </tr>
                     <SectionRows section={profitLoss.operatingExpenses} title="Operating Expense" />
-                    <tr className="border-b border-slate-200">
-                      <td className="px-6 py-3 font-bold text-slate-950">Operating Profit</td>
+                    <tr className="border-b border-border">
+                      <td className="px-6 py-3 font-bold text-foreground">Operating Profit</td>
                       <StatementAmount strong value={profitLoss.netProfit} />
                     </tr>
-                    <tr className="border-b border-slate-100">
-                      <td className="px-6 py-3 font-bold text-slate-950">Non Operating Income</td>
+                    <tr className="border-b border-border">
+                      <td className="px-6 py-3 font-bold text-foreground">Non Operating Income</td>
                       <StatementAmount strong value={0} />
                     </tr>
-                    <tr className="border-b border-slate-100">
-                      <td className="px-6 py-3 font-bold text-slate-950">Non Operating Expense</td>
+                    <tr className="border-b border-border">
+                      <td className="px-6 py-3 font-bold text-foreground">Non Operating Expense</td>
                       <StatementAmount strong value={0} />
                     </tr>
-                    <tr className="border-t border-slate-300 text-base">
-                      <td className="px-6 py-4 font-bold text-slate-950">Net Profit/Loss</td>
+                    <tr className="border-t border-border text-base">
+                      <td className="px-6 py-4 font-bold text-foreground">Net Profit/Loss</td>
                       <td
                         className={cn(
                           "px-6 py-4 text-right font-bold tabular-nums",
-                          profitLoss.netProfit >= 0 ? "text-slate-950" : "text-red-700",
+                          profitLoss.netProfit >= 0 ? "text-foreground" : "text-danger-text",
                         )}
                       >
                         {money(profitLoss.netProfit)}
@@ -339,7 +339,7 @@ export function ProfitLossPageClient(): JSX.Element {
                   </tbody>
                 </table>
 
-                <p className="mt-6 text-xs text-slate-500">
+                <p className="mt-6 text-xs text-foreground-muted">
                   Amounts are shown in AED. Draft journal entries are excluded.
                 </p>
               </div>

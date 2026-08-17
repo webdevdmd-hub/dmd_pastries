@@ -350,7 +350,7 @@ export function PurchasingItemLineEditor({
 
   return (
     <>
-      <section className="flex min-h-0 w-full flex-1 flex-col rounded-md border border-workspace-border bg-white shadow-sm">
+      <section className="flex min-h-0 w-full flex-1 flex-col rounded-md border border-workspace-border bg-card shadow-sm">
         <div className="flex flex-col gap-2 border-b border-workspace-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold text-brand-mocha">Item Rates Are</span>
@@ -369,7 +369,7 @@ export function PurchasingItemLineEditor({
         </div>
 
         {referenceNotices.length > 0 ? (
-          <ul className="space-y-1 border-b border-workspace-border bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <ul className="space-y-1 border-b border-workspace-border bg-warning-tint px-3 py-2 text-xs text-warning-text">
             {referenceNotices.map((notice) => (
               <li className="flex items-start gap-1.5" key={notice}>
                 <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -423,9 +423,9 @@ export function PurchasingItemLineEditor({
                     className={cn(
                       "border-b border-workspace-border align-top",
                       accountLine
-                        ? "border-l-2 border-l-amber-400 bg-amber-50/30"
+                        ? "border-l-2 border-l-amber-400 bg-warning-tint/30"
                         : "border-l-2 border-l-brand-caramel/60",
-                      lineError ? "bg-red-50/60" : undefined,
+                      lineError ? "bg-danger-tint/60" : undefined,
                     )}
                     key={line.lineId}
                   >
@@ -455,7 +455,7 @@ export function PurchasingItemLineEditor({
                           <SelectTrigger
                             className={cn(
                               "h-8 text-xs font-semibold",
-                              accountLine ? "text-amber-800" : "text-brand-espresso",
+                              accountLine ? "text-warning-text" : "text-brand-espresso",
                             )}
                           >
                             <SelectValue />
@@ -501,7 +501,7 @@ export function PurchasingItemLineEditor({
                             value={line.description ?? line.itemNameSnapshot ?? ""}
                           />
                           <div className="flex flex-wrap items-center gap-2 text-[11px] text-brand-mocha">
-                            <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 font-semibold uppercase tracking-[0.12em] text-amber-800">
+                            <span className="inline-flex items-center gap-1 rounded bg-warning-tint px-1.5 py-0.5 font-semibold text-warning-text">
                               <FileText className="h-3 w-3" />
                               Account Row
                             </span>
@@ -564,7 +564,7 @@ export function PurchasingItemLineEditor({
                           />
                           {canCreateProductInEditor ? (
                             <Button
-                              className="h-7 gap-1 rounded-md border border-dashed border-blue-300 bg-blue-50/60 px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                              className="h-7 gap-1 rounded-md border border-dashed border-info/30 bg-info-tint/60 px-2 text-xs font-semibold text-info-text hover:bg-info-tint"
                               disabled={isLineLocked}
                               onClick={() => {
                                 if (onCreateProductRequest) {
@@ -611,7 +611,7 @@ export function PurchasingItemLineEditor({
                             </div>
                           ) : null}
                           <div className="flex flex-wrap items-center gap-2 text-[11px] text-brand-mocha">
-                            <span className="inline-flex items-center gap-1 rounded bg-brand-cappuccino/60 px-1.5 py-0.5 font-semibold uppercase tracking-[0.12em] text-brand-espresso">
+                            <span className="inline-flex items-center gap-1 rounded bg-brand-cappuccino/60 px-1.5 py-0.5 font-semibold text-brand-espresso">
                               <Package className="h-3 w-3" />
                               {selectedProduct
                                 ? PRODUCT_TYPE_LABELS[selectedProduct.productType]
@@ -622,7 +622,7 @@ export function PurchasingItemLineEditor({
                             ) : null}
                           </div>
                           {isLegacyLine ? (
-                            <p className="text-xs text-amber-700">
+                            <p className="text-xs text-warning-text">
                               Legacy item saved as {line.itemNameSnapshot ?? "purchase item"}.
                               Select a Product Master item before saving changes.
                             </p>
@@ -698,7 +698,7 @@ export function PurchasingItemLineEditor({
                           value={line.accountId ?? ""}
                         />
                       ) : (
-                        <div className="rounded-md border border-workspace-border bg-white px-2 py-1.5 text-xs font-semibold text-brand-espresso">
+                        <div className="rounded-md border border-workspace-border bg-card px-2 py-1.5 text-xs font-semibold text-brand-espresso">
                           Inventory Asset
                         </div>
                       )}
@@ -721,7 +721,7 @@ export function PurchasingItemLineEditor({
                         value={line.quantity}
                       />
                       {lineLock ? (
-                        <p className="mt-1 flex items-center justify-end gap-1 text-right text-[11px] leading-4 text-amber-700">
+                        <p className="mt-1 flex items-center justify-end gap-1 text-right text-[11px] leading-4 text-warning-text">
                           <Lock aria-hidden="true" className="h-3 w-3 shrink-0" />
                           Received {formatAmount(lineLock.receivedQuantity)} · can&apos;t go lower
                         </p>
@@ -732,7 +732,7 @@ export function PurchasingItemLineEditor({
                         </p>
                       ) : null}
                       {lineError ? (
-                        <p className="mt-1 text-right text-[11px] font-semibold leading-4 text-red-700">
+                        <p className="mt-1 text-right text-[11px] font-semibold leading-4 text-danger-text">
                           {lineError}
                         </p>
                       ) : null}
@@ -835,7 +835,7 @@ export function PurchasingItemLineEditor({
                         type="button"
                         variant="ghost"
                       >
-                        <Trash2 className="h-4 w-4 text-red-700" />
+                        <Trash2 className="h-4 w-4 text-danger-text" />
                       </Button>
                     </td>
                   </tr>
@@ -901,9 +901,9 @@ export function PurchasingItemLineEditor({
             <div className="flex items-start justify-between gap-6 border-t border-workspace-border pt-2">
               <div>
                 <span className="text-brand-mocha">Line discounts</span>
-                <p className="text-xs text-blue-700">Applied per line</p>
+                <p className="text-xs text-info-text">Applied per line</p>
               </div>
-              <span className="font-semibold tabular-nums text-red-700">
+              <span className="font-semibold tabular-nums text-danger-text">
                 -{formatAmount(totals.discount)}
               </span>
             </div>
@@ -922,7 +922,7 @@ export function PurchasingItemLineEditor({
             ) : showAccountRows || billDiscountAmount > 0 ? (
               <div className="flex items-center justify-between border-t border-workspace-border pt-2">
                 <span className="text-brand-mocha">Bill discount</span>
-                <span className="font-semibold tabular-nums text-red-700">
+                <span className="font-semibold tabular-nums text-danger-text">
                   -{formatAmount(billDiscountAmount)}
                 </span>
               </div>

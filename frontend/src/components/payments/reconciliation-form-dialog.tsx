@@ -136,7 +136,7 @@ export function ReconciliationFormDialog({
                   </Select>
                 )}
               />
-              <p className="text-xs text-red-700">{form.formState.errors.branchId?.message}</p>
+              <p className="text-xs text-danger-text">{form.formState.errors.branchId?.message}</p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="reconciliationDate">Date</Label>
@@ -165,7 +165,9 @@ export function ReconciliationFormDialog({
                 </Select>
               )}
             />
-            <p className="text-xs text-red-700">{form.formState.errors.paymentMethodId?.message}</p>
+            <p className="text-xs text-danger-text">
+              {form.formState.errors.paymentMethodId?.message}
+            </p>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="countedAmount">Counted amount</Label>
@@ -176,7 +178,9 @@ export function ReconciliationFormDialog({
               type="number"
               {...form.register("countedAmount")}
             />
-            <p className="text-xs text-red-700">{form.formState.errors.countedAmount?.message}</p>
+            <p className="text-xs text-danger-text">
+              {form.formState.errors.countedAmount?.message}
+            </p>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="notes">Notes</Label>

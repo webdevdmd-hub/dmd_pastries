@@ -60,7 +60,7 @@ export function PurchasingItemLines({
   title?: string;
 }): JSX.Element {
   return (
-    <Card className="bg-white/85">
+    <Card className="bg-card/85">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>

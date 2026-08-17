@@ -42,7 +42,7 @@ export function OrderCustomerSelector({
   };
 
   return (
-    <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
+    <section className="rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-brand-espresso">Customer</h2>
@@ -62,7 +62,7 @@ export function OrderCustomerSelector({
           value={search}
         />
         {search.trim().length >= 2 ? (
-          <div className="scrollbar-hidden absolute left-0 right-0 top-full z-20 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-brand-cappuccino bg-white p-2 shadow-float">
+          <div className="scrollbar-hidden absolute left-0 right-0 top-full z-20 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-brand-cappuccino bg-card p-2 shadow-float">
             {lookupQuery.isLoading ? (
               <p className="p-3 text-sm text-brand-mocha">Searching...</p>
             ) : null}

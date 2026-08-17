@@ -161,11 +161,13 @@ export function OrderPaymentDialog({
               </SelectContent>
             </Select>
             {methods.length === 0 ? (
-              <p className="text-xs text-amber-700">
+              <p className="text-xs text-warning-text">
                 No configured bakery payment methods are available.
               </p>
             ) : null}
-            <p className="text-xs text-red-700">{form.formState.errors.paymentMethodId?.message}</p>
+            <p className="text-xs text-danger-text">
+              {form.formState.errors.paymentMethodId?.message}
+            </p>
           </div>
           <div className="grid gap-2">
             <Label>Payment stage</Label>
@@ -182,13 +184,13 @@ export function OrderPaymentDialog({
               type="number"
               {...form.register("amount", { valueAsNumber: true })}
             />
-            <p className="text-xs text-red-700">{form.formState.errors.amount?.message}</p>
+            <p className="text-xs text-danger-text">{form.formState.errors.amount?.message}</p>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="orderPaymentReference">
               Reference number
               {selectedMethod?.requiresReference ? (
-                <span aria-hidden="true" className="ml-1 text-red-700">
+                <span aria-hidden="true" className="ml-1 text-danger-text">
                   *
                 </span>
               ) : null}
@@ -202,7 +204,9 @@ export function OrderPaymentDialog({
               }
               {...form.register("referenceNumber")}
             />
-            <p className="text-xs text-red-700">{form.formState.errors.referenceNumber?.message}</p>
+            <p className="text-xs text-danger-text">
+              {form.formState.errors.referenceNumber?.message}
+            </p>
           </div>
           <DialogFooter>
             <Button onClick={onClose} type="button" variant="outline">

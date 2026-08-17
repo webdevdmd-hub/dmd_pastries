@@ -47,7 +47,7 @@ export function RefundsTable({ refunds }: RefundsTableProps): JSX.Element {
             <TableCell>
               <PaymentMethodBadge methodName={refund.paymentMethodNameSnapshot} />
             </TableCell>
-            <TableCell className="font-black">{formatMoney(refund.refundAmount)}</TableCell>
+            <TableCell className="font-medium">{formatMoney(refund.refundAmount)}</TableCell>
             <TableCell>
               <PaymentStatusBadge status={refund.refundStatus} />
             </TableCell>

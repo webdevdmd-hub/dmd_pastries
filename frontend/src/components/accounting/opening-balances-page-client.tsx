@@ -49,18 +49,14 @@ function formatMoney(value: number): string {
 
 function ErrorNotice({ message }: { message: string }): JSX.Element {
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+    <div className="rounded-xl border border-danger/30 bg-danger-tint px-4 py-3 text-sm text-danger-text">
       {message}
     </div>
   );
 }
 
 function FieldLabel({ children }: { children: string }): JSX.Element {
-  return (
-    <label className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-      {children}
-    </label>
-  );
+  return <label className="text-xs font-semibold text-muted-foreground">{children}</label>;
 }
 
 export function OpeningBalancesPageClient(): JSX.Element {

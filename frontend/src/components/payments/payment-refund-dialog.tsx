@@ -137,9 +137,11 @@ export function PaymentRefundDialog({
             <p className="text-xs text-brand-mocha">
               Maximum refundable amount: {formatMoney(remainingRefundableAmount)}.
             </p>
-            <p className="text-xs text-red-700">{form.formState.errors.refundAmount?.message}</p>
+            <p className="text-xs text-danger-text">
+              {form.formState.errors.refundAmount?.message}
+            </p>
           </div>
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <div className="rounded-2xl border border-warning/30 bg-warning-tint p-3 text-sm text-warning-text">
             Refunds affect sale payment status and daily collection reports.
           </div>
           <div className="grid gap-2">
@@ -149,7 +151,9 @@ export function PaymentRefundDialog({
               {...form.register("refundReason")}
               placeholder="Customer return, duplicate charge..."
             />
-            <p className="text-xs text-red-700">{form.formState.errors.refundReason?.message}</p>
+            <p className="text-xs text-danger-text">
+              {form.formState.errors.refundReason?.message}
+            </p>
           </div>
           <div className="grid gap-2">
             <Label>Approved by</Label>

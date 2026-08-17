@@ -8,7 +8,7 @@ import type { SupplierStatus } from "@/types/supplier";
 const statusConfig: Record<SupplierStatus, { label: string; className: string }> = {
   active: {
     label: "Active",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    className: "border-money/30 bg-money-tint text-money-text",
   },
   inactive: {
     label: "Inactive",
@@ -16,7 +16,7 @@ const statusConfig: Record<SupplierStatus, { label: string; className: string }>
   },
   blocked: {
     label: "Blocked",
-    className: "border-red-200 bg-red-50 text-red-800",
+    className: "border-danger/30 bg-danger-tint text-danger-text",
   },
 };
 

@@ -46,7 +46,7 @@ export function ChartAccountsTable({
   onStatusChange,
 }: ChartAccountsTableProps): JSX.Element {
   return (
-    <div className="overflow-x-auto bg-white/75 [&>div]:rounded-none">
+    <div className="overflow-x-auto bg-card/75 [&>div]:rounded-none">
       <Table>
         <TableHeader>
           <TableRow>
@@ -126,7 +126,7 @@ export function ChartAccountsTable({
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          className="text-red-700 focus:text-red-800"
+                          className="text-danger-text focus:text-danger-text"
                           disabled={account.isSystemAccount}
                           onClick={() => onDelete(account)}
                         >

@@ -102,7 +102,7 @@ export function AddPaymentDialog({
           <div className="grid gap-2">
             <Label htmlFor="saleId">Sale ID</Label>
             <Input id="saleId" {...form.register("saleId")} placeholder="sale_uuid_here" />
-            <p className="text-xs text-red-700">{form.formState.errors.saleId?.message}</p>
+            <p className="text-xs text-danger-text">{form.formState.errors.saleId?.message}</p>
           </div>
           <div className="grid gap-2">
             <Label>Payment method</Label>
@@ -126,12 +126,14 @@ export function AddPaymentDialog({
                 </Select>
               )}
             />
-            <p className="text-xs text-red-700">{form.formState.errors.paymentMethodId?.message}</p>
+            <p className="text-xs text-danger-text">
+              {form.formState.errors.paymentMethodId?.message}
+            </p>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="amount">Amount</Label>
             <Input id="amount" min={0} step="0.01" type="number" {...form.register("amount")} />
-            <p className="text-xs text-red-700">{form.formState.errors.amount?.message}</p>
+            <p className="text-xs text-danger-text">{form.formState.errors.amount?.message}</p>
           </div>
           <div className="grid gap-2 md:grid-cols-2">
             <div className="grid gap-2">
@@ -139,7 +141,7 @@ export function AddPaymentDialog({
                 Reference number{selectedPaymentMethod?.requiresReference ? " *" : ""}
               </Label>
               <Input id="referenceNumber" {...form.register("referenceNumber")} />
-              <p className="text-xs text-red-700">
+              <p className="text-xs text-danger-text">
                 {form.formState.errors.referenceNumber?.message}
               </p>
             </div>

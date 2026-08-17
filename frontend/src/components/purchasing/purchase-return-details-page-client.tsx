@@ -253,8 +253,8 @@ export function PurchaseReturnDetailsPageClient({
               </Link>
             ) : isPosted ? (
               <div className="space-y-1">
-                <p className="text-lg font-semibold text-red-700">Journal missing</p>
-                <p className="text-xs text-red-700">
+                <p className="text-lg font-semibold text-danger-text">Journal missing</p>
+                <p className="text-xs text-danger-text">
                   Posted without linked journal. Run purchase-return journal backfill.
                 </p>
               </div>
@@ -268,7 +268,7 @@ export function PurchaseReturnDetailsPageClient({
       {purchaseReturn.status === "reversed" ||
       purchaseReturn.reversalReturnNumber ||
       purchaseReturn.originalReturnNumber ? (
-        <Card className="border-sky-200 bg-sky-50/60">
+        <Card className="border-info/30 bg-info-tint/60">
           <CardHeader>
             <CardTitle>Reversal details</CardTitle>
           </CardHeader>
@@ -360,7 +360,7 @@ export function PurchaseReturnDetailsPageClient({
         </CardContent>
       </Card>
 
-      <Card className="bg-white/85">
+      <Card className="bg-card/85">
         <CardHeader>
           <CardTitle>Return reason</CardTitle>
         </CardHeader>

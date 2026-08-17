@@ -12,10 +12,10 @@ const labels: Record<PurchasePaymentStatus, string> = {
 };
 
 const toneByStatus: Record<PurchasePaymentStatus, string> = {
-  overdue: "border-red-300 bg-red-50 text-red-800",
-  paid: "border-emerald-300 bg-emerald-50 text-emerald-800",
-  partial: "border-amber-300 bg-amber-50 text-amber-900",
-  unpaid: "border-zinc-300 bg-zinc-50 text-zinc-700",
+  overdue: "border-danger/30 bg-danger-tint text-danger-text",
+  paid: "border-money/30 bg-money-tint text-money-text",
+  partial: "border-warning/30 bg-warning-tint text-warning-text",
+  unpaid: "border-border bg-muted text-foreground-muted",
 };
 
 export function PurchasePaymentStatusBadge({

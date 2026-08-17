@@ -4,10 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import type { SalesReturnStatus } from "@/types/sales-return";
 
 const statusStyles: Record<SalesReturnStatus, string> = {
-  draft: "border-amber-200 bg-amber-50 text-amber-800",
-  posted: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  cancelled: "border-stone-200 bg-stone-100 text-stone-700",
-  reversed: "border-sky-200 bg-sky-50 text-sky-800",
+  draft: "border-warning/30 bg-warning-tint text-warning-text",
+  posted: "border-money/30 bg-money-tint text-money-text",
+  cancelled: "border-border bg-muted text-foreground-muted",
+  reversed: "border-info/30 bg-info-tint text-info-text",
 };
 
 function statusLabel(status: SalesReturnStatus): string {

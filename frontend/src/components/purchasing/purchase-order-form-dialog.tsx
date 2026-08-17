@@ -109,7 +109,7 @@ function lockedFieldReason(isPartialAdjustment: boolean, isCorrectionEdit: boole
 
 function RequiredMark(): JSX.Element {
   return (
-    <span aria-hidden="true" className="text-red-600">
+    <span aria-hidden="true" className="text-danger-text">
       {" "}
       *
     </span>
@@ -119,7 +119,7 @@ function RequiredMark(): JSX.Element {
 function FieldError({ message }: { message?: string | undefined }): JSX.Element | null {
   if (!message) return null;
 
-  return <p className="mt-1.5 text-xs font-medium text-red-700">{message}</p>;
+  return <p className="mt-1.5 text-xs font-medium text-danger-text">{message}</p>;
 }
 
 function FieldHint({ children }: { children: ReactNode }): JSX.Element {
@@ -138,9 +138,9 @@ function FormSection({
   title: string;
 }): JSX.Element {
   return (
-    <section className="rounded-md border border-workspace-border bg-white">
+    <section className="rounded-md border border-workspace-border bg-card">
       <div className="border-b border-workspace-border px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-workspace-muted">
+        <p className="text-xs font-semibold text-workspace-muted">
           {title}
           {required ? <RequiredMark /> : null}
         </p>
@@ -165,14 +165,14 @@ function StepBadge({
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
         active
-          ? "border-brand-espresso bg-brand-espresso text-white"
-          : "border-workspace-border bg-white text-workspace-muted",
+          ? "border-brand-espresso bg-brand-espresso text-primary-foreground"
+          : "border-workspace-border bg-card text-workspace-muted",
       )}
     >
       <span
         className={cn(
           "flex h-4 w-4 items-center justify-center rounded-full text-[10px]",
-          active ? "bg-white/25" : "bg-workspace-border/70",
+          active ? "bg-card/25" : "bg-workspace-border/70",
         )}
       >
         {step}
@@ -198,9 +198,9 @@ function ReviewFigure({
         className={cn(
           "mt-1 text-xl font-bold tabular-nums",
           tone === "increase"
-            ? "text-red-700"
+            ? "text-danger-text"
             : tone === "decrease"
-              ? "text-emerald-700"
+              ? "text-money-text"
               : "text-brand-espresso",
         )}
       >
@@ -472,7 +472,7 @@ export function PurchaseOrderFormDialog({
             className={cn(
               "text-sm leading-5",
               isOrderedEdit
-                ? "mt-1 inline-flex w-fit items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-900"
+                ? "mt-1 inline-flex w-fit items-center gap-1.5 rounded-md border border-info/30 bg-info-tint px-2.5 py-1 text-info-text"
                 : undefined,
             )}
           >
@@ -504,12 +504,12 @@ export function PurchaseOrderFormDialog({
                 Applies to {lines.length} item line{lines.length === 1 ? "" : "s"} on{" "}
                 {order?.purchaseOrderNumber ?? "this order"}.
               </p>
-              <div className="mt-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
+              <div className="mt-4 flex items-start gap-2 rounded-md border border-warning/30 bg-warning-tint px-4 py-3">
                 <AlertTriangle
                   aria-hidden="true"
-                  className="mt-0.5 h-4 w-4 shrink-0 text-amber-700"
+                  className="mt-0.5 h-4 w-4 shrink-0 text-warning-text"
                 />
-                <p className="text-sm text-amber-900">
+                <p className="text-sm text-warning-text">
                   Posted GRNs, stock movements, bills, journals, and payments will not be rewritten.
                   The backend will save a PO revision and keep correction impact visible for
                   follow-up.
@@ -519,7 +519,7 @@ export function PurchaseOrderFormDialog({
           ) : (
             <>
               {generalFieldError ? (
-                <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                <div className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger-tint px-4 py-3 text-sm text-danger-text">
                   <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
                   <p className="font-medium">{generalFieldError}</p>
                 </div>
@@ -610,7 +610,7 @@ export function PurchaseOrderFormDialog({
                 title="Items"
               >
                 {itemsFieldError ? (
-                  <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
+                  <p className="mb-3 rounded-md border border-danger/30 bg-danger-tint px-3 py-2 text-sm font-medium text-danger-text">
                     {itemsFieldError}
                   </p>
                 ) : null}
@@ -660,7 +660,7 @@ export function PurchaseOrderFormDialog({
             </>
           )}
         </div>
-        <DialogFooter className="shrink-0 border-t border-workspace-border bg-white px-5 py-3">
+        <DialogFooter className="shrink-0 border-t border-workspace-border bg-card px-5 py-3">
           <Button onClick={onClose} type="button" variant="outline">
             Cancel
           </Button>

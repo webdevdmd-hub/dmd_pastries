@@ -78,9 +78,9 @@ function today(): string {
 }
 
 function balanceTone(paymentStatus: PurchasePaymentStatus, balanceAmount: number): string {
-  if (balanceAmount <= 0) return "text-emerald-600";
-  if (paymentStatus === "overdue") return "text-red-600";
-  return "text-amber-600";
+  if (balanceAmount <= 0) return "text-money-text";
+  if (paymentStatus === "overdue") return "text-danger-text";
+  return "text-warning-text";
 }
 
 function receiveStatusMeta(status: PurchaseInvoice["receiveStatus"]): {
@@ -307,12 +307,10 @@ export function PurchaseInvoiceDetailsPageClient({
         Back to Bills
       </Link>
 
-      <header className="overflow-hidden rounded-md border border-workspace-border bg-white">
+      <header className="overflow-hidden rounded-md border border-workspace-border bg-card">
         <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-workspace-muted">
-              Bill no
-            </p>
+            <p className="text-xs font-semibold text-workspace-muted">Bill no</p>
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <h1 className="truncate text-3xl font-semibold text-brand-espresso">
                 {invoice.invoiceNumber}
@@ -348,7 +346,7 @@ export function PurchaseInvoiceDetailsPageClient({
             ) : null}
             {canCancelInvoice ? (
               <Button
-                className="border-red-200 text-red-700 hover:bg-red-50"
+                className="border-danger/30 text-danger-text hover:bg-danger-tint"
                 onClick={() => {
                   setCancelReason("");
                   setCancelOpen(true);
@@ -365,7 +363,7 @@ export function PurchaseInvoiceDetailsPageClient({
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div className="flex min-w-0 flex-col gap-6">
-          <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+          <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
             <SectionHeader
               description="Identifiers, dates, and the linked purchase order for this bill."
               title="Bill info & supplier"
@@ -385,7 +383,7 @@ export function PurchaseInvoiceDetailsPageClient({
                   <span
                     className={cn(
                       "inline-flex items-center gap-1.5",
-                      isOverdue ? "text-red-700" : undefined,
+                      isOverdue ? "text-danger-text" : undefined,
                     )}
                   >
                     {isOverdue ? (
@@ -419,42 +417,44 @@ export function PurchaseInvoiceDetailsPageClient({
           </section>
 
           {invoice.status === "cancelled" ? (
-            <section className="rounded-md border border-red-200 bg-red-50 p-5">
+            <section className="rounded-md border border-danger/30 bg-danger-tint p-5">
               <div className="flex items-start gap-3">
                 <AlertTriangle
                   aria-hidden="true"
-                  className="mt-0.5 h-5 w-5 shrink-0 text-red-700"
+                  className="mt-0.5 h-5 w-5 shrink-0 text-danger-text"
                 />
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-base font-semibold text-red-900">This bill was cancelled</h2>
-                  <p className="mt-1 text-sm text-red-800">
+                  <h2 className="text-base font-semibold text-danger-text">
+                    This bill was cancelled
+                  </h2>
+                  <p className="mt-1 text-sm text-danger-text">
                     Cancelling a posted bill reverses the supplier payable, VAT, and inventory
                     impact where stock is still available.
                   </p>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-danger-text">
                         Cancelled at
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-red-900">
+                      <p className="mt-1 text-sm font-semibold text-danger-text">
                         {formatDateTime(invoice.cancelledAt)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-danger-text">
                         Cancel reason
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-red-900">
+                      <p className="mt-1 text-sm font-semibold text-danger-text">
                         {invoice.cancelReason ?? "Not recorded"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-danger-text">
                         Reversal journal
                       </p>
                       {invoice.reversalJournalEntryId ? (
                         <Link
-                          className="mt-1 inline-block text-sm font-semibold text-red-900 underline-offset-4 hover:underline"
+                          className="mt-1 inline-block text-sm font-semibold text-danger-text underline-offset-4 hover:underline"
                           href={`${ROUTES.accountingJournalEntries}?search=${encodeURIComponent(
                             invoice.reversalJournalEntryId,
                           )}`}
@@ -462,22 +462,22 @@ export function PurchaseInvoiceDetailsPageClient({
                           View journal
                         </Link>
                       ) : (
-                        <p className="mt-1 text-sm font-semibold text-red-900">Not recorded</p>
+                        <p className="mt-1 text-sm font-semibold text-danger-text">Not recorded</p>
                       )}
                     </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-danger-text">
                         Cancelled receipt
                       </p>
                       {invoice.cancelledReceiptId ? (
                         <Link
-                          className="mt-1 inline-block text-sm font-semibold text-red-900 underline-offset-4 hover:underline"
+                          className="mt-1 inline-block text-sm font-semibold text-danger-text underline-offset-4 hover:underline"
                           href={`${ROUTES.purchasingReceipts}/${invoice.cancelledReceiptId}`}
                         >
                           View receipt
                         </Link>
                       ) : (
-                        <p className="mt-1 text-sm font-semibold text-red-900">Not recorded</p>
+                        <p className="mt-1 text-sm font-semibold text-danger-text">Not recorded</p>
                       )}
                     </div>
                   </div>
@@ -486,7 +486,7 @@ export function PurchaseInvoiceDetailsPageClient({
             </section>
           ) : null}
 
-          <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+          <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
             <SectionHeader
               description={`${String(invoice.items.length)} line item(s) on this bill.`}
               title="Bill items"
@@ -496,7 +496,7 @@ export function PurchaseInvoiceDetailsPageClient({
 
           <PurchaseInvoicePaymentsSection canManage={canManage} invoice={invoice} />
 
-          <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+          <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
             <SectionHeader title="Notes" />
             <div className="p-5">
               <p className="text-sm text-workspace-muted">
@@ -507,7 +507,7 @@ export function PurchaseInvoiceDetailsPageClient({
         </div>
 
         <div className="flex flex-col gap-6 lg:sticky lg:top-6">
-          <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+          <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
             <SectionHeader
               description="Amounts owed and paid for this bill."
               title="Financial summary"
@@ -534,7 +534,7 @@ export function PurchaseInvoiceDetailsPageClient({
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase text-workspace-muted">Paid</p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums text-emerald-600">
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-money-text">
                     {formatCurrency(invoice.paidAmount)}
                   </p>
                 </div>

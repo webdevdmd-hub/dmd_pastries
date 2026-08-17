@@ -257,7 +257,7 @@ export function PurchaseReceiveDialog({
             {line.itemNameSnapshot ?? selectedProduct?.productName ?? "Product"}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-brand-mocha">
-            <span className="rounded bg-brand-cappuccino/60 px-1.5 py-0.5 font-semibold uppercase tracking-[0.12em] text-brand-espresso">
+            <span className="rounded bg-brand-cappuccino/60 px-1.5 py-0.5 font-semibold text-brand-espresso">
               {selectedProduct ? PRODUCT_TYPE_LABELS[selectedProduct.productType] : "Product"}
             </span>
             {selectedProduct?.productCode ? <span>{selectedProduct.productCode}</span> : null}
@@ -377,7 +377,7 @@ export function PurchaseReceiveDialog({
             ) : null}
           </div>
 
-          <section className="rounded-xl border border-brand-cappuccino/70 bg-white shadow-sm">
+          <section className="rounded-xl border border-brand-cappuccino/70 bg-card shadow-sm">
             <div className="border-b border-brand-cappuccino/70 px-4 py-3">
               <h3 className="text-sm font-semibold text-brand-espresso">Items to receive</h3>
               <p className="text-sm text-brand-mocha">
@@ -386,7 +386,7 @@ export function PurchaseReceiveDialog({
             </div>
 
             <div className="hidden lg:block">
-              <div className="grid grid-cols-[minmax(220px,1.5fr)_110px_110px_110px_140px_150px_96px_44px] gap-3 border-b border-brand-cappuccino/70 bg-brand-latte/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-brand-mocha">
+              <div className="grid grid-cols-[minmax(220px,1.5fr)_110px_110px_110px_140px_150px_96px_44px] gap-3 border-b border-brand-cappuccino/70 bg-brand-latte/30 px-4 py-2 text-xs font-semibold text-brand-mocha">
                 <span>Item</span>
                 <span className="text-right">Qty</span>
                 <span>Unit</span>
@@ -470,7 +470,7 @@ export function PurchaseReceiveDialog({
                       type="button"
                       variant="ghost"
                     >
-                      <Trash2 className="h-4 w-4 text-red-700" />
+                      <Trash2 className="h-4 w-4 text-danger-text" />
                     </Button>
                   </div>
                 ))}
@@ -493,7 +493,7 @@ export function PurchaseReceiveDialog({
                       type="button"
                       variant="ghost"
                     >
-                      <Trash2 className="h-4 w-4 text-red-700" />
+                      <Trash2 className="h-4 w-4 text-danger-text" />
                     </Button>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -566,7 +566,7 @@ export function PurchaseReceiveDialog({
                     </div>
                     <div>
                       <p className="mb-1 text-xs font-semibold text-brand-mocha">Amount</p>
-                      <div className="flex h-10 items-center rounded-md border border-brand-cappuccino/70 bg-white px-3 text-sm font-semibold text-brand-espresso">
+                      <div className="flex h-10 items-center rounded-md border border-brand-cappuccino/70 bg-card px-3 text-sm font-semibold text-brand-espresso">
                         {formatAmount(lineAmount(line))}
                       </div>
                     </div>
@@ -578,7 +578,7 @@ export function PurchaseReceiveDialog({
             {!sourceLocked ? (
               <div className="border-t border-brand-cappuccino/70 px-4 py-3">
                 <Button
-                  className="px-0 text-blue-700"
+                  className="px-0 text-info-text"
                   onClick={() => setLines([...lines, emptyLine()])}
                   type="button"
                   variant="link"
@@ -596,7 +596,7 @@ export function PurchaseReceiveDialog({
             placeholder="Notes"
             value={notes}
           />
-          {error ? <p className="text-sm font-semibold text-red-700">{error}</p> : null}
+          {error ? <p className="text-sm font-semibold text-danger-text">{error}</p> : null}
         </div>
 
         <DialogFooter className="border-t border-brand-cappuccino/70 px-6 py-4">

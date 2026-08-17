@@ -196,7 +196,7 @@ function JournalLink({ id }: { id: string | null }): JSX.Element | null {
 
 function QueryError({ message, title }: { message: string; title: string }): JSX.Element {
   return (
-    <Alert className="border-red-200 bg-red-50 text-red-950">
+    <Alert className="border-danger/30 bg-danger-tint text-danger-text">
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription>{message}</AlertDescription>
     </Alert>
@@ -695,7 +695,7 @@ export function PaymentAccountsPageClient({
                           Mark inactive
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          className="text-red-700 focus:text-red-800"
+                          className="text-danger-text focus:text-danger-text"
                           disabled={!canManage}
                           onSelect={() => void deleteAccount(account)}
                         >

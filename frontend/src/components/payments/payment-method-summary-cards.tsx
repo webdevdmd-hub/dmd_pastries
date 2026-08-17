@@ -70,9 +70,7 @@ export function PaymentMethodSummaryCards({
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-brand-mocha">
-          Collection by method
-        </h2>
+        <h2 className="text-sm font-bold text-brand-mocha">Collection by method</h2>
         <p className="mt-1 text-sm text-brand-mocha">
           Backend-calculated method totals after refunds.
         </p>
@@ -82,7 +80,7 @@ export function PaymentMethodSummaryCards({
           const Icon = iconForMethod(summary.paymentMethodName);
 
           return (
-            <Card className="bg-white/80" key={summary.paymentMethodId}>
+            <Card className="bg-card/80" key={summary.paymentMethodId}>
               <CardContent className="space-y-3 p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -100,7 +98,7 @@ export function PaymentMethodSummaryCards({
                   </div>
                 </div>
                 <div>
-                  <p className="text-2xl font-black text-brand-espresso">
+                  <p className="text-2xl font-medium text-brand-espresso">
                     {formatMoney(summary.netAmount)}
                   </p>
                   <p className="text-xs text-brand-mocha">

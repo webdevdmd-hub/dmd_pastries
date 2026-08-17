@@ -540,7 +540,7 @@ function ExpenseFormDialog({
                 Cash, bank, wallet, or clearing payment account used to pay.
               </p>
               {hasNoPaidThroughOptions ? (
-                <p className="text-xs text-red-700">
+                <p className="text-xs text-danger-text">
                   Configure an active payment account for this branch before recording expenses.
                 </p>
               ) : null}
@@ -627,7 +627,7 @@ function ExpenseFormDialog({
             />
           </div>
 
-          {error ? <p className="text-sm font-medium text-red-700">{error}</p> : null}
+          {error ? <p className="text-sm font-medium text-danger-text">{error}</p> : null}
 
           <DialogFooter>
             <Button onClick={onClose} type="button" variant="outline">
@@ -846,7 +846,7 @@ export function ExpensesPageClient({
         title="Expenses"
       />
 
-      <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-white/80 p-4 lg:grid-cols-[1.5fr_repeat(5,minmax(0,1fr))]">
+      <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-card/80 p-4 lg:grid-cols-[1.5fr_repeat(5,minmax(0,1fr))]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mocha" />
           <Input
@@ -938,9 +938,9 @@ export function ExpensesPageClient({
       ) : null}
 
       {!expensesQuery.isLoading && !expensesQuery.error && expenses.length > 0 ? (
-        <Card className="overflow-hidden border-brand-cappuccino/70 bg-white/85">
+        <Card className="overflow-hidden border-brand-cappuccino/70 bg-card/85">
           <CardContent className="overflow-hidden p-0">
-            <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 bg-white/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 bg-card/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold text-brand-espresso">Expense register</p>
                 <p className="text-xs text-brand-mocha">
@@ -951,7 +951,7 @@ export function ExpensesPageClient({
                 Page {filters.page} of {totalPages}
               </p>
             </div>
-            <div className="overflow-x-auto bg-white/75">
+            <div className="overflow-x-auto bg-card/75">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1025,7 +1025,7 @@ export function ExpensesPageClient({
                               <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  className="text-red-700 focus:text-red-800"
+                                  className="text-danger-text focus:text-danger-text"
                                   onClick={() => setDeleteTarget(expense)}
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -1041,7 +1041,7 @@ export function ExpensesPageClient({
                 </TableBody>
               </Table>
             </div>
-            <div className="flex flex-col gap-3 border-t border-brand-cappuccino/70 bg-white/80 px-4 py-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-3 border-t border-brand-cappuccino/70 bg-card/80 px-4 py-3 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-brand-mocha">Rows per page</span>
                 <Select
@@ -1125,7 +1125,7 @@ export function ExpensesPageClient({
               Cancel
             </Button>
             <Button
-              className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+              className="border-danger/30 text-danger-text hover:bg-danger-tint hover:text-danger-text"
               disabled={deleteMutation.isPending}
               onClick={() => void confirmDelete()}
               type="button"

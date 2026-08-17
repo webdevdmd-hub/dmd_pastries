@@ -4,10 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import type { PurchaseReceipt } from "@/types/purchasing";
 
 const statusClasses: Record<PurchaseReceipt["accountingStatus"], string> = {
-  accounted_at_bill_posting: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  not_applicable: "border-slate-200 bg-slate-50 text-slate-700",
-  pending_accounting_journal: "border-red-200 bg-red-50 text-red-800",
-  pending_bill_posting: "border-amber-200 bg-amber-50 text-amber-800",
+  accounted_at_bill_posting: "border-money/30 bg-money-tint text-money-text",
+  not_applicable: "border-border bg-muted text-foreground-muted",
+  pending_accounting_journal: "border-danger/30 bg-danger-tint text-danger-text",
+  pending_bill_posting: "border-warning/30 bg-warning-tint text-warning-text",
 };
 
 export function PurchaseReceiptAccountingBadge({

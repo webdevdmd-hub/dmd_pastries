@@ -527,7 +527,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
             </div>
 
             {invoicesError ? (
-              <div className="grid gap-3 px-4 py-6 text-sm text-red-800">
+              <div className="grid gap-3 px-4 py-6 text-sm text-danger-text">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4" />
                   {invoicesError}
@@ -604,7 +604,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
                                 value={allocations[invoice.id] ?? "0"}
                               />
                               {rowError ? (
-                                <p className="mt-1 text-xs text-red-700">{rowError}</p>
+                                <p className="mt-1 text-xs text-danger-text">{rowError}</p>
                               ) : null}
                             </TableCell>
                             <TableCell className="text-right">
@@ -677,7 +677,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
                             type="number"
                             value={allocations[invoice.id] ?? "0"}
                           />
-                          {rowError ? <p className="text-xs text-red-700">{rowError}</p> : null}
+                          {rowError ? <p className="text-xs text-danger-text">{rowError}</p> : null}
                         </div>
                       </div>
                     );
@@ -720,12 +720,12 @@ export function PurchaseSupplierPaymentAllocationDialog({
                 </div>
               </div>
               {advanceAmount > 0 && amountValue > 0 ? (
-                <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <p className="mt-3 rounded-lg bg-warning-tint px-3 py-2 text-sm text-warning-text">
                   {formatCurrency(advanceAmount)} will be saved as supplier advance.
                 </p>
               ) : null}
               {overAllocated ? (
-                <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+                <p className="mt-3 rounded-lg bg-danger-tint px-3 py-2 text-sm text-danger-text">
                   Allocated amount cannot exceed payment amount.
                 </p>
               ) : null}
@@ -735,7 +735,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
 
         <DialogFooter className="border-t border-brand-cappuccino/70 px-6 py-4">
           {submitError ? (
-            <p className="mr-auto flex items-center gap-2 text-sm text-red-700">
+            <p className="mr-auto flex items-center gap-2 text-sm text-danger-text">
               <AlertCircle className="h-4 w-4" />
               {submitError}
             </p>

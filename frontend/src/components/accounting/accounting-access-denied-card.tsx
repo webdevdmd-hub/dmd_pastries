@@ -9,7 +9,7 @@ export function AccountingAccessDeniedCard({
   message?: string;
 }): JSX.Element {
   return (
-    <Card className="border-brand-cappuccino/70 bg-white/80">
+    <Card className="border-brand-cappuccino/70 bg-card/80">
       <CardContent className="flex min-h-64 flex-col items-center justify-center gap-3 text-center">
         <ShieldAlert className="h-10 w-10 text-brand-mocha" />
         <h2 className="text-2xl font-semibold text-brand-espresso">Access denied</h2>

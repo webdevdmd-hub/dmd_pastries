@@ -126,7 +126,7 @@ export function PurchaseOrderActionsMenu({
               </DropdownMenuItem>
             ) : null}
             {canHardDelete ? (
-              <DropdownMenuItem className="text-red-700" onSelect={() => onDelete(order)}>
+              <DropdownMenuItem className="text-danger-text" onSelect={() => onDelete(order)}>
                 Delete
               </DropdownMenuItem>
             ) : null}

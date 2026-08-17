@@ -38,7 +38,7 @@ export function OrderScheduleCard({
   pickupTime: string;
 }): JSX.Element {
   return (
-    <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
+    <section className="rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-5">
       <h2 className="text-xl font-semibold text-brand-espresso">Schedule</h2>
       <p className="mt-1 text-sm text-brand-mocha">
         Set event date and pickup or delivery details.

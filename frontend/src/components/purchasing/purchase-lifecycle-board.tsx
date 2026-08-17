@@ -101,14 +101,14 @@ function buildStages(summary?: PurchasingSummary): LifecycleStage[] {
 
 function toneClasses(tone: LifecycleStage["tone"]): string {
   if (tone === "warning") {
-    return "border-amber-200 bg-amber-50/70 text-amber-900";
+    return "border-warning/30 bg-warning-tint/70 text-warning-text";
   }
 
   if (tone === "active") {
-    return "border-emerald-200 bg-emerald-50/70 text-emerald-900";
+    return "border-money/30 bg-money-tint/70 text-money-text";
   }
 
-  return "border-brand-cappuccino bg-white text-brand-espresso";
+  return "border-brand-cappuccino bg-card text-brand-espresso";
 }
 
 function StageCard({ stage }: { stage: LifecycleStage }): JSX.Element {
@@ -116,16 +116,14 @@ function StageCard({ stage }: { stage: LifecycleStage }): JSX.Element {
 
   return (
     <Link className="group block h-full" href={stage.href}>
-      <article className="flex h-full flex-col gap-4 rounded-2xl border border-brand-cappuccino bg-white p-4 shadow-sm transition group-hover:-translate-y-0.5 group-hover:border-brand-caramel group-hover:shadow-float">
+      <article className="flex h-full flex-col gap-4 rounded-2xl border border-brand-cappuccino bg-card p-4 shadow-sm transition group-hover:-translate-y-0.5 group-hover:border-brand-caramel group-hover:shadow-float">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-latte text-brand-mocha">
               <Icon className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-mocha">
-                Step {stage.step}
-              </p>
+              <p className="text-xs font-bold text-brand-mocha">Step {stage.step}</p>
               <h3 className="text-base font-bold text-brand-espresso">{stage.label}</h3>
             </div>
           </div>
@@ -153,13 +151,11 @@ export function PurchaseLifecycleBoard({
   const stages = buildStages(summary);
 
   return (
-    <Card className="overflow-hidden border-brand-cappuccino bg-white/90 shadow-sm">
-      <CardHeader className="border-b border-brand-cappuccino bg-white">
+    <Card className="overflow-hidden border-brand-cappuccino bg-card/90 shadow-sm">
+      <CardHeader className="border-b border-brand-cappuccino bg-card">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-brand-mocha">
-              Purchase lifecycle
-            </p>
+            <p className="text-xs font-bold text-brand-mocha">Purchase lifecycle</p>
             <CardTitle className="mt-2 text-2xl text-brand-espresso">
               Convert documents instead of re-entering them
             </CardTitle>
@@ -182,19 +178,19 @@ export function PurchaseLifecycleBoard({
 
         <div className="grid gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4 md:grid-cols-3">
           <div className="flex items-start gap-3">
-            <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-700" />
+            <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-money-text" />
             <p className="text-sm text-brand-mocha">
               PO to bill creates a draft invoice and blocks duplicate conversion.
             </p>
           </div>
           <div className="flex items-start gap-3">
-            <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-700" />
+            <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-money-text" />
             <p className="text-sm text-brand-mocha">
               Receive goods creates inventory only when the receiving record is posted.
             </p>
           </div>
           <div className="flex items-start gap-3">
-            <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-700" />
+            <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-money-text" />
             <p className="text-sm text-brand-mocha">
               Payments made and vendor credits stay linked in the purchase timeline.
             </p>

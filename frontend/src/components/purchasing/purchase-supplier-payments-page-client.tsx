@@ -281,7 +281,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
         }
       />
 
-      <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-white/80 p-4 lg:grid-cols-[1.4fr_repeat(6,minmax(0,1fr))]">
+      <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-card/80 p-4 lg:grid-cols-[1.4fr_repeat(6,minmax(0,1fr))]">
         <Input
           aria-label="Search supplier payments"
           onChange={(event) => updateFilters({ search: event.target.value })}

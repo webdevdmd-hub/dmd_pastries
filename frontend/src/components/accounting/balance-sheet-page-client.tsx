@@ -140,7 +140,7 @@ function AmountCell({ strong = false, value }: { strong?: boolean; value: number
     <td
       className={cn(
         "w-52 px-6 py-3 text-right tabular-nums",
-        strong ? "font-bold text-slate-950" : "font-medium text-blue-600",
+        strong ? "font-bold text-foreground" : "font-medium text-info-text",
       )}
     >
       {money(value)}
@@ -159,26 +159,26 @@ function BalanceSheetRows({
 
   return (
     <>
-      <tr className="border-b border-slate-100">
-        <td className="px-6 py-3 text-base font-bold text-slate-950">{title}</td>
+      <tr className="border-b border-border">
+        <td className="px-6 py-3 text-base font-bold text-foreground">{title}</td>
         <td />
       </tr>
       {groups.map((group) => (
         <Fragment key={`${title}-${group.group}`}>
-          <tr className="border-b border-slate-100">
-            <td className="px-10 py-3 font-bold text-slate-950">{group.group}</td>
+          <tr className="border-b border-border">
+            <td className="px-10 py-3 font-bold text-foreground">{group.group}</td>
             <AmountCell value={0} />
           </tr>
           {group.items.map((item, itemIndex) => (
             <tr
-              className="border-b border-slate-100 transition-colors hover:bg-slate-50"
+              className="border-b border-border transition-colors hover:bg-muted"
               key={getBalanceSheetItemKey(item, itemIndex, group.group, title)}
             >
               <td className="px-14 py-3">
                 <span
                   className={cn(
                     "inline-flex items-center gap-2 font-medium",
-                    item.isCalculated ? "text-slate-700" : "text-blue-600",
+                    item.isCalculated ? "text-foreground-muted" : "text-info-text",
                   )}
                 >
                   {getBalanceSheetItemLabel(item)}
@@ -192,14 +192,14 @@ function BalanceSheetRows({
               <AmountCell value={item.amount} />
             </tr>
           ))}
-          <tr className="border-b border-slate-200">
-            <td className="px-10 py-3 font-bold text-slate-950">Total for {group.group}</td>
+          <tr className="border-b border-border">
+            <td className="px-10 py-3 font-bold text-foreground">Total for {group.group}</td>
             <AmountCell strong value={group.amount} />
           </tr>
         </Fragment>
       ))}
-      <tr className="border-b border-slate-200 bg-slate-50/60">
-        <td className="px-6 py-3 font-bold text-slate-950">Total for {title}</td>
+      <tr className="border-b border-border bg-muted/60">
+        <td className="px-6 py-3 font-bold text-foreground">Total for {title}</td>
         <AmountCell strong value={section.total} />
       </tr>
     </>
@@ -300,7 +300,7 @@ export function BalanceSheetPageClient(): JSX.Element {
       ) : null}
 
       {!balanceSheetQuery.isLoading && balanceSheetQuery.error ? (
-        <Card className="border-red-200 bg-red-50/70">
+        <Card className="border-danger/30 bg-danger-tint/70">
           <CardContent className="flex min-h-64 flex-col items-center justify-center gap-4 text-center">
             <h2 className="text-xl font-semibold text-brand-espresso">
               Unable to load Balance Sheet
@@ -337,13 +337,13 @@ export function BalanceSheetPageClient(): JSX.Element {
             <div className="overflow-x-auto px-4 py-10">
               <div className="mx-auto min-w-[42rem] max-w-4xl">
                 <div className="mb-8 text-center">
-                  <p className="text-sm font-medium text-slate-500">Accrual basis</p>
-                  <h2 className="mt-2 text-2xl font-bold text-slate-950">Balance Sheet</h2>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="text-sm font-medium text-foreground-muted">Accrual basis</p>
+                  <h2 className="mt-2 text-2xl font-bold text-foreground">Balance Sheet</h2>
+                  <p className="mt-1 text-sm text-foreground-muted">
                     As of {formatDate(balanceSheet.asOfDate)}
                   </p>
                   {balanceSheet.financialYearStartDate ? (
-                    <p className="mt-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                    <p className="mt-1 text-xs font-medium text-foreground-muted">
                       Financial year starts {formatDate(balanceSheet.financialYearStartDate)}
                     </p>
                   ) : null}
@@ -352,14 +352,17 @@ export function BalanceSheetPageClient(): JSX.Element {
                       Balanced
                     </Badge>
                   ) : (
-                    <Badge className="mt-3 border-red-200 bg-red-50 text-red-700" variant="outline">
+                    <Badge
+                      className="mt-3 border-danger/30 bg-danger-tint text-danger-text"
+                      variant="outline"
+                    >
                       Difference {money(balanceSheet.difference)}
                     </Badge>
                   )}
                 </div>
 
                 {!balanceSheet.isBalanced ? (
-                  <Alert className="mb-6 border-amber-300 bg-amber-50/80">
+                  <Alert className="mb-6 border-warning/30 bg-warning-tint/80">
                     <Scale className="h-4 w-4" />
                     <AlertTitle>Balance Sheet is not balanced.</AlertTitle>
                     <AlertDescription>
@@ -370,7 +373,7 @@ export function BalanceSheetPageClient(): JSX.Element {
 
                 <table className="w-full border-collapse text-sm">
                   <thead>
-                    <tr className="border-y border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr className="border-y border-border bg-muted text-xs uppercase tracking-wide text-foreground-muted">
                       <th className="px-6 py-3 text-left font-bold">Account</th>
                       <th className="px-6 py-3 text-right font-bold">Total</th>
                     </tr>
@@ -379,16 +382,18 @@ export function BalanceSheetPageClient(): JSX.Element {
                     <BalanceSheetRows section={balanceSheet.assets} title="Assets" />
                     <BalanceSheetRows section={balanceSheet.liabilities} title="Liabilities" />
                     <BalanceSheetRows section={balanceSheet.equity} title="Equity" />
-                    <tr className="border-t border-slate-300">
-                      <td className="px-6 py-4 font-bold text-slate-950">Liabilities and Equity</td>
+                    <tr className="border-t border-border">
+                      <td className="px-6 py-4 font-bold text-foreground">
+                        Liabilities and Equity
+                      </td>
                       <AmountCell strong value={balanceSheet.totalLiabilitiesAndEquity} />
                     </tr>
-                    <tr className="border-t border-slate-100">
-                      <td className="px-6 py-4 font-bold text-slate-950">Difference</td>
+                    <tr className="border-t border-border">
+                      <td className="px-6 py-4 font-bold text-foreground">Difference</td>
                       <td
                         className={cn(
                           "px-6 py-4 text-right font-bold tabular-nums",
-                          balanceSheet.difference === 0 ? "text-slate-950" : "text-red-700",
+                          balanceSheet.difference === 0 ? "text-foreground" : "text-danger-text",
                         )}
                       >
                         {money(balanceSheet.difference)}
@@ -397,7 +402,7 @@ export function BalanceSheetPageClient(): JSX.Element {
                   </tbody>
                 </table>
 
-                <p className="mt-6 text-xs text-slate-500">
+                <p className="mt-6 text-xs text-foreground-muted">
                   Amounts are shown in AED. Draft journal entries are excluded. Current year
                   profit/loss rows are calculated by the backend from the configured financial year
                   start.

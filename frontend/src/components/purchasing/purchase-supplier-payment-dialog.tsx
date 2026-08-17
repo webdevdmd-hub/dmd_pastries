@@ -175,25 +175,19 @@ export function PurchaseSupplierPaymentDialog({
 
           <div className="grid gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4 text-sm md:grid-cols-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha">
-                Bill balance
-              </p>
+              <p className="text-xs font-semibold text-brand-mocha">Bill balance</p>
               <p className="mt-1 font-semibold text-brand-espresso">
                 AED {balanceAmount.toFixed(2)}
               </p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha">
-                New payment
-              </p>
+              <p className="text-xs font-semibold text-brand-mocha">New payment</p>
               <p className="mt-1 font-semibold text-brand-espresso">
                 AED {safePaymentAmount.toFixed(2)}
               </p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha">
-                Remaining
-              </p>
+              <p className="text-xs font-semibold text-brand-mocha">Remaining</p>
               <p className="mt-1 font-semibold text-brand-espresso">
                 AED {remainingBalance.toFixed(2)}
               </p>
@@ -231,11 +225,11 @@ export function PurchaseSupplierPaymentDialog({
               )}
             />
             {hasPaymentMethods ? (
-              <p className="text-xs text-red-700">
+              <p className="text-xs text-danger-text">
                 {form.formState.errors.paymentMethodId?.message}
               </p>
             ) : (
-              <p className="text-xs text-red-700">
+              <p className="text-xs text-danger-text">
                 Set up an active purchasing payment method with a linked payment account for this
                 branch.
               </p>
@@ -254,7 +248,7 @@ export function PurchaseSupplierPaymentDialog({
                 disabled={disabled}
                 {...form.register("amount", { valueAsNumber: true })}
               />
-              <p className="text-xs text-red-700">{form.formState.errors.amount?.message}</p>
+              <p className="text-xs text-danger-text">{form.formState.errors.amount?.message}</p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="supplierPaymentPaidAt">Paid at</Label>
@@ -282,7 +276,9 @@ export function PurchaseSupplierPaymentDialog({
               }
               {...form.register("referenceNumber")}
             />
-            <p className="text-xs text-red-700">{form.formState.errors.referenceNumber?.message}</p>
+            <p className="text-xs text-danger-text">
+              {form.formState.errors.referenceNumber?.message}
+            </p>
           </div>
 
           <div className="grid gap-2">
@@ -297,7 +293,9 @@ export function PurchaseSupplierPaymentDialog({
 
           <DialogFooter>
             {form.formState.errors.root?.message ? (
-              <p className="mr-auto text-sm text-red-700">{form.formState.errors.root.message}</p>
+              <p className="mr-auto text-sm text-danger-text">
+                {form.formState.errors.root.message}
+              </p>
             ) : null}
             <Button onClick={onClose} type="button" variant="outline">
               Cancel

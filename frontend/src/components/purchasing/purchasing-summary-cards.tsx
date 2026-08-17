@@ -51,7 +51,7 @@ export function PurchasingSummaryCards({
       {cards.map((card) => {
         const Icon = card.icon;
         return (
-          <Card className="bg-white/85" key={card.label}>
+          <Card className="bg-card/85" key={card.label}>
             <CardContent className="flex items-center justify-between p-6">
               <div>
                 <p className="text-sm text-brand-mocha">{card.label}</p>

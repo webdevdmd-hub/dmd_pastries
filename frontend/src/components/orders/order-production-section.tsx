@@ -163,7 +163,7 @@ export function OrderProductionSection({
   }, [productRecipe, productionForm.recipeId, selectedItem]);
 
   return (
-    <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
+    <section className="rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-5">
       <h2 className="text-xl font-semibold text-brand-espresso">Production Link</h2>
       <p className="mt-1 text-sm text-brand-mocha">
         Attach this order to an existing manufacturing batch.
@@ -267,7 +267,7 @@ export function OrderProductionSection({
                 value={productionForm.recipeId}
               />
               {recipeValidationMessage ? (
-                <p className="text-sm text-red-700">{recipeValidationMessage}</p>
+                <p className="text-sm text-danger-text">{recipeValidationMessage}</p>
               ) : null}
             </div>
             <div className="space-y-1">

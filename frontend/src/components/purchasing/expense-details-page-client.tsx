@@ -139,8 +139,8 @@ export function ExpenseDetailsPageClient({ expenseId }: { expenseId: string }): 
 
 function Detail({ label, value }: { label: string; value: string }): JSX.Element {
   return (
-    <div className="rounded-2xl border border-brand-cappuccino/60 bg-white/80 p-4">
-      <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">{label}</p>
+    <div className="rounded-2xl border border-brand-cappuccino/60 bg-card/80 p-4">
+      <p className="text-xs text-brand-mocha">{label}</p>
       <p className="mt-1 break-words font-semibold text-brand-espresso">{value}</p>
     </div>
   );

@@ -610,7 +610,7 @@ function JournalEntryFormDialog({
               </div>
             </div>
 
-            {error ? <p className="text-sm font-medium text-red-700">{error}</p> : null}
+            {error ? <p className="text-sm font-medium text-danger-text">{error}</p> : null}
 
             <DialogFooter>
               <Button onClick={onClose} type="button" variant="outline">
@@ -682,10 +682,10 @@ function JournalEntryDetailsPanel({
     : "";
 
   return (
-    <div className="flex min-h-full flex-col bg-white">
+    <div className="flex min-h-full flex-col bg-card">
       <div className="flex flex-col gap-4 border-b border-brand-cappuccino/60 bg-brand-latte/20 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mocha">
+          <p className="text-xs font-semibold text-brand-mocha">
             {entry.sourceType === "manual" ? "Manual Journal" : sourceLabel(entry.sourceType)}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-3">
@@ -694,7 +694,10 @@ function JournalEntryDetailsPanel({
             </h2>
             <Badge variant={statusBadgeVariant(entry.status)}>{statusLabel(entry.status)}</Badge>
             {isLocked ? (
-              <Badge className="border-amber-200 bg-amber-50 text-amber-800" variant="outline">
+              <Badge
+                className="border-warning/30 bg-warning-tint text-warning-text"
+                variant="outline"
+              >
                 <Lock className="h-3 w-3" />
                 Period locked
               </Badge>
@@ -703,7 +706,7 @@ function JournalEntryDetailsPanel({
           <p className="mt-1 text-sm text-brand-mocha">
             {formatDate(entry.entryDate)} | {displayText(entry.branchName, "Business-level")}
           </p>
-          {isLocked ? <p className="mt-1 text-sm text-amber-700">{lockedHint}</p> : null}
+          {isLocked ? <p className="mt-1 text-sm text-warning-text">{lockedHint}</p> : null}
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -744,7 +747,7 @@ function JournalEntryDetailsPanel({
           ) : null}
           {canManage && entry.sourceType === "manual" ? (
             <Button
-              className="border-red-200 text-red-700 hover:bg-red-50"
+              className="border-danger/30 text-danger-text hover:bg-danger-tint"
               disabled={isLocked}
               onClick={() => onDelete(entry)}
               title={isLocked ? lockedHint : undefined}
@@ -767,7 +770,7 @@ function JournalEntryDetailsPanel({
       </div>
 
       <div className="grid gap-6 px-6 py-6">
-        <Card className="overflow-hidden border-brand-cappuccino/70 bg-white shadow-none">
+        <Card className="overflow-hidden border-brand-cappuccino/70 bg-card shadow-none">
           <CardContent className="grid gap-6 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -822,7 +825,7 @@ function JournalEntryDetailsPanel({
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden border-brand-cappuccino/70 bg-white shadow-none">
+        <Card className="overflow-hidden border-brand-cappuccino/70 bg-card shadow-none">
           <CardContent className="p-0">
             <div className="border-b border-brand-cappuccino/60 px-4 py-4">
               <h3 className="text-xl font-semibold text-brand-espresso">Journal Details</h3>
@@ -1060,10 +1063,10 @@ export function JournalEntriesPageClient(): JSX.Element {
         title="Journal Entries"
       />
 
-      <Card className="overflow-hidden rounded-3xl border-brand-cappuccino/70 bg-white shadow-sm">
+      <Card className="overflow-hidden rounded-3xl border-brand-cappuccino/70 bg-card shadow-sm">
         <CardContent className="p-0">
           <div className="grid min-h-[720px] lg:grid-cols-[420px_minmax(0,1fr)]">
-            <aside className="flex min-h-[720px] flex-col border-b border-brand-cappuccino/70 bg-white lg:border-b-0 lg:border-r">
+            <aside className="flex min-h-[720px] flex-col border-b border-brand-cappuccino/70 bg-card lg:border-b-0 lg:border-r">
               <div className="flex items-center justify-between gap-3 border-b border-brand-cappuccino/70 px-4 py-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1107,7 +1110,7 @@ export function JournalEntriesPageClient(): JSX.Element {
               </div>
 
               <div className="grid gap-3 border-b border-brand-cappuccino/70 bg-brand-latte/25 p-4">
-                <div className="grid grid-cols-3 rounded-2xl border border-brand-cappuccino/70 bg-white p-1">
+                <div className="grid grid-cols-3 rounded-2xl border border-brand-cappuccino/70 bg-card p-1">
                   <Button
                     className="rounded-xl"
                     onClick={() =>
@@ -1175,7 +1178,7 @@ export function JournalEntriesPageClient(): JSX.Element {
                       <SelectItem value="reversed">Reversed</SelectItem>
                     </SelectContent>
                   </Select>
-                  <div className="flex items-center rounded-2xl border border-brand-cappuccino/70 bg-white px-3 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha">
+                  <div className="flex items-center rounded-2xl border border-brand-cappuccino/70 bg-card px-3 text-xs font-semibold text-brand-mocha">
                     {journalViewLabel}
                   </div>
                 </div>
@@ -1224,7 +1227,7 @@ export function JournalEntriesPageClient(): JSX.Element {
 
                 {!entriesQuery.isLoading && entriesQuery.error ? (
                   <div className="flex min-h-80 flex-col items-center justify-center gap-3 p-6 text-center">
-                    <FilePlus2 className="h-10 w-10 text-red-700" />
+                    <FilePlus2 className="h-10 w-10 text-danger-text" />
                     <p className="font-semibold text-brand-espresso">
                       Unable to load journal entries
                     </p>
@@ -1264,7 +1267,7 @@ export function JournalEntriesPageClient(): JSX.Element {
                           className={`flex w-full flex-col gap-2 px-4 py-4 text-left transition ${
                             isSelected
                               ? "bg-brand-latte/75 shadow-[inset_4px_0_0_#B08968]"
-                              : "bg-white hover:bg-brand-latte/30"
+                              : "bg-card hover:bg-brand-latte/30"
                           }`}
                           onClick={() => setSelectedEntryId(entry.id)}
                           type="button"
@@ -1303,7 +1306,7 @@ export function JournalEntriesPageClient(): JSX.Element {
                 ) : null}
               </div>
 
-              <div className="flex items-center justify-between gap-3 border-t border-brand-cappuccino/70 bg-white px-4 py-3">
+              <div className="flex items-center justify-between gap-3 border-t border-brand-cappuccino/70 bg-card px-4 py-3">
                 <Button
                   disabled={filters.page <= 1 || entriesQuery.isFetching}
                   onClick={() => updateFilters({ page: Math.max(1, filters.page - 1) }, false)}
@@ -1383,7 +1386,9 @@ export function JournalEntriesPageClient(): JSX.Element {
               Cancel
             </Button>
             <Button
-              className={pendingAction?.type === "reverse" ? "border-red-200 text-red-700" : ""}
+              className={
+                pendingAction?.type === "reverse" ? "border-danger/30 text-danger-text" : ""
+              }
               disabled={
                 postMutation.isPending || reverseMutation.isPending || deleteMutation.isPending
               }

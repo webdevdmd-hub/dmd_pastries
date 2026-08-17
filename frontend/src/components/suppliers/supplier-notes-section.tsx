@@ -51,7 +51,7 @@ export function SupplierNotesSection({
   );
 
   return (
-    <Card className="bg-white/80">
+    <Card className="bg-card/80">
       <CardHeader>
         <CardTitle>Notes</CardTitle>
       </CardHeader>
@@ -116,7 +116,7 @@ export function SupplierNotesSection({
                     type="button"
                     variant="ghost"
                   >
-                    <Trash2 className="h-4 w-4 text-red-700" />
+                    <Trash2 className="h-4 w-4 text-danger-text" />
                   </Button>
                 ) : null}
               </div>

@@ -12,7 +12,7 @@ export function OrdersEmptyState({
   onCreate: () => void;
 }): JSX.Element {
   return (
-    <Card className="border-brand-cappuccino/70 bg-white/85">
+    <Card className="border-brand-cappuccino/70 bg-card/85">
       <CardContent className="flex flex-col items-center gap-4 p-12 text-center">
         <CakeSlice className="h-12 w-12 text-brand-mocha" />
         <div>

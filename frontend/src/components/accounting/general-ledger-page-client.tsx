@@ -218,7 +218,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
         </AlertDescription>
       </Alert>
 
-      <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-white/80 p-4 lg:grid-cols-[1.2fr_1fr_1fr_1fr_0.8fr]">
+      <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-card/80 p-4 lg:grid-cols-[1.2fr_1fr_1fr_1fr_0.8fr]">
         <SearchableSelect
           ariaLabel="Filter General Ledger by account"
           clearable={false}
@@ -284,7 +284,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
       </div>
 
       {hasInvalidAccountId ? (
-        <Card className="border-red-200 bg-red-50/70">
+        <Card className="border-danger/30 bg-danger-tint/70">
           <CardContent className="flex min-h-64 flex-col items-center justify-center gap-4 text-center">
             <h2 className="text-2xl font-semibold text-brand-espresso">
               Unable to load General Ledger
@@ -312,7 +312,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
       ) : null}
 
       {!hasInvalidAccountId && !ledgerQuery.isLoading && ledgerQuery.error ? (
-        <Card className="border-red-200 bg-red-50/70">
+        <Card className="border-danger/30 bg-danger-tint/70">
           <CardContent className="flex min-h-64 flex-col items-center justify-center gap-4 text-center">
             <h2 className="text-2xl font-semibold text-brand-espresso">
               Unable to load General Ledger
@@ -333,7 +333,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
             {showRunningBalance ? (
               <Card>
                 <CardContent className="p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Opening</p>
+                  <p className="text-xs text-brand-mocha">Opening</p>
                   <p className="mt-1 text-xl font-bold text-brand-espresso">
                     {money(ledger.openingBalance)}
                   </p>
@@ -342,7 +342,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
             ) : null}
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Debit</p>
+                <p className="text-xs text-brand-mocha">Debit</p>
                 <p className="mt-1 text-xl font-bold text-brand-espresso">
                   {money(ledger.periodDebit)}
                 </p>
@@ -350,7 +350,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Credit</p>
+                <p className="text-xs text-brand-mocha">Credit</p>
                 <p className="mt-1 text-xl font-bold text-brand-espresso">
                   {money(ledger.periodCredit)}
                 </p>
@@ -359,7 +359,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
             {showRunningBalance ? (
               <Card>
                 <CardContent className="p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-brand-mocha">Closing</p>
+                  <p className="text-xs text-brand-mocha">Closing</p>
                   <p className="mt-1 text-xl font-bold text-brand-espresso">
                     {money(ledger.closingBalance)}
                   </p>
@@ -369,7 +369,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
           </div>
 
           {ledger.items.length === 0 ? (
-            <Card className="border-brand-cappuccino/70 bg-white/80">
+            <Card className="border-brand-cappuccino/70 bg-card/80">
               <CardContent className="flex min-h-64 flex-col items-center justify-center gap-3 text-center">
                 <BookOpenText className="h-10 w-10 text-brand-mocha" />
                 <h2 className="text-2xl font-semibold text-brand-espresso">
@@ -381,9 +381,9 @@ export function GeneralLedgerPageClient(): JSX.Element {
               </CardContent>
             </Card>
           ) : (
-            <Card className="overflow-hidden border-brand-cappuccino/70 bg-white/85">
+            <Card className="overflow-hidden border-brand-cappuccino/70 bg-card/85">
               <CardContent className="overflow-hidden p-0">
-                <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 bg-white/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 bg-card/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-brand-espresso">
                       {ledger.account
@@ -401,7 +401,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
                     Page {currentPage} of {totalPages}
                   </p>
                 </div>
-                <div className="overflow-x-auto bg-white/75 [&>div]:rounded-none">
+                <div className="overflow-x-auto bg-card/75 [&>div]:rounded-none">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -447,7 +447,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
                     </TableBody>
                   </Table>
                 </div>
-                <div className="flex flex-col gap-3 border-t border-brand-cappuccino/70 bg-white/80 px-4 py-3 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-col gap-3 border-t border-brand-cappuccino/70 bg-card/80 px-4 py-3 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-brand-mocha">Rows per page</span>
                     <Select

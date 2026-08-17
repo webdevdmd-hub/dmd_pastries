@@ -64,7 +64,7 @@ export function SupplierActionsMenu({
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-700" onSelect={() => onDelete(supplier)}>
+            <DropdownMenuItem className="text-danger-text" onSelect={() => onDelete(supplier)}>
               Delete
             </DropdownMenuItem>
           </>

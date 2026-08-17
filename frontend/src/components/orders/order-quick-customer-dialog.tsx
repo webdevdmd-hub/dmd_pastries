@@ -76,7 +76,7 @@ export function OrderQuickCustomerDialog({
           <div className="grid gap-2">
             <Label htmlFor="quickCustomerName">Full name</Label>
             <Input id="quickCustomerName" {...form.register("fullName")} />
-            <p className="text-xs text-red-700">{form.formState.errors.fullName?.message}</p>
+            <p className="text-xs text-danger-text">{form.formState.errors.fullName?.message}</p>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="quickCustomerPhone">Phone</Label>
@@ -85,7 +85,7 @@ export function OrderQuickCustomerDialog({
           <div className="grid gap-2">
             <Label htmlFor="quickCustomerEmail">Email</Label>
             <Input id="quickCustomerEmail" type="email" {...form.register("email")} />
-            <p className="text-xs text-red-700">{form.formState.errors.email?.message}</p>
+            <p className="text-xs text-danger-text">{form.formState.errors.email?.message}</p>
           </div>
           <DialogFooter>
             <Button onClick={onClose} type="button" variant="outline">

@@ -111,14 +111,12 @@ export function SupplierFormDialog({
           }}
         >
           <section className="grid gap-4 md:grid-cols-2">
-            <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-brand-mocha md:col-span-2">
-              Basic Information
-            </h3>
+            <h3 className="text-sm font-bold text-brand-mocha md:col-span-2">Basic Information</h3>
             <label className="grid gap-2">
               <Label htmlFor="supplier-name">Supplier name</Label>
               <Input id="supplier-name" {...form.register("supplierName")} />
               {fieldError("supplierName") ? (
-                <span className="text-sm text-red-700">{fieldError("supplierName")}</span>
+                <span className="text-sm text-danger-text">{fieldError("supplierName")}</span>
               ) : null}
             </label>
             <label className="grid gap-2">
@@ -129,7 +127,7 @@ export function SupplierFormDialog({
               <Label htmlFor="supplier-email">Email</Label>
               <Input id="supplier-email" type="email" {...form.register("email")} />
               {fieldError("email") ? (
-                <span className="text-sm text-red-700">{fieldError("email")}</span>
+                <span className="text-sm text-danger-text">{fieldError("email")}</span>
               ) : null}
             </label>
             <label className="grid gap-2">
@@ -140,7 +138,7 @@ export function SupplierFormDialog({
                 {...form.register("website")}
               />
               {fieldError("website") ? (
-                <span className="text-sm text-red-700">{fieldError("website")}</span>
+                <span className="text-sm text-danger-text">{fieldError("website")}</span>
               ) : null}
             </label>
             <label className="grid gap-2">
@@ -150,9 +148,7 @@ export function SupplierFormDialog({
           </section>
 
           <section className="grid gap-4 md:grid-cols-2">
-            <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-brand-mocha md:col-span-2">
-              Address
-            </h3>
+            <h3 className="text-sm font-bold text-brand-mocha md:col-span-2">Address</h3>
             <Input placeholder="Address line 1" {...form.register("addressLine1")} />
             <Input placeholder="Address line 2" {...form.register("addressLine2")} />
             <Input placeholder="City" {...form.register("city")} />

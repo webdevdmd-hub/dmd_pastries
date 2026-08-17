@@ -147,7 +147,7 @@ function groupTrialBalanceItems(items: readonly TrialBalanceItem[]): TrialBalanc
 }
 
 function AmountCell({ value }: { value: number }): JSX.Element {
-  return <td className="w-40 px-6 py-3 text-right tabular-nums text-blue-600">{money(value)}</td>;
+  return <td className="w-40 px-6 py-3 text-right tabular-nums text-info-text">{money(value)}</td>;
 }
 
 export function TrialBalancePageClient(): JSX.Element {
@@ -253,7 +253,7 @@ export function TrialBalancePageClient(): JSX.Element {
       ) : null}
 
       {!trialBalanceQuery.isLoading && trialBalanceQuery.error ? (
-        <Card className="border-red-200 bg-red-50/70">
+        <Card className="border-danger/30 bg-danger-tint/70">
           <CardContent className="flex min-h-64 flex-col items-center justify-center gap-4 text-center">
             <h2 className="text-xl font-semibold text-brand-espresso">
               Unable to load Trial Balance
@@ -290,9 +290,9 @@ export function TrialBalancePageClient(): JSX.Element {
             <div className="overflow-x-auto px-4 py-10">
               <div className="mx-auto min-w-[48rem] max-w-5xl">
                 <div className="mb-8 text-center">
-                  <p className="text-sm font-medium text-slate-500">Accrual basis</p>
-                  <h2 className="mt-2 text-2xl font-bold text-slate-950">Trial Balance</h2>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="text-sm font-medium text-foreground-muted">Accrual basis</p>
+                  <h2 className="mt-2 text-2xl font-bold text-foreground">Trial Balance</h2>
+                  <p className="mt-1 text-sm text-foreground-muted">
                     From {formatDate(trialBalance.dateFrom)} to {formatDate(trialBalance.dateTo)}
                   </p>
                   {trialBalance.isBalanced ? (
@@ -300,14 +300,17 @@ export function TrialBalancePageClient(): JSX.Element {
                       Balanced
                     </Badge>
                   ) : (
-                    <Badge className="mt-3 border-red-200 bg-red-50 text-red-700" variant="outline">
+                    <Badge
+                      className="mt-3 border-danger/30 bg-danger-tint text-danger-text"
+                      variant="outline"
+                    >
                       Debit / credit mismatch
                     </Badge>
                   )}
                 </div>
 
                 {!trialBalance.isBalanced ? (
-                  <Alert className="mb-6 border-amber-300 bg-amber-50/80">
+                  <Alert className="mb-6 border-warning/30 bg-warning-tint/80">
                     <Scale className="h-4 w-4" />
                     <AlertTitle>Trial balance mismatch</AlertTitle>
                     <AlertDescription>
@@ -318,7 +321,7 @@ export function TrialBalancePageClient(): JSX.Element {
 
                 <table className="w-full border-collapse text-sm">
                   <thead>
-                    <tr className="border-y border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr className="border-y border-border bg-muted text-xs uppercase tracking-wide text-foreground-muted">
                       <th className="px-6 py-3 text-left font-bold">Account</th>
                       <th className="px-6 py-3 text-right font-bold">Net Debit</th>
                       <th className="px-6 py-3 text-right font-bold">Net Credit</th>
@@ -327,8 +330,8 @@ export function TrialBalancePageClient(): JSX.Element {
                   <tbody>
                     {sections.map((section) => (
                       <Fragment key={section.type}>
-                        <tr className="border-b border-slate-100">
-                          <td className="px-6 py-3 text-base font-bold text-slate-950">
+                        <tr className="border-b border-border">
+                          <td className="px-6 py-3 text-base font-bold text-foreground">
                             {section.label}
                           </td>
                           <td />
@@ -337,8 +340,8 @@ export function TrialBalancePageClient(): JSX.Element {
 
                         {section.groups.map((group) => (
                           <Fragment key={`${section.type}-${group.group}`}>
-                            <tr className="border-b border-slate-100">
-                              <td className="px-10 py-3 font-semibold text-slate-900">
+                            <tr className="border-b border-border">
+                              <td className="px-10 py-3 font-semibold text-foreground">
                                 {formatGroupName(group.group)}
                               </td>
                               <AmountCell value={0} />
@@ -346,18 +349,18 @@ export function TrialBalancePageClient(): JSX.Element {
                             </tr>
                             {group.items.map((item) => (
                               <tr
-                                className="border-b border-slate-100 transition-colors hover:bg-slate-50"
+                                className="border-b border-border transition-colors hover:bg-muted"
                                 key={item.accountId}
                               >
-                                <td className="px-14 py-3 font-medium text-blue-600">
+                                <td className="px-14 py-3 font-medium text-info-text">
                                   {item.accountName}
                                 </td>
                                 <AmountCell value={item.closingDebit} />
                                 <AmountCell value={item.closingCredit} />
                               </tr>
                             ))}
-                            <tr className="border-b border-slate-200">
-                              <td className="px-10 py-3 font-bold text-slate-950">
+                            <tr className="border-b border-border">
+                              <td className="px-10 py-3 font-bold text-foreground">
                                 Total for {formatGroupName(group.group)}
                               </td>
                               <AmountCell value={group.closingDebit} />
@@ -367,7 +370,7 @@ export function TrialBalancePageClient(): JSX.Element {
                         ))}
                       </Fragment>
                     ))}
-                    <tr className="border-t border-slate-300 text-base font-bold text-slate-950">
+                    <tr className="border-t border-border text-base font-bold text-foreground">
                       <td className="px-6 py-4">Total for Trial Balance</td>
                       <td className="px-6 py-4 text-right tabular-nums">
                         {money(trialBalance.totalDebit)}
@@ -382,7 +385,9 @@ export function TrialBalancePageClient(): JSX.Element {
                 <p
                   className={cn(
                     "mt-6 text-xs",
-                    trialBalance.isBalanced ? "text-slate-500" : "font-semibold text-red-700",
+                    trialBalance.isBalanced
+                      ? "text-foreground-muted"
+                      : "font-semibold text-danger-text",
                   )}
                 >
                   Amounts are shown in AED. Draft journal entries are excluded.

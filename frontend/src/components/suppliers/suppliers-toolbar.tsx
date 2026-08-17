@@ -24,7 +24,7 @@ export function SuppliersToolbar({ filters, onFiltersChange }: SuppliersToolbarP
   };
 
   return (
-    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/75 p-4 shadow-soft lg:grid-cols-[1.6fr_1fr_1fr_auto]">
+    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-card/75 p-4 shadow-soft lg:grid-cols-[1.6fr_1fr_1fr_auto]">
       <Input
         aria-label="Search suppliers"
         onChange={(event) => update({ search: event.target.value })}

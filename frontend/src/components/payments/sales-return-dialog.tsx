@@ -270,7 +270,7 @@ export function SalesReturnDialog({
 
         {draftReturn ? (
           <div className="space-y-5">
-            <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900">
+            <Alert className="border-money/30 bg-money-tint text-money-text">
               <CheckCircle2 className="h-4 w-4" />
               <AlertTitle>Draft credit note ready</AlertTitle>
               <AlertDescription>
@@ -279,30 +279,22 @@ export function SalesReturnDialog({
             </Alert>
 
             <div className="grid gap-3 md:grid-cols-4">
-              <div className="rounded-2xl border border-brand-cappuccino bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
-                  Credit note
-                </p>
+              <div className="rounded-2xl border border-brand-cappuccino bg-card p-4">
+                <p className="text-xs font-bold text-brand-mocha">Credit note</p>
                 <p className="mt-1 font-bold text-brand-espresso">{draftReturn.returnNumber}</p>
               </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
-                  Refund amount
-                </p>
+              <div className="rounded-2xl border border-brand-cappuccino bg-card p-4">
+                <p className="text-xs font-bold text-brand-mocha">Refund amount</p>
                 <p className="mt-1 font-bold text-brand-espresso">
                   {formatMoney(draftReturn.refundAmount)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
-                  Items
-                </p>
+              <div className="rounded-2xl border border-brand-cappuccino bg-card p-4">
+                <p className="text-xs font-bold text-brand-mocha">Items</p>
                 <p className="mt-1 font-bold text-brand-espresso">{draftReturn.items.length}</p>
               </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
-                  Status
-                </p>
+              <div className="rounded-2xl border border-brand-cappuccino bg-card p-4">
+                <p className="text-xs font-bold text-brand-mocha">Status</p>
                 <div className="mt-1">
                   <SalesReturnStatusBadge status={draftReturn.status} />
                 </div>
@@ -380,12 +372,12 @@ export function SalesReturnDialog({
                     </Select>
                   </div>
                   <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
+                    <p className="text-xs font-bold text-brand-mocha">
                       {refundMode === "store_credit"
                         ? "Estimated store credit"
                         : "Estimated refund"}
                     </p>
-                    <p className="mt-1 text-2xl font-black text-brand-espresso">
+                    <p className="mt-1 text-2xl font-medium text-brand-espresso">
                       {formatMoney(
                         refundMode !== "none" ? estimatedRefundPreview.finalRefundAmount : 0,
                       )}
@@ -449,8 +441,8 @@ export function SalesReturnDialog({
                   />
                 </div>
 
-                <div className="overflow-hidden rounded-3xl border border-brand-cappuccino bg-white">
-                  <div className="grid grid-cols-[minmax(0,1fr)_120px_180px_220px] gap-3 border-b border-brand-cappuccino bg-brand-cream/60 px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
+                <div className="overflow-hidden rounded-3xl border border-brand-cappuccino bg-card">
+                  <div className="grid grid-cols-[minmax(0,1fr)_120px_180px_220px] gap-3 border-b border-brand-cappuccino bg-brand-cream/60 px-4 py-3 text-xs font-bold text-brand-mocha">
                     <span>Item</span>
                     <span>Quantity</span>
                     <span>Action</span>

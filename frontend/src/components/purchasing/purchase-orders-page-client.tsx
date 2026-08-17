@@ -504,7 +504,7 @@ export function PurchaseOrdersPageClient(): JSX.Element {
             <Button
               className={
                 pendingAction?.type === "delete"
-                  ? "bg-red-700 text-white hover:bg-red-800"
+                  ? "bg-danger text-primary-foreground hover:bg-danger"
                   : undefined
               }
               disabled={

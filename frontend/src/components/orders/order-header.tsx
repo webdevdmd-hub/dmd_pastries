@@ -20,7 +20,7 @@ export function OrderHeader({
   order: BakeryOrder | null;
 }): JSX.Element {
   return (
-    <header className="flex flex-col gap-4 rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-6 shadow-float lg:flex-row lg:items-center lg:justify-between">
+    <header className="flex flex-col gap-4 rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-6 shadow-float lg:flex-row lg:items-center lg:justify-between">
       <div>
         <Button asChild className="mb-4" size="sm" variant="outline">
           <Link href="/orders">
@@ -46,7 +46,7 @@ export function OrderHeader({
         ) : null}
         {onSave ? (
           <Button
-            className="bg-brand-caramel text-white hover:bg-brand-mocha"
+            className="bg-brand-caramel text-primary-foreground hover:bg-brand-mocha"
             disabled={!canManage || isSaving}
             onClick={onSave}
             type="button"

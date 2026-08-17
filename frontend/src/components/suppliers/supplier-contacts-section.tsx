@@ -72,7 +72,7 @@ export function SupplierContactsSection({
   };
 
   return (
-    <Card className="bg-white/80">
+    <Card className="bg-card/80">
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <CardTitle>Contacts</CardTitle>
@@ -148,7 +148,7 @@ export function SupplierContactsSection({
                     type="button"
                     variant="ghost"
                   >
-                    <Trash2 className="h-4 w-4 text-red-700" />
+                    <Trash2 className="h-4 w-4 text-danger-text" />
                   </Button>
                 </div>
               ) : null}

@@ -71,7 +71,7 @@ export function OrderActionsMenu({
             ))
           : null}
         {canManage ? (
-          <DropdownMenuItem className="text-red-700" onClick={() => onDelete(order)}>
+          <DropdownMenuItem className="text-danger-text" onClick={() => onDelete(order)}>
             <Trash2 className="mr-2 h-4 w-4" />
             Delete order
           </DropdownMenuItem>

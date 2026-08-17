@@ -39,7 +39,7 @@ export function OrderItemsSection({
   units: Unit[];
 }): JSX.Element {
   return (
-    <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
+    <section className="rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-brand-espresso">Order Items</h2>

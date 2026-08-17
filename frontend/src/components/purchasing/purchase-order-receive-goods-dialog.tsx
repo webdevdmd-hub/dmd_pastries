@@ -251,7 +251,7 @@ export function PurchaseOrderReceiveGoodsDialog({
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-border bg-background">
-            <div className="grid grid-cols-[1.8fr_0.7fr_0.7fr_0.85fr_1fr_1fr] gap-3 border-b bg-muted/50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="grid grid-cols-[1.8fr_0.7fr_0.7fr_0.85fr_1fr_1fr] gap-3 border-b bg-muted/50 px-4 py-3 text-xs font-semibold text-muted-foreground">
               <span>Item</span>
               <span>Ordered</span>
               <span>Received</span>
@@ -265,7 +265,7 @@ export function PurchaseOrderReceiveGoodsDialog({
                   Loading purchase order items...
                 </div>
               ) : loadError ? (
-                <div className="px-4 py-6 text-sm font-medium text-red-700">{loadError}</div>
+                <div className="px-4 py-6 text-sm font-medium text-danger-text">{loadError}</div>
               ) : order ? (
                 receivableItems(order).map((item) => {
                   const row = rows.find((line) => line.purchaseOrderItemId === item.id);
@@ -311,7 +311,7 @@ export function PurchaseOrderReceiveGoodsDialog({
             </div>
           </div>
 
-          {error ? <p className="text-sm font-medium text-red-700">{error}</p> : null}
+          {error ? <p className="text-sm font-medium text-danger-text">{error}</p> : null}
         </div>
 
         <DialogFooter className="items-center gap-3">

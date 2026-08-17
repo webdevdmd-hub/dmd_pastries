@@ -113,7 +113,7 @@ export function ReconciliationPageClient(): JSX.Element {
         }
       />
 
-      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino/70 bg-white/75 p-4 shadow-sm md:grid-cols-4">
+      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino/70 bg-card/75 p-4 shadow-sm md:grid-cols-4">
         <Select
           onValueChange={(value) => setFilters((current) => ({ ...current, branchId: value }))}
           value={filters.branchId}
@@ -169,7 +169,7 @@ export function ReconciliationPageClient(): JSX.Element {
       </div>
 
       {lastCreated ? (
-        <div className="rounded-3xl border border-brand-cappuccino bg-white/80 p-4 text-sm text-brand-mocha">
+        <div className="rounded-3xl border border-brand-cappuccino bg-card/80 p-4 text-sm text-brand-mocha">
           Reconciliation created for {lastCreated.reconciliationDate}. Backend calculated the
           expected amount and difference; the table below has been refreshed with the saved result.
         </div>
