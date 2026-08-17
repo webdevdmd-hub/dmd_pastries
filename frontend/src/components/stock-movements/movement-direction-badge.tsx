@@ -13,7 +13,7 @@ export function MovementDirectionBadge({ direction }: MovementDirectionBadgeProp
   }
 
   if (direction === "out") {
-    return <Badge className="bg-orange-100 text-orange-900 hover:bg-orange-100">Out</Badge>;
+    return <Badge className="bg-muted text-foreground-muted hover:bg-muted">Out</Badge>;
   }
 
   if (direction === "transfer") {

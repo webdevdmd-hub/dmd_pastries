@@ -71,9 +71,9 @@ const statusClasses: Record<ApiMonitorStatus, string> = {
   failed: "border-danger/30 bg-danger-tint text-danger-text",
   healthy: "border-money/30 bg-money-tint text-money-text",
   not_tested: "border-brand-cappuccino bg-brand-latte text-brand-mocha",
-  server_error: "border-rose-200 bg-rose-50 text-rose-800",
+  server_error: "border-danger/30 bg-danger-tint text-danger-text",
   slow: "border-warning/30 bg-warning-tint text-warning-text",
-  unauthorized: "border-orange-200 bg-orange-50 text-orange-800",
+  unauthorized: "border-warning/30 bg-warning-tint text-warning-text",
 };
 
 function routeKey(method: string, path: string): string {

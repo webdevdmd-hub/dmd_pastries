@@ -161,7 +161,7 @@ export function MovementDetailsDrawer({
               ) : null}
             </div>
             {movement.reversedMovementId ? (
-              <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+              <div className="rounded-2xl border border-warning/30 bg-warning-tint p-4">
                 <p className="font-bold text-brand-espresso">Reversal information</p>
                 <p className="mt-1 text-sm text-brand-mocha">
                   Related movement: {movement.reversedMovementId}

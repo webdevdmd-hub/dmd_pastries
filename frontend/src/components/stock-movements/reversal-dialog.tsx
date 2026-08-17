@@ -67,7 +67,7 @@ export function ReversalDialog({
             })(event);
           }}
         >
-          <div className="rounded-2xl bg-orange-50 p-3 text-sm text-orange-900">
+          <div className="rounded-2xl bg-warning-tint p-3 text-sm text-warning-text">
             Reversal is controlled by the backend. Protected sale or purchase movements may be
             rejected.
           </div>

@@ -42,10 +42,10 @@ function formatMoney(value: number): string {
 }
 
 function rowClassName(movement: StockMovement): string | undefined {
-  if (movement.movementType === "reversal" || movement.isReversal) return "bg-violet-50/60";
+  if (movement.movementType === "reversal" || movement.isReversal) return "bg-warning-tint/50";
   if (movement.movementType === "transfer") return "bg-info-tint/40";
   if (movement.movementDirection === "in") return "bg-money-tint/40";
-  if (movement.movementDirection === "out") return "bg-orange-50/40";
+  if (movement.movementDirection === "out") return undefined;
   return undefined;
 }
 

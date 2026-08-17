@@ -152,7 +152,7 @@ export function ManualMovementDialog({
             <Input id="manualNotes" {...form.register("notes")} />
           </div>
           {movementType === "adjustment_out" || movementType === "wastage" ? (
-            <p className="rounded-2xl bg-orange-50 p-3 text-sm text-orange-900">
+            <p className="rounded-2xl bg-warning-tint p-3 text-sm text-warning-text">
               This movement decreases stock availability. Backend will reject invalid stock changes.
             </p>
           ) : null}

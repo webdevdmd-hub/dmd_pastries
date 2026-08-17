@@ -84,7 +84,7 @@ const fontSerif = Fraunces({
 
 This alone fixes the 31 files where `font-mono` resolved to nothing. Remove the `Manrope` and `Cormorant_Garamond` imports; `--font-display` is replaced by `--font-serif`, so grep for `font-display` before deleting.
 
-   Use the **v3** values from DESIGN.md §3, not v2's: the neutrals are barely warm, and `--foreground-muted` is `#6E6A64` rather than `#737373` (v2's value is 4.35:1 on v2's own muted fills, below its own AA floor).
+Use the **v3** values from DESIGN.md §3, not v2's: the neutrals are barely warm, and `--foreground-muted` is `#6E6A64` rather than `#737373` (v2's value is 4.35:1 on v2's own muted fills, below its own AA floor).
 
 4. Remove `html { scroll-behavior: smooth }` from `globals.css`, scope it to marketing routes.
 
@@ -340,6 +340,24 @@ Add to `eslint.config.mjs`:
 ```
 
 All-errors on day one makes `pnpm lint` unusable. Each rule flips `warn` → `error` in the phase that clears it, and `--max-warnings 0` goes on last. **This table is the contract** — without it the rules stay decorative, which is exactly what happened after `ce01f74`.
+
+> **Status, 2026-08-17: `no-raw-palette` and `no-heavy-weight` are now at `error`.**
+>
+> Raw palette utilities across `frontend/src` went **1949 → 0** and `font-black`
+> went **78 → 0**, so both flipped in the commit that finished clearing them —
+> which is what this table asks for. Verified in both directions: `pnpm lint` is
+> clean on the tree, and a file containing `text-zinc-500` or `font-black` now exits
+> ESLint with code 1, fails `lint-staged`, and is reverted before it can be
+> committed.
+>
+> Three rules stay at `warn` because what remains is not drift a codemod can clear:
+> `no-hex-in-class` (57 — Recharts and react-three-fiber literals, which cannot read
+> CSS custom properties and need the `palette.ts` bridge in Phase 6),
+> `no-uppercase` (40 — table headers without the wide tracking, so a copy pass), and
+> `no-sub-12px` (39 — each one a layout decision).
+>
+> Live severities are in `frontend/eslint.design-plugin.mjs`; that file is the
+> source of truth, this table is the schedule.
 
 | Rule                                  | Flips to `error` after | Why then                                                                                                              |
 | ------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------- |

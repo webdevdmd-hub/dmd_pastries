@@ -56,7 +56,7 @@ function expiryStateBadge(state: ExpiryState, label: string): JSX.Element {
   }
 
   if (state === "expires_today") {
-    return <Badge className="border-orange-200 bg-orange-100 text-orange-900">{label}</Badge>;
+    return <Badge className="border-danger/30 bg-danger-tint text-danger-text">{label}</Badge>;
   }
 
   return <Badge className="bg-warning-tint text-warning-text hover:bg-warning-tint">{label}</Badge>;

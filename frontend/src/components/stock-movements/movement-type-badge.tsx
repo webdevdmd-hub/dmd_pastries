@@ -28,7 +28,9 @@ const labels: Record<MovementType, string> = {
 export function MovementTypeBadge({ type }: MovementTypeBadgeProps): JSX.Element {
   if (type === "reversal") {
     return (
-      <Badge className="bg-violet-100 text-violet-900 hover:bg-violet-100">{labels[type]}</Badge>
+      <Badge className="bg-warning-tint text-warning-text hover:bg-warning-tint">
+        {labels[type]}
+      </Badge>
     );
   }
 
@@ -40,9 +42,7 @@ export function MovementTypeBadge({ type }: MovementTypeBadgeProps): JSX.Element
     type === "purchase_return_out" ||
     type === "purchase_bill_cancel_out"
   ) {
-    return (
-      <Badge className="bg-orange-100 text-orange-900 hover:bg-orange-100">{labels[type]}</Badge>
-    );
+    return <Badge className="bg-muted text-foreground-muted hover:bg-muted">{labels[type]}</Badge>;
   }
 
   return (
