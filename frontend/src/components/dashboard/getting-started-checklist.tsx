@@ -163,7 +163,7 @@ export function GettingStartedChecklist({
   };
 
   return (
-    <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+    <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
       <div className="flex items-start justify-between gap-3 border-b border-workspace-border px-5 py-4">
         <div>
           <h2 className="text-lg font-semibold text-brand-espresso">Get your bakery ready</h2>
@@ -173,7 +173,7 @@ export function GettingStartedChecklist({
         </div>
         <button
           aria-label="Dismiss getting started"
-          className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-brand-espresso"
+          className="rounded-md p-1 text-foreground-muted transition-colors hover:bg-muted hover:text-brand-espresso"
           onClick={handleDismiss}
           type="button"
         >
@@ -201,7 +201,7 @@ export function GettingStartedChecklist({
               <StatusIcon
                 className={cn(
                   "h-5 w-5 shrink-0",
-                  step.complete ? "text-brand-caramel" : "text-zinc-300",
+                  step.complete ? "text-brand-caramel" : "text-foreground-muted",
                 )}
               />
               <span className="hidden rounded-lg bg-brand-latte/70 p-2 text-brand-mocha sm:block">

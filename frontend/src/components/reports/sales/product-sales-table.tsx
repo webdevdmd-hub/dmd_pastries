@@ -13,7 +13,7 @@ import type { ProductSalesRow } from "@/types/sales-reports";
 
 export function ProductSalesTable({ rows }: { rows: ProductSalesRow[] }): JSX.Element {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-brand-cappuccino bg-white/85">
+    <div className="overflow-x-auto rounded-2xl border border-brand-cappuccino bg-card/85">
       <Table>
         <TableHeader className="sticky top-0 bg-brand-latte">
           <TableRow>

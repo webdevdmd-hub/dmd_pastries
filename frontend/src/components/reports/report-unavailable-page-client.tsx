@@ -68,7 +68,7 @@ export function ReportUnavailablePageClient({
         title={title}
         description="This report is not available yet. Please go back to the Reports Index to view available reports."
       />
-      <Card className="bg-white/85 shadow-soft">
+      <Card className="bg-card/85 shadow-soft">
         <CardContent className="flex flex-col gap-5 p-6">
           <div className="flex items-start gap-4">
             <span className="rounded-2xl bg-brand-latte p-3 text-brand-mocha">

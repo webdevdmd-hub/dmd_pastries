@@ -52,14 +52,14 @@ function formatDate(value: string): string {
 
 function expiryStateBadge(state: ExpiryState, label: string): JSX.Element {
   if (state === "expired") {
-    return <Badge className="border-red-200 bg-red-100 text-red-900">{label}</Badge>;
+    return <Badge className="border-danger/30 bg-danger-tint text-danger-text">{label}</Badge>;
   }
 
   if (state === "expires_today") {
     return <Badge className="border-orange-200 bg-orange-100 text-orange-900">{label}</Badge>;
   }
 
-  return <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">{label}</Badge>;
+  return <Badge className="bg-warning-tint text-warning-text hover:bg-warning-tint">{label}</Badge>;
 }
 
 function itemTypeLabel(itemType: ExpiryBatch["itemType"]): string {
@@ -144,7 +144,7 @@ export function ExpiryAlertsPageClient(): JSX.Element {
         title="Expiry Alerts"
         description="Track stock batches that are expiring soon or already expired."
       />
-      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/70 p-4 shadow-soft md:grid-cols-6">
+      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-card/70 p-4 shadow-soft md:grid-cols-6">
         <Select
           onValueChange={(branchId) => setFilters({ ...filters, branchId })}
           value={filters.branchId}
@@ -311,7 +311,9 @@ export function ExpiryAlertsPageClient(): JSX.Element {
                       </TableCell>
                       <TableCell>{formatDate(batch.receivedDate)}</TableCell>
                       <TableCell>{formatDate(batch.expiryDate)}</TableCell>
-                      <TableCell className={remaining < 0 ? "font-bold text-red-800" : undefined}>
+                      <TableCell
+                        className={remaining < 0 ? "font-bold text-danger-text" : undefined}
+                      >
                         {remaining < 0
                           ? `${String(Math.abs(remaining))} days overdue`
                           : `${String(remaining)} days`}

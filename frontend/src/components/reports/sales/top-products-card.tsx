@@ -6,7 +6,7 @@ import type { ProductSalesRow } from "@/types/sales-reports";
 
 export function TopProductsCard({ products }: { products: ProductSalesRow[] }): JSX.Element {
   return (
-    <Card className="bg-white/85 shadow-soft">
+    <Card className="bg-card/85 shadow-soft">
       <CardHeader>
         <CardTitle className="text-brand-espresso">Top Products</CardTitle>
       </CardHeader>

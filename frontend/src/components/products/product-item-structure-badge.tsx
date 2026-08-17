@@ -17,10 +17,7 @@ export function ProductItemStructureBadge({
 }: ProductItemStructureBadgeProps): JSX.Element {
   return (
     <Badge
-      className={cn(
-        "border-neutral-200 bg-neutral-50 text-neutral-800 hover:bg-neutral-50",
-        className,
-      )}
+      className={cn("border-border bg-muted text-foreground hover:bg-muted", className)}
       variant="outline"
     >
       {ITEM_STRUCTURE_LABELS[itemStructure]}

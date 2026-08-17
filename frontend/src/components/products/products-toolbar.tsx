@@ -32,7 +32,7 @@ export function ProductsToolbar({
   onFiltersChange,
 }: ProductsToolbarProps): JSX.Element {
   return (
-    <div className="rounded-3xl border border-brand-cappuccino bg-white/75 p-4 shadow-soft">
+    <div className="rounded-3xl border border-brand-cappuccino bg-card/75 p-4 shadow-soft">
       <ProductFilters
         categories={categories}
         defaultFilters={defaultFilters}

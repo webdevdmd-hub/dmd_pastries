@@ -18,12 +18,12 @@ import type { ProductionBatchReportRow } from "@/types/manufacturing-reports";
 
 function statusBadge(status: string): JSX.Element {
   if (status === "completed")
-    return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">Completed</Badge>;
+    return <Badge className="border-money/30 bg-money-tint text-money-text">Completed</Badge>;
   if (status === "cancelled")
-    return <Badge className="border-red-200 bg-red-50 text-red-800">Cancelled</Badge>;
+    return <Badge className="border-danger/30 bg-danger-tint text-danger-text">Cancelled</Badge>;
   if (status === "in_progress" || status === "partially_completed")
     return (
-      <Badge className="border-amber-200 bg-amber-50 text-amber-800">
+      <Badge className="border-warning/30 bg-warning-tint text-warning-text">
         {status.replaceAll("_", " ")}
       </Badge>
     );

@@ -46,7 +46,7 @@ function TransferDetails({ movement }: { movement: StockMovement }): JSX.Element
   }
 
   return (
-    <div className="mt-2 min-w-44 rounded-lg border border-sky-100 bg-sky-50/70 px-2 py-1 text-xs text-sky-950">
+    <div className="mt-2 min-w-44 rounded-lg border border-info/30 bg-info-tint/70 px-2 py-1 text-xs text-info-text">
       <p>From: {locationName(movement.fromStockLocationName)}</p>
       <p>To: {locationName(movement.toStockLocationName)}</p>
       <p>

@@ -100,7 +100,7 @@ export function PaymentsReportPageClient(): JSX.Element {
           onRetry={() => void reportQuery.refetch()}
         />
       ) : null}
-      <Card className="bg-white/85 shadow-soft">
+      <Card className="bg-card/85 shadow-soft">
         <CardContent className="overflow-x-auto p-5">
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <PaymentsReportTable rows={reportQuery.data} />

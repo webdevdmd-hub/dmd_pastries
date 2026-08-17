@@ -94,7 +94,7 @@ export function TaxReportPageClient(): JSX.Element {
         />
       ) : null}
       {canShowReport ? (
-        <Card className="bg-white/85 shadow-soft">
+        <Card className="bg-card/85 shadow-soft">
           <CardContent className="p-5">
             {rows.length > 0 ? (
               <TaxReportTable rows={rows} />

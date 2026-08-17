@@ -9,7 +9,9 @@ type InventoryStatusBadgeProps = {
 
 export function InventoryStatusBadge({ status }: InventoryStatusBadgeProps): JSX.Element {
   if (status === "not_initialized") {
-    return <Badge className="bg-sky-100 text-sky-900 hover:bg-sky-100">Not initialized</Badge>;
+    return (
+      <Badge className="bg-info-tint text-info-text hover:bg-info-tint">Not initialized</Badge>
+    );
   }
 
   return (

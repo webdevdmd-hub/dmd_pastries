@@ -17,7 +17,7 @@ import type { TaxReportRow } from "@/types/sales-reports";
 
 export function TaxReportTable({ rows }: { rows: TaxReportRow[] }): JSX.Element {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-brand-cappuccino bg-white/85">
+    <div className="overflow-x-auto rounded-2xl border border-brand-cappuccino bg-card/85">
       <Table>
         <TableHeader className="sticky top-0 bg-brand-latte">
           <TableRow>

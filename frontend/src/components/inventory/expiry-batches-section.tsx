@@ -15,14 +15,14 @@ type ExpiryBatchesSectionProps = {
 
 function statusBadge(status: ExpiryBatchStatus): JSX.Element {
   if (status === "expired") {
-    return <Badge className="border-red-200 bg-red-100 text-red-900">Expired</Badge>;
+    return <Badge className="border-danger/30 bg-danger-tint text-danger-text">Expired</Badge>;
   }
 
   if (status === "depleted") {
     return <Badge variant="secondary">Depleted</Badge>;
   }
 
-  return <Badge className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100">Active</Badge>;
+  return <Badge className="bg-money-tint text-money-text hover:bg-money-tint">Active</Badge>;
 }
 
 function formatDate(value: string): string {
@@ -46,7 +46,7 @@ export function ExpiryBatchesSection({
   return (
     <div className="space-y-3">
       {batches.map((batch) => (
-        <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-3" key={batch.id}>
+        <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-3" key={batch.id}>
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-bold text-brand-espresso">{batch.batchNumber}</p>

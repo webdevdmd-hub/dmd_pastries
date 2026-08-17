@@ -39,7 +39,7 @@ export function ProductVariantsSection({
 }: ProductVariantsSectionProps): JSX.Element {
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-brand-cappuccino/70 bg-white/60">
+      <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-brand-cappuccino/70 bg-card/60">
         <div>
           <CardTitle className="text-lg">Variants</CardTitle>
           <p className="text-sm text-brand-mocha">
@@ -96,7 +96,7 @@ export function ProductVariantsSection({
                       <span
                         className={
                           isPosSelectableProductVariant(product, variant)
-                            ? "text-sm font-medium text-emerald-700"
+                            ? "text-sm font-medium text-money-text"
                             : "text-sm text-brand-mocha"
                         }
                       >
@@ -114,7 +114,7 @@ export function ProductVariantsSection({
                             <span className="sr-only">Edit {variant.variantName}</span>
                           </Button>
                           <Button
-                            className="text-red-700"
+                            className="text-danger-text"
                             onClick={() => onDelete(variant)}
                             size="icon"
                             variant="outline"

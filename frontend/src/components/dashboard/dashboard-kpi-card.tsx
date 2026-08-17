@@ -13,12 +13,10 @@ export function DashboardKpiCard({
   value: string;
 }): JSX.Element {
   return (
-    <Card className="overflow-hidden bg-white/85 shadow-soft">
+    <Card className="overflow-hidden bg-card/85 shadow-soft">
       <CardContent className="flex items-start justify-between gap-4 p-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-mocha">
-            {label}
-          </p>
+          <p className="text-xs font-semibold text-brand-mocha">{label}</p>
           <p className="mt-3 text-3xl font-semibold text-brand-espresso transition-all duration-300">
             {value}
           </p>

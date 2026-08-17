@@ -14,13 +14,13 @@ import type { CurrentStockRow } from "@/types/inventory-reports";
 
 function stockBadge(row: CurrentStockRow): JSX.Element {
   if (row.isOutOfStock) {
-    return <Badge className="border-red-200 bg-red-50 text-red-800">Out of stock</Badge>;
+    return <Badge className="border-danger/30 bg-danger-tint text-danger-text">Out of stock</Badge>;
   }
   if (row.isLowStock) {
-    return <Badge className="border-amber-200 bg-amber-50 text-amber-800">Low stock</Badge>;
+    return <Badge className="border-warning/30 bg-warning-tint text-warning-text">Low stock</Badge>;
   }
 
-  return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">Normal</Badge>;
+  return <Badge className="border-money/30 bg-money-tint text-money-text">Normal</Badge>;
 }
 
 export function CurrentStockTable({ rows }: { rows: CurrentStockRow[] }): JSX.Element {

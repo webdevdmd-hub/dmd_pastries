@@ -14,12 +14,12 @@ import type { ExpiryReportRow } from "@/types/inventory-reports";
 
 function expiryBadge(state: string, label: string): JSX.Element {
   if (state === "expired") {
-    return <Badge className="border-red-200 bg-red-50 text-red-800">{label}</Badge>;
+    return <Badge className="border-danger/30 bg-danger-tint text-danger-text">{label}</Badge>;
   }
   if (state === "expires_today") {
     return <Badge className="border-orange-200 bg-orange-50 text-orange-800">{label}</Badge>;
   }
-  return <Badge className="border-amber-200 bg-amber-50 text-amber-800">{label}</Badge>;
+  return <Badge className="border-warning/30 bg-warning-tint text-warning-text">{label}</Badge>;
 }
 
 export function ExpiryReportTable({ rows }: { rows: ExpiryReportRow[] }): JSX.Element {

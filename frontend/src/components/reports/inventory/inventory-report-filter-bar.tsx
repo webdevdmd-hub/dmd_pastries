@@ -87,7 +87,7 @@ export function InventoryReportFilterBar({
   statusOptions?: InventoryReportSelectOption[];
 }): JSX.Element {
   return (
-    <Card className="bg-white/85 shadow-soft">
+    <Card className="bg-card/85 shadow-soft">
       <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-6">
         <ReportBranchSelect
           branches={branches}

@@ -46,6 +46,6 @@ export function MovementTypeBadge({ type }: MovementTypeBadgeProps): JSX.Element
   }
 
   return (
-    <Badge className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100">{labels[type]}</Badge>
+    <Badge className="bg-money-tint text-money-text hover:bg-money-tint">{labels[type]}</Badge>
   );
 }

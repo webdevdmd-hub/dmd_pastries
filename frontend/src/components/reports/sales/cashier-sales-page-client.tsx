@@ -124,7 +124,7 @@ export function CashierSalesPageClient(): JSX.Element {
               value={`${topSalesCount.cashierName} - ${formatNumber(topSalesCount.salesCount)}`}
             />
           </div>
-          <Card className="bg-white/85 shadow-soft">
+          <Card className="bg-card/85 shadow-soft">
             <CardContent className="p-5">
               {rows.length > 0 ? (
                 <CashierSalesTable rows={rows} />

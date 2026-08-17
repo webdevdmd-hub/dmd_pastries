@@ -175,7 +175,7 @@ export function MovementDetailsPageClient({
               </div>
             </div>
             {movement.accountingJournalEntryId ? (
-              <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
+              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
                 <p className="text-sm text-brand-mocha">Accounting journal</p>
                 <p className="mt-1 text-brand-espresso">{movement.accountingJournalEntryId}</p>
                 <div className="mt-3">

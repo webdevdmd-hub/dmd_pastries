@@ -11,7 +11,7 @@ export function ManufacturingReportErrorState({
   onRetry: () => void;
 }): JSX.Element {
   return (
-    <div className="rounded-3xl border border-red-200 bg-red-50 p-5 text-red-900">
+    <div className="rounded-3xl border border-danger/30 bg-danger-tint p-5 text-danger-text">
       <div className="flex items-start gap-3">
         <AlertTriangle className="mt-0.5 h-5 w-5" aria-hidden="true" />
         <div className="space-y-3">

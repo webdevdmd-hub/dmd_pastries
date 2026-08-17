@@ -35,7 +35,7 @@ export function SupplierPayablesTable({ rows }: { rows: SupplierPayableRow[] }):
             <TableCell>{formatNumber(row.invoiceCount)}</TableCell>
             <TableCell>{formatCurrency(row.totalInvoiceAmount)}</TableCell>
             <TableCell>{formatCurrency(row.paidAmount)}</TableCell>
-            <TableCell className={row.payableBalance > 0 ? "font-semibold text-red-800" : ""}>
+            <TableCell className={row.payableBalance > 0 ? "font-semibold text-danger-text" : ""}>
               {formatCurrency(row.payableBalance)}
             </TableCell>
             <TableCell>{formatDate(row.oldestDueDate)}</TableCell>

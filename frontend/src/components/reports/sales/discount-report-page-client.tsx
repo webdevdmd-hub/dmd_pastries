@@ -97,7 +97,7 @@ export function DiscountReportPageClient(): JSX.Element {
       {canShowReport && report ? (
         <>
           <DiscountSummaryCard report={report} />
-          <Card className="bg-white/85 shadow-soft">
+          <Card className="bg-card/85 shadow-soft">
             <CardContent className="p-5">
               {report.items.length > 0 ? (
                 <DiscountSalesTable rows={report.items} />

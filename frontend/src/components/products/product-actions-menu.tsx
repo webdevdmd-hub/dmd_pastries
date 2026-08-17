@@ -76,7 +76,7 @@ export function ProductActionsMenu({
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuItem
-              className="text-red-700 focus:text-red-800"
+              className="text-danger-text focus:text-danger-text"
               onClick={() => onDelete(product)}
             >
               <Trash2 className="h-4 w-4" />

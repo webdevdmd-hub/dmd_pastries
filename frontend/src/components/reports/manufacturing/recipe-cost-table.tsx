@@ -41,7 +41,7 @@ export function RecipeCostTable({ rows }: { rows: RecipeCostReportRow[] }): JSX.
             <TableCell>v{formatNumber(row.versionNumber)}</TableCell>
             <TableCell>
               {row.isActive ? (
-                <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">Active</Badge>
+                <Badge className="border-money/30 bg-money-tint text-money-text">Active</Badge>
               ) : (
                 <Badge variant="outline">Inactive</Badge>
               )}

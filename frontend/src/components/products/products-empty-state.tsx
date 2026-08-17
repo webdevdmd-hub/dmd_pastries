@@ -13,7 +13,7 @@ type ProductsEmptyStateProps = {
 
 export function ProductsEmptyState({ canCreate, onCreate }: ProductsEmptyStateProps): JSX.Element {
   return (
-    <Card className="border-brand-cappuccino bg-white/80">
+    <Card className="border-brand-cappuccino bg-card/80">
       <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
         <div className="rounded-2xl bg-brand-cappuccino/40 p-4 text-brand-mocha">
           <PackagePlus className="h-8 w-8" />

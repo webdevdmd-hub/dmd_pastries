@@ -25,7 +25,7 @@ export function DashboardChartCard({
   title: string;
 }): JSX.Element {
   return (
-    <Card className="overflow-hidden border-brand-cappuccino/70 bg-white/90 shadow-soft">
+    <Card className="overflow-hidden border-brand-cappuccino/70 bg-card/90 shadow-soft">
       <CardHeader className="pb-2">
         <CardTitle className="text-brand-espresso">{title}</CardTitle>
         <p className="text-sm leading-6 text-brand-mocha">{description}</p>

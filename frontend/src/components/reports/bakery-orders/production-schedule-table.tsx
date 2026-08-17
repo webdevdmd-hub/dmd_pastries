@@ -51,7 +51,7 @@ export function ProductionScheduleTable({ rows }: { rows: ProductionScheduleRow[
             <TableCell>
               {row.assignedBatchNumber ||
                 (row.hasProductionRecord ? (
-                  <span className="text-red-700">Missing assignment</span>
+                  <span className="text-danger-text">Missing assignment</span>
                 ) : (
                   <span className="text-muted-foreground">No batch</span>
                 ))}

@@ -237,7 +237,7 @@ export function ReportsExportClient(): JSX.Element {
           </Button>
         }
       />
-      <Card className="bg-white/85 shadow-soft">
+      <Card className="bg-card/85 shadow-soft">
         <CardHeader>
           <CardTitle className="text-brand-espresso">Available CSV exports</CardTitle>
         </CardHeader>
@@ -251,7 +251,9 @@ export function ReportsExportClient(): JSX.Element {
             are shown from backend availability.
           </p>
           {exportOptionsQuery.error ? (
-            <p className="font-medium text-red-700">{getErrorMessage(exportOptionsQuery.error)}</p>
+            <p className="font-medium text-danger-text">
+              {getErrorMessage(exportOptionsQuery.error)}
+            </p>
           ) : null}
           {!canExport ? <p>You need `reports.export` to export CSV files.</p> : null}
         </CardContent>

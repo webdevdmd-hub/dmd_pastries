@@ -121,18 +121,18 @@ export function StockAdjustmentDialog({
               {...form.register("quantity")}
             />
             {form.formState.errors.quantity ? (
-              <p className="text-sm text-red-800">{form.formState.errors.quantity.message}</p>
+              <p className="text-sm text-danger-text">{form.formState.errors.quantity.message}</p>
             ) : null}
           </div>
           <div className="space-y-1">
             <Label htmlFor="adjustReason">Reason</Label>
             <Input id="adjustReason" {...form.register("reason")} />
             {form.formState.errors.reason ? (
-              <p className="text-sm text-red-800">{form.formState.errors.reason.message}</p>
+              <p className="text-sm text-danger-text">{form.formState.errors.reason.message}</p>
             ) : null}
           </div>
           {form.watch("adjustmentType") === "decrease" ? (
-            <p className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="rounded-2xl bg-warning-tint p-3 text-sm text-warning-text">
               Decreasing stock affects availability immediately. Backend remains final authority.
             </p>
           ) : null}

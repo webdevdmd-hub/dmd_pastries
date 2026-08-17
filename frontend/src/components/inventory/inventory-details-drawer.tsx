@@ -77,33 +77,31 @@ export function InventoryDetailsDrawer({
         {item ? (
           <div className="mt-6 space-y-6">
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">Current</p>
-                <p className="mt-2 text-2xl font-black text-brand-espresso">
+              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
+                <p className="text-xs text-brand-mocha">Current</p>
+                <p className="mt-2 text-2xl font-medium text-brand-espresso">
                   {formatQuantity(item.currentQuantity, item.unitSymbol)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">Available</p>
-                <p className="mt-2 text-2xl font-black text-brand-espresso">
+              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
+                <p className="text-xs text-brand-mocha">Available</p>
+                <p className="mt-2 text-2xl font-medium text-brand-espresso">
                   {formatQuantity(item.availableQuantity, item.unitSymbol)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">Branch</p>
+              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
+                <p className="text-xs text-brand-mocha">Branch</p>
                 <p className="mt-2 font-bold text-brand-espresso">{item.branchName}</p>
               </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">Status</p>
+              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
+                <p className="text-xs text-brand-mocha">Status</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <InventoryStatusBadge status={item.status} />
                   <StockLevelBadge item={item} />
                 </div>
               </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">
-                  Item Identity
-                </p>
+              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
+                <p className="text-xs text-brand-mocha">Item Identity</p>
                 <div className="mt-2 space-y-1 text-sm text-brand-espresso">
                   <p className="font-bold">
                     {item.productType ? PRODUCT_TYPE_LABELS[item.productType] : "Legacy item"}
@@ -112,10 +110,8 @@ export function InventoryDetailsDrawer({
                   <p className="text-brand-mocha">{item.itemCode || item.id.slice(0, 8)}</p>
                 </div>
               </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">
-                  Inventory Value
-                </p>
+              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
+                <p className="text-xs text-brand-mocha">Inventory Value</p>
                 <div className="mt-2 space-y-1 text-sm text-brand-espresso">
                   <p>
                     Avg cost: <span className="font-bold">{formatMoney(item.averageCost)}</span>
@@ -125,7 +121,7 @@ export function InventoryDetailsDrawer({
                   </p>
                   {item.accountingStatus === "pending_bill_posting" ? (
                     <div className="space-y-1 pt-1">
-                      <Badge className="border-amber-200 bg-amber-50 text-amber-800">
+                      <Badge className="border-warning/30 bg-warning-tint text-warning-text">
                         {item.accountingStatusLabel || "Pending Bill Posting"}
                       </Badge>
                       <p className="text-xs text-brand-mocha">{item.accountingStatusDetail}</p>

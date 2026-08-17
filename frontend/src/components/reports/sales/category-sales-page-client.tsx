@@ -96,7 +96,7 @@ export function CategorySalesPageClient(): JSX.Element {
         />
       ) : null}
       {canShowReport ? (
-        <Card className="bg-white/85 shadow-soft">
+        <Card className="bg-card/85 shadow-soft">
           <CardContent className="p-5">
             {rows.length > 0 ? (
               <div className="space-y-6">

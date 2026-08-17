@@ -11,7 +11,7 @@ export function DashboardErrorState({
   onRetry: () => void;
 }): JSX.Element {
   return (
-    <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-900">
+    <div className="rounded-2xl border border-danger/30 bg-danger-tint p-5 text-danger-text">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <AlertTriangle className="mt-0.5 h-5 w-5" aria-hidden="true" />

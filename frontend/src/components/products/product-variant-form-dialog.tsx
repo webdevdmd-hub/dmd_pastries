@@ -45,7 +45,7 @@ type ProductVariantFormDialogProps = {
 };
 
 function FieldError({ message }: { message: string | undefined }): JSX.Element | null {
-  return message ? <p className="text-xs font-medium text-red-700">{message}</p> : null;
+  return message ? <p className="text-xs font-medium text-danger-text">{message}</p> : null;
 }
 
 function toDefaultValues(variant: ProductVariant | null): ProductVariantSchema {
@@ -258,14 +258,12 @@ export function ProductVariantFormDialog({
                 <FieldError message={form.formState.errors.minimumSalePrice?.message} />
               </div>
               <div className="rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/50 p-3 md:col-span-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha">
-                  Suggested selling price
-                </p>
+                <p className="text-xs font-semibold text-brand-mocha">Suggested selling price</p>
                 <p className="mt-1 text-lg font-semibold text-brand-espresso">
                   AED {liveSuggestedPrice.toFixed(2)}
                 </p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <label className="flex items-center gap-2 rounded-xl bg-white/70 p-2 text-sm text-brand-espresso">
+                  <label className="flex items-center gap-2 rounded-xl bg-card/70 p-2 text-sm text-brand-espresso">
                     <Checkbox
                       checked={form.watch("autoPriceUpdateEnabled")}
                       onCheckedChange={(checked) =>
@@ -274,7 +272,7 @@ export function ProductVariantFormDialog({
                     />
                     Auto-update POS price
                   </label>
-                  <label className="flex items-center gap-2 rounded-xl bg-white/70 p-2 text-sm text-brand-espresso">
+                  <label className="flex items-center gap-2 rounded-xl bg-card/70 p-2 text-sm text-brand-espresso">
                     <Checkbox
                       checked={form.watch("salePriceLocked")}
                       onCheckedChange={(checked) =>

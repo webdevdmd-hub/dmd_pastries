@@ -14,11 +14,11 @@ import type { YieldVarianceRow } from "@/types/manufacturing-reports";
 
 function varianceBadge(value: number): JSX.Element {
   if (value > 0)
-    return (
-      <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">Over produced</Badge>
-    );
+    return <Badge className="border-money/30 bg-money-tint text-money-text">Over produced</Badge>;
   if (value < 0)
-    return <Badge className="border-amber-200 bg-amber-50 text-amber-800">Under produced</Badge>;
+    return (
+      <Badge className="border-warning/30 bg-warning-tint text-warning-text">Under produced</Badge>
+    );
   return <Badge variant="outline">Exact yield</Badge>;
 }
 

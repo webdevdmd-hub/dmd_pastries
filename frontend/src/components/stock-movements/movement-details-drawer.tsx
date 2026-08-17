@@ -51,8 +51,8 @@ function formatItemType(value: StockMovement["itemType"]): string {
 
 function DetailRow({ label, value }: { label: string; value: string }): JSX.Element {
   return (
-    <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-3">
-      <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">{label}</p>
+    <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-3">
+      <p className="text-xs text-brand-mocha">{label}</p>
       <p className="mt-1 font-semibold text-brand-espresso">{value}</p>
     </div>
   );
@@ -80,8 +80,8 @@ export function MovementDetailsDrawer({
               <MovementTypeBadge type={movement.movementType} />
               <MovementDirectionBadge direction={movement.movementDirection} />
             </div>
-            <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">What happened</p>
+            <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
+              <p className="text-xs text-brand-mocha">What happened</p>
               <p className="mt-2 font-semibold text-brand-espresso">
                 {stockMovementDescription(movement)}
               </p>
@@ -137,10 +137,8 @@ export function MovementDetailsDrawer({
               <DetailRow label="Created at" value={formatDate(movement.createdAt)} />
             </div>
             {movement.accountingJournalEntryId ? (
-              <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">
-                  Accounting journal
-                </p>
+              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
+                <p className="text-xs text-brand-mocha">Accounting journal</p>
                 <p className="mt-2 text-sm text-brand-espresso">
                   This movement was posted to accounting journal {movement.accountingJournalEntryId}
                   .
@@ -150,14 +148,14 @@ export function MovementDetailsDrawer({
                 </div>
               </div>
             ) : null}
-            <div className="rounded-2xl border border-brand-cappuccino bg-white/70 p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-brand-mocha">Reason</p>
+            <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
+              <p className="text-xs text-brand-mocha">Reason</p>
               <p className="mt-2 text-sm text-brand-espresso">
                 {movement.reason ?? stockMovementDescription(movement)}
               </p>
               {movement.notes ? (
                 <>
-                  <p className="mt-4 text-xs uppercase tracking-[0.18em] text-brand-mocha">Notes</p>
+                  <p className="mt-4 text-xs text-brand-mocha">Notes</p>
                   <p className="mt-2 text-sm text-brand-espresso">{movement.notes}</p>
                 </>
               ) : null}

@@ -69,7 +69,7 @@ export function OrderStatusReportPageClient(): JSX.Element {
           onRetry={() => void reportQuery.refetch()}
         />
       ) : null}
-      <Card className="bg-white/85 shadow-soft">
+      <Card className="bg-card/85 shadow-soft">
         <CardContent className="space-y-6 p-5">
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <>

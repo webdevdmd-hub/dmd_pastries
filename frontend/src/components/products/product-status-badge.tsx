@@ -16,7 +16,7 @@ export function ProductStatusBadge({ className, status }: ProductStatusBadgeProp
     return (
       <Badge
         className={cn(
-          "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-50",
+          "border-money/30 bg-money-tint text-money-text hover:bg-money-tint",
           className,
         )}
       >
@@ -28,7 +28,7 @@ export function ProductStatusBadge({ className, status }: ProductStatusBadgeProp
   if (status === "archived") {
     return (
       <Badge
-        className={cn("border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-100", className)}
+        className={cn("border-border bg-muted text-foreground-muted hover:bg-muted", className)}
       >
         Archived
       </Badge>
@@ -37,7 +37,10 @@ export function ProductStatusBadge({ className, status }: ProductStatusBadgeProp
 
   return (
     <Badge
-      className={cn("border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-50", className)}
+      className={cn(
+        "border-warning/30 bg-warning-tint text-warning-text hover:bg-warning-tint",
+        className,
+      )}
     >
       Inactive
     </Badge>

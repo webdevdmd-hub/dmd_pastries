@@ -425,7 +425,7 @@ export function ProductsPageClient(): JSX.Element {
             value: priceSuggestionsQuery.data?.total ?? 0,
           },
         ].map((item) => (
-          <Card className="bg-white/80" key={item.label}>
+          <Card className="bg-card/80" key={item.label}>
             <CardContent className="flex items-center justify-between p-6">
               <div>
                 <p className="text-sm text-brand-mocha">{item.label}</p>
@@ -440,7 +440,7 @@ export function ProductsPageClient(): JSX.Element {
       </section>
 
       {priceSuggestions.length > 0 ? (
-        <Card className="overflow-hidden bg-white/80">
+        <Card className="overflow-hidden bg-card/80">
           <CardContent className="p-0">
             <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -572,7 +572,7 @@ export function ProductsPageClient(): JSX.Element {
         />
       ) : null}
       {!productsQuery.isLoading && !productsQuery.error && list.length > 0 ? (
-        <Card className="overflow-hidden bg-white/80">
+        <Card className="overflow-hidden bg-card/80">
           <CardContent className="p-0">
             <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -611,7 +611,7 @@ export function ProductsPageClient(): JSX.Element {
         </Card>
       ) : null}
 
-      <div className="flex flex-col gap-3 rounded-3xl border border-brand-cappuccino bg-white/75 p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-3xl border border-brand-cappuccino bg-card/75 p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
         <Button
           disabled={filters.page <= 1}
           onClick={() => setFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
@@ -743,8 +743,8 @@ export function ProductsPageClient(): JSX.Element {
       </Dialog>
 
       {referenceDataQuery.error ? (
-        <Card className="border-amber-200 bg-amber-50/80">
-          <CardContent className="p-4 text-sm text-amber-800">
+        <Card className="border-warning/30 bg-warning-tint/80">
+          <CardContent className="p-4 text-sm text-warning-text">
             <div className="inline-flex items-center gap-2">
               <Box className="h-4 w-4" />
               Unable to load categories/units/tax rates. Product form options may be limited.

@@ -357,7 +357,9 @@ export function OpeningStockDialog({
                 value={form.watch("productId") ?? ""}
               />
               {form.formState.errors.productId ? (
-                <p className="text-sm text-red-800">{form.formState.errors.productId.message}</p>
+                <p className="text-sm text-danger-text">
+                  {form.formState.errors.productId.message}
+                </p>
               ) : null}
             </div>
             {itemType === "product_variant" ? (
@@ -375,7 +377,7 @@ export function OpeningStockDialog({
                   value={form.watch("productVariantId") ?? ""}
                 />
                 {form.formState.errors.productVariantId ? (
-                  <p className="text-sm text-red-800">
+                  <p className="text-sm text-danger-text">
                     {form.formState.errors.productVariantId.message}
                   </p>
                 ) : selectedProductId && activeProductVariants.length === 0 ? (
@@ -416,7 +418,7 @@ export function OpeningStockDialog({
                 {...form.register("quantity")}
               />
               {form.formState.errors.quantity ? (
-                <p className="text-sm text-red-800">{form.formState.errors.quantity.message}</p>
+                <p className="text-sm text-danger-text">{form.formState.errors.quantity.message}</p>
               ) : null}
             </div>
             <div className="space-y-1">
@@ -429,7 +431,7 @@ export function OpeningStockDialog({
                 {...form.register("unitCost")}
               />
               {form.formState.errors.unitCost ? (
-                <p className="text-sm text-red-800">{form.formState.errors.unitCost.message}</p>
+                <p className="text-sm text-danger-text">{form.formState.errors.unitCost.message}</p>
               ) : (
                 <p className="text-xs text-brand-mocha">
                   Estimated opening value: {formatMoney(estimatedOpeningValue)}

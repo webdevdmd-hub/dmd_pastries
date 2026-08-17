@@ -13,9 +13,9 @@ type ProductsErrorStateProps = {
 
 export function ProductsErrorState({ description, onRetry }: ProductsErrorStateProps): JSX.Element {
   return (
-    <Card className="border-red-200 bg-red-50/70">
+    <Card className="border-danger/30 bg-danger-tint/70">
       <CardContent className="p-8 text-center">
-        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 text-red-700">
+        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-tint text-danger-text">
           <AlertTriangle className="h-6 w-6" />
         </div>
         <h3 className="text-xl font-semibold text-brand-espresso">Products could not be loaded</h3>

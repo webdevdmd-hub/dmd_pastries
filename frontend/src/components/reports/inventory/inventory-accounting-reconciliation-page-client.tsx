@@ -69,13 +69,13 @@ function SummaryTile({
   value: string;
 }): JSX.Element {
   return (
-    <Card className="bg-white/85 shadow-soft">
+    <Card className="bg-card/85 shadow-soft">
       <CardContent className="p-5">
         <p className="text-sm text-brand-mocha">{label}</p>
         <p
           className={
             tone === "danger"
-              ? "mt-2 text-2xl font-semibold text-red-700"
+              ? "mt-2 text-2xl font-semibold text-danger-text"
               : "mt-2 text-2xl font-semibold text-brand-espresso"
           }
         >
@@ -175,7 +175,7 @@ export function InventoryAccountingReconciliationPageClient(): JSX.Element {
         />
       </div>
       {unassignedLines.length > 0 ? (
-        <Card className="border-red-100 bg-white/85 shadow-soft">
+        <Card className="border-danger/30 bg-card/85 shadow-soft">
           <CardContent className="space-y-4 p-5">
             <div>
               <h2 className="text-lg font-semibold text-brand-espresso">
@@ -196,7 +196,7 @@ export function InventoryAccountingReconciliationPageClient(): JSX.Element {
           onRetry={() => void reportQuery.refetch()}
         />
       ) : null}
-      <Card className="bg-white/85 shadow-soft">
+      <Card className="bg-card/85 shadow-soft">
         <CardContent className="p-5">
           {report && report.items.length > 0 ? (
             <InventoryAccountingReconciliationTable rows={report.items} />

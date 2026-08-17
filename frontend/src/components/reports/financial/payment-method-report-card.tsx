@@ -31,7 +31,7 @@ export function PaymentMethodReportCard({ rows }: { rows: PaymentMethodReportRow
         label="Net Transactions"
         value={formatNumber(netTransactions)}
       />
-      <div className="rounded-2xl border border-brand-cappuccino/70 bg-white/85 p-4 text-sm text-brand-mocha shadow-soft md:col-span-2 xl:col-span-4">
+      <div className="rounded-2xl border border-brand-cappuccino/70 bg-card/85 p-4 text-sm text-brand-mocha shadow-soft md:col-span-2 xl:col-span-4">
         Gross Transactions: {formatNumber(grossTransactions)} / Refund Transactions:{" "}
         {formatNumber(refundTransactions)} / Net Transactions: {formatNumber(netTransactions)}
       </div>

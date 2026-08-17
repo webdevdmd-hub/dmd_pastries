@@ -58,7 +58,7 @@ export function InventoryTable({
   showBatchAction = true,
   showViewAction = true,
 }: InventoryTableProps): JSX.Element {
-  const catalogRowClassName = "bg-sky-50/70";
+  const catalogRowClassName = "bg-info-tint/70";
 
   return (
     <Table>
@@ -105,7 +105,7 @@ export function InventoryTable({
                 isNotInitialized
                   ? catalogRowClassName
                   : item.lowStock
-                    ? "bg-amber-50/70"
+                    ? "bg-warning-tint/70"
                     : undefined
               }
               key={rowKey}
@@ -141,7 +141,7 @@ export function InventoryTable({
                 <div className="space-y-1">
                   <p className="font-semibold">{formatMoney(item.inventoryValue)}</p>
                   {item.accountingStatus === "pending_bill_posting" ? (
-                    <Badge className="border-amber-200 bg-amber-50 text-amber-800">
+                    <Badge className="border-warning/30 bg-warning-tint text-warning-text">
                       {item.accountingStatusLabel || "Pending Bill Posting"}
                     </Badge>
                   ) : null}

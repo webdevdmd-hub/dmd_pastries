@@ -69,7 +69,7 @@ export function DeliveryVsPickupPageClient(): JSX.Element {
           onRetry={() => void reportQuery.refetch()}
         />
       ) : null}
-      <Card className="bg-white/85 shadow-soft">
+      <Card className="bg-card/85 shadow-soft">
         <CardContent className="p-5">
           {reportQuery.data ? <DeliveryVsPickupChart report={reportQuery.data} /> : null}
         </CardContent>

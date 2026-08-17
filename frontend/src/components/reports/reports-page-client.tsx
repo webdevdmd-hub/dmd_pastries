@@ -145,7 +145,7 @@ export function ReportsPageClient(): JSX.Element {
 
           return (
             <Card
-              className={`bg-white/85 shadow-soft ${
+              className={`bg-card/85 shadow-soft ${
                 isOpenable ? "transition hover:-translate-y-0.5 hover:shadow-float" : ""
               }`}
               key={card.title}

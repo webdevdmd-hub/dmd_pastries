@@ -61,7 +61,7 @@ type ProductFormDefaults = {
 };
 
 function FieldError({ message }: { message: string | undefined }): JSX.Element | null {
-  return message ? <p className="text-xs font-medium text-red-700">{message}</p> : null;
+  return message ? <p className="text-xs font-medium text-danger-text">{message}</p> : null;
 }
 
 const PRODUCT_FORM_STEPS = [
@@ -446,9 +446,9 @@ export function ProductFormDialog({
                   className={cn(
                     "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
                     isActive
-                      ? "bg-brand-caramel text-white"
+                      ? "bg-brand-caramel text-primary-foreground"
                       : isComplete
-                        ? "bg-brand-mocha text-white"
+                        ? "bg-brand-mocha text-primary-foreground"
                         : "bg-brand-cappuccino/60 text-brand-espresso",
                   )}
                 >
@@ -699,11 +699,9 @@ export function ProductFormDialog({
                   </Select>
                 </div>
               </div>
-              <div className="mt-4 grid gap-3 rounded-2xl border border-brand-cappuccino/70 bg-white/70 p-3 md:grid-cols-[1fr_1fr_auto] md:items-center">
+              <div className="mt-4 grid gap-3 rounded-2xl border border-brand-cappuccino/70 bg-card/70 p-3 md:grid-cols-[1fr_1fr_auto] md:items-center">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mocha">
-                    Suggested selling price
-                  </p>
+                  <p className="text-xs font-semibold text-brand-mocha">Suggested selling price</p>
                   <p className="mt-1 text-lg font-semibold text-brand-espresso">
                     AED {liveSuggestedPrice.toFixed(2)}
                   </p>
@@ -749,14 +747,14 @@ export function ProductFormDialog({
                   <FieldError message={form.formState.errors.preparationTimeMinutes?.message} />
                 </div>
                 <div className="grid gap-2 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/40 p-3 sm:grid-cols-2">
-                  <label className="flex items-center gap-2 rounded-xl bg-white/60 p-2 text-sm text-brand-espresso">
+                  <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
                     <Checkbox
                       checked={watchedIsSellable}
                       onCheckedChange={(checked) => handleSellableChange(checked === true)}
                     />
                     Sellable
                   </label>
-                  <label className="flex items-center gap-2 rounded-xl bg-white/60 p-2 text-sm text-brand-espresso">
+                  <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
                     <Checkbox
                       checked={watchedIsSellable && form.watch("isPosVisible")}
                       disabled={!watchedIsSellable}
@@ -770,7 +768,7 @@ export function ProductFormDialog({
                     />
                     POS visible
                   </label>
-                  <label className="flex items-center gap-2 rounded-xl bg-white/60 p-2 text-sm text-brand-espresso">
+                  <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
                     <Checkbox
                       checked={form.watch("isPurchasable")}
                       onCheckedChange={(checked) =>
@@ -783,7 +781,7 @@ export function ProductFormDialog({
                     />
                     Purchasable
                   </label>
-                  <label className="flex items-center gap-2 rounded-xl bg-white/60 p-2 text-sm text-brand-espresso">
+                  <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
                     <Checkbox
                       checked={form.watch("isStockTracked")}
                       onCheckedChange={(checked) =>
@@ -792,7 +790,7 @@ export function ProductFormDialog({
                     />
                     Stock tracked
                   </label>
-                  <label className="flex items-center gap-2 rounded-xl bg-white/60 p-2 text-sm text-brand-espresso">
+                  <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
                     <Checkbox
                       checked={form.watch("isExpiryTracked")}
                       onCheckedChange={(checked) =>
@@ -801,7 +799,7 @@ export function ProductFormDialog({
                     />
                     Expiry tracked
                   </label>
-                  <label className="flex items-center gap-2 rounded-xl bg-white/60 p-2 text-sm text-brand-espresso">
+                  <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
                     <Checkbox
                       checked={form.watch("isCustomOrderAvailable")}
                       onCheckedChange={(checked) =>
@@ -865,7 +863,7 @@ export function ProductFormDialog({
             </CardContent>
           </Card>
 
-          <DialogFooter className="sticky bottom-0 -mx-2 flex-row items-center justify-between gap-2 rounded-2xl border border-brand-cappuccino/70 bg-white/95 p-3 backdrop-blur">
+          <DialogFooter className="sticky bottom-0 -mx-2 flex-row items-center justify-between gap-2 rounded-2xl border border-brand-cappuccino/70 bg-card/95 p-3 backdrop-blur">
             <div className="flex items-center gap-2">
               <Button onClick={onClose} type="button" variant="outline">
                 Cancel

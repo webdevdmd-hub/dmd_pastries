@@ -26,7 +26,7 @@ export function DashboardRecentActivity({
   onRetry: () => void;
 }): JSX.Element {
   return (
-    <Card className="bg-white/85 shadow-soft">
+    <Card className="bg-card/85 shadow-soft">
       <CardHeader>
         <CardTitle className="text-brand-espresso">Recent Activity</CardTitle>
       </CardHeader>
@@ -49,13 +49,13 @@ export function DashboardRecentActivity({
                     {activity.title || "Activity"}
                   </p>
                   {activity.referenceNumber ? (
-                    <span className="rounded-full border border-brand-cinnamon/30 bg-white px-2 py-0.5 text-xs font-semibold text-brand-espresso">
+                    <span className="rounded-full border border-brand-cinnamon/30 bg-card px-2 py-0.5 text-xs font-semibold text-brand-espresso">
                       {activity.referenceNumber}
                     </span>
                   ) : null}
                 </div>
                 <p className="mt-1 text-sm leading-6 text-brand-mocha">{activity.description}</p>
-                <p className="mt-2 text-xs uppercase tracking-[0.18em] text-brand-mocha">
+                <p className="mt-2 text-xs text-brand-mocha">
                   {activity.createdBy || "System"} - {formatDate(activity.createdAt)}
                 </p>
               </article>

@@ -46,9 +46,11 @@ export function PackagingStockTable({ rows }: { rows: PackagingStockRow[] }): JS
             <TableCell>{formatCurrency(row.stockValue)}</TableCell>
             <TableCell>
               {row.isLowStock ? (
-                <Badge className="border-amber-200 bg-amber-50 text-amber-800">Low stock</Badge>
+                <Badge className="border-warning/30 bg-warning-tint text-warning-text">
+                  Low stock
+                </Badge>
               ) : (
-                <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">Normal</Badge>
+                <Badge className="border-money/30 bg-money-tint text-money-text">Normal</Badge>
               )}
             </TableCell>
           </TableRow>

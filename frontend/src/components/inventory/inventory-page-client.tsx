@@ -350,7 +350,7 @@ export function InventoryPageClient(): JSX.Element {
                 href={link.href}
                 key={link.href}
               >
-                <Card className="bg-white/80 transition-colors group-hover:border-brand-caramel/40 group-hover:bg-brand-latte/50">
+                <Card className="bg-card/80 transition-colors group-hover:border-brand-caramel/40 group-hover:bg-brand-latte/50">
                   <CardContent className="flex items-start gap-4 p-4">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-cappuccino/45 text-brand-mocha">
                       <Icon className="h-5 w-5" />

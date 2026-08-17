@@ -16,15 +16,15 @@ export function AuditResultCard({ audit }: AuditResultCardProps): JSX.Element {
   return (
     <Card
       className={
-        audit.isBalanced ? "border-emerald-200 bg-emerald-50/70" : "border-red-200 bg-red-50/70"
+        audit.isBalanced ? "border-money/30 bg-money-tint/70" : "border-danger/30 bg-danger-tint/70"
       }
     >
       <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
         <div className="flex items-start gap-3">
           {audit.isBalanced ? (
-            <CheckCircle2 className="mt-1 h-7 w-7 text-emerald-800" />
+            <CheckCircle2 className="mt-1 h-7 w-7 text-money-text" />
           ) : (
-            <AlertTriangle className="mt-1 h-7 w-7 text-red-800" />
+            <AlertTriangle className="mt-1 h-7 w-7 text-danger-text" />
           )}
           <div>
             <h2 className="text-xl font-bold text-brand-espresso">
@@ -35,7 +35,7 @@ export function AuditResultCard({ audit }: AuditResultCardProps): JSX.Element {
               records.
             </p>
             {!audit.isBalanced ? (
-              <p className="mt-2 text-sm text-red-900">
+              <p className="mt-2 text-sm text-danger-text">
                 Investigate stock movements or perform a controlled adjustment.
               </p>
             ) : null}

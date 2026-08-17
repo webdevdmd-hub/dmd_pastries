@@ -201,7 +201,7 @@ export function SalesReportsPageClient(): JSX.Element {
             <TopProductsCard products={reportData.topProducts} />
             <SlowMovingProductsCard products={reportData.slowProducts} />
           </div>
-          <Card className="bg-white/85 shadow-soft">
+          <Card className="bg-card/85 shadow-soft">
             <CardHeader>
               <CardTitle className="text-brand-espresso">Daily Sales</CardTitle>
             </CardHeader>
@@ -220,7 +220,7 @@ export function SalesReportsPageClient(): JSX.Element {
           const Icon = item.icon;
           return (
             <Link href={item.href} key={item.href}>
-              <Card className="h-full bg-white/85 shadow-soft transition hover:-translate-y-0.5 hover:shadow-float">
+              <Card className="h-full bg-card/85 shadow-soft transition hover:-translate-y-0.5 hover:shadow-float">
                 <CardContent className="flex items-center justify-between gap-4 p-5">
                   <div className="flex items-center gap-3">
                     <span className="rounded-2xl bg-brand-latte p-3 text-brand-mocha">

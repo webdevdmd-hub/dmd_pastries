@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function ExportHistoryPlaceholder(): JSX.Element {
   return (
-    <Card className="bg-white/85 shadow-soft">
+    <Card className="bg-card/85 shadow-soft">
       <CardHeader>
         <CardTitle className="text-brand-espresso">Export history</CardTitle>
       </CardHeader>

@@ -9,7 +9,7 @@ type MovementDirectionBadgeProps = {
 
 export function MovementDirectionBadge({ direction }: MovementDirectionBadgeProps): JSX.Element {
   if (direction === "in") {
-    return <Badge className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100">In</Badge>;
+    return <Badge className="bg-money-tint text-money-text hover:bg-money-tint">In</Badge>;
   }
 
   if (direction === "out") {
@@ -17,7 +17,7 @@ export function MovementDirectionBadge({ direction }: MovementDirectionBadgeProp
   }
 
   if (direction === "transfer") {
-    return <Badge className="bg-sky-100 text-sky-900 hover:bg-sky-100">Transfer</Badge>;
+    return <Badge className="bg-info-tint text-info-text hover:bg-info-tint">Transfer</Badge>;
   }
 
   return <Badge variant="secondary">Neutral</Badge>;

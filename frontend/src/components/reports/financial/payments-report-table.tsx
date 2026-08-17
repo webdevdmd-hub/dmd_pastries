@@ -14,12 +14,16 @@ import type { PaymentsReportRow } from "@/types/financial-reports";
 
 function statusBadge(status: string): JSX.Element {
   if (status === "completed" || status === "paid") {
-    return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">{status}</Badge>;
+    return <Badge className="border-money/30 bg-money-tint text-money-text">{status}</Badge>;
   }
   if (status === "pending" || status === "partial") {
-    return <Badge className="border-amber-200 bg-amber-50 text-amber-800">{status}</Badge>;
+    return <Badge className="border-warning/30 bg-warning-tint text-warning-text">{status}</Badge>;
   }
-  return <Badge className="border-red-200 bg-red-50 text-red-800">{status || "unknown"}</Badge>;
+  return (
+    <Badge className="border-danger/30 bg-danger-tint text-danger-text">
+      {status || "unknown"}
+    </Badge>
+  );
 }
 
 export function PaymentsReportTable({ rows }: { rows: PaymentsReportRow[] }): JSX.Element {

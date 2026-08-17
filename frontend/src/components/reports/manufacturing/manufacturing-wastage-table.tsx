@@ -14,9 +14,11 @@ import type { ManufacturingWastageRow } from "@/types/manufacturing-reports";
 
 function wastageBadge(type: string): JSX.Element {
   if (type === "finished_goods_wastage")
-    return <Badge className="border-red-200 bg-red-50 text-red-800">Finished goods</Badge>;
+    return (
+      <Badge className="border-danger/30 bg-danger-tint text-danger-text">Finished goods</Badge>
+    );
   return (
-    <Badge className="border-amber-200 bg-amber-50 text-amber-800">
+    <Badge className="border-warning/30 bg-warning-tint text-warning-text">
       {type.replaceAll("_", " ") || "Wastage"}
     </Badge>
   );

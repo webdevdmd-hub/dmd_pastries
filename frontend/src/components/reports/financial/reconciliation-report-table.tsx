@@ -14,9 +14,9 @@ import type { ReconciliationRow } from "@/types/financial-reports";
 
 function directionBadge(direction: string): JSX.Element {
   if (direction === "in") {
-    return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">In</Badge>;
+    return <Badge className="border-money/30 bg-money-tint text-money-text">In</Badge>;
   }
-  return <Badge className="border-red-200 bg-red-50 text-red-800">Out</Badge>;
+  return <Badge className="border-danger/30 bg-danger-tint text-danger-text">Out</Badge>;
 }
 
 export function ReconciliationReportTable({ rows }: { rows: ReconciliationRow[] }): JSX.Element {

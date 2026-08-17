@@ -199,10 +199,12 @@ export function ExportReportDialog({
               </SelectContent>
             </Select>
             {selectedOption && !selectedOption.supported ? (
-              <p className="text-xs font-medium text-red-700">{selectedOption.unsupportedReason}</p>
+              <p className="text-xs font-medium text-danger-text">
+                {selectedOption.unsupportedReason}
+              </p>
             ) : null}
             {form.formState.errors.reportType ? (
-              <p className="text-xs font-medium text-red-700">
+              <p className="text-xs font-medium text-danger-text">
                 {form.formState.errors.reportType.message}
               </p>
             ) : null}
@@ -232,7 +234,7 @@ export function ExportReportDialog({
               </SelectContent>
             </Select>
             {form.formState.errors.filters?.branchId ? (
-              <p className="text-xs font-medium text-red-700">
+              <p className="text-xs font-medium text-danger-text">
                 {form.formState.errors.filters.branchId.message}
               </p>
             ) : null}
@@ -252,7 +254,7 @@ export function ExportReportDialog({
               }}
             />
             {form.formState.errors.filters?.dateFrom ? (
-              <p className="text-xs font-medium text-red-700">
+              <p className="text-xs font-medium text-danger-text">
                 {form.formState.errors.filters.dateFrom.message}
               </p>
             ) : null}
@@ -273,7 +275,7 @@ export function ExportReportDialog({
             />
           </div>
           {form.formState.errors.filters?.dateTo ? (
-            <p className="md:col-span-2 text-sm text-red-700">
+            <p className="md:col-span-2 text-sm text-danger-text">
               {form.formState.errors.filters.dateTo.message}
             </p>
           ) : null}
@@ -281,35 +283,25 @@ export function ExportReportDialog({
             <p className="font-semibold text-brand-espresso">Export preview</p>
             <dl className="mt-3 grid gap-2 md:grid-cols-2">
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
-                  Report
-                </dt>
+                <dt className="text-xs font-semibold text-brand-mocha/70">Report</dt>
                 <dd>{selectedOption?.label ?? "Select a report"}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
-                  Category
-                </dt>
+                <dt className="text-xs font-semibold text-brand-mocha/70">Category</dt>
                 <dd>{selectedOption?.category ?? selectedCategory}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
-                  Date range
-                </dt>
+                <dt className="text-xs font-semibold text-brand-mocha/70">Date range</dt>
                 <dd>
                   {dateFrom} to {dateTo}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
-                  Branch
-                </dt>
+                <dt className="text-xs font-semibold text-brand-mocha/70">Branch</dt>
                 <dd>{branchLabel}</dd>
               </div>
               <div className="md:col-span-2">
-                <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-mocha/70">
-                  File
-                </dt>
+                <dt className="text-xs font-semibold text-brand-mocha/70">File</dt>
                 <dd className="break-all font-mono text-xs">{previewFilename}</dd>
               </div>
             </dl>
@@ -318,13 +310,13 @@ export function ExportReportDialog({
             ) : null}
           </div>
           {exportError ? (
-            <Alert className="md:col-span-2 border-red-200 bg-red-50 text-red-950">
+            <Alert className="md:col-span-2 border-danger/30 bg-danger-tint text-danger-text">
               <AlertTitle>Export failed</AlertTitle>
               <AlertDescription>{exportError}</AlertDescription>
             </Alert>
           ) : null}
           {latestDownload ? (
-            <Alert className="md:col-span-2 border-emerald-200 bg-emerald-50 text-emerald-950">
+            <Alert className="md:col-span-2 border-money/30 bg-money-tint text-money-text">
               <AlertTitle>Export ready</AlertTitle>
               <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <span className="break-all">

@@ -56,15 +56,17 @@ function displayText(value: string, fallback = "-"): string {
 function statusBadge(row: InventoryAccountingReconciliationRow): JSX.Element {
   if (row.possibleReasonKey === "pending_bill_posting") {
     return (
-      <Badge className="border-amber-200 bg-amber-50 text-amber-800">Pending Bill Posting</Badge>
+      <Badge className="border-warning/30 bg-warning-tint text-warning-text">
+        Pending Bill Posting
+      </Badge>
     );
   }
 
   if (row.status === "matched") {
-    return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">Matched</Badge>;
+    return <Badge className="border-money/30 bg-money-tint text-money-text">Matched</Badge>;
   }
 
-  return <Badge className="border-red-200 bg-red-50 text-red-800">Mismatch</Badge>;
+  return <Badge className="border-danger/30 bg-danger-tint text-danger-text">Mismatch</Badge>;
 }
 
 export function InventoryAccountingReconciliationTable({
@@ -109,7 +111,7 @@ export function InventoryAccountingReconciliationTable({
               <TableCell
                 className={
                   Math.abs(row.differenceAmount) > 0.01
-                    ? "font-semibold text-red-700"
+                    ? "font-semibold text-danger-text"
                     : "text-muted-foreground"
                 }
               >
@@ -200,7 +202,7 @@ export function InventoryAccountingUnassignedLinesTable({
               <TableCell
                 className={
                   Math.abs(line.signedInventoryAmount) > 0.01
-                    ? "font-semibold text-red-700"
+                    ? "font-semibold text-danger-text"
                     : "text-muted-foreground"
                 }
               >

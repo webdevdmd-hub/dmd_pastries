@@ -30,7 +30,7 @@ export function InventoryAuditTable({ rows }: { rows: InventoryAuditRow[] }): JS
             <TableCell>
               <div className="font-semibold">{row.itemName || "-"}</div>
               {!row.isBalanced ? (
-                <div className="text-xs text-red-700">
+                <div className="text-xs text-danger-text">
                   Investigate stock movements or perform correction adjustment.
                 </div>
               ) : null}

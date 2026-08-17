@@ -95,7 +95,7 @@ export function InventoryMovementsPageClient(): JSX.Element {
         description="Review every stock change including opening stock, adjustments, sales, purchases, wastage, and transfers."
       />
 
-      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/70 p-4 shadow-soft lg:grid-cols-7">
+      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-card/70 p-4 shadow-soft lg:grid-cols-7">
         <Input
           aria-label="Search stock movements"
           onChange={(event) => updateFilters({ search: event.target.value })}

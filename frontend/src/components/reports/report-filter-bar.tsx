@@ -59,7 +59,7 @@ export function ReportFilterBar({
   };
 
   return (
-    <Card className={cn("bg-white/85 shadow-soft", compact && "rounded-md shadow-none")}>
+    <Card className={cn("bg-card/85 shadow-soft", compact && "rounded-md shadow-none")}>
       <CardContent
         className={cn(
           "grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-6",

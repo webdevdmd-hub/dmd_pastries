@@ -26,7 +26,7 @@ export function ReportChartCard({
   title,
 }: ReportChartCardProps): JSX.Element {
   return (
-    <Card className="bg-white/85 shadow-soft">
+    <Card className="bg-card/85 shadow-soft">
       <CardHeader>
         <CardTitle className="text-brand-espresso">{title}</CardTitle>
         <p className="text-sm text-brand-mocha">{caption}</p>

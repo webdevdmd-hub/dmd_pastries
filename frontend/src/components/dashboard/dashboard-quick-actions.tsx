@@ -16,7 +16,7 @@ export function DashboardQuickActions({
   actions: DashboardQuickAction[];
 }): JSX.Element {
   return (
-    <Card className="bg-white/85 shadow-soft">
+    <Card className="bg-card/85 shadow-soft">
       <CardHeader>
         <CardTitle className="text-brand-espresso">Quick Actions</CardTitle>
       </CardHeader>

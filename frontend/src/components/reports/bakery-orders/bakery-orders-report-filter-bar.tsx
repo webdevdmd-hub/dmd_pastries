@@ -108,7 +108,7 @@ export function BakeryOrdersReportFilterBar({
   };
 
   return (
-    <Card className="bg-white/85 shadow-soft">
+    <Card className="bg-card/85 shadow-soft">
       <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-6">
         <ReportPresetSelector value={filters.datePreset} onChange={setPreset} />
         <ReportDateRangePicker

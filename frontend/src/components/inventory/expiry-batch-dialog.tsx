@@ -96,7 +96,9 @@ export function ExpiryBatchDialog({
               <Label htmlFor="batchExpiryDate">Expiry date</Label>
               <Input id="batchExpiryDate" type="date" {...form.register("expiryDate")} />
               {form.formState.errors.expiryDate ? (
-                <p className="text-sm text-red-800">{form.formState.errors.expiryDate.message}</p>
+                <p className="text-sm text-danger-text">
+                  {form.formState.errors.expiryDate.message}
+                </p>
               ) : null}
             </div>
           </div>

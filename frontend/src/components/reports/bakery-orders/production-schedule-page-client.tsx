@@ -80,7 +80,7 @@ export function ProductionSchedulePageClient(): JSX.Element {
           onRetry={() => void reportQuery.refetch()}
         />
       ) : null}
-      <Card className="bg-white/85 shadow-soft">
+      <Card className="bg-card/85 shadow-soft">
         <CardContent className="p-5">
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <ProductionScheduleTable rows={reportQuery.data} />

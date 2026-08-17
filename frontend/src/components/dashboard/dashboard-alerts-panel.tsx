@@ -7,8 +7,8 @@ import { getErrorMessage } from "@/lib/api/client";
 import type { DashboardAlert } from "@/types/dashboard";
 
 function severityClass(severity: DashboardAlert["severity"]): string {
-  if (severity === "critical") return "border-red-200 bg-red-50 text-red-900";
-  if (severity === "warning") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (severity === "critical") return "border-danger/30 bg-danger-tint text-danger-text";
+  if (severity === "warning") return "border-warning/30 bg-warning-tint text-warning-text";
   return "border-brand-cappuccino bg-brand-latte/70 text-brand-espresso";
 }
 
@@ -24,7 +24,7 @@ export function DashboardAlertsPanel({
   onRetry: () => void;
 }): JSX.Element {
   return (
-    <Card className="bg-white/85 shadow-soft">
+    <Card className="bg-card/85 shadow-soft">
       <CardHeader>
         <CardTitle className="text-brand-espresso">Operational Alerts</CardTitle>
       </CardHeader>
@@ -44,9 +44,7 @@ export function DashboardAlertsPanel({
                     <p className="font-semibold">{alert.title || "Dashboard alert"}</p>
                     <p className="mt-1 text-sm leading-6">{alert.description}</p>
                   </div>
-                  <span className="text-xs font-semibold uppercase tracking-[0.2em]">
-                    {alert.severity}
-                  </span>
+                  <span className="text-xs font-semibold">{alert.severity}</span>
                 </div>
               </article>
             ))

@@ -110,8 +110,8 @@ function Availability({ product }: { product: Product }): JSX.Element {
         <span
           className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[0.68rem] font-medium ${
             item.active
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-zinc-200 bg-zinc-50 text-zinc-500"
+              ? "border-money/30 bg-money-tint text-money-text"
+              : "border-border bg-muted text-foreground-muted"
           }`}
           key={item.label}
         >
@@ -143,7 +143,7 @@ export function ProductsTable({
 
           return (
             <article
-              className="rounded-2xl border border-brand-cappuccino bg-white p-4"
+              className="rounded-2xl border border-brand-cappuccino bg-card p-4"
               key={product.id}
             >
               <div className="flex items-start justify-between gap-3">

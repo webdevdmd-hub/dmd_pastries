@@ -142,9 +142,9 @@ function severityRank(severity: DashboardAlert["severity"]): number {
 }
 
 function severityStyle(severity: DashboardAlert["severity"]): string {
-  if (severity === "critical") return "bg-red-500";
-  if (severity === "warning") return "bg-amber-500";
-  return "bg-zinc-400";
+  if (severity === "critical") return "bg-danger";
+  if (severity === "warning") return "bg-warning";
+  return "bg-foreground-muted";
 }
 
 function DashboardLoadWarningsBanner({
@@ -159,7 +159,7 @@ function DashboardLoadWarningsBanner({
   if (warnings.length === 0) return null;
 
   return (
-    <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-950">
+    <div className="rounded-md border border-warning/30 bg-warning-tint p-4 text-warning-text">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
@@ -219,7 +219,7 @@ function AttentionQueue({
   const criticalCount = alerts?.filter((alert) => alert.severity === "critical").length ?? 0;
 
   return (
-    <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+    <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
       <SectionHeader
         action={
           <span className="text-xs font-semibold uppercase text-workspace-muted">
@@ -238,14 +238,14 @@ function AttentionQueue({
         {!error && isLoading ? (
           <div className="space-y-2 p-5">
             {[0, 1, 2].map((item) => (
-              <div className="h-14 animate-pulse bg-zinc-100" key={item} />
+              <div className="h-14 animate-pulse bg-muted" key={item} />
             ))}
           </div>
         ) : null}
         {!error && !isLoading && orderedAlerts.length > 0
           ? orderedAlerts.map((alert) => (
               <Link
-                className="group grid grid-cols-[4px_minmax(0,1fr)_auto] items-center gap-4 border-b border-workspace-border px-5 py-3.5 last:border-b-0 hover:bg-zinc-50"
+                className="group grid grid-cols-[4px_minmax(0,1fr)_auto] items-center gap-4 border-b border-workspace-border px-5 py-3.5 last:border-b-0 hover:bg-muted"
                 href={alertHref(alert)}
                 key={`${alert.alertType}-${alert.referenceId}-${alert.title}`}
               >
@@ -258,7 +258,7 @@ function AttentionQueue({
                     {alert.description}
                   </span>
                 </span>
-                <ArrowRight className="h-4 w-4 text-zinc-400 transition-transform group-hover:translate-x-0.5" />
+                <ArrowRight className="h-4 w-4 text-foreground-muted transition-transform group-hover:translate-x-0.5" />
               </Link>
             ))
           : null}
@@ -286,7 +286,7 @@ function ActivityTable({
   const rows = activities?.slice(0, 8) ?? [];
 
   return (
-    <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+    <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
       <SectionHeader
         description="Recent operational events across the active business scope."
         title="Recent activity"
@@ -296,11 +296,11 @@ function ActivityTable({
           <DashboardErrorState description={getErrorMessage(error)} onRetry={onRetry} />
         </div>
       ) : null}
-      {!error && isLoading ? <div className="m-5 h-36 animate-pulse bg-zinc-100" /> : null}
+      {!error && isLoading ? <div className="m-5 h-36 animate-pulse bg-muted" /> : null}
       {!error && !isLoading && rows.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="bg-zinc-50 text-xs font-semibold uppercase text-workspace-muted">
+            <thead className="bg-muted text-xs font-semibold uppercase text-workspace-muted">
               <tr>
                 <th className="px-5 py-3">Activity</th>
                 <th className="px-4 py-3">Module</th>
@@ -549,7 +549,7 @@ export function AdminDashboardClient(): JSX.Element {
 
           <GettingStartedChecklist hasFirstSale={dashboard.sales.salesCountToday > 0} />
 
-          <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+          <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
             <div className="grid sm:grid-cols-2 xl:grid-cols-5">
               {decisionMetrics.map((metric) => {
                 const Icon = metric.icon;
@@ -562,7 +562,7 @@ export function AdminDashboardClient(): JSX.Element {
                       <p className="text-xs font-semibold uppercase text-workspace-muted">
                         {metric.label}
                       </p>
-                      <Icon className="h-4 w-4 text-zinc-500" aria-hidden="true" />
+                      <Icon className="h-4 w-4 text-foreground-muted" aria-hidden="true" />
                     </div>
                     <p className="mt-4 text-2xl font-semibold text-brand-espresso">
                       {metric.value}
@@ -582,11 +582,11 @@ export function AdminDashboardClient(): JSX.Element {
               const Icon = action.icon;
               return (
                 <Link
-                  className="inline-flex h-9 items-center gap-2 rounded-md border border-workspace-border bg-white px-3 text-sm font-semibold text-brand-espresso hover:bg-zinc-50"
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-workspace-border bg-card px-3 text-sm font-semibold text-brand-espresso hover:bg-muted"
                   href={action.href}
                   key={action.href}
                 >
-                  <Icon className="h-4 w-4 text-zinc-500" />
+                  <Icon className="h-4 w-4 text-foreground-muted" />
                   {action.label}
                 </Link>
               );
@@ -601,7 +601,7 @@ export function AdminDashboardClient(): JSX.Element {
               onRetry={() => void alertsQuery.refetch()}
             />
 
-            <section className="overflow-hidden rounded-md border border-workspace-border bg-white">
+            <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
               <SectionHeader
                 description="Current workload across daily operations."
                 title="Operational health"
@@ -609,7 +609,7 @@ export function AdminDashboardClient(): JSX.Element {
               <div>
                 {healthRows.map((row) => (
                   <Link
-                    className="group flex items-center justify-between gap-4 border-b border-workspace-border px-5 py-3.5 last:border-b-0 hover:bg-zinc-50"
+                    className="group flex items-center justify-between gap-4 border-b border-workspace-border px-5 py-3.5 last:border-b-0 hover:bg-muted"
                     href={row.href}
                     key={row.label}
                   >
@@ -621,7 +621,7 @@ export function AdminDashboardClient(): JSX.Element {
                     </span>
                     <span className="flex items-center gap-3">
                       <strong className="text-lg text-brand-espresso">{row.value}</strong>
-                      <ArrowRight className="h-4 w-4 text-zinc-400 transition-transform group-hover:translate-x-0.5" />
+                      <ArrowRight className="h-4 w-4 text-foreground-muted transition-transform group-hover:translate-x-0.5" />
                     </span>
                   </Link>
                 ))}
@@ -639,7 +639,7 @@ export function AdminDashboardClient(): JSX.Element {
               </div>
               <div
                 aria-label="Performance view"
-                className="flex max-w-full gap-1 overflow-x-auto rounded-md border border-workspace-border bg-white p-1"
+                className="flex max-w-full gap-1 overflow-x-auto rounded-md border border-workspace-border bg-card p-1"
                 role="group"
               >
                 {performanceViews.map((view) => (
@@ -647,8 +647,8 @@ export function AdminDashboardClient(): JSX.Element {
                     aria-pressed={performanceView === view}
                     className={`h-8 whitespace-nowrap rounded px-3 text-xs font-semibold transition-colors ${
                       performanceView === view
-                        ? "bg-zinc-950 text-white"
-                        : "text-workspace-muted hover:bg-zinc-100 hover:text-brand-espresso"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-workspace-muted hover:bg-muted hover:text-brand-espresso"
                     }`}
                     key={view}
                     onClick={() => setPerformanceView(view)}

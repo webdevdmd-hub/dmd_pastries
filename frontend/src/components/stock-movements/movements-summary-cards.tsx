@@ -43,7 +43,7 @@ export function MovementsSummaryCards({ summary }: MovementsSummaryCardsProps): 
           <CardContent className="flex items-center justify-between p-6">
             <div>
               <p className="text-sm text-brand-mocha">{card.label}</p>
-              <p className="mt-2 text-3xl font-black text-brand-espresso">{card.value}</p>
+              <p className="mt-2 text-3xl font-medium text-brand-espresso">{card.value}</p>
             </div>
             <div className="rounded-2xl bg-brand-cappuccino/35 p-3 text-brand-mocha">
               <card.icon className="h-6 w-6" />

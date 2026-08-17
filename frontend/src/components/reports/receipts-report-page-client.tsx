@@ -109,12 +109,16 @@ function selectReceiptLayout(
 function statusBadge(status: string): JSX.Element {
   const normalized = status.toLowerCase();
   if (normalized === "paid" || normalized === "completed" || normalized === "viewed") {
-    return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">{status}</Badge>;
+    return <Badge className="border-money/30 bg-money-tint text-money-text">{status}</Badge>;
   }
   if (normalized === "partial" || normalized === "pending" || normalized === "draft") {
-    return <Badge className="border-amber-200 bg-amber-50 text-amber-800">{status}</Badge>;
+    return <Badge className="border-warning/30 bg-warning-tint text-warning-text">{status}</Badge>;
   }
-  return <Badge className="border-red-200 bg-red-50 text-red-800">{status || "unknown"}</Badge>;
+  return (
+    <Badge className="border-danger/30 bg-danger-tint text-danger-text">
+      {status || "unknown"}
+    </Badge>
+  );
 }
 
 function ReceiptsTable({
@@ -260,7 +264,7 @@ export function ReceiptsReportPageClient(): JSX.Element {
         description="Review completed POS sales, receipt view history, payment status, and printable bill details."
       />
 
-      <Card className="bg-white/85 shadow-soft">
+      <Card className="bg-card/85 shadow-soft">
         <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-6">
           <ReportPresetSelector value={draft.datePreset} onChange={setPreset} />
           <ReportDateRangePicker
@@ -345,36 +349,36 @@ export function ReceiptsReportPageClient(): JSX.Element {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="bg-white/85 shadow-soft">
+        <Card className="bg-card/85 shadow-soft">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-brand-mocha">Receipts in view</CardTitle>
           </CardHeader>
           <CardContent className="flex items-end gap-2">
             <ReceiptText className="mb-1 h-5 w-5 text-brand-caramel" />
-            <span className="text-3xl font-black text-brand-espresso">{rows.length}</span>
+            <span className="text-3xl font-medium text-brand-espresso">{rows.length}</span>
           </CardContent>
         </Card>
-        <Card className="bg-white/85 shadow-soft">
+        <Card className="bg-card/85 shadow-soft">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-brand-mocha">Total billed</CardTitle>
           </CardHeader>
-          <CardContent className="text-3xl font-black text-brand-espresso">
+          <CardContent className="text-3xl font-medium text-brand-espresso">
             {formatCurrency(totalAmount)}
           </CardContent>
         </Card>
-        <Card className="bg-white/85 shadow-soft">
+        <Card className="bg-card/85 shadow-soft">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-brand-mocha">Viewed receipts</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black text-brand-espresso">{viewedCount}</div>
+            <div className="text-3xl font-medium text-brand-espresso">{viewedCount}</div>
             <p className="text-sm text-brand-mocha">Paid total: {formatCurrency(paidAmount)}</p>
           </CardContent>
         </Card>
       </div>
 
       {receiptsQuery.error ? (
-        <Card className="border-red-200 bg-red-50 text-red-800">
+        <Card className="border-danger/30 bg-danger-tint text-danger-text">
           <CardContent className="flex items-center justify-between gap-4 p-5">
             <p>{getErrorMessage(receiptsQuery.error)}</p>
             <Button type="button" variant="outline" onClick={() => void receiptsQuery.refetch()}>
@@ -384,7 +388,7 @@ export function ReceiptsReportPageClient(): JSX.Element {
         </Card>
       ) : null}
 
-      <Card className="bg-white/85 shadow-soft">
+      <Card className="bg-card/85 shadow-soft">
         <CardContent className="overflow-x-auto p-5">
           {receiptsQuery.isLoading ? (
             <div className="space-y-3">

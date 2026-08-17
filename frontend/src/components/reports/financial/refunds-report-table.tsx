@@ -14,12 +14,14 @@ import type { RefundReportRow } from "@/types/financial-reports";
 
 function refundBadge(status: string): JSX.Element {
   if (status === "completed") {
-    return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">Completed</Badge>;
+    return <Badge className="border-money/30 bg-money-tint text-money-text">Completed</Badge>;
   }
   if (status === "pending") {
-    return <Badge className="border-amber-200 bg-amber-50 text-amber-800">Pending</Badge>;
+    return <Badge className="border-warning/30 bg-warning-tint text-warning-text">Pending</Badge>;
   }
-  return <Badge className="border-red-200 bg-red-50 text-red-800">{status || "Failed"}</Badge>;
+  return (
+    <Badge className="border-danger/30 bg-danger-tint text-danger-text">{status || "Failed"}</Badge>
+  );
 }
 
 export function RefundsReportTable({ rows }: { rows: RefundReportRow[] }): JSX.Element {

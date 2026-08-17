@@ -37,7 +37,7 @@ export function InventoryToolbar({
   };
 
   return (
-    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/70 p-4 shadow-soft lg:grid-cols-[1.3fr_repeat(4,1fr)_auto]">
+    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-card/70 p-4 shadow-soft lg:grid-cols-[1.3fr_repeat(4,1fr)_auto]">
       <Input
         aria-label="Search inventory"
         onChange={(event) => updateFilters({ search: event.target.value })}

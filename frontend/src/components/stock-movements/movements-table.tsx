@@ -43,8 +43,8 @@ function formatMoney(value: number): string {
 
 function rowClassName(movement: StockMovement): string | undefined {
   if (movement.movementType === "reversal" || movement.isReversal) return "bg-violet-50/60";
-  if (movement.movementType === "transfer") return "bg-sky-50/40";
-  if (movement.movementDirection === "in") return "bg-emerald-50/40";
+  if (movement.movementType === "transfer") return "bg-info-tint/40";
+  if (movement.movementDirection === "in") return "bg-money-tint/40";
   if (movement.movementDirection === "out") return "bg-orange-50/40";
   return undefined;
 }
@@ -59,7 +59,7 @@ function TransferDetails({ movement }: { movement: StockMovement }): JSX.Element
   }
 
   return (
-    <div className="mt-2 min-w-44 rounded-lg border border-sky-100 bg-sky-50/70 px-2 py-1 text-xs text-sky-950">
+    <div className="mt-2 min-w-44 rounded-lg border border-info/30 bg-info-tint/70 px-2 py-1 text-xs text-info-text">
       <p>From: {locationName(movement.fromStockLocationName)}</p>
       <p>To: {locationName(movement.toStockLocationName)}</p>
       <p>
