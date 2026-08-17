@@ -207,79 +207,22 @@
 }
 
 @layer utilities {
-  /* NOTE: the .auth-* and .story-section-reveal-* utilities below are slated
-   * for deletion in tracks D1 and D4 respectively, along with the components
-   * that consume them. They are left intact here so this commit stays a pure
-   * token-layer swap. */
-
-  @keyframes auth-orb-drift {
-    0%,
-    100% {
-      transform: translate3d(0, 0, 0) scale(1);
-    }
-
-    50% {
-      transform: translate3d(22px, -18px, 0) scale(1.08);
-    }
-  }
-
-  @keyframes auth-scan {
-    0% {
-      transform: translateX(-120%);
-      opacity: 0;
-    }
-
-    30% {
-      opacity: 0.8;
-    }
-
-    100% {
-      transform: translateX(120%);
-      opacity: 0;
-    }
-  }
-
-  .auth-orb {
-    position: absolute;
-    border-radius: 9999px;
-    filter: blur(58px);
-    pointer-events: none;
-    animation: auth-orb-drift 11s ease-in-out infinite;
-  }
-
-  .auth-orb-one {
-    left: 8%;
-    top: 14%;
-    width: 18rem;
-    height: 18rem;
-    background: rgba(176, 137, 104, 0.28);
-  }
-
-  .auth-orb-two {
-    right: 8%;
-    bottom: 12%;
-    width: 22rem;
-    height: 22rem;
-    background: rgba(243, 233, 215, 0.12);
-    animation-delay: -4s;
-  }
-
-  .auth-scanline {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    overflow: hidden;
-  }
-
-  .auth-scanline::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 34%;
-    background: linear-gradient(90deg, transparent, rgba(243, 233, 215, 0.06), transparent);
-    animation: auth-scan 8s ease-in-out infinite;
-  }
+  /* D1 (2026-08-17): the auth orbs and scanline are deleted.
+   *
+   * Two 18rem/22rem blurred gradient circles drifting on an 11s loop behind the
+   * login form, plus a gradient sweep on an 8s loop. DESIGN.md §5 names blurred
+   * drifting gradient blobs as the most recognisable "AI generated this page" tell
+   * there is, and they were the source of 54 of the app's hardcoded hexes.
+   *
+   * Also: two infinite animations behind a form that exists to be typed into, which
+   * `prefers-reduced-motion` did not cover because these were decoration rather
+   * than transitions.
+   *
+   * NOTE: .auth-glass-card and .auth-login-frame are deliberately still here. They
+   * are structural rather than decorative, and the plan (§9.7) retires them with D5
+   * when the auth routes move onto the Threshold register — deleting them now would
+   * leave the login form unstyled in the meantime.
+   * */
 
   .auth-glass-card {
     background:
@@ -311,32 +254,6 @@
   .auth-login-frame > * {
     position: relative;
     z-index: 1;
-  }
-
-  .story-section-reveal {
-    opacity: 0;
-    transform: translate3d(0, 56px, 0);
-    transition:
-      opacity 900ms ease,
-      transform 1000ms cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: opacity, transform;
-  }
-
-  .story-section-reveal-scale {
-    transform: scale(0.96) translate3d(0, 36px, 0);
-  }
-
-  .story-section-reveal-slide-left {
-    transform: translate3d(72px, 24px, 0);
-  }
-
-  .story-section-reveal-slide-right {
-    transform: translate3d(-72px, 24px, 0);
-  }
-
-  .story-section-reveal-visible {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
   }
 
   .scrollbar-hidden {

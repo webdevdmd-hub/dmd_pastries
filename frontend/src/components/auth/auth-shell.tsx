@@ -68,19 +68,23 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
 
   if (usesMinimalAuthLayout) {
     return (
-      <div className="min-h-screen bg-[#f4f4f1] text-[#191918]">
+      <div className="min-h-screen bg-canvas text-foreground">
         <main className="mx-auto flex min-h-screen w-full max-w-7xl items-center justify-center px-6 py-12 sm:px-8 lg:px-10">
           <section
             className={isSignupPage ? "w-full max-w-[44rem]" : "w-full max-w-[27rem]"}
             aria-labelledby="auth-heading"
           >
             <div className="mb-9">
-              <p className="mb-3 text-xs font-semibold uppercase text-[#70706b]">Account access</p>
+              <p className="mb-3 text-xs font-semibold uppercase text-foreground-muted">
+                Account access
+              </p>
               <h1 className="text-3xl font-semibold leading-tight sm:text-4xl" id="auth-heading">
                 {title}
               </h1>
               {!isSignupPage ? (
-                <p className="mt-3 max-w-sm text-sm leading-6 text-[#666662]">{description}</p>
+                <p className="mt-3 max-w-sm text-sm leading-6 text-foreground-muted">
+                  {description}
+                </p>
               ) : null}
             </div>
 
@@ -92,12 +96,16 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#050302] text-brand-latte">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_12%,rgba(176,137,104,0.42),transparent_28%),radial-gradient(circle_at_78%_8%,rgba(243,233,215,0.16),transparent_26%),radial-gradient(circle_at_70%_78%,rgba(122,85,58,0.38),transparent_34%),linear-gradient(135deg,#060403_0%,#1b120d_48%,#050302_100%)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(243,233,215,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(243,233,215,0.045)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(circle_at_center,black,transparent_76%)]" />
-      <div className="auth-orb auth-orb-one" />
-      <div className="auth-orb auth-orb-two" />
-      <div className="auth-scanline" />
+    <div className="relative min-h-screen overflow-hidden bg-primary text-primary-foreground">
+      {/* D1: the drifting orbs and the scanline sweep are gone, along with the
+          four-stop radial-gradient wash and the grid overlay they sat on. That
+          stack was 20 hardcoded colour values, three of them the v1 coffee palette
+          in rgba form, and two infinite animations behind a form whose only job is
+          to be typed into.
+
+          D5 replaces this with the Threshold treatment proper (serif wordmark on a
+          calm field, DESIGN.md §7). Until then the frame below carries itself on a
+          plain --primary ground, which is quieter than what it replaces. */}
 
       <div className="relative mx-auto grid min-h-screen max-w-[100rem] lg:grid-cols-[1.1fr_0.9fr]">
         <section className="hidden min-h-screen flex-col border-r border-card/10 px-10 py-8 xl:flex">
@@ -213,7 +221,7 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
             </div>
 
             <div className="auth-login-frame relative rounded-[2.1rem] border border-card/14 bg-card/[0.08] p-[1px] shadow-[0_40px_120px_rgba(0,0,0,0.48)] backdrop-blur-2xl">
-              <div className="rounded-[calc(2.1rem-1px)] bg-[#100c09]/86 p-5 backdrop-blur-2xl sm:p-7">
+              <div className="rounded-[calc(2.1rem-1px)] bg-primary/[0.86] p-5 backdrop-blur-2xl sm:p-7">
                 <div className="mb-7 flex items-start justify-between gap-4 border-b border-card/10 pb-6">
                   <div className="space-y-3">
                     <div className="inline-flex items-center gap-2 rounded-full border border-brand-caramel/30 bg-brand-caramel/12 px-3 py-1 text-[0.65rem] text-brand-cappuccino">

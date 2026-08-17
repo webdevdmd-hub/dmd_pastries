@@ -195,7 +195,7 @@ export function LoginForm(): JSX.Element {
                         void continueSession();
                       }}
                       type="button"
-                      className="bg-[#191918] text-primary-foreground hover:bg-primary"
+                      className="bg-primary text-primary-foreground hover:bg-primary"
                     >
                       Continue with current session
                     </Button>
@@ -205,7 +205,7 @@ export function LoginForm(): JSX.Element {
                         void restartSessionLogin();
                       }}
                       type="button"
-                      className="border-[#d8d8d2] bg-card text-[#191918] hover:bg-[#eeeeea]"
+                      className="border-border bg-card text-foreground hover:bg-muted"
                       variant="outline"
                     >
                       Restart login
@@ -249,13 +249,13 @@ export function LoginForm(): JSX.Element {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-sm font-medium text-[#2d2d2a]">Email</FormLabel>
+                  <FormLabel className="text-sm font-medium text-foreground">Email</FormLabel>
                   <FormControl>
                     <div className="relative group">
-                      <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b8b85]" />
+                      <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
                       <Input
                         autoComplete="email"
-                        className="h-12 rounded-lg border-[#d6d6d0] bg-card pl-11 text-[#191918] shadow-none transition placeholder:text-[#a2a29c] focus-visible:border-[#191918] focus-visible:ring-[#191918]/10"
+                        className="h-12 rounded-lg border-border bg-card pl-11 text-foreground shadow-none transition placeholder:text-foreground-disabled focus-visible:border-ring focus-visible:ring-ring/40"
                         placeholder="owner@bakery.com"
                         type="email"
                         {...field}
@@ -273,9 +273,9 @@ export function LoginForm(): JSX.Element {
               render={({ field }) => (
                 <FormItem>
                   <div className="flex items-center justify-between gap-3">
-                    <FormLabel className="text-sm font-medium text-[#2d2d2a]">Password</FormLabel>
+                    <FormLabel className="text-sm font-medium text-foreground">Password</FormLabel>
                     <Link
-                      className="text-sm text-[#666662] underline-offset-4 hover:text-[#191918] hover:underline"
+                      className="text-sm text-foreground-muted underline-offset-4 hover:text-foreground hover:underline"
                       href={ROUTES.forgotPassword}
                     >
                       Forgot password?
@@ -283,10 +283,10 @@ export function LoginForm(): JSX.Element {
                   </div>
                   <FormControl>
                     <div className="relative group">
-                      <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b8b85]" />
+                      <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
                       <Input
                         autoComplete="current-password"
-                        className="h-12 rounded-lg border-[#d6d6d0] bg-card pl-11 pr-11 text-[#191918] shadow-none transition placeholder:text-[#a2a29c] focus-visible:border-[#191918] focus-visible:ring-[#191918]/10"
+                        className="h-12 rounded-lg border-border bg-card pl-11 pr-11 text-foreground shadow-none transition placeholder:text-foreground-disabled focus-visible:border-ring focus-visible:ring-ring/40"
                         placeholder="Enter your password"
                         type={showPassword ? "text" : "password"}
                         {...field}
@@ -294,7 +294,7 @@ export function LoginForm(): JSX.Element {
                       <button
                         aria-label={showPassword ? "Hide password" : "Show password"}
                         aria-pressed={showPassword}
-                        className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#777772] transition hover:bg-[#eeeeea] hover:text-[#191918] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#191918]/20"
+                        className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-foreground-muted transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
                         onClick={() => {
                           setShowPassword((current) => !current);
                         }}
@@ -315,7 +315,7 @@ export function LoginForm(): JSX.Element {
             />
 
             <Button
-              className="h-12 w-full rounded-lg bg-[#191918] text-sm font-semibold text-primary-foreground shadow-none transition hover:bg-primary"
+              className="h-12 w-full rounded-lg bg-primary text-sm font-semibold text-primary-foreground shadow-none transition hover:bg-primary"
               disabled={form.formState.isSubmitting || recoveryLoading || isCooldownActive}
               type="submit"
             >
@@ -332,17 +332,17 @@ export function LoginForm(): JSX.Element {
               )}
             </Button>
 
-            <div className="flex items-start gap-3 border-t border-[#deded8] pt-5 text-xs leading-5 text-[#777772]">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#555550]" />
+            <div className="flex items-start gap-3 border-t border-border pt-5 text-xs leading-5 text-foreground-muted">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-foreground-muted" />
               <span>
                 Login restores backend permissions, branch access, and active workspace context.
               </span>
             </div>
 
-            <p className="text-center text-sm text-[#70706b]">
+            <p className="text-center text-sm text-foreground-muted">
               Need an owner account?{" "}
               <Link
-                className="font-medium text-[#191918] underline-offset-4 hover:underline"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
                 href={ROUTES.signup}
               >
                 Create one now

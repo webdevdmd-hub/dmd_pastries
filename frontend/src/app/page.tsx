@@ -13,7 +13,6 @@ import {
 import Link from "next/link";
 import type { JSX } from "react";
 
-import { BakeryOperationsScene } from "@/components/home/bakery-operations-scene";
 import { ROUTES } from "@/constants/routes";
 
 const operatingFlow = [
@@ -58,7 +57,11 @@ export default function HomePage(): JSX.Element {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f4f6f5] text-[#171918]">
       <section className="relative min-h-[96svh] overflow-hidden border-b border-primary/10 lg:min-h-[88svh]">
-        <BakeryOperationsScene />
+        {/* D4: the react-three-fiber door scene is deleted (901 lines, 87 hexes,
+            four WebGL dependencies). D3 rebuilds this hero on the Threshold
+            structure; until then it is type on a calm field, which the plan
+            calls for explicitly — "ship type-only until [the photograph]
+            exists; still better than the door scene". */}
 
         <header className="relative z-20 mx-auto flex h-20 max-w-[90rem] items-center justify-between px-5 sm:px-8 lg:px-12">
           <Link className="flex items-center gap-3" href={ROUTES.home}>

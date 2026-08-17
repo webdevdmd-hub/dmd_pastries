@@ -116,11 +116,11 @@ function getSignupFieldError(field: keyof SignupSchema, message: string): string
   }
 }
 
-const labelClassName = "text-sm font-medium text-[#2d2d2a]";
+const labelClassName = "text-sm font-medium text-foreground";
 const iconClassName =
-  "pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b8b85]";
+  "pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted";
 const inputClassName =
-  "h-12 rounded-lg border-[#d6d6d0] bg-card pl-11 text-[#191918] shadow-none transition placeholder:text-[#a2a29c] focus-visible:border-[#191918] focus-visible:ring-[#191918]/10";
+  "h-12 rounded-lg border-border bg-card pl-11 text-foreground shadow-none transition placeholder:text-foreground-disabled focus-visible:border-ring focus-visible:ring-ring/40";
 
 export function SignupForm(): JSX.Element {
   const router = useRouter();
@@ -307,7 +307,7 @@ export function SignupForm(): JSX.Element {
                         <button
                           aria-label={showPassword ? "Hide password" : "Show password"}
                           aria-pressed={showPassword}
-                          className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#777772] transition hover:bg-[#eeeeea] hover:text-[#191918] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#191918]/20"
+                          className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-foreground-muted transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
                           onClick={() => {
                             setShowPassword((current) => !current);
                           }}
@@ -347,7 +347,7 @@ export function SignupForm(): JSX.Element {
                             showConfirmPassword ? "Hide confirm password" : "Show confirm password"
                           }
                           aria-pressed={showConfirmPassword}
-                          className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#777772] transition hover:bg-[#eeeeea] hover:text-[#191918] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#191918]/20"
+                          className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-foreground-muted transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
                           onClick={() => {
                             setShowConfirmPassword((current) => !current);
                           }}
@@ -371,7 +371,7 @@ export function SignupForm(): JSX.Element {
             </div>
 
             <Button
-              className="h-12 w-full rounded-lg bg-[#191918] text-sm font-semibold text-primary-foreground shadow-none transition hover:bg-primary"
+              className="h-12 w-full rounded-lg bg-primary text-sm font-semibold text-primary-foreground shadow-none transition hover:bg-primary"
               disabled={form.formState.isSubmitting}
               type="submit"
             >
@@ -388,10 +388,10 @@ export function SignupForm(): JSX.Element {
               )}
             </Button>
 
-            <p className="text-center text-sm text-[#70706b]">
+            <p className="text-center text-sm text-foreground-muted">
               Already have access?{" "}
               <Link
-                className="font-medium text-[#191918] underline-offset-4 hover:underline"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
                 href={ROUTES.login}
               >
                 Login

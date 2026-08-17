@@ -19,13 +19,25 @@ export const schemes = ["light", "dark"];
 
 export const routes = [
   // --- Threshold ---------------------------------------------------------
-  { path: "/login", name: "login", auth: false },
+  // /login is NOT captured here. It redirects to the role landing page whenever a
+  // session exists, and this harness needs a hand-established authenticated session
+  // to reach the other 34 routes — so within one run those two requirements are
+  // mutually exclusive. It has to be captured in a separate unauthenticated pass.
+  //
+  // Leaving it in produced the worst possible outcome: the committed `login`
+  // baseline was a screenshot of /dashboard/admin. Plausible in review, distinct
+  // from its neighbours, and the wrong page. See TODOS T-Q.
 
   // --- Counter -----------------------------------------------------------
   { path: "/pos", name: "pos", viewports: ["ledger", "counter"] },
 
   // --- Dashboards --------------------------------------------------------
-  { path: "/dashboard", name: "dashboard" },
+  // Redirects by role; for an admin session that is /dashboard/admin. Declared so
+  // the redirect assertion passes on a KNOWN destination rather than being
+  // silently accepted. Note this makes `dashboard` and `dashboard-admin` the same
+  // screenshot for an admin — which is honest, and is what the identical hashes
+  // were telling us before the assertion existed.
+  { path: "/dashboard", name: "dashboard", redirectsTo: "/dashboard/admin" },
   { path: "/dashboard/cashier", name: "dashboard-cashier" },
   { path: "/dashboard/admin", name: "dashboard-admin" },
   { path: "/dashboard/production", name: "dashboard-production" },
@@ -45,7 +57,7 @@ export const routes = [
   { path: "/inventory/stock-transfers", name: "inventory-transfers" },
 
   // --- Manufacturing -----------------------------------------------------
-  { path: "/manufacturing", name: "manufacturing" },
+  { path: "/manufacturing", name: "manufacturing", redirectsTo: "/manufacturing/batches" },
   { path: "/manufacturing/batches", name: "manufacturing-batches" },
   { path: "/ingredients", name: "ingredients" },
 

@@ -258,6 +258,32 @@ for (const route of selected) {
       const blankPage = stdout.includes("CAPTURE_BLANK");
       const captured = existsSync(file);
 
+      // ...and the reverse, which the check above does NOT cover: a route that
+      // redirects AWAY to somewhere else. `/login` bounces to the dashboard
+      // whenever a session exists, so the committed `login` baseline was in fact a
+      // screenshot of /dashboard/admin — a real page, distinct from its neighbours,
+      // passing every other guard here, and simply the wrong route.
+      //
+      // The trailing `url` step already reported the truth; nothing compared it to
+      // what was asked for. This does.
+      const finalPath = (() => {
+        const urls = stdout.match(/https?:\/\/[^\s]+/g) ?? [];
+        const last = urls[urls.length - 1];
+        if (!last) return null;
+        try {
+          return new URL(last).pathname.replace(/\/$/, "") || "/";
+        } catch {
+          return null;
+        }
+      })();
+      const wanted = route.path.replace(/\/$/, "") || "/";
+      // A route may declare where it legitimately lands (role-based dashboards,
+      // index routes that forward to a default tab). Declared destinations pass;
+      // undeclared ones fail, so the harness can never again quietly screenshot
+      // one page under another page's name.
+      const allowed = route.redirectsTo?.replace(/\/$/, "") ?? wanted;
+      const redirected = finalPath !== null && finalPath !== allowed && !landedOnLogin;
+
       if (errorPage || blankPage) {
         // Delete it. A retained error-page or blank PNG is worse than a missing
         // file, because the next `visual:diff` treats it as a valid reference.
@@ -272,6 +298,15 @@ for (const route of selected) {
       } else if (landedOnLogin) {
         failures.push({ label, reason: "redirected to /login (session expired?)" });
         console.log(`${progress} AUTH  ${label}`);
+      } else if (redirected) {
+        // Delete it: a screenshot of the wrong route is the most misleading kind
+        // of baseline, because it looks entirely plausible in review.
+        rmSync(file, { force: true });
+        failures.push({
+          label,
+          reason: `redirected to ${String(finalPath)}, expected ${allowed} — captured the wrong page`,
+        });
+        console.log(`${progress} REDIR ${label}`);
       } else if (!captured) {
         // Surface the actual ERROR line. Taking the last line of stdout gets
         // the trailing `url` step instead, which reports a perfectly correct
