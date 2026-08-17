@@ -167,14 +167,12 @@ export function PackagingFormDialog({
           }}
         >
           <section className="grid gap-4 md:grid-cols-2">
-            <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-brand-mocha md:col-span-2">
-              Basic Information
-            </h3>
+            <h3 className="text-sm font-bold text-brand-mocha md:col-span-2">Basic Information</h3>
             <label className="grid gap-2">
               <Label htmlFor="packaging-name">Packaging name</Label>
               <Input id="packaging-name" {...form.register("packagingName")} />
               {fieldError("packagingName") ? (
-                <span className="text-sm text-red-700">{fieldError("packagingName")}</span>
+                <span className="text-sm text-danger-text">{fieldError("packagingName")}</span>
               ) : null}
             </label>
             <label className="grid gap-2">
@@ -195,7 +193,9 @@ export function PackagingFormDialog({
                 </SelectContent>
               </Select>
               {fieldError("packagingCategoryId") ? (
-                <span className="text-sm text-red-700">{fieldError("packagingCategoryId")}</span>
+                <span className="text-sm text-danger-text">
+                  {fieldError("packagingCategoryId")}
+                </span>
               ) : null}
             </label>
             <label className="grid gap-2">
@@ -237,7 +237,7 @@ export function PackagingFormDialog({
                 </SelectContent>
               </Select>
               {fieldError("unitId") ? (
-                <span className="text-sm text-red-700">{fieldError("unitId")}</span>
+                <span className="text-sm text-danger-text">{fieldError("unitId")}</span>
               ) : null}
             </label>
             <label className="grid gap-2">
@@ -250,15 +250,13 @@ export function PackagingFormDialog({
                 {...form.register("costPerUnit")}
               />
               {fieldError("costPerUnit") ? (
-                <span className="text-sm text-red-700">{fieldError("costPerUnit")}</span>
+                <span className="text-sm text-danger-text">{fieldError("costPerUnit")}</span>
               ) : null}
             </label>
           </section>
 
           <section className="grid gap-4 md:grid-cols-3">
-            <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-brand-mocha md:col-span-3">
-              Behavior
-            </h3>
+            <h3 className="text-sm font-bold text-brand-mocha md:col-span-3">Behavior</h3>
             <label className="flex items-center gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte p-3">
               <Checkbox
                 checked={form.watch("isStockTracked")}
@@ -286,9 +284,7 @@ export function PackagingFormDialog({
           </section>
 
           <section className="grid gap-4 md:grid-cols-2">
-            <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-brand-mocha md:col-span-2">
-              Media & Notes
-            </h3>
+            <h3 className="text-sm font-bold text-brand-mocha md:col-span-2">Media & Notes</h3>
             <label className="grid gap-2">
               <Label htmlFor="packaging-image">Packaging image</Label>
               <div className="flex flex-col gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-3 sm:flex-row sm:items-center">

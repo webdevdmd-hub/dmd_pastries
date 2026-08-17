@@ -44,7 +44,7 @@ export function RecipeCostCard({
   };
 
   return (
-    <Card className="bg-white/80">
+    <Card className="bg-card/80">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Live cost preview</CardTitle>
         {canRecalculate && recipeId ? (
@@ -99,13 +99,13 @@ export function RecipeCostCard({
           </p>
         ) : null}
         {livePreview?.hasZeroCostComponents ? (
-          <p className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-amber-800">
+          <p className="rounded-2xl border border-warning/30 bg-warning-tint p-3 text-warning-text">
             Some components have zero cost. Add cost price in Product Master for accurate recipe
             costing.
           </p>
         ) : null}
         {livePreview?.hasUnitMismatch ? (
-          <p className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-amber-800">
+          <p className="rounded-2xl border border-warning/30 bg-warning-tint p-3 text-warning-text">
             Some component units differ from Product Master. Backend costing requires the component
             unit to match because unit conversion is not available yet.
           </p>

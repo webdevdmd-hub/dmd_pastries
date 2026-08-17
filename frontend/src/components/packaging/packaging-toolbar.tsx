@@ -36,7 +36,7 @@ export function PackagingToolbar({
   };
 
   return (
-    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/75 p-4 shadow-soft xl:grid-cols-[1.5fr_1fr_1fr_1fr_auto_auto]">
+    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-card/75 p-4 shadow-soft xl:grid-cols-[1.5fr_1fr_1fr_1fr_auto_auto]">
       <Input
         aria-label="Search packaging"
         onChange={(event) => update({ search: event.target.value })}

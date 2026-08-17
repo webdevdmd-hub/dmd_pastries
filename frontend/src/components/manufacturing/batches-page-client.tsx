@@ -267,13 +267,9 @@ export function BatchesPageClient(): JSX.Element {
     <div className="mx-auto flex max-w-7xl flex-col gap-7">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-neutral-500">
-            Manufacturing
-          </p>
-          <h1 className="mt-2 text-4xl font-semibold tracking-tight text-neutral-950">
-            Production
-          </h1>
-          <p className="mt-2 max-w-2xl text-base text-neutral-600">
+          <p className="text-xs font-bold text-foreground-muted">Manufacturing</p>
+          <h1 className="mt-2 text-4xl font-semibold tracking-tight text-foreground">Production</h1>
+          <p className="mt-2 max-w-2xl text-base text-foreground-muted">
             Choose a recipe and output quantity. Component consumption, packaging consumption,
             output stock, costing, and accounting are handled automatically by the backend.
           </p>
@@ -281,7 +277,7 @@ export function BatchesPageClient(): JSX.Element {
         <div className="flex flex-wrap gap-3">
           <Button
             asChild
-            className="border-neutral-300 bg-white text-neutral-950 hover:bg-neutral-100"
+            className="border-border bg-card text-foreground hover:bg-muted"
             variant="outline"
           >
             <Link href={ROUTES.reportsManufacturing}>
@@ -291,7 +287,7 @@ export function BatchesPageClient(): JSX.Element {
           </Button>
           {canCreate ? (
             <Button
-              className="bg-black text-white hover:bg-neutral-800"
+              className="bg-primary text-primary-foreground hover:bg-primary"
               onClick={openCreate}
               type="button"
             >
@@ -304,33 +300,28 @@ export function BatchesPageClient(): JSX.Element {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         {metricCards.map((metric) => (
-          <section
-            className="rounded-2xl border border-neutral-300 bg-white p-5"
-            key={metric.label}
-          >
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-neutral-500">
-              {metric.label}
-            </p>
+          <section className="rounded-2xl border border-border bg-card p-5" key={metric.label}>
+            <p className="text-xs font-bold text-foreground-muted">{metric.label}</p>
             <div className="mt-4 flex items-end gap-2">
               <p
                 className={
                   metric.tone === "danger"
-                    ? "font-mono text-4xl font-semibold leading-none text-red-600"
-                    : "font-mono text-4xl font-semibold leading-none text-neutral-950"
+                    ? "font-mono text-4xl font-semibold leading-none text-danger-text"
+                    : "font-mono text-4xl font-semibold leading-none text-foreground"
                 }
               >
                 {metric.value}
               </p>
-              <p className="pb-1 text-sm text-neutral-500">{metric.meta}</p>
+              <p className="pb-1 text-sm text-foreground-muted">{metric.meta}</p>
             </div>
           </section>
         ))}
       </div>
 
-      <div className="rounded-2xl border border-neutral-300 bg-white p-5">
+      <div className="rounded-2xl border border-border bg-card p-5">
         <div className="grid gap-4 lg:grid-cols-[1.5fr_repeat(5,minmax(0,1fr))]">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
             <Input
               aria-label="Search batches"
               className="pl-10"
@@ -401,7 +392,7 @@ export function BatchesPageClient(): JSX.Element {
           />
         </div>
         <div className="mt-4 flex items-center justify-between gap-3">
-          <Button className="border-neutral-300" type="button" variant="ghost">
+          <Button className="border-border" type="button" variant="ghost">
             <SlidersHorizontal className="h-4 w-4" />
             Filter options
           </Button>
@@ -438,7 +429,7 @@ export function BatchesPageClient(): JSX.Element {
       ) : null}
 
       {!batchesQuery.isLoading && !batchesQuery.error && batches.length > 0 ? (
-        <Card className="overflow-hidden rounded-2xl border-neutral-300 bg-white shadow-none">
+        <Card className="overflow-hidden rounded-2xl border-border bg-card shadow-none">
           <CardContent className="p-0">
             <BatchesTable
               batches={batches}
@@ -508,7 +499,7 @@ export function BatchesPageClient(): JSX.Element {
               Cancel
             </Button>
             <Button
-              className="bg-red-700 text-white hover:bg-red-800"
+              className="bg-danger text-primary-foreground hover:bg-danger"
               disabled={deleteBatchMutation.isPending}
               onClick={() => void confirmDelete()}
               type="button"

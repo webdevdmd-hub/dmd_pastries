@@ -30,7 +30,7 @@ export function RecipesToolbar({
   };
 
   return (
-    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/75 p-4 shadow-soft xl:grid-cols-[1.4fr_1fr_1fr_auto_auto]">
+    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-card/75 p-4 shadow-soft xl:grid-cols-[1.4fr_1fr_1fr_auto_auto]">
       <Input
         aria-label="Search recipes"
         onChange={(event) => update({ search: event.target.value })}

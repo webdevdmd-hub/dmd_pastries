@@ -15,12 +15,12 @@ const labels: Record<BatchStatus, string> = {
 export function BatchStatusBadge({ status }: { status: BatchStatus }): JSX.Element {
   const className =
     status === "completed"
-      ? "border-neutral-950 bg-neutral-950 text-white"
+      ? "border-primary bg-primary text-primary-foreground"
       : status === "cancelled"
-        ? "border-red-300 bg-red-50 text-red-700"
+        ? "border-danger/30 bg-danger-tint text-danger-text"
         : status === "in_progress" || status === "partially_completed"
-          ? "border-neutral-300 bg-neutral-200 text-neutral-800"
-          : "border-neutral-300 bg-neutral-100 text-neutral-600";
+          ? "border-border bg-muted text-foreground"
+          : "border-border bg-muted text-foreground-muted";
 
   return (
     <Badge

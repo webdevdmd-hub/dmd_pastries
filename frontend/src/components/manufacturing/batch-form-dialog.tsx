@@ -60,15 +60,15 @@ function countLabel(value: number | null): string {
 
 function feedbackClassName(feedback: ProductionFeedback): string {
   if (feedback.tone === "success") {
-    return "border-green-200 bg-green-50 text-green-800";
+    return "border-money/30 bg-money-tint text-money-text";
   }
   if (feedback.tone === "warning") {
-    return "border-amber-200 bg-amber-50 text-amber-800";
+    return "border-warning/30 bg-warning-tint text-warning-text";
   }
   if (feedback.tone === "info") {
-    return "border-blue-200 bg-blue-50 text-blue-800";
+    return "border-info/30 bg-info-tint text-info-text";
   }
-  return "border-red-200 bg-red-50 text-red-800";
+  return "border-danger/30 bg-danger-tint text-danger-text";
 }
 
 function formatQuantity(value: number, unit = ""): string {
@@ -101,45 +101,45 @@ function PreviewLinesTable({
   }
 
   return (
-    <div className="rounded-xl border border-neutral-300 bg-white">
-      <div className="border-b border-neutral-200 px-3 py-2">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-neutral-500">{title}</p>
+    <div className="rounded-xl border border-border bg-card">
+      <div className="border-b border-border px-3 py-2">
+        <p className="text-xs font-bold text-foreground-muted">{title}</p>
       </div>
-      <div className="divide-y divide-neutral-200">
+      <div className="divide-y divide-border">
         {lines.map((line) => (
           <div
-            className="grid gap-2 px-3 py-2 text-xs text-neutral-600 sm:grid-cols-[1.5fr_1fr_1fr_1fr]"
+            className="grid gap-2 px-3 py-2 text-xs text-foreground-muted sm:grid-cols-[1.5fr_1fr_1fr_1fr]"
             key={line.recipeLineId}
           >
             <div>
-              <p className="font-semibold text-neutral-950">{line.productName}</p>
+              <p className="font-semibold text-foreground">{line.productName}</p>
               <p>{line.productType || "Component"}</p>
             </div>
             <div>
-              <p className="text-neutral-500">Required</p>
-              <p className="font-semibold text-neutral-950">
+              <p className="text-foreground-muted">Required</p>
+              <p className="font-semibold text-foreground">
                 {formatQuantity(line.requiredQuantity, line.unit)}
               </p>
             </div>
             <div>
-              <p className="text-neutral-500">Available</p>
+              <p className="text-foreground-muted">Available</p>
               <p
                 className={
                   line.shortageQuantity > 0
-                    ? "font-semibold text-red-700"
-                    : "font-semibold text-neutral-950"
+                    ? "font-semibold text-danger-text"
+                    : "font-semibold text-foreground"
                 }
               >
                 {formatQuantity(line.availableQuantity, line.unit)}
               </p>
             </div>
             <div>
-              <p className="text-neutral-500">Cost</p>
-              <p className="font-semibold text-neutral-950">
+              <p className="text-foreground-muted">Cost</p>
+              <p className="font-semibold text-foreground">
                 {formatMoney(line.estimatedTotalCost)}
               </p>
               {line.shortageQuantity > 0 ? (
-                <p className="mt-1 font-semibold text-red-700">
+                <p className="mt-1 font-semibold text-danger-text">
                   Short {formatQuantity(line.shortageQuantity, line.unit)}
                 </p>
               ) : null}
@@ -499,7 +499,7 @@ export function BatchFormDialog({
       onOpenChange={(nextOpen) => (!nextOpen && !isSubmitting ? onClose() : undefined)}
     >
       <DialogContent className="flex max-h-[92vh] max-w-4xl flex-col overflow-hidden p-0">
-        <DialogHeader className="shrink-0 border-b border-neutral-300 px-8 py-6">
+        <DialogHeader className="shrink-0 border-b border-border px-8 py-6">
           <DialogTitle>{batch ? "Edit planned production" : "Create production"}</DialogTitle>
           <DialogDescription>
             Save a planned production without stock impact, or produce now to let the backend
@@ -510,9 +510,9 @@ export function BatchFormDialog({
         <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
           <div className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-neutral-950">Branch</label>
+              <label className="text-sm font-medium text-foreground">Branch</label>
               {batch ? (
-                <div className="min-h-10 rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950">
+                <div className="min-h-10 rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground">
                   {batch.branchName}
                 </div>
               ) : (
@@ -540,7 +540,7 @@ export function BatchFormDialog({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-neutral-950">Production date</label>
+              <label className="text-sm font-medium text-foreground">Production date</label>
               <Input
                 aria-label="Production date"
                 onChange={(event) => {
@@ -553,9 +553,9 @@ export function BatchFormDialog({
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium text-neutral-950">Output product</label>
+              <label className="text-sm font-medium text-foreground">Output product</label>
               {batch ? (
-                <div className="min-h-10 rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950">
+                <div className="min-h-10 rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground">
                   {batch.productVariantName
                     ? `${batch.productName} / ${batch.productVariantName}`
                     : batch.productName}
@@ -579,9 +579,9 @@ export function BatchFormDialog({
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium text-neutral-950">Active recipe</label>
+              <label className="text-sm font-medium text-foreground">Active recipe</label>
               {batch ? (
-                <div className="min-h-10 rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950">
+                <div className="min-h-10 rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground">
                   {batch.recipeName}{" "}
                   {batch.recipeVersionNumber ? <>v{batch.recipeVersionNumber}</> : null}
                 </div>
@@ -619,13 +619,13 @@ export function BatchFormDialog({
             </div>
 
             {shouldShowPreviewPanel ? (
-              <div className="rounded-2xl border border-neutral-300 bg-neutral-100 p-5 text-sm text-neutral-600 md:col-span-2">
+              <div className="rounded-2xl border border-border bg-muted p-5 text-sm text-foreground-muted md:col-span-2">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="font-semibold text-neutral-950">Recipe Details</p>
+                    <p className="font-semibold text-foreground">Recipe Details</p>
                     <p className="mt-3">
                       Output stock:{" "}
-                      <span className="font-semibold text-neutral-950">
+                      <span className="font-semibold text-foreground">
                         {selectedRecipe?.productVariantName ??
                           batch?.productVariantName ??
                           "Parent product"}
@@ -641,17 +641,17 @@ export function BatchFormDialog({
                         : `Current batch uses ${batch?.batchUnitName ?? "the saved yield unit"}`}
                     </p>
                     <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                      <div className="rounded-xl border border-neutral-300 bg-white px-3 py-2">
-                        <span className="text-neutral-500">Ingredients</span>
-                        <strong className="ml-2 text-neutral-950">
+                      <div className="rounded-xl border border-border bg-card px-3 py-2">
+                        <span className="text-foreground-muted">Ingredients</span>
+                        <strong className="ml-2 text-foreground">
                           {productionPreview
                             ? productionPreview.components.length.toLocaleString()
                             : countLabel(selectedRecipe?.componentCount ?? null)}
                         </strong>
                       </div>
-                      <div className="rounded-xl border border-neutral-300 bg-white px-3 py-2">
-                        <span className="text-neutral-500">Packaging</span>
-                        <strong className="ml-2 text-neutral-950">
+                      <div className="rounded-xl border border-border bg-card px-3 py-2">
+                        <span className="text-foreground-muted">Packaging</span>
+                        <strong className="ml-2 text-foreground">
                           {productionPreview
                             ? productionPreview.packaging.length.toLocaleString()
                             : countLabel(selectedRecipe?.packagingCount ?? null)}
@@ -660,24 +660,24 @@ export function BatchFormDialog({
                     </div>
                   </div>
                   {(selectedRecipe?.versionNumber ?? batch?.recipeVersionNumber) ? (
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-neutral-600">
+                    <span className="rounded-full bg-card px-3 py-1 text-xs font-bold text-foreground-muted">
                       v{selectedRecipe?.versionNumber ?? batch?.recipeVersionNumber}
                     </span>
                   ) : null}
                 </div>
                 {selectedRecipeIsKnownInactive ? (
-                  <p className="mt-3 font-semibold text-red-700">
+                  <p className="mt-3 font-semibold text-danger-text">
                     Activate this recipe before creating production.
                   </p>
                 ) : null}
                 {selectedRecipeHasKnownMissingComponents ? (
-                  <Alert className="mt-4 border-amber-300 bg-amber-50 text-amber-950">
+                  <Alert className="mt-4 border-warning/30 bg-warning-tint text-warning-text">
                     <AlertTitle>Missing BOM lines</AlertTitle>
                     <AlertDescription>{EMPTY_BOM_PRODUCTION_MESSAGE}</AlertDescription>
                   </Alert>
                 ) : null}
                 {productionPreviewQuery.isLoading ? (
-                  <Alert className="mt-4 border-neutral-300 bg-white text-neutral-700">
+                  <Alert className="mt-4 border-border bg-card text-foreground-muted">
                     <AlertTitle>Checking stock availability</AlertTitle>
                     <AlertDescription>
                       Required components, packaging, and cost will appear here before production
@@ -686,7 +686,7 @@ export function BatchFormDialog({
                   </Alert>
                 ) : null}
                 {productionPreviewQuery.isError ? (
-                  <Alert className="mt-4 border-red-300 bg-red-50 text-red-950">
+                  <Alert className="mt-4 border-danger/30 bg-danger-tint text-danger-text">
                     <AlertTitle>Cannot validate production stock</AlertTitle>
                     <AlertDescription>
                       {productionFailureMessage(productionPreviewQuery.error)}
@@ -695,22 +695,22 @@ export function BatchFormDialog({
                 ) : null}
                 {productionPreview ? (
                   <div className="mt-4 space-y-3">
-                    <div className="grid gap-2 rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm sm:grid-cols-3">
+                    <div className="grid gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm sm:grid-cols-3">
                       <div>
-                        <p className="text-neutral-500">Estimated total cost</p>
-                        <p className="font-semibold text-neutral-950">
+                        <p className="text-foreground-muted">Estimated total cost</p>
+                        <p className="font-semibold text-foreground">
                           {formatMoney(productionPreview.estimatedTotalCost)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-neutral-500">Cost per unit</p>
-                        <p className="font-semibold text-neutral-950">
+                        <p className="text-foreground-muted">Cost per unit</p>
+                        <p className="font-semibold text-foreground">
                           {formatMoney(productionPreview.estimatedCostPerUnit)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-neutral-500">Quantity checked</p>
-                        <p className="font-semibold text-neutral-950">
+                        <p className="text-foreground-muted">Quantity checked</p>
+                        <p className="font-semibold text-foreground">
                           {formatQuantity(
                             productionPreview.quantityProduced,
                             productionPreview.recipeYieldUnit,
@@ -723,14 +723,14 @@ export function BatchFormDialog({
                     <PreviewLinesTable lines={productionPreview.packaging} title="Packaging" />
 
                     {previewHasNoComponentLines ? (
-                      <Alert className="border-amber-300 bg-amber-50 text-amber-950">
+                      <Alert className="border-warning/30 bg-warning-tint text-warning-text">
                         <AlertTitle>Missing BOM lines</AlertTitle>
                         <AlertDescription>{EMPTY_BOM_PRODUCTION_MESSAGE}</AlertDescription>
                       </Alert>
                     ) : null}
 
                     {productionPreview.hasShortage ? (
-                      <Alert className="border-red-300 bg-red-50 text-red-950">
+                      <Alert className="border-danger/30 bg-danger-tint text-danger-text">
                         <AlertTitle>Not enough stock to produce</AlertTitle>
                         <AlertDescription>
                           Add stock for the shortage items before posting production.
@@ -747,7 +747,7 @@ export function BatchFormDialog({
                     ) : null}
 
                     {productionPreview.warnings.length > 0 ? (
-                      <Alert className="border-amber-300 bg-amber-50 text-amber-950">
+                      <Alert className="border-warning/30 bg-warning-tint text-warning-text">
                         <AlertTitle>Production cost warning</AlertTitle>
                         <AlertDescription>
                           <ul className="list-disc space-y-1 pl-5">
@@ -764,7 +764,7 @@ export function BatchFormDialog({
             ) : null}
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-neutral-950">
+              <label className="text-sm font-medium text-foreground">
                 {batch ? "Quantity to produce now" : "Quantity to produce"}
               </label>
               <Input
@@ -781,7 +781,7 @@ export function BatchFormDialog({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-neutral-950">Notes</label>
+              <label className="text-sm font-medium text-foreground">Notes</label>
               <Input
                 aria-label="Notes"
                 onChange={(event) => {
@@ -804,7 +804,7 @@ export function BatchFormDialog({
           </div>
         ) : null}
 
-        <DialogFooter className="shrink-0 border-t border-neutral-300 bg-neutral-50 px-8 py-5">
+        <DialogFooter className="shrink-0 border-t border-border bg-muted px-8 py-5">
           <Button disabled={isSubmitting} onClick={onClose} type="button" variant="outline">
             Cancel
           </Button>
@@ -829,7 +829,7 @@ export function BatchFormDialog({
           )}
           {batch && canProducePlanned ? (
             <Button
-              className="bg-black text-white hover:bg-neutral-800"
+              className="bg-primary text-primary-foreground hover:bg-primary"
               disabled={isProduceDisabled}
               onClick={() => void submitPlannedProduction()}
               type="button"
@@ -843,7 +843,7 @@ export function BatchFormDialog({
           ) : null}
           {!batch ? (
             <Button
-              className="bg-black text-white hover:bg-neutral-800"
+              className="bg-primary text-primary-foreground hover:bg-primary"
               disabled={isProduceDisabled}
               onClick={() => void submitProduction()}
               type="button"

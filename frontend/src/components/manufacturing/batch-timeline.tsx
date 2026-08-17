@@ -15,10 +15,8 @@ export function BatchTimeline({ batch }: { batch: ProductionBatch }): JSX.Elemen
   ];
 
   return (
-    <section className="rounded-2xl border border-neutral-300 bg-white p-6">
-      <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-neutral-950">
-        Production Timeline
-      </h2>
+    <section className="rounded-2xl border border-border bg-card p-6">
+      <h2 className="text-sm font-bold text-foreground">Production Timeline</h2>
       <div className="mt-6 space-y-0">
         {steps.map((step, index) => (
           <div className="grid grid-cols-[24px_1fr] gap-4" key={step.label}>
@@ -26,21 +24,23 @@ export function BatchTimeline({ batch }: { batch: ProductionBatch }): JSX.Elemen
               <span
                 className={
                   step.done
-                    ? "h-4 w-4 rounded-full bg-black"
-                    : "h-4 w-4 rounded-full border-2 border-neutral-300 bg-white"
+                    ? "h-4 w-4 rounded-full bg-primary"
+                    : "h-4 w-4 rounded-full border-2 border-border bg-card"
                 }
               />
-              {index < steps.length - 1 ? <span className="h-12 w-px bg-neutral-300" /> : null}
+              {index < steps.length - 1 ? <span className="h-12 w-px bg-border" /> : null}
             </div>
             <div className="-mt-1 pb-6">
               <p
                 className={
-                  step.done ? "font-semibold text-neutral-950" : "font-semibold text-neutral-500"
+                  step.done
+                    ? "font-semibold text-foreground"
+                    : "font-semibold text-foreground-muted"
                 }
               >
                 {step.label}
               </p>
-              <p className="mt-1 text-sm text-neutral-500">
+              <p className="mt-1 text-sm text-foreground-muted">
                 {step.done ? "Completed in workflow" : "Pending"}
               </p>
             </div>

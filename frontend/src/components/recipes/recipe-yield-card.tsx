@@ -21,7 +21,7 @@ export function RecipeYieldCard({ preview }: { preview: RecipeYieldPreview }): J
       : "Not saved";
 
   return (
-    <Card className="bg-white/80">
+    <Card className="bg-card/80">
       <CardHeader>
         <CardTitle>Yield</CardTitle>
       </CardHeader>

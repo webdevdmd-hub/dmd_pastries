@@ -58,7 +58,7 @@ export function PackagingActionsMenu({
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-700" onSelect={() => onDelete(item)}>
+            <DropdownMenuItem className="text-danger-text" onSelect={() => onDelete(item)}>
               Delete
             </DropdownMenuItem>
           </>

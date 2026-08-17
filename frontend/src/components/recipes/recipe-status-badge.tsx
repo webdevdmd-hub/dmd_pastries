@@ -8,11 +8,11 @@ import type { RecipeStatus } from "@/types/recipes";
 export function RecipeStatusBadge({ status }: { status: RecipeStatus }): JSX.Element {
   const className =
     status === "active"
-      ? "border-green-200 bg-green-50 text-green-800"
+      ? "border-money/30 bg-money-tint text-money-text"
       : status === "archived"
-        ? "border-red-200 bg-red-50 text-red-800"
+        ? "border-danger/30 bg-danger-tint text-danger-text"
         : status === "inactive"
-          ? "border-neutral-200 bg-neutral-100 text-neutral-700"
+          ? "border-border bg-muted text-foreground-muted"
           : "border-brand-cappuccino bg-brand-latte text-brand-mocha";
 
   return (

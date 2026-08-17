@@ -60,7 +60,7 @@ export function RecipeActionsMenu({
               Create version
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-700" onSelect={() => onDelete(recipe)}>
+            <DropdownMenuItem className="text-danger-text" onSelect={() => onDelete(recipe)}>
               Delete
             </DropdownMenuItem>
           </>

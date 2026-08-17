@@ -44,14 +44,14 @@ export function BatchProduceDialog({
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
       <DialogContent className="max-w-xl p-0">
-        <DialogHeader className="border-b border-neutral-300 px-7 py-6">
+        <DialogHeader className="border-b border-border px-7 py-6">
           <DialogTitle>Produce output</DialogTitle>
           <DialogDescription>
             Record finished goods stock-in for this production batch.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2 px-7 py-6">
-          <label className="text-sm font-medium text-neutral-950">Quantity produced</label>
+          <label className="text-sm font-medium text-foreground">Quantity produced</label>
           <Input
             aria-label="Quantity produced"
             min="0"
@@ -59,17 +59,17 @@ export function BatchProduceDialog({
             type="number"
             value={quantityProduced}
           />
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-foreground-muted">
             Finished stock increases only when backend accepts this output record.
           </p>
-          {error ? <p className="text-sm font-semibold text-red-700">{error}</p> : null}
+          {error ? <p className="text-sm font-semibold text-danger-text">{error}</p> : null}
         </div>
-        <DialogFooter className="border-t border-neutral-300 bg-neutral-50 px-7 py-5">
+        <DialogFooter className="border-t border-border bg-muted px-7 py-5">
           <Button onClick={onClose} type="button" variant="outline">
             Cancel
           </Button>
           <Button
-            className="bg-black text-white hover:bg-neutral-800"
+            className="bg-primary text-primary-foreground hover:bg-primary"
             disabled={isSubmitting}
             onClick={() => void submit()}
             type="button"

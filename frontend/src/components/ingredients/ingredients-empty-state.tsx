@@ -13,7 +13,7 @@ export function IngredientsEmptyState({
   onCreate,
 }: IngredientsEmptyStateProps): JSX.Element {
   return (
-    <div className="grid place-items-center rounded-3xl border border-brand-cappuccino bg-white/70 p-12 text-center shadow-soft">
+    <div className="grid place-items-center rounded-3xl border border-brand-cappuccino bg-card/70 p-12 text-center shadow-soft">
       <div className="grid max-w-md gap-4">
         <Wheat className="mx-auto h-10 w-10 text-brand-mocha" />
         <h2 className="text-2xl font-bold text-brand-espresso">No ingredients found.</h2>

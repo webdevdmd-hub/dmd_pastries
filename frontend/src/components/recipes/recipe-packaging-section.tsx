@@ -207,7 +207,7 @@ export function RecipePackagingSection({
   };
 
   return (
-    <Card className="bg-white/80">
+    <Card className="bg-card/80">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Packaging BOM</CardTitle>
         {canManage ? (
@@ -281,7 +281,7 @@ export function RecipePackagingSection({
             No packaging added yet.
           </p>
         ) : (
-          <p className="rounded-2xl border border-dashed border-brand-cappuccino bg-white/70 p-4 text-sm text-brand-mocha">
+          <p className="rounded-2xl border border-dashed border-brand-cappuccino bg-card/70 p-4 text-sm text-brand-mocha">
             Add your first packaging line if this recipe needs branch packaging.
           </p>
         )}

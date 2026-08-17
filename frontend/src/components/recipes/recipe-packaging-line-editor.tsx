@@ -183,7 +183,7 @@ export function RecipePackagingLineEditor({
             value={unitId}
           />
           {shouldShowMissingUnitWarning ? (
-            <span className="text-xs text-red-700">
+            <span className="text-xs text-danger-text">
               This packaging product has no default unit configured. Select a unit before saving.
             </span>
           ) : selectedProduct ? (

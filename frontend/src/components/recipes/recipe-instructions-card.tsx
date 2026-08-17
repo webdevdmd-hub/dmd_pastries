@@ -10,7 +10,7 @@ export function RecipeInstructionsCard({
   instructions: string | null;
 }): JSX.Element {
   return (
-    <Card className="bg-white/80">
+    <Card className="bg-card/80">
       <CardHeader>
         <CardTitle>Instructions</CardTitle>
       </CardHeader>

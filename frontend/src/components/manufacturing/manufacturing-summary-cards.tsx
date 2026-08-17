@@ -39,22 +39,20 @@ export function ManufacturingSummaryCards({
         const Icon = card.icon;
         return (
           <section
-            className="rounded-2xl border border-neutral-300 bg-white p-5 text-neutral-950"
+            className="rounded-2xl border border-border bg-card p-5 text-foreground"
             key={card.label}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
-                  {card.label}
-                </p>
+                <p className="text-xs font-semibold text-foreground-muted">{card.label}</p>
                 <div className="mt-4 flex items-end gap-2">
-                  <p className="font-mono text-4xl font-semibold leading-none text-neutral-950">
+                  <p className="font-mono text-4xl font-semibold leading-none text-foreground">
                     {card.value}
                   </p>
-                  <p className="pb-1 text-sm text-neutral-500">{card.meta}</p>
+                  <p className="pb-1 text-sm text-foreground-muted">{card.meta}</p>
                 </div>
               </div>
-              <span className="rounded-full border border-neutral-300 bg-neutral-50 p-2 text-neutral-700">
+              <span className="rounded-full border border-border bg-muted p-2 text-foreground-muted">
                 <Icon className="h-5 w-5" />
               </span>
             </div>

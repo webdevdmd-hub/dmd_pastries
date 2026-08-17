@@ -66,28 +66,18 @@ export function BatchesTable({
 
   return (
     <Table>
-      <TableHeader className="bg-neutral-100">
-        <TableRow className="border-neutral-300 hover:bg-neutral-100">
-          <TableHead className="h-14 text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
+      <TableHeader className="bg-muted">
+        <TableRow className="border-border hover:bg-muted">
+          <TableHead className="h-14 text-xs font-bold text-foreground-muted">
             Production Number
           </TableHead>
-          <TableHead className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
-            Output Product
-          </TableHead>
-          <TableHead className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
-            Recipe
-          </TableHead>
-          <TableHead className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
-            Planned
-          </TableHead>
-          <TableHead className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
-            Produced
-          </TableHead>
+          <TableHead className="text-xs font-bold text-foreground-muted">Output Product</TableHead>
+          <TableHead className="text-xs font-bold text-foreground-muted">Recipe</TableHead>
+          <TableHead className="text-xs font-bold text-foreground-muted">Planned</TableHead>
+          <TableHead className="text-xs font-bold text-foreground-muted">Produced</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
-            Start Time
-          </TableHead>
-          <TableHead className="text-right text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
+          <TableHead className="text-xs font-bold text-foreground-muted">Start Time</TableHead>
+          <TableHead className="text-right text-xs font-bold text-foreground-muted">
             Actions
           </TableHead>
         </TableRow>
@@ -100,10 +90,10 @@ export function BatchesTable({
               : 0;
 
           return (
-            <TableRow className="border-neutral-200 hover:bg-neutral-50" key={batch.id}>
+            <TableRow className="border-border hover:bg-muted" key={batch.id}>
               <TableCell>
                 <Link
-                  className="font-mono text-sm font-semibold text-neutral-950 underline-offset-4 hover:underline"
+                  className="font-mono text-sm font-semibold text-foreground underline-offset-4 hover:underline"
                   href={`${ROUTES.manufacturingBatches}/${batch.id}`}
                 >
                   {batch.batchNumber}
@@ -111,26 +101,26 @@ export function BatchesTable({
               </TableCell>
               <TableCell>
                 <div className="grid gap-1">
-                  <span className="font-semibold text-neutral-950">{batchOutputLabel(batch)}</span>
-                  <span className="text-xs text-neutral-500">
+                  <span className="font-semibold text-foreground">{batchOutputLabel(batch)}</span>
+                  <span className="text-xs text-foreground-muted">
                     Output: {batch.productVariantName ? "Variant stock" : "Parent product stock"}
                   </span>
                 </div>
               </TableCell>
-              <TableCell className="text-neutral-700">
+              <TableCell className="text-foreground-muted">
                 {batch.recipeName} · {formatRecipeVersionLabel(batch.recipeVersionNumber)}
               </TableCell>
-              <TableCell className="font-mono text-neutral-950">
+              <TableCell className="font-mono text-foreground">
                 {formatQuantity(batch.plannedQuantity, batch.batchUnitName)}
               </TableCell>
               <TableCell className="min-w-44">
                 <div className="space-y-2">
-                  <span className="font-mono text-neutral-950">
+                  <span className="font-mono text-foreground">
                     {formatQuantity(batch.producedQuantity, batch.batchUnitName)}
                   </span>
-                  <div className="h-1.5 rounded-full bg-neutral-200">
+                  <div className="h-1.5 rounded-full bg-muted">
                     <div
-                      className="h-1.5 rounded-full bg-neutral-950"
+                      className="h-1.5 rounded-full bg-primary"
                       style={{ width: `${progress.toFixed(0)}%` }}
                     />
                   </div>
@@ -139,14 +129,14 @@ export function BatchesTable({
               <TableCell>
                 <BatchStatusBadge status={batch.status} />
               </TableCell>
-              <TableCell className="text-sm text-neutral-600">
+              <TableCell className="text-sm text-foreground-muted">
                 {formatDateTime(batch.startTime)}
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
                   {canProduce && canProduceBatch(batch) ? (
                     <Button
-                      className="h-8 border-neutral-300 px-3 text-xs"
+                      className="h-8 border-border px-3 text-xs"
                       disabled={producingBatchId === batch.id}
                       onClick={() => onProduce(batch)}
                       type="button"

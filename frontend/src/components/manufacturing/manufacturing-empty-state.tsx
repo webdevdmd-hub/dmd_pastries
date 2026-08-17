@@ -16,7 +16,7 @@ export function ManufacturingEmptyState({
   title?: string;
 }): JSX.Element {
   return (
-    <Card className="border-brand-cappuccino/70 bg-white/80">
+    <Card className="border-brand-cappuccino/70 bg-card/80">
       <CardContent className="flex min-h-72 flex-col items-center justify-center gap-4 text-center">
         <div className="rounded-2xl bg-brand-latte p-4 text-brand-mocha">
           <Factory className="h-8 w-8" />

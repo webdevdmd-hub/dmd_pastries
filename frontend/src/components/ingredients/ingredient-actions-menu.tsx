@@ -49,7 +49,7 @@ export function IngredientActionsMenu({
           </DropdownMenuItem>
         ) : null}
         {canManage ? (
-          <DropdownMenuItem className="text-red-700" onClick={() => onDelete(item)}>
+          <DropdownMenuItem className="text-danger-text" onClick={() => onDelete(item)}>
             Delete
           </DropdownMenuItem>
         ) : null}

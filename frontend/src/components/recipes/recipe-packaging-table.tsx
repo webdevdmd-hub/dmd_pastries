@@ -88,7 +88,7 @@ export function RecipePackagingTable({
                     type="button"
                     variant="ghost"
                   >
-                    <Trash2 className="h-4 w-4 text-red-700" />
+                    <Trash2 className="h-4 w-4 text-danger-text" />
                   </Button>
                 </div>
               ) : null}

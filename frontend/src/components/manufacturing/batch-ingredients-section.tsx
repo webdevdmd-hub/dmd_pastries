@@ -43,20 +43,18 @@ export function BatchIngredientsSection({
   ingredients: ProductionBatchIngredient[];
 }): JSX.Element {
   return (
-    <section className="overflow-hidden rounded-2xl border border-neutral-300 bg-white">
-      <div className="flex items-center justify-between gap-4 border-b border-neutral-300 p-5">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="flex items-center justify-between gap-4 border-b border-border p-5">
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-neutral-950">
-            Components Consumed
-          </h2>
-          <p className="mt-1 text-sm text-neutral-500">
+          <h2 className="text-sm font-bold text-foreground">Components Consumed</h2>
+          <p className="mt-1 text-sm text-foreground-muted">
             Backend-generated ingredient and material stock-out rows for this production.
           </p>
         </div>
       </div>
       <Table>
-        <TableHeader className="bg-neutral-50">
-          <TableRow className="border-neutral-300 hover:bg-neutral-50">
+        <TableHeader className="bg-muted">
+          <TableRow className="border-border hover:bg-muted">
             <TableHead>Product</TableHead>
             <TableHead>Required</TableHead>
             <TableHead>Consumed</TableHead>
@@ -67,10 +65,10 @@ export function BatchIngredientsSection({
         </TableHeader>
         <TableBody>
           {ingredients.map((ingredient) => (
-            <TableRow className="border-neutral-200 hover:bg-neutral-50" key={ingredient.id}>
+            <TableRow className="border-border hover:bg-muted" key={ingredient.id}>
               <TableCell>
-                <p className="font-semibold text-neutral-950">{componentName(ingredient)}</p>
-                <p className="text-xs text-neutral-500">{componentMeta(ingredient)}</p>
+                <p className="font-semibold text-foreground">{componentName(ingredient)}</p>
+                <p className="text-xs text-foreground-muted">{componentMeta(ingredient)}</p>
               </TableCell>
               <TableCell className="font-mono">
                 {ingredient.requiredQuantity} {ingredient.unitSymbol || ingredient.unitName}
@@ -81,7 +79,7 @@ export function BatchIngredientsSection({
               <TableCell>
                 <p className="font-mono">{formatMoney(ingredient.totalCost)}</p>
                 {ingredient.unitCostSnapshot > 0 ? (
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-foreground-muted">
                     Unit {formatMoney(ingredient.unitCostSnapshot)}
                   </p>
                 ) : null}

@@ -592,7 +592,7 @@ export function RecipeFormPage({
         {isSaving ? "Saving..." : "Save & activate"}
       </Button>
       {!canSaveRecipe ? (
-        <p className="text-xs text-red-700">
+        <p className="text-xs text-danger-text">
           You do not have permission to {isCreate ? "create" : "edit"} recipes.
         </p>
       ) : !canUpdateRecipeStatus ? (
@@ -611,17 +611,17 @@ export function RecipeFormPage({
     <div
       className={
         isDialog
-          ? "mx-auto flex h-full min-h-0 max-h-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-neutral-300 bg-white shadow-2xl"
+          ? "mx-auto flex h-full min-h-0 max-h-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
           : "mx-auto flex max-w-7xl flex-col gap-6"
       }
     >
       {isDialog ? (
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-neutral-200 px-5 py-5 sm:px-8">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-5 sm:px-8">
           <div>
-            <h2 className="text-3xl font-semibold tracking-tight text-neutral-950">
+            <h2 className="text-3xl font-semibold tracking-tight text-foreground">
               Recipe Builder
             </h2>
-            <p className="mt-1 text-sm text-neutral-600">
+            <p className="mt-1 text-sm text-foreground-muted">
               Define how finished and semi-finished products are made.
             </p>
           </div>
@@ -662,7 +662,7 @@ export function RecipeFormPage({
                 : "flex flex-col gap-6"
             }
           >
-            <Card className="rounded-2xl border-workspace-border bg-white shadow-none">
+            <Card className="rounded-2xl border-workspace-border bg-card shadow-none">
               <CardHeader className="border-b border-workspace-border pb-4">
                 <CardTitle className="text-2xl text-brand-espresso">Recipe Details</CardTitle>
               </CardHeader>
@@ -693,7 +693,7 @@ export function RecipeFormPage({
                     value={selectedProductId}
                   />
                   {fieldError("productId") ? (
-                    <span className="text-sm text-red-700">{fieldError("productId")}</span>
+                    <span className="text-sm text-danger-text">{fieldError("productId")}</span>
                   ) : null}
                 </div>
                 <label className="grid gap-2">
@@ -738,7 +738,9 @@ export function RecipeFormPage({
                       value={selectedVariantId}
                     />
                     {fieldError("productVariantId") ? (
-                      <span className="text-sm text-red-700">{fieldError("productVariantId")}</span>
+                      <span className="text-sm text-danger-text">
+                        {fieldError("productVariantId")}
+                      </span>
                     ) : null}
                   </label>
                 ) : null}
@@ -753,7 +755,7 @@ export function RecipeFormPage({
                         {...form.register("newProductVariantName")}
                       />
                       {fieldError("newProductVariantName") ? (
-                        <span className="text-sm text-red-700">
+                        <span className="text-sm text-danger-text">
                           {fieldError("newProductVariantName")}
                         </span>
                       ) : null}
@@ -778,7 +780,7 @@ export function RecipeFormPage({
                         {...form.register("newProductVariantSalePrice")}
                       />
                       {fieldError("newProductVariantSalePrice") ? (
-                        <span className="text-sm text-red-700">
+                        <span className="text-sm text-danger-text">
                           {fieldError("newProductVariantSalePrice")}
                         </span>
                       ) : null}
@@ -793,7 +795,7 @@ export function RecipeFormPage({
                     {...form.register("recipeName")}
                   />
                   {fieldError("recipeName") ? (
-                    <span className="text-sm text-red-700">{fieldError("recipeName")}</span>
+                    <span className="text-sm text-danger-text">{fieldError("recipeName")}</span>
                   ) : null}
                 </label>
                 <label className="grid gap-2 lg:col-span-2">
@@ -808,7 +810,7 @@ export function RecipeFormPage({
               </CardContent>
             </Card>
 
-            <Card className="rounded-2xl border-workspace-border bg-white shadow-none">
+            <Card className="rounded-2xl border-workspace-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle className="text-2xl text-brand-espresso">This Recipe Makes</CardTitle>
                 <p className="text-sm text-brand-mocha">
@@ -878,7 +880,7 @@ export function RecipeFormPage({
               recipeId={recipeId}
               units={data.units}
             />
-            <Card className="rounded-2xl border-workspace-border bg-white shadow-none">
+            <Card className="rounded-2xl border-workspace-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle className="text-2xl text-brand-espresso">
                   Production Instructions
@@ -899,13 +901,13 @@ export function RecipeFormPage({
           <div
             className={
               isDialog
-                ? "min-h-0 overflow-y-auto overscroll-contain border-t border-neutral-200 bg-neutral-50 px-5 py-5 lg:border-l lg:border-t-0"
+                ? "min-h-0 overflow-y-auto overscroll-contain border-t border-border bg-muted px-5 py-5 lg:border-l lg:border-t-0"
                 : "flex flex-col gap-5 xl:sticky xl:top-6 xl:self-start"
             }
           >
             <div className="flex flex-col gap-5">
               {canSaveRecipe || canUpdateRecipeStatus ? (
-                <Card className="rounded-2xl border-workspace-border bg-white shadow-none">
+                <Card className="rounded-2xl border-workspace-border bg-card shadow-none">
                   <CardHeader>
                     <CardTitle className="text-2xl text-brand-espresso">Builder Actions</CardTitle>
                   </CardHeader>
@@ -931,7 +933,7 @@ export function RecipeFormPage({
         </div>
 
         {!isDialog && (canSaveRecipe || canUpdateRecipeStatus) ? (
-          <div className="rounded-3xl border border-brand-cappuccino bg-white/80 p-4 shadow-sm xl:hidden">
+          <div className="rounded-3xl border border-brand-cappuccino bg-card/80 p-4 shadow-sm xl:hidden">
             {recipeActionButtons}
           </div>
         ) : null}

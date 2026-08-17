@@ -87,7 +87,7 @@ export function BatchWastageDialog({
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
       <DialogContent className="max-w-xl p-0">
-        <DialogHeader className="border-b border-neutral-300 px-7 py-6">
+        <DialogHeader className="border-b border-border px-7 py-6">
           <DialogTitle>Add wastage</DialogTitle>
           <DialogDescription>
             Record unusable stock or production waste for audit visibility.
@@ -130,14 +130,14 @@ export function BatchWastageDialog({
             placeholder="Reason"
             value={reason}
           />
-          {error ? <p className="text-sm font-semibold text-red-700">{error}</p> : null}
+          {error ? <p className="text-sm font-semibold text-danger-text">{error}</p> : null}
         </div>
-        <DialogFooter className="border-t border-neutral-300 bg-neutral-50 px-7 py-5">
+        <DialogFooter className="border-t border-border bg-muted px-7 py-5">
           <Button onClick={onClose} type="button" variant="outline">
             Cancel
           </Button>
           <Button
-            className="bg-black text-white hover:bg-neutral-800"
+            className="bg-primary text-primary-foreground hover:bg-primary"
             disabled={isSubmitting}
             onClick={() => void submit()}
             type="button"

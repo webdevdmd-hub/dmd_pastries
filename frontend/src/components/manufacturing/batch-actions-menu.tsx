@@ -69,7 +69,7 @@ export function BatchActionsMenu({
           </DropdownMenuItem>
         ) : null}
         {canDelete && isPlanned ? (
-          <DropdownMenuItem className="text-red-700" onSelect={() => onDelete(batch)}>
+          <DropdownMenuItem className="text-danger-text" onSelect={() => onDelete(batch)}>
             <Trash2 className="h-4 w-4" />
             Delete planned
           </DropdownMenuItem>

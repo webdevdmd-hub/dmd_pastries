@@ -31,32 +31,30 @@ export function BatchOutputSection({ outputs }: { outputs: ProductionOutput[] })
   const totalCost = outputs.reduce((total, output) => total + output.totalCost, 0);
 
   return (
-    <section className="rounded-2xl bg-black p-6 text-white">
+    <section className="rounded-2xl bg-primary p-6 text-primary-foreground">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-neutral-300">
-            Finished Output
-          </h2>
+          <h2 className="text-sm font-bold text-primary-foreground/70">Finished Output</h2>
           <p className="mt-6 font-mono text-5xl font-semibold">{totalQuantity}</p>
-          <p className="mt-2 text-neutral-300">
+          <p className="mt-2 text-primary-foreground/70">
             {outputs[0] ? outputMeta(outputs[0]) : "No output recorded yet"}
           </p>
         </div>
       </div>
-      <div className="mt-6 border-t border-white/20 pt-5">
+      <div className="mt-6 border-t border-card/20 pt-5">
         <p className="font-mono text-2xl font-semibold">{formatMoney(totalCost)}</p>
-        <p className="text-sm text-neutral-400">Estimated total value</p>
+        <p className="text-sm text-foreground-muted">Estimated total value</p>
       </div>
       {outputs.length > 0 ? (
         <div className="mt-6 space-y-3">
           {outputs.map((output) => (
-            <div className="rounded-xl border border-white/15 p-4" key={output.id}>
+            <div className="rounded-xl border border-card/15 p-4" key={output.id}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold">
                     {output.quantityProduced} {output.unitName}
                   </p>
-                  <p className="text-sm text-neutral-400">{formatDate(output.createdAt)}</p>
+                  <p className="text-sm text-foreground-muted">{formatDate(output.createdAt)}</p>
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">
                   <StockMovementLink id={output.stockMovementId} />

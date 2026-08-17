@@ -8,7 +8,7 @@ export function IngredientStatusBadge({ status }: { status: IngredientStatus }):
     <Badge
       className={
         status === "active"
-          ? "border-green-200 bg-green-50 text-green-800"
+          ? "border-money/30 bg-money-tint text-money-text"
           : "border-brand-cappuccino bg-brand-latte text-brand-mocha"
       }
       variant="outline"

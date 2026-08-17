@@ -75,7 +75,7 @@ export function PackagingUsageSection({
   };
 
   return (
-    <Card className="bg-white/80">
+    <Card className="bg-card/80">
       <CardHeader>
         <CardTitle>Packaging usage rules</CardTitle>
       </CardHeader>
@@ -170,7 +170,7 @@ export function PackagingUsageSection({
                   type="button"
                   variant="ghost"
                 >
-                  <Trash2 className="h-4 w-4 text-red-700" />
+                  <Trash2 className="h-4 w-4 text-danger-text" />
                 </Button>
               ) : null}
             </div>

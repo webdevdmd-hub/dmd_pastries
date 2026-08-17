@@ -10,7 +10,7 @@ export function PackagingStatusBadge({ status }: { status: PackagingStatus }): J
     <Badge
       className={
         status === "active"
-          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+          ? "border-money/30 bg-money-tint text-money-text"
           : "border-brand-cappuccino bg-brand-latte text-brand-mocha"
       }
       variant="outline"

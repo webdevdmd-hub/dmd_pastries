@@ -41,18 +41,16 @@ export function BatchPackagingSection({
   packaging: ProductionBatchPackaging[];
 }): JSX.Element {
   return (
-    <section className="overflow-hidden rounded-2xl border border-neutral-300 bg-white">
-      <div className="border-b border-neutral-300 p-5">
-        <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-neutral-950">
-          Packaging Consumed
-        </h2>
-        <p className="mt-1 text-sm text-neutral-500">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="border-b border-border p-5">
+        <h2 className="text-sm font-bold text-foreground">Packaging Consumed</h2>
+        <p className="mt-1 text-sm text-foreground-muted">
           Backend-generated packaging stock-out rows for this production.
         </p>
       </div>
       <Table>
-        <TableHeader className="bg-neutral-50">
-          <TableRow className="border-neutral-300 hover:bg-neutral-50">
+        <TableHeader className="bg-muted">
+          <TableRow className="border-border hover:bg-muted">
             <TableHead>Product</TableHead>
             <TableHead>Required</TableHead>
             <TableHead>Consumed</TableHead>
@@ -63,10 +61,10 @@ export function BatchPackagingSection({
         </TableHeader>
         <TableBody>
           {packaging.map((item) => (
-            <TableRow className="border-neutral-200 hover:bg-neutral-50" key={item.id}>
+            <TableRow className="border-border hover:bg-muted" key={item.id}>
               <TableCell>
-                <p className="font-semibold text-neutral-950">{componentName(item)}</p>
-                <p className="text-xs text-neutral-500">{componentMeta(item)}</p>
+                <p className="font-semibold text-foreground">{componentName(item)}</p>
+                <p className="text-xs text-foreground-muted">{componentMeta(item)}</p>
               </TableCell>
               <TableCell className="font-mono">
                 {item.requiredQuantity} {item.unitSymbol || item.unitName}
@@ -79,7 +77,7 @@ export function BatchPackagingSection({
                   <>
                     <p className="font-mono">{formatMoney(item.totalCost)}</p>
                     {item.unitCostSnapshot > 0 ? (
-                      <p className="text-xs text-neutral-500">
+                      <p className="text-xs text-foreground-muted">
                         Unit {formatMoney(item.unitCostSnapshot)}
                       </p>
                     ) : null}
