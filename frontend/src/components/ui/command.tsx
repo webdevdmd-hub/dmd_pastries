@@ -11,7 +11,7 @@ const Command = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof CommandPrimitive>
 >(({ className, ...props }, ref) => (
   <CommandPrimitive
-    className={cn("flex h-full w-full flex-col overflow-hidden rounded-2xl bg-white", className)}
+    className={cn("flex h-full w-full flex-col overflow-hidden rounded-2xl bg-card", className)}
     ref={ref}
     {...props}
   />
@@ -66,7 +66,7 @@ const CommandGroup = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <CommandPrimitive.Group
     className={cn(
-      "overflow-hidden p-1 text-brand-espresso [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.16em] [&_[cmdk-group-heading]]:text-brand-mocha",
+      "overflow-hidden p-1 text-brand-espresso [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]: [&_[cmdk-group-heading]]: [&_[cmdk-group-heading]]:text-brand-mocha",
       className,
     )}
     ref={ref}

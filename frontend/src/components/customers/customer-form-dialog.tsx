@@ -125,28 +125,26 @@ export function CustomerFormDialog({
           }}
         >
           <section className="grid gap-4 md:grid-cols-2">
-            <h3 className="md:col-span-2 text-sm font-bold uppercase tracking-[0.18em] text-brand-mocha">
-              Basic Information
-            </h3>
+            <h3 className="md:col-span-2 text-sm font-bold text-brand-mocha">Basic Information</h3>
             <label className="grid gap-2">
               <Label htmlFor="customer-full-name">Full name</Label>
               <Input id="customer-full-name" {...form.register("fullName")} />
               {fieldError("fullName") ? (
-                <span className="text-sm text-red-700">{fieldError("fullName")}</span>
+                <span className="text-sm text-danger-text">{fieldError("fullName")}</span>
               ) : null}
             </label>
             <label className="grid gap-2">
               <Label htmlFor="customer-phone">Phone</Label>
               <Input id="customer-phone" {...form.register("phone")} />
               {fieldError("phone") ? (
-                <span className="text-sm text-red-700">{fieldError("phone")}</span>
+                <span className="text-sm text-danger-text">{fieldError("phone")}</span>
               ) : null}
             </label>
             <label className="grid gap-2">
               <Label htmlFor="customer-email">Email</Label>
               <Input id="customer-email" type="email" {...form.register("email")} />
               {fieldError("email") ? (
-                <span className="text-sm text-red-700">{fieldError("email")}</span>
+                <span className="text-sm text-danger-text">{fieldError("email")}</span>
               ) : null}
             </label>
             <label className="grid gap-2">
@@ -176,9 +174,7 @@ export function CustomerFormDialog({
           </section>
 
           <section className="grid gap-4 md:grid-cols-2">
-            <h3 className="md:col-span-2 text-sm font-bold uppercase tracking-[0.18em] text-brand-mocha">
-              Address
-            </h3>
+            <h3 className="md:col-span-2 text-sm font-bold text-brand-mocha">Address</h3>
             <Input placeholder="Address line 1" {...form.register("addressLine1")} />
             <Input placeholder="Address line 2" {...form.register("addressLine2")} />
             <Input placeholder="City" {...form.register("city")} />

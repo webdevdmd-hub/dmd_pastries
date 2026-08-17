@@ -16,11 +16,7 @@ export function AppPageHeader({
   return (
     <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        {eyebrow ? (
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.28em] text-brand-caramel">
-            {eyebrow}
-          </p>
-        ) : null}
+        {eyebrow ? <p className="mb-2 text-xs font-bold text-brand-caramel">{eyebrow}</p> : null}
         <h1 className="text-3xl font-semibold tracking-tight text-brand-espresso md:text-4xl">
           {title}
         </h1>

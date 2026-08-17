@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export function NoBranchScopeCard(): JSX.Element {
   return (
-    <Card className="border-brand-cappuccino bg-white/80 shadow-soft">
+    <Card className="border-brand-cappuccino bg-card/80 shadow-soft">
       <CardContent className="p-8">
         <div className="space-y-3 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-cappuccino/30 text-brand-caramel">

@@ -154,9 +154,7 @@ export function AppHeader(): JSX.Element {
               <AppSidebar />
             </div>
             <div>
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-workspace-muted">
-                Operations
-              </p>
+              <p className="text-[0.65rem] font-semibold text-workspace-muted">Operations</p>
               <p className="text-sm font-semibold text-brand-espresso">
                 {businessQuery.data?.businessName ?? user?.businessName ?? "Business workspace"}
               </p>
@@ -168,7 +166,7 @@ export function AppHeader(): JSX.Element {
               <MapPin className="h-4 w-4" />
             </span>
             <span className="min-w-0">
-              <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-workspace-muted">
+              <span className="block text-[0.65rem] font-semibold text-workspace-muted">
                 {currentBranchDisplayLabel}
               </span>
               <span className="block truncate text-sm font-semibold text-brand-espresso">

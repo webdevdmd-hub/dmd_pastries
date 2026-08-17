@@ -90,13 +90,13 @@ export function DocumentChargesEditor({
           <h3
             className={
               compact
-                ? "text-sm font-black text-zinc-950"
+                ? "text-body font-medium text-foreground"
                 : "text-lg font-semibold text-brand-espresso"
             }
           >
             Charges
           </h3>
-          <p className={compact ? "text-xs text-zinc-500" : "text-sm text-brand-mocha"}>
+          <p className={compact ? "text-xs text-foreground-muted" : "text-sm text-brand-mocha"}>
             Optional document-level charges such as delivery, packing, or service fees.
           </p>
         </div>
@@ -115,7 +115,7 @@ export function DocumentChargesEditor({
         <p
           className={
             compact
-              ? "mt-2 rounded-md border border-dashed border-zinc-300 p-2 text-xs text-zinc-500"
+              ? "mt-2 rounded-md border border-dashed border-border p-2 text-xs text-foreground-muted"
               : "mt-4 rounded-2xl border border-dashed border-brand-cappuccino p-4 text-sm text-brand-mocha"
           }
         >
@@ -133,8 +133,8 @@ export function DocumentChargesEditor({
               <div
                 className={
                   compact
-                    ? "rounded-md border border-zinc-300 bg-white p-2"
-                    : "rounded-2xl border border-brand-cappuccino/60 bg-white/80 p-4"
+                    ? "rounded-md border border-border bg-card p-2"
+                    : "rounded-2xl border border-brand-cappuccino/60 bg-card/80 p-4"
                 }
                 key={`${charge.chargeType}-${String(index)}`}
               >
@@ -226,7 +226,7 @@ export function DocumentChargesEditor({
                 ) : null}
 
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <label className="flex items-center gap-2 font-medium text-zinc-600">
+                  <label className="flex items-center gap-2 font-medium text-foreground-muted">
                     <Checkbox
                       checked={charge.isRefundable}
                       onCheckedChange={(checked) =>
@@ -235,7 +235,7 @@ export function DocumentChargesEditor({
                     />
                     Refundable
                   </label>
-                  <div className="flex items-center gap-3 text-zinc-600">
+                  <div className="flex items-center gap-3 text-foreground-muted">
                     {selectedTaxRate ? (
                       <span>
                         Tax {selectedTaxRate.ratePercentage}%: AED {taxAmount.toFixed(2)}
@@ -260,7 +260,7 @@ export function DocumentChargesEditor({
           <div
             className={
               compact
-                ? "rounded-md bg-zinc-50 p-2 text-xs"
+                ? "rounded-md bg-muted p-2 text-xs"
                 : "rounded-2xl bg-brand-latte/70 p-3 text-sm"
             }
           >

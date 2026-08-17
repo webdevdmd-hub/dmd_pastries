@@ -14,9 +14,9 @@ export function CustomersErrorState({
   onRetry,
 }: CustomersErrorStateProps): JSX.Element {
   return (
-    <Card className="border-red-200 bg-red-50/80">
+    <Card className="border-danger/30 bg-danger-tint/80">
       <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
-        <AlertTriangle className="h-8 w-8 text-red-800" />
+        <AlertTriangle className="h-8 w-8 text-danger-text" />
         <div>
           <h2 className="text-lg font-semibold text-brand-espresso">Unable to load customers</h2>
           <p className="mt-2 text-sm text-brand-mocha">{description}</p>

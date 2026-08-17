@@ -115,7 +115,7 @@ export function SearchableCombobox({
 
     if (errorMessage) {
       return (
-        <div className="grid gap-3 py-5 text-center text-sm text-red-800">
+        <div className="grid gap-3 py-5 text-center text-sm text-danger-text">
           <span>{errorMessage}</span>
           {onRetry ? (
             <Button className="mx-auto" onClick={onRetry} size="sm" type="button" variant="outline">

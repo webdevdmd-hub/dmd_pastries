@@ -96,7 +96,7 @@ export function CustomerTagsSection({
   };
 
   return (
-    <Card className="bg-white/80">
+    <Card className="bg-card/80">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Tags</CardTitle>
         {canManage ? (
@@ -138,9 +138,7 @@ export function CustomerTagsSection({
 
         {canManage ? (
           <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-mocha">
-              Assign existing tag
-            </p>
+            <p className="text-xs font-bold text-brand-mocha">Assign existing tag</p>
             {availableTags.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {availableTags.map((tag) => (

@@ -43,7 +43,7 @@ export function CustomersSummaryCards({ customers }: { customers: Customer[] }):
         const Icon = item.icon;
 
         return (
-          <Card className="bg-white/80" key={item.label}>
+          <Card className="bg-card/80" key={item.label}>
             <CardContent className="flex items-center justify-between p-6">
               <div>
                 <p className="text-sm text-brand-mocha">{item.label}</p>

@@ -171,14 +171,17 @@ export function LoginForm(): JSX.Element {
             }}
           >
             {submitError && !rateLimited ? (
-              <Alert className="border-red-200 bg-red-50 text-red-900" variant="destructive">
+              <Alert
+                className="border-danger/30 bg-danger-tint text-danger-text"
+                variant="destructive"
+              >
                 <AlertTitle>Unable to sign in</AlertTitle>
                 <AlertDescription>{submitError}</AlertDescription>
               </Alert>
             ) : null}
 
             {sessionConflict ? (
-              <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+              <Alert className="border-warning/30 bg-warning-tint text-warning-text">
                 <AlertTitle>Session already active</AlertTitle>
                 <AlertDescription className="space-y-3">
                   <p>
@@ -192,7 +195,7 @@ export function LoginForm(): JSX.Element {
                         void continueSession();
                       }}
                       type="button"
-                      className="bg-[#191918] text-white hover:bg-black"
+                      className="bg-[#191918] text-primary-foreground hover:bg-primary"
                     >
                       Continue with current session
                     </Button>
@@ -202,7 +205,7 @@ export function LoginForm(): JSX.Element {
                         void restartSessionLogin();
                       }}
                       type="button"
-                      className="border-[#d8d8d2] bg-white text-[#191918] hover:bg-[#eeeeea]"
+                      className="border-[#d8d8d2] bg-card text-[#191918] hover:bg-[#eeeeea]"
                       variant="outline"
                     >
                       Restart login
@@ -213,7 +216,7 @@ export function LoginForm(): JSX.Element {
             ) : null}
 
             {rateLimited ? (
-              <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+              <Alert className="border-warning/30 bg-warning-tint text-warning-text">
                 <AlertTitle>Too many login sync attempts</AlertTitle>
                 <AlertDescription className="space-y-3">
                   <p>
@@ -223,14 +226,14 @@ export function LoginForm(): JSX.Element {
                       : "60 seconds"}
                     , then continue the existing session instead of creating another login attempt.
                   </p>
-                  {submitError ? <p className="text-sm text-amber-800">{submitError}</p> : null}
+                  {submitError ? <p className="text-sm text-warning-text">{submitError}</p> : null}
                   <Button
                     disabled={recoveryLoading || isCooldownActive}
                     onClick={() => {
                       void continueSession();
                     }}
                     type="button"
-                    className="border-amber-300 bg-white text-amber-950 hover:bg-amber-100"
+                    className="border-warning/30 bg-card text-warning-text hover:bg-warning-tint"
                     variant="outline"
                   >
                     {isCooldownActive
@@ -252,7 +255,7 @@ export function LoginForm(): JSX.Element {
                       <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b8b85]" />
                       <Input
                         autoComplete="email"
-                        className="h-12 rounded-lg border-[#d6d6d0] bg-white pl-11 text-[#191918] shadow-none transition placeholder:text-[#a2a29c] focus-visible:border-[#191918] focus-visible:ring-[#191918]/10"
+                        className="h-12 rounded-lg border-[#d6d6d0] bg-card pl-11 text-[#191918] shadow-none transition placeholder:text-[#a2a29c] focus-visible:border-[#191918] focus-visible:ring-[#191918]/10"
                         placeholder="owner@bakery.com"
                         type="email"
                         {...field}
@@ -283,7 +286,7 @@ export function LoginForm(): JSX.Element {
                       <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b8b85]" />
                       <Input
                         autoComplete="current-password"
-                        className="h-12 rounded-lg border-[#d6d6d0] bg-white pl-11 pr-11 text-[#191918] shadow-none transition placeholder:text-[#a2a29c] focus-visible:border-[#191918] focus-visible:ring-[#191918]/10"
+                        className="h-12 rounded-lg border-[#d6d6d0] bg-card pl-11 pr-11 text-[#191918] shadow-none transition placeholder:text-[#a2a29c] focus-visible:border-[#191918] focus-visible:ring-[#191918]/10"
                         placeholder="Enter your password"
                         type={showPassword ? "text" : "password"}
                         {...field}
@@ -312,7 +315,7 @@ export function LoginForm(): JSX.Element {
             />
 
             <Button
-              className="h-12 w-full rounded-lg bg-[#191918] text-sm font-semibold text-white shadow-none transition hover:bg-black"
+              className="h-12 w-full rounded-lg bg-[#191918] text-sm font-semibold text-primary-foreground shadow-none transition hover:bg-primary"
               disabled={form.formState.isSubmitting || recoveryLoading || isCooldownActive}
               type="submit"
             >

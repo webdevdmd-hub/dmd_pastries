@@ -29,7 +29,7 @@ export function CustomersToolbar({
   };
 
   return (
-    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-white/75 p-4 shadow-soft lg:grid-cols-[1.5fr_1fr_1fr_1fr_1fr_auto]">
+    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-card/75 p-4 shadow-soft lg:grid-cols-[1.5fr_1fr_1fr_1fr_1fr_auto]">
       <Input
         aria-label="Search customers"
         onChange={(event) => update({ search: event.target.value })}

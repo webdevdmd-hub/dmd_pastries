@@ -56,7 +56,7 @@ export function CustomerRecentTransactionsTable({
   transactions: CustomerTransaction[];
 }): JSX.Element {
   return (
-    <Card className="bg-white/80">
+    <Card className="bg-card/80">
       <CardHeader>
         <CardTitle>Recent Transactions</CardTitle>
       </CardHeader>

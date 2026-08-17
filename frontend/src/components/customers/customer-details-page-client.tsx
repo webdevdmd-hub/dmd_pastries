@@ -100,7 +100,7 @@ export function CustomerDetailsPageClient({ customerId }: { customerId: string }
       <CustomerStatsCards creditBalance={creditsQuery.data?.balance ?? 0} stats={statsQuery.data} />
 
       {(creditsQuery.data?.items.length ?? 0) > 0 ? (
-        <section className="rounded-3xl border border-brand-cappuccino/60 bg-white/85 p-5">
+        <section className="rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-5">
           <h2 className="text-xl font-semibold text-brand-espresso">Store credit history</h2>
           <div className="mt-4 grid gap-2">
             {(creditsQuery.data?.items ?? []).map((credit) => (

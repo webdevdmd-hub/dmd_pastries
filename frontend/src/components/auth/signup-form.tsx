@@ -120,7 +120,7 @@ const labelClassName = "text-sm font-medium text-[#2d2d2a]";
 const iconClassName =
   "pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b8b85]";
 const inputClassName =
-  "h-12 rounded-lg border-[#d6d6d0] bg-white pl-11 text-[#191918] shadow-none transition placeholder:text-[#a2a29c] focus-visible:border-[#191918] focus-visible:ring-[#191918]/10";
+  "h-12 rounded-lg border-[#d6d6d0] bg-card pl-11 text-[#191918] shadow-none transition placeholder:text-[#a2a29c] focus-visible:border-[#191918] focus-visible:ring-[#191918]/10";
 
 export function SignupForm(): JSX.Element {
   const router = useRouter();
@@ -188,7 +188,10 @@ export function SignupForm(): JSX.Element {
             }}
           >
             {submitError ? (
-              <Alert className="border-red-200 bg-red-50 text-red-900" variant="destructive">
+              <Alert
+                className="border-danger/30 bg-danger-tint text-danger-text"
+                variant="destructive"
+              >
                 <AlertDescription>{getSignupErrorMessage(submitError)}</AlertDescription>
               </Alert>
             ) : null}
@@ -368,7 +371,7 @@ export function SignupForm(): JSX.Element {
             </div>
 
             <Button
-              className="h-12 w-full rounded-lg bg-[#191918] text-sm font-semibold text-white shadow-none transition hover:bg-black"
+              className="h-12 w-full rounded-lg bg-[#191918] text-sm font-semibold text-primary-foreground shadow-none transition hover:bg-primary"
               disabled={form.formState.isSubmitting}
               type="submit"
             >

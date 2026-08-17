@@ -30,14 +30,14 @@ export function MobileSidebar(): JSX.Element {
         </Button>
       </SheetTrigger>
       <SheetContent
-        className="flex w-[20rem] flex-col border-workspace-border bg-zinc-100 p-4 text-brand-espresso sm:w-[22rem]"
+        className="flex w-[20rem] flex-col border-workspace-border bg-muted p-4 text-brand-espresso sm:w-[22rem]"
         side="left"
       >
         <SheetHeader>
           <SheetTitle className="text-left text-xl font-semibold leading-none text-brand-espresso">
             KCHEF
           </SheetTitle>
-          <SheetDescription className="text-left text-xs uppercase tracking-[0.22em] text-workspace-muted">
+          <SheetDescription className="text-left text-xs text-workspace-muted">
             Operations OS
           </SheetDescription>
         </SheetHeader>

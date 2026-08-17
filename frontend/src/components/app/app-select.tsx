@@ -53,7 +53,7 @@ export function AppSelect({
           ))}
         </SelectContent>
       </Select>
-      {error ? <p className="text-xs font-medium text-red-700">{error}</p> : null}
+      {error ? <p className="text-xs font-medium text-danger-text">{error}</p> : null}
     </div>
   );
 }

@@ -57,12 +57,12 @@ const moduleGroups = [
 export default function HomePage(): JSX.Element {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f4f6f5] text-[#171918]">
-      <section className="relative min-h-[96svh] overflow-hidden border-b border-black/10 lg:min-h-[88svh]">
+      <section className="relative min-h-[96svh] overflow-hidden border-b border-primary/10 lg:min-h-[88svh]">
         <BakeryOperationsScene />
 
         <header className="relative z-20 mx-auto flex h-20 max-w-[90rem] items-center justify-between px-5 sm:px-8 lg:px-12">
           <Link className="flex items-center gap-3" href={ROUTES.home}>
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#171918] text-white">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#171918] text-primary-foreground">
               <Store className="h-4 w-4" />
             </span>
             <span>
@@ -77,7 +77,7 @@ export default function HomePage(): JSX.Element {
 
           <nav className="flex items-center gap-2" aria-label="Account access">
             <Link
-              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-md bg-[#171918] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#343836] sm:px-4 sm:text-sm"
+              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-md bg-[#171918] px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-[#343836] sm:px-4 sm:text-sm"
               href={ROUTES.signup}
             >
               <span className="sm:hidden">Sign up</span>
@@ -102,14 +102,14 @@ export default function HomePage(): JSX.Element {
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
-                className="inline-flex h-12 items-center gap-2 rounded-md bg-[#171918] px-5 text-sm font-semibold text-white transition-transform hover:-translate-y-0.5"
+                className="inline-flex h-12 items-center gap-2 rounded-md bg-[#171918] px-5 text-sm font-semibold text-primary-foreground transition-transform hover:-translate-y-0.5"
                 href={ROUTES.signup}
               >
                 Start owner onboarding
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
-                className="inline-flex h-12 items-center px-4 text-sm font-semibold text-[#3e4340] hover:text-black"
+                className="inline-flex h-12 items-center px-4 text-sm font-semibold text-[#3e4340] hover:text-foreground"
                 href="#how-it-works"
               >
                 See how it works
@@ -119,7 +119,7 @@ export default function HomePage(): JSX.Element {
         </div>
       </section>
 
-      <section className="border-b border-black/10 bg-white" id="how-it-works">
+      <section className="border-b border-primary/10 bg-card" id="how-it-works">
         <div className="mx-auto max-w-[90rem] px-5 py-14 sm:px-8 lg:px-12 lg:py-20">
           <div className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr]">
             <div>
@@ -133,10 +133,10 @@ export default function HomePage(): JSX.Element {
               </p>
             </div>
 
-            <ol className="grid border-y border-black/10 sm:grid-cols-2 lg:grid-cols-4 lg:border-y-0 lg:border-l">
+            <ol className="grid border-y border-primary/10 sm:grid-cols-2 lg:grid-cols-4 lg:border-y-0 lg:border-l">
               {operatingFlow.map(([number, title, detail]) => (
                 <li
-                  className="border-b border-black/10 py-5 sm:px-5 lg:border-b-0 lg:border-r"
+                  className="border-b border-primary/10 py-5 sm:px-5 lg:border-b-0 lg:border-r"
                   key={number}
                 >
                   <span className="text-xs font-bold text-[#f2735b]">{number}</span>
@@ -149,16 +149,16 @@ export default function HomePage(): JSX.Element {
         </div>
       </section>
 
-      <section className="bg-[#171918] text-white">
+      <section className="bg-[#171918] text-primary-foreground">
         <div className="mx-auto max-w-[90rem] px-5 py-16 sm:px-8 lg:px-12 lg:py-24">
-          <div className="mb-12 flex flex-col justify-between gap-5 border-b border-white/15 pb-8 lg:flex-row lg:items-end">
+          <div className="mb-12 flex flex-col justify-between gap-5 border-b border-card/15 pb-8 lg:flex-row lg:items-end">
             <div>
               <p className="text-xs font-bold uppercase text-[#67d0ad]">What the app manages</p>
               <h2 className="mt-3 max-w-2xl text-3xl font-semibold leading-tight sm:text-4xl">
                 Daily operations, without disconnected tools.
               </h2>
             </div>
-            <div className="flex items-center gap-5 text-sm text-white/60">
+            <div className="flex items-center gap-5 text-sm text-primary-foreground/60">
               <span className="flex items-center gap-2">
                 <Boxes className="h-4 w-4" /> Branch aware
               </span>
@@ -173,7 +173,7 @@ export default function HomePage(): JSX.Element {
               const Icon = group.icon;
               return (
                 <article
-                  className={`border-white/15 py-8 lg:min-h-64 lg:p-9 ${
+                  className={`border-card/15 py-8 lg:min-h-64 lg:p-9 ${
                     index < 2 ? "border-b" : ""
                   } ${index % 2 === 0 ? "lg:border-r" : ""}`}
                   key={group.label}
@@ -182,7 +182,7 @@ export default function HomePage(): JSX.Element {
                     <Icon className="mt-1 h-5 w-5 shrink-0 text-[#67d0ad]" />
                     <div>
                       <h3 className="text-xl font-semibold">{group.label}</h3>
-                      <p className="mt-3 max-w-xl text-sm leading-6 text-white/64">
+                      <p className="mt-3 max-w-xl text-sm leading-6 text-primary-foreground/64">
                         {group.detail}
                       </p>
                       <p className="mt-7 text-xs font-bold uppercase text-[#f58a75]">
@@ -210,13 +210,13 @@ export default function HomePage(): JSX.Element {
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
-              className="inline-flex h-11 items-center rounded-md border border-black/20 px-5 text-sm font-semibold hover:bg-white/50"
+              className="inline-flex h-11 items-center rounded-md border border-primary/20 px-5 text-sm font-semibold hover:bg-card/50"
               href={ROUTES.login}
             >
               Login
             </Link>
             <Link
-              className="inline-flex h-11 items-center gap-2 rounded-md bg-[#171918] px-5 text-sm font-semibold text-white hover:bg-[#343836]"
+              className="inline-flex h-11 items-center gap-2 rounded-md bg-[#171918] px-5 text-sm font-semibold text-primary-foreground hover:bg-[#343836]"
               href={ROUTES.signup}
             >
               Create owner account

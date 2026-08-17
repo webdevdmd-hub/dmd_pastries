@@ -14,11 +14,11 @@ export function CustomerStatusBadge({ status }: { status: CustomerStatus }): JSX
   return (
     <Badge
       className={cn(
-        status === "active" ? "border-emerald-300 bg-emerald-100 text-emerald-800" : undefined,
+        status === "active" ? "border-money/30 bg-money-tint text-money-text" : undefined,
         status === "inactive"
           ? "border-brand-cappuccino bg-brand-latte text-brand-mocha"
           : undefined,
-        status === "blocked" ? "border-red-200 bg-red-100 text-red-800" : undefined,
+        status === "blocked" ? "border-danger/30 bg-danger-tint text-danger-text" : undefined,
       )}
     >
       {labels[status]}

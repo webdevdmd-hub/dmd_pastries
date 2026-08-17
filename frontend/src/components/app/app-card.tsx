@@ -18,9 +18,9 @@ const toneClasses: Record<AppCardTone, string> = {
   default: "bg-workspace-panel",
   warm: "bg-brand-latte",
   white: "bg-workspace-panel",
-  danger: "border-red-200 bg-red-50/80",
-  success: "border-emerald-200 bg-emerald-50/80",
-  warning: "border-amber-200 bg-amber-50/80",
+  danger: "border-danger/30 bg-danger-tint/80",
+  success: "border-money/30 bg-money-tint/80",
+  warning: "border-warning/30 bg-warning-tint/80",
 };
 
 export function AppCard({

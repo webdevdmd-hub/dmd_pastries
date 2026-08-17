@@ -259,10 +259,10 @@ export function AppNavigationList({
             <button
               aria-expanded={isOpen}
               className={cn(
-                "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[0.66rem] font-semibold uppercase tracking-[0.2em] transition-colors",
+                "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[0.66rem] font-semibold transition-colors",
                 isPosTheme
-                  ? "text-zinc-500 hover:bg-zinc-200 hover:text-zinc-950"
-                  : "text-workspace-sidebar-muted hover:bg-white/[0.06] hover:text-white",
+                  ? "text-foreground-muted hover:bg-muted hover:text-foreground"
+                  : "text-workspace-sidebar-muted hover:bg-card/[0.06] hover:text-primary-foreground",
                 collapsed ? "justify-center px-2" : "",
               )}
               onClick={() => {
@@ -284,7 +284,7 @@ export function AppNavigationList({
                 <span
                   className={cn(
                     "h-1.5 w-1.5 rounded-full",
-                    isPosTheme ? "bg-zinc-500" : "bg-workspace-sidebar-muted",
+                    isPosTheme ? "bg-foreground-muted" : "bg-workspace-sidebar-muted",
                   )}
                 />
               ) : (
@@ -319,11 +319,11 @@ export function AppNavigationList({
                               "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                               isPosTheme
                                 ? isParentActive
-                                  ? "bg-zinc-950 text-white shadow-none"
-                                  : "text-zinc-700 hover:bg-zinc-200 hover:text-zinc-950"
+                                  ? "bg-primary text-primary-foreground shadow-none"
+                                  : "text-foreground-muted hover:bg-muted hover:text-foreground"
                                 : isParentActive
-                                  ? "bg-workspace-sidebar-active text-white shadow-sm"
-                                  : "text-white/78 hover:bg-white/[0.07] hover:text-white",
+                                  ? "bg-workspace-sidebar-active text-primary-foreground shadow-sm"
+                                  : "text-primary-foreground/78 hover:bg-card/[0.07] hover:text-primary-foreground",
                               collapsed ? "justify-center px-2.5" : "",
                             )}
                             onClick={() => {
@@ -362,7 +362,7 @@ export function AppNavigationList({
                           <div
                             className={cn(
                               "ml-4 grid gap-1 border-l pl-3",
-                              isPosTheme ? "border-zinc-300" : "border-white/10",
+                              isPosTheme ? "border-border" : "border-card/10",
                             )}
                           >
                             {item.children?.map((child) => {
@@ -375,11 +375,11 @@ export function AppNavigationList({
                                     "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                                     isPosTheme
                                       ? childIsActive
-                                        ? "bg-zinc-950 text-white shadow-none"
-                                        : "text-zinc-600 hover:bg-zinc-200 hover:text-zinc-950"
+                                        ? "bg-primary text-primary-foreground shadow-none"
+                                        : "text-foreground-muted hover:bg-muted hover:text-foreground"
                                       : childIsActive
-                                        ? "bg-white text-workspace-sidebar shadow-sm"
-                                        : "text-white/65 hover:bg-white/[0.07] hover:text-white",
+                                        ? "bg-card text-workspace-sidebar shadow-sm"
+                                        : "text-primary-foreground/65 hover:bg-card/[0.07] hover:text-primary-foreground",
                                   )}
                                   href={child.href}
                                   key={child.href}
@@ -403,11 +403,11 @@ export function AppNavigationList({
                           "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                           isPosTheme
                             ? isActive
-                              ? "bg-zinc-950 text-white shadow-none"
-                              : "text-zinc-700 hover:bg-zinc-200 hover:text-zinc-950"
+                              ? "bg-primary text-primary-foreground shadow-none"
+                              : "text-foreground-muted hover:bg-muted hover:text-foreground"
                             : isActive
-                              ? "bg-workspace-sidebar-active text-white shadow-sm"
-                              : "text-white/78 hover:bg-white/[0.07] hover:text-white",
+                              ? "bg-workspace-sidebar-active text-primary-foreground shadow-sm"
+                              : "text-primary-foreground/78 hover:bg-card/[0.07] hover:text-primary-foreground",
                           collapsed ? "justify-center px-2.5" : "",
                         )}
                         href={item.href}

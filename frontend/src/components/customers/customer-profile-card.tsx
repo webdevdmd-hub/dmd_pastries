@@ -14,7 +14,7 @@ export function CustomerProfileCard({ customer }: { customer: Customer }): JSX.E
     .join(", ");
 
   return (
-    <Card className="bg-white/80">
+    <Card className="bg-card/80">
       <CardHeader>
         <CardTitle>Customer profile</CardTitle>
       </CardHeader>

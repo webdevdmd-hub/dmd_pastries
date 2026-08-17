@@ -79,7 +79,7 @@ export function ReturnReversalDialog({
             Close
           </Button>
           <Button
-            className="bg-red-700 text-white hover:bg-red-800"
+            className="bg-danger text-primary-foreground hover:bg-danger"
             disabled={isSubmitting || trimmedReason.length === 0}
             onClick={() => onConfirm(trimmedReason)}
             type="button"

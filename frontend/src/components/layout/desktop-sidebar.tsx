@@ -16,7 +16,7 @@ export function DesktopSidebar(): JSX.Element {
     <aside
       className={cn(
         "sticky top-0 hidden h-screen shrink-0 border-r transition-[width,background-color,border-color,color] duration-300 lg:flex lg:flex-col",
-        "border-workspace-border bg-zinc-100 text-brand-espresso shadow-none",
+        "border-workspace-border bg-muted text-brand-espresso shadow-none",
         collapsed ? "w-[4.75rem]" : "w-[18rem]",
       )}
     >
@@ -32,16 +32,14 @@ export function DesktopSidebar(): JSX.Element {
             <p className="truncate text-xl font-semibold tracking-tight text-brand-espresso">
               KCHEF
             </p>
-            <p className="mt-1 text-[0.68rem] uppercase tracking-[0.28em] text-workspace-sidebar-muted">
-              Operations OS
-            </p>
+            <p className="mt-1 text-[0.68rem] text-workspace-sidebar-muted">Operations OS</p>
           </div>
         ) : null}
         <Button
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className={cn(
             "h-10 w-10 rounded-2xl",
-            "border-workspace-border bg-workspace-panel text-brand-espresso shadow-none hover:bg-zinc-100",
+            "border-workspace-border bg-workspace-panel text-brand-espresso shadow-none hover:bg-muted",
           )}
           size="icon"
           type="button"

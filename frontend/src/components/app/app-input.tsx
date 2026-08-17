@@ -22,7 +22,7 @@ export const AppInput = React.forwardRef<HTMLInputElement, AppInputProps>(
         <Input
           aria-describedby={error ? errorId : helperText ? helperId : undefined}
           aria-invalid={error ? true : undefined}
-          className={cn(error ? "border-red-300 focus-visible:ring-red-700" : "", className)}
+          className={cn(error ? "border-danger/30 focus-visible:ring-danger" : "", className)}
           id={inputId}
           ref={ref}
           {...props}
@@ -33,7 +33,7 @@ export const AppInput = React.forwardRef<HTMLInputElement, AppInputProps>(
           </p>
         ) : null}
         {error ? (
-          <p className="text-xs font-medium text-red-700" id={errorId}>
+          <p className="text-xs font-medium text-danger-text" id={errorId}>
             {error}
           </p>
         ) : null}

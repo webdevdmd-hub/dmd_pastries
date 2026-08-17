@@ -72,7 +72,7 @@ export function CustomerStatsCards({
         const Icon = card.icon;
 
         return (
-          <Card className="bg-white/80" key={card.label}>
+          <Card className="bg-card/80" key={card.label}>
             <CardContent className="flex items-center justify-between p-5">
               <div>
                 <p className="text-sm text-brand-mocha">{card.label}</p>

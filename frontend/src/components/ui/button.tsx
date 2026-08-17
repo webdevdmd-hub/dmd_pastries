@@ -15,7 +15,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-brand-caramel text-white shadow-none hover:bg-brand-mocha",
+        default: "bg-brand-caramel text-primary-foreground shadow-none hover:bg-brand-mocha",
         secondary: "bg-brand-latte text-brand-espresso hover:bg-brand-cappuccino/55",
         outline:
           "border border-workspace-border bg-workspace-panel text-brand-espresso hover:bg-brand-latte/70",

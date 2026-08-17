@@ -100,23 +100,21 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
       <div className="auth-scanline" />
 
       <div className="relative mx-auto grid min-h-screen max-w-[100rem] lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="hidden min-h-screen flex-col border-r border-white/10 px-10 py-8 xl:flex">
+        <section className="hidden min-h-screen flex-col border-r border-card/10 px-10 py-8 xl:flex">
           <div className="space-y-10">
-            <nav className="flex items-center justify-between rounded-full border border-white/10 bg-white/[0.065] px-4 py-3 shadow-[0_24px_80px_rgba(0,0,0,0.24)] backdrop-blur-2xl">
+            <nav className="flex items-center justify-between rounded-full border border-card/10 bg-card/[0.065] px-4 py-3 shadow-[0_24px_80px_rgba(0,0,0,0.24)] backdrop-blur-2xl">
               <Link className="group flex items-center gap-3" href={ROUTES.home}>
                 <div className="relative flex h-11 w-11 items-center justify-center rounded-full border border-brand-latte/15 bg-brand-caramel/18 shadow-[0_0_45px_rgba(176,137,104,0.34)] transition group-hover:scale-105 group-hover:bg-brand-caramel/30">
                   <Croissant className="h-5 w-5 text-brand-latte" />
                 </div>
                 <div>
                   <p className="font-serif text-xl leading-none text-brand-latte">KCHEF</p>
-                  <p className="text-[0.65rem] uppercase tracking-[0.26em] text-brand-cappuccino/80">
-                    Secure operations OS
-                  </p>
+                  <p className="text-[0.65rem] text-brand-cappuccino/80">Secure operations OS</p>
                 </div>
               </Link>
               <Button
                 asChild
-                className="rounded-full border-white/10 bg-white/[0.06] text-brand-latte hover:bg-white/[0.12]"
+                className="rounded-full border-card/10 bg-card/[0.06] text-brand-latte hover:bg-card/[0.12]"
                 size="sm"
                 variant="outline"
               >
@@ -145,25 +143,21 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
             <div className="grid max-w-3xl gap-4 md:grid-cols-3">
               {operatingSignals.map((signal) => (
                 <div
-                  className="auth-glass-card rounded-3xl border border-white/10 p-5"
+                  className="auth-glass-card rounded-3xl border border-card/10 p-5"
                   key={signal.label}
                 >
                   <p className="font-serif text-3xl text-brand-latte">{signal.value}</p>
-                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-brand-cappuccino/75">
-                    {signal.label}
-                  </p>
+                  <p className="mt-2 text-xs text-brand-cappuccino/75">{signal.label}</p>
                 </div>
               ))}
             </div>
           </div>
 
           <div className="mt-12 grid gap-4 lg:grid-cols-[0.96fr_0.82fr]">
-            <div className="auth-glass-card rounded-[1.6rem] border border-white/10 p-4">
+            <div className="auth-glass-card rounded-[1.6rem] border border-card/10 p-4">
               <div className="mb-4 flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-[0.65rem] uppercase tracking-[0.24em] text-brand-cappuccino">
-                    Workspace graph
-                  </p>
+                  <p className="text-[0.65rem] text-brand-cappuccino">Workspace graph</p>
                   <h2 className="mt-1 text-xl font-semibold text-brand-latte">
                     One secure entry point
                   </h2>
@@ -175,7 +169,7 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
               <div className="grid grid-cols-2 gap-2">
                 {platformNodes.map((node) => (
                   <div
-                    className="rounded-xl border border-white/10 bg-white/[0.055] px-3 py-1.5 text-xs text-brand-latte/72"
+                    className="rounded-xl border border-card/10 bg-card/[0.055] px-3 py-1.5 text-xs text-brand-latte/72"
                     key={node}
                   >
                     {node}
@@ -185,14 +179,14 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
             </div>
 
             <div className="grid gap-4">
-              <div className="auth-glass-card rounded-[1.6rem] border border-white/10 p-4">
+              <div className="auth-glass-card rounded-[1.6rem] border border-card/10 p-4">
                 <ShieldCheck className="mb-3 h-4 w-4 text-brand-caramel" />
                 <h2 className="text-sm font-semibold text-brand-latte">Backend-trusted session</h2>
                 <p className="mt-2 text-xs leading-5 text-brand-latte/62">
                   Permissions, branch isolation, and profile state are synced from the backend.
                 </p>
               </div>
-              <div className="auth-glass-card rounded-[1.6rem] border border-white/10 p-4">
+              <div className="auth-glass-card rounded-[1.6rem] border border-card/10 p-4">
                 <Layers3 className="mb-3 h-4 w-4 text-brand-caramel" />
                 <h2 className="text-sm font-semibold text-brand-latte">Operational continuity</h2>
                 <p className="mt-2 text-xs leading-5 text-brand-latte/62">
@@ -215,14 +209,14 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
                   <p className="text-xs text-brand-cappuccino">Secure operations OS</p>
                 </div>
               </Link>
-              <Badge className="border-white/10 bg-white/10 text-brand-latte">Secure</Badge>
+              <Badge className="border-card/10 bg-card/10 text-brand-latte">Secure</Badge>
             </div>
 
-            <div className="auth-login-frame relative rounded-[2.1rem] border border-white/14 bg-white/[0.08] p-[1px] shadow-[0_40px_120px_rgba(0,0,0,0.48)] backdrop-blur-2xl">
+            <div className="auth-login-frame relative rounded-[2.1rem] border border-card/14 bg-card/[0.08] p-[1px] shadow-[0_40px_120px_rgba(0,0,0,0.48)] backdrop-blur-2xl">
               <div className="rounded-[calc(2.1rem-1px)] bg-[#100c09]/86 p-5 backdrop-blur-2xl sm:p-7">
-                <div className="mb-7 flex items-start justify-between gap-4 border-b border-white/10 pb-6">
+                <div className="mb-7 flex items-start justify-between gap-4 border-b border-card/10 pb-6">
                   <div className="space-y-3">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-brand-caramel/30 bg-brand-caramel/12 px-3 py-1 text-[0.65rem] uppercase tracking-[0.22em] text-brand-cappuccino">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-brand-caramel/30 bg-brand-caramel/12 px-3 py-1 text-[0.65rem] text-brand-cappuccino">
                       <ScanLine className="h-3.5 w-3.5" />
                       Access gateway
                     </div>
@@ -235,7 +229,7 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
                       </p>
                     </div>
                   </div>
-                  <div className="hidden h-13 w-13 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-brand-latte/10 text-brand-latte shadow-[0_0_38px_rgba(243,233,215,0.13)] sm:flex">
+                  <div className="hidden h-13 w-13 shrink-0 items-center justify-center rounded-2xl border border-card/10 bg-brand-latte/10 text-brand-latte shadow-[0_0_38px_rgba(243,233,215,0.13)] sm:flex">
                     <LockKeyhole className="h-5 w-5" />
                   </div>
                 </div>
@@ -247,7 +241,7 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
             <div className="mt-7 flex flex-wrap items-center justify-center gap-3 text-sm text-brand-latte/70">
               <Button
                 asChild
-                className="rounded-full border-white/10 bg-white/[0.08] text-brand-latte hover:bg-white/[0.14]"
+                className="rounded-full border-card/10 bg-card/[0.08] text-brand-latte hover:bg-card/[0.14]"
                 size="sm"
                 variant="outline"
               >
@@ -258,7 +252,7 @@ export function AuthShell({ children, title, description }: AuthShellProps): JSX
               </Button>
               <Button
                 asChild
-                className="rounded-full text-brand-cappuccino hover:bg-white/[0.08] hover:text-brand-latte"
+                className="rounded-full text-brand-cappuccino hover:bg-card/[0.08] hover:text-brand-latte"
                 size="sm"
                 variant="ghost"
               >
