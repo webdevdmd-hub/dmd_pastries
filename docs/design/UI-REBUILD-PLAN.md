@@ -685,6 +685,53 @@ which already carries `@typescript-eslint/no-explicit-any` at `error`, AST-aware
 errors, so the tree is genuinely `any`-free and this script is pure redundancy. Deleting it is
 defensible; it was kept because deleting someone's check is an owner call, not a review call.
 
+### 10.10 E5 is half-shippable, and the other half has no host
+
+**Offline: shipped.** Charge disables with the reason in its own label, a persistent
+undismissable bar sits in the counter layout, and reachability is inferred from real
+traffic rather than a probe. Two corrections to what the plan assumed:
+
+- **"25 files already reference `onLine`/`offline` ad hoc" was false.** The real
+  count was zero — `grep -rli offline src/` returned nothing. E5's offline half was
+  greenfield, not a consolidation.
+- **`navigator.onLine` alone would have missed the target case.** It reports true
+  whenever any interface is up, so the bakery failure — access point alive, router
+  or uplink dead — reads as online while every charge fails. Reachability is now a
+  second, independent signal driven by network-class request failures.
+
+**Partial: not built, deliberately.** The plan specifies "a list that loaded page 1
+of N and failed on page 2". That state **cannot occur in this codebase**:
+
+```
+useInfiniteQuery / fetchNextPage / hasNextPage   0 occurrences
+client-side pagination (getPaginationRowModel)   0 occurrences
+```
+
+Every list fetches once, whole. Building the strip would produce a primitive with
+zero call sites, which is precisely the C0.5 mistake — and this time it would be
+made knowingly. It is deferred until incremental loading exists, and it should be
+built _with_ that work rather than before it.
+
+**But a real cousin exists and nothing surfaces it.** Three call sites hard-cap at
+`?limit=100` — `getManufacturingProducts`, the purchasing ingredient options, and
+the manufacturing inventory options. A tenant with 150 products sees 100 in those
+pickers with **no error, no notice, and no way to tell**. That is a silent
+truncation, which is worse than a failed page 2 because there is nothing to react
+to.
+
+It cannot be fixed in the presentation layer alone: those endpoints return a bare
+array with no `total`, so the frontend genuinely cannot distinguish "100 of 100"
+from "100 of 150". Two options, and this needs an owner decision rather than a
+guess:
+
+- **Return a total** (backend contract change, outside E5's stated boundary) and
+  render an accurate "Showing 100 of 150 — refine your search".
+- **Heuristic**: when exactly `limit` rows come back, warn "Showing the first 100".
+  No contract change, but it cries wolf on a tenant with exactly 100.
+
+Recorded as a TODO rather than folded into E5, because the honest fix is a contract
+change and E5 is presentation-only.
+
 ### 10.9 Shipped in this session — the Counter register is token-native
 
 Not review findings; work done. `pnpm verify` exits 0, lint holds at **0 errors**, repo warnings fell
