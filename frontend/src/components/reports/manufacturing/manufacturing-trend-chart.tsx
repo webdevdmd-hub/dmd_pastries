@@ -4,7 +4,10 @@ import type { JSX } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Tooltip, XAxis, YAxis } from "recharts";
 
 import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
+import { chartSeries, palette } from "@/lib/design/palette";
 import type { ManufacturingTrendChart as ManufacturingTrendChartData } from "@/types/manufacturing-reports";
+
+const p = palette();
 
 export function ManufacturingTrendChart({
   chart,
@@ -26,15 +29,15 @@ export function ManufacturingTrendChart({
     >
       {({ height, width }) => (
         <BarChart data={rows} height={height} width={width}>
-          <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
-          <XAxis dataKey="label" stroke="#7A553A" />
-          <YAxis stroke="#7A553A" />
+          <CartesianGrid stroke={chartSeries[0]} strokeDasharray="3 3" />
+          <XAxis dataKey="label" stroke={chartSeries[1]} />
+          <YAxis stroke={chartSeries[1]} />
           <Tooltip />
           <Legend />
           {chart.datasets.map((dataset, index) => (
             <Bar
               dataKey={dataset.label}
-              fill={index === 0 ? "#3B2A22" : "#B08968"}
+              fill={index === 0 ? p.primary : chartSeries[2]}
               key={dataset.label}
               radius={8}
             />

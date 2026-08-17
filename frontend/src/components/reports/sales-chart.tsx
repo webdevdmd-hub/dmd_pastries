@@ -4,7 +4,10 @@ import type { JSX } from "react";
 import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 
 import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
+import { chartSeries, palette } from "@/lib/design/palette";
 import type { ReportChartData } from "@/types/reports";
+
+const p = palette();
 
 type ChartPoint = {
   label: string;
@@ -30,22 +33,26 @@ export function SalesChart({ chart }: { chart: ReportChartData }): JSX.Element {
           margin={{ bottom: 10, left: 0, right: 10, top: 10 }}
           width={width}
         >
-          <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
-          <XAxis dataKey="label" stroke="#7A553A" tick={{ fill: "#7A553A", fontSize: 12 }} />
-          <YAxis stroke="#7A553A" tick={{ fill: "#7A553A", fontSize: 12 }} />
+          <CartesianGrid stroke={chartSeries[0]} strokeDasharray="3 3" />
+          <XAxis
+            dataKey="label"
+            stroke={chartSeries[1]}
+            tick={{ fill: chartSeries[1], fontSize: 12 }}
+          />
+          <YAxis stroke={chartSeries[1]} tick={{ fill: chartSeries[1], fontSize: 12 }} />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#3B2A22",
-              border: "1px solid #B08968",
+              backgroundColor: p.primary,
+              border: `1px solid ${p.border}`,
               borderRadius: "12px",
-              color: "#F3E9D7",
+              color: p.muted,
             }}
           />
           <Line
             activeDot={{ r: 6 }}
             dataKey="value"
             name={chart.datasets[0]?.label ?? "Sales"}
-            stroke="#B08968"
+            stroke={chartSeries[2]}
             strokeWidth={3}
             type="monotone"
           />

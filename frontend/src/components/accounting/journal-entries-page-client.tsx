@@ -1266,7 +1266,7 @@ export function JournalEntriesPageClient(): JSX.Element {
                           key={entry.id}
                           className={`flex w-full flex-col gap-2 px-4 py-4 text-left transition ${
                             isSelected
-                              ? "bg-brand-latte/75 shadow-[inset_4px_0_0_#B08968]"
+                              ? "bg-brand-latte/75 shadow-[inset_4px_0_0_var(--money-solid)]"
                               : "bg-card hover:bg-brand-latte/30"
                           }`}
                           onClick={() => setSelectedEntryId(entry.id)}

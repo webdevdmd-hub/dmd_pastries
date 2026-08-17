@@ -47,7 +47,7 @@ export function SuperAdminOverview(): JSX.Element {
               env-allowlisted Appwrite users.
             </p>
           </div>
-          <span className="w-fit rounded-md bg-[#1f2933] px-3 py-2 text-sm font-medium text-primary-foreground">
+          <span className="w-fit rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">
             {user?.email ?? "Super Admin"}
           </span>
         </div>

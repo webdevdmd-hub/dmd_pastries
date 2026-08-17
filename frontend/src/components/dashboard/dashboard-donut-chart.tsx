@@ -4,7 +4,10 @@ import type { JSX } from "react";
 import { Pie, PieChart, Tooltip } from "recharts";
 
 import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
+import { chartSeries, palette } from "@/lib/design/palette";
 import type { ReportChartData } from "@/types/reports";
+
+const p = palette();
 
 type DonutPoint = {
   fill: string;
@@ -12,13 +15,13 @@ type DonutPoint = {
   value: number;
 };
 
-const colors = ["#171918", "#45B894", "#F2735B", "#71717A", "#D4D4D8"];
+const colors = chartSeries;
 
 function toDonutPoints(chart: ReportChartData): DonutPoint[] {
   const dataset = chart.datasets[0];
 
   return chart.labels.map((label, index) => ({
-    fill: colors[index % colors.length] ?? "#171918",
+    fill: colors[index % colors.length] ?? p.primary,
     label,
     value: dataset?.data[index] ?? 0,
   }));
@@ -34,10 +37,10 @@ export function DashboardDonutChart({ chart }: { chart: ReportChartData }): JSX.
           <PieChart height={height} width={width}>
             <Tooltip
               contentStyle={{
-                backgroundColor: "#FFFFFF",
-                border: "1px solid #D4D4D8",
+                backgroundColor: p.card,
+                border: `1px solid ${p.border}`,
                 borderRadius: "6px",
-                color: "#171918",
+                color: p.primary,
               }}
             />
             <Pie

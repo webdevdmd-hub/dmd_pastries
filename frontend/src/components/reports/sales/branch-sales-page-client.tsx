@@ -26,6 +26,7 @@ import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { useSalesByBranch } from "@/hooks/use-sales-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { chartSeries } from "@/lib/design/palette";
 import { salesReportFiltersSchema } from "@/lib/validators/sales-reports.schema";
 import type { SalesReportFilters } from "@/types/sales-reports";
 
@@ -125,11 +126,11 @@ export function BranchSalesPageClient(): JSX.Element {
                       height={height}
                       width={width}
                     >
-                      <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
-                      <XAxis dataKey="name" stroke="#7A553A" />
-                      <YAxis stroke="#7A553A" />
+                      <CartesianGrid stroke={chartSeries[0]} strokeDasharray="3 3" />
+                      <XAxis dataKey="name" stroke={chartSeries[1]} />
+                      <YAxis stroke={chartSeries[1]} />
                       <Tooltip />
-                      <Bar dataKey="value" fill="#7A553A" radius={8} />
+                      <Bar dataKey="value" fill={chartSeries[1]} radius={8} />
                     </BarChart>
                   )}
                 </ResponsiveChartFrame>

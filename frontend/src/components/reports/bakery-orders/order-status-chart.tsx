@@ -4,6 +4,7 @@ import type { JSX } from "react";
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 
 import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
+import { chartSeries } from "@/lib/design/palette";
 import type { OrderStatusRow } from "@/types/bakery-orders-reports";
 
 export function OrderStatusChart({ rows }: { rows: OrderStatusRow[] }): JSX.Element {
@@ -18,11 +19,11 @@ export function OrderStatusChart({ rows }: { rows: OrderStatusRow[] }): JSX.Elem
           height={height}
           width={width}
         >
-          <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
-          <XAxis dataKey="name" stroke="#7A553A" />
-          <YAxis stroke="#7A553A" />
+          <CartesianGrid stroke={chartSeries[0]} strokeDasharray="3 3" />
+          <XAxis dataKey="name" stroke={chartSeries[1]} />
+          <YAxis stroke={chartSeries[1]} />
           <Tooltip />
-          <Bar dataKey="value" fill="#B08968" radius={8} />
+          <Bar dataKey="value" fill={chartSeries[2]} radius={8} />
         </BarChart>
       )}
     </ResponsiveChartFrame>

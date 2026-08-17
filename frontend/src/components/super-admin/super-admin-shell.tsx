@@ -41,8 +41,8 @@ export function SuperAdminShell({ children }: SuperAdminShellProps): JSX.Element
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f4ee] text-brand-espresso">
-      <header className="border-b border-border bg-[#1f2933] text-primary-foreground">
+    <div className="min-h-screen bg-canvas text-brand-espresso">
+      <header className="border-b border-border bg-primary text-primary-foreground">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-caramel text-brand-espresso">

@@ -4,7 +4,10 @@ import type { JSX } from "react";
 import { CartesianGrid, Legend, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 
 import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
+import { chartSeries, palette } from "@/lib/design/palette";
 import type { SalesTrendChart as SalesTrendChartData } from "@/types/sales-reports";
+
+const p = palette();
 
 type TrendPoint = {
   label: string;
@@ -36,29 +39,33 @@ export function SalesTrendChart({ chart }: { chart: SalesTrendChartData }): JSX.
           margin={{ bottom: 12, left: 0, right: 12, top: 12 }}
           width={width}
         >
-          <CartesianGrid stroke="#D6BFA6" strokeDasharray="3 3" />
-          <XAxis dataKey="label" stroke="#7A553A" tick={{ fill: "#7A553A", fontSize: 12 }} />
-          <YAxis stroke="#7A553A" tick={{ fill: "#7A553A", fontSize: 12 }} />
+          <CartesianGrid stroke={chartSeries[0]} strokeDasharray="3 3" />
+          <XAxis
+            dataKey="label"
+            stroke={chartSeries[1]}
+            tick={{ fill: chartSeries[1], fontSize: 12 }}
+          />
+          <YAxis stroke={chartSeries[1]} tick={{ fill: chartSeries[1], fontSize: 12 }} />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#3B2A22",
-              border: "1px solid #B08968",
+              backgroundColor: p.primary,
+              border: `1px solid ${p.border}`,
               borderRadius: "12px",
-              color: "#F3E9D7",
+              color: p.muted,
             }}
           />
           <Legend />
           <Line
             dataKey="netSales"
             name="Net Sales"
-            stroke="#B08968"
+            stroke={chartSeries[2]}
             strokeWidth={3}
             type="monotone"
           />
           <Line
             dataKey="salesCount"
             name="Sales Count"
-            stroke="#7A553A"
+            stroke={chartSeries[1]}
             strokeWidth={3}
             type="monotone"
           />
