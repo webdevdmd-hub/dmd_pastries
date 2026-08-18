@@ -18,6 +18,7 @@ import { PaymentsTodayStrip } from "@/components/payments/payments-today-strip";
 import { PaymentsToolbar } from "@/components/payments/payments-toolbar";
 import { SalesReturnDialog } from "@/components/payments/sales-return-dialog";
 import { POSReceiptDialog } from "@/components/pos/pos-receipt-dialog";
+import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ import { useSaleReceipt } from "@/hooks/use-reports";
 import { useReceiptLayouts } from "@/hooks/use-settings-data";
 import { useUsers } from "@/hooks/use-users";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { toastMoneyFailure } from "@/lib/money-failure-toast";
 import { resolveDashboardTimezone } from "@/lib/reports/dashboard-filters";
 import type {
   AddPaymentPayload,
@@ -164,6 +166,14 @@ export function PaymentsPageClient(): JSX.Element {
   );
   const isPermissionDenied =
     paymentsQuery.error instanceof ApiError && paymentsQuery.error.status === 403;
+  // Branch is scope, not a filter: it is always set, so it must not make an
+  // empty ledger look like a narrow search.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.paymentMethodId !== defaultFilters.paymentMethodId ||
+    filters.paymentStatus !== defaultFilters.paymentStatus ||
+    filters.dateFrom.length > 0 ||
+    filters.dateTo.length > 0;
   const approverOptions = (usersQuery.data ?? []).filter(hasApproverRole).map((approver) => ({
     id: approver.id,
     label: `${approver.fullName} (${approver.roleName})`,
@@ -191,7 +201,7 @@ export function PaymentsPageClient(): JSX.Element {
       toast.success("Payment added to sale.");
       setAddPaymentOpen(false);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toastMoneyFailure("No payment was taken", error);
     }
   };
 
@@ -201,7 +211,7 @@ export function PaymentsPageClient(): JSX.Element {
       toast.success("Refund created.");
       setRefundPayment(null);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toastMoneyFailure("No refund was issued", error);
     }
   };
 
@@ -272,9 +282,24 @@ export function PaymentsPageClient(): JSX.Element {
         )
       ) : null}
 
+      {/* Filtered and empty need opposite remedies. Showing "no payments yet"
+          to a cashier who typed a reference that matched nothing says the till
+          took no money today, which may be flatly untrue. */}
       {!paymentsQuery.isLoading &&
       !paymentsQuery.error &&
-      (paymentsQuery.data ?? []).length === 0 ? (
+      (paymentsQuery.data ?? []).length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="payments"
+          onClearFilters={() => setFilters({ ...defaultFilters, branchId: filters.branchId })}
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!paymentsQuery.isLoading &&
+      !paymentsQuery.error &&
+      (paymentsQuery.data ?? []).length === 0 &&
+      !hasActiveFilters ? (
         <PaymentsEmptyState />
       ) : null}
 

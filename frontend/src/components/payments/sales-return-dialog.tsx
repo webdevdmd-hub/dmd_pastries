@@ -336,7 +336,7 @@ export function SalesReturnDialog({
             !returnableItemsQuery.error &&
             (returnableItemsQuery.data ?? []).length === 0 ? (
               <div className="rounded-3xl border border-brand-cappuccino bg-brand-latte/40 p-8 text-center">
-                <p className="font-semibold text-brand-espresso">No returnable items found.</p>
+                <p className="font-semibold text-brand-espresso">Nothing left to return</p>
                 <p className="mt-1 text-sm text-brand-mocha">
                   This sale may already be fully returned or not eligible for item returns.
                 </p>

@@ -9,6 +9,7 @@ import { PaymentsErrorState } from "@/components/payments/payments-error-state";
 import { PaymentsTableSkeleton } from "@/components/payments/payments-table-skeleton";
 import { PaymentsToolbar } from "@/components/payments/payments-toolbar";
 import { RefundsTable } from "@/components/payments/refunds-table";
+import { FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -33,6 +34,12 @@ export function RefundsPageClient(): JSX.Element {
   const methodsQuery = usePaymentMethods(canView);
   const isPermissionDenied =
     refundsQuery.error instanceof ApiError && refundsQuery.error.status === 403;
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.paymentMethodId !== defaultFilters.paymentMethodId ||
+    filters.refundStatus !== defaultFilters.refundStatus ||
+    filters.dateFrom.length > 0 ||
+    filters.dateTo.length > 0;
 
   if (!canView) {
     return (
@@ -69,9 +76,23 @@ export function RefundsPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!refundsQuery.isLoading && !refundsQuery.error && (refundsQuery.data ?? []).length === 0 ? (
+      {!refundsQuery.isLoading &&
+      !refundsQuery.error &&
+      (refundsQuery.data ?? []).length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="refunds"
+          onClearFilters={() => setFilters(defaultFilters)}
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!refundsQuery.isLoading &&
+      !refundsQuery.error &&
+      (refundsQuery.data ?? []).length === 0 &&
+      !hasActiveFilters ? (
         <PaymentsEmptyState
-          title="No refunds found."
+          title="No refunds yet"
           description="Refunds created from completed payments will appear here."
         />
       ) : null}

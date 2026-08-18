@@ -12,6 +12,7 @@ import { PaymentsErrorState } from "@/components/payments/payments-error-state";
 import { PaymentsTableSkeleton } from "@/components/payments/payments-table-skeleton";
 import { ReconciliationFormDialog } from "@/components/payments/reconciliation-form-dialog";
 import { ReconciliationTable } from "@/components/payments/reconciliation-table";
+import { FilteredState } from "@/components/shared/collection-state";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
@@ -35,6 +36,7 @@ import {
 } from "@/hooks/use-payments";
 import { usePermission } from "@/hooks/use-permission";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { toastMoneyFailure } from "@/lib/money-failure-toast";
 import type { CreateReconciliationPayload, ReconciliationFilters } from "@/types/payment";
 
 const defaultFilters: ReconciliationFilters = {
@@ -62,6 +64,12 @@ export function ReconciliationPageClient(): JSX.Element {
   const createMutation = useCreateReconciliation();
   const isPermissionDenied =
     reconciliationsQuery.error instanceof ApiError && reconciliationsQuery.error.status === 403;
+  // Branch is scope rather than a filter here too — it defaults to the user's
+  // own branch, so counting it would mark every empty ledger as "filtered".
+  const hasActiveFilters =
+    filters.paymentMethodId !== defaultFilters.paymentMethodId ||
+    filters.dateFrom.length > 0 ||
+    filters.dateTo.length > 0;
   const branchOptions = useMemo(
     () =>
       (branchesQuery.data ?? []).filter(
@@ -96,7 +104,7 @@ export function ReconciliationPageClient(): JSX.Element {
       setLastCreated(payload);
       setDialogOpen(false);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toastMoneyFailure("The reconciliation was not saved", error);
     }
   };
 
@@ -204,9 +212,22 @@ export function ReconciliationPageClient(): JSX.Element {
 
       {!reconciliationsQuery.isLoading &&
       !reconciliationsQuery.error &&
-      (reconciliationsQuery.data ?? []).length === 0 ? (
+      (reconciliationsQuery.data ?? []).length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="reconciliations"
+          onClearFilters={() =>
+            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })
+          }
+        />
+      ) : null}
+
+      {!reconciliationsQuery.isLoading &&
+      !reconciliationsQuery.error &&
+      (reconciliationsQuery.data ?? []).length === 0 &&
+      !hasActiveFilters ? (
         <PaymentsEmptyState
-          title="No reconciliations found."
+          title="No reconciliations yet"
           description="Create daily reconciliation records to compare expected and counted totals."
         />
       ) : null}

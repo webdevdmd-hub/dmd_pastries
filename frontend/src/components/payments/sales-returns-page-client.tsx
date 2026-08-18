@@ -8,7 +8,9 @@ import { toast } from "sonner";
 import { TableDensityToggle } from "@/components/density/table-density";
 import { AccessDeniedCard } from "@/components/payments/access-denied-card";
 import { PaymentsErrorState } from "@/components/payments/payments-error-state";
+import { PaymentsTableSkeleton } from "@/components/payments/payments-table-skeleton";
 import { SalesReturnsTable } from "@/components/payments/sales-returns-table";
+import { EmptyState, FilteredState } from "@/components/shared/collection-state";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
@@ -33,6 +35,7 @@ import {
   useSalesReturns,
 } from "@/hooks/use-sales-returns";
 import { getErrorMessage } from "@/lib/api/client";
+import { toastMoneyFailure } from "@/lib/money-failure-toast";
 import type { SalesReturn, SalesReturnFilters, SalesReturnStatus } from "@/types/sales-return";
 
 const defaultFilters: SalesReturnFilters = {
@@ -54,6 +57,9 @@ export function SalesReturnsPageClient(): JSX.Element {
   const [filters, setFilters] = useState<SalesReturnFilters>(defaultFilters);
   const [reversalReturn, setReversalReturn] = useState<SalesReturn | null>(null);
   const returnsQuery = useSalesReturns(filters, canView && branchScope.hasBranchScope);
+  // "Nothing to show" has two causes with opposite remedies (DESIGN.md §8).
+  const hasActiveFilters =
+    filters.search.trim().length > 0 || filters.status !== defaultFilters.status;
   const postMutation = usePostSalesReturn();
   const cancelMutation = useCancelSalesReturn();
   const reverseMutation = useReverseSalesReturn();
@@ -73,7 +79,7 @@ export function SalesReturnsPageClient(): JSX.Element {
       await postMutation.mutateAsync(salesReturn.id);
       toast.success("Credit note posted.");
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toastMoneyFailure("The credit note was not posted", error);
     }
   };
 
@@ -97,7 +103,7 @@ export function SalesReturnsPageClient(): JSX.Element {
       toast.success("Credit note reversed.");
       setReversalReturn(null);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toastMoneyFailure("The credit note was not reversed", error);
     }
   };
 
@@ -148,36 +154,39 @@ export function SalesReturnsPageClient(): JSX.Element {
         <TableDensityToggle className="ml-auto" />
       </FilterBar>
 
-      {returnsQuery.isLoading ? (
-        <Card>
-          <CardContent className="p-8 text-sm text-brand-mocha">
-            Loading credit notes...
-          </CardContent>
-        </Card>
-      ) : null}
+      {returnsQuery.isLoading ? <PaymentsTableSkeleton /> : null}
 
       {!returnsQuery.isLoading && returnsQuery.error ? (
         <PaymentsErrorState
           description={getErrorMessage(returnsQuery.error)}
           onRetry={() => void returnsQuery.refetch()}
-          title="Unable to load credit notes"
+          title="credit notes"
         />
       ) : null}
 
-      {!returnsQuery.isLoading && !returnsQuery.error && (returnsQuery.data ?? []).length === 0 ? (
-        <Card>
-          <CardContent className="grid min-h-64 place-items-center p-8 text-center">
-            <div>
-              <RotateCcw className="mx-auto h-10 w-10 text-brand-mocha" />
-              <h2 className="mt-4 text-lg font-bold text-brand-espresso">
-                No returns or credit notes found.
-              </h2>
-              <p className="mt-1 text-sm text-brand-mocha">
-                Create item returns from POS sale details inside Payments.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Filtered and empty are different situations with opposite remedies.
+          Offering nothing but "create one from a POS sale" is wrong when credit
+          notes exist and the user simply typed a status that excludes them. */}
+      {!returnsQuery.isLoading &&
+      !returnsQuery.error &&
+      (returnsQuery.data ?? []).length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="credit notes"
+          onClearFilters={() => setFilters(defaultFilters)}
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!returnsQuery.isLoading &&
+      !returnsQuery.error &&
+      (returnsQuery.data ?? []).length === 0 &&
+      !hasActiveFilters ? (
+        <EmptyState
+          description="Create item returns from POS sale details inside Payments."
+          icon={RotateCcw}
+          title="No credit notes yet"
+        />
       ) : null}
 
       {!returnsQuery.isLoading && !returnsQuery.error && (returnsQuery.data ?? []).length > 0 ? (
