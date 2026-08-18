@@ -610,7 +610,7 @@ export function AuditLogsPageClient(): JSX.Element {
                 setSelectedUserId(nextUserId);
                 resetUserActivity();
               }}
-              variant="secondary"
+              variant="outline"
             >
               Load User Activity
             </Button>

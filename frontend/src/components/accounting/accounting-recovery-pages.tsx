@@ -1257,7 +1257,7 @@ export function AccountingBackfillPageClient(): JSX.Element {
               className="w-full"
               disabled={!canRunDryRun || runBackfill.isPending}
               onClick={() => submitBackfill(true)}
-              variant="secondary"
+              variant="outline"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               Run dry run

@@ -6,7 +6,8 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<"tex
   ({ className, ...props }, ref) => (
     <textarea
       className={cn(
-        "flex min-h-24 w-full rounded-xl border border-workspace-border bg-workspace-panel px-3 py-2 text-sm text-brand-espresso placeholder:text-workspace-muted/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-brand-latte disabled:opacity-60",
+        // See input.tsx — same token pass, same blue-only focus ring.
+        "flex min-h-24 w-full rounded border border-border bg-card px-3 py-2 text-cell text-foreground placeholder:text-foreground-disabled focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60",
         className,
       )}
       ref={ref}

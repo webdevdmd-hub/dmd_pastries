@@ -18,7 +18,9 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     suppressHydrationWarning
     className={cn(
-      "flex h-11 w-full items-center justify-between rounded-xl border border-workspace-border bg-workspace-panel px-3 py-2 text-sm text-brand-espresso ring-offset-background placeholder:text-workspace-muted/65 focus:outline-none focus:ring-2 focus:ring-brand-caramel focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-brand-latte disabled:opacity-60",
+      // Matches Input and Button on height and radius; blue-only focus ring
+      // (see input.tsx — `ring-brand-caramel` was a near-black, invisible ring).
+      "flex h-field w-full items-center justify-between rounded border border-border bg-card px-3 py-2 text-cell text-foreground placeholder:text-foreground-disabled focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-canvas disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60",
       className,
     )}
     {...props}

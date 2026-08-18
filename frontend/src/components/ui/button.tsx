@@ -11,22 +11,42 @@ const buttonVariants = cva(
   // near-black focus ring, and on a black primary button it was invisible.
   // Keyboard and switch users had no way to see which control was focused,
   // including the safe-by-default button on a destructive confirm dialog.
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  //
+  // Weight is 500, not 600: DESIGN.md §2 makes 500 the workhorse and reserves
+  // 600 for page titles. Radius is the 10px token, down from rounded-xl.
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded text-cell font-medium transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "bg-brand-caramel text-primary-foreground shadow-none hover:bg-brand-mocha",
-        secondary: "bg-brand-latte text-brand-espresso hover:bg-brand-cappuccino/55",
-        outline:
-          "border border-workspace-border bg-workspace-panel text-brand-espresso hover:bg-brand-latte/70",
-        ghost: "text-brand-espresso hover:bg-brand-latte/70",
-        link: "text-brand-espresso underline-offset-4 hover:underline",
+        // `default` is the primary role of DESIGN.md §6. Kept under this key
+        // rather than renamed to `primary`, because ~15 call sites select it
+        // dynamically (`variant={cond ? "outline" : "default"}`) and renaming
+        // would churn them for no visual change.
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+
+        // The one accent. Reserved for money-committing actions — Charge, Post,
+        // Confirm payment, Close period — and never more than one per screen.
+        // DESIGN.md §3.2: "If two things on a screen are green, one is wrong."
+        commit: "bg-money text-money-foreground hover:bg-money-hover",
+
+        outline: "border border-border bg-card text-foreground hover:bg-muted",
+        ghost: "text-foreground hover:bg-muted",
+
+        // Void, delete, refund. A bordered card surface with a danger-coloured
+        // label, not a filled red block — a destructive action should read as
+        // deliberate, not as the loudest thing on the screen.
+        danger: "border border-border bg-card text-danger-text hover:bg-danger-tint",
+
+        link: "text-foreground underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-11 px-5 py-2.5",
-        sm: "h-9 rounded-lg px-3",
-        lg: "h-12 rounded-xl px-8",
-        icon: "h-11 w-11",
+        // `default` follows the density register: 36px on Ledger surfaces,
+        // 48px inside a counter surface, without the call site knowing which.
+        default: "h-control px-4",
+        sm: "h-8 px-3",
+        lg: "h-11 px-6",
+        counter: "h-12 px-6 text-body",
+        icon: "h-control w-control min-h-tap min-w-tap p-0",
       },
     },
     defaultVariants: {

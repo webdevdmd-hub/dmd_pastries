@@ -107,7 +107,7 @@ export function SettingsSectionCard({
                   disabled={disabled}
                   onClick={onOpen}
                   type="button"
-                  variant={disabled ? "outline" : "secondary"}
+                  variant="outline"
                 >
                   <span className="sr-only">{canManage ? section.actionLabel : "View"}</span>
                   <ArrowRight
