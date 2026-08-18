@@ -103,22 +103,33 @@ export function ReconciliationFormDialog({
     open && Boolean(selectedBranchId) && Boolean(selectedDate),
   );
 
+  // null means "we do not know yet" (no method picked, still loading, request
+  // failed). A method with no row in the summary is NOT unknown — the backend
+  // collected nothing on it, so expected is a real 0. Conflating the two hides
+  // the variance on exactly the case worth flagging: cash counted on a day the
+  // ledger says had no sales.
   const expectedAmount = useMemo(() => {
-    if (!selectedMethodId) {
+    if (!selectedMethodId || !summaryQuery.data) {
       return null;
     }
 
-    const match = summaryQuery.data?.find((entry) => entry.paymentMethodId === selectedMethodId);
+    const match = summaryQuery.data.find((entry) => entry.paymentMethodId === selectedMethodId);
 
-    return match?.netAmount ?? null;
+    return match?.netAmount ?? 0;
   }, [selectedMethodId, summaryQuery.data]);
 
   const variance = useMemo(() => {
-    if (expectedAmount === null || !Number.isFinite(Number(countedAmount))) {
+    const counted = Number(countedAmount);
+
+    if (
+      expectedAmount === null ||
+      String(countedAmount).trim().length === 0 ||
+      !Number.isFinite(counted)
+    ) {
       return null;
     }
 
-    return Number(countedAmount) - expectedAmount;
+    return counted - expectedAmount;
   }, [countedAmount, expectedAmount]);
 
   const submitForm = async (values: CreateReconciliationSchema): Promise<void> => {
@@ -216,11 +227,9 @@ export function ReconciliationFormDialog({
                   ? "Select a payment method"
                   : summaryQuery.isPending
                     ? "Loading..."
-                    : summaryQuery.isError
+                    : summaryQuery.isError || expectedAmount === null
                       ? "Unavailable"
-                      : expectedAmount === null
-                        ? formatAmount(0)
-                        : formatAmount(expectedAmount)}
+                      : formatAmount(expectedAmount)}
               </span>
             </div>
             {variance !== null ? (
