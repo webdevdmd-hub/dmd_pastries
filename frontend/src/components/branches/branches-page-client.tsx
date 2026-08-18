@@ -10,6 +10,7 @@ import { BranchesEmptyState } from "@/components/branches/branches-empty-state";
 import { BranchesErrorState } from "@/components/branches/branches-error-state";
 import { BranchesTable } from "@/components/branches/branches-table";
 import { BranchesTableSkeleton } from "@/components/branches/branches-table-skeleton";
+import { FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -72,6 +73,7 @@ export function BranchesPageClient(): JSX.Element {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
 
+  const isSearching = search.trim().length > 0;
   const branches = useMemo(
     () => filterBranches(branchesQuery.data ?? [], search),
     [branchesQuery.data, search],
@@ -185,8 +187,23 @@ export function BranchesPageClient(): JSX.Element {
         />
       ) : null}
 
+      {/* Two different situations. Searching a tenant that HAS branches used to
+          render "No branches yet" directly under "0 visible of 1 branches" — the
+          screen contradicting itself, with no way back but clearing the box by
+          hand. */}
       {!branchesQuery.isLoading && !branchesQuery.error && branches.length === 0 ? (
-        <BranchesEmptyState />
+        isSearching ? (
+          <FilteredState
+            noun="branches"
+            onClearFilters={() => {
+              setSearch("");
+            }}
+            query={search}
+            totalCount={branchesQuery.data?.length ?? 0}
+          />
+        ) : (
+          <BranchesEmptyState />
+        )
       ) : null}
 
       {!branchesQuery.isLoading && !branchesQuery.error && branches.length > 0 ? (

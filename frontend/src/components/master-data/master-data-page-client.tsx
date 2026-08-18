@@ -4,10 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Copy,
   Database,
+  ListChecks,
   LoaderCircle,
   MoreHorizontal,
   Plus,
+  Ruler,
   Search,
+  Shapes,
   ShieldAlert,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -17,6 +20,8 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { useConfirm } from "@/components/app/confirm-provider";
+import { EmptyState } from "@/components/shared/collection-state";
+import { CollectionStateRow } from "@/components/shared/collection-state-row";
 import { PageHeader } from "@/components/shared/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -406,7 +411,7 @@ function ProductCategoryIconPicker({
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-brand-cappuccino bg-card px-4 py-8 text-center text-sm text-brand-mocha">
-            No matching icons found.
+            No icons match that search.
           </div>
         )}
       </div>
@@ -1006,6 +1011,15 @@ function UnitsTable({
         </TableRow>
       </TableHeader>
       <TableBody>
+        {units.length === 0 ? (
+          <CollectionStateRow colSpan={8}>
+            <EmptyState
+              description="A unit is how a quantity is measured — kg, litre, piece. Recipes, stock and purchase orders all need one."
+              icon={Ruler}
+              title="No units yet"
+            />
+          </CollectionStateRow>
+        ) : null}
         {units.map((unit) => (
           <TableRow key={unit.id}>
             <TableCell className="font-medium">{unit.unitName}</TableCell>
@@ -1091,6 +1105,15 @@ function ProductCategoriesTable({
         </TableRow>
       </TableHeader>
       <TableBody>
+        {categories.length === 0 ? (
+          <CollectionStateRow colSpan={7}>
+            <EmptyState
+              description="Categories group products for the catalogue and the POS grid. Without them, every product lands in one undifferentiated list."
+              icon={Shapes}
+              title="No product categories yet"
+            />
+          </CollectionStateRow>
+        ) : null}
         {categories.map((category) => {
           const Icon = getProductCategoryIconForMetadata(category);
 
@@ -1171,12 +1194,17 @@ function ProductCategoriesTable({
 function SimpleCategoriesTable({
   canManage = false,
   categories,
+  noun,
   onDeactivate,
   onEdit,
   onStatusChange,
 }: {
   canManage?: boolean;
   categories: SimpleCategory[];
+  /** Names the collection in the empty state. Required: this table renders both
+      ingredient and packaging categories, and "No categories yet" on the
+      packaging screen sends someone looking in the wrong place. */
+  noun: string;
   onDeactivate?: (category: SimpleCategory) => void;
   onEdit?: (category: SimpleCategory) => void;
   onStatusChange?: (category: SimpleCategory, status: RecordStatus) => void;
@@ -1195,6 +1223,15 @@ function SimpleCategoriesTable({
         </TableRow>
       </TableHeader>
       <TableBody>
+        {categories.length === 0 ? (
+          <CollectionStateRow colSpan={showActions ? 4 : 3}>
+            <EmptyState
+              description={`Used to group ${noun} for reporting and stock organisation.`}
+              icon={Shapes}
+              title={`No ${noun} yet`}
+            />
+          </CollectionStateRow>
+        ) : null}
         {categories.map((category) => (
           <TableRow key={category.id}>
             <TableCell className="font-medium">{category.categoryName}</TableCell>
@@ -1460,6 +1497,15 @@ function OrderStatusesTable({
         </TableRow>
       </TableHeader>
       <TableBody>
+        {statuses.length === 0 ? (
+          <CollectionStateRow colSpan={7}>
+            <EmptyState
+              description="Order statuses are the steps a bakery order moves through, from new to delivered."
+              icon={ListChecks}
+              title="No order statuses yet"
+            />
+          </CollectionStateRow>
+        ) : null}
         {statuses.map((status) => (
           <TableRow key={status.id}>
             <TableCell className="font-medium">{status.statusName}</TableCell>
@@ -1669,6 +1715,15 @@ function PaymentStatusesTable({
         </TableRow>
       </TableHeader>
       <TableBody>
+        {statuses.length === 0 ? (
+          <CollectionStateRow colSpan={6}>
+            <EmptyState
+              description="Payment statuses describe where a payment stands: pending, completed, refunded."
+              icon={ListChecks}
+              title="No payment statuses yet"
+            />
+          </CollectionStateRow>
+        ) : null}
         {statuses.map((status) => (
           <TableRow key={status.id}>
             <TableCell className="font-medium">{status.statusName}</TableCell>
@@ -2515,6 +2570,7 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
             <SimpleCategoriesTable
               canManage={canManage}
               categories={ingredientCategoriesQuery.data}
+              noun="ingredient categories"
               onDeactivate={(category) => {
                 void handleSimpleCategoryDeactivate(category);
               }}
@@ -2532,6 +2588,7 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
             <SimpleCategoriesTable
               canManage={canManage}
               categories={packagingCategoriesQuery.data}
+              noun="packaging categories"
               onDeactivate={(category) => {
                 void handleSimpleCategoryDeactivate(category);
               }}

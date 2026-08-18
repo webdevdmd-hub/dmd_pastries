@@ -14,6 +14,8 @@ import { Fragment, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/settings/access-denied-card";
+import { EmptyState, FilteredState } from "@/components/shared/collection-state";
+import { CollectionStateRow } from "@/components/shared/collection-state-row";
 import { LoadingState } from "@/components/shared/loading-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -181,7 +183,19 @@ function methodBadgeClass(method: string): string {
   }
 }
 
-function RouteTable({ groups }: { groups: ModuleRouteGroup[] }): JSX.Element {
+function RouteTable({
+  groups,
+  isFiltered,
+  onClearFilters,
+  query,
+  totalCount,
+}: {
+  groups: ModuleRouteGroup[];
+  isFiltered: boolean;
+  onClearFilters: () => void;
+  query: string;
+  totalCount: number;
+}): JSX.Element {
   return (
     <Card>
       <CardContent className="p-0">
@@ -200,12 +214,25 @@ function RouteTable({ groups }: { groups: ModuleRouteGroup[] }): JSX.Element {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/* This said "No APIs match the current filters" unconditionally,
+                  including with no filter set — the inverse of the usual bug. */}
               {groups.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-sm text-brand-mocha">
-                    No APIs match the current filters.
-                  </TableCell>
-                </TableRow>
+                <CollectionStateRow colSpan={8}>
+                  {isFiltered ? (
+                    <FilteredState
+                      noun="APIs"
+                      onClearFilters={onClearFilters}
+                      query={query}
+                      totalCount={totalCount}
+                    />
+                  ) : (
+                    <EmptyState
+                      description="The route registry is empty, so there is nothing to probe."
+                      icon={Activity}
+                      title="No APIs registered"
+                    />
+                  )}
+                </CollectionStateRow>
               ) : null}
 
               {groups.map(([module, rows]) => (
@@ -260,9 +287,11 @@ function RecentEventsPanel({ events }: { events: ApiMonitorEvent[] }): JSX.Eleme
       </CardHeader>
       <CardContent className="space-y-3">
         {events.length === 0 ? (
-          <p className="text-sm text-brand-mocha">
-            No frontend API calls captured in this browser session yet.
-          </p>
+          <EmptyState
+            description="Calls appear here as you use the app. Reloading the page clears them."
+            icon={Activity}
+            title="No calls captured yet"
+          />
         ) : null}
 
         {events.slice(0, 15).map((event) => (
@@ -365,6 +394,11 @@ export function ApiMonitorPageClient(): JSX.Element {
     [methodFilter, moduleFilter, rows, search, statusFilter],
   );
   const groupedRows = useMemo(() => groupRows(filteredRows), [filteredRows]);
+  const isRouteTableFiltered =
+    search.trim().length > 0 ||
+    moduleFilter !== "all" ||
+    methodFilter !== "all" ||
+    statusFilter !== "all";
   const safeProbeRoutes = useMemo(
     () => routes.filter((route) => route.probeMode === "safe_probe"),
     [routes],
@@ -515,7 +549,18 @@ export function ApiMonitorPageClient(): JSX.Element {
       {catalogQuery.isLoading ? <LoadingState /> : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <RouteTable groups={groupedRows} />
+        <RouteTable
+          groups={groupedRows}
+          isFiltered={isRouteTableFiltered}
+          onClearFilters={() => {
+            setSearch("");
+            setModuleFilter("all");
+            setMethodFilter("all");
+            setStatusFilter("all");
+          }}
+          query={search}
+          totalCount={rows.length}
+        />
         <div className="space-y-4">
           <Card>
             <CardContent className="flex items-start gap-3 p-5">

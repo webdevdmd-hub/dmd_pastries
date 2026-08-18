@@ -15,6 +15,7 @@ import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { EmptyState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -737,16 +738,11 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
       ) : null}
 
       {!layoutsQuery.isLoading && !layoutsQuery.error && layouts.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center p-10 text-center">
-            <ReceiptText className="h-10 w-10 text-brand-caramel" />
-            <h2 className="mt-4 text-2xl font-bold text-brand-espresso">No receipt layouts yet</h2>
-            <p className="mt-2 max-w-xl text-brand-mocha">
-              Create a default layout for 80mm thermal printers, 58mm counters, A4 invoice style, or
-              a custom receipt format.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          description="A layout decides what a printed receipt looks like — 80mm thermal, 58mm counter, A4 invoice, or a custom format."
+          icon={ReceiptText}
+          title="No receipt layouts yet"
+        />
       ) : null}
 
       {!layoutsQuery.isLoading && !layoutsQuery.error && layouts.length > 0 ? (

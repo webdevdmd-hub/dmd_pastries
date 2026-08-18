@@ -7,6 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { EmptyState } from "@/components/shared/collection-state";
+import { CollectionStateRow } from "@/components/shared/collection-state-row";
 import { PageHeader } from "@/components/shared/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -520,17 +522,13 @@ export function SalesChannelsPageClient(): JSX.Element {
                 </TableRow>
               ))}
               {!salesChannelsQuery.isLoading && (salesChannelsQuery.data ?? []).length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-12 text-center">
-                    <RadioTower className="mx-auto h-8 w-8 text-brand-mocha" />
-                    <p className="mt-3 font-medium text-brand-espresso">
-                      No sales channels configured.
-                    </p>
-                    <p className="text-sm text-brand-mocha">
-                      Create channels for Walk-in, WhatsApp, Talabat, and other order sources.
-                    </p>
-                  </TableCell>
-                </TableRow>
+                <CollectionStateRow colSpan={7}>
+                  <EmptyState
+                    description="A channel records where an order came from — walk-in, WhatsApp, Talabat — so sales can be reported by source."
+                    icon={RadioTower}
+                    title="No sales channels yet"
+                  />
+                </CollectionStateRow>
               ) : null}
             </TableBody>
           </Table>

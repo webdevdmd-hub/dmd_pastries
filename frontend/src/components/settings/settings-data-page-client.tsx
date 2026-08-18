@@ -9,6 +9,8 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { useConfirm } from "@/components/app/confirm-provider";
+import { EmptyState } from "@/components/shared/collection-state";
+import { CollectionStateRow } from "@/components/shared/collection-state-row";
 import { PageHeader } from "@/components/shared/page-header";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
@@ -806,6 +808,15 @@ function TaxRatesTable({
             </TableRow>
           </TableHeader>
           <TableBody>
+            {taxRates.length === 0 ? (
+              <CollectionStateRow colSpan={8}>
+                <EmptyState
+                  description="A tax rate is the VAT percentage applied to a sale or purchase. Without one, documents post at zero tax."
+                  icon={Percent}
+                  title="No tax rates yet"
+                />
+              </CollectionStateRow>
+            ) : null}
             {taxRates.map((taxRate) => (
               <TableRow key={taxRate.id}>
                 <TableCell className="font-medium">{taxRate.taxName}</TableCell>
@@ -897,6 +908,15 @@ function PaymentMethodsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
+            {methods.length === 0 ? (
+              <CollectionStateRow colSpan={9}>
+                <EmptyState
+                  description="Payment methods are the ways a customer can pay — cash, card, bank transfer — and each one links to the account its money is recorded in."
+                  icon={CreditCard}
+                  title="No payment methods yet"
+                />
+              </CollectionStateRow>
+            ) : null}
             {methods.map((method) => (
               <TableRow key={method.id}>
                 <TableCell className="font-medium">{method.methodName}</TableCell>
@@ -1161,7 +1181,7 @@ function PaymentMethodDialog({
                   <FormLabel>Default payment account</FormLabel>
                   <FormControl>
                     <SearchableCombobox
-                      emptyMessage="No active payment accounts found."
+                      emptyMessage="No active payment accounts."
                       options={paymentAccountOptions}
                       placeholder="Select payment account"
                       searchPlaceholder="Search payment account..."

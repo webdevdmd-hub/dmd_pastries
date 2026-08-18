@@ -1,11 +1,12 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Link2, RefreshCw, Scale } from "lucide-react";
 import Link from "next/link";
 import type { JSX, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { AccountingAccessDeniedCard } from "@/components/accounting/accounting-access-denied-card";
+import { EmptyState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
@@ -429,9 +430,11 @@ function YearEndCloseCard({
 
       {yearsQuery.isError ? <ErrorNotice message={yearsQuery.error.message} /> : null}
       {!yearsQuery.isLoading && years.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No posted accounting history yet, so there is nothing to close.
-        </p>
+        <EmptyState
+          description="A financial year can only be closed once it has posted journals. Record some activity first."
+          icon={CalendarClock}
+          title="No accounting history yet"
+        />
       ) : null}
 
       <div className="flex flex-col gap-3">
@@ -667,7 +670,7 @@ export function AccountMappingsPageClient(): JSX.Element {
               <div className="flex flex-col gap-2">
                 <SearchableCombobox
                   disabled={!canEditMappings}
-                  emptyMessage="No active chart accounts found."
+                  emptyMessage="No active chart accounts."
                   errorMessage={
                     chartAccountsQuery.isError ? chartAccountsQuery.error.message : null
                   }
@@ -713,9 +716,11 @@ export function AccountMappingsPageClient(): JSX.Element {
           );
         })}
         {mappingItems.length === 0 ? (
-          <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-            No account mappings found.
-          </div>
+          <EmptyState
+            description="Mappings tell each transaction type which ledger account to post to. Seed the defaults to start."
+            icon={Link2}
+            title="No account mappings yet"
+          />
         ) : null}
         {changedMappingCount > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/20 px-4 py-3">
@@ -821,7 +826,11 @@ function ReconciliationSection({
           </div>
         ))}
         {!isLoading && !errorMessage && items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No reconciliation rows returned yet.</p>
+          <EmptyState
+            description="Rows appear once inventory movements have been posted for this period."
+            icon={Scale}
+            title="No reconciliation rows"
+          />
         ) : null}
       </div>
     </RecoveryCard>
@@ -1239,7 +1248,7 @@ export function AccountingBackfillPageClient(): JSX.Element {
             ))}
             {readiness?.issues.length === 0 ? (
               <p className="rounded-xl border bg-background px-4 py-3 text-sm text-muted-foreground">
-                No readiness issues returned.
+                No readiness issues — everything required is in place.
               </p>
             ) : null}
             {readinessQuery.isError ? <ErrorNotice message={readinessQuery.error.message} /> : null}
