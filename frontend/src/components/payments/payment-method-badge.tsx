@@ -4,22 +4,21 @@ import { Badge } from "@/components/ui/badge";
 
 type PaymentMethodBadgeProps = {
   methodName: string;
-  methodType?: string;
 };
 
-export function PaymentMethodBadge({
-  methodName,
-  methodType,
-}: PaymentMethodBadgeProps): JSX.Element {
+/**
+ * The payment method, as one chip.
+ *
+ * This used to stack the raw `method_type` underneath the name, so every row
+ * read "Card / card" and "Bank Transfer / bank_transfer" — a duplicate of the
+ * label and a raw enum at the same time. It also made table rows two lines
+ * tall, which defeated the 44px density the ledger table is built around.
+ * Invisible until the ledger had data in it.
+ */
+export function PaymentMethodBadge({ methodName }: PaymentMethodBadgeProps): JSX.Element {
   return (
-    <div className="flex flex-col gap-1">
-      <Badge
-        className="w-fit border-brand-caramel/30 bg-brand-latte text-brand-espresso"
-        variant="outline"
-      >
-        {methodName}
-      </Badge>
-      {methodType ? <span className="text-xs text-brand-mocha">{methodType}</span> : null}
-    </div>
+    <Badge className="w-fit" variant="secondary">
+      {methodName}
+    </Badge>
   );
 }

@@ -310,10 +310,7 @@ export function SaleDetailPageClient({ saleId }: SaleDetailPageClientProps): JSX
                   {(paymentsQuery.data ?? []).map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell>
-                        <PaymentMethodBadge
-                          methodName={payment.paymentMethodNameSnapshot}
-                          methodType={payment.paymentMethodTypeSnapshot}
-                        />
+                        <PaymentMethodBadge methodName={payment.paymentMethodNameSnapshot} />
                       </TableCell>
                       <TableCell className="font-bold">{formatMoney(payment.amount)}</TableCell>
                       <TableCell>

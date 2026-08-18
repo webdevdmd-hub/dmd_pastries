@@ -95,10 +95,7 @@ export function PaymentDetailsDrawer({
               </p>
             </div>
 
-            <PaymentMethodBadge
-              methodName={payment.paymentMethodNameSnapshot}
-              methodType={payment.paymentMethodTypeSnapshot}
-            />
+            <PaymentMethodBadge methodName={payment.paymentMethodNameSnapshot} />
 
             <div className="grid gap-3">
               <DetailRow label="Source Type" value={sourceLabel} />

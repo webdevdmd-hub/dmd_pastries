@@ -96,16 +96,16 @@ export function PaymentsTable({
       <TableBody>
         {payments.map((payment) => (
           <TableRow key={payment.id}>
-            <TableCell>
-              <span className="block font-bold text-brand-espresso">{payment.sourceNumber}</span>
-              <span className="text-xs font-semibold text-brand-mocha">{sourceLabel(payment)}</span>
+            {/* The sale number is an identifier: mono, and it must not wrap.
+                Left to wrap it took two lines and pushed every row to 75px,
+                overriding the density system entirely. */}
+            <TableCell className="whitespace-nowrap">
+              <span className="block font-mono font-medium">{payment.sourceNumber}</span>
+              <span className="text-meta text-foreground-muted">{sourceLabel(payment)}</span>
             </TableCell>
             <TableCell>{payment.customerName ?? "Walk-in customer"}</TableCell>
             <TableCell>
-              <PaymentMethodBadge
-                methodName={payment.paymentMethodNameSnapshot}
-                methodType={payment.paymentMethodTypeSnapshot}
-              />
+              <PaymentMethodBadge methodName={payment.paymentMethodNameSnapshot} />
             </TableCell>
             <TableCell className="capitalize">{paymentTypeLabel(payment)}</TableCell>
             <TableCell className="text-right font-medium tabular-nums">
