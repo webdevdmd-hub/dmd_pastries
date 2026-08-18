@@ -26,7 +26,14 @@ export const createReconciliationSchema = z.object({
   branchId: z.string().trim().min(1, "Branch is required."),
   reconciliationDate: z.string().trim().min(1, "Reconciliation date is required."),
   paymentMethodId: z.string().trim().min(1, "Payment method is required."),
-  countedAmount: z.coerce.number().min(0, "Counted amount cannot be negative."),
+  // Blank must not silently coerce to 0: z.coerce.number()("") is 0, which
+  // would record a zero cash count as if the cashier had really counted zero.
+  countedAmount: z
+    .union([z.string(), z.number()])
+    .refine((value) => String(value).trim().length > 0, {
+      message: "Counted amount is required.",
+    })
+    .pipe(z.coerce.number().min(0, "Counted amount cannot be negative.")),
   notes: optionalText,
 });
 
@@ -57,6 +64,7 @@ export const reconciliationFiltersSchema = z.object({
 export type AddPaymentSchema = z.infer<typeof addPaymentSchema>;
 export type RefundPaymentSchema = z.infer<typeof refundPaymentSchema>;
 export type CreateReconciliationSchema = z.infer<typeof createReconciliationSchema>;
+export type CreateReconciliationInputValues = z.input<typeof createReconciliationSchema>;
 export type PaymentFiltersSchema = z.infer<typeof paymentFiltersSchema>;
 export type RefundFiltersSchema = z.infer<typeof refundFiltersSchema>;
 export type ReconciliationFiltersSchema = z.infer<typeof reconciliationFiltersSchema>;

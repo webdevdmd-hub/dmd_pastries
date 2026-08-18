@@ -24,13 +24,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { usePaymentSummaryByMethod } from "@/hooks/use-payments";
+import { resolveDashboardTimezone } from "@/lib/reports/dashboard-filters";
 import {
+  type CreateReconciliationInputValues,
   type CreateReconciliationSchema,
   createReconciliationSchema,
 } from "@/lib/validators/payment.schema";
 import type { Branch } from "@/types/branch";
 import type { CreateReconciliationPayload } from "@/types/payment";
 import type { PaymentMethod } from "@/types/settings";
+
+function formatAmount(value: number): string {
+  return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
+}
 
 type ReconciliationFormDialogProps = {
   branches: Branch[];
@@ -59,13 +66,13 @@ export function ReconciliationFormDialog({
       ),
     [branchScope.canAccessAllBranches, branchScope.effectiveBranchId, branches],
   );
-  const form = useForm<CreateReconciliationSchema>({
+  const form = useForm<CreateReconciliationInputValues, unknown, CreateReconciliationSchema>({
     resolver: zodResolver(createReconciliationSchema),
     defaultValues: {
       branchId: activeBranches[0]?.id ?? "",
       reconciliationDate: new Date().toISOString().slice(0, 10),
       paymentMethodId: "",
-      countedAmount: 0,
+      countedAmount: "",
       notes: null,
     },
   });
@@ -76,11 +83,43 @@ export function ReconciliationFormDialog({
         branchId: activeBranches[0]?.id ?? "",
         reconciliationDate: new Date().toISOString().slice(0, 10),
         paymentMethodId: "",
-        countedAmount: 0,
+        countedAmount: "",
         notes: null,
       });
     }
   }, [activeBranches, form, open]);
+
+  // The dialog exists to compare expected against counted, so the expected
+  // figure has to be on screen while the cashier types. Same backend summary
+  // the payments overview already reads.
+  const timezone = useMemo(resolveDashboardTimezone, []);
+  const selectedBranchId = form.watch("branchId");
+  const selectedDate = form.watch("reconciliationDate");
+  const selectedMethodId = form.watch("paymentMethodId");
+  const countedAmount = form.watch("countedAmount");
+
+  const summaryQuery = usePaymentSummaryByMethod(
+    { branchId: selectedBranchId, date: selectedDate, timezone },
+    open && Boolean(selectedBranchId) && Boolean(selectedDate),
+  );
+
+  const expectedAmount = useMemo(() => {
+    if (!selectedMethodId) {
+      return null;
+    }
+
+    const match = summaryQuery.data?.find((entry) => entry.paymentMethodId === selectedMethodId);
+
+    return match?.netAmount ?? null;
+  }, [selectedMethodId, summaryQuery.data]);
+
+  const variance = useMemo(() => {
+    if (expectedAmount === null || !Number.isFinite(Number(countedAmount))) {
+      return null;
+    }
+
+    return Number(countedAmount) - expectedAmount;
+  }, [countedAmount, expectedAmount]);
 
   const submitForm = async (values: CreateReconciliationSchema): Promise<void> => {
     await onSubmit({
@@ -123,7 +162,7 @@ export function ReconciliationFormDialog({
                 name="branchId"
                 render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="Branch">
                       <SelectValue placeholder="Select branch" />
                     </SelectTrigger>
                     <SelectContent>
@@ -150,7 +189,7 @@ export function ReconciliationFormDialog({
               name="paymentMethodId"
               render={({ field }) => (
                 <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Payment method">
                     <SelectValue placeholder="Select method" />
                   </SelectTrigger>
                   <SelectContent>
@@ -169,11 +208,45 @@ export function ReconciliationFormDialog({
               {form.formState.errors.paymentMethodId?.message}
             </p>
           </div>
+          <div className="rounded-2xl border border-brand-cappuccino/70 bg-card/60 p-3 text-sm">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-muted-foreground">Expected total</span>
+              <span aria-live="polite" className="font-semibold">
+                {!selectedMethodId
+                  ? "Select a payment method"
+                  : summaryQuery.isPending
+                    ? "Loading..."
+                    : summaryQuery.isError
+                      ? "Unavailable"
+                      : expectedAmount === null
+                        ? formatAmount(0)
+                        : formatAmount(expectedAmount)}
+              </span>
+            </div>
+            {variance !== null ? (
+              <div className="mt-2 flex items-center justify-between gap-4">
+                <span className="text-muted-foreground">Variance</span>
+                <span
+                  aria-live="polite"
+                  className={
+                    Math.abs(variance) < 0.005
+                      ? "font-semibold text-success-text"
+                      : "font-semibold text-danger-text"
+                  }
+                >
+                  {Math.abs(variance) < 0.005
+                    ? `Balanced (${formatAmount(0)})`
+                    : `${variance > 0 ? "Over" : "Short"} ${formatAmount(Math.abs(variance))}`}
+                </span>
+              </div>
+            ) : null}
+          </div>
           <div className="grid gap-2">
             <Label htmlFor="countedAmount">Counted amount</Label>
             <Input
               id="countedAmount"
               min={0}
+              placeholder="0.00"
               step="0.01"
               type="number"
               {...form.register("countedAmount")}
