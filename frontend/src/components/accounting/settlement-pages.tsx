@@ -92,14 +92,13 @@ import type { Branch } from "@/types/branch";
 
 const noBranchValue = "__all__";
 
-const paymentAccountTypes: { label: string; value: PaymentAccountType }[] = [
-  { label: "Cash", value: "cash" },
-  { label: "Bank", value: "bank" },
-  { label: "Card clearing", value: "card_clearing" },
-  { label: "Platform clearing", value: "platform_clearing" },
-  { label: "Wallet", value: "wallet" },
-  { label: "Other", value: "other" },
-];
+// Derived from the label map so it stays exhaustive by construction. The
+// hand-written version omitted store_credit, which the backend accepts
+// (service.go validateAccountType) and seeds ("Store Credit"), so operators
+// could neither create such an account nor filter the seeded one.
+const paymentAccountTypes: { label: string; value: PaymentAccountType }[] = (
+  Object.keys(PAYMENT_ACCOUNT_TYPE_LABELS) as PaymentAccountType[]
+).map((value) => ({ label: PAYMENT_ACCOUNT_TYPE_LABELS[value], value }));
 
 const defaultPaymentAccountFilters: PaymentAccountsFilters = {
   accountType: "all",
@@ -340,7 +339,7 @@ function PaymentAccountDialog({
                 update({ accountType: accountType as PaymentAccountType })
               }
             >
-              <SelectTrigger>
+              <SelectTrigger aria-label="Account type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -389,7 +388,7 @@ function PaymentAccountDialog({
                 update({ status: status as PaymentAccountFormState["status"] })
               }
             >
-              <SelectTrigger>
+              <SelectTrigger aria-label="Status">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -569,6 +568,7 @@ export function PaymentAccountsPageClient({
       <Card>
         <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_220px_180px]">
           <Input
+            aria-label="Search payment accounts"
             placeholder="Search account..."
             value={filters.search}
             onChange={(event) =>
@@ -585,7 +585,7 @@ export function PaymentAccountsPageClient({
               }))
             }
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label="Account type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -607,7 +607,7 @@ export function PaymentAccountsPageClient({
               }))
             }
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label="Account status">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
