@@ -5,6 +5,28 @@ export type ReconciliationStatus = "draft" | "submitted" | "approved" | "rejecte
 export type PaymentSourceType = "pos_sale" | "bakery_order";
 export type CustomerPaymentType = "deposit" | "balance" | "full";
 
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  pending: "Pending",
+  completed: "Completed",
+  failed: "Failed",
+  refunded: "Refunded",
+  partially_refunded: "Partially Refunded",
+};
+
+export const REFUND_STATUS_LABELS: Record<RefundStatus, string> = {
+  pending: "Pending",
+  completed: "Completed",
+  failed: "Failed",
+  cancelled: "Cancelled",
+};
+
+export const RECONCILIATION_STATUS_LABELS: Record<ReconciliationStatus, string> = {
+  draft: "Draft",
+  submitted: "Submitted",
+  approved: "Approved",
+  rejected: "Rejected",
+};
+
 export type SalePayment = {
   id: string;
   businessId: string;

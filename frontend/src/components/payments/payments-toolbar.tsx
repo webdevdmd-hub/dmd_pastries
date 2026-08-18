@@ -9,7 +9,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { PaymentFilters, PaymentStatus, RefundFilters, RefundStatus } from "@/types/payment";
+import {
+  PAYMENT_STATUS_LABELS,
+  type PaymentFilters,
+  type PaymentStatus,
+  REFUND_STATUS_LABELS,
+  type RefundFilters,
+  type RefundStatus,
+} from "@/types/payment";
 import type { PaymentMethod } from "@/types/settings";
 
 type PaymentsToolbarProps =
@@ -54,7 +61,7 @@ function PaymentMethodSelect({
 }): JSX.Element {
   return (
     <Select onValueChange={onChange} value={value}>
-      <SelectTrigger className="rounded-2xl">
+      <SelectTrigger aria-label="Payment method" className="rounded-2xl">
         <SelectValue placeholder="Payment method" />
       </SelectTrigger>
       <SelectContent>
@@ -84,6 +91,7 @@ export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
     return (
       <ToolbarFrame>
         <Input
+          aria-label="Search refunds"
           className="rounded-2xl"
           onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
           placeholder="Search refund"
@@ -102,13 +110,13 @@ export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
           }}
           value={filters.refundStatus}
         >
-          <SelectTrigger className="rounded-2xl">
+          <SelectTrigger aria-label="Refund status" className="rounded-2xl">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
             {refundStatuses.map((status) => (
               <SelectItem key={status} value={status}>
-                {status.replaceAll("_", " ")}
+                {status === "all" ? "All statuses" : REFUND_STATUS_LABELS[status]}
               </SelectItem>
             ))}
           </SelectContent>
@@ -151,6 +159,7 @@ export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
   return (
     <ToolbarFrame>
       <Input
+        aria-label="Search payments by sale, reference, or cashier"
         className="rounded-2xl"
         onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
         placeholder="Search sale, reference, cashier"
@@ -169,13 +178,13 @@ export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
         }}
         value={filters.paymentStatus}
       >
-        <SelectTrigger className="rounded-2xl">
+        <SelectTrigger aria-label="Payment status" className="rounded-2xl">
           <SelectValue placeholder="Status" />
         </SelectTrigger>
         <SelectContent>
           {paymentStatuses.map((status) => (
             <SelectItem key={status} value={status}>
-              {status.replaceAll("_", " ")}
+              {status === "all" ? "All statuses" : PAYMENT_STATUS_LABELS[status]}
             </SelectItem>
           ))}
         </SelectContent>
