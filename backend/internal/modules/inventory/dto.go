@@ -10,6 +10,7 @@ type InventoryListQuery struct {
 	Search               string
 	BranchID             string
 	ItemType             string
+	ProductType          string
 	Status               string
 	LowStockOnly         bool
 	ExpiryTracked        *bool

@@ -453,6 +453,7 @@ func parseInventoryListQuery(c *gin.Context) InventoryListQuery {
 		Search:               c.Query("search"),
 		BranchID:             c.Query("branch_id"),
 		ItemType:             c.Query("item_type"),
+		ProductType:          c.Query("product_type"),
 		Status:               c.Query("status"),
 		LowStockOnly:         lowStockOnly,
 		ExpiryTracked:        expiryTracked,
