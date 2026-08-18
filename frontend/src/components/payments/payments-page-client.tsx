@@ -9,13 +9,12 @@ import { toast } from "sonner";
 import { AccessDeniedCard } from "@/components/payments/access-denied-card";
 import { AddPaymentDialog } from "@/components/payments/add-payment-dialog";
 import { PaymentDetailsDrawer } from "@/components/payments/payment-details-drawer";
-import { PaymentMethodSummaryCards } from "@/components/payments/payment-method-summary-cards";
 import { PaymentRefundDialog } from "@/components/payments/payment-refund-dialog";
 import { PaymentsEmptyState } from "@/components/payments/payments-empty-state";
 import { PaymentsErrorState } from "@/components/payments/payments-error-state";
-import { PaymentsSummaryCards } from "@/components/payments/payments-summary-cards";
 import { PaymentsTable } from "@/components/payments/payments-table";
 import { PaymentsTableSkeleton } from "@/components/payments/payments-table-skeleton";
+import { PaymentsTodayStrip } from "@/components/payments/payments-today-strip";
 import { PaymentsToolbar } from "@/components/payments/payments-toolbar";
 import { SalesReturnDialog } from "@/components/payments/sales-return-dialog";
 import { POSReceiptDialog } from "@/components/pos/pos-receipt-dialog";
@@ -235,23 +234,22 @@ export function PaymentsPageClient(): JSX.Element {
         description="Track incoming customer collections from POS sales and bakery orders."
         actions={
           canAdd ? (
-            <Button onClick={() => setAddPaymentOpen(true)} type="button">
+            <Button onClick={() => setAddPaymentOpen(true)} type="button" variant="commit">
               <Plus className="h-4 w-4" />
-              Add payment
+              Record payment
             </Button>
           ) : undefined
         }
       />
 
-      <PaymentsSummaryCards
+      <PaymentsTodayStrip
         errorMessage={summaryQuery.error ? getErrorMessage(summaryQuery.error) : undefined}
+        methodSummaries={methodSummaryQuery.data ?? []}
         onRetry={() => {
           void summaryQuery.refetch();
         }}
         summary={summaryQuery.data}
       />
-
-      <PaymentMethodSummaryCards summaries={methodSummaryQuery.data ?? []} />
 
       <PaymentsToolbar
         filters={filters}

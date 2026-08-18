@@ -1,7 +1,9 @@
 import type { JSX, ReactNode } from "react";
 
+import { TableDensityToggle } from "@/components/density/table-density";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   Select,
   SelectContent,
@@ -50,6 +52,12 @@ const refundStatuses: (RefundStatus | "all")[] = [
   "cancelled",
 ];
 
+// Above this many options the segmented control stops being a glance and starts
+// being a wall, so it falls back to the select. DESIGN.md §6 names the segmented
+// control for payment method, but payment methods are tenant data — most
+// bakeries run three or four, some run more.
+const MAX_SEGMENTED_METHODS = 5;
+
 function PaymentMethodSelect({
   onChange,
   paymentMethods,
@@ -59,9 +67,25 @@ function PaymentMethodSelect({
   paymentMethods: PaymentMethod[];
   value: string;
 }): JSX.Element {
+  const options = [
+    { label: "All", value: "all" },
+    ...paymentMethods.map((method) => ({ label: method.methodName, value: method.id })),
+  ];
+
+  if (options.length <= MAX_SEGMENTED_METHODS) {
+    return (
+      <SegmentedControl
+        aria-label="Payment method"
+        onValueChange={onChange}
+        options={options}
+        value={value}
+      />
+    );
+  }
+
   return (
     <Select onValueChange={onChange} value={value}>
-      <SelectTrigger aria-label="Payment method" className="rounded-2xl">
+      <SelectTrigger aria-label="Payment method">
         <SelectValue placeholder="Payment method" />
       </SelectTrigger>
       <SelectContent>
@@ -78,9 +102,7 @@ function PaymentMethodSelect({
 
 function ToolbarFrame({ children }: { children: ReactNode }): JSX.Element {
   return (
-    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino/70 bg-card/75 p-4 shadow-sm lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_auto]">
-      {children}
-    </div>
+    <div className="flex flex-wrap items-center gap-2.5 rounded bg-muted px-4 py-3">{children}</div>
   );
 }
 
@@ -92,8 +114,8 @@ export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
       <ToolbarFrame>
         <Input
           aria-label="Search refunds"
-          className="rounded-2xl"
           onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
+          className="min-w-52 flex-1"
           placeholder="Search refund"
           value={filters.search}
         />
@@ -110,7 +132,7 @@ export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
           }}
           value={filters.refundStatus}
         >
-          <SelectTrigger aria-label="Refund status" className="rounded-2xl">
+          <SelectTrigger aria-label="Refund status" className="w-44">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -123,14 +145,14 @@ export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
         </Select>
         <Input
           aria-label="Date from"
-          className="rounded-2xl"
+          className="w-40"
           onChange={(event) => onFiltersChange({ ...filters, dateFrom: event.target.value })}
           type="date"
           value={filters.dateFrom}
         />
         <Input
           aria-label="Date to"
-          className="rounded-2xl"
+          className="w-40"
           onChange={(event) => onFiltersChange({ ...filters, dateTo: event.target.value })}
           type="date"
           value={filters.dateTo}
@@ -160,8 +182,8 @@ export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
     <ToolbarFrame>
       <Input
         aria-label="Search payments by sale, reference, or cashier"
-        className="rounded-2xl"
         onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
+        className="min-w-52 flex-1"
         placeholder="Search sale, reference, cashier"
         value={filters.search}
       />
@@ -178,7 +200,7 @@ export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
         }}
         value={filters.paymentStatus}
       >
-        <SelectTrigger aria-label="Payment status" className="rounded-2xl">
+        <SelectTrigger aria-label="Payment status" className="w-44">
           <SelectValue placeholder="Status" />
         </SelectTrigger>
         <SelectContent>
@@ -191,14 +213,14 @@ export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
       </Select>
       <Input
         aria-label="Date from"
-        className="rounded-2xl"
+        className="w-40"
         onChange={(event) => onFiltersChange({ ...filters, dateFrom: event.target.value })}
         type="date"
         value={filters.dateFrom}
       />
       <Input
         aria-label="Date to"
-        className="rounded-2xl"
+        className="w-40"
         onChange={(event) => onFiltersChange({ ...filters, dateTo: event.target.value })}
         type="date"
         value={filters.dateTo}
@@ -210,6 +232,7 @@ export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
       >
         Reset
       </Button>
+      <TableDensityToggle className="ml-auto" />
     </ToolbarFrame>
   );
 }

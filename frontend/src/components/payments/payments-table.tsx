@@ -85,7 +85,7 @@ export function PaymentsTable({
           <TableHead>Customer</TableHead>
           <TableHead>Payment Method</TableHead>
           <TableHead>Type</TableHead>
-          <TableHead>Amount</TableHead>
+          <TableHead className="text-right">Amount</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Reference</TableHead>
           <TableHead>Cashier</TableHead>
@@ -108,13 +108,15 @@ export function PaymentsTable({
               />
             </TableCell>
             <TableCell className="capitalize">{paymentTypeLabel(payment)}</TableCell>
-            <TableCell className="font-medium">{formatMoney(payment.amount)}</TableCell>
+            <TableCell className="text-right font-medium tabular-nums">
+              {formatMoney(payment.amount)}
+            </TableCell>
             <TableCell>
               <PaymentStatusBadge status={payment.paymentStatus} />
             </TableCell>
-            <TableCell>{payment.referenceNumber ?? "No reference"}</TableCell>
+            <TableCell className="font-mono">{payment.referenceNumber ?? "No reference"}</TableCell>
             <TableCell>{payment.paidByUserName}</TableCell>
-            <TableCell>{formatDate(payment.paidAt)}</TableCell>
+            <TableCell className="tabular-nums">{formatDate(payment.paidAt)}</TableCell>
             <TableCell>
               <div className="flex justify-end gap-2">
                 <Button
