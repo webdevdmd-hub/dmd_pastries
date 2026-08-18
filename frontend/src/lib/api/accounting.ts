@@ -813,12 +813,30 @@ function parseAccountMappingsResponse(value: unknown): AccountMappingsResponse {
   throw new Error("Backend account mappings payload is invalid.");
 }
 
-function parseReconciliationItem(value: unknown): AccountingReconciliationItem {
+function parseReconciliationItem(value: unknown, index = 0): AccountingReconciliationItem {
   if (!isObject(value)) {
     throw new Error("Backend reconciliation item payload is invalid.");
   }
 
-  const fallbackId = stringValue(value.key, stringValue(value.name, "check"));
+  /*
+   * The identity chain has to cover every shape the five reconciliation
+   * endpoints actually return, because only ONE of them nests its rows under a
+   * keyed object. /health-check sends `checks: [...]` keyed by `check_key`, and
+   * /payment-accounts sends `items: [...]` keyed by `payment_account_id` —
+   * neither carries `key` or `name`, so both collapsed onto the literal string
+   * "check" for every row. Duplicate React keys on one card, and on the other a
+   * list of three payment accounts all captioned "check".
+   *
+   * `index` is the last resort rather than the first, so a row keeps its
+   * identity across a refetch that reorders the list.
+   */
+  const fallbackId = stringValue(
+    value.key,
+    stringValue(
+      value.check_key,
+      stringValue(value.payment_account_id, stringValue(value.name, `check-${String(index)}`)),
+    ),
+  );
   const status = stringValue(
     value.status,
     booleanValue(value.is_matched) ? "matched" : "unmatched",
@@ -827,7 +845,16 @@ function parseReconciliationItem(value: unknown): AccountingReconciliationItem {
 
   return {
     id: stringValue(value.id, fallbackId),
-    label: stringValue(value.label, stringValue(value.name, fallbackId.replace(/_/g, " "))),
+    label: stringValue(
+      value.label,
+      stringValue(
+        value.name,
+        stringValue(
+          value.payment_account_name,
+          stringValue(value.chart_account_name, fallbackId.replace(/[_-]/g, " ")),
+        ),
+      ),
+    ),
     status,
     isMatched: booleanValue(
       value.is_matched,
@@ -839,7 +866,7 @@ function parseReconciliationItem(value: unknown): AccountingReconciliationItem {
       numberValue(value.source_amount, numberValue(value.document_amount, 0)),
     ),
     ledgerAmount: numberValue(value.ledger_amount, numberValue(value.accounting_amount, 0)),
-    details: stringValue(value.details, stringValue(value.message)),
+    details: stringValue(value.details, stringValue(value.message, stringValue(value.notes))),
   };
 }
 

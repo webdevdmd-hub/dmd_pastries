@@ -1,6 +1,8 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -27,6 +29,7 @@ import { useInventory } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import {
   useCreateManualMovement,
+  useInventoryItemMovements,
   useReverseStockMovement,
   useStockMovements,
   useStockMovementSummary,
@@ -53,6 +56,9 @@ const defaultFilters: StockMovementFilters = {
 };
 
 export function MovementsPageClient(): JSX.Element {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const itemIdParam = searchParams.get("item");
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
   const { normalizeBranchId } = branchScope;
@@ -72,7 +78,20 @@ export function MovementsPageClient(): JSX.Element {
   const [manualOpen, setManualOpen] = useState(false);
   const [selectedMovement, setSelectedMovement] = useState<StockMovement | null>(null);
   const [reversalMovement, setReversalMovement] = useState<StockMovement | null>(null);
-  const movementsQuery = useStockMovements(filters, canView && branchScope.hasBranchScope);
+  // "Movements for [item]" links elsewhere in the app deep-link here with
+  // ?item=<inventoryItemId>. When present, scope the ledger to that one item
+  // (same endpoint the item detail drawer already uses correctly) instead of
+  // silently showing the whole ledger with the param ignored.
+  const movementsQuery = useStockMovements(
+    filters,
+    canView && branchScope.hasBranchScope && !itemIdParam,
+  );
+  const itemMovementsQuery = useInventoryItemMovements(
+    itemIdParam,
+    filters,
+    canView && branchScope.hasBranchScope && Boolean(itemIdParam),
+  );
+  const activeMovementsQuery = itemIdParam ? itemMovementsQuery : movementsQuery;
   const summaryQuery = useStockMovementSummary(
     {
       branchId: filters.branchId,
@@ -83,7 +102,7 @@ export function MovementsPageClient(): JSX.Element {
       dateFrom: filters.dateFrom,
       dateTo: filters.dateTo,
     },
-    canView && branchScope.hasBranchScope,
+    canView && branchScope.hasBranchScope && !itemIdParam,
   );
   const branchesQuery = useBranches(canView);
   const inventoryQuery = useInventory(
@@ -102,11 +121,13 @@ export function MovementsPageClient(): JSX.Element {
   const manualMutation = useCreateManualMovement();
   const reversalMutation = useReverseStockMovement();
   const isPermissionDenied =
-    movementsQuery.error instanceof ApiError && movementsQuery.error.status === 403;
+    activeMovementsQuery.error instanceof ApiError && activeMovementsQuery.error.status === 403;
   // Branch is scope, not a filter: it always carries a value, so counting it
   // would make a genuinely empty ledger look like a narrow search and the
-  // empty state would never appear.
+  // empty state would never appear. The item deep-link is a filter too — an
+  // item with zero movements should read as "narrowed", not "ledger is empty".
   const hasActiveFilters =
+    Boolean(itemIdParam) ||
     filters.search.trim().length > 0 ||
     filters.itemType !== defaultFilters.itemType ||
     filters.productType !== defaultFilters.productType ||
@@ -161,7 +182,13 @@ export function MovementsPageClient(): JSX.Element {
     }
   };
 
-  const movements = movementsQuery.data ?? [];
+  const movements = activeMovementsQuery.data ?? [];
+  const scopedItemName = itemIdParam ? (movements[0]?.itemName ?? "this item") : null;
+
+  const clearItemScope = (): void => {
+    setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId });
+    router.push("/inventory/movements");
+  };
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -178,22 +205,39 @@ export function MovementsPageClient(): JSX.Element {
         }
       />
 
-      <MovementsSummaryCards summary={summaryQuery.data} />
+      {itemIdParam ? (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte px-4 py-3 text-sm text-brand-mocha">
+          <span>
+            Showing movements for{" "}
+            <span className="font-semibold text-brand-espresso">{scopedItemName}</span> only.
+          </span>
+          <Button asChild size="sm" type="button" variant="ghost">
+            <Link href="/inventory/movements">
+              <X className="h-4 w-4" />
+              Clear
+            </Link>
+          </Button>
+        </div>
+      ) : (
+        <>
+          <MovementsSummaryCards summary={summaryQuery.data} />
 
-      {summaryQuery.data?.byMovementType.length ? (
-        <Card>
-          <CardContent className="flex flex-wrap gap-2 p-4">
-            {summaryQuery.data.byMovementType.map((entry) => (
-              <span
-                className="rounded-full border border-brand-cappuccino bg-brand-latte px-3 py-1 text-xs font-semibold text-brand-mocha"
-                key={entry.movementType}
-              >
-                {movementTypeLabel(entry.movementType)} - {entry.quantity} - {entry.count} moves
-              </span>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
+          {summaryQuery.data?.byMovementType.length ? (
+            <Card>
+              <CardContent className="flex flex-wrap gap-2 p-4">
+                {summaryQuery.data.byMovementType.map((entry) => (
+                  <span
+                    className="rounded-full border border-brand-cappuccino bg-brand-latte px-3 py-1 text-xs font-semibold text-brand-mocha"
+                    key={entry.movementType}
+                  >
+                    {movementTypeLabel(entry.movementType)} - {entry.quantity} - {entry.count} moves
+                  </span>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
+        </>
+      )}
 
       <MovementsToolbar
         allowAllBranches={branchScope.canAccessAllBranches}
@@ -203,16 +247,16 @@ export function MovementsPageClient(): JSX.Element {
         resetBranchId={branchScope.defaultBranchId}
       />
 
-      {movementsQuery.isLoading ? <MovementsTableSkeleton /> : null}
+      {activeMovementsQuery.isLoading ? <MovementsTableSkeleton /> : null}
 
-      {!movementsQuery.isLoading && movementsQuery.error ? (
+      {!activeMovementsQuery.isLoading && activeMovementsQuery.error ? (
         isPermissionDenied ? (
           <AccessDeniedCard message="The backend denied access to stock movements." />
         ) : (
           <MovementsErrorState
-            description={getErrorMessage(movementsQuery.error)}
+            description={getErrorMessage(activeMovementsQuery.error)}
             onRetry={() => {
-              void movementsQuery.refetch();
+              void activeMovementsQuery.refetch();
             }}
           />
         )
@@ -221,27 +265,25 @@ export function MovementsPageClient(): JSX.Element {
       {/* Filtered and empty need opposite remedies. "No stock movements yet" on a
           screen narrowed to Wastage in one date range says nothing has ever moved,
           which is untrue whenever the ledger holds anything at all. DESIGN.md 8. */}
-      {!movementsQuery.isLoading &&
-      !movementsQuery.error &&
+      {!activeMovementsQuery.isLoading &&
+      !activeMovementsQuery.error &&
       movements.length === 0 &&
       hasActiveFilters ? (
         <FilteredState
           noun="stock movements"
-          onClearFilters={() =>
-            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })
-          }
+          onClearFilters={clearItemScope}
           query={filters.search.trim() || undefined}
         />
       ) : null}
 
-      {!movementsQuery.isLoading &&
-      !movementsQuery.error &&
+      {!activeMovementsQuery.isLoading &&
+      !activeMovementsQuery.error &&
       movements.length === 0 &&
       !hasActiveFilters ? (
         <MovementsEmptyState />
       ) : null}
 
-      {!movementsQuery.isLoading && !movementsQuery.error && movements.length > 0 ? (
+      {!activeMovementsQuery.isLoading && !activeMovementsQuery.error && movements.length > 0 ? (
         <Card>
           <CardContent className="p-0">
             <MovementsTable
