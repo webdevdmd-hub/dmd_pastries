@@ -113,12 +113,12 @@ export function ReconciliationPageClient(): JSX.Element {
         }
       />
 
-      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino/70 bg-card/75 p-4 shadow-sm md:grid-cols-4">
+      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino/70 bg-card/75 p-4 shadow-sm md:grid-cols-[1fr_1fr_1fr_1fr_auto]">
         <Select
           onValueChange={(value) => setFilters((current) => ({ ...current, branchId: value }))}
           value={filters.branchId}
         >
-          <SelectTrigger>
+          <SelectTrigger aria-label="Branch">
             <SelectValue placeholder="Branch" />
           </SelectTrigger>
           <SelectContent>
@@ -138,7 +138,7 @@ export function ReconciliationPageClient(): JSX.Element {
           }
           value={filters.paymentMethodId}
         >
-          <SelectTrigger>
+          <SelectTrigger aria-label="Payment method">
             <SelectValue placeholder="Payment method" />
           </SelectTrigger>
           <SelectContent>
@@ -166,6 +166,13 @@ export function ReconciliationPageClient(): JSX.Element {
           type="date"
           value={filters.dateTo}
         />
+        <Button
+          onClick={() => setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })}
+          type="button"
+          variant="outline"
+        >
+          Reset
+        </Button>
       </div>
 
       {lastCreated ? (

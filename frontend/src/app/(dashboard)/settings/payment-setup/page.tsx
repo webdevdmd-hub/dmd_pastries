@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { JSX } from "react";
 
 import { PaymentSetupPageClient } from "@/components/settings/payment-setup-page-client";
@@ -15,6 +16,10 @@ type PaymentSetupPageProps = {
 function parseTab(value: string | undefined): PaymentSetupTab {
   return validTabs.find((tab) => tab === value) ?? "overview";
 }
+
+export const metadata: Metadata = {
+  title: "Payment Methods & Accounts",
+};
 
 export default async function PaymentSetupPage({
   searchParams,

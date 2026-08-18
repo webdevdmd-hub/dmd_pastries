@@ -313,7 +313,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
           value={filters.supplierId}
           onValueChange={(supplierId) => updateFilters({ supplierId })}
         >
-          <SelectTrigger>
+          <SelectTrigger aria-label="Supplier">
             <SelectValue placeholder="Supplier" />
           </SelectTrigger>
           <SelectContent>
@@ -326,7 +326,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
           </SelectContent>
         </Select>
         <Select value={filters.branchId} onValueChange={(branchId) => updateFilters({ branchId })}>
-          <SelectTrigger>
+          <SelectTrigger aria-label="Branch">
             <SelectValue placeholder="Branch" />
           </SelectTrigger>
           <SelectContent>
@@ -344,7 +344,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
           value={filters.paymentMethodId}
           onValueChange={(paymentMethodId) => updateFilters({ paymentMethodId })}
         >
-          <SelectTrigger>
+          <SelectTrigger aria-label="Payment method">
             <SelectValue placeholder="Method" />
           </SelectTrigger>
           <SelectContent>
@@ -360,7 +360,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
           value={filters.paymentStatus}
           onValueChange={(paymentStatus) => updateFilters({ paymentStatus })}
         >
-          <SelectTrigger>
+          <SelectTrigger aria-label="Payment status">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>

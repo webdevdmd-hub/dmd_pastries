@@ -115,6 +115,7 @@ export function SalesReturnsPageClient(): JSX.Element {
                 search: event.target.value,
               }))
             }
+            aria-label="Search returns by return, sale, or customer"
             placeholder="Search return, sale, customer..."
             value={filters.search}
           />
@@ -127,7 +128,7 @@ export function SalesReturnsPageClient(): JSX.Element {
             }
             value={filters.status}
           >
-            <SelectTrigger className="md:w-56">
+            <SelectTrigger aria-label="Return status" className="md:w-56">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

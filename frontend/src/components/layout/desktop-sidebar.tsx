@@ -7,10 +7,15 @@ import { useState } from "react";
 import { AppNavigationList } from "@/components/layout/app-navigation-list";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils/cn";
 
 export function DesktopSidebar(): JSX.Element {
   const [collapsed, setCollapsed] = useState(false);
+  // Was a hardcoded "KCHEF": in a multi-tenant product that shows another
+  // brand's name to the customer. Same source the header already reads.
+  const { user } = useAuth();
+  const workspaceName = user?.businessName ?? "Workspace";
 
   return (
     <aside
@@ -29,8 +34,11 @@ export function DesktopSidebar(): JSX.Element {
       >
         {!collapsed ? (
           <div className="min-w-0">
-            <p className="truncate text-xl font-semibold tracking-tight text-brand-espresso">
-              KCHEF
+            <p
+              className="truncate text-xl font-semibold tracking-tight text-brand-espresso"
+              title={workspaceName}
+            >
+              {workspaceName}
             </p>
             <p className="mt-1 text-[0.68rem] text-workspace-sidebar-muted">Operations OS</p>
           </div>

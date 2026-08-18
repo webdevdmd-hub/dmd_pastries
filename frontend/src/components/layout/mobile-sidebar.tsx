@@ -14,8 +14,13 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useAuth } from "@/hooks/use-auth";
 
 export function MobileSidebar(): JSX.Element {
+  // Was a hardcoded "KCHEF" — see desktop-sidebar.tsx.
+  const { user } = useAuth();
+  const workspaceName = user?.businessName ?? "Workspace";
+
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -34,8 +39,8 @@ export function MobileSidebar(): JSX.Element {
         side="left"
       >
         <SheetHeader>
-          <SheetTitle className="text-left text-xl font-semibold leading-none text-brand-espresso">
-            KCHEF
+          <SheetTitle className="truncate text-left text-xl font-semibold leading-none text-brand-espresso">
+            {workspaceName}
           </SheetTitle>
           <SheetDescription className="text-left text-xs text-workspace-muted">
             Operations OS
