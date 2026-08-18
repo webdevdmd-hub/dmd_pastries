@@ -9,16 +9,25 @@ type InventorySummaryCardsProps = {
   expiryAlerts?: ExpiryBatch[];
 };
 
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    maximumFractionDigits: 2,
+    style: "currency",
+  }).format(value);
+}
+
 export function InventorySummaryCards({
   items,
   expiryAlerts = [],
 }: InventorySummaryCardsProps): JSX.Element {
   const lowStockCount = items.filter((item) => item.lowStock).length;
+  const totalStockValue = items.reduce((sum, item) => sum + item.inventoryValue, 0);
   const cards = [
     { label: "Total Inventory Items", value: items.length, icon: Boxes },
     { label: "Low Stock Items", value: lowStockCount, icon: AlertTriangle },
     { label: "Expiring Soon", value: expiryAlerts.length, icon: CalendarClock },
-    { label: "Total Stock Value", value: "Soon", icon: WalletCards },
+    { label: "Total Stock Value", value: formatMoney(totalStockValue), icon: WalletCards },
   ];
 
   return (
