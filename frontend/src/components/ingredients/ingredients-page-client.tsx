@@ -14,6 +14,7 @@ import { IngredientsSummaryCards } from "@/components/ingredients/ingredients-su
 import { IngredientsTable } from "@/components/ingredients/ingredients-table";
 import { IngredientsTableSkeleton } from "@/components/ingredients/ingredients-table-skeleton";
 import { IngredientsToolbar } from "@/components/ingredients/ingredients-toolbar";
+import { FilteredState } from "@/components/shared/collection-state";
 import { LegacyProductMasterNotice } from "@/components/shared/legacy-product-master-notice";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -88,6 +89,14 @@ export function IngredientsPageClient(): JSX.Element {
   const deleteMutation = useDeleteIngredient();
   const isPermissionDenied =
     ingredientsQuery.error instanceof ApiError && ingredientsQuery.error.status === 403;
+  // Every field in this toolbar is user-chosen, so every field counts. There is
+  // no branch scope and no paging here to exclude.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.categoryId !== defaultFilters.categoryId ||
+    filters.supplierId !== defaultFilters.supplierId ||
+    filters.status !== defaultFilters.status ||
+    filters.stockTracked !== defaultFilters.stockTracked;
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -194,7 +203,24 @@ export function IngredientsPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!ingredientsQuery.isLoading && !ingredientsQuery.error && items.length === 0 ? (
+      {/* Empty and filtered need opposite remedies. "No ingredients yet" is a lie
+          when 300 exist and the user simply picked a supplier that stocks none.
+          DESIGN.md 8. */}
+      {!ingredientsQuery.isLoading &&
+      !ingredientsQuery.error &&
+      items.length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="ingredients"
+          onClearFilters={() => setFilters(defaultFilters)}
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!ingredientsQuery.isLoading &&
+      !ingredientsQuery.error &&
+      items.length === 0 &&
+      !hasActiveFilters ? (
         <IngredientsEmptyState canManage={false} onCreate={() => undefined} />
       ) : null}
 

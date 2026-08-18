@@ -26,6 +26,7 @@ import { InventoryTableSkeleton } from "@/components/inventory/inventory-table-s
 import { InventoryToolbar } from "@/components/inventory/inventory-toolbar";
 import { OpeningStockDialog } from "@/components/inventory/opening-stock-dialog";
 import { StockAdjustmentDialog } from "@/components/inventory/stock-adjustment-dialog";
+import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -182,6 +183,17 @@ export function InventoryPageClient(): JSX.Element {
   const batchStatusMutation = useUpdateExpiryBatchStatus();
   const isPermissionDenied =
     inventoryQuery.error instanceof ApiError && inventoryQuery.error.status === 403;
+  // Branch is scope, not a filter: it always carries a value, so counting it
+  // would make a genuinely empty inventory read as a narrow search.
+  const filterDefaults = buildDefaultFilters(filters.branchId);
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.itemType !== filterDefaults.itemType ||
+    filters.productType !== filterDefaults.productType ||
+    filters.status !== filterDefaults.status ||
+    filters.lowStockOnly !== filterDefaults.lowStockOnly ||
+    filters.expiryTrackedOnly !== filterDefaults.expiryTrackedOnly ||
+    filters.includeUninitialized !== filterDefaults.includeUninitialized;
 
   const branchOptions = useMemo<Branch[]>(() => {
     const backendBranches = (branchesQuery.data ?? []).filter(
@@ -396,7 +408,24 @@ export function InventoryPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!inventoryQuery.isLoading && !inventoryQuery.error && items.length === 0 ? (
+      {/* Filtered and empty need opposite remedies. "Add opening stock" is the
+          wrong next step for someone who typed a code that matched nothing while
+          the branch holds hundreds of stocked items. DESIGN.md §8. */}
+      {!inventoryQuery.isLoading &&
+      !inventoryQuery.error &&
+      items.length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="inventory items"
+          onClearFilters={() => setFilters(buildDefaultFilters(branchScope.defaultBranchId))}
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!inventoryQuery.isLoading &&
+      !inventoryQuery.error &&
+      items.length === 0 &&
+      !hasActiveFilters ? (
         <InventoryEmptyState canManage={canManage} onCreate={() => setOpeningStockOpen(true)} />
       ) : null}
 

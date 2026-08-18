@@ -8,6 +8,7 @@ import { InventoryEmptyState } from "@/components/inventory/inventory-empty-stat
 import { InventoryErrorState } from "@/components/inventory/inventory-error-state";
 import { InventoryTableSkeleton } from "@/components/inventory/inventory-table-skeleton";
 import { StockMovementsTable } from "@/components/inventory/stock-movements-table";
+import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,16 @@ export function InventoryMovementsPageClient(): JSX.Element {
       ),
     [branchScope, branchesQuery.data],
   );
+  // Branch is scope, not a filter: it always carries a value, so counting it
+  // would make a genuinely empty ledger look like a narrow search and the
+  // empty state would never appear.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.itemType !== defaultFilters.itemType ||
+    filters.productType !== defaultFilters.productType ||
+    filters.movementType !== defaultFilters.movementType ||
+    filters.dateFrom.length > 0 ||
+    filters.dateTo.length > 0;
 
   useEffect(() => {
     setFilters((currentFilters) => {
@@ -180,9 +191,25 @@ export function InventoryMovementsPageClient(): JSX.Element {
           }}
         />
       ) : null}
+      {/* Filtered and empty need opposite remedies. Telling an owner who narrowed
+          to one product type that no stock has ever moved is flatly untrue when
+          the ledger holds thousands of movements. DESIGN.md 8. */}
       {!movementsQuery.isLoading &&
       !movementsQuery.error &&
-      (movementsQuery.data ?? []).length === 0 ? (
+      (movementsQuery.data ?? []).length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="stock movements"
+          onClearFilters={() =>
+            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })
+          }
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+      {!movementsQuery.isLoading &&
+      !movementsQuery.error &&
+      (movementsQuery.data ?? []).length === 0 &&
+      !hasActiveFilters ? (
         <InventoryEmptyState
           description="Stock changes will appear here after opening stock, sales, purchases, or adjustments."
           title="No stock movements found."

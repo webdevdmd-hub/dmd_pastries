@@ -13,6 +13,7 @@ import { CustomersSummaryCards } from "@/components/customers/customers-summary-
 import { CustomersTable } from "@/components/customers/customers-table";
 import { CustomersTableSkeleton } from "@/components/customers/customers-table-skeleton";
 import { CustomersToolbar } from "@/components/customers/customers-toolbar";
+import { FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -80,6 +81,15 @@ export function CustomersPageClient(): JSX.Element {
   const deleteMutation = useDeleteCustomer();
   const isPermissionDenied =
     customersQuery.error instanceof ApiError && customersQuery.error.status === 403;
+  // Zero rows has two causes with opposite remedies. Every field here is a
+  // choice the user made in the toolbar; there is no branch scope on this
+  // screen, so nothing has to be excluded.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.status !== defaultFilters.status ||
+    filters.tagId !== defaultFilters.tagId ||
+    filters.dateFrom.length > 0 ||
+    filters.dateTo.length > 0;
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -173,7 +183,23 @@ export function CustomersPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!customersQuery.isLoading && !customersQuery.error && customers.length === 0 ? (
+      {/* "No customers yet" is a lie when a tag or date range excluded them, and
+          it offers "Add Customer" to someone who already has hundreds. DESIGN.md 8. */}
+      {!customersQuery.isLoading &&
+      !customersQuery.error &&
+      customers.length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="customers"
+          onClearFilters={() => setFilters(defaultFilters)}
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!customersQuery.isLoading &&
+      !customersQuery.error &&
+      customers.length === 0 &&
+      !hasActiveFilters ? (
         <CustomersEmptyState canManage={canManage} onCreate={openCreate} />
       ) : null}
 

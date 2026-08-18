@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { AccessDeniedCard } from "@/components/stock-movements/access-denied-card";
@@ -102,6 +103,18 @@ export function MovementsPageClient(): JSX.Element {
   const reversalMutation = useReverseStockMovement();
   const isPermissionDenied =
     movementsQuery.error instanceof ApiError && movementsQuery.error.status === 403;
+  // Branch is scope, not a filter: it always carries a value, so counting it
+  // would make a genuinely empty ledger look like a narrow search and the
+  // empty state would never appear.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.itemType !== defaultFilters.itemType ||
+    filters.productType !== defaultFilters.productType ||
+    filters.movementType !== defaultFilters.movementType ||
+    filters.direction !== defaultFilters.direction ||
+    filters.dateFrom.length > 0 ||
+    filters.dateTo.length > 0 ||
+    filters.createdBy.trim().length > 0;
 
   const branchOptions = useMemo(
     () =>
@@ -205,7 +218,26 @@ export function MovementsPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!movementsQuery.isLoading && !movementsQuery.error && movements.length === 0 ? (
+      {/* Filtered and empty need opposite remedies. "No stock movements yet" on a
+          screen narrowed to Wastage in one date range says nothing has ever moved,
+          which is untrue whenever the ledger holds anything at all. DESIGN.md 8. */}
+      {!movementsQuery.isLoading &&
+      !movementsQuery.error &&
+      movements.length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="stock movements"
+          onClearFilters={() =>
+            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })
+          }
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!movementsQuery.isLoading &&
+      !movementsQuery.error &&
+      movements.length === 0 &&
+      !hasActiveFilters ? (
         <MovementsEmptyState />
       ) : null}
 

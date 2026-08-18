@@ -12,6 +12,7 @@ import { PurchaseReturnFromReceiptDialog } from "@/components/purchasing/purchas
 import { PurchaseReturnsTable } from "@/components/purchasing/purchase-returns-table";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
 import { PurchasingToolbar } from "@/components/purchasing/purchasing-toolbar";
+import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReturnReversalDialog } from "@/components/shared/return-reversal-dialog";
@@ -95,6 +96,15 @@ export function PurchaseReturnsPageClient(): JSX.Element {
   const reverseMutation = useReversePurchaseReturn();
   const isPermissionDenied =
     returnsQuery.error instanceof ApiError && returnsQuery.error.status === 403;
+  // Branch is scope, not a filter: it always carries a value, so counting it
+  // would make a genuinely empty ledger look like a narrow search and the empty
+  // state would never appear.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.status !== defaultFilters.status ||
+    filters.supplierId !== defaultFilters.supplierId ||
+    filters.dateFrom.length > 0 ||
+    filters.dateTo.length > 0;
 
   const branchOptions = useMemo(
     () =>
@@ -202,7 +212,26 @@ export function PurchaseReturnsPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!returnsQuery.isLoading && !returnsQuery.error && purchaseReturns.length === 0 ? (
+      {/* Filtered and empty need opposite remedies. Offering "Create vendor
+          credit" to someone whose supplier filter simply matched nothing says
+          no credits exist when there may be hundreds. DESIGN.md 8. */}
+      {!returnsQuery.isLoading &&
+      !returnsQuery.error &&
+      purchaseReturns.length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="vendor credits"
+          onClearFilters={() =>
+            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })
+          }
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!returnsQuery.isLoading &&
+      !returnsQuery.error &&
+      purchaseReturns.length === 0 &&
+      !hasActiveFilters ? (
         <PurchaseEmptyState
           actionLabel={canCreate ? "Create vendor credit" : undefined}
           title="No vendor credits found."

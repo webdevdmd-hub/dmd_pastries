@@ -14,6 +14,7 @@ import { OrdersSummaryCards } from "@/components/orders/orders-summary-cards";
 import { OrdersTable } from "@/components/orders/orders-table";
 import { OrdersTableSkeleton } from "@/components/orders/orders-table-skeleton";
 import { OrdersToolbar } from "@/components/orders/orders-toolbar";
+import { FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -80,6 +81,15 @@ export function OrdersPageClient(): JSX.Element {
   const deleteMutation = useDeleteOrder();
   const isPermissionDenied =
     ordersQuery.error instanceof ApiError && ordersQuery.error.status === 403;
+  // Every field on BakeryOrderFilters is user-chosen: there is no branch scope
+  // and no paging here, so all five count. View mode is a display toggle, not a
+  // filter, and never narrows the result set.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.status !== defaultFilters.status ||
+    filters.orderType !== defaultFilters.orderType ||
+    filters.dateFrom.length > 0 ||
+    filters.dateTo.length > 0;
 
   useEffect(() => {
     const savedViewMode = window.localStorage.getItem(ordersViewModeStorageKey);
@@ -197,7 +207,18 @@ export function OrdersPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!ordersQuery.isLoading && !ordersQuery.error && orders.length === 0 ? (
+      {/* An order book narrowed to one date with nothing in it is not an empty
+          order book. Offering "Create Order" there hides the fact that hundreds
+          of orders exist just outside the filter. DESIGN.md 8. */}
+      {!ordersQuery.isLoading && !ordersQuery.error && orders.length === 0 && hasActiveFilters ? (
+        <FilteredState
+          noun="orders"
+          onClearFilters={() => setFilters(defaultFilters)}
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!ordersQuery.isLoading && !ordersQuery.error && orders.length === 0 && !hasActiveFilters ? (
         <OrdersEmptyState canManage={canManage} onCreate={openCreate} />
       ) : null}
 

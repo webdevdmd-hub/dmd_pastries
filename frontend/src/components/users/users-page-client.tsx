@@ -6,6 +6,7 @@ import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -65,6 +66,14 @@ import type {
 
 const selfDestructiveActionMessage = "You cannot deactivate, suspend, or delete your own account.";
 
+// Lifted out of useState unchanged so the filtered state can compare against
+// the same defaults the screen starts from.
+const defaultFilters: UserFiltersType = {
+  branchId: allBranchesFilterValue,
+  search: "",
+  status: "all",
+};
+
 function isDestructiveStatus(status: UserStatus): boolean {
   return status === "inactive" || status === "suspended";
 }
@@ -122,11 +131,7 @@ export function UsersPageClient(): JSX.Element {
   const router = useRouter();
   const { logout, refreshProfile, user } = useAuth();
   const branchScope = useBranchScope();
-  const [filters, setFilters] = useState<UserFiltersType>({
-    branchId: allBranchesFilterValue,
-    search: "",
-    status: "all",
-  });
+  const [filters, setFilters] = useState<UserFiltersType>(defaultFilters);
   const [dialogMode, setDialogMode] = useState<UserFormMode>("create");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -181,6 +186,11 @@ export function UsersPageClient(): JSX.Element {
     [canViewSettings, canAccessAllBranches, hasMultipleAllowedBranches].some(Boolean);
 
   const users = useMemo(() => (data ? filterUsers(data, filters) : []), [data, filters]);
+  // Branch is scope, not a filter: it always carries a value, and for staff
+  // without all-branch access it is forced to their own branch. Counting it
+  // would mean a tenant with no staff records never sees the empty state.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 || filters.status !== defaultFilters.status;
   const roleOptions = useMemo(() => {
     if (rolesQuery.data && rolesQuery.data.length > 0) {
       return buildRoleOptionsFromRoles(rolesQuery.data);
@@ -564,7 +574,23 @@ export function UsersPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!isLoading && !error && users.length === 0 ? (
+      {/* A search or status that matched nobody is not an empty staff list, and
+          it must not offer "Create User" as the way out. DESIGN.md 8. */}
+      {!isLoading && !error && users.length === 0 && hasActiveFilters ? (
+        <FilteredState
+          noun="staff users"
+          onClearFilters={() => {
+            setFilters((currentFilters) => ({
+              ...currentFilters,
+              search: defaultFilters.search,
+              status: defaultFilters.status,
+            }));
+          }}
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!isLoading && !error && users.length === 0 && !hasActiveFilters ? (
         <UsersEmptyState canCreate={canCreateUsers} onCreate={openCreateDialog} />
       ) : null}
 

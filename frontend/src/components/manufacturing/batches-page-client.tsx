@@ -13,6 +13,7 @@ import { BatchesTable } from "@/components/manufacturing/batches-table";
 import { ManufacturingEmptyState } from "@/components/manufacturing/manufacturing-empty-state";
 import { ManufacturingErrorState } from "@/components/manufacturing/manufacturing-error-state";
 import { ManufacturingTableSkeleton } from "@/components/manufacturing/manufacturing-table-skeleton";
+import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -105,6 +106,15 @@ export function BatchesPageClient(): JSX.Element {
   const addWastageMutation = useAddBatchWastage();
   const isPermissionDenied =
     batchesQuery.error instanceof ApiError && batchesQuery.error.status === 403;
+  // Branch is scope, not a filter: it always carries a value, so counting it
+  // would make a genuinely empty production log look like a narrow search and
+  // the empty state would never appear.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.productId !== defaultFilters.productId ||
+    filters.status !== defaultFilters.status ||
+    filters.dateFrom.length > 0 ||
+    filters.dateTo.length > 0;
 
   const branchOptions = useMemo(
     () =>
@@ -421,7 +431,27 @@ export function BatchesPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!batchesQuery.isLoading && !batchesQuery.error && batches.length === 0 ? (
+      {/* Filtered and empty need opposite remedies. Offering "Create Production"
+          to someone who filtered to Cancelled in one date range implies nothing
+          has ever been produced, and sends them off to do the wrong thing.
+          DESIGN.md 8. */}
+      {!batchesQuery.isLoading &&
+      !batchesQuery.error &&
+      batches.length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="batches"
+          onClearFilters={() =>
+            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })
+          }
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!batchesQuery.isLoading &&
+      !batchesQuery.error &&
+      batches.length === 0 &&
+      !hasActiveFilters ? (
         <ManufacturingEmptyState
           actionLabel={canCreate ? "Create Production" : undefined}
           onAction={canCreate ? openCreate : undefined}

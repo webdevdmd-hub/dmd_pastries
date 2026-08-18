@@ -14,6 +14,7 @@ import { PurchaseInvoicesTable } from "@/components/purchasing/purchase-invoices
 import { PurchaseReceiveDialog } from "@/components/purchasing/purchase-receive-dialog";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
 import { PurchasingToolbar } from "@/components/purchasing/purchasing-toolbar";
+import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -138,6 +139,15 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
   const convertMutation = useConvertPurchaseInvoiceToReceipt();
   const isPermissionDenied =
     invoicesQuery.error instanceof ApiError && invoicesQuery.error.status === 403;
+  // Branch is scope, not a filter: it always carries a value, so counting it
+  // would make every genuinely empty ledger look like a narrow search.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.supplierId !== defaultFilters.supplierId ||
+    filters.status !== defaultFilters.status ||
+    (filters.paymentStatus ?? defaultFilters.paymentStatus) !== defaultFilters.paymentStatus ||
+    filters.dateFrom.length > 0 ||
+    filters.dateTo.length > 0;
 
   const branchOptions = useMemo(
     () =>
@@ -313,7 +323,26 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!invoicesQuery.isLoading && !invoicesQuery.error && invoices.length === 0 ? (
+      {/* Filtered and empty need opposite remedies. Offering "Create Bill" to a
+          clerk who filtered to "overdue" and saw nothing says no supplier has
+          ever billed us, which sends them off to key a duplicate. DESIGN.md 8. */}
+      {!invoicesQuery.isLoading &&
+      !invoicesQuery.error &&
+      invoices.length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="bills"
+          onClearFilters={() =>
+            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })
+          }
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!invoicesQuery.isLoading &&
+      !invoicesQuery.error &&
+      invoices.length === 0 &&
+      !hasActiveFilters ? (
         <PurchaseEmptyState
           actionLabel={canManage ? "Create Bill" : undefined}
           onAction={canManage ? openCreate : undefined}

@@ -15,6 +15,7 @@ import { RecipesSummaryCards } from "@/components/recipes/recipes-summary-cards"
 import { RecipesTable } from "@/components/recipes/recipes-table";
 import { RecipesTableSkeleton } from "@/components/recipes/recipes-table-skeleton";
 import { RecipesToolbar } from "@/components/recipes/recipes-toolbar";
+import { FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -74,6 +75,13 @@ export function RecipesPageClient(): JSX.Element {
   const deleteMutation = useDeleteRecipe();
   const isPermissionDenied =
     recipesQuery.error instanceof ApiError && recipesQuery.error.status === 403;
+  // Every field in this toolbar is user-chosen, so every field counts. There is
+  // no branch scope and no paging here to exclude.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.active !== defaultFilters.active ||
+    filters.productId !== defaultFilters.productId ||
+    filters.status !== defaultFilters.status;
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -144,7 +152,24 @@ export function RecipesPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!recipesQuery.isLoading && !recipesQuery.error && recipes.length === 0 ? (
+      {/* Empty and filtered need opposite remedies. Offering "Create Recipe" to
+          someone who filtered to a product with no BOM sends them off to build a
+          recipe that already exists elsewhere. DESIGN.md 8. */}
+      {!recipesQuery.isLoading &&
+      !recipesQuery.error &&
+      recipes.length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="recipes"
+          onClearFilters={() => setFilters(defaultFilters)}
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!recipesQuery.isLoading &&
+      !recipesQuery.error &&
+      recipes.length === 0 &&
+      !hasActiveFilters ? (
         <RecipesEmptyState canManage={canManage} onCreate={() => setCreateOpen(true)} />
       ) : null}
 

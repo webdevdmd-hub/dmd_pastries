@@ -13,6 +13,7 @@ import { PurchaseReceiveDialog } from "@/components/purchasing/purchase-receive-
 import { PurchaseReturnDialog } from "@/components/purchasing/purchase-return-dialog";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
 import { PurchasingToolbar } from "@/components/purchasing/purchasing-toolbar";
+import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -98,6 +99,14 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
   const cancelMutation = useCancelPurchaseReceipt();
   const isPermissionDenied =
     receiptsQuery.error instanceof ApiError && receiptsQuery.error.status === 403;
+  // Branch is scope, not a filter: it always carries a value, so counting it
+  // would make every genuinely empty ledger look like a narrow search.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.supplierId !== defaultFilters.supplierId ||
+    filters.status !== defaultFilters.status ||
+    filters.dateFrom.length > 0 ||
+    filters.dateTo.length > 0;
 
   const branchOptions = useMemo(
     () =>
@@ -195,7 +204,26 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!receiptsQuery.isLoading && !receiptsQuery.error && receipts.length === 0 ? (
+      {/* Filtered and empty need opposite remedies. Offering "Receive Goods" to
+          a storekeeper whose supplier filter matched nothing says no delivery was
+          ever booked in, and invites a duplicate stock-in. DESIGN.md 8. */}
+      {!receiptsQuery.isLoading &&
+      !receiptsQuery.error &&
+      receipts.length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="receive goods records"
+          onClearFilters={() =>
+            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })
+          }
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!receiptsQuery.isLoading &&
+      !receiptsQuery.error &&
+      receipts.length === 0 &&
+      !hasActiveFilters ? (
         <PurchaseEmptyState
           actionLabel={canManage ? "Receive Goods" : undefined}
           onAction={canManage ? () => setReceiveOpen(true) : undefined}

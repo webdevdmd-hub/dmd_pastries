@@ -15,6 +15,7 @@ import { PurchaseOrderReceiveGoodsDialog } from "@/components/purchasing/purchas
 import { PurchaseOrdersTable } from "@/components/purchasing/purchase-orders-table";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
 import { PurchasingToolbar } from "@/components/purchasing/purchasing-toolbar";
+import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -172,6 +173,14 @@ export function PurchaseOrdersPageClient(): JSX.Element {
   const receiveMutation = useReceivePurchaseOrder();
   const isPermissionDenied =
     ordersQuery.error instanceof ApiError && ordersQuery.error.status === 403;
+  // Branch is scope, not a filter: it always carries a value, so counting it
+  // would make every genuinely empty ledger look like a narrow search.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.supplierId !== defaultFilters.supplierId ||
+    filters.status !== defaultFilters.status ||
+    filters.dateFrom.length > 0 ||
+    filters.dateTo.length > 0;
 
   const branchOptions = useMemo(
     () =>
@@ -379,7 +388,20 @@ export function PurchaseOrdersPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!ordersQuery.isLoading && !ordersQuery.error && orders.length === 0 ? (
+      {/* Filtered and empty need opposite remedies. Offering "Create Purchase
+          Order" to a buyer whose date range simply excluded everything says the
+          supplier ledger is bare when it may hold hundreds. DESIGN.md 8. */}
+      {!ordersQuery.isLoading && !ordersQuery.error && orders.length === 0 && hasActiveFilters ? (
+        <FilteredState
+          noun="purchase orders"
+          onClearFilters={() =>
+            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })
+          }
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!ordersQuery.isLoading && !ordersQuery.error && orders.length === 0 && !hasActiveFilters ? (
         <PurchaseEmptyState
           actionLabel={canCreate ? "Create Purchase Order" : undefined}
           onAction={canCreate ? openCreate : undefined}

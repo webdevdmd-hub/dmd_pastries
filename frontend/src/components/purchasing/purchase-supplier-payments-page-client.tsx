@@ -13,6 +13,7 @@ import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state
 import { PurchaseSupplierPaymentAllocationDialog } from "@/components/purchasing/purchase-supplier-payment-allocation-dialog";
 import { PurchaseSupplierPaymentsTable } from "@/components/purchasing/purchase-supplier-payments-table";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
+import { FilteredState } from "@/components/shared/collection-state";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
@@ -172,6 +173,18 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   const purchasingPaymentMethods = methodsQuery.data ?? [];
   const isPermissionDenied =
     paymentsQuery.error instanceof ApiError && paymentsQuery.error.status === 403;
+  // Branch is scope, not a filter: it always carries a value, so counting it
+  // would make a genuinely empty ledger look like a narrow search. Sort order is
+  // not a filter either — it reorders rows, it never removes them.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.supplierId !== defaultFilters.supplierId ||
+    filters.paymentMethodId !== defaultFilters.paymentMethodId ||
+    filters.paymentStatus !== defaultFilters.paymentStatus ||
+    filters.paidByUserId.length > 0 ||
+    filters.purchaseInvoiceId.length > 0 ||
+    filters.dateFrom.length > 0 ||
+    filters.dateTo.length > 0;
   const payableInvoices = useMemo(() => {
     if (!selectedSupplierId) return [];
 
@@ -414,9 +427,26 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
         )
       ) : null}
 
+      {/* Filtered and empty need opposite remedies. "No payments made" on a
+          screen where a date range simply excluded everything reads as "we have
+          never paid this supplier", which may be flatly untrue. DESIGN.md 8. */}
       {!paymentsQuery.isLoading &&
       !paymentsQuery.error &&
-      (paymentsQuery.data ?? []).length === 0 ? (
+      (paymentsQuery.data ?? []).length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="supplier payments"
+          onClearFilters={() =>
+            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })
+          }
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!paymentsQuery.isLoading &&
+      !paymentsQuery.error &&
+      (paymentsQuery.data ?? []).length === 0 &&
+      !hasActiveFilters ? (
         <PurchaseEmptyState title="No payments made found." />
       ) : null}
 

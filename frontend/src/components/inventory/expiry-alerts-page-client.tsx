@@ -7,6 +7,7 @@ import { AccessDeniedCard } from "@/components/inventory/access-denied-card";
 import { InventoryEmptyState } from "@/components/inventory/inventory-empty-state";
 import { InventoryErrorState } from "@/components/inventory/inventory-error-state";
 import { InventoryTableSkeleton } from "@/components/inventory/inventory-table-skeleton";
+import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -114,6 +115,14 @@ export function ExpiryAlertsPageClient(): JSX.Element {
     () => new Map((branchesQuery.data ?? []).map((branch) => [branch.id, branch.name])),
     [branchesQuery.data],
   );
+  // Branch and timezone are scope, not filters: both always carry a value, so
+  // counting them would make a genuinely quiet alert list read as a narrow
+  // search. The days window is a real filter — 3 days hides what 30 shows.
+  const hasActiveFilters =
+    filters.itemType !== defaultFilters.itemType ||
+    filters.productType !== defaultFilters.productType ||
+    filters.expiryState !== defaultFilters.expiryState ||
+    filters.days !== defaultFilters.days;
 
   function getBranchLabel(batch: ExpiryBatch): string {
     return (
@@ -245,7 +254,25 @@ export function ExpiryAlertsPageClient(): JSX.Element {
           }}
         />
       ) : null}
-      {!alertsQuery.isLoading && !alertsQuery.error && (alertsQuery.data ?? []).length === 0 ? (
+      {/* Filtered and empty need opposite remedies. "No expiry alerts" reads as
+          nothing is spoiling, which is the wrong thing to believe when a 3-day
+          window is hiding batches that expire on Friday. DESIGN.md §8. */}
+      {!alertsQuery.isLoading &&
+      !alertsQuery.error &&
+      (alertsQuery.data ?? []).length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="expiry alerts"
+          onClearFilters={() =>
+            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId, timezone })
+          }
+          query={undefined}
+        />
+      ) : null}
+      {!alertsQuery.isLoading &&
+      !alertsQuery.error &&
+      (alertsQuery.data ?? []).length === 0 &&
+      !hasActiveFilters ? (
         <InventoryEmptyState
           description="No expiry-sensitive batches match the selected alert window."
           title="No expiry alerts found."

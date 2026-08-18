@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { AccessDeniedCard } from "@/components/suppliers/access-denied-card";
 import { SupplierFormDialog } from "@/components/suppliers/supplier-form-dialog";
@@ -75,6 +76,12 @@ export function SuppliersPageClient(): JSX.Element {
   const deleteMutation = useDeleteSupplier();
   const isPermissionDenied =
     suppliersQuery.error instanceof ApiError && suppliersQuery.error.status === 403;
+  // Zero rows has two causes with opposite remedies. All three fields are
+  // toolbar choices; this screen carries no branch scope to exclude.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.status !== defaultFilters.status ||
+    filters.country.trim().length > 0;
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -164,7 +171,23 @@ export function SuppliersPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!suppliersQuery.isLoading && !suppliersQuery.error && suppliers.length === 0 ? (
+      {/* A country or status that matched nothing is not an empty supplier book,
+          and "Add Supplier" is the wrong next step for it. DESIGN.md 8. */}
+      {!suppliersQuery.isLoading &&
+      !suppliersQuery.error &&
+      suppliers.length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="suppliers"
+          onClearFilters={() => setFilters(defaultFilters)}
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!suppliersQuery.isLoading &&
+      !suppliersQuery.error &&
+      suppliers.length === 0 &&
+      !hasActiveFilters ? (
         <SuppliersEmptyState canManage={canManage} onCreate={openCreate} />
       ) : null}
 

@@ -10,6 +10,7 @@ import { InventoryErrorState } from "@/components/inventory/inventory-error-stat
 import { InventoryTable } from "@/components/inventory/inventory-table";
 import { InventoryTableSkeleton } from "@/components/inventory/inventory-table-skeleton";
 import { StockAdjustmentDialog } from "@/components/inventory/stock-adjustment-dialog";
+import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,12 @@ export function LowStockPageClient(): JSX.Element {
   const lowStockQuery = useLowStock(lowStockQueryFilters, canView && branchScope.hasBranchScope);
   const branchesQuery = useBranches(canView);
   const adjustmentMutation = useAdjustStock();
+  // Branch is scope, not a filter: it always carries a value, so counting it
+  // would make a genuinely quiet alert list read as a narrow search.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.itemType !== defaultFilters.itemType ||
+    filters.productType !== defaultFilters.productType;
 
   const branchOptions = useMemo(
     () =>
@@ -182,9 +189,25 @@ export function LowStockPageClient(): JSX.Element {
           }}
         />
       ) : null}
+      {/* Filtered and empty need opposite remedies. "No low stock items right
+          now" is a relief to read and flatly untrue when a product-type filter
+          is hiding the items that are actually short. DESIGN.md §8. */}
       {!lowStockQuery.isLoading &&
       !lowStockQuery.error &&
-      (lowStockQuery.data ?? []).length === 0 ? (
+      (lowStockQuery.data ?? []).length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="low stock items"
+          onClearFilters={() =>
+            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })
+          }
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+      {!lowStockQuery.isLoading &&
+      !lowStockQuery.error &&
+      (lowStockQuery.data ?? []).length === 0 &&
+      !hasActiveFilters ? (
         <InventoryEmptyState
           description="No low stock items right now."
           title="No low stock items right now."

@@ -14,6 +14,7 @@ import { PackagingSummaryCards } from "@/components/packaging/packaging-summary-
 import { PackagingTable } from "@/components/packaging/packaging-table";
 import { PackagingTableSkeleton } from "@/components/packaging/packaging-table-skeleton";
 import { PackagingToolbar } from "@/components/packaging/packaging-toolbar";
+import { FilteredState } from "@/components/shared/collection-state";
 import { LegacyProductMasterNotice } from "@/components/shared/legacy-product-master-notice";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -89,6 +90,14 @@ export function PackagingPageClient(): JSX.Element {
   const deleteMutation = useDeletePackaging();
   const isPermissionDenied =
     packagingQuery.error instanceof ApiError && packagingQuery.error.status === 403;
+  // Every field in this toolbar is user-chosen, so every field counts. There is
+  // no branch scope and no paging here to exclude.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.categoryId !== defaultFilters.categoryId ||
+    filters.supplierId !== defaultFilters.supplierId ||
+    filters.status !== defaultFilters.status ||
+    filters.stockTracked !== defaultFilters.stockTracked;
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -197,7 +206,24 @@ export function PackagingPageClient(): JSX.Element {
         )
       ) : null}
 
-      {!packagingQuery.isLoading && !packagingQuery.error && items.length === 0 ? (
+      {/* Empty and filtered need opposite remedies. "No packaging yet" is a lie
+          when the catalogue is full and the user simply ticked "Stock tracked".
+          DESIGN.md 8. */}
+      {!packagingQuery.isLoading &&
+      !packagingQuery.error &&
+      items.length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="packaging items"
+          onClearFilters={() => setFilters(defaultFilters)}
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!packagingQuery.isLoading &&
+      !packagingQuery.error &&
+      items.length === 0 &&
+      !hasActiveFilters ? (
         <PackagingEmptyState canManage={false} onCreate={() => undefined} />
       ) : null}
 

@@ -11,6 +11,7 @@ import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseEmptyState } from "@/components/purchasing/purchase-empty-state";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
+import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
@@ -734,6 +735,19 @@ export function ExpensesPageClient({
   const expenses = expensesQuery.data?.items ?? [];
   const totalExpenses = expensesQuery.data?.total ?? expenses.length;
   const totalPages = Math.max(1, Math.ceil(totalExpenses / filters.limit));
+  // Branch is scope, not a filter: it always carries a value, so counting it
+  // would make a genuinely empty register look like a narrow search. Paging and
+  // page size are excluded too — page 3 of an empty result is still empty, not
+  // filtered — and sort order reorders rows without removing any.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.status !== defaultFilters.status ||
+    filters.supplierId.length > 0 ||
+    filters.customerId.length > 0 ||
+    filters.expenseAccountId.length > 0 ||
+    filters.paidThroughAccountId.length > 0 ||
+    filters.dateFrom.length > 0 ||
+    filters.dateTo.length > 0;
   const expenseAccountList = useMemo(
     () =>
       uniqueAccounts([
@@ -929,7 +943,29 @@ export function ExpensesPageClient({
         )
       ) : null}
 
-      {!expensesQuery.isLoading && !expensesQuery.error && expenses.length === 0 ? (
+      {/* Filtered and empty need opposite remedies. Offering "Record Expense" to
+          someone whose date range simply excluded everything says the register is
+          empty when it may hold a year of spending. DESIGN.md 8. */}
+      {!expensesQuery.isLoading &&
+      !expensesQuery.error &&
+      expenses.length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="expenses"
+          onClearFilters={() =>
+            setFilters({
+              ...defaultFilters,
+              branchId: branchScope.defaultBranchId,
+            })
+          }
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!expensesQuery.isLoading &&
+      !expensesQuery.error &&
+      expenses.length === 0 &&
+      !hasActiveFilters ? (
         <PurchaseEmptyState
           actionLabel={canCreate ? "Record Expense" : undefined}
           onAction={canCreate ? openCreate : undefined}
