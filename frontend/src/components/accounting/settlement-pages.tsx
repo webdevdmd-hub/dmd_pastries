@@ -75,17 +75,18 @@ import {
   paymentAccountSchema,
   platformSettlementSchema,
 } from "@/lib/validators/accounting.schema";
-import type {
-  AccountTransferPayload,
-  AccountTransfersFilters,
-  ChartAccount,
-  PaymentAccount,
-  PaymentAccountPayload,
-  PaymentAccountsFilters,
-  PaymentAccountType,
-  PlatformSettlementDeductionPayload,
-  PlatformSettlementPayload,
-  PlatformSettlementsFilters,
+import {
+  type AccountTransferPayload,
+  type AccountTransfersFilters,
+  type ChartAccount,
+  PAYMENT_ACCOUNT_TYPE_LABELS,
+  type PaymentAccount,
+  type PaymentAccountPayload,
+  type PaymentAccountsFilters,
+  type PaymentAccountType,
+  type PlatformSettlementDeductionPayload,
+  type PlatformSettlementPayload,
+  type PlatformSettlementsFilters,
 } from "@/types/accounting";
 import type { Branch } from "@/types/branch";
 
@@ -652,7 +653,7 @@ export function PaymentAccountsPageClient({
                   <TableCell className="font-medium text-brand-espresso">
                     {account.accountName}
                   </TableCell>
-                  <TableCell>{account.accountType.replaceAll("_", " ")}</TableCell>
+                  <TableCell>{PAYMENT_ACCOUNT_TYPE_LABELS[account.accountType]}</TableCell>
                   <TableCell>
                     {account.chartAccountCode} - {account.chartAccountName}
                   </TableCell>
@@ -668,13 +669,17 @@ export function PaymentAccountsPageClient({
                   </TableCell>
                   <TableCell>
                     <Badge variant={account.status === "active" ? "secondary" : "default"}>
-                      {account.status}
+                      {account.status === "active" ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button size="icon" variant="ghost">
+                        <Button
+                          aria-label={`Open actions for ${account.accountName}`}
+                          size="icon"
+                          variant="ghost"
+                        >
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

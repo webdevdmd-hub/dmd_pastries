@@ -94,6 +94,7 @@ import {
 } from "@/hooks/use-master-data";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
+import { formatLabel } from "@/lib/format/label";
 import type { ProductCategoryIconKey } from "@/lib/product-category-icons";
 import {
   getProductCategoryIconForMetadata,
@@ -239,7 +240,9 @@ const paymentStatusDefaultValues: PaymentStatusSchema = {
 };
 
 function StatusBadge({ status }: { status: RecordStatus }): JSX.Element {
-  return <Badge variant={status === "active" ? "secondary" : "default"}>{status}</Badge>;
+  return (
+    <Badge variant={status === "active" ? "secondary" : "default"}>{formatLabel(status)}</Badge>
+  );
 }
 
 function LoadingCard(): JSX.Element {
@@ -1670,7 +1673,16 @@ function PaymentStatusesTable({
           <TableRow key={status.id}>
             <TableCell className="font-medium">{status.statusName}</TableCell>
             <TableCell>{status.statusKey}</TableCell>
-            <TableCell>{status.color}</TableCell>
+            <TableCell>
+              <span className="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-4 w-4 shrink-0 rounded-full border border-border"
+                  style={{ backgroundColor: status.color }}
+                />
+                <span className="font-mono">{status.color}</span>
+              </span>
+            </TableCell>
             <TableCell>{status.isSystemDefault ? "Yes" : "No"}</TableCell>
             <TableCell>
               <StatusBadge status={status.status} />

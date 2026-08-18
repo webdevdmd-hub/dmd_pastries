@@ -46,6 +46,10 @@ const DialogContent = React.forwardRef<
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
+        // Explicit rather than inherited: without it assistive tech does not
+        // confine navigation to the dialog, so a screen reader can wander into
+        // the inert page behind an open money-entry form.
+        aria-modal="true"
         data-density={density}
         ref={ref}
         className={cn(

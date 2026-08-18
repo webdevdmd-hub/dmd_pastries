@@ -527,6 +527,16 @@ export type PaymentAccountType =
   | "store_credit"
   | "other";
 
+export const PAYMENT_ACCOUNT_TYPE_LABELS: Record<PaymentAccountType, string> = {
+  cash: "Cash",
+  bank: "Bank",
+  card_clearing: "Card Clearing",
+  platform_clearing: "Platform Clearing",
+  wallet: "Wallet",
+  store_credit: "Store Credit",
+  other: "Other",
+};
+
 export type PaymentAccount = {
   id: string;
   businessId: string;

@@ -69,6 +69,7 @@ import {
 import { getPaymentAccounts } from "@/lib/api/accounting";
 import { getErrorMessage } from "@/lib/api/client";
 import { getBusinessAssetPreviewUrl, uploadBusinessAsset } from "@/lib/appwrite/storage";
+import { formatLabel } from "@/lib/format/label";
 import {
   type CompanySettingsSchema,
   companySettingsSchema,
@@ -101,7 +102,9 @@ type SettingsDataPageClientProps = {
 };
 
 function StatusBadge({ status }: { status: "active" | "inactive" }): JSX.Element {
-  return <Badge variant={status === "active" ? "secondary" : "default"}>{status}</Badge>;
+  return (
+    <Badge variant={status === "active" ? "secondary" : "default"}>{formatLabel(status)}</Badge>
+  );
 }
 
 function blankTaxRateDefaults(): TaxRateSchema {
@@ -897,7 +900,7 @@ function PaymentMethodsTable({
             {methods.map((method) => (
               <TableRow key={method.id}>
                 <TableCell className="font-medium">{method.methodName}</TableCell>
-                <TableCell>{method.methodType}</TableCell>
+                <TableCell>{formatLabel(method.methodType)}</TableCell>
                 <TableCell>{method.isDefault ? "Yes" : "No"}</TableCell>
                 <TableCell>{method.allowSplitPayment ? "Allowed" : "No"}</TableCell>
                 <TableCell>{method.requiresReference ? "Required" : "Optional"}</TableCell>
