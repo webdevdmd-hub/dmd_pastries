@@ -209,7 +209,7 @@ export function LowStockPageClient(): JSX.Element {
       (lowStockQuery.data ?? []).length === 0 &&
       !hasActiveFilters ? (
         <InventoryEmptyState
-          description="No low stock items right now."
+          description="Every tracked item is above its reorder level. Items will appear here once available quantity drops to or below reorder level."
           title="No low stock items right now."
         />
       ) : null}
