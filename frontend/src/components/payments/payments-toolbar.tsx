@@ -16,9 +16,7 @@ import {
   PAYMENT_STATUS_LABELS,
   type PaymentFilters,
   type PaymentStatus,
-  REFUND_STATUS_LABELS,
   type RefundFilters,
-  type RefundStatus,
 } from "@/types/payment";
 import type { PaymentMethod } from "@/types/settings";
 
@@ -36,21 +34,21 @@ type PaymentsToolbarProps =
       paymentMethods: PaymentMethod[];
     };
 
+// Only the statuses the backend can actually produce.
+//
+// The schema permits five (migration 000013), and this list offered all five,
+// but sale_payments.payment_status is written as "completed" at both creation
+// sites and only ever moved on by a refund. Nothing anywhere sets "pending" or
+// "failed", so those two options matched zero rows forever — a user picking
+// "Failed" got an empty table and reasonably concluded the data was broken.
+//
+// Restore them here when a payment flow can genuinely produce them; the badge
+// tones for both already exist in payment-status-badge.tsx.
 const paymentStatuses: (PaymentStatus | "all")[] = [
   "all",
-  "pending",
   "completed",
-  "failed",
-  "refunded",
   "partially_refunded",
-];
-
-const refundStatuses: (RefundStatus | "all")[] = [
-  "all",
-  "pending",
-  "completed",
-  "failed",
-  "cancelled",
+  "refunded",
 ];
 
 // Above this many options the segmented control stops being a glance and starts
@@ -119,25 +117,10 @@ export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
           paymentMethods={paymentMethods}
           value={filters.paymentMethodId}
         />
-        <Select
-          onValueChange={(value) => {
-            if (isRefundFilterStatus(value)) {
-              onFiltersChange({ ...filters, refundStatus: value });
-            }
-          }}
-          value={filters.refundStatus}
-        >
-          <SelectTrigger aria-label="Refund status" className="w-44">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            {refundStatuses.map((status) => (
-              <SelectItem key={status} value={status}>
-                {status === "all" ? "All statuses" : REFUND_STATUS_LABELS[status]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* No refund status control. payment_refunds.refund_status is only ever
+            written as "completed" (payments/service.go), so the filter could
+            never narrow anything. `filters.refundStatus` stays "all" and is
+            still sent, so the query contract is unchanged. */}
         <Input
           aria-label="Date from"
           className="w-40"
@@ -243,8 +226,4 @@ const defaultPaymentReset = {
 
 function isPaymentFilterStatus(value: string): value is PaymentStatus | "all" {
   return paymentStatuses.some((status) => status === value);
-}
-
-function isRefundFilterStatus(value: string): value is RefundStatus | "all" {
-  return refundStatuses.some((status) => status === value);
 }
