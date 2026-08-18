@@ -156,9 +156,21 @@ export function PaymentsPageClient(): JSX.Element {
     canView && branchScope.hasBranchScope,
   );
   const methodsQuery = usePaymentMethods(canView);
-  const stockLocationsQuery = useStockLocations(canRefund && branchScope.hasBranchScope);
+  // Refund-dialog-only data: fetching it on every list render cost two requests
+  // per page load for a dialog most visits never open. React Query caches the
+  // result, so it is fetched once on first open and reused after that.
+  //
+  // receiptLayouts deliberately stays eager: the receipt dialog renders as soon
+  // as setReceipt fires, so a lazy layout could print with the wrong one.
+  const isRefundDialogOpen = refundPayment !== null;
+  const stockLocationsQuery = useStockLocations(
+    isRefundDialogOpen && canRefund && branchScope.hasBranchScope,
+  );
   const receiptLayoutsQuery = useReceiptLayouts(canView && branchScope.hasBranchScope);
-  const usersQuery = useUsers({ search: "", status: "active" }, canRefund && canViewUsers);
+  const usersQuery = useUsers(
+    { search: "", status: "active" },
+    isRefundDialogOpen && canRefund && canViewUsers,
+  );
   const addPaymentMutation = useAddPaymentToSale();
   const refundMutation = useRefundPayment();
   const saleReceiptMutation = useSaleReceipt();

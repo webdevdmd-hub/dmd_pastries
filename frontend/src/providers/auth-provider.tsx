@@ -197,12 +197,26 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       return;
     }
 
+    // focus and visibilitychange both fire for a single tab switch, and the
+    // in-flight guard in refreshCurrentProfile only collapses them when they
+    // overlap — sequential ones each hit /auth/me. Coalesce on a short window
+    // so one user action costs one profile refresh.
+    let lastRefreshAt = 0;
+
     const refreshOnFocus = (): void => {
-      if (document.visibilityState === "visible") {
-        void refreshCurrentProfile().catch(() => {
-          // Keep the current session state if a background profile refresh fails.
-        });
+      if (document.visibilityState !== "visible") {
+        return;
       }
+
+      const now = Date.now();
+      if (now - lastRefreshAt < 1000) {
+        return;
+      }
+      lastRefreshAt = now;
+
+      void refreshCurrentProfile().catch(() => {
+        // Keep the current session state if a background profile refresh fails.
+      });
     };
 
     window.addEventListener("focus", refreshOnFocus);
