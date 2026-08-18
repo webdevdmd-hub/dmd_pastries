@@ -454,7 +454,9 @@ export function BatchesPageClient(): JSX.Element {
       !hasActiveFilters ? (
         <ManufacturingEmptyState
           actionLabel={canCreate ? "Create Production" : undefined}
+          description="Production batches turn recipes into finished stock. Creating one consumes its ingredients and adds the output to inventory."
           onAction={canCreate ? openCreate : undefined}
+          title="No production batches yet"
         />
       ) : null}
 

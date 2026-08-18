@@ -404,7 +404,9 @@ export function PurchaseOrdersPageClient(): JSX.Element {
       {!ordersQuery.isLoading && !ordersQuery.error && orders.length === 0 && !hasActiveFilters ? (
         <PurchaseEmptyState
           actionLabel={canCreate ? "Create Purchase Order" : undefined}
+          description="Purchase orders record what you have asked a supplier for, before the goods or the bill arrive."
           onAction={canCreate ? openCreate : undefined}
+          title="No purchase orders yet"
         />
       ) : null}
 
