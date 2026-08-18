@@ -1,24 +1,23 @@
 import { Settings } from "lucide-react";
 import type { JSX } from "react";
 
-import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/collection-state";
+
+/**
+ * Module adapter for the canonical empty state (DESIGN.md 8, plan item E2).
+ *
+ * Signature unchanged so call sites do not move. The copy also drops "found" —
+ * every one of these said "No X found.", which is search language on a screen that
+ * means "none exist yet". That single word is what made empty and filtered
+ * indistinguishable.
+ */
 
 export function SettingsEmptyState(): JSX.Element {
   return (
-    <Card>
-      <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-cappuccino/30 text-brand-caramel">
-          <Settings className="h-6 w-6" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold text-brand-espresso">
-            No settings sections available
-          </h2>
-          <p className="max-w-xl text-sm leading-6 text-brand-mocha">
-            No settings sections available for your role.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+    <EmptyState
+      description="Your role does not include access to any settings sections."
+      icon={Settings}
+      title="No settings available"
+    />
   );
 }

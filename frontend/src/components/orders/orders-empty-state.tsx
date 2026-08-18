@@ -1,8 +1,16 @@
-import { CakeSlice } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import type { JSX } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/collection-state";
+
+/**
+ * Module adapter for the canonical empty state (DESIGN.md 8, plan item E2).
+ *
+ * Signature unchanged so call sites do not move. The copy also drops "found" —
+ * every one of these said "No X found.", which is search language on a screen that
+ * means "none exist yet". That single word is what made empty and filtered
+ * indistinguishable.
+ */
 
 export function OrdersEmptyState({
   canManage,
@@ -12,21 +20,11 @@ export function OrdersEmptyState({
   onCreate: () => void;
 }): JSX.Element {
   return (
-    <Card className="border-brand-cappuccino/70 bg-card/85">
-      <CardContent className="flex flex-col items-center gap-4 p-12 text-center">
-        <CakeSlice className="h-12 w-12 text-brand-mocha" />
-        <div>
-          <h2 className="text-2xl font-semibold text-brand-espresso">No bakery orders found.</h2>
-          <p className="mt-2 text-sm text-brand-mocha">
-            Create custom cake and made-to-order workflows with schedule, items, and deposits.
-          </p>
-        </div>
-        {canManage ? (
-          <Button onClick={onCreate} type="button">
-            Create Order
-          </Button>
-        ) : null}
-      </CardContent>
-    </Card>
+    <EmptyState
+      action={canManage ? { label: "Create order", onClick: onCreate } : undefined}
+      description="Orders scheduled for collection or delivery appear here once they are placed."
+      icon={ClipboardList}
+      title="No bakery orders yet"
+    />
   );
 }

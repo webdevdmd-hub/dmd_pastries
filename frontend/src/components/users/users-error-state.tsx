@@ -1,24 +1,23 @@
-import { RotateCcw } from "lucide-react";
 import type { JSX } from "react";
 
-import { ErrorState } from "@/components/shared/error-state";
-import { Button } from "@/components/ui/button";
+import { FailedState } from "@/components/shared/collection-state";
 
-type UsersErrorStateProps = {
+/**
+ * Module adapter for the canonical failed state (DESIGN.md 8, plan item E2).
+ *
+ * The call signature is unchanged on purpose. 23 of these wrappers existed, each
+ * rendering its own arrangement of the same idea, across ~120 call sites. Rewriting
+ * the bodies converges every module on one treatment; rewriting the call sites
+ * instead would have been ~120 edits for the same pixels and a much larger blast
+ * radius. The duplication that mattered was the markup, not the prop shape.
+ */
+
+export function UsersErrorState({
+  description,
+  onRetry,
+}: {
   description: string;
   onRetry: () => void;
-};
-
-export function UsersErrorState({ description, onRetry }: UsersErrorStateProps): JSX.Element {
-  return (
-    <div className="space-y-5">
-      <ErrorState title="Unable to load staff users" description={description} />
-      <div className="flex justify-center">
-        <Button onClick={onRetry} variant="outline">
-          <RotateCcw className="h-4 w-4" />
-          Retry
-        </Button>
-      </div>
-    </div>
-  );
+}): JSX.Element {
+  return <FailedState detail={description} noun="users" onRetry={onRetry} />;
 }

@@ -1,36 +1,30 @@
 import { UserRoundPlus } from "lucide-react";
 import type { JSX } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/collection-state";
 
-type CustomersEmptyStateProps = {
-  canManage: boolean;
-  onCreate: () => void;
-};
+/**
+ * Module adapter for the canonical empty state (DESIGN.md 8, plan item E2).
+ *
+ * Signature unchanged so call sites do not move. The copy also drops "found" —
+ * every one of these said "No X found.", which is search language on a screen that
+ * means "none exist yet". That single word is what made empty and filtered
+ * indistinguishable.
+ */
 
 export function CustomersEmptyState({
   canManage,
   onCreate,
-}: CustomersEmptyStateProps): JSX.Element {
+}: {
+  canManage: boolean;
+  onCreate: () => void;
+}): JSX.Element {
   return (
-    <Card className="border-brand-cappuccino bg-card/80">
-      <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
-        <div className="rounded-2xl bg-brand-cappuccino/40 p-4 text-brand-mocha">
-          <UserRoundPlus className="h-8 w-8" />
-        </div>
-        <div>
-          <h2 className="text-xl font-semibold text-brand-espresso">No customers found.</h2>
-          <p className="mt-2 text-sm text-brand-mocha">
-            Create customer profiles for POS lookup, notes, and purchase history.
-          </p>
-        </div>
-        {canManage ? (
-          <Button onClick={onCreate} type="button">
-            Add customer
-          </Button>
-        ) : null}
-      </CardContent>
-    </Card>
+    <EmptyState
+      action={canManage ? { label: "Add customer", onClick: onCreate } : undefined}
+      description="Customer profiles power POS lookup, notes and purchase history."
+      icon={UserRoundPlus}
+      title="No customers yet"
+    />
   );
 }

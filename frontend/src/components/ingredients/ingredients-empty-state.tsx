@@ -1,32 +1,30 @@
-import { Wheat } from "lucide-react";
+import { Carrot } from "lucide-react";
 import type { JSX } from "react";
 
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/shared/collection-state";
 
-type IngredientsEmptyStateProps = {
-  canManage: boolean;
-  onCreate: () => void;
-};
+/**
+ * Module adapter for the canonical empty state (DESIGN.md 8, plan item E2).
+ *
+ * Signature unchanged so call sites do not move. The copy also drops "found" —
+ * every one of these said "No X found.", which is search language on a screen that
+ * means "none exist yet". That single word is what made empty and filtered
+ * indistinguishable.
+ */
 
 export function IngredientsEmptyState({
   canManage,
   onCreate,
-}: IngredientsEmptyStateProps): JSX.Element {
+}: {
+  canManage: boolean;
+  onCreate: () => void;
+}): JSX.Element {
   return (
-    <div className="grid place-items-center rounded-3xl border border-brand-cappuccino bg-card/70 p-12 text-center shadow-soft">
-      <div className="grid max-w-md gap-4">
-        <Wheat className="mx-auto h-10 w-10 text-brand-mocha" />
-        <h2 className="text-2xl font-bold text-brand-espresso">No ingredients found.</h2>
-        <p className="text-brand-mocha">
-          Create raw materials like flour, sugar, dairy, chocolate, and flavoring for inventory,
-          recipes, and purchasing.
-        </p>
-        {canManage ? (
-          <Button className="mx-auto" onClick={onCreate} type="button">
-            Add Ingredient
-          </Button>
-        ) : null}
-      </div>
-    </div>
+    <EmptyState
+      action={canManage ? { label: "Add ingredient", onClick: onCreate } : undefined}
+      description="Ingredients are the raw materials recipes consume and purchasing restocks."
+      icon={Carrot}
+      title="No ingredients yet"
+    />
   );
 }

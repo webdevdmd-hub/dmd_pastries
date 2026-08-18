@@ -1,20 +1,23 @@
 import type { JSX } from "react";
 
-import { ErrorState } from "@/components/shared/error-state";
-import { Button } from "@/components/ui/button";
+import { FailedState } from "@/components/shared/collection-state";
 
-type ReportErrorStateProps = {
+/**
+ * Module adapter for the canonical failed state (DESIGN.md 8, plan item E2).
+ *
+ * The call signature is unchanged on purpose. 23 of these wrappers existed, each
+ * rendering its own arrangement of the same idea, across ~120 call sites. Rewriting
+ * the bodies converges every module on one treatment; rewriting the call sites
+ * instead would have been ~120 edits for the same pixels and a much larger blast
+ * radius. The duplication that mattered was the markup, not the prop shape.
+ */
+
+export function ReportErrorState({
+  description,
+  onRetry,
+}: {
   description: string;
   onRetry: () => void;
-};
-
-export function ReportErrorState({ description, onRetry }: ReportErrorStateProps): JSX.Element {
-  return (
-    <div className="space-y-3">
-      <ErrorState title="Unable to load reports" description={description} />
-      <Button type="button" variant="outline" onClick={onRetry}>
-        Retry
-      </Button>
-    </div>
-  );
+}): JSX.Element {
+  return <FailedState detail={description} noun="this report" onRetry={onRetry} />;
 }

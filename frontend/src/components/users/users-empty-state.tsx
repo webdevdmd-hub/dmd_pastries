@@ -1,30 +1,30 @@
-import { UserPlus, Users } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import type { JSX } from "react";
 
-import { EmptyState } from "@/components/shared/empty-state";
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/shared/collection-state";
 
-type UsersEmptyStateProps = {
+/**
+ * Module adapter for the canonical empty state (DESIGN.md 8, plan item E2).
+ *
+ * Signature unchanged so call sites do not move. The copy also drops "found" —
+ * every one of these said "No X found.", which is search language on a screen that
+ * means "none exist yet". That single word is what made empty and filtered
+ * indistinguishable.
+ */
+
+export function UsersEmptyState({
+  canCreate,
+  onCreate,
+}: {
   canCreate: boolean;
   onCreate: () => void;
-};
-
-export function UsersEmptyState({ canCreate, onCreate }: UsersEmptyStateProps): JSX.Element {
+}): JSX.Element {
   return (
-    <div className="space-y-5">
-      <EmptyState
-        title="No staff users found."
-        description="Start building your bakery team by creating the first staff account with role-based access."
-        icon={Users}
-      />
-      {canCreate ? (
-        <div className="flex justify-center">
-          <Button onClick={onCreate}>
-            <UserPlus className="h-4 w-4" />
-            Add staff user
-          </Button>
-        </div>
-      ) : null}
-    </div>
+    <EmptyState
+      action={canCreate ? { label: "Invite user", onClick: onCreate } : undefined}
+      description="Invite staff and assign them a role to give them access."
+      icon={UserPlus}
+      title="No users yet"
+    />
   );
 }

@@ -1,10 +1,16 @@
-"use client";
-
-import { ClipboardList } from "lucide-react";
+import { ChefHat } from "lucide-react";
 import type { JSX } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/collection-state";
+
+/**
+ * Module adapter for the canonical empty state (DESIGN.md 8, plan item E2).
+ *
+ * Signature unchanged so call sites do not move. The copy also drops "found" —
+ * every one of these said "No X found.", which is search language on a screen that
+ * means "none exist yet". That single word is what made empty and filtered
+ * indistinguishable.
+ */
 
 export function RecipesEmptyState({
   canManage,
@@ -14,21 +20,11 @@ export function RecipesEmptyState({
   onCreate: () => void;
 }): JSX.Element {
   return (
-    <Card className="bg-card/80">
-      <CardContent className="flex flex-col items-center gap-4 p-12 text-center">
-        <ClipboardList className="h-12 w-12 text-brand-mocha" />
-        <div>
-          <h2 className="text-2xl font-bold text-brand-espresso">No recipes found.</h2>
-          <p className="mt-2 max-w-xl text-sm text-brand-mocha">
-            Create your first BOM to define ingredients, packaging, yield, and cost for a product.
-          </p>
-        </div>
-        {canManage ? (
-          <Button onClick={onCreate} type="button">
-            Create Recipe
-          </Button>
-        ) : null}
-      </CardContent>
-    </Card>
+    <EmptyState
+      action={canManage ? { label: "Add recipe", onClick: onCreate } : undefined}
+      description="A recipe turns ingredients into a product, and drives production costing."
+      icon={ChefHat}
+      title="No recipes yet"
+    />
   );
 }

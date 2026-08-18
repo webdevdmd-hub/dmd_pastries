@@ -1,29 +1,30 @@
 import { ShieldPlus } from "lucide-react";
 import type { JSX } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/collection-state";
 
-type RolesEmptyStateProps = {
+/**
+ * Module adapter for the canonical empty state (DESIGN.md 8, plan item E2).
+ *
+ * Signature unchanged so call sites do not move. The copy also drops "found" —
+ * every one of these said "No X found.", which is search language on a screen that
+ * means "none exist yet". That single word is what made empty and filtered
+ * indistinguishable.
+ */
+
+export function RolesEmptyState({
+  canCreate,
+  onCreate,
+}: {
   canCreate: boolean;
   onCreate: () => void;
-};
-
-export function RolesEmptyState({ canCreate, onCreate }: RolesEmptyStateProps): JSX.Element {
+}): JSX.Element {
   return (
-    <Card>
-      <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-cappuccino/30 text-brand-caramel">
-          <ShieldPlus className="h-6 w-6" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold text-brand-espresso">No custom roles found.</h2>
-          <p className="max-w-xl text-sm leading-6 text-brand-mocha">
-            Create staff roles to control access across your POS system.
-          </p>
-        </div>
-        {canCreate ? <Button onClick={onCreate}>Create Role</Button> : null}
-      </CardContent>
-    </Card>
+    <EmptyState
+      action={canCreate ? { label: "Create role", onClick: onCreate } : undefined}
+      description="Roles control what staff can see and do across the app."
+      icon={ShieldPlus}
+      title="No custom roles yet"
+    />
   );
 }

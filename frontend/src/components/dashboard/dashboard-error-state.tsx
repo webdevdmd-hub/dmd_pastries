@@ -1,7 +1,16 @@
-import { AlertTriangle } from "lucide-react";
 import type { JSX } from "react";
 
-import { Button } from "@/components/ui/button";
+import { FailedState } from "@/components/shared/collection-state";
+
+/**
+ * Module adapter for the canonical failed state (DESIGN.md 8, plan item E2).
+ *
+ * The call signature is unchanged on purpose. 23 of these wrappers existed, each
+ * rendering its own arrangement of the same idea, across ~120 call sites. Rewriting
+ * the bodies converges every module on one treatment; rewriting the call sites
+ * instead would have been ~120 edits for the same pixels and a much larger blast
+ * radius. The duplication that mattered was the markup, not the prop shape.
+ */
 
 export function DashboardErrorState({
   description,
@@ -10,20 +19,5 @@ export function DashboardErrorState({
   description: string;
   onRetry: () => void;
 }): JSX.Element {
-  return (
-    <div className="rounded-2xl border border-danger/30 bg-danger-tint p-5 text-danger-text">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3">
-          <AlertTriangle className="mt-0.5 h-5 w-5" aria-hidden="true" />
-          <div>
-            <p className="font-semibold">Unable to load dashboard.</p>
-            <p className="text-sm">{description}</p>
-          </div>
-        </div>
-        <Button type="button" variant="outline" onClick={onRetry}>
-          Retry
-        </Button>
-      </div>
-    </div>
-  );
+  return <FailedState detail={description} noun="the dashboard" onRetry={onRetry} />;
 }

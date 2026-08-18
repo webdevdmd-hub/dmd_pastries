@@ -1,37 +1,29 @@
-import { PackageOpen, Plus } from "lucide-react";
+import { PackageOpen } from "lucide-react";
 import type { JSX } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/collection-state";
 
-type InventoryEmptyStateProps = {
-  canManage?: boolean;
-  onCreate?: () => void;
-  title?: string;
-  description?: string;
-};
-
+/**
+ * Module adapter for the canonical empty state (DESIGN.md 8, plan item E2).
+ * Signature unchanged so call sites do not move.
+ */
 export function InventoryEmptyState({
   canManage = false,
-  onCreate,
-  title = "No inventory items found.",
   description = "Create opening stock to begin tracking branch-level product quantities.",
-}: InventoryEmptyStateProps): JSX.Element {
+  onCreate,
+  title = "No inventory yet",
+}: {
+  canManage?: boolean | undefined;
+  onCreate?: (() => void) | undefined;
+  title?: string | undefined;
+  description?: string | undefined;
+}): JSX.Element {
   return (
-    <Card>
-      <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
-        <PackageOpen className="h-10 w-10 text-brand-mocha" />
-        <div className="space-y-1">
-          <h2 className="text-xl font-bold text-brand-espresso">{title}</h2>
-          <p className="max-w-md text-sm text-brand-mocha">{description}</p>
-        </div>
-        {canManage && onCreate ? (
-          <Button onClick={onCreate} type="button">
-            <Plus className="h-4 w-4" />
-            Opening Stock
-          </Button>
-        ) : null}
-      </CardContent>
-    </Card>
+    <EmptyState
+      action={canManage && onCreate ? { label: "Add opening stock", onClick: onCreate } : undefined}
+      description={description}
+      icon={PackageOpen}
+      title={title}
+    />
   );
 }

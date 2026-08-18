@@ -1,36 +1,30 @@
-"use client";
-
-import { PackageOpen } from "lucide-react";
+import { Package } from "lucide-react";
 import type { JSX } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/collection-state";
 
-type PackagingEmptyStateProps = {
-  canManage: boolean;
-  onCreate: () => void;
-};
+/**
+ * Module adapter for the canonical empty state (DESIGN.md 8, plan item E2).
+ *
+ * Signature unchanged so call sites do not move. The copy also drops "found" —
+ * every one of these said "No X found.", which is search language on a screen that
+ * means "none exist yet". That single word is what made empty and filtered
+ * indistinguishable.
+ */
 
 export function PackagingEmptyState({
   canManage,
   onCreate,
-}: PackagingEmptyStateProps): JSX.Element {
+}: {
+  canManage: boolean;
+  onCreate: () => void;
+}): JSX.Element {
   return (
-    <Card className="bg-card/80">
-      <CardContent className="flex flex-col items-center gap-4 p-12 text-center">
-        <PackageOpen className="h-12 w-12 text-brand-mocha" />
-        <div>
-          <h2 className="text-2xl font-bold text-brand-espresso">No packaging items found.</h2>
-          <p className="mt-2 max-w-xl text-sm text-brand-mocha">
-            Create boxes, cups, trays, labels, and other packaging used across products and orders.
-          </p>
-        </div>
-        {canManage ? (
-          <Button onClick={onCreate} type="button">
-            Add Packaging
-          </Button>
-        ) : null}
-      </CardContent>
-    </Card>
+    <EmptyState
+      action={canManage ? { label: "Add packaging", onClick: onCreate } : undefined}
+      description="Packaging items are consumed by production and restocked through purchasing."
+      icon={Package}
+      title="No packaging yet"
+    />
   );
 }

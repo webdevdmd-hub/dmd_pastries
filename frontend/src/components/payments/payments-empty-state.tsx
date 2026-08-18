@@ -1,26 +1,19 @@
-import { WalletCards } from "lucide-react";
+import { Receipt } from "lucide-react";
 import type { JSX } from "react";
 
-import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/collection-state";
 
-type PaymentsEmptyStateProps = {
-  title?: string;
-  description?: string;
-};
+/**
+ * Module adapter for the canonical empty state (DESIGN.md 8, plan item E2).
+ * Signature unchanged so call sites do not move.
+ */
 
 export function PaymentsEmptyState({
-  title = "No payments found.",
-  description = "Customer collections will appear here once POS sales or bakery order payments are recorded.",
-}: PaymentsEmptyStateProps): JSX.Element {
-  return (
-    <Card>
-      <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-cappuccino/30 text-brand-caramel">
-          <WalletCards className="h-6 w-6" />
-        </div>
-        <h2 className="text-xl font-semibold text-brand-espresso">{title}</h2>
-        <p className="max-w-xl text-sm leading-6 text-brand-mocha">{description}</p>
-      </CardContent>
-    </Card>
-  );
+  description,
+  title,
+}: {
+  title?: string | undefined;
+  description?: string | undefined;
+}): JSX.Element {
+  return <EmptyState description={description} icon={Receipt} title={title ?? "No payments yet"} />;
 }

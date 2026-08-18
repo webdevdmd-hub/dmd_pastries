@@ -1,27 +1,23 @@
-import { AlertTriangle } from "lucide-react";
 import type { JSX } from "react";
 
-import { Button } from "@/components/ui/button";
+import { FailedState } from "@/components/shared/collection-state";
 
-type IngredientsErrorStateProps = {
-  description: string;
-  onRetry: () => void;
-};
+/**
+ * Module adapter for the canonical failed state (DESIGN.md 8, plan item E2).
+ *
+ * The call signature is unchanged on purpose. 23 of these wrappers existed, each
+ * rendering its own arrangement of the same idea, across ~120 call sites. Rewriting
+ * the bodies converges every module on one treatment; rewriting the call sites
+ * instead would have been ~120 edits for the same pixels and a much larger blast
+ * radius. The duplication that mattered was the markup, not the prop shape.
+ */
 
 export function IngredientsErrorState({
   description,
   onRetry,
-}: IngredientsErrorStateProps): JSX.Element {
-  return (
-    <div className="grid place-items-center rounded-3xl border border-danger/30 bg-danger-tint/70 p-12 text-center">
-      <div className="grid max-w-md gap-4">
-        <AlertTriangle className="mx-auto h-10 w-10 text-danger-text" />
-        <h2 className="text-2xl font-bold text-brand-espresso">Unable to load ingredients</h2>
-        <p className="text-brand-mocha">{description}</p>
-        <Button className="mx-auto" onClick={onRetry} type="button" variant="outline">
-          Retry
-        </Button>
-      </div>
-    </div>
-  );
+}: {
+  description: string;
+  onRetry: () => void;
+}): JSX.Element {
+  return <FailedState detail={description} noun="ingredients" onRetry={onRetry} />;
 }

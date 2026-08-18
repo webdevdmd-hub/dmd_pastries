@@ -200,6 +200,11 @@ type FailedStateProps = {
  * error where a list should be reads as "my data is gone"; that one sentence is the
  * most commonly missing part of a failed state and the cheapest to add.
  *
+ * The reassurance deliberately avoids the noun. "your {noun} are still there" reads
+ * well for "products" and breaks for the nouns modules actually pass — "the
+ * dashboard", "purchasing data", "the report". A sentence that is grammatical for
+ * every caller beats one that is warmer for some and broken for others.
+ *
  * `role="alert"`, because unlike the filtered row this is not a refinement of what
  * the user just did — it is something that went wrong and warrants interrupting.
  */
@@ -212,7 +217,7 @@ export function FailedState({ detail, noun, onRetry }: FailedStateProps): JSX.El
       <h2 className="text-title text-danger-text">Couldn&rsquo;t load {noun}</h2>
 
       <p className="text-body max-w-[54ch] text-danger-text">
-        {detail ?? "The request failed."} Nothing has changed — your {noun} are still there.
+        {detail ?? "The request failed."} Nothing has changed and no data was lost.
       </p>
 
       {onRetry ? (

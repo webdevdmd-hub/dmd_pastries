@@ -1,30 +1,25 @@
-import { AlertTriangle } from "lucide-react";
 import type { JSX } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { FailedState } from "@/components/shared/collection-state";
+
+/**
+ * Module adapter for the canonical failed state (DESIGN.md 8, plan item E2).
+ *
+ * The call signature is unchanged on purpose. 23 of these wrappers existed, each
+ * rendering its own arrangement of the same idea, across ~120 call sites. Rewriting
+ * the bodies converges every module on one treatment; rewriting the call sites
+ * instead would have been ~120 edits for the same pixels and a much larger blast
+ * radius. The duplication that mattered was the markup, not the prop shape.
+ */
 
 export function PurchaseErrorState({
   description,
   onRetry,
-  title = "Unable to load purchasing data",
+  title,
 }: {
   description: string;
   onRetry: () => void;
   title?: string;
 }): JSX.Element {
-  return (
-    <Card className="border-danger/30 bg-danger-tint/70">
-      <CardContent className="flex min-h-72 flex-col items-center justify-center gap-4 text-center">
-        <AlertTriangle className="h-10 w-10 text-danger-text" />
-        <div>
-          <h2 className="text-2xl font-semibold text-brand-espresso">{title}</h2>
-          <p className="mt-2 text-sm text-brand-mocha">{description}</p>
-        </div>
-        <Button onClick={onRetry} type="button" variant="outline">
-          Retry
-        </Button>
-      </CardContent>
-    </Card>
-  );
+  return <FailedState detail={description} noun={title ?? "purchasing data"} onRetry={onRetry} />;
 }

@@ -1,37 +1,32 @@
-import type { JSX, ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import type { JSX } from "react";
 
-import { AppButton } from "@/components/app/app-button";
-import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/collection-state";
 
-type AppEmptyStateProps = {
-  actionLabel?: string;
-  description: string;
-  icon?: ReactNode;
-  onAction?: () => void;
-  title: string;
-};
+/**
+ * Module adapter for the canonical empty state (DESIGN.md 8, plan item E2).
+ * Signature unchanged so call sites do not move.
+ */
 
 export function AppEmptyState({
   actionLabel,
-  description,
   icon,
   onAction,
+  description,
   title,
-}: AppEmptyStateProps): JSX.Element {
+}: {
+  title: string;
+  description: string;
+  icon?: LucideIcon | undefined;
+  actionLabel?: string | undefined;
+  onAction?: (() => void) | undefined;
+}): JSX.Element {
   return (
-    <Card className="bg-workspace-panel">
-      <CardContent className="flex flex-col items-center gap-4 p-12 text-center">
-        {icon ? <div className="text-workspace-muted">{icon}</div> : null}
-        <div>
-          <h2 className="text-2xl font-semibold text-brand-espresso">{title}</h2>
-          <p className="mt-2 max-w-xl text-sm text-workspace-muted">{description}</p>
-        </div>
-        {actionLabel && onAction ? (
-          <AppButton onClick={onAction} type="button">
-            {actionLabel}
-          </AppButton>
-        ) : null}
-      </CardContent>
-    </Card>
+    <EmptyState
+      action={actionLabel && onAction ? { label: actionLabel, onClick: onAction } : undefined}
+      description={description}
+      icon={icon}
+      title={title}
+    />
   );
 }

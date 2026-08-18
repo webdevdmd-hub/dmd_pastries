@@ -1,11 +1,17 @@
 import { FileText } from "lucide-react";
 import type { JSX } from "react";
 
+import { EmptyState } from "@/components/shared/collection-state";
+
+/**
+ * Module adapter for the canonical empty state (DESIGN.md 8, plan item E2).
+ *
+ * Signature unchanged so call sites do not move. The copy also drops "found" —
+ * every one of these said "No X found.", which is search language on a screen that
+ * means "none exist yet". That single word is what made empty and filtered
+ * indistinguishable.
+ */
+
 export function ReportEmptyState({ message }: { message: string }): JSX.Element {
-  return (
-    <div className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-brand-cappuccino bg-brand-latte/60 p-6 text-center text-brand-mocha">
-      <FileText className="h-8 w-8" />
-      <p className="text-sm">{message}</p>
-    </div>
-  );
+  return <EmptyState icon={FileText} title={message} />;
 }
