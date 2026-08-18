@@ -504,10 +504,11 @@ export function POSWorkspace(): JSX.Element {
         });
       } catch (verificationError) {
         showCheckoutFeedback({
-          message: `The checkout result could not be verified. Retry will use the same checkout reference to prevent a duplicate sale. ${getErrorMessage(
+          message: `We can't confirm whether this sale went through. Do not re-run the customer's card. Tap "Retry checkout" below — it's safe, and will not create a duplicate sale even if the first attempt actually succeeded. (${getErrorMessage(
             verificationError,
-          )}`,
-          title: "Checkout status unknown",
+          )})`,
+          showRetry: true,
+          title: "Checkout status unknown — do not re-charge the customer",
           tone: "warning",
         });
       }
@@ -1113,6 +1114,7 @@ export function POSWorkspace(): JSX.Element {
         customerCreditBalance={customerCreditBalance}
         customerId={customerId}
         feedback={checkoutFeedback}
+        hasBlocker={checkoutBlocker !== null}
         isSubmitting={isCheckoutProcessing}
         onConfirm={() => {
           void submitCheckout();
