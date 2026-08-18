@@ -114,8 +114,7 @@ export function InventoryTable({
                 <div>
                   <p className="font-bold">{item.itemName}</p>
                   <p className="text-xs text-brand-mocha">
-                    {item.itemCode ||
-                      (isNotInitialized ? "Catalog item without stock" : item.id.slice(0, 8))}
+                    {item.itemCode || (isNotInitialized ? "Catalog item without stock" : "No code")}
                   </p>
                   {item.variantName ? (
                     <p className="text-xs text-brand-mocha">Variant: {item.variantName}</p>
