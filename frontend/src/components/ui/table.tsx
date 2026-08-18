@@ -2,10 +2,22 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils/cn";
 
+/**
+ * Ledger table (DESIGN.md §4).
+ *
+ * Row height and cell padding come from `--row-h` / `--cell-pad-x`, which the
+ * token layer sets from `[data-table-density]` — so a density change is a single
+ * attribute on the document element, not a re-render of every table. See
+ * components/density/table-density.tsx.
+ *
+ * House rules encoded here: no vertical rules, `--muted` row hover, a sticky
+ * header in `text-meta`/`--foreground-muted`, and a totals row filled `--muted`
+ * with a top border.
+ */
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
     <div className="relative w-full overflow-auto">
-      <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
+      <table ref={ref} className={cn("w-full caption-bottom text-cell", className)} {...props} />
     </div>
   ),
 );
@@ -15,11 +27,7 @@ const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead
-    ref={ref}
-    className={cn("[&_tr]:border-b [&_tr]:border-workspace-border", className)}
-    {...props}
-  />
+  <thead ref={ref} className={cn("[&_tr]:border-b [&_tr]:border-border", className)} {...props} />
 ));
 TableHeader.displayName = "TableHeader";
 
@@ -37,10 +45,7 @@ const TableFooter = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tfoot
     ref={ref}
-    className={cn(
-      "border-t border-workspace-border bg-brand-latte/40 font-medium [&>tr]:last:border-b-0",
-      className,
-    )}
+    className={cn("border-t border-border bg-muted font-medium [&>tr]:last:border-b-0", className)}
     {...props}
   />
 ));
@@ -51,7 +56,7 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
     <tr
       ref={ref}
       className={cn(
-        "border-b border-workspace-border transition-colors hover:bg-brand-latte/45 data-[state=selected]:bg-brand-latte/60",
+        "h-row border-b border-border transition-colors duration-fast ease-out hover:bg-muted data-[state=selected]:bg-muted",
         className,
       )}
       {...props}
@@ -67,7 +72,9 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-10 px-4 text-left align-middle text-[0.7rem] font-semibold text-workspace-muted",
+      // Sticky so the column names survive a long ledger. Was `text-[0.7rem]`
+      // (11.2px), under the 12px floor in DESIGN.md §9.
+      "sticky top-0 z-10 h-10 bg-card px-cell-x text-left align-middle text-meta font-medium text-foreground-muted",
       className,
     )}
     {...props}
@@ -79,11 +86,7 @@ const TableCell = React.forwardRef<
   HTMLTableCellElement,
   React.TdHTMLAttributes<HTMLTableCellElement>
 >(({ className, ...props }, ref) => (
-  <td
-    ref={ref}
-    className={cn("px-4 py-3 align-middle text-brand-espresso", className)}
-    {...props}
-  />
+  <td ref={ref} className={cn("px-cell-x align-middle text-foreground", className)} {...props} />
 ));
 TableCell.displayName = "TableCell";
 
@@ -91,7 +94,7 @@ const TableCaption = React.forwardRef<
   HTMLTableCaptionElement,
   React.HTMLAttributes<HTMLTableCaptionElement>
 >(({ className, ...props }, ref) => (
-  <caption ref={ref} className={cn("mt-4 text-sm text-workspace-muted", className)} {...props} />
+  <caption ref={ref} className={cn("mt-4 text-cell text-foreground-muted", className)} {...props} />
 ));
 TableCaption.displayName = "TableCaption";
 

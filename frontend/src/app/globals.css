@@ -152,7 +152,12 @@
     --row-h: 2.25rem;
     --cell-pad-x: 0.875rem;
   }
-  :root,
+  /* `:root:not([data-table-density])`, not a bare `:root`. The attribute lands
+   * on <html>, so a bare `:root` matches the same element as
+   * `[data-table-density="compact"]` at equal specificity — and because it is
+   * declared later, it won, pinning compact to 44px rows. Only `comfortable`
+   * escaped, by being declared after this block. */
+  :root:not([data-table-density]),
   [data-table-density="default"] {
     --row-h: 2.75rem;
     --cell-pad-x: 1rem;
