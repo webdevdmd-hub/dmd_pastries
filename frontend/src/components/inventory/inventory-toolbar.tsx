@@ -75,8 +75,15 @@ export function InventoryToolbar({
 
   const hiddenFilterCount = countHiddenFilters(filters);
   const isBranchNarrowed = allowAllBranches && filters.branchId !== resetBranchId;
+  // lowStockOnly is excluded from the badge count (it is the visible tab, not a
+  // hidden filter) but included here, because Reset does clear it. A Reset that
+  // silently returns the view to All items while refusing to appear for that
+  // state would be a button whose visibility disagrees with its effect.
   const hasAnyFilter =
-    hiddenFilterCount > 0 || isBranchNarrowed || filters.search.trim().length > 0;
+    hiddenFilterCount > 0 ||
+    isBranchNarrowed ||
+    filters.lowStockOnly ||
+    filters.search.trim().length > 0;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
