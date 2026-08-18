@@ -85,7 +85,7 @@ export function ProductionSchedulePageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <ProductionScheduleTable rows={reportQuery.data} />
           ) : (
-            <BakeryOrdersReportEmptyState message="No production schedule rows found." />
+            <BakeryOrdersReportEmptyState message="No production schedule rows in this period." />
           )}
         </CardContent>
       </Card>

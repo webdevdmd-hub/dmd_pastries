@@ -122,7 +122,7 @@ export function FinancialReportsPageClient(): JSX.Element {
             />
           </div>
         ) : (
-          <FinancialReportEmptyState message="No financial trend data found." />
+          <FinancialReportEmptyState message="No financial trend data in this period." />
         )}
       </ReportChartCard>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -74,7 +74,7 @@ export function YieldVarianceReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <YieldVarianceTable rows={reportQuery.data} />
           ) : (
-            <ManufacturingReportEmptyState message="No yield variance rows found." />
+            <ManufacturingReportEmptyState message="No yield variance rows in this period." />
           )}
         </CardContent>
       </Card>

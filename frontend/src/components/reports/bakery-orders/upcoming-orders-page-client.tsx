@@ -89,7 +89,7 @@ export function UpcomingOrdersPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <UpcomingOrdersTable rows={reportQuery.data} />
           ) : (
-            <BakeryOrdersReportEmptyState message="No upcoming orders found." />
+            <BakeryOrdersReportEmptyState message="No upcoming orders in this period." />
           )}
         </CardContent>
       </Card>

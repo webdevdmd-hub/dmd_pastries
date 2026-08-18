@@ -80,7 +80,7 @@ export function ProductionBatchesReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <ProductionBatchesTable rows={reportQuery.data} />
           ) : (
-            <ManufacturingReportEmptyState message="No production batches found." />
+            <ManufacturingReportEmptyState message="No production batches in this period." />
           )}
         </CardContent>
       </Card>

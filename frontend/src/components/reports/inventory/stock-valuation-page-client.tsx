@@ -78,7 +78,7 @@ export function StockValuationPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <StockValuationTable rows={reportQuery.data} />
           ) : (
-            <InventoryReportEmptyState message="No stock valuation rows found." />
+            <InventoryReportEmptyState message="No stock valuation rows." />
           )}
         </CardContent>
       </Card>

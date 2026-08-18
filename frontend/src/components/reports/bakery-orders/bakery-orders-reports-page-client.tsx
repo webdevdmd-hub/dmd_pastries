@@ -100,7 +100,7 @@ export function BakeryOrdersReportsPageClient(): JSX.Element {
         {trendQuery.data ? (
           <BakeryOrdersTrendChart chart={trendQuery.data} />
         ) : (
-          <BakeryOrdersReportEmptyState message="No bakery orders trend data found." />
+          <BakeryOrdersReportEmptyState message="No bakery orders trend data in this period." />
         )}
       </ReportChartCard>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

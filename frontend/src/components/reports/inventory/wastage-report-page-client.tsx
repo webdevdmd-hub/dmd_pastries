@@ -78,7 +78,7 @@ export function WastageReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.items.length > 0 ? (
             <WastageReportTable rows={reportQuery.data.items} />
           ) : (
-            <InventoryReportEmptyState message="No wastage records found." />
+            <InventoryReportEmptyState message="No wastage records in this period." />
           )}
         </CardContent>
       </Card>

@@ -76,7 +76,7 @@ export function LowStockPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <LowStockTable rows={reportQuery.data} />
           ) : (
-            <InventoryReportEmptyState message="No low stock items found." />
+            <InventoryReportEmptyState message="No low stock items." />
           )}
         </CardContent>
       </Card>

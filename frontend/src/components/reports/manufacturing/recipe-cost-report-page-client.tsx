@@ -74,7 +74,7 @@ export function RecipeCostReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <RecipeCostTable rows={reportQuery.data} />
           ) : (
-            <ManufacturingReportEmptyState message="No recipe cost rows found." />
+            <ManufacturingReportEmptyState message="No recipe cost rows in this period." />
           )}
         </CardContent>
       </Card>

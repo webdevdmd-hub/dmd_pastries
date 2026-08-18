@@ -101,7 +101,7 @@ export function SupplierPayablesPageClient(): JSX.Element {
           {rows.length > 0 ? (
             <SupplierPayablesTable rows={rows} />
           ) : (
-            <FinancialReportEmptyState message="No supplier payables found." />
+            <FinancialReportEmptyState message="No supplier payables." />
           )}
         </CardContent>
       </Card>

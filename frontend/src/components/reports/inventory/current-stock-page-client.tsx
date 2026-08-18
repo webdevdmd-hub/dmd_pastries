@@ -76,7 +76,7 @@ export function CurrentStockPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <CurrentStockTable rows={reportQuery.data} />
           ) : (
-            <InventoryReportEmptyState message="No current stock rows found." />
+            <InventoryReportEmptyState message="No current stock rows." />
           )}
         </CardContent>
       </Card>

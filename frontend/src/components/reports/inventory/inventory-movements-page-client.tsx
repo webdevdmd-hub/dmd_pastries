@@ -76,7 +76,7 @@ export function InventoryMovementsPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <InventoryMovementsTable rows={reportQuery.data} />
           ) : (
-            <InventoryReportEmptyState message="No inventory movements found." />
+            <InventoryReportEmptyState message="No inventory movements in this period." />
           )}
         </CardContent>
       </Card>

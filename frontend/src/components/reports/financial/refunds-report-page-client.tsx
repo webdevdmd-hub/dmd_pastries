@@ -78,7 +78,7 @@ export function RefundsReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <RefundsReportTable rows={reportQuery.data} />
           ) : (
-            <FinancialReportEmptyState message="No refunds found." />
+            <FinancialReportEmptyState message="No refunds in this period." />
           )}
         </CardContent>
       </Card>

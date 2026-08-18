@@ -101,7 +101,7 @@ export function OutstandingBalancesPageClient(): JSX.Element {
           {rows.length > 0 ? (
             <OutstandingBalancesTable rows={rows} />
           ) : (
-            <FinancialReportEmptyState message="No outstanding balances found." />
+            <FinancialReportEmptyState message="No outstanding balances." />
           )}
         </CardContent>
       </Card>

@@ -88,7 +88,7 @@ export function ReconciliationReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <ReconciliationReportTable rows={reportQuery.data} />
           ) : (
-            <FinancialReportEmptyState message="No financial transactions found." />
+            <FinancialReportEmptyState message="No financial transactions in this period." />
           )}
         </CardContent>
       </Card>

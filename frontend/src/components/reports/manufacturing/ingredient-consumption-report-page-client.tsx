@@ -74,7 +74,7 @@ export function IngredientConsumptionReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <IngredientConsumptionTable rows={reportQuery.data} />
           ) : (
-            <ManufacturingReportEmptyState message="No ingredient consumption found." />
+            <ManufacturingReportEmptyState message="No ingredient consumption in this period." />
           )}
         </CardContent>
       </Card>

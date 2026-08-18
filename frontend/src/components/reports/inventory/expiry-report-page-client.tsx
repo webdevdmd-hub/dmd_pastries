@@ -91,7 +91,7 @@ export function ExpiryReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <ExpiryReportTable rows={reportQuery.data} />
           ) : (
-            <InventoryReportEmptyState message="No expiry risks found." />
+            <InventoryReportEmptyState message="No expiry risks." />
           )}
         </CardContent>
       </Card>

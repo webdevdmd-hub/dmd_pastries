@@ -1,11 +1,13 @@
 import { Soup } from "lucide-react";
 import type { JSX } from "react";
 
+import { EmptyState } from "@/components/shared/collection-state";
+
+/**
+ * Module adapter for the canonical empty state (DESIGN.md §8, plan item E2).
+ * Missed by the E2 sweep; kept its own dashed card on legacy brand-* tokens.
+ * Signature unchanged so call sites do not move.
+ */
 export function ManufacturingReportEmptyState({ message }: { message: string }): JSX.Element {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-brand-cappuccino bg-brand-latte/50 p-8 text-center">
-      <Soup className="h-8 w-8 text-brand-mocha" aria-hidden="true" />
-      <p className="mt-3 font-semibold text-brand-espresso">{message}</p>
-    </div>
-  );
+  return <EmptyState icon={Soup} title={message} />;
 }

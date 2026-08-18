@@ -81,7 +81,7 @@ export function PackagingStockPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <PackagingStockTable rows={reportQuery.data} />
           ) : (
-            <InventoryReportEmptyState message="No packaging stock rows found." />
+            <InventoryReportEmptyState message="No packaging stock rows." />
           )}
         </CardContent>
       </Card>

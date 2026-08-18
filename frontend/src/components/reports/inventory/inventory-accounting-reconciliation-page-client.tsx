@@ -201,7 +201,7 @@ export function InventoryAccountingReconciliationPageClient(): JSX.Element {
           {report && report.items.length > 0 ? (
             <InventoryAccountingReconciliationTable rows={report.items} />
           ) : (
-            <InventoryReportEmptyState message="No inventory accounting reconciliation rows found." />
+            <InventoryReportEmptyState message="No inventory accounting reconciliation rows in this period." />
           )}
         </CardContent>
       </Card>

@@ -91,7 +91,7 @@ export function PaymentsReportPageClient(): JSX.Element {
         {methodsQuery.data && methodsQuery.data.length > 0 ? (
           <PaymentMethodChart rows={methodsQuery.data} />
         ) : (
-          <FinancialReportEmptyState message="No payment method data found." />
+          <FinancialReportEmptyState message="No payment method data in this period." />
         )}
       </ReportChartCard>
       {reportQuery.error ? (
@@ -105,7 +105,7 @@ export function PaymentsReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <PaymentsReportTable rows={reportQuery.data} />
           ) : (
-            <FinancialReportEmptyState message="No payments found." />
+            <FinancialReportEmptyState message="No payments in this period." />
           )}
         </CardContent>
       </Card>

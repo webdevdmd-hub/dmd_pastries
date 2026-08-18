@@ -76,7 +76,7 @@ export function ManufacturingWastageReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.items.length > 0 ? (
             <ManufacturingWastageTable rows={reportQuery.data.items} />
           ) : (
-            <ManufacturingReportEmptyState message="No manufacturing wastage found." />
+            <ManufacturingReportEmptyState message="No manufacturing wastage in this period." />
           )}
         </CardContent>
       </Card>

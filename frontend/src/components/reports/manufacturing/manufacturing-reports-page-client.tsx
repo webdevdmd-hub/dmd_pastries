@@ -104,7 +104,7 @@ export function ManufacturingReportsPageClient(): JSX.Element {
         {trendQuery.data ? (
           <ManufacturingTrendChart chart={trendQuery.data} />
         ) : (
-          <ManufacturingReportEmptyState message="No manufacturing trend data found." />
+          <ManufacturingReportEmptyState message="No manufacturing trend data in this period." />
         )}
       </ReportChartCard>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

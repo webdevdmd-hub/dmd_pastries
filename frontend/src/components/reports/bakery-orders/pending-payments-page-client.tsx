@@ -108,7 +108,7 @@ export function PendingPaymentsPageClient(): JSX.Element {
             {orders.length > 0 ? (
               <PendingPaymentsTable rows={orders} />
             ) : (
-              <BakeryOrdersReportEmptyState message="No pending payments found." />
+              <BakeryOrdersReportEmptyState message="No pending payments." />
             )}
           </CardContent>
         </Card>

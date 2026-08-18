@@ -77,7 +77,7 @@ export function OrderStatusReportPageClient(): JSX.Element {
               <OrderStatusTable rows={reportQuery.data} />
             </>
           ) : (
-            <BakeryOrdersReportEmptyState message="No order status rows found." />
+            <BakeryOrdersReportEmptyState message="No order status rows in this period." />
           )}
         </CardContent>
       </Card>

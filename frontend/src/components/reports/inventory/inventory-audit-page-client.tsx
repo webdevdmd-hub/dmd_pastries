@@ -76,7 +76,7 @@ export function InventoryAuditPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <InventoryAuditTable rows={reportQuery.data} />
           ) : (
-            <InventoryReportEmptyState message="No inventory audit rows found." />
+            <InventoryReportEmptyState message="No inventory audit rows in this period." />
           )}
         </CardContent>
       </Card>
