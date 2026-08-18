@@ -14,12 +14,11 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useAuth } from "@/hooks/use-auth";
+import { useWorkspaceName } from "@/hooks/use-workspace-name";
 
 export function MobileSidebar(): JSX.Element {
   // Was a hardcoded "KCHEF" — see desktop-sidebar.tsx.
-  const { user } = useAuth();
-  const workspaceName = user?.businessName ?? "Workspace";
+  const workspaceName = useWorkspaceName();
 
   return (
     <Sheet>

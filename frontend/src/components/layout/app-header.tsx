@@ -45,8 +45,9 @@ import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/hooks/use-auth";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useBranches } from "@/hooks/use-branches";
-import { useBusinessProfile, useOnboardingStatus, useSwitchBranch } from "@/hooks/use-business";
+import { useOnboardingStatus, useSwitchBranch } from "@/hooks/use-business";
 import { usePermission } from "@/hooks/use-permission";
+import { useWorkspaceName } from "@/hooks/use-workspace-name";
 import { getErrorMessage } from "@/lib/api/client";
 
 function initials(fullName: string): string {
@@ -91,7 +92,7 @@ export function AppHeader(): JSX.Element {
     PERMISSIONS.branchesAccessManage,
     PERMISSIONS.settingsView,
   ]);
-  const businessQuery = useBusinessProfile(canViewSettings);
+  const workspaceName = useWorkspaceName();
   const canUseBranchSwitcher =
     canViewBranches &&
     (canViewSettings ||
@@ -155,9 +156,7 @@ export function AppHeader(): JSX.Element {
             </div>
             <div>
               <p className="text-[0.65rem] font-semibold text-workspace-muted">Operations</p>
-              <p className="text-sm font-semibold text-brand-espresso">
-                {businessQuery.data?.businessName ?? user?.businessName ?? "Business workspace"}
-              </p>
+              <p className="text-sm font-semibold text-brand-espresso">{workspaceName}</p>
             </div>
           </div>
 
