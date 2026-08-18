@@ -51,12 +51,15 @@ export function InventorySummaryCards({
   ];
 
   return (
-    <dl className="grid grid-cols-2 overflow-hidden rounded bg-muted md:grid-cols-4">
+    // Hairlines come from a 1px grid gap showing the border colour through
+    // from behind, not from per-cell borders. Per-cell `border-r` with a
+    // `last:border-r-0` reset only clears the final cell, so at the two-column
+    // mobile breakpoint cell 2 painted a rule down the container's right edge
+    // and cells 3-4 painted one along its bottom. The gap approach cannot draw
+    // an outer edge by construction, at either breakpoint.
+    <dl className="grid grid-cols-2 gap-px overflow-hidden rounded bg-border md:grid-cols-4">
       {stats.map((stat) => (
-        <div
-          className="flex flex-col justify-center gap-0.5 border-b border-r border-border px-4 py-3 last:border-r-0 md:border-b-0"
-          key={stat.label}
-        >
+        <div className="flex flex-col justify-center gap-0.5 bg-muted px-4 py-3" key={stat.label}>
           <dt className="text-meta text-foreground-muted">{stat.label}</dt>
           <dd
             className={

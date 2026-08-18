@@ -296,28 +296,35 @@ export function InventoryPageClient(): JSX.Element {
         title="Inventory"
         description="Track product stock, branch quantities, movements, low stock, and expiry-sensitive items."
         actions={
-          <div className="flex items-center gap-2">
-            {canViewStockLocations ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button aria-label="More inventory options" size="icon" variant="outline">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href={ROUTES.inventoryStockLocations}>Manage stock locations</Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
-            {canManage ? (
-              <Button onClick={() => setOpeningStockOpen(true)} type="button">
-                <Plus className="h-4 w-4" />
-                Opening Stock
-              </Button>
-            ) : null}
-          </div>
+          // Gate the wrapper, not just its children. PageHeader tests the node
+          // for truthiness, and a React element is always truthy -- so an
+          // always-rendered wrapper makes the actions region exist even when
+          // both children are gated away, leaving an empty flex child that
+          // still draws the parent's gap.
+          canManage || canViewStockLocations ? (
+            <div className="flex items-center gap-2">
+              {canViewStockLocations ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button aria-label="More inventory options" size="icon" variant="outline">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link href={ROUTES.inventoryStockLocations}>Manage stock locations</Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+              {canManage ? (
+                <Button onClick={() => setOpeningStockOpen(true)} type="button">
+                  <Plus className="h-4 w-4" />
+                  Opening Stock
+                </Button>
+              ) : null}
+            </div>
+          ) : undefined
         }
       />
 
