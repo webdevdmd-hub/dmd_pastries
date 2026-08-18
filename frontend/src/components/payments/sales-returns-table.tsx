@@ -53,7 +53,7 @@ export function SalesReturnsTable({
           <TableHead>Sale</TableHead>
           <TableHead>Customer</TableHead>
           <TableHead>Return Date</TableHead>
-          <TableHead>Refund</TableHead>
+          <TableHead className="text-right">Refund</TableHead>
           <TableHead>Status</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
@@ -62,31 +62,31 @@ export function SalesReturnsTable({
         {returns.map((salesReturn) => (
           <TableRow key={salesReturn.id}>
             <TableCell>
-              <span className="block font-bold text-brand-espresso">
-                {salesReturn.returnNumber}
+              <span className="block font-mono font-medium">{salesReturn.returnNumber}</span>
+              <span className="text-meta text-foreground-muted">
+                {salesReturn.reason ?? "No reason"}
               </span>
-              <span className="text-xs text-brand-mocha">{salesReturn.reason ?? "No reason"}</span>
               {salesReturn.reversalReturnNumber ? (
-                <span className="mt-1 block text-xs text-info-text">
+                <span className="mt-1 block text-meta text-info-text">
                   Reversal: {salesReturn.reversalReturnNumber}
                 </span>
               ) : null}
             </TableCell>
             <TableCell>
-              <span className="block font-semibold text-brand-espresso">
-                {salesReturn.saleNumber}
-              </span>
-              <span className="text-xs text-brand-mocha">{salesReturn.branchName}</span>
+              <span className="block font-mono font-medium">{salesReturn.saleNumber}</span>
+              <span className="text-meta text-foreground-muted">{salesReturn.branchName}</span>
             </TableCell>
             <TableCell>{salesReturn.customerName ?? "Walk-in customer"}</TableCell>
-            <TableCell>{formatDate(salesReturn.returnDate)}</TableCell>
-            <TableCell>
-              <span className="block font-semibold text-brand-espresso">
+            <TableCell className="tabular-nums">{formatDate(salesReturn.returnDate)}</TableCell>
+            <TableCell className="text-right">
+              <span className="block font-medium tabular-nums">
                 {salesReturn.refundMode === "refund"
                   ? formatMoney(salesReturn.refundAmount)
                   : "No refund"}
               </span>
-              <span className="text-xs capitalize text-brand-mocha">{salesReturn.refundMode}</span>
+              <span className="text-meta capitalize text-foreground-muted">
+                {salesReturn.refundMode.replaceAll("_", " ")}
+              </span>
             </TableCell>
             <TableCell>
               <SalesReturnStatusBadge status={salesReturn.status} />

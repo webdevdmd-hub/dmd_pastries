@@ -5,12 +5,14 @@ import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { TableDensityToggle } from "@/components/density/table-density";
 import { AccessDeniedCard } from "@/components/payments/access-denied-card";
 import { PaymentsEmptyState } from "@/components/payments/payments-empty-state";
 import { PaymentsErrorState } from "@/components/payments/payments-error-state";
 import { PaymentsTableSkeleton } from "@/components/payments/payments-table-skeleton";
 import { ReconciliationFormDialog } from "@/components/payments/reconciliation-form-dialog";
 import { ReconciliationTable } from "@/components/payments/reconciliation-table";
+import { FilterBar } from "@/components/shared/filter-bar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -113,12 +115,12 @@ export function ReconciliationPageClient(): JSX.Element {
         }
       />
 
-      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino/70 bg-card/75 p-4 shadow-sm md:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+      <FilterBar>
         <Select
           onValueChange={(value) => setFilters((current) => ({ ...current, branchId: value }))}
           value={filters.branchId}
         >
-          <SelectTrigger aria-label="Branch">
+          <SelectTrigger aria-label="Branch" className="w-48">
             <SelectValue placeholder="Branch" />
           </SelectTrigger>
           <SelectContent>
@@ -138,7 +140,7 @@ export function ReconciliationPageClient(): JSX.Element {
           }
           value={filters.paymentMethodId}
         >
-          <SelectTrigger aria-label="Payment method">
+          <SelectTrigger aria-label="Payment method" className="w-48">
             <SelectValue placeholder="Payment method" />
           </SelectTrigger>
           <SelectContent>
@@ -152,6 +154,7 @@ export function ReconciliationPageClient(): JSX.Element {
         </Select>
         <Input
           aria-label="Date from"
+          className="w-40"
           onChange={(event) =>
             setFilters((current) => ({ ...current, dateFrom: event.target.value }))
           }
@@ -160,6 +163,7 @@ export function ReconciliationPageClient(): JSX.Element {
         />
         <Input
           aria-label="Date to"
+          className="w-40"
           onChange={(event) =>
             setFilters((current) => ({ ...current, dateTo: event.target.value }))
           }
@@ -173,7 +177,8 @@ export function ReconciliationPageClient(): JSX.Element {
         >
           Reset
         </Button>
-      </div>
+        <TableDensityToggle className="ml-auto" />
+      </FilterBar>
 
       {lastCreated ? (
         <div className="rounded-3xl border border-brand-cappuccino bg-card/80 p-4 text-sm text-brand-mocha">

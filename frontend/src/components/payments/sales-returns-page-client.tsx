@@ -5,9 +5,11 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { TableDensityToggle } from "@/components/density/table-density";
 import { AccessDeniedCard } from "@/components/payments/access-denied-card";
 import { PaymentsErrorState } from "@/components/payments/payments-error-state";
 import { SalesReturnsTable } from "@/components/payments/sales-returns-table";
+import { FilterBar } from "@/components/shared/filter-bar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReturnReversalDialog } from "@/components/shared/return-reversal-dialog";
@@ -106,45 +108,45 @@ export function SalesReturnsPageClient(): JSX.Element {
         description="Review POS item-level returns, refund handling, and posted credit notes."
       />
 
-      <Card>
-        <CardContent className="flex flex-col gap-3 p-4 md:flex-row">
-          <Input
-            onChange={(event) =>
-              setFilters((currentFilters) => ({
-                ...currentFilters,
-                search: event.target.value,
-              }))
-            }
-            aria-label="Search returns by return, sale, or customer"
-            placeholder="Search return, sale, customer..."
-            value={filters.search}
-          />
-          <Select
-            onValueChange={(value) =>
-              setFilters((currentFilters) => ({
-                ...currentFilters,
-                status: value as SalesReturnStatus | "all",
-              }))
-            }
-            value={filters.status}
-          >
-            <SelectTrigger aria-label="Return status" className="md:w-56">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="posted">Posted</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-              <SelectItem value="reversed">Reversed</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={() => setFilters(defaultFilters)} type="button" variant="outline">
-            <RotateCcw className="h-4 w-4" />
-            Reset
-          </Button>
-        </CardContent>
-      </Card>
+      <FilterBar>
+        <Input
+          onChange={(event) =>
+            setFilters((currentFilters) => ({
+              ...currentFilters,
+              search: event.target.value,
+            }))
+          }
+          aria-label="Search returns by return, sale, or customer"
+          className="min-w-52 flex-1"
+          placeholder="Search return, sale, customer..."
+          value={filters.search}
+        />
+        <Select
+          onValueChange={(value) =>
+            setFilters((currentFilters) => ({
+              ...currentFilters,
+              status: value as SalesReturnStatus | "all",
+            }))
+          }
+          value={filters.status}
+        >
+          <SelectTrigger aria-label="Return status" className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="posted">Posted</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+            <SelectItem value="reversed">Reversed</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button onClick={() => setFilters(defaultFilters)} type="button" variant="outline">
+          <RotateCcw className="h-4 w-4" />
+          Reset
+        </Button>
+        <TableDensityToggle className="ml-auto" />
+      </FilterBar>
 
       {returnsQuery.isLoading ? (
         <Card>

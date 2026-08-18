@@ -32,7 +32,7 @@ export function RefundsTable({ refunds }: RefundsTableProps): JSX.Element {
           <TableHead>Refund Number</TableHead>
           <TableHead>Sale Number</TableHead>
           <TableHead>Payment Method</TableHead>
-          <TableHead>Refund Amount</TableHead>
+          <TableHead className="text-right">Refund Amount</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Reason</TableHead>
           <TableHead>Created By</TableHead>
@@ -47,7 +47,9 @@ export function RefundsTable({ refunds }: RefundsTableProps): JSX.Element {
             <TableCell>
               <PaymentMethodBadge methodName={refund.paymentMethodNameSnapshot} />
             </TableCell>
-            <TableCell className="font-medium">{formatMoney(refund.refundAmount)}</TableCell>
+            <TableCell className="text-right font-medium tabular-nums">
+              {formatMoney(refund.refundAmount)}
+            </TableCell>
             <TableCell>
               <PaymentStatusBadge status={refund.refundStatus} />
             </TableCell>

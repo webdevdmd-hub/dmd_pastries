@@ -220,39 +220,32 @@ export function SaleDetailPageClient({ saleId }: SaleDetailPageClientProps): JSX
 
       {receipt ? (
         <>
-          <div className="grid gap-4 md:grid-cols-4">
-            <Card>
-              <CardContent className="p-5">
-                <p className="text-xs font-bold text-brand-mocha">Total</p>
-                <p className="mt-1 text-2xl font-medium text-brand-espresso">
-                  {formatMoney(receipt.total)}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <p className="text-xs font-bold text-brand-mocha">Paid</p>
-                <p className="mt-1 text-2xl font-medium text-brand-espresso">
-                  {formatMoney(receipt.paidAmount)}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <p className="text-xs font-bold text-brand-mocha">Balance Due</p>
-                <p className="mt-1 text-2xl font-medium text-brand-espresso">
-                  {formatMoney(receipt.balanceDue)}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <p className="text-xs font-bold text-brand-mocha">Sold At</p>
-                <p className="mt-1 text-sm font-bold text-brand-espresso">
-                  {formatDateTime(receipt.soldAt)}
-                </p>
-              </CardContent>
-            </Card>
+          {/* One strip, not four tiles. Balance due leads because it is the
+              only figure here anyone acts on; the rest are context. */}
+          <div className="flex flex-wrap items-center gap-x-7 gap-y-2 rounded bg-muted px-4 py-3">
+            <div className="flex items-baseline gap-2.5">
+              <span className="text-meta text-foreground-muted">Balance due</span>
+              <span className="text-kpi tabular-nums">{formatMoney(receipt.balanceDue)}</span>
+            </div>
+            <span aria-hidden="true" className="hidden h-5 w-px bg-border sm:block" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-meta text-foreground-muted">Total</span>
+              <span className="text-cell font-medium tabular-nums">
+                {formatMoney(receipt.total)}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-meta text-foreground-muted">Paid</span>
+              <span className="text-cell font-medium tabular-nums">
+                {formatMoney(receipt.paidAmount)}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-meta text-foreground-muted">Sold at</span>
+              <span className="text-cell font-medium tabular-nums">
+                {formatDateTime(receipt.soldAt)}
+              </span>
+            </div>
           </div>
 
           <Card>

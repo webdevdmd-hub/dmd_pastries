@@ -1,6 +1,7 @@
-import type { JSX, ReactNode } from "react";
+import type { JSX } from "react";
 
 import { TableDensityToggle } from "@/components/density/table-density";
+import { FilterBar } from "@/components/shared/filter-bar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -100,18 +101,12 @@ function PaymentMethodSelect({
   );
 }
 
-function ToolbarFrame({ children }: { children: ReactNode }): JSX.Element {
-  return (
-    <div className="flex flex-wrap items-center gap-2.5 rounded bg-muted px-4 py-3">{children}</div>
-  );
-}
-
 export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
   if (props.mode === "refunds") {
     const { filters, onFiltersChange, paymentMethods } = props;
 
     return (
-      <ToolbarFrame>
+      <FilterBar>
         <Input
           aria-label="Search refunds"
           onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
@@ -172,14 +167,15 @@ export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
         >
           Reset
         </Button>
-      </ToolbarFrame>
+        <TableDensityToggle className="ml-auto" />
+      </FilterBar>
     );
   }
 
   const { filters, onFiltersChange, paymentMethods } = props;
 
   return (
-    <ToolbarFrame>
+    <FilterBar>
       <Input
         aria-label="Search payments by sale, reference, or cashier"
         onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
@@ -233,7 +229,7 @@ export function PaymentsToolbar(props: PaymentsToolbarProps): JSX.Element {
         Reset
       </Button>
       <TableDensityToggle className="ml-auto" />
-    </ToolbarFrame>
+    </FilterBar>
   );
 }
 

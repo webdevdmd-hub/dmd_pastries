@@ -6,12 +6,14 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useConfirm } from "@/components/app/confirm-provider";
+import { TableDensityToggle } from "@/components/density/table-density";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseEmptyState } from "@/components/purchasing/purchase-empty-state";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
 import { PurchaseSupplierPaymentAllocationDialog } from "@/components/purchasing/purchase-supplier-payment-allocation-dialog";
 import { PurchaseSupplierPaymentsTable } from "@/components/purchasing/purchase-supplier-payments-table";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
+import { FilterBar } from "@/components/shared/filter-bar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -302,9 +304,10 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
         }
       />
 
-      <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-card/80 p-4 lg:grid-cols-[1.4fr_repeat(6,minmax(0,1fr))]">
+      <FilterBar>
         <Input
           aria-label="Search supplier payments"
+          className="min-w-52 flex-1"
           onChange={(event) => updateFilters({ search: event.target.value })}
           placeholder="Search supplier, reference, method..."
           value={filters.search}
@@ -313,7 +316,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
           value={filters.supplierId}
           onValueChange={(supplierId) => updateFilters({ supplierId })}
         >
-          <SelectTrigger aria-label="Supplier">
+          <SelectTrigger aria-label="Supplier" className="w-48">
             <SelectValue placeholder="Supplier" />
           </SelectTrigger>
           <SelectContent>
@@ -326,7 +329,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
           </SelectContent>
         </Select>
         <Select value={filters.branchId} onValueChange={(branchId) => updateFilters({ branchId })}>
-          <SelectTrigger aria-label="Branch">
+          <SelectTrigger aria-label="Branch" className="w-44">
             <SelectValue placeholder="Branch" />
           </SelectTrigger>
           <SelectContent>
@@ -344,7 +347,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
           value={filters.paymentMethodId}
           onValueChange={(paymentMethodId) => updateFilters({ paymentMethodId })}
         >
-          <SelectTrigger aria-label="Payment method">
+          <SelectTrigger aria-label="Payment method" className="w-44">
             <SelectValue placeholder="Method" />
           </SelectTrigger>
           <SelectContent>
@@ -360,7 +363,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
           value={filters.paymentStatus}
           onValueChange={(paymentStatus) => updateFilters({ paymentStatus })}
         >
-          <SelectTrigger aria-label="Payment status">
+          <SelectTrigger aria-label="Payment status" className="w-44">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -374,26 +377,27 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
         </Select>
         <Input
           aria-label="Date from"
+          className="w-40"
           onChange={(event) => updateFilters({ dateFrom: event.target.value })}
           type="date"
           value={filters.dateFrom}
         />
-        <div className="flex gap-3">
-          <Input
-            aria-label="Date to"
-            onChange={(event) => updateFilters({ dateTo: event.target.value })}
-            type="date"
-            value={filters.dateTo}
-          />
-          <Button
-            onClick={() => setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })}
-            type="button"
-            variant="outline"
-          >
-            Reset
-          </Button>
-        </div>
-      </div>
+        <Input
+          aria-label="Date to"
+          className="w-40"
+          onChange={(event) => updateFilters({ dateTo: event.target.value })}
+          type="date"
+          value={filters.dateTo}
+        />
+        <Button
+          onClick={() => setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })}
+          type="button"
+          variant="outline"
+        >
+          Reset
+        </Button>
+        <TableDensityToggle className="ml-auto" />
+      </FilterBar>
 
       {paymentsQuery.isLoading ? <PurchaseTableSkeleton /> : null}
 

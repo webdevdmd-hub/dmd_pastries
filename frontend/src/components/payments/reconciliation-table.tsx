@@ -32,6 +32,13 @@ function differenceLabel(value: number): string {
   return "Shortage";
 }
 
+function differenceTone(value: number): "money" | "warning" | "danger" {
+  if (value === 0) return "money";
+  if (value > 0) return "warning";
+
+  return "danger";
+}
+
 export function ReconciliationTable({ reconciliations }: ReconciliationTableProps): JSX.Element {
   return (
     <Table>
@@ -40,8 +47,8 @@ export function ReconciliationTable({ reconciliations }: ReconciliationTableProp
           <TableHead>Date</TableHead>
           <TableHead>Branch</TableHead>
           <TableHead>Payment Method</TableHead>
-          <TableHead>Expected</TableHead>
-          <TableHead>Counted</TableHead>
+          <TableHead className="text-right">Expected</TableHead>
+          <TableHead className="text-right">Counted</TableHead>
           <TableHead>Difference</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Created By</TableHead>
@@ -57,21 +64,21 @@ export function ReconciliationTable({ reconciliations }: ReconciliationTableProp
             <TableCell>
               <PaymentMethodBadge methodName={reconciliation.paymentMethodName} />
             </TableCell>
-            <TableCell>{formatMoney(reconciliation.expectedAmount)}</TableCell>
-            <TableCell>{formatMoney(reconciliation.countedAmount)}</TableCell>
-            <TableCell>
-              <div className="flex flex-col gap-1">
-                <span className="font-medium">{formatMoney(reconciliation.differenceAmount)}</span>
-                <Badge
-                  className={
-                    reconciliation.differenceAmount === 0
-                      ? "border-money/30 bg-money-tint text-money-text"
-                      : reconciliation.differenceAmount > 0
-                        ? "border-warning/30 bg-warning-tint text-warning-text"
-                        : "border-danger/30 bg-danger-tint text-danger-text"
-                  }
-                  variant="outline"
-                >
+            <TableCell className="text-right tabular-nums">
+              {formatMoney(reconciliation.expectedAmount)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {formatMoney(reconciliation.countedAmount)}
+            </TableCell>
+            <TableCell className="text-right">
+              <div className="flex flex-col items-end gap-1">
+                <span className="font-medium tabular-nums">
+                  {formatMoney(reconciliation.differenceAmount)}
+                </span>
+                {/* Balanced is the money accent; over needs a look; short is a
+                    real problem. The semantic variants carry the dot, so the
+                    verdict survives colour-blindness. */}
+                <Badge variant={differenceTone(reconciliation.differenceAmount)}>
                   {differenceLabel(reconciliation.differenceAmount)}
                 </Badge>
               </div>
