@@ -1,7 +1,7 @@
-import { Eye, History, PackagePlus, Plus, SlidersHorizontal } from "lucide-react";
-import Link from "next/link";
+import { Plus } from "lucide-react";
 import type { JSX } from "react";
 
+import { InventoryActionsMenu } from "@/components/inventory/inventory-actions-menu";
 import { InventoryStatusBadge } from "@/components/inventory/inventory-status-badge";
 import { StockLevelBadge } from "@/components/inventory/stock-level-badge";
 import { ReorderLevelHeader } from "@/components/shared/reorder-level-help";
@@ -156,30 +156,7 @@ export function InventoryTable({
                 <InventoryStatusBadge status={item.status} />
               </TableCell>
               <TableCell>
-                <div className="flex justify-end gap-1">
-                  {showViewAction && !isNotInitialized ? (
-                    <Button
-                      aria-label={`View ${item.itemName}`}
-                      onClick={() => onView(item)}
-                      size="icon"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  ) : null}
-                  {!isNotInitialized ? (
-                    <Button
-                      asChild
-                      aria-label={`Movements for ${item.itemName}`}
-                      size="icon"
-                      variant="ghost"
-                    >
-                      <Link href={`/inventory/movements?item=${item.id}`}>
-                        <History className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  ) : null}
+                <div className="flex items-center justify-end gap-1">
                   {canManage && canCreateProductMasterOpeningStock ? (
                     <Button
                       aria-label={`Add opening stock for ${item.itemName}`}
@@ -200,29 +177,16 @@ export function InventoryTable({
                       Legacy read-only
                     </span>
                   ) : null}
-                  {canManage && !isNotInitialized ? (
-                    <>
-                      <Button
-                        aria-label={`Adjust ${item.itemName}`}
-                        onClick={() => onAdjust(item)}
-                        size="icon"
-                        type="button"
-                        variant="ghost"
-                      >
-                        <SlidersHorizontal className="h-4 w-4" />
-                      </Button>
-                      {showBatchAction && item.isExpiryTracked ? (
-                        <Button
-                          aria-label={`Add expiry batch for ${item.itemName}`}
-                          onClick={() => onAddBatch(item)}
-                          size="icon"
-                          type="button"
-                          variant="ghost"
-                        >
-                          <PackagePlus className="h-4 w-4" />
-                        </Button>
-                      ) : null}
-                    </>
+                  {!isNotInitialized ? (
+                    <InventoryActionsMenu
+                      canManage={canManage}
+                      item={item}
+                      onAddBatch={onAddBatch}
+                      onAdjust={onAdjust}
+                      onView={onView}
+                      showBatchAction={showBatchAction}
+                      showViewAction={showViewAction}
+                    />
                   ) : null}
                 </div>
               </TableCell>
