@@ -42,17 +42,21 @@ function buildResetFilters(resetBranchId: string): InventoryFilters {
 
 /**
  * Counts only the filters that live inside the popover, so the badge on the
- * trigger describes what is hidden behind it. Search stays in the toolbar and
- * shows its own value, and branch is scope rather than a filter -- it always
+ * trigger describes what is hidden behind it.
+ *
+ * Three fields are deliberately excluded. Search stays in the toolbar and
+ * shows its own value. Branch is scope rather than a filter -- it always
  * carries a value, so counting it would leave the badge permanently at 1 and
- * stop meaning anything.
+ * stop meaning anything. And lowStockOnly is now the "Low stock" tab, which
+ * is visible state one row up: counting it here would badge the trigger for
+ * something the user can already see they selected, and send them into the
+ * popover hunting for a filter that is not in it.
  */
 function countHiddenFilters(filters: InventoryFilters): number {
   let count = 0;
   if (filters.itemType !== "all") count += 1;
   if (filters.productType !== "all") count += 1;
   if (filters.status !== "all") count += 1;
-  if (filters.lowStockOnly) count += 1;
   if (filters.expiryTrackedOnly) count += 1;
   if (filters.includeUninitialized) count += 1;
   return count;
@@ -191,13 +195,6 @@ export function InventoryToolbar({
             </div>
 
             <div className="flex flex-col gap-2.5 border-t border-brand-cappuccino pt-3">
-              <label className="flex items-center gap-2 text-sm text-brand-espresso">
-                <Checkbox
-                  checked={filters.lowStockOnly}
-                  onCheckedChange={(checked) => updateFilters({ lowStockOnly: checked === true })}
-                />
-                Low stock only
-              </label>
               <label className="flex items-center gap-2 text-sm text-brand-espresso">
                 <Checkbox
                   checked={filters.expiryTrackedOnly}
