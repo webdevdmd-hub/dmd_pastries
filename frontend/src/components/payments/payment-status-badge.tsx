@@ -1,38 +1,49 @@
 import type { JSX } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import type { PaymentStatus, ReconciliationStatus, RefundStatus } from "@/types/payment";
+import {
+  PAYMENT_STATUS_LABELS,
+  type PaymentStatus,
+  RECONCILIATION_STATUS_LABELS,
+  type ReconciliationStatus,
+  REFUND_STATUS_LABELS,
+  type RefundStatus,
+} from "@/types/payment";
+
+type AnyPaymentStatus = PaymentStatus | RefundStatus | ReconciliationStatus;
 
 type PaymentStatusBadgeProps = {
-  status: PaymentStatus | RefundStatus | ReconciliationStatus;
+  status: AnyPaymentStatus;
 };
 
-function getStatusClass(status: PaymentStatus | RefundStatus | ReconciliationStatus): string {
-  switch (status) {
-    case "completed":
-    case "approved":
-      return "border-money/30 bg-money-tint text-money-text";
-    case "pending":
-    case "submitted":
-      return "border-warning/30 bg-warning-tint text-warning-text";
-    case "failed":
-    case "rejected":
-      return "border-danger/30 bg-danger-tint text-danger-text";
-    case "refunded":
-    case "cancelled":
-      return "border-brand-mocha/20 bg-brand-cappuccino/40 text-brand-mocha";
-    case "partially_refunded":
-    case "draft":
-      return "border-brand-caramel/30 bg-brand-latte text-brand-mocha";
-    default:
-      return "border-brand-cappuccino bg-brand-latte text-brand-mocha";
-  }
-}
+type BadgeTone = "money" | "warning" | "danger" | "info" | "draft";
+
+// Tones follow the DESIGN.md §3.3 table: money for settled, info for in-flight,
+// warning for needs-attention, danger for broken, and neutral draft for states
+// that are the absence of a state rather than a state.
+const STATUS_TONE: Record<AnyPaymentStatus, BadgeTone> = {
+  completed: "money",
+  approved: "money",
+  pending: "info",
+  submitted: "info",
+  failed: "danger",
+  rejected: "danger",
+  partially_refunded: "warning",
+  refunded: "draft",
+  cancelled: "draft",
+  draft: "draft",
+};
+
+// One lookup across all three status unions. This component previously rendered
+// `status.replaceAll("_", " ")` for every value, which put "partially refunded"
+// on screen in raw lowercase — the same defect fixed in the filters, missed
+// during QA only because an empty ledger never rendered a badge.
+const STATUS_LABEL: Record<AnyPaymentStatus, string> = {
+  ...PAYMENT_STATUS_LABELS,
+  ...REFUND_STATUS_LABELS,
+  ...RECONCILIATION_STATUS_LABELS,
+};
 
 export function PaymentStatusBadge({ status }: PaymentStatusBadgeProps): JSX.Element {
-  return (
-    <Badge className={getStatusClass(status)} variant="outline">
-      {status.replaceAll("_", " ")}
-    </Badge>
-  );
+  return <Badge variant={STATUS_TONE[status]}>{STATUS_LABEL[status]}</Badge>;
 }
