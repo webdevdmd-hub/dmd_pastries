@@ -1,6 +1,14 @@
 "use client";
 
-import { Box, Boxes, CircleDollarSign, Eye, PackageCheck, PlusCircle } from "lucide-react";
+import {
+  Box,
+  Boxes,
+  CircleDollarSign,
+  Eye,
+  PackageCheck,
+  PackagePlus,
+  PlusCircle,
+} from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -10,11 +18,10 @@ import { ProductsAccessDeniedCard } from "@/components/products/access-denied-ca
 import { ProductDetailsDrawer } from "@/components/products/product-details-drawer";
 import { ProductFormDialog } from "@/components/products/product-form-dialog";
 import { ProductVariantFormDialog } from "@/components/products/product-variant-form-dialog";
-import { ProductsEmptyState } from "@/components/products/products-empty-state";
-import { ProductsErrorState } from "@/components/products/products-error-state";
 import { ProductsTable } from "@/components/products/products-table";
 import { ProductsTableSkeleton } from "@/components/products/products-table-skeleton";
 import { ProductsToolbar } from "@/components/products/products-toolbar";
+import { EmptyState, FailedState, FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -255,6 +262,18 @@ export function ProductsPageClient(): JSX.Element {
     list,
     productsQuery.data?.total,
   ]);
+  // "Nothing to show" has two causes with opposite remedies. Everything except
+  // paging and page size counts as a filter: page 3 of an empty result is still an
+  // empty result, not a filtered one.
+  const hasActiveFilters =
+    filters.search.trim().length > 0 ||
+    filters.categoryId !== initialFilters.categoryId ||
+    filters.productType !== initialFilters.productType ||
+    filters.itemStructure !== initialFilters.itemStructure ||
+    filters.status !== initialFilters.status ||
+    filters.isPosVisible !== initialFilters.isPosVisible ||
+    filters.isSellable !== initialFilters.isSellable ||
+    filters.isPurchasable !== initialFilters.isPurchasable;
   const totalPages = Math.max(1, Math.ceil((productsQuery.data?.total ?? 0) / filters.limit));
   const priceSuggestions = priceSuggestionsQuery.data?.items ?? [];
 
@@ -555,20 +574,48 @@ export function ProductsPageClient(): JSX.Element {
 
       {productsQuery.isLoading ? <ProductsTableSkeleton /> : null}
       {!productsQuery.isLoading && productsQuery.error ? (
-        <ProductsErrorState
-          description={getErrorMessage(productsQuery.error)}
+        <FailedState
+          detail={getErrorMessage(productsQuery.error)}
+          noun="products"
           onRetry={() => {
             void productsQuery.refetch();
           }}
         />
       ) : null}
-      {!productsQuery.isLoading && !productsQuery.error && list.length === 0 ? (
-        <ProductsEmptyState
-          canCreate={canCreateProducts}
-          onCreate={() => {
-            setSelectedProduct(null);
-            setFormOpen(true);
+      {/* Empty and filtered were one branch: `list.length === 0` rendered the empty
+          state whether the catalogue was genuinely empty or a search had simply
+          excluded everything. Those need opposite actions - "Add product" is wrong
+          when 214 products exist and the user typed "sourd" - so they are now
+          separate. DESIGN.md 8. */}
+      {!productsQuery.isLoading && !productsQuery.error && list.length === 0 && hasActiveFilters ? (
+        <FilteredState
+          noun="products"
+          onClearFilters={() => {
+            setFilters((current) => ({ ...initialFilters, limit: current.limit }));
           }}
+          query={filters.search || undefined}
+          totalCount={stats.total}
+        />
+      ) : null}
+      {!productsQuery.isLoading &&
+      !productsQuery.error &&
+      list.length === 0 &&
+      !hasActiveFilters ? (
+        <EmptyState
+          action={
+            canCreateProducts
+              ? {
+                  label: "Add product",
+                  onClick: () => {
+                    setSelectedProduct(null);
+                    setFormOpen(true);
+                  },
+                }
+              : undefined
+          }
+          description="Products are what the counter sells and what stock is counted against. Add one to give it a price, a category and POS visibility."
+          icon={PackagePlus}
+          title="No products yet"
         />
       ) : null}
       {!productsQuery.isLoading && !productsQuery.error && list.length > 0 ? (
