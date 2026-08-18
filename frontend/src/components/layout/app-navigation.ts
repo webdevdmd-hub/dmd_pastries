@@ -96,16 +96,58 @@ export const appNavigationGroups = [
         ],
       },
       {
+        href: ROUTES.reports,
+        icon: ChartNoAxesCombined,
+        label: "Reports",
+        permissionAny: [PERMISSIONS.reportsView],
+      },
+    ],
+  },
+  {
+    // Money in, money out and the setup behind both, in one place.
+    //
+    // These four lived in three different groups under three vocabularies:
+    // "Payments" under Sales, "Payments Made" and "Vendor Credits" under Supply
+    // Chain, and the setup under Settings. Worse, Refunds, Returns and
+    // Reconciliation had no sidebar entry at all — the payments overview had to
+    // carry four navigation cards to reach them, which is why that screen ended
+    // up being a dashboard, a nav hub and a table at once.
+    label: "Money",
+    items: [
+      {
         href: ROUTES.payments,
         icon: Landmark,
         label: "Payments",
         permissionAny: [PERMISSIONS.paymentsView, PERMISSIONS.paymentsAdd, PERMISSIONS.posView],
       },
       {
-        href: ROUTES.reports,
-        icon: ChartNoAxesCombined,
-        label: "Reports",
-        permissionAny: [PERMISSIONS.reportsView],
+        href: ROUTES.purchasingPayments,
+        icon: WalletCards,
+        label: "Payments Made",
+        permissionAny: [PERMISSIONS.purchasingView, PERMISSIONS.inventoryView],
+      },
+      {
+        href: ROUTES.purchasingReturns,
+        icon: RotateCcwSquare,
+        label: "Vendor Credits",
+        permissionAny: [
+          PERMISSIONS.purchasingView,
+          PERMISSIONS.purchasingReturnsView,
+          PERMISSIONS.purchasingReturnsCreate,
+          PERMISSIONS.purchasingReturnsManage,
+          PERMISSIONS.inventoryView,
+        ],
+      },
+      {
+        href: ROUTES.settingsPaymentSetup,
+        icon: WalletCards,
+        label: "Payment Setup",
+        permissionAny: [
+          PERMISSIONS.settingsView,
+          PERMISSIONS.settingsPaymentMethodsManage,
+          PERMISSIONS.accountingView,
+          PERMISSIONS.accountingAccountsManage,
+        ],
       },
     ],
   },
@@ -176,24 +218,9 @@ export const appNavigationGroups = [
           PERMISSIONS.inventoryView,
         ],
       },
-      {
-        href: ROUTES.purchasingPayments,
-        icon: WalletCards,
-        label: "Payments Made",
-        permissionAny: [PERMISSIONS.purchasingView, PERMISSIONS.inventoryView],
-      },
-      {
-        href: ROUTES.purchasingReturns,
-        icon: RotateCcwSquare,
-        label: "Vendor Credits",
-        permissionAny: [
-          PERMISSIONS.purchasingView,
-          PERMISSIONS.purchasingReturnsView,
-          PERMISSIONS.purchasingReturnsCreate,
-          PERMISSIONS.purchasingReturnsManage,
-          PERMISSIONS.inventoryView,
-        ],
-      },
+      // "Payments Made" and "Vendor Credits" moved to the Money group. They are
+      // the outgoing half of the same job as /payments, and reading them beside
+      // the incoming half beats reading them beside goods receipts.
       {
         href: ROUTES.expenses,
         icon: FileMinus2,

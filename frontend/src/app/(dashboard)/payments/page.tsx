@@ -1,12 +1,23 @@
 import type { Metadata } from "next";
 import type { JSX } from "react";
 
-import { PaymentsPageClient } from "@/components/payments/payments-page-client";
+import { PaymentsTabShell } from "@/components/payments/payments-tab-shell";
+import { parsePaymentsTab } from "@/components/payments/payments-tabs";
 
 export const metadata: Metadata = {
   title: "Payments",
 };
 
-export default function PaymentsPage(): JSX.Element {
-  return <PaymentsPageClient />;
+type PaymentsPageProps = {
+  searchParams: Promise<{
+    tab?: string;
+  }>;
+};
+
+export default async function PaymentsPage({
+  searchParams,
+}: PaymentsPageProps): Promise<JSX.Element> {
+  const resolvedSearchParams = await searchParams;
+
+  return <PaymentsTabShell activeTab={parsePaymentsTab(resolvedSearchParams.tab)} />;
 }

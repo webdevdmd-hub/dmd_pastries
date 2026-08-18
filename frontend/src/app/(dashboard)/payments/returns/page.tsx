@@ -1,12 +1,6 @@
-import type { Metadata } from "next";
-import type { JSX } from "react";
+import { redirect } from "next/navigation";
 
-import { SalesReturnsPageClient } from "@/components/payments/sales-returns-page-client";
-
-export const metadata: Metadata = {
-  title: "Returns / Credit Notes",
-};
-
-export default function PaymentReturnsPage(): JSX.Element {
-  return <SalesReturnsPageClient />;
+// Moved into a tab on /payments — see refunds/page.tsx.
+export default function PaymentReturnsRedirectPage(): never {
+  redirect("/payments?tab=returns");
 }

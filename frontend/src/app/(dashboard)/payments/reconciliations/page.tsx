@@ -1,12 +1,6 @@
-import type { Metadata } from "next";
-import type { JSX } from "react";
+import { redirect } from "next/navigation";
 
-import { ReconciliationPageClient } from "@/components/payments/reconciliation-page-client";
-
-export const metadata: Metadata = {
-  title: "Payment Reconciliation",
-};
-
-export default function PaymentReconciliationPage(): JSX.Element {
-  return <ReconciliationPageClient />;
+// Moved into a tab on /payments — see refunds/page.tsx.
+export default function PaymentReconciliationsRedirectPage(): never {
+  redirect("/payments?tab=reconciliation");
 }
