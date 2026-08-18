@@ -31,6 +31,7 @@ import { useFinancialSummary, useFinancialTrend } from "@/hooks/use-financial-re
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 import type { FinancialTrendChart as FinancialTrendChartData } from "@/types/financial-reports";
 
 const navigationCards = [
@@ -63,6 +64,10 @@ export function FinancialReportsPageClient(): JSX.Element {
   );
   const [draft, setDraft] = useState<FinancialReportFilterDraft>(initialDraft);
   const [filters, setFilters] = useState(() => toFinancialReportFilters(initialDraft));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toFinancialReportFilters(initialDraft);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const summaryQuery = useFinancialSummary(filters, canView && hasScope);
@@ -122,7 +127,12 @@ export function FinancialReportsPageClient(): JSX.Element {
             />
           </div>
         ) : (
-          <FinancialReportEmptyState message="No financial trend data in this period." />
+          <FinancialReportEmptyState
+            isFiltered={isReportNarrowed}
+            message="No financial trend data in this period."
+            noun="financial trend data"
+            onClearFilters={() => setFilters(reportDefaultFilters)}
+          />
         )}
       </ReportChartCard>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

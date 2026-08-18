@@ -1,13 +1,18 @@
 import { CakeSlice } from "lucide-react";
 import type { JSX } from "react";
 
-import { EmptyState } from "@/components/shared/collection-state";
+import { ReportEmptyState } from "@/components/reports/report-empty-state";
 
 /**
- * Module adapter for the canonical empty state (DESIGN.md §8, plan item E2).
- * Missed by the E2 sweep; kept its own dashed card on legacy brand-* tokens.
- * Signature unchanged so call sites do not move.
+ * Module adapter for the report zero-row state. All behaviour lives in
+ * ReportEmptyState; this only supplies the module icon and keeps the call
+ * signature stable.
  */
-export function BakeryOrdersReportEmptyState({ message }: { message: string }): JSX.Element {
-  return <EmptyState icon={CakeSlice} title={message} />;
+export function BakeryOrdersReportEmptyState(props: {
+  message: string;
+  noun?: string | undefined;
+  isFiltered?: boolean | undefined;
+  onClearFilters?: (() => void) | undefined;
+}): JSX.Element {
+  return <ReportEmptyState {...props} icon={CakeSlice} />;
 }

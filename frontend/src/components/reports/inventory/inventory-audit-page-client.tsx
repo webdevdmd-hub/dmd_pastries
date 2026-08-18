@@ -25,6 +25,7 @@ import { useInventoryAuditReport } from "@/hooks/use-inventory-reports";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 
 export function InventoryAuditPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -37,6 +38,10 @@ export function InventoryAuditPageClient(): JSX.Element {
   );
   const [draft, setDraft] = useState<InventoryReportFilterDraft>(initialDraft);
   const [filters, setFilters] = useState(() => toInventoryReportFilters(initialDraft));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toInventoryReportFilters(initialDraft);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useInventoryAuditReport(filters, canView && hasScope);
@@ -76,7 +81,12 @@ export function InventoryAuditPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <InventoryAuditTable rows={reportQuery.data} />
           ) : (
-            <InventoryReportEmptyState message="No inventory audit rows in this period." />
+            <InventoryReportEmptyState
+              isFiltered={isReportNarrowed}
+              message="No inventory audit rows in this period."
+              noun="inventory audit rows"
+              onClearFilters={() => setFilters(reportDefaultFilters)}
+            />
           )}
         </CardContent>
       </Card>

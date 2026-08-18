@@ -29,6 +29,7 @@ import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useManufacturingSummary, useManufacturingTrend } from "@/hooks/use-manufacturing-reports";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 import type { ManufacturingTrendChart as ManufacturingTrendChartData } from "@/types/manufacturing-reports";
 
 const navigationCards = [
@@ -63,6 +64,10 @@ export function ManufacturingReportsPageClient(): JSX.Element {
   );
   const [draft, setDraft] = useState<ManufacturingReportFilterDraft>(initialDraft);
   const [filters, setFilters] = useState(() => toManufacturingReportFilters(initialDraft));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toManufacturingReportFilters(initialDraft);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const summaryQuery = useManufacturingSummary(filters, canView && hasScope);
@@ -104,7 +109,12 @@ export function ManufacturingReportsPageClient(): JSX.Element {
         {trendQuery.data ? (
           <ManufacturingTrendChart chart={trendQuery.data} />
         ) : (
-          <ManufacturingReportEmptyState message="No manufacturing trend data in this period." />
+          <ManufacturingReportEmptyState
+            isFiltered={isReportNarrowed}
+            message="No manufacturing trend data in this period."
+            noun="manufacturing trend data"
+            onClearFilters={() => setFilters(reportDefaultFilters)}
+          />
         )}
       </ReportChartCard>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -28,6 +28,7 @@ import { useOutstandingBalancesReport } from "@/hooks/use-financial-reports";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 
 import { AccessDeniedCard } from "./access-denied-card";
 
@@ -41,6 +42,10 @@ export function OutstandingBalancesPageClient(): JSX.Element {
   );
   const [draft, setDraft] = useState<FinancialReportFilterDraft>(initialDraft);
   const [filters, setFilters] = useState(() => toFinancialReportFilters(initialDraft));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toFinancialReportFilters(initialDraft);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useOutstandingBalancesReport(filters, canView && hasScope);
@@ -101,7 +106,12 @@ export function OutstandingBalancesPageClient(): JSX.Element {
           {rows.length > 0 ? (
             <OutstandingBalancesTable rows={rows} />
           ) : (
-            <FinancialReportEmptyState message="No outstanding balances." />
+            <FinancialReportEmptyState
+              isFiltered={isReportNarrowed}
+              message="No outstanding balances in this period."
+              noun="outstanding balances"
+              onClearFilters={() => setFilters(reportDefaultFilters)}
+            />
           )}
         </CardContent>
       </Card>

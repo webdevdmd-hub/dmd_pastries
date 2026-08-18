@@ -27,6 +27,7 @@ import { useReportBranches } from "@/hooks/use-reports";
 import { useSalesByBranch } from "@/hooks/use-sales-reports";
 import { getErrorMessage } from "@/lib/api/client";
 import { chartSeries } from "@/lib/design/palette";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 import { salesReportFiltersSchema } from "@/lib/validators/sales-reports.schema";
 import type { SalesReportFilters } from "@/types/sales-reports";
 
@@ -57,6 +58,13 @@ export function BranchSalesPageClient(): JSX.Element {
     ...toSalesReportFilters(initialDraft, currentTimezone),
     branchId: branchScope.canAccessAllBranches ? "all" : initialDraft.branchId,
   }));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = {
+    ...toSalesReportFilters(initialDraft, currentTimezone),
+    branchId: branchScope.canAccessAllBranches ? "all" : initialDraft.branchId,
+  };
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useSalesByBranch(filters, canView && hasScope);
@@ -137,7 +145,12 @@ export function BranchSalesPageClient(): JSX.Element {
                 <BranchSalesTable rows={rows} />
               </>
             ) : (
-              <SalesReportEmptyState message="No branch sales returned." />
+              <SalesReportEmptyState
+                isFiltered={isReportNarrowed}
+                message="No branch sales returned."
+                noun="branch sales"
+                onClearFilters={() => setFilters(reportDefaultFilters)}
+              />
             )}
           </CardContent>
         </Card>

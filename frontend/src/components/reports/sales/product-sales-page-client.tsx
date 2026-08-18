@@ -25,6 +25,7 @@ import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { useSalesByProduct } from "@/hooks/use-sales-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 import { salesReportFiltersSchema } from "@/lib/validators/sales-reports.schema";
 import type { SalesReportFilters } from "@/types/sales-reports";
 
@@ -58,6 +59,14 @@ export function ProductSalesPageClient(): JSX.Element {
     sortBy: "net_sales",
     sortOrder: "desc",
   }));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = {
+    ...toSalesReportFilters(initialDraft, currentTimezone),
+    limit: 25,
+    page: 1,
+  };
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useSalesByProduct(filters, canView && hasScope);
@@ -116,7 +125,12 @@ export function ProductSalesPageClient(): JSX.Element {
             {rows.length > 0 ? (
               <ProductSalesTable rows={rows} />
             ) : (
-              <SalesReportEmptyState message="No product sales returned." />
+              <SalesReportEmptyState
+                isFiltered={isReportNarrowed}
+                message="No product sales returned."
+                noun="product sales"
+                onClearFilters={() => setFilters(reportDefaultFilters)}
+              />
             )}
           </CardContent>
         </Card>

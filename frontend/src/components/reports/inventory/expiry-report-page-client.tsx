@@ -26,6 +26,7 @@ import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
 import { resolveDashboardTimezone } from "@/lib/reports/dashboard-filters";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 
 const expiryStatusOptions = [
   { label: "All expiry states", value: "all" },
@@ -49,6 +50,13 @@ export function ExpiryReportPageClient(): JSX.Element {
     ...toInventoryReportFilters(initialDraft, "expiryState"),
     timezone,
   }));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = {
+    ...toInventoryReportFilters(initialDraft, "expiryState"),
+    timezone,
+  };
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useExpiryReport(filters, canView && hasScope);
@@ -91,7 +99,12 @@ export function ExpiryReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <ExpiryReportTable rows={reportQuery.data} />
           ) : (
-            <InventoryReportEmptyState message="No expiry risks." />
+            <InventoryReportEmptyState
+              isFiltered={isReportNarrowed}
+              message="No expiry risks."
+              noun="expiry risks"
+              onClearFilters={() => setFilters(reportDefaultFilters)}
+            />
           )}
         </CardContent>
       </Card>

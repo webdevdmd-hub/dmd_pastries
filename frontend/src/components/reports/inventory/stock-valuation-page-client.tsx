@@ -26,6 +26,7 @@ import { useStockValuationReport } from "@/hooks/use-inventory-reports";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 
 export function StockValuationPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -38,6 +39,10 @@ export function StockValuationPageClient(): JSX.Element {
   );
   const [draft, setDraft] = useState<InventoryReportFilterDraft>(initialDraft);
   const [filters, setFilters] = useState(() => toInventoryReportFilters(initialDraft));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toInventoryReportFilters(initialDraft);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useStockValuationReport(filters, canView && hasScope);
@@ -78,7 +83,12 @@ export function StockValuationPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <StockValuationTable rows={reportQuery.data} />
           ) : (
-            <InventoryReportEmptyState message="No stock valuation rows." />
+            <InventoryReportEmptyState
+              isFiltered={isReportNarrowed}
+              message="No stock valuation rows in this period."
+              noun="stock valuation rows"
+              onClearFilters={() => setFilters(reportDefaultFilters)}
+            />
           )}
         </CardContent>
       </Card>

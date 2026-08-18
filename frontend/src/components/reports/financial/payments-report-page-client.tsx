@@ -28,6 +28,7 @@ import { usePaymentMethodReport, usePaymentsReport } from "@/hooks/use-financial
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 
 export function PaymentsReportPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -39,6 +40,10 @@ export function PaymentsReportPageClient(): JSX.Element {
   );
   const [draft, setDraft] = useState<FinancialReportFilterDraft>(initialDraft);
   const [filters, setFilters] = useState(() => toFinancialReportFilters(initialDraft));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toFinancialReportFilters(initialDraft);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = usePaymentsReport(filters, canView && hasScope);
@@ -91,7 +96,12 @@ export function PaymentsReportPageClient(): JSX.Element {
         {methodsQuery.data && methodsQuery.data.length > 0 ? (
           <PaymentMethodChart rows={methodsQuery.data} />
         ) : (
-          <FinancialReportEmptyState message="No payment method data in this period." />
+          <FinancialReportEmptyState
+            isFiltered={isReportNarrowed}
+            message="No payment method data in this period."
+            noun="payment method data"
+            onClearFilters={() => setFilters(reportDefaultFilters)}
+          />
         )}
       </ReportChartCard>
       {reportQuery.error ? (
@@ -105,7 +115,12 @@ export function PaymentsReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <PaymentsReportTable rows={reportQuery.data} />
           ) : (
-            <FinancialReportEmptyState message="No payments in this period." />
+            <FinancialReportEmptyState
+              isFiltered={isReportNarrowed}
+              message="No payments in this period."
+              noun="payments"
+              onClearFilters={() => setFilters(reportDefaultFilters)}
+            />
           )}
         </CardContent>
       </Card>

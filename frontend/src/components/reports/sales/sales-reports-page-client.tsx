@@ -38,6 +38,7 @@ import {
   useTopProducts,
 } from "@/hooks/use-sales-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 import { salesReportFiltersSchema } from "@/lib/validators/sales-reports.schema";
 import type {
   SalesReportFilters,
@@ -91,6 +92,10 @@ export function SalesReportsPageClient(): JSX.Element {
   const [filters, setFilters] = useState<SalesReportFilters>(() =>
     toSalesReportFilters(initialDraft, currentTimezone),
   );
+  // Zero rows means two different things on a report: nothing happened in the
+  // default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toSalesReportFilters(initialDraft, currentTimezone);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const summaryQuery = useSalesSummary(filters, canView && hasScope);
@@ -209,7 +214,12 @@ export function SalesReportsPageClient(): JSX.Element {
               {reportData.daily.length > 0 ? (
                 <DailySalesTable rows={reportData.daily} />
               ) : (
-                <SalesReportEmptyState message="No daily sales returned for this filter range." />
+                <SalesReportEmptyState
+                  isFiltered={isReportNarrowed}
+                  message="No daily sales in this period."
+                  noun="daily sales"
+                  onClearFilters={resetFilters}
+                />
               )}
             </CardContent>
           </Card>

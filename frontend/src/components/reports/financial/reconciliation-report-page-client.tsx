@@ -25,6 +25,7 @@ import { useReconciliationReport } from "@/hooks/use-financial-reports";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 
 export function ReconciliationReportPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -36,6 +37,10 @@ export function ReconciliationReportPageClient(): JSX.Element {
   );
   const [draft, setDraft] = useState<FinancialReportFilterDraft>(initialDraft);
   const [filters, setFilters] = useState(() => toFinancialReportFilters(initialDraft));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toFinancialReportFilters(initialDraft);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useReconciliationReport(filters, canView && hasScope);
@@ -88,7 +93,12 @@ export function ReconciliationReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <ReconciliationReportTable rows={reportQuery.data} />
           ) : (
-            <FinancialReportEmptyState message="No financial transactions in this period." />
+            <FinancialReportEmptyState
+              isFiltered={isReportNarrowed}
+              message="No financial transactions in this period."
+              noun="financial transactions"
+              onClearFilters={() => setFilters(reportDefaultFilters)}
+            />
           )}
         </CardContent>
       </Card>

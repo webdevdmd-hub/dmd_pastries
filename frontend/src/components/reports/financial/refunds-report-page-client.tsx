@@ -25,6 +25,7 @@ import { useRefundsReport } from "@/hooks/use-financial-reports";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 
 export function RefundsReportPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -36,6 +37,10 @@ export function RefundsReportPageClient(): JSX.Element {
   );
   const [draft, setDraft] = useState<FinancialReportFilterDraft>(initialDraft);
   const [filters, setFilters] = useState(() => toFinancialReportFilters(initialDraft));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toFinancialReportFilters(initialDraft);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useRefundsReport(filters, canView && hasScope);
@@ -78,7 +83,12 @@ export function RefundsReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <RefundsReportTable rows={reportQuery.data} />
           ) : (
-            <FinancialReportEmptyState message="No refunds in this period." />
+            <FinancialReportEmptyState
+              isFiltered={isReportNarrowed}
+              message="No refunds in this period."
+              noun="refunds"
+              onClearFilters={() => setFilters(reportDefaultFilters)}
+            />
           )}
         </CardContent>
       </Card>

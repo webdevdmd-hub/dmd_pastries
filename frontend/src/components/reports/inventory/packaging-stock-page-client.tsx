@@ -25,6 +25,7 @@ import { usePackagingStockReport } from "@/hooks/use-inventory-reports";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 
 export function PackagingStockPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -40,6 +41,15 @@ export function PackagingStockPageClient(): JSX.Element {
     ...toInventoryReportFilters(initialDraft),
     itemType: "packaging" as const,
   }));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  // `as const` on itemType: without it the literal widens to string and no
+  // longer satisfies the filters type.
+  const reportDefaultFilters = {
+    ...toInventoryReportFilters(initialDraft),
+    itemType: "packaging" as const,
+  };
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = usePackagingStockReport(filters, canView && hasScope);
@@ -81,7 +91,12 @@ export function PackagingStockPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <PackagingStockTable rows={reportQuery.data} />
           ) : (
-            <InventoryReportEmptyState message="No packaging stock rows." />
+            <InventoryReportEmptyState
+              isFiltered={isReportNarrowed}
+              message="No packaging stock rows."
+              noun="packaging stock rows"
+              onClearFilters={() => setFilters(reportDefaultFilters)}
+            />
           )}
         </CardContent>
       </Card>

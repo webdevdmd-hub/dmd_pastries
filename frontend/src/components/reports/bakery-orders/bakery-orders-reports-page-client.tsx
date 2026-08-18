@@ -29,6 +29,7 @@ import { useBakeryOrdersSummary, useBakeryOrdersTrend } from "@/hooks/use-bakery
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 import type { BakeryOrdersTrendChart as BakeryOrdersTrendChartData } from "@/types/bakery-orders-reports";
 
 const navigationCards = [
@@ -62,6 +63,10 @@ export function BakeryOrdersReportsPageClient(): JSX.Element {
   );
   const [draft, setDraft] = useState<BakeryOrdersReportFilterDraft>(initialDraft);
   const [filters, setFilters] = useState(() => toBakeryOrdersReportFilters(initialDraft));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toBakeryOrdersReportFilters(initialDraft);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const summaryQuery = useBakeryOrdersSummary(filters, canView && hasScope);
@@ -100,7 +105,12 @@ export function BakeryOrdersReportsPageClient(): JSX.Element {
         {trendQuery.data ? (
           <BakeryOrdersTrendChart chart={trendQuery.data} />
         ) : (
-          <BakeryOrdersReportEmptyState message="No bakery orders trend data in this period." />
+          <BakeryOrdersReportEmptyState
+            isFiltered={isReportNarrowed}
+            message="No bakery orders trend data in this period."
+            noun="bakery orders trend data"
+            onClearFilters={() => setFilters(reportDefaultFilters)}
+          />
         )}
       </ReportChartCard>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -26,6 +26,7 @@ import { useManufacturingWastageReport } from "@/hooks/use-manufacturing-reports
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 
 export function ManufacturingWastageReportPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -39,6 +40,10 @@ export function ManufacturingWastageReportPageClient(): JSX.Element {
   );
   const [draft, setDraft] = useState<ManufacturingReportFilterDraft>(initialDraft);
   const [filters, setFilters] = useState(() => toManufacturingReportFilters(initialDraft));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toManufacturingReportFilters(initialDraft);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useManufacturingWastageReport(filters, canView && hasScope);
@@ -76,7 +81,12 @@ export function ManufacturingWastageReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.items.length > 0 ? (
             <ManufacturingWastageTable rows={reportQuery.data.items} />
           ) : (
-            <ManufacturingReportEmptyState message="No manufacturing wastage in this period." />
+            <ManufacturingReportEmptyState
+              isFiltered={isReportNarrowed}
+              message="No manufacturing wastage in this period."
+              noun="manufacturing wastage"
+              onClearFilters={() => setFilters(reportDefaultFilters)}
+            />
           )}
         </CardContent>
       </Card>

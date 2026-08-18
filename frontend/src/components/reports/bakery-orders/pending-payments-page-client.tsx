@@ -24,6 +24,7 @@ import { useBranchScope } from "@/hooks/use-branch-scope";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 import { bakeryOrdersPendingPaymentsFiltersSchema } from "@/lib/validators/bakery-orders-reports.schema";
 import type { BakeryOrdersReportFilters } from "@/types/bakery-orders-reports";
 
@@ -65,6 +66,10 @@ export function PendingPaymentsPageClient(): JSX.Element {
   );
   const [draft, setDraft] = useState<BakeryOrdersReportFilterDraft>(initialDraft);
   const [filters, setFilters] = useState(() => toBakeryOrdersReportFilters(initialDraft));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toBakeryOrdersReportFilters(initialDraft);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = usePendingPaymentsReport(filters, canView && hasScope);
@@ -108,7 +113,12 @@ export function PendingPaymentsPageClient(): JSX.Element {
             {orders.length > 0 ? (
               <PendingPaymentsTable rows={orders} />
             ) : (
-              <BakeryOrdersReportEmptyState message="No pending payments." />
+              <BakeryOrdersReportEmptyState
+                isFiltered={isReportNarrowed}
+                message="No pending payments in this period."
+                noun="pending payments"
+                onClearFilters={() => setFilters(reportDefaultFilters)}
+              />
             )}
           </CardContent>
         </Card>

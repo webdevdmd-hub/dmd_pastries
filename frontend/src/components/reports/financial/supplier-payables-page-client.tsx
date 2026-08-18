@@ -29,6 +29,7 @@ import { useSupplierPayablesReport } from "@/hooks/use-financial-reports";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 
 export function SupplierPayablesPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -40,6 +41,10 @@ export function SupplierPayablesPageClient(): JSX.Element {
   );
   const [draft, setDraft] = useState<FinancialReportFilterDraft>(initialDraft);
   const [filters, setFilters] = useState(() => toFinancialReportFilters(initialDraft));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toFinancialReportFilters(initialDraft);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useSupplierPayablesReport(filters, canView && hasScope);
@@ -101,7 +106,12 @@ export function SupplierPayablesPageClient(): JSX.Element {
           {rows.length > 0 ? (
             <SupplierPayablesTable rows={rows} />
           ) : (
-            <FinancialReportEmptyState message="No supplier payables." />
+            <FinancialReportEmptyState
+              isFiltered={isReportNarrowed}
+              message="No supplier payables in this period."
+              noun="supplier payables"
+              onClearFilters={() => setFilters(reportDefaultFilters)}
+            />
           )}
         </CardContent>
       </Card>

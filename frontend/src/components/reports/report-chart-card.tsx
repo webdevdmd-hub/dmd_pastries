@@ -35,7 +35,7 @@ export function ReportChartCard({
         {isLoading ? <ReportChartSkeleton /> : null}
         {error ? <ReportErrorState description={getErrorMessage(error)} onRetry={onRetry} /> : null}
         {!isLoading && !error && isEmpty ? (
-          <ReportEmptyState message="No chart data returned for this filter range." />
+          <ReportEmptyState message="No chart data in this period." />
         ) : null}
         {!isLoading && !error && !isEmpty ? children : null}
       </CardContent>

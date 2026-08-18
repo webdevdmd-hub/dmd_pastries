@@ -24,6 +24,7 @@ import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { useTaxReport } from "@/hooks/use-sales-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 import { salesReportFiltersSchema } from "@/lib/validators/sales-reports.schema";
 
 function timezone(): string {
@@ -50,6 +51,10 @@ export function TaxReportPageClient(): JSX.Element {
   );
   const [draft, setDraft] = useState<SalesReportFilterDraft>(initialDraft);
   const [filters, setFilters] = useState(() => toSalesReportFilters(initialDraft, currentTimezone));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toSalesReportFilters(initialDraft, currentTimezone);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useTaxReport(filters, canView && hasScope);
@@ -99,7 +104,12 @@ export function TaxReportPageClient(): JSX.Element {
             {rows.length > 0 ? (
               <TaxReportTable rows={rows} />
             ) : (
-              <SalesReportEmptyState message="No tax rows returned." />
+              <SalesReportEmptyState
+                isFiltered={isReportNarrowed}
+                message="No tax rows returned in this period."
+                noun="tax rows returned"
+                onClearFilters={() => setFilters(reportDefaultFilters)}
+              />
             )}
           </CardContent>
         </Card>

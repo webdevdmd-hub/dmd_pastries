@@ -29,6 +29,7 @@ import { useInventoryAccountingReconciliationReport } from "@/hooks/use-inventor
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 import type { InventoryReportFilters } from "@/types/inventory-reports";
 
 const pageSize = 50;
@@ -101,6 +102,10 @@ export function InventoryAccountingReconciliationPageClient(): JSX.Element {
   const [filters, setFilters] = useState(() =>
     reconciliationFilters(toInventoryReportFilters(initialDraft)),
   );
+  // Zero rows means two different things on a report: nothing happened in the
+  // default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = reconciliationFilters(toInventoryReportFilters(initialDraft));
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useInventoryAccountingReconciliationReport(filters, canView && hasScope);
@@ -201,7 +206,12 @@ export function InventoryAccountingReconciliationPageClient(): JSX.Element {
           {report && report.items.length > 0 ? (
             <InventoryAccountingReconciliationTable rows={report.items} />
           ) : (
-            <InventoryReportEmptyState message="No inventory accounting reconciliation rows in this period." />
+            <InventoryReportEmptyState
+              isFiltered={isReportNarrowed}
+              message="No inventory accounting reconciliation rows in this period."
+              noun="reconciliation rows"
+              onClearFilters={resetFilters}
+            />
           )}
         </CardContent>
       </Card>

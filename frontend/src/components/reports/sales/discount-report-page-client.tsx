@@ -25,6 +25,7 @@ import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { useDiscountReport } from "@/hooks/use-sales-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 import { salesReportFiltersSchema } from "@/lib/validators/sales-reports.schema";
 
 function timezone(): string {
@@ -51,6 +52,10 @@ export function DiscountReportPageClient(): JSX.Element {
   );
   const [draft, setDraft] = useState<SalesReportFilterDraft>(initialDraft);
   const [filters, setFilters] = useState(() => toSalesReportFilters(initialDraft, currentTimezone));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = toSalesReportFilters(initialDraft, currentTimezone);
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useDiscountReport(filters, canView && hasScope);
@@ -102,7 +107,12 @@ export function DiscountReportPageClient(): JSX.Element {
               {report.items.length > 0 ? (
                 <DiscountSalesTable rows={report.items} />
               ) : (
-                <SalesReportEmptyState message="No discounted sales returned." />
+                <SalesReportEmptyState
+                  isFiltered={isReportNarrowed}
+                  message="No discounted sales returned in this period."
+                  noun="discounted sales returned"
+                  onClearFilters={() => setFilters(reportDefaultFilters)}
+                />
               )}
             </CardContent>
           </Card>

@@ -25,6 +25,7 @@ import { useProductionBatchReport } from "@/hooks/use-manufacturing-reports";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
+import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 
 export function ProductionBatchesReportPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -42,6 +43,14 @@ export function ProductionBatchesReportPageClient(): JSX.Element {
     limit: 25,
     page: 1,
   }));
+  // Zero rows means two different things on a report: nothing happened in
+  // the default period, or the user narrowed it. See report-empty-state.tsx.
+  const reportDefaultFilters = {
+    ...toManufacturingReportFilters(initialDraft),
+    limit: 25,
+    page: 1,
+  };
+  const isReportNarrowed = isReportFiltered(filters, reportDefaultFilters);
   const hasScope = branchScope.canAccessAllBranches || Boolean(branchScope.effectiveBranchId);
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const reportQuery = useProductionBatchReport(filters, canView && hasScope);
@@ -80,7 +89,12 @@ export function ProductionBatchesReportPageClient(): JSX.Element {
           {reportQuery.data && reportQuery.data.length > 0 ? (
             <ProductionBatchesTable rows={reportQuery.data} />
           ) : (
-            <ManufacturingReportEmptyState message="No production batches in this period." />
+            <ManufacturingReportEmptyState
+              isFiltered={isReportNarrowed}
+              message="No production batches in this period."
+              noun="production batches"
+              onClearFilters={() => setFilters(reportDefaultFilters)}
+            />
           )}
         </CardContent>
       </Card>
