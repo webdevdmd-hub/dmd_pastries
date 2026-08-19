@@ -3,6 +3,7 @@
 import { SlidersHorizontal } from "lucide-react";
 import type { JSX } from "react";
 
+import { TableDensityToggle } from "@/components/density/table-density";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -234,6 +235,8 @@ export function InventoryToolbar({
           Reset
         </Button>
       ) : null}
+
+      <TableDensityToggle className="ml-auto" />
     </div>
   );
 }
