@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/inventory/access-denied-card";
+import { InventoryViewTabs } from "@/components/inventory/inventory-view-tabs";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
@@ -244,6 +245,8 @@ export function StockTransfersPageClient(): JSX.Element {
           ) : undefined
         }
       />
+
+      <InventoryViewTabs active="transfers" />
 
       <Card>
         <CardContent className="grid gap-4 p-5 md:grid-cols-4">

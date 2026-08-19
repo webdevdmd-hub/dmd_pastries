@@ -4,6 +4,7 @@ import type { JSX } from "react";
 import { useMemo, useState } from "react";
 
 import { AccessDeniedCard } from "@/components/inventory/access-denied-card";
+import { InventoryViewTabs } from "@/components/inventory/inventory-view-tabs";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +85,8 @@ export function LocationBalancesPageClient(): JSX.Element {
         title="Location Balances"
         description="View the physical breakdown of branch inventory by stock location. Branch total stock remains the sum of all location balances."
       />
+
+      <InventoryViewTabs active="locations" />
 
       <Card>
         <CardContent className="grid gap-4 p-5 md:grid-cols-4">

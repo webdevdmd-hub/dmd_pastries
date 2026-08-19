@@ -88,25 +88,10 @@ export function InventoryPageClient(): JSX.Element {
     PERMISSIONS.inventoryAdjust,
     PERMISSIONS.inventoryExpiryBatchesManage,
   ]);
-  const canViewStockMovements = hasAnyPermission([
-    PERMISSIONS.stockMovementsView,
-    PERMISSIONS.inventoryMovementsView,
-    PERMISSIONS.inventoryView,
-  ]);
-  const canViewLowStock = hasAnyPermission([
-    PERMISSIONS.inventoryLowStockView,
-    PERMISSIONS.inventoryView,
-  ]);
-  const canViewExpiryAlerts = hasAnyPermission([
-    PERMISSIONS.inventoryExpiryView,
-    PERMISSIONS.inventoryView,
-  ]);
-  const canViewStockTransfers = hasAnyPermission([
-    PERMISSIONS.inventoryView,
-    PERMISSIONS.inventoryTransferCreate,
-    PERMISSIONS.inventoryTransferComplete,
-    PERMISSIONS.inventoryTransferCancel,
-  ]);
+  // The four destination gates used to live here and be threaded into the tab
+  // strip. They now resolve inside InventoryViewTabs, which renders on all five
+  // inventory pages -- keeping a second copy here would be a second thing to
+  // update whenever a destination's permissions change.
   const canViewStockLocations = hasAnyPermission([
     PERMISSIONS.inventoryView,
     PERMISSIONS.inventoryLocationsManage,
@@ -331,15 +316,10 @@ export function InventoryPageClient(): JSX.Element {
       <InventorySummaryCards expiryAlerts={expiryAlerts} items={items} />
 
       <InventoryViewTabs
-        canViewExpiryAlerts={canViewExpiryAlerts}
-        canViewLocationBalances={hasAnyPermission([PERMISSIONS.inventoryView])}
-        canViewLowStock={canViewLowStock}
-        canViewStockMovements={canViewStockMovements}
-        canViewStockTransfers={canViewStockTransfers}
+        active={view}
         expiringCount={expiryAlerts.length}
         lowStockCount={lowStockCount}
         onViewChange={handleViewChange}
-        view={view}
       />
 
       <InventoryToolbar

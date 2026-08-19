@@ -7,6 +7,7 @@ import { AccessDeniedCard } from "@/components/inventory/access-denied-card";
 import { InventoryEmptyState } from "@/components/inventory/inventory-empty-state";
 import { InventoryErrorState } from "@/components/inventory/inventory-error-state";
 import { InventoryTableSkeleton } from "@/components/inventory/inventory-table-skeleton";
+import { InventoryViewTabs } from "@/components/inventory/inventory-view-tabs";
 import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
@@ -152,6 +153,8 @@ export function ExpiryAlertsPageClient(): JSX.Element {
         title="Expiry Alerts"
         description="Track stock batches that are expiring soon or already expired."
       />
+
+      <InventoryViewTabs active="expiring" />
       <div className="grid gap-3 rounded-3xl border border-border bg-card/70 p-4 shadow-soft md:grid-cols-6">
         <Select
           onValueChange={(branchId) => setFilters({ ...filters, branchId })}

@@ -7,6 +7,7 @@ import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { InventoryViewTabs } from "@/components/inventory/inventory-view-tabs";
 import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
@@ -204,6 +205,8 @@ export function MovementsPageClient(): JSX.Element {
           ) : undefined
         }
       />
+
+      <InventoryViewTabs active="movements" />
 
       {itemIdParam ? (
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted px-4 py-3 text-sm text-foreground-muted">
