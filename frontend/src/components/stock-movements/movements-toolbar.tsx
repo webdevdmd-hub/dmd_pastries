@@ -35,7 +35,7 @@ export function MovementsToolbar({
   };
 
   return (
-    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-card/70 p-4 shadow-soft lg:grid-cols-4 xl:grid-cols-9">
+    <div className="grid gap-3 rounded-3xl border border-border bg-card/70 p-4 shadow-soft lg:grid-cols-4 xl:grid-cols-9">
       <Input
         aria-label="Search stock movements"
         onChange={(event) => updateFilters({ search: event.target.value })}

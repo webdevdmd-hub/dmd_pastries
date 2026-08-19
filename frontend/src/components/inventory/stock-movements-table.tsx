@@ -79,13 +79,13 @@ export function StockMovementsTable({ movements }: StockMovementsTableProps): JS
         {movements.map((movement) => (
           <TableRow key={movement.id}>
             <TableCell>{formatDate(movement.createdAt)}</TableCell>
-            <TableCell className="font-bold">{movement.itemName}</TableCell>
+            <TableCell className="font-medium">{movement.itemName}</TableCell>
             <TableCell>{movement.branchName}</TableCell>
             <TableCell>
               <MovementTypeBadge type={movement.movementType} />
               <TransferDetails movement={movement} />
             </TableCell>
-            <TableCell className="font-bold">{formatQuantity(movement.quantity)}</TableCell>
+            <TableCell className="font-medium">{formatQuantity(movement.quantity)}</TableCell>
             <TableCell>{formatQuantity(movement.beforeQuantity)}</TableCell>
             <TableCell>{formatQuantity(movement.afterQuantity)}</TableCell>
             <TableCell>{movement.unitSymbol}</TableCell>
@@ -93,7 +93,7 @@ export function StockMovementsTable({ movements }: StockMovementsTableProps): JS
               {movement.totalCost > 0 ? (
                 <div>
                   <p className="font-semibold">{formatMoney(movement.totalCost)}</p>
-                  <p className="text-xs text-brand-mocha">
+                  <p className="text-xs text-foreground-muted">
                     Unit {formatMoney(movement.unitCostSnapshot)}
                     {movement.valuationMethod ? ` / ${movement.valuationMethod}` : ""}
                   </p>
@@ -106,10 +106,8 @@ export function StockMovementsTable({ movements }: StockMovementsTableProps): JS
               <AccountingJournalLink id={movement.accountingJournalEntryId} />
             </TableCell>
             <TableCell className="min-w-72">
-              <p className="font-medium text-brand-espresso">
-                {stockMovementDescription(movement)}
-              </p>
-              <p className="text-xs text-brand-mocha">
+              <p className="font-medium text-foreground">{stockMovementDescription(movement)}</p>
+              <p className="text-xs text-foreground-muted">
                 {sourceModuleLabel(movement)} - {sourceReferenceLabel(movement)}
               </p>
             </TableCell>

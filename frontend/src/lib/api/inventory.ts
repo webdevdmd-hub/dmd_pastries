@@ -506,7 +506,7 @@ export async function getInventory(params: InventoryFilters): Promise<InventoryI
       item_type: params.itemType,
       product_type: params.productType,
       status: params.status,
-      low_stock: params.lowStockOnly,
+      low_stock_only: params.lowStockOnly,
       expiry_tracked: params.expiryTrackedOnly,
       include_uninitialized: params.includeUninitialized,
     })}`,

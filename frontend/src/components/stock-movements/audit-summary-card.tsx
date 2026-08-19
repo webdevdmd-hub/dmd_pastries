@@ -30,12 +30,12 @@ export function AuditSummaryCard({ audit }: AuditSummaryCardProps): JSX.Element 
         <Card key={card.label}>
           <CardContent className="flex items-center justify-between p-6">
             <div>
-              <p className="text-sm text-brand-mocha">{card.label}</p>
-              <p className="mt-2 text-3xl font-medium text-brand-espresso">
+              <p className="text-sm text-foreground-muted">{card.label}</p>
+              <p className="mt-2 text-3xl font-medium text-foreground">
                 {formatQuantity(card.value)}
               </p>
             </div>
-            <div className="rounded-2xl bg-brand-cappuccino/35 p-3 text-brand-mocha">
+            <div className="rounded-2xl bg-border/35 p-3 text-foreground-muted">
               <card.icon className="h-6 w-6" />
             </div>
           </CardContent>

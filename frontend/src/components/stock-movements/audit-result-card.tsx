@@ -27,10 +27,10 @@ export function AuditResultCard({ audit }: AuditResultCardProps): JSX.Element {
             <AlertTriangle className="mt-1 h-7 w-7 text-danger-text" />
           )}
           <div>
-            <h2 className="text-xl font-bold text-brand-espresso">
+            <h2 className="text-xl font-medium text-foreground">
               {audit.isBalanced ? "Inventory ledger is balanced" : "Inventory mismatch detected"}
             </h2>
-            <p className="mt-1 text-sm text-brand-mocha">
+            <p className="mt-1 text-sm text-foreground-muted">
               Difference: {formatQuantity(audit.difference)} across {audit.movementCount} movement
               records.
             </p>

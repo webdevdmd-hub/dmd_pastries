@@ -4,6 +4,7 @@ import type { JSX } from "react";
 import { useMemo, useState } from "react";
 
 import { AccessDeniedCard } from "@/components/inventory/access-denied-card";
+import { InventoryViewTabs } from "@/components/inventory/inventory-view-tabs";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +85,8 @@ export function LocationBalancesPageClient(): JSX.Element {
         title="Location Balances"
         description="View the physical breakdown of branch inventory by stock location. Branch total stock remains the sum of all location balances."
       />
+
+      <InventoryViewTabs active="locations" />
 
       <Card>
         <CardContent className="grid gap-4 p-5 md:grid-cols-4">
@@ -185,8 +188,10 @@ export function LocationBalancesPageClient(): JSX.Element {
               {balances.map((balance) => (
                 <TableRow key={`${balance.inventoryItemId}-${balance.stockLocationId}`}>
                   <TableCell>
-                    <div className="font-semibold text-brand-espresso">{balance.itemName}</div>
-                    <div className="text-sm text-brand-mocha">{balance.itemCode || "No code"}</div>
+                    <div className="font-semibold text-foreground">{balance.itemName}</div>
+                    <div className="text-sm text-foreground-muted">
+                      {balance.itemCode || "No code"}
+                    </div>
                   </TableCell>
                   <TableCell>{balance.stockLocationName}</TableCell>
                   <TableCell>
@@ -207,7 +212,7 @@ export function LocationBalancesPageClient(): JSX.Element {
               ))}
               {!balancesQuery.isLoading && balances.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-brand-mocha">
+                  <TableCell colSpan={6} className="py-10 text-center text-foreground-muted">
                     {balancesQuery.error
                       ? isPermissionDenied
                         ? "The backend denied access to location balances."

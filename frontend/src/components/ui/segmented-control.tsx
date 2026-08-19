@@ -3,9 +3,22 @@
 import type { JSX } from "react";
 import { useCallback, useId, useRef } from "react";
 
+import {
+  SEGMENT_BADGE_CLASS,
+  SEGMENT_TRACK_CLASS,
+  segmentItemClass,
+} from "@/components/ui/segment-styles";
 import { cn } from "@/lib/utils/cn";
 
 export type SegmentedControlOption<TValue extends string> = {
+  /**
+   * Optional count rendered after the label, for options that carry a live
+   * figure worth seeing before you select them (how many items are low on
+   * stock, how many payments are unreconciled). Zero and undefined both render
+   * nothing: a badged "0" reads as a thing to attend to when it is the
+   * opposite.
+   */
+  badge?: number;
   disabled?: boolean;
   label: string;
   value: TValue;
@@ -93,7 +106,7 @@ export function SegmentedControl<TValue extends string>({
   return (
     <div
       aria-label={ariaLabel}
-      className={cn("inline-flex gap-0.5 rounded bg-muted p-0.5", className)}
+      className={cn(SEGMENT_TRACK_CLASS, className)}
       onKeyDown={handleKeyDown}
       ref={containerRef}
       role="radiogroup"
@@ -104,14 +117,7 @@ export function SegmentedControl<TValue extends string>({
         return (
           <button
             aria-checked={selected}
-            className={cn(
-              "inline-flex h-8 items-center justify-center whitespace-nowrap rounded-sm px-3 text-meta font-medium transition-colors duration-fast ease-out",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-muted",
-              "disabled:pointer-events-none disabled:opacity-50",
-              selected
-                ? "bg-card text-foreground shadow-xs"
-                : "text-foreground-muted hover:text-foreground",
-            )}
+            className={segmentItemClass(selected)}
             data-segment=""
             disabled={option.disabled}
             id={`${groupId}-${option.value}`}
@@ -124,6 +130,7 @@ export function SegmentedControl<TValue extends string>({
             type="button"
           >
             {option.label}
+            {option.badge ? <span className={SEGMENT_BADGE_CLASS}>{option.badge}</span> : null}
           </button>
         );
       })}

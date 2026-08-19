@@ -7,6 +7,7 @@ import { AccessDeniedCard } from "@/components/inventory/access-denied-card";
 import { InventoryEmptyState } from "@/components/inventory/inventory-empty-state";
 import { InventoryErrorState } from "@/components/inventory/inventory-error-state";
 import { InventoryTableSkeleton } from "@/components/inventory/inventory-table-skeleton";
+import { InventoryViewTabs } from "@/components/inventory/inventory-view-tabs";
 import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
@@ -51,16 +52,15 @@ function formatDate(value: string): string {
   return value ? new Date(value).toLocaleDateString("en-AE") : "Not recorded";
 }
 
+// Semantic variants so the expiry state carries a dot (DESIGN.md sections 6
+// and 9). Expired and expires-today are both danger; anything further out is
+// warning -- the same split the className colours already made.
 function expiryStateBadge(state: ExpiryState, label: string): JSX.Element {
-  if (state === "expired") {
-    return <Badge className="border-danger/30 bg-danger-tint text-danger-text">{label}</Badge>;
+  if (state === "expired" || state === "expires_today") {
+    return <Badge variant="danger">{label}</Badge>;
   }
 
-  if (state === "expires_today") {
-    return <Badge className="border-danger/30 bg-danger-tint text-danger-text">{label}</Badge>;
-  }
-
-  return <Badge className="bg-warning-tint text-warning-text hover:bg-warning-tint">{label}</Badge>;
+  return <Badge variant="warning">{label}</Badge>;
 }
 
 function itemTypeLabel(itemType: ExpiryBatch["itemType"]): string {
@@ -153,7 +153,9 @@ export function ExpiryAlertsPageClient(): JSX.Element {
         title="Expiry Alerts"
         description="Track stock batches that are expiring soon or already expired."
       />
-      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-card/70 p-4 shadow-soft md:grid-cols-6">
+
+      <InventoryViewTabs active="expiring" />
+      <div className="grid gap-3 rounded-3xl border border-border bg-card/70 p-4 shadow-soft md:grid-cols-6">
         <Select
           onValueChange={(branchId) => setFilters({ ...filters, branchId })}
           value={filters.branchId}
@@ -301,10 +303,10 @@ export function ExpiryAlertsPageClient(): JSX.Element {
                   return (
                     <TableRow key={batch.id}>
                       <TableCell>
-                        <div className="font-bold text-brand-espresso">
+                        <div className="font-medium text-foreground">
                           {batch.itemName ?? "Item details unavailable"}
                         </div>
-                        <div className="text-xs text-brand-mocha">
+                        <div className="text-xs text-foreground-muted">
                           {compactList([
                             batch.sku ? `SKU: ${batch.sku}` : null,
                             batch.itemCode ? `Code: ${batch.itemCode}` : null,
@@ -314,13 +316,13 @@ export function ExpiryAlertsPageClient(): JSX.Element {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className="border-brand-cappuccino bg-brand-latte/70 text-brand-espresso">
+                        <Badge className="border-border bg-muted/70 text-foreground">
                           {itemTypeLabel(batch.itemType)}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="font-bold">{batch.batchNumber || "-"}</div>
-                        <div className="text-xs text-brand-mocha">
+                        <div className="font-medium">{batch.batchNumber || "-"}</div>
+                        <div className="text-xs text-foreground-muted">
                           {batch.purchaseReferenceNumber
                             ? `Purchase: ${batch.purchaseReferenceNumber}`
                             : "-"}
@@ -328,7 +330,7 @@ export function ExpiryAlertsPageClient(): JSX.Element {
                       </TableCell>
                       <TableCell>
                         <div>{getBranchLabel(batch)}</div>
-                        <div className="text-xs text-brand-mocha">
+                        <div className="text-xs text-foreground-muted">
                           {compactList([batch.stockLocationName, batch.supplierName]) || "-"}
                         </div>
                       </TableCell>
@@ -339,7 +341,7 @@ export function ExpiryAlertsPageClient(): JSX.Element {
                       <TableCell>{formatDate(batch.receivedDate)}</TableCell>
                       <TableCell>{formatDate(batch.expiryDate)}</TableCell>
                       <TableCell
-                        className={remaining < 0 ? "font-bold text-danger-text" : undefined}
+                        className={remaining < 0 ? "font-medium text-danger-text" : undefined}
                       >
                         {remaining < 0
                           ? `${String(Math.abs(remaining))} days overdue`

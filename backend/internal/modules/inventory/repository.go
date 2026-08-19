@@ -1184,6 +1184,16 @@ func applyInventoryFilters(db *gorm.DB, query InventoryListQuery) *gorm.DB {
 	if query.ItemType != "" {
 		db = db.Where("inventory_items.item_type = ?", query.ItemType)
 	}
+	if query.ProductType != "" {
+		// EXISTS rather than a join: the search branch below already aliases
+		// `products p`, so a second join would collide on the alias, and this
+		// builder feeds Count as well as Find -- a join here would multiply
+		// rows and inflate the total.
+		db = db.Where(
+			"EXISTS (SELECT 1 FROM products pt WHERE pt.id = inventory_items.product_id AND pt.business_id = inventory_items.business_id AND pt.product_type = ?)",
+			query.ProductType,
+		)
+	}
 	if query.Status != "" {
 		db = db.Where("inventory_items.status = ?", query.Status)
 	}
