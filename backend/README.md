@@ -684,6 +684,7 @@ Behavior:
 - product inventory is fully validated against existing products, branches, and units
 - product variants can be tracked as separate inventory rows with `item_type = product_variant`, `product_id`, and `product_variant_id`
 - inventory list supports `include_uninitialized=true` to include stock-tracked catalog products, variants, ingredients, and packaging items that do not have an inventory row yet
+- inventory list (`GET /api/v1/inventory`) and movement list (`GET /api/v1/inventory/movements`) support `product_type` to filter product-backed rows by catalog product type; the filter works on both the initialized and include-uninitialized paths
 - uninitialized inventory rows return zero quantities, `inventory_status = not_initialized`, and `can_add_opening_stock = true`
 - POS checkout deducts variant inventory when `product_variant_id` is provided; otherwise it deducts parent product inventory
 - ingredient inventory IDs are schema-ready for a future ingredients module; packaging inventory IDs now link to Sprint 4.1 packaging items

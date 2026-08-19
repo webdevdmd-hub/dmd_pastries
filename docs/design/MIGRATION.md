@@ -128,7 +128,7 @@ Before running this codemod, re-check every row against `frontend/eslint.design-
 mapping table and a lint rule that disagree is a silent, high-volume defect: at `warn` severity the
 new violations do not even show up.
 
-**Verify:** screenshot-diff error states on `/accounting/journal-entries`, `/inventory/low-stock`, `/payments/refunds`.
+**Verify:** screenshot-diff error states on `/accounting/journal-entries`, `/inventory?view=low_stock` (the old `/inventory/low-stock` route now redirects to this tab), `/payments/refunds`.
 
 ---
 
