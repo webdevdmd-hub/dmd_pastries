@@ -5,6 +5,8 @@ import type { ExpiryBatch, InventoryItem } from "@/types/inventory";
 type InventorySummaryCardsProps = {
   items: InventoryItem[];
   expiryAlerts?: ExpiryBatch[];
+  /** Server-side row count. When it exceeds items.length, the page truncated. */
+  total?: number;
 };
 
 function formatMoney(value: number): string {
@@ -38,16 +40,28 @@ type Stat = {
 export function InventorySummaryCards({
   items,
   expiryAlerts = [],
+  total,
 }: InventorySummaryCardsProps): JSX.Element {
+  // The list endpoint caps at 100 rows. "Total items" comes from the server's
+  // own count, so it is always exact; the two figures derived by walking the
+  // rows are floors once the page truncates, and they say so with a "+" --
+  // a stock value quietly computed over part of the branch is exactly the
+  // silently-wrong number this strip exists to prevent.
+  const serverTotal = total ?? items.length;
+  const truncated = serverTotal > items.length;
+  const floor = (value: string): string => (truncated ? `${value}+` : value);
   const lowStockCount = items.filter((item) => item.lowStock).length;
   const expiringCount = expiryAlerts.length;
   const totalStockValue = items.reduce((sum, item) => sum + item.inventoryValue, 0);
 
   const stats: Stat[] = [
-    { label: "Total items", value: String(items.length) },
-    { label: "Low stock", value: String(lowStockCount), attention: lowStockCount > 0 },
+    { label: "Total items", value: String(serverTotal) },
+    { label: "Low stock", value: floor(String(lowStockCount)), attention: lowStockCount > 0 },
     { label: "Expiring soon", value: String(expiringCount), attention: expiringCount > 0 },
-    { label: "Total stock value", value: formatMoney(totalStockValue) },
+    {
+      label: truncated ? "Stock value (first 100 items)" : "Total stock value",
+      value: floor(formatMoney(totalStockValue)),
+    },
   ];
 
   return (

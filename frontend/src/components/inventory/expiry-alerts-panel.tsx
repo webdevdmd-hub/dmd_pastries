@@ -294,9 +294,10 @@ export function ExpiryAlertsPanel(): JSX.Element {
       hasActiveFilters ? (
         <FilteredState
           noun="expiry alerts"
-          onClearFilters={() =>
-            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId, timezone })
-          }
+          onClearFilters={() => {
+            setSearch("");
+            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId, timezone });
+          }}
           query={undefined}
         />
       ) : null}
@@ -319,7 +320,7 @@ export function ExpiryAlertsPanel(): JSX.Element {
                   <TableHead>Type</TableHead>
                   <TableHead>Batch</TableHead>
                   <TableHead>Branch</TableHead>
-                  <TableHead>Quantity</TableHead>
+                  <TableHead className="text-right">Quantity</TableHead>
                   <TableHead>Received</TableHead>
                   <TableHead>Expiry</TableHead>
                   <TableHead>Days Remaining</TableHead>
@@ -363,14 +364,20 @@ export function ExpiryAlertsPanel(): JSX.Element {
                           {compactList([batch.stockLocationName, batch.supplierName]) || "-"}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right tabular-nums">
                         {batch.quantity}
                         {batch.unitSymbol ? ` ${batch.unitSymbol}` : ""}
                       </TableCell>
-                      <TableCell>{formatDate(batch.receivedDate)}</TableCell>
-                      <TableCell>{formatDate(batch.expiryDate)}</TableCell>
+                      <TableCell className="tabular-nums">
+                        {formatDate(batch.receivedDate)}
+                      </TableCell>
+                      <TableCell className="tabular-nums">{formatDate(batch.expiryDate)}</TableCell>
                       <TableCell
-                        className={remaining < 0 ? "font-medium text-danger-text" : undefined}
+                        className={
+                          remaining < 0
+                            ? "font-medium tabular-nums text-danger-text"
+                            : "tabular-nums"
+                        }
                       >
                         {remaining < 0
                           ? `${String(Math.abs(remaining))} days overdue`

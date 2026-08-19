@@ -20,7 +20,7 @@ type InventoryViewTabsProps = {
   active: InventoryTabKey;
   /** Badge counts, when the list that produces them is loaded. */
   expiringCount?: number;
-  lowStockCount?: number;
+  lowStockCount?: number | string;
   onViewChange: (view: InventoryTabKey) => void;
   /** Other query params to carry into each tab's href (e.g. `item`). */
   params?: URLSearchParams;
@@ -29,7 +29,7 @@ type InventoryViewTabsProps = {
 type Tab = {
   key: InventoryTabKey;
   label: string;
-  badge?: number;
+  badge?: number | string;
   visible: boolean;
 };
 

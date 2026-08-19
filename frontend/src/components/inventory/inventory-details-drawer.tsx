@@ -18,6 +18,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { ROUTES } from "@/constants/routes";
 import type {
   ExpiryBatch,
   ExpiryBatchStatus,
@@ -229,7 +230,7 @@ export function InventoryDetailsDrawer({
                 </Button>
               ) : null}
               <Button asChild type="button" variant="outline">
-                <Link href={`/inventory/movements?item=${item.id}`}>
+                <Link href={`${ROUTES.inventoryMovements}&item=${item.id}`}>
                   <History className="h-4 w-4" />
                   View all movements
                 </Link>

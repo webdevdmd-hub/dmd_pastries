@@ -20,7 +20,6 @@ import {
   getInventoryItemMovements,
   getInventoryMovements,
   getLocationBalances,
-  getLowStock,
   getStockLocationById,
   getStockLocations,
   getStockTransferById,
@@ -42,7 +41,6 @@ import type {
   InventoryStatus,
   LocationBalance,
   LocationBalanceFilters,
-  LowStockFilters,
   OpeningStockPayload,
   StockAdjustmentPayload,
   StockLocation,
@@ -144,16 +142,6 @@ export function useInventoryItemMovements(
       return getInventoryItemMovements(id, filters);
     },
     enabled: enabled && id !== null,
-  });
-}
-
-export function useLowStock(filters: LowStockFilters, enabled = true) {
-  const branchQueryKey = useBranchQueryKey();
-
-  return useQuery<InventoryItem[]>({
-    queryKey: [inventoryQueryKey, branchQueryKey, "low-stock", filters],
-    queryFn: async () => getLowStock(filters),
-    enabled,
   });
 }
 

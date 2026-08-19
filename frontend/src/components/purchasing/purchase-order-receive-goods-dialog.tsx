@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { totalsByUnit } from "@/lib/purchasing/purchase-order-quantities";
+import { isStockLine, totalsByUnit } from "@/lib/purchasing/purchase-order-quantities";
 import { cn } from "@/lib/utils/cn";
 import type {
   PurchaseOrder,
@@ -51,7 +51,12 @@ const currencyFormat = new Intl.NumberFormat("en-AE", { currency: "AED", style: 
 const GRID = "lg:grid-cols-[1.8fr_0.75fr_0.85fr_0.85fr_0.9fr_1fr_1fr]";
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Local calendar date. toISOString() is UTC, which in a UTC+4 business
+  // pre-filled yesterday's date for any receipt posted before 4am.
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${String(now.getFullYear())}-${month}-${day}`;
 }
 
 function unitLabel(item: PurchaseOrderLine): string {
@@ -72,7 +77,7 @@ function remainingQuantity(order: PurchaseOrder, purchaseOrderItemId: string): n
 }
 
 function receivableItems(order: PurchaseOrder): PurchaseOrder["items"] {
-  return order.items.filter((item) => item.lineType !== "account");
+  return order.items.filter(isStockLine);
 }
 
 function hasRowChanges(order: PurchaseOrder, rows: ReceiveGoodsRow[]): boolean {
@@ -125,7 +130,9 @@ export function PurchaseOrderReceiveGoodsDialog({
         batchNumber: "",
         expiryDate: "",
         purchaseOrderItemId: item.id,
-        quantityReceived: String(Math.max(item.quantityOrdered - item.quantityReceived, 0)),
+        quantityReceived: String(
+          Math.round(Math.max(item.quantityOrdered - item.quantityReceived, 0) * 1000) / 1000,
+        ),
       })),
     );
   }, [open, order]);
@@ -173,7 +180,9 @@ export function PurchaseOrderReceiveGoodsDialog({
         continue;
       }
 
-      if (quantity > remaining) {
+      // Epsilon covers float drift: remaining can be 0.29999999 while the row
+      // displays "0.3", and typing exactly 0.3 must not be rejected.
+      if (quantity > remaining + 1e-9) {
         issues.set(
           item.id,
           `Only ${withUnit(remaining, item)} of ${item.itemNameSnapshot} is still outstanding.`,
@@ -316,7 +325,7 @@ export function PurchaseOrderReceiveGoodsDialog({
         return;
       }
 
-      if (quantity > remaining) {
+      if (quantity > remaining + 1e-9) {
         setError("Receive quantity cannot exceed the remaining ordered quantity.");
         setStep("count");
         return;
@@ -342,7 +351,7 @@ export function PurchaseOrderReceiveGoodsDialog({
           expiryDate: row.expiryDate || null,
           productId: orderItem.productId,
           productVariantId: orderItem.productVariantId,
-          quantityReceived: quantity,
+          quantityReceived: Math.min(quantity, remaining),
           unitCost: orderItem.unitCost,
           unitId: orderItem.unitId,
         });
@@ -527,7 +536,6 @@ export function PurchaseOrderReceiveGoodsDialog({
                           <StackedLabel>Batch</StackedLabel>
                           <Input
                             aria-label={`Batch number for ${item.itemNameSnapshot}`}
-                            className=""
                             onChange={(event) =>
                               updateRow(item.id, "batchNumber", event.target.value)
                             }
@@ -539,7 +547,6 @@ export function PurchaseOrderReceiveGoodsDialog({
                           <StackedLabel>Expiry</StackedLabel>
                           <Input
                             aria-label={`Expiry date for ${item.itemNameSnapshot}`}
-                            className=""
                             onChange={(event) =>
                               updateRow(item.id, "expiryDate", event.target.value)
                             }

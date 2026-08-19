@@ -196,13 +196,15 @@ export function StockLocationsPageClient(): JSX.Element {
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-foreground-muted">Total locations</p>
-            <p className="mt-2 text-3xl font-medium text-foreground">{locations.length}</p>
+            <p className="mt-2 text-3xl font-medium tabular-nums text-foreground">
+              {locations.length}
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-foreground-muted">Active locations</p>
-            <p className="mt-2 text-3xl font-medium text-foreground">{activeCount}</p>
+            <p className="mt-2 text-3xl font-medium tabular-nums text-foreground">{activeCount}</p>
           </CardContent>
         </Card>
         <Card>

@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ROUTES } from "@/constants/routes";
 import type { InventoryItem } from "@/types/inventory";
 
 type InventoryActionsMenuProps = {
@@ -64,7 +65,7 @@ export function InventoryActionsMenu({
           <DropdownMenuItem onClick={() => onAdjust(item)}>Adjust stock</DropdownMenuItem>
         ) : null}
         <DropdownMenuItem asChild>
-          <Link href={`/inventory/movements?item=${item.id}`}>Movements</Link>
+          <Link href={`${ROUTES.inventoryMovements}&item=${item.id}`}>Movements</Link>
         </DropdownMenuItem>
         {canAddBatch ? (
           <>

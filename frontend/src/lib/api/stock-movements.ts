@@ -266,10 +266,11 @@ function movementQuery(params: Partial<StockMovementFilters>): string {
     item_type: params.itemType,
     product_type: params.productType,
     movement_type: params.movementType,
-    direction: params.direction,
+    // The handler binds movement_direction; the shorter name was silently
+    // ignored and the Direction select filtered nothing.
+    movement_direction: params.direction,
     date_from: params.dateFrom,
     date_to: params.dateTo,
-    created_by: params.createdBy,
   });
 }
 
@@ -355,7 +356,7 @@ export async function getStockMovementSummary(
       item_type: params.itemType,
       product_type: params.productType,
       movement_type: params.movementType,
-      direction: params.direction,
+      movement_direction: params.direction,
       date_from: params.dateFrom,
       date_to: params.dateTo,
     })}`,

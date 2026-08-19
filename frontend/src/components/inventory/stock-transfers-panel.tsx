@@ -56,7 +56,6 @@ import type {
   StockTransferPayload,
   StockTransferStatus,
 } from "@/types/inventory";
-import { PRODUCT_TYPE_LABELS, PRODUCT_TYPES } from "@/types/product";
 
 function defaultFilters(): StockTransferFilters {
   return {
@@ -104,9 +103,7 @@ export function StockTransfersPanel(): JSX.Element {
   // Search shows its own value in the toolbar, so only the popover's three
   // fields are counted.
   const transferHiddenFilterCount =
-    (filters.status !== "all" ? 1 : 0) +
-    (filters.itemType !== "all" ? 1 : 0) +
-    (filters.productType !== "all" ? 1 : 0);
+    (filters.status !== "all" ? 1 : 0) + (filters.itemType !== "all" ? 1 : 0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [payload, setPayload] = useState<StockTransferPayload>(emptyPayload);
   const debouncedSearch = useDebouncedValue(filters.search);
@@ -139,7 +136,7 @@ export function StockTransfersPanel(): JSX.Element {
   const locations = (locationsQuery.data ?? []).filter((location) => location.status === "active");
   const inventoryItemOptions = useMemo<SearchableComboboxOption[]>(
     () =>
-      (inventoryQuery.data ?? []).map((item) => ({
+      (inventoryQuery.data?.items ?? []).map((item) => ({
         value: item.id,
         label: item.itemName,
         description: [
@@ -301,31 +298,6 @@ export function StockTransfersPanel(): JSX.Element {
             </SelectContent>
           </Select>
         </FilterField>
-
-        <FilterField htmlFor="transferFilterProductType" label="Product type">
-          <Select
-            value={filters.productType}
-            onValueChange={(value) =>
-              setFilters((current) => ({
-                ...current,
-                productType: value as StockTransferFilters["productType"],
-                page: 1,
-              }))
-            }
-          >
-            <SelectTrigger id="transferFilterProductType">
-              <SelectValue placeholder="Product type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All product types</SelectItem>
-              {PRODUCT_TYPES.map((productType) => (
-                <SelectItem key={productType} value={productType}>
-                  {PRODUCT_TYPE_LABELS[productType]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </FilterField>
       </FilterToolbar>
 
       <Card>
@@ -335,7 +307,7 @@ export function StockTransfersPanel(): JSX.Element {
               <TableRow>
                 <TableHead>Item</TableHead>
                 <TableHead>Transfer</TableHead>
-                <TableHead>Quantity</TableHead>
+                <TableHead className="text-right">Quantity</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -358,13 +330,13 @@ export function StockTransfersPanel(): JSX.Element {
                       <div className="text-sm text-foreground-muted">{transfer.notes}</div>
                     ) : null}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-right tabular-nums">
                     {transfer.quantity.toLocaleString(undefined, { maximumFractionDigits: 3 })}
                   </TableCell>
                   <TableCell>
                     <Badge variant={statusVariant(transfer.status)}>{transfer.status}</Badge>
                   </TableCell>
-                  <TableCell>{formatDate(transfer.createdAt)}</TableCell>
+                  <TableCell className="tabular-nums">{formatDate(transfer.createdAt)}</TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-2">
                       {transfer.status === "draft" && canComplete ? (

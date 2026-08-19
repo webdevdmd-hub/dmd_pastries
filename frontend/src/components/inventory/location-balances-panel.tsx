@@ -30,7 +30,6 @@ import { useLocationBalances, useStockLocations } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import type { LocationBalanceFilters } from "@/types/inventory";
-import { PRODUCT_TYPE_LABELS, PRODUCT_TYPES } from "@/types/product";
 
 function defaultFilters(): LocationBalanceFilters {
   return {
@@ -78,9 +77,7 @@ export function LocationBalancesPanel(): JSX.Element {
   // Search shows its own value in the toolbar, so only the popover's own three
   // fields are counted.
   const hiddenFilterCount =
-    (filters.itemType !== "all" ? 1 : 0) +
-    (filters.productType !== "all" ? 1 : 0) +
-    (filters.stockLocationId !== "all" ? 1 : 0);
+    (filters.itemType !== "all" ? 1 : 0) + (filters.stockLocationId !== "all" ? 1 : 0);
 
   if (!canView) {
     return <AccessDeniedCard message="You need inventory.view to view location balances." />;
@@ -124,31 +121,6 @@ export function LocationBalancesPanel(): JSX.Element {
           </Select>
         </FilterField>
 
-        <FilterField htmlFor="locationFilterProductType" label="Product type">
-          <Select
-            value={filters.productType}
-            onValueChange={(value) =>
-              setFilters((current) => ({
-                ...current,
-                productType: value as LocationBalanceFilters["productType"],
-                page: 1,
-              }))
-            }
-          >
-            <SelectTrigger id="locationFilterProductType">
-              <SelectValue placeholder="Product type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All product types</SelectItem>
-              {PRODUCT_TYPES.map((productType) => (
-                <SelectItem key={productType} value={productType}>
-                  {PRODUCT_TYPE_LABELS[productType]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </FilterField>
-
         <FilterField htmlFor="locationFilterLocation" label="Stock location">
           <Select
             value={filters.stockLocationId}
@@ -179,9 +151,9 @@ export function LocationBalancesPanel(): JSX.Element {
                 <TableHead>Item</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Current</TableHead>
-                <TableHead>Reserved</TableHead>
-                <TableHead>Available</TableHead>
+                <TableHead className="text-right">Current</TableHead>
+                <TableHead className="text-right">Reserved</TableHead>
+                <TableHead className="text-right">Available</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -199,13 +171,13 @@ export function LocationBalancesPanel(): JSX.Element {
                       {balance.itemType === "product_variant" ? "Variant" : balance.itemType}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-right tabular-nums">
                     {formatQuantity(balance.currentQuantity, balance.unit.symbol)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-right tabular-nums">
                     {formatQuantity(balance.reservedQuantity, balance.unit.symbol)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-right tabular-nums">
                     {formatQuantity(balance.availableQuantity, balance.unit.symbol)}
                   </TableCell>
                 </TableRow>

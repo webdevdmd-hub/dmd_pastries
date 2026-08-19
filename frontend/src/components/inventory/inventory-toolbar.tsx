@@ -64,13 +64,8 @@ export function InventoryToolbar({
 
   const hiddenFilterCount = countHiddenFilters(filters);
   const isBranchNarrowed = allowAllBranches && filters.branchId !== resetBranchId;
-  // lowStockOnly is excluded from the badge but included here, because Reset
-  // does clear it.
   const hasAnyFilter =
-    hiddenFilterCount > 0 ||
-    isBranchNarrowed ||
-    filters.lowStockOnly ||
-    filters.search.trim().length > 0;
+    hiddenFilterCount > 0 || isBranchNarrowed || filters.search.trim().length > 0;
 
   return (
     <FilterToolbar

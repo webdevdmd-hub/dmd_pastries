@@ -229,7 +229,7 @@ export function ProductsPageClient(): JSX.Element {
       { availableQuantity: number; currentQuantity: number; unitSymbol: string }
     >();
 
-    (inventoryQuery.data ?? []).forEach((item) => {
+    (inventoryQuery.data?.items ?? []).forEach((item) => {
       if (!item.productId) return;
       const current = summaries.get(item.productId) ?? {
         availableQuantity: 0,

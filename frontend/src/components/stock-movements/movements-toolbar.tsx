@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { STOCK_MOVEMENT_TYPE_LABELS } from "@/lib/inventory/stock-movement-display";
 import type { Branch } from "@/types/branch";
 import { PRODUCT_TYPE_LABELS, PRODUCT_TYPES } from "@/types/product";
 import type { StockMovementFilters } from "@/types/stock-movements";
@@ -23,23 +24,12 @@ type MovementsToolbarProps = {
   resetBranchId: string;
 };
 
-const MOVEMENT_TYPES: readonly { value: string; label: string }[] = [
-  { value: "opening_stock", label: "Opening Stock" },
-  { value: "purchase_in", label: "Purchase In" },
-  { value: "sale_out", label: "Sale Out" },
-  { value: "adjustment_in", label: "Adjustment In" },
-  { value: "adjustment_out", label: "Adjustment Out" },
-  { value: "wastage", label: "Wastage" },
-  { value: "return_in", label: "Return In" },
-  { value: "transfer", label: "Stock Transfer" },
-  { value: "transfer_in", label: "Transfer In" },
-  { value: "transfer_out", label: "Transfer Out" },
-  { value: "production_in", label: "Production In" },
-  { value: "production_out", label: "Production Out" },
-  { value: "purchase_return_out", label: "Vendor Credit" },
-  { value: "purchase_bill_cancel_out", label: "Purchase Cancellation" },
-  { value: "reversal", label: "Reversal" },
-];
+// Derived from the shared label map: this file used to carry the fourth
+// hand-written copy of these labels, in a diff whose own comments campaign
+// against exactly that drift.
+const MOVEMENT_TYPES: readonly { value: string; label: string }[] = Object.entries(
+  STOCK_MOVEMENT_TYPE_LABELS,
+).map(([value, label]) => ({ label, value }));
 
 function buildResetFilters(resetBranchId: string): StockMovementFilters {
   return {
@@ -64,7 +54,6 @@ function countHiddenFilters(filters: StockMovementFilters): number {
   if (filters.direction !== "all") count += 1;
   if (filters.dateFrom.length > 0) count += 1;
   if (filters.dateTo.length > 0) count += 1;
-  if (filters.createdBy.trim().length > 0) count += 1;
   return count;
 }
 
@@ -214,15 +203,6 @@ export function MovementsToolbar({
           />
         </FilterField>
       </div>
-
-      <FilterField htmlFor="movementFilterCreatedBy" label="Created by">
-        <Input
-          id="movementFilterCreatedBy"
-          onChange={(event) => updateFilters({ createdBy: event.target.value })}
-          placeholder="Created by user..."
-          value={filters.createdBy}
-        />
-      </FilterField>
     </FilterToolbar>
   );
 }

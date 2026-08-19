@@ -126,13 +126,11 @@ export function InventoryModuleClient(): JSX.Element {
   // Dropping the item scope is a URL change, so it belongs to whoever owns the
   // URL. The Movements panel asks; the container edits and pushes.
   const handleClearItemScope = useCallback((): void => {
-    setCarriedParams((current) => {
-      const next = new URLSearchParams(current.toString());
-      next.delete("item");
-      window.history.pushState({}, "", inventoryTabHref("movements", next));
-      return next;
-    });
-  }, []);
+    const next = new URLSearchParams(carriedParams.toString());
+    next.delete("item");
+    window.history.pushState({}, "", inventoryTabHref("movements", next));
+    setCarriedParams(next);
+  }, [carriedParams]);
 
   const timezone = useMemo(resolveDashboardTimezone, []);
   const badgesEnabled = canView && branchScope.hasBranchScope;
@@ -172,7 +170,14 @@ export function InventoryModuleClient(): JSX.Element {
     return <NoBranchScopeCard />;
   }
 
-  const lowStockCount = (badgeInventoryQuery.data ?? []).filter((item) => item.lowStock).length;
+  // The badge reads at most the first 100 rows; past that the count is a
+  // floor, and the "+" says so instead of presenting a truncated number as
+  // the whole answer.
+  const badgeItems = badgeInventoryQuery.data?.items ?? [];
+  const badgeTotal = badgeInventoryQuery.data?.total ?? badgeItems.length;
+  const lowStockOnBadgePage = badgeItems.filter((item) => item.lowStock).length;
+  const lowStockCount =
+    badgeTotal > badgeItems.length ? `${String(lowStockOnBadgePage)}+` : lowStockOnBadgePage;
   const expiringCount = (badgeExpiryQuery.data ?? []).length;
   const itemParam = carriedParams.get("item");
 

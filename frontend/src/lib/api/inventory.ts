@@ -12,7 +12,6 @@ import type {
   InventoryStatus,
   LocationBalance,
   LocationBalanceFilters,
-  LowStockFilters,
   MovementType,
   OpeningStockPayload,
   StockAdjustmentPayload,
@@ -498,8 +497,19 @@ function stockTransferPayload(payload: StockTransferPayload): BackendStockTransf
   };
 }
 
-export async function getInventory(params: InventoryFilters): Promise<InventoryItem[]> {
-  const response = await apiRequest<InventoryItem[]>(
+export type InventoryListResult = {
+  items: InventoryItem[];
+  /** Server-side row count for the filter, before the page limit truncates. */
+  total: number;
+};
+
+export async function getInventory(params: InventoryFilters): Promise<InventoryListResult> {
+  // The backend clamps any missing or >100 limit down to 20 rows. This request
+  // used to send no limit at all, so every consumer -- the list, the KPI strip,
+  // the tab badges -- was silently reading the 20 most recent rows as if they
+  // were the whole branch. Ask for the maximum and carry the server's total so
+  // callers can tell a complete answer from a truncated one.
+  const response = await apiRequest<InventoryListResult>(
     `/api/v1/inventory${queryString({
       search: params.search,
       branch_id: params.branchId,
@@ -511,10 +521,19 @@ export async function getInventory(params: InventoryFilters): Promise<InventoryI
       include_uninitialized: params.includeUninitialized,
       sort_by: params.sortBy,
       sort_order: params.sortOrder,
+      page: 1,
+      limit: 100,
     })}`,
     {
       authMode: "appwrite",
-      parse: (data) => parseList(data, parseInventoryItem),
+      parse: (data) => {
+        const items = parseList(data, parseInventoryItem);
+        const total =
+          isObject(data) && isObject(data.pagination) && typeof data.pagination.total === "number"
+            ? data.pagination.total
+            : items.length;
+        return { items, total };
+      },
     },
   );
 
@@ -600,23 +619,6 @@ export async function getInventoryItemMovements(
     {
       authMode: "appwrite",
       parse: (data) => parseList(data, parseStockMovement),
-    },
-  );
-
-  return response.data;
-}
-
-export async function getLowStock(params: LowStockFilters): Promise<InventoryItem[]> {
-  const response = await apiRequest<InventoryItem[]>(
-    `/api/v1/inventory/low-stock${queryString({
-      search: params.search,
-      branch_id: params.branchId,
-      item_type: params.itemType,
-      product_type: params.productType,
-    })}`,
-    {
-      authMode: "appwrite",
-      parse: (data) => parseList(data, parseInventoryItem),
     },
   );
 
@@ -803,7 +805,6 @@ export async function getLocationBalances(
     `/api/v1/inventory/location-balances${queryString({
       search: filters.search,
       item_type: filters.itemType,
-      product_type: filters.productType,
       stock_location_id: filters.stockLocationId,
       page: filters.page,
       limit: filters.limit,
@@ -839,7 +840,6 @@ export async function getStockTransfers(filters: StockTransferFilters): Promise<
       search: filters.search,
       status: filters.status,
       item_type: filters.itemType,
-      product_type: filters.productType,
       stock_location_id: filters.stockLocationId,
       page: filters.page,
       limit: filters.limit,

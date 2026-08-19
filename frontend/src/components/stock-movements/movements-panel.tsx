@@ -305,7 +305,7 @@ export function MovementsPanel({ itemId, onClearItemScope }: MovementsPanelProps
       />
 
       <ManualMovementDialog
-        inventoryItems={inventoryQuery.data ?? []}
+        inventoryItems={inventoryQuery.data?.items ?? []}
         isSubmitting={manualMutation.isPending}
         onClose={() => setManualOpen(false)}
         onSubmit={handleManualMovement}

@@ -305,7 +305,8 @@ export function InventoryListPanel({ lowStockOnly }: InventoryListPanelProps): J
     );
   };
 
-  const items = inventoryQuery.data ?? [];
+  const items = inventoryQuery.data?.items ?? [];
+  const listTotal = inventoryQuery.data?.total ?? items.length;
   const expiryAlerts = expiryAlertsQuery.data ?? [];
 
   return (
@@ -337,7 +338,11 @@ export function InventoryListPanel({ lowStockOnly }: InventoryListPanelProps): J
         </div>
       ) : null}
 
-      <InventorySummaryCards expiryAlerts={expiryAlerts} items={summaryQuery.data ?? []} />
+      <InventorySummaryCards
+        expiryAlerts={expiryAlerts}
+        items={summaryQuery.data?.items ?? []}
+        total={summaryQuery.data?.total ?? 0}
+      />
 
       <InventoryToolbar
         allowAllBranches={branchScope.canAccessAllBranches}
@@ -398,6 +403,12 @@ export function InventoryListPanel({ lowStockOnly }: InventoryListPanelProps): J
               onView={setSelectedItem}
             />
           </CardContent>
+          {listTotal > items.length ? (
+            <div className="border-t border-border px-4 py-2.5 text-meta tabular-nums text-foreground-muted">
+              Showing the first {items.length} of {listTotal} items - refine the search or filters
+              to narrow the list.
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
