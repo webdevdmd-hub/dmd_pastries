@@ -116,7 +116,7 @@ export function PurchasingItemLines({
   const receivableLines = quantitiesByLine.filter((entry) => entry.kind === "ordered").length;
 
   return (
-    <Card className="bg-card/85">
+    <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <CardTitle>{title}</CardTitle>
         {tracksReceiving ? (

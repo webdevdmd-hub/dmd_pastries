@@ -436,14 +436,14 @@ export function PurchaseOrderReceiveGoodsDialog({
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-border bg-background">
+            <div className="overflow-hidden rounded-md border border-border bg-background">
               {/* Remaining is what the operator is actually counting against. It
                   was computed to pre-fill the input but never shown, leaving
                   "Received" (to date) sitting next to the entry field as the only
                   context -- two different quantities, one word apart. */}
               <div
                 className={cn(
-                  "hidden gap-3 border-b bg-muted/50 px-4 py-3 text-meta font-medium text-foreground-muted lg:grid",
+                  "hidden gap-3 border-b bg-muted px-4 py-3 text-meta font-medium text-foreground-muted lg:grid",
                   GRID,
                 )}
               >
@@ -576,8 +576,8 @@ export function PurchaseOrderReceiveGoodsDialog({
           </div>
         ) : (
           <div className="grid gap-4">
-            <div className="overflow-hidden rounded-2xl border border-border bg-background">
-              <p className="border-b bg-muted/50 px-4 py-3 text-meta font-medium text-foreground-muted">
+            <div className="overflow-hidden rounded-md border border-border bg-background">
+              <p className="border-b bg-muted px-4 py-3 text-meta font-medium text-foreground-muted">
                 Posting this receipt adds the following to stock
               </p>
               {postingRows.map(({ item, quantity }) => {
@@ -604,7 +604,7 @@ export function PurchaseOrderReceiveGoodsDialog({
               })}
               {skippedLines.map(({ item, remaining }) => (
                 <div
-                  className="flex flex-wrap items-baseline justify-between gap-3 border-b bg-muted/40 px-4 py-3 text-foreground-muted last:border-b-0"
+                  className="flex flex-wrap items-baseline justify-between gap-3 border-b bg-muted px-4 py-3 text-foreground-muted last:border-b-0"
                   key={item.id}
                 >
                   <div>

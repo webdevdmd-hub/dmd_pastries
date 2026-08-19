@@ -153,7 +153,7 @@ export function PurchaseDocumentChain({
           : "This purchase timeline has linked downstream documents.";
 
   return (
-    <Card className="overflow-hidden border-brand-cappuccino bg-card/90 shadow-sm">
+    <Card className="overflow-hidden border-brand-cappuccino bg-card shadow-sm">
       <CardHeader className="border-b border-brand-cappuccino bg-card">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>

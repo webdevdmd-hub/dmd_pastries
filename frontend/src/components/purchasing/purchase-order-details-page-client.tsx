@@ -14,7 +14,7 @@ import { PurchaseInvoiceFormDialog } from "@/components/purchasing/purchase-invo
 import { PurchaseOrderFormDialog } from "@/components/purchasing/purchase-order-form-dialog";
 import { PurchaseOrderReceiveGoodsDialog } from "@/components/purchasing/purchase-order-receive-goods-dialog";
 import { PurchaseOrderStatusBadge } from "@/components/purchasing/purchase-order-status-badge";
-import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
+import { PurchaseDetailSkeleton } from "@/components/purchasing/purchase-table-skeleton";
 import { PurchasingItemLines } from "@/components/purchasing/purchasing-item-lines";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -83,7 +83,7 @@ function WorkflowStep({
   return (
     <div
       className={cn(
-        "rounded-2xl border p-4 transition",
+        "rounded-md border p-4 transition",
         isDone
           ? "border-brand-espresso bg-brand-espresso text-primary-foreground"
           : isActive
@@ -169,7 +169,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   }
 
   if (orderQuery.isLoading) {
-    return <PurchaseTableSkeleton />;
+    return <PurchaseDetailSkeleton />;
   }
 
   if (orderQuery.error || !orderQuery.data) {
@@ -422,7 +422,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
         </CardContent>
       </Card>
 
-      <Card className="border-brand-cappuccino bg-card/95 shadow-sm">
+      <Card className="border-brand-cappuccino bg-card shadow-sm">
         <CardHeader className="border-b border-brand-cappuccino">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -468,7 +468,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <Card className="border-brand-cappuccino bg-card/95 shadow-sm">
+        <Card className="border-brand-cappuccino bg-card shadow-sm">
           <CardHeader>
             <CardTitle>What's next?</CardTitle>
           </CardHeader>
@@ -488,7 +488,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
               </Button>
             </div>
             {order.status === "partially_received" ? (
-              <p className="rounded-2xl border border-brand-cappuccino bg-brand-latte p-4 text-sm text-brand-mocha">
+              <p className="rounded-md border border-brand-cappuccino bg-brand-latte p-4 text-sm text-brand-mocha">
                 Partially received purchase orders must be fully received before converting to a
                 bill in this workflow.
               </p>
@@ -496,7 +496,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
           </CardContent>
         </Card>
 
-        <Card className="border-brand-cappuccino bg-card/95 shadow-sm">
+        <Card className="border-brand-cappuccino bg-card shadow-sm">
           <CardHeader>
             <CardTitle>Document summary</CardTitle>
           </CardHeader>
@@ -588,7 +588,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
         />
       </div>
 
-      <Card className="bg-card/85">
+      <Card className="bg-card">
         <CardHeader>
           <CardTitle>Notes</CardTitle>
         </CardHeader>
