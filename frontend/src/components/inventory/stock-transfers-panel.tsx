@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/inventory/access-denied-card";
+import { FilterField, FilterToolbar } from "@/components/shared/filter-toolbar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
@@ -100,6 +101,12 @@ export function StockTransfersPanel(): JSX.Element {
   const canComplete = hasAnyPermission([PERMISSIONS.inventoryTransferComplete]);
   const canCancel = hasAnyPermission([PERMISSIONS.inventoryTransferCancel]);
   const [filters, setFilters] = useState<StockTransferFilters>(() => defaultFilters());
+  // Search shows its own value in the toolbar, so only the popover's three
+  // fields are counted.
+  const transferHiddenFilterCount =
+    (filters.status !== "all" ? 1 : 0) +
+    (filters.itemType !== "all" ? 1 : 0) +
+    (filters.productType !== "all" ? 1 : 0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [payload, setPayload] = useState<StockTransferPayload>(emptyPayload);
   const debouncedSearch = useDebouncedValue(filters.search);
@@ -240,90 +247,86 @@ export function StockTransfersPanel(): JSX.Element {
         </div>
       ) : null}
 
-      <Card>
-        <CardContent className="grid gap-4 p-5 md:grid-cols-4">
-          <div className="space-y-1">
-            <Label>Search</Label>
-            <Input
-              placeholder="Search item or reference"
-              value={filters.search}
-              onChange={(event) =>
-                setFilters((current) => ({ ...current, search: event.target.value, page: 1 }))
-              }
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Status</Label>
-            <Select
-              value={filters.status}
-              onValueChange={(value) =>
-                setFilters((current) => ({
-                  ...current,
-                  status: value as StockTransferStatus | "all",
-                  page: 1,
-                }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Item type</Label>
-            <Select
-              value={filters.itemType}
-              onValueChange={(value) =>
-                setFilters((current) => ({
-                  ...current,
-                  itemType: value as StockTransferFilters["itemType"],
-                  page: 1,
-                }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All item types</SelectItem>
-                <SelectItem value="product">Products</SelectItem>
-                <SelectItem value="product_variant">Variants</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Product type</Label>
-            <Select
-              value={filters.productType}
-              onValueChange={(value) =>
-                setFilters((current) => ({
-                  ...current,
-                  productType: value as StockTransferFilters["productType"],
-                  page: 1,
-                }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All product types</SelectItem>
-                {PRODUCT_TYPES.map((productType) => (
-                  <SelectItem key={productType} value={productType}>
-                    {PRODUCT_TYPE_LABELS[productType]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <FilterToolbar
+        hasAnyFilter={transferHiddenFilterCount > 0 || filters.search.trim().length > 0}
+        hiddenFilterCount={transferHiddenFilterCount}
+        onReset={() => setFilters(defaultFilters())}
+        onSearchChange={(search) => setFilters((current) => ({ ...current, search, page: 1 }))}
+        popoverTitle="Filter transfers"
+        searchAriaLabel="Search stock transfers"
+        searchPlaceholder="Search item or reference"
+        searchValue={filters.search}
+      >
+        <FilterField htmlFor="transferFilterStatus" label="Status">
+          <Select
+            value={filters.status}
+            onValueChange={(value) =>
+              setFilters((current) => ({
+                ...current,
+                status: value as StockTransferStatus | "all",
+                page: 1,
+              }))
+            }
+          >
+            <SelectTrigger id="transferFilterStatus">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        <FilterField htmlFor="transferFilterItemType" label="Item type">
+          <Select
+            value={filters.itemType}
+            onValueChange={(value) =>
+              setFilters((current) => ({
+                ...current,
+                itemType: value as StockTransferFilters["itemType"],
+                page: 1,
+              }))
+            }
+          >
+            <SelectTrigger id="transferFilterItemType">
+              <SelectValue placeholder="Item type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All item types</SelectItem>
+              <SelectItem value="product">Products</SelectItem>
+              <SelectItem value="product_variant">Variants</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        <FilterField htmlFor="transferFilterProductType" label="Product type">
+          <Select
+            value={filters.productType}
+            onValueChange={(value) =>
+              setFilters((current) => ({
+                ...current,
+                productType: value as StockTransferFilters["productType"],
+                page: 1,
+              }))
+            }
+          >
+            <SelectTrigger id="transferFilterProductType">
+              <SelectValue placeholder="Product type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All product types</SelectItem>
+              {PRODUCT_TYPES.map((productType) => (
+                <SelectItem key={productType} value={productType}>
+                  {PRODUCT_TYPE_LABELS[productType]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+      </FilterToolbar>
 
       <Card>
         <CardContent className="p-0">

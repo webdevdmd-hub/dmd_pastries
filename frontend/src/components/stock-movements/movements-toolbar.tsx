@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { Button } from "@/components/ui/button";
+import { FilterField, FilterToolbar } from "@/components/shared/filter-toolbar";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -23,6 +23,51 @@ type MovementsToolbarProps = {
   resetBranchId: string;
 };
 
+const MOVEMENT_TYPES: readonly { value: string; label: string }[] = [
+  { value: "opening_stock", label: "Opening Stock" },
+  { value: "purchase_in", label: "Purchase In" },
+  { value: "sale_out", label: "Sale Out" },
+  { value: "adjustment_in", label: "Adjustment In" },
+  { value: "adjustment_out", label: "Adjustment Out" },
+  { value: "wastage", label: "Wastage" },
+  { value: "return_in", label: "Return In" },
+  { value: "transfer", label: "Stock Transfer" },
+  { value: "transfer_in", label: "Transfer In" },
+  { value: "transfer_out", label: "Transfer Out" },
+  { value: "production_in", label: "Production In" },
+  { value: "production_out", label: "Production Out" },
+  { value: "purchase_return_out", label: "Vendor Credit" },
+  { value: "purchase_bill_cancel_out", label: "Purchase Cancellation" },
+  { value: "reversal", label: "Reversal" },
+];
+
+function buildResetFilters(resetBranchId: string): StockMovementFilters {
+  return {
+    search: "",
+    branchId: resetBranchId,
+    itemType: "all",
+    productType: "all",
+    movementType: "all",
+    direction: "all",
+    dateFrom: "",
+    dateTo: "",
+    createdBy: "",
+  };
+}
+
+/** Branch is scope and search is visible in the toolbar, so neither counts. */
+function countHiddenFilters(filters: StockMovementFilters): number {
+  let count = 0;
+  if (filters.itemType !== "all") count += 1;
+  if (filters.productType !== "all") count += 1;
+  if (filters.movementType !== "all") count += 1;
+  if (filters.direction !== "all") count += 1;
+  if (filters.dateFrom.length > 0) count += 1;
+  if (filters.dateTo.length > 0) count += 1;
+  if (filters.createdBy.trim().length > 0) count += 1;
+  return count;
+}
+
 export function MovementsToolbar({
   allowAllBranches = true,
   branches,
@@ -34,143 +79,150 @@ export function MovementsToolbar({
     onFiltersChange({ ...filters, ...nextFilters });
   };
 
+  const hiddenFilterCount = countHiddenFilters(filters);
+  const isBranchNarrowed = allowAllBranches && filters.branchId !== resetBranchId;
+  const hasAnyFilter =
+    hiddenFilterCount > 0 || isBranchNarrowed || filters.search.trim().length > 0;
+
   return (
-    <div className="grid gap-3 rounded-3xl border border-border bg-card/70 p-4 shadow-soft lg:grid-cols-4 xl:grid-cols-9">
-      <Input
-        aria-label="Search stock movements"
-        onChange={(event) => updateFilters({ search: event.target.value })}
-        placeholder="Search item, reference..."
-        value={filters.search}
-      />
-      <Select onValueChange={(branchId) => updateFilters({ branchId })} value={filters.branchId}>
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {allowAllBranches ? <SelectItem value="all">All branches</SelectItem> : null}
-          {branches.map((branch) => (
-            <SelectItem key={branch.id} value={branch.id}>
-              {branch.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select
-        onValueChange={(itemType) =>
-          updateFilters({ itemType: itemType as StockMovementFilters["itemType"] })
-        }
-        value={filters.itemType}
-      >
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All item types</SelectItem>
-          <SelectItem value="product">Products</SelectItem>
-          <SelectItem value="product_variant">Variants</SelectItem>
-        </SelectContent>
-      </Select>
-      <Select
-        onValueChange={(productType) =>
-          updateFilters({ productType: productType as StockMovementFilters["productType"] })
-        }
-        value={filters.productType}
-      >
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All product types</SelectItem>
-          {PRODUCT_TYPES.map((productType) => (
-            <SelectItem key={productType} value={productType}>
-              {PRODUCT_TYPE_LABELS[productType]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select
-        onValueChange={(movementType) =>
-          updateFilters({ movementType: movementType as StockMovementFilters["movementType"] })
-        }
-        value={filters.movementType}
-      >
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All movements</SelectItem>
-          <SelectItem value="opening_stock">Opening Stock</SelectItem>
-          <SelectItem value="purchase_in">Purchase In</SelectItem>
-          <SelectItem value="sale_out">Sale Out</SelectItem>
-          <SelectItem value="adjustment_in">Adjustment In</SelectItem>
-          <SelectItem value="adjustment_out">Adjustment Out</SelectItem>
-          <SelectItem value="wastage">Wastage</SelectItem>
-          <SelectItem value="return_in">Return In</SelectItem>
-          <SelectItem value="transfer">Stock Transfer</SelectItem>
-          <SelectItem value="transfer_in">Transfer In</SelectItem>
-          <SelectItem value="transfer_out">Transfer Out</SelectItem>
-          <SelectItem value="production_in">Production In</SelectItem>
-          <SelectItem value="production_out">Production Out</SelectItem>
-          <SelectItem value="purchase_return_out">Vendor Credit</SelectItem>
-          <SelectItem value="purchase_bill_cancel_out">Purchase Cancellation</SelectItem>
-          <SelectItem value="reversal">Reversal</SelectItem>
-        </SelectContent>
-      </Select>
-      <Select
-        onValueChange={(direction) =>
-          updateFilters({ direction: direction as StockMovementFilters["direction"] })
-        }
-        value={filters.direction}
-      >
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All directions</SelectItem>
-          <SelectItem value="in">In</SelectItem>
-          <SelectItem value="out">Out</SelectItem>
-          <SelectItem value="transfer">Transfer</SelectItem>
-          <SelectItem value="neutral">Neutral</SelectItem>
-        </SelectContent>
-      </Select>
-      <Input
-        aria-label="Date from"
-        onChange={(event) => updateFilters({ dateFrom: event.target.value })}
-        type="date"
-        value={filters.dateFrom}
-      />
-      <Input
-        aria-label="Date to"
-        onChange={(event) => updateFilters({ dateTo: event.target.value })}
-        type="date"
-        value={filters.dateTo}
-      />
-      <Button
-        onClick={() =>
-          onFiltersChange({
-            search: "",
-            branchId: resetBranchId,
-            itemType: "all",
-            productType: "all",
-            movementType: "all",
-            direction: "all",
-            dateFrom: "",
-            dateTo: "",
-            createdBy: "",
-          })
-        }
-        type="button"
-        variant="outline"
-      >
-        Reset
-      </Button>
-      <Input
-        aria-label="Created by"
-        className="lg:col-span-2"
-        onChange={(event) => updateFilters({ createdBy: event.target.value })}
-        placeholder="Created by user..."
-        value={filters.createdBy}
-      />
-    </div>
+    <FilterToolbar
+      hasAnyFilter={hasAnyFilter}
+      hiddenFilterCount={hiddenFilterCount}
+      onReset={() => onFiltersChange(buildResetFilters(resetBranchId))}
+      onSearchChange={(search) => updateFilters({ search })}
+      popoverTitle="Filter movements"
+      searchAriaLabel="Search stock movements"
+      searchPlaceholder="Search item, reference..."
+      searchValue={filters.search}
+    >
+      {allowAllBranches ? (
+        <FilterField htmlFor="movementFilterBranch" label="Branch">
+          <Select
+            onValueChange={(branchId) => updateFilters({ branchId })}
+            value={filters.branchId}
+          >
+            <SelectTrigger id="movementFilterBranch">
+              <SelectValue placeholder="Branch" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All branches</SelectItem>
+              {branches.map((branch) => (
+                <SelectItem key={branch.id} value={branch.id}>
+                  {branch.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+      ) : null}
+
+      <FilterField htmlFor="movementFilterItemType" label="Item type">
+        <Select
+          onValueChange={(itemType) =>
+            updateFilters({ itemType: itemType as StockMovementFilters["itemType"] })
+          }
+          value={filters.itemType}
+        >
+          <SelectTrigger id="movementFilterItemType">
+            <SelectValue placeholder="Item type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All item types</SelectItem>
+            <SelectItem value="product">Products</SelectItem>
+            <SelectItem value="product_variant">Variants</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterField>
+
+      <FilterField htmlFor="movementFilterProductType" label="Product type">
+        <Select
+          onValueChange={(productType) =>
+            updateFilters({ productType: productType as StockMovementFilters["productType"] })
+          }
+          value={filters.productType}
+        >
+          <SelectTrigger id="movementFilterProductType">
+            <SelectValue placeholder="Product type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All product types</SelectItem>
+            {PRODUCT_TYPES.map((productType) => (
+              <SelectItem key={productType} value={productType}>
+                {PRODUCT_TYPE_LABELS[productType]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FilterField>
+
+      <FilterField htmlFor="movementFilterMovementType" label="Movement">
+        <Select
+          onValueChange={(movementType) =>
+            updateFilters({ movementType: movementType as StockMovementFilters["movementType"] })
+          }
+          value={filters.movementType}
+        >
+          <SelectTrigger id="movementFilterMovementType">
+            <SelectValue placeholder="Movement" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All movements</SelectItem>
+            {MOVEMENT_TYPES.map((movementType) => (
+              <SelectItem key={movementType.value} value={movementType.value}>
+                {movementType.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FilterField>
+
+      <FilterField htmlFor="movementFilterDirection" label="Direction">
+        <Select
+          onValueChange={(direction) =>
+            updateFilters({ direction: direction as StockMovementFilters["direction"] })
+          }
+          value={filters.direction}
+        >
+          <SelectTrigger id="movementFilterDirection">
+            <SelectValue placeholder="Direction" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All directions</SelectItem>
+            <SelectItem value="in">In</SelectItem>
+            <SelectItem value="out">Out</SelectItem>
+            <SelectItem value="transfer">Transfer</SelectItem>
+            <SelectItem value="neutral">Neutral</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterField>
+
+      <div className="grid grid-cols-2 gap-2 border-t border-border pt-3">
+        <FilterField htmlFor="movementFilterDateFrom" label="From">
+          <Input
+            id="movementFilterDateFrom"
+            onChange={(event) => updateFilters({ dateFrom: event.target.value })}
+            type="date"
+            value={filters.dateFrom}
+          />
+        </FilterField>
+        <FilterField htmlFor="movementFilterDateTo" label="To">
+          <Input
+            id="movementFilterDateTo"
+            onChange={(event) => updateFilters({ dateTo: event.target.value })}
+            type="date"
+            value={filters.dateTo}
+          />
+        </FilterField>
+      </div>
+
+      <FilterField htmlFor="movementFilterCreatedBy" label="Created by">
+        <Input
+          id="movementFilterCreatedBy"
+          onChange={(event) => updateFilters({ createdBy: event.target.value })}
+          placeholder="Created by user..."
+          value={filters.createdBy}
+        />
+      </FilterField>
+    </FilterToolbar>
   );
 }

@@ -8,9 +8,9 @@ import { InventoryEmptyState } from "@/components/inventory/inventory-empty-stat
 import { InventoryErrorState } from "@/components/inventory/inventory-error-state";
 import { InventoryTableSkeleton } from "@/components/inventory/inventory-table-skeleton";
 import { FilteredState } from "@/components/shared/collection-state";
+import { FilterField, FilterToolbar } from "@/components/shared/filter-toolbar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -100,6 +100,12 @@ export function ExpiryAlertsPanel(): JSX.Element {
     branchId: branchScope.defaultBranchId,
     timezone,
   });
+  // The expiry-alerts endpoint takes no search term, so this filters the
+  // batches already loaded. That is honest here and nowhere else in the module:
+  // the response is bounded by the days window, so there is no page 2 hiding a
+  // match. It is kept out of ExpiryAlertFilters so it can never be mistaken for
+  // something the query sends.
+  const [search, setSearch] = useState("");
   const alertsQuery = useExpiryAlerts(filters, canView && branchScope.hasBranchScope);
   const branchesQuery = useBranches(canView);
   const branchOptions = useMemo(
@@ -116,11 +122,25 @@ export function ExpiryAlertsPanel(): JSX.Element {
   // Branch and timezone are scope, not filters: both always carry a value, so
   // counting them would make a genuinely quiet alert list read as a narrow
   // search. The days window is a real filter — 3 days hides what 30 shows.
-  const hasActiveFilters =
-    filters.itemType !== defaultFilters.itemType ||
-    filters.productType !== defaultFilters.productType ||
-    filters.expiryState !== defaultFilters.expiryState ||
-    filters.days !== defaultFilters.days;
+  const hiddenFilterCount =
+    (filters.itemType !== defaultFilters.itemType ? 1 : 0) +
+    (filters.productType !== defaultFilters.productType ? 1 : 0) +
+    (filters.expiryState !== defaultFilters.expiryState ? 1 : 0) +
+    (filters.days !== defaultFilters.days ? 1 : 0);
+  const hasActiveFilters = hiddenFilterCount > 0 || search.trim().length > 0;
+
+  const visibleBatches = useMemo(() => {
+    const batches = alertsQuery.data ?? [];
+    const term = search.trim().toLowerCase();
+    if (!term) {
+      return batches;
+    }
+    return batches.filter((batch) =>
+      [batch.itemName, batch.itemCode, batch.batchNumber].some((field) =>
+        field?.toLowerCase().includes(term),
+      ),
+    );
+  }, [alertsQuery.data, search]);
 
   function getBranchLabel(batch: ExpiryBatch): string {
     return (
@@ -147,97 +167,114 @@ export function ExpiryAlertsPanel(): JSX.Element {
 
   return (
     <>
-      <div className="grid gap-3 rounded-3xl border border-border bg-card/70 p-4 shadow-soft md:grid-cols-6">
-        <Select
-          onValueChange={(branchId) => setFilters({ ...filters, branchId })}
-          value={filters.branchId}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {branchScope.canAccessAllBranches ? (
-              <SelectItem value="all">All branches</SelectItem>
-            ) : null}
-            {branchOptions.map((branch) => (
-              <SelectItem key={branch.id} value={branch.id}>
-                {branch.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          onValueChange={(itemType) =>
-            setFilters({ ...filters, itemType: itemType as ExpiryAlertFilters["itemType"] })
-          }
-          value={filters.itemType}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All types</SelectItem>
-            <SelectItem value="product">Products</SelectItem>
-            <SelectItem value="product_variant">Variants</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          onValueChange={(productType) =>
-            setFilters({
-              ...filters,
-              productType: productType as ExpiryAlertFilters["productType"],
-            })
-          }
-          value={filters.productType}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All product types</SelectItem>
-            {PRODUCT_TYPES.map((productType) => (
-              <SelectItem key={productType} value={productType}>
-                {PRODUCT_TYPE_LABELS[productType]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          onValueChange={(expiryState) =>
-            setFilters({
-              ...filters,
-              expiryState: expiryState as ExpiryAlertFilters["expiryState"],
-            })
-          }
-          value={filters.expiryState}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All expiry states</SelectItem>
-            <SelectItem value="expiring_soon">Expiring Soon</SelectItem>
-            <SelectItem value="expires_today">Expires Today</SelectItem>
-            <SelectItem value="expired">Expired / Overdue</SelectItem>
-          </SelectContent>
-        </Select>
-        <Input
-          aria-label="Days window"
-          min={1}
-          onChange={(event) => setFilters({ ...filters, days: Number(event.target.value) })}
-          type="number"
-          value={filters.days}
-        />
-        <Button
-          onClick={() =>
-            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId, timezone })
-          }
-          type="button"
-          variant="outline"
-        >
-          Reset
-        </Button>
-      </div>
+      <FilterToolbar
+        hasAnyFilter={hasActiveFilters}
+        hiddenFilterCount={hiddenFilterCount}
+        onReset={() => {
+          setSearch("");
+          setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId, timezone });
+        }}
+        onSearchChange={setSearch}
+        popoverTitle="Filter expiry alerts"
+        searchAriaLabel="Search expiry alerts"
+        searchPlaceholder="Search item, code, batch..."
+        searchValue={search}
+      >
+        {branchScope.canAccessAllBranches ? (
+          <FilterField htmlFor="expiryFilterBranch" label="Branch">
+            <Select
+              onValueChange={(branchId) => setFilters({ ...filters, branchId })}
+              value={filters.branchId}
+            >
+              <SelectTrigger id="expiryFilterBranch">
+                <SelectValue placeholder="Branch" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All branches</SelectItem>
+                {branchOptions.map((branch) => (
+                  <SelectItem key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+        ) : null}
+
+        <FilterField htmlFor="expiryFilterItemType" label="Item type">
+          <Select
+            onValueChange={(itemType) =>
+              setFilters({ ...filters, itemType: itemType as ExpiryAlertFilters["itemType"] })
+            }
+            value={filters.itemType}
+          >
+            <SelectTrigger id="expiryFilterItemType">
+              <SelectValue placeholder="Item type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              <SelectItem value="product">Products</SelectItem>
+              <SelectItem value="product_variant">Variants</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        <FilterField htmlFor="expiryFilterProductType" label="Product type">
+          <Select
+            onValueChange={(productType) =>
+              setFilters({
+                ...filters,
+                productType: productType as ExpiryAlertFilters["productType"],
+              })
+            }
+            value={filters.productType}
+          >
+            <SelectTrigger id="expiryFilterProductType">
+              <SelectValue placeholder="Product type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All product types</SelectItem>
+              {PRODUCT_TYPES.map((productType) => (
+                <SelectItem key={productType} value={productType}>
+                  {PRODUCT_TYPE_LABELS[productType]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        <FilterField htmlFor="expiryFilterState" label="Expiry state">
+          <Select
+            onValueChange={(expiryState) =>
+              setFilters({
+                ...filters,
+                expiryState: expiryState as ExpiryAlertFilters["expiryState"],
+              })
+            }
+            value={filters.expiryState}
+          >
+            <SelectTrigger id="expiryFilterState">
+              <SelectValue placeholder="Expiry state" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All expiry states</SelectItem>
+              <SelectItem value="expiring_soon">Expiring Soon</SelectItem>
+              <SelectItem value="expires_today">Expires Today</SelectItem>
+              <SelectItem value="expired">Expired / Overdue</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        <FilterField htmlFor="expiryFilterDays" label="Days ahead">
+          <Input
+            id="expiryFilterDays"
+            min={1}
+            onChange={(event) => setFilters({ ...filters, days: Number(event.target.value) })}
+            type="number"
+            value={filters.days}
+          />
+        </FilterField>
+      </FilterToolbar>
 
       {alertsQuery.isLoading ? <InventoryTableSkeleton /> : null}
       {!alertsQuery.isLoading && alertsQuery.error ? (
@@ -253,7 +290,7 @@ export function ExpiryAlertsPanel(): JSX.Element {
           window is hiding batches that expire on Friday. DESIGN.md §8. */}
       {!alertsQuery.isLoading &&
       !alertsQuery.error &&
-      (alertsQuery.data ?? []).length === 0 &&
+      visibleBatches.length === 0 &&
       hasActiveFilters ? (
         <FilteredState
           noun="expiry alerts"
@@ -265,14 +302,14 @@ export function ExpiryAlertsPanel(): JSX.Element {
       ) : null}
       {!alertsQuery.isLoading &&
       !alertsQuery.error &&
-      (alertsQuery.data ?? []).length === 0 &&
+      visibleBatches.length === 0 &&
       !hasActiveFilters ? (
         <InventoryEmptyState
           description="No expiry-sensitive batches match the selected alert window."
           title="No expiry alerts found."
         />
       ) : null}
-      {!alertsQuery.isLoading && !alertsQuery.error && (alertsQuery.data ?? []).length > 0 ? (
+      {!alertsQuery.isLoading && !alertsQuery.error && visibleBatches.length > 0 ? (
         <Card>
           <CardContent className="p-0">
             <Table>
@@ -290,7 +327,7 @@ export function ExpiryAlertsPanel(): JSX.Element {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(alertsQuery.data ?? []).map((batch) => {
+                {visibleBatches.map((batch) => {
                   const remaining = batch.daysRemaining;
                   return (
                     <TableRow key={batch.id}>

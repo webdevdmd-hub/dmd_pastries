@@ -4,11 +4,10 @@ import type { JSX } from "react";
 import { useMemo, useState } from "react";
 
 import { AccessDeniedCard } from "@/components/inventory/access-denied-card";
+import { FilterField, FilterToolbar } from "@/components/shared/filter-toolbar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -76,6 +75,12 @@ export function LocationBalancesPanel(): JSX.Element {
   const balances = balancesQuery.data ?? [];
   const isPermissionDenied =
     balancesQuery.error instanceof ApiError && balancesQuery.error.status === 403;
+  // Search shows its own value in the toolbar, so only the popover's own three
+  // fields are counted.
+  const hiddenFilterCount =
+    (filters.itemType !== "all" ? 1 : 0) +
+    (filters.productType !== "all" ? 1 : 0) +
+    (filters.stockLocationId !== "all" ? 1 : 0);
 
   if (!canView) {
     return <AccessDeniedCard message="You need inventory.view to view location balances." />;
@@ -87,88 +92,84 @@ export function LocationBalancesPanel(): JSX.Element {
 
   return (
     <>
-      <Card>
-        <CardContent className="grid gap-4 p-5 md:grid-cols-4">
-          <div className="space-y-1">
-            <Label>Search item</Label>
-            <Input
-              placeholder="Search item name or code"
-              value={filters.search}
-              onChange={(event) =>
-                setFilters((current) => ({ ...current, search: event.target.value, page: 1 }))
-              }
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Item type</Label>
-            <Select
-              value={filters.itemType}
-              onValueChange={(value) =>
-                setFilters((current) => ({
-                  ...current,
-                  itemType: value as LocationBalanceFilters["itemType"],
-                  page: 1,
-                }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All item types</SelectItem>
-                <SelectItem value="product">Products</SelectItem>
-                <SelectItem value="product_variant">Variants</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Product type</Label>
-            <Select
-              value={filters.productType}
-              onValueChange={(value) =>
-                setFilters((current) => ({
-                  ...current,
-                  productType: value as LocationBalanceFilters["productType"],
-                  page: 1,
-                }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All product types</SelectItem>
-                {PRODUCT_TYPES.map((productType) => (
-                  <SelectItem key={productType} value={productType}>
-                    {PRODUCT_TYPE_LABELS[productType]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Stock location</Label>
-            <Select
-              value={filters.stockLocationId}
-              onValueChange={(value) =>
-                setFilters((current) => ({ ...current, stockLocationId: value, page: 1 }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All locations</SelectItem>
-                {(locationsQuery.data ?? []).map((location) => (
-                  <SelectItem key={location.id} value={location.id}>
-                    {location.locationName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <FilterToolbar
+        hasAnyFilter={hiddenFilterCount > 0 || filters.search.trim().length > 0}
+        hiddenFilterCount={hiddenFilterCount}
+        onReset={() => setFilters(defaultFilters())}
+        onSearchChange={(search) => setFilters((current) => ({ ...current, search, page: 1 }))}
+        popoverTitle="Filter location balances"
+        searchAriaLabel="Search location balances"
+        searchPlaceholder="Search item name or code"
+        searchValue={filters.search}
+      >
+        <FilterField htmlFor="locationFilterItemType" label="Item type">
+          <Select
+            value={filters.itemType}
+            onValueChange={(value) =>
+              setFilters((current) => ({
+                ...current,
+                itemType: value as LocationBalanceFilters["itemType"],
+                page: 1,
+              }))
+            }
+          >
+            <SelectTrigger id="locationFilterItemType">
+              <SelectValue placeholder="Item type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All item types</SelectItem>
+              <SelectItem value="product">Products</SelectItem>
+              <SelectItem value="product_variant">Variants</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        <FilterField htmlFor="locationFilterProductType" label="Product type">
+          <Select
+            value={filters.productType}
+            onValueChange={(value) =>
+              setFilters((current) => ({
+                ...current,
+                productType: value as LocationBalanceFilters["productType"],
+                page: 1,
+              }))
+            }
+          >
+            <SelectTrigger id="locationFilterProductType">
+              <SelectValue placeholder="Product type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All product types</SelectItem>
+              {PRODUCT_TYPES.map((productType) => (
+                <SelectItem key={productType} value={productType}>
+                  {PRODUCT_TYPE_LABELS[productType]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        <FilterField htmlFor="locationFilterLocation" label="Stock location">
+          <Select
+            value={filters.stockLocationId}
+            onValueChange={(value) =>
+              setFilters((current) => ({ ...current, stockLocationId: value, page: 1 }))
+            }
+          >
+            <SelectTrigger id="locationFilterLocation">
+              <SelectValue placeholder="Stock location" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All locations</SelectItem>
+              {(locationsQuery.data ?? []).map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  {location.locationName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+      </FilterToolbar>
 
       <Card>
         <CardContent className="p-0">
