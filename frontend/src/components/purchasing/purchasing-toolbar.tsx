@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils/cn";
 import type {
   PurchasingBranchOption,
   PurchasingFilters,
@@ -43,7 +44,14 @@ export function PurchasingToolbar({
   };
 
   return (
-    <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-card/80 p-4 lg:grid-cols-[1.4fr_repeat(6,minmax(0,1fr))]">
+    <div
+      className={cn(
+        "grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-card/80 p-4",
+        paymentStatuses
+          ? "lg:grid-cols-[1.4fr_repeat(6,minmax(0,1fr))]"
+          : "lg:grid-cols-[1.4fr_repeat(5,minmax(0,1fr))]",
+      )}
+    >
       <Input
         aria-label="Search purchasing records"
         onChange={(event) => updateFilter({ search: event.target.value })}

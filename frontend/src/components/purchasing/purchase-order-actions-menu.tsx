@@ -89,32 +89,23 @@ export function PurchaseOrderActionsMenu({
             {canAdjustRemaining ? (
               <DropdownMenuItem onSelect={() => onEdit(order)}>Adjust remaining</DropdownMenuItem>
             ) : null}
-            {canUpdateStatus ? (
-              <DropdownMenuItem
-                disabled={order.status !== "draft"}
-                onSelect={() => onStatusChange(order, "ordered")}
-              >
+            {canUpdateStatus && order.status === "draft" ? (
+              <DropdownMenuItem onSelect={() => onStatusChange(order, "ordered")}>
                 Mark as issued
               </DropdownMenuItem>
             ) : null}
-            <DropdownMenuItem
-              disabled={!canConvertToBill || !isConversionEligible}
-              onSelect={() => onConvertToBill(order)}
-            >
-              Convert to bill
-            </DropdownMenuItem>
-            {canReceiveOrder ? (
-              <DropdownMenuItem disabled={!canReceive} onSelect={() => onReceive(order)}>
-                Receive goods
+            {canConvertToBill && isConversionEligible ? (
+              <DropdownMenuItem onSelect={() => onConvertToBill(order)}>
+                Convert to bill
               </DropdownMenuItem>
             ) : null}
+            {canReceiveOrder && canReceive ? (
+              <DropdownMenuItem onSelect={() => onReceive(order)}>Receive goods</DropdownMenuItem>
+            ) : null}
             <DropdownMenuSeparator />
-            {canUpdateStatus ? (
-              <DropdownMenuItem
-                disabled={order.status === "received" || order.status === "cancelled"}
-                onSelect={() => onStatusChange(order, "cancelled")}
-              >
-                Cancel
+            {canUpdateStatus && order.status !== "received" && order.status !== "cancelled" ? (
+              <DropdownMenuItem onSelect={() => onStatusChange(order, "cancelled")}>
+                Cancel order
               </DropdownMenuItem>
             ) : null}
             {canReopen ? (

@@ -73,7 +73,7 @@ function ChainCard({
           {icon}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[0.65rem] font-bold text-brand-mocha">{stage}</p>
+          <p className="text-meta font-medium text-brand-mocha">{stage}</p>
           <p className="truncate text-sm font-semibold text-brand-espresso">{title}</p>
           <p className="mt-1 text-xs text-brand-mocha">{description}</p>
           {children ? (

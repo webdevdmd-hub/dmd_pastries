@@ -32,6 +32,7 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useAllChartAccounts } from "@/hooks/use-accounting";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePermission } from "@/hooks/use-permission";
 import {
   useCreatePurchaseInvoice,
@@ -126,7 +127,14 @@ export function PurchaseOrdersPageClient(): JSX.Element {
   const [receivingOrderId, setReceivingOrderId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
-  const ordersQuery = usePurchaseOrders(filters, canView && branchScope.hasBranchScope);
+  // Typing in search used to fire one request per keystroke: the raw filters
+  // object fed the query key directly. Debounce only the search half; the
+  // dropdowns and dates still apply instantly.
+  const debouncedSearch = useDebouncedValue(filters.search);
+  const ordersQuery = usePurchaseOrders(
+    { ...filters, search: debouncedSearch },
+    canView && branchScope.hasBranchScope,
+  );
   const editingOrderQuery = usePurchaseOrder(
     editingOrderId,
     canView && branchScope.hasBranchScope && editingOrderId !== null,
@@ -511,14 +519,22 @@ export function PurchaseOrdersPageClient(): JSX.Element {
                 ? "Delete purchase order"
                 : pendingAction?.type === "reopen"
                   ? "Reopen purchase order"
-                  : "Change purchase order status"}
+                  : pendingAction?.status === "ordered"
+                    ? `Issue ${pendingAction.order.purchaseOrderNumber} to ${pendingAction.order.supplierName}?`
+                    : pendingAction?.status === "cancelled"
+                      ? `Cancel ${pendingAction.order.purchaseOrderNumber}?`
+                      : "Change purchase order status"}
             </DialogTitle>
             <DialogDescription>
               {pendingAction?.type === "delete"
                 ? "This will permanently delete the purchase order plus linked draft bills, draft receive-goods records, and draft vendor credits. Posted bills, posted GRNs, stock movements, journals, supplier payments, or posted vendor credits will block deletion."
                 : pendingAction?.type === "reopen"
                   ? "Reopen this cancelled purchase order as a draft only if it has no linked receipt, bill, payment, return, or stock history."
-                  : `Update ${pendingAction?.order.purchaseOrderNumber ?? "order"} to ${pendingAction?.status ?? "status"}?`}
+                  : pendingAction?.status === "ordered"
+                    ? "The order moves from Draft to Ordered and becomes receivable."
+                    : pendingAction?.status === "cancelled"
+                      ? "The order moves to Cancelled and can no longer be received. It can be reopened as a draft later if nothing else links to it."
+                      : `Update ${pendingAction?.order.purchaseOrderNumber ?? "order"} to ${pendingAction?.status ?? "status"}?`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -541,7 +557,11 @@ export function PurchaseOrdersPageClient(): JSX.Element {
                 ? "Delete purchase order"
                 : pendingAction?.type === "reopen"
                   ? "Reopen purchase order"
-                  : "Confirm"}
+                  : pendingAction?.status === "ordered"
+                    ? "Issue order"
+                    : pendingAction?.status === "cancelled"
+                      ? "Cancel order"
+                      : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -127,6 +127,14 @@ function formatAmount(value: number): string {
   return value.toFixed(2);
 }
 
+/* The one screen where a buyer sets unit cost never said AED (C4). Quantities
+   keep formatAmount; money renders through the locale formatter. */
+const moneyFormat = new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" });
+
+function formatMoney(value: number): string {
+  return moneyFormat.format(value);
+}
+
 function withSnapshotOption(
   options: SearchableComboboxOption[],
   selectedValue: string,
@@ -161,11 +169,7 @@ function optionSearchText(option: SearchableComboboxOption): string {
 }
 
 function MiniLabel({ children }: { children: ReactNode }): JSX.Element {
-  return (
-    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-workspace-muted">
-      {children}
-    </span>
-  );
+  return <span className="mb-1 block text-meta font-medium text-workspace-muted">{children}</span>;
 }
 
 export function PurchasingItemLineEditor({
@@ -387,8 +391,8 @@ export function PurchasingItemLineEditor({
                 <th className="w-[220px] px-2 py-2">Item Details</th>
                 <th className="w-[200px] px-2 py-2">Account</th>
                 <th className="w-[64px] px-2 py-2 text-right">Qty</th>
-                <th className="w-[78px] px-2 py-2 text-right">Rate</th>
-                <th className="w-[78px] px-2 py-2 text-right">Discount</th>
+                <th className="w-[88px] px-2 py-2 text-right">Rate (AED)</th>
+                <th className="w-[96px] px-2 py-2 text-right">Discount (AED)</th>
                 <th className="w-[118px] px-2 py-2">Tax</th>
                 <th className="w-[104px] px-2 py-2">Unit</th>
                 <th className="w-[92px] px-2 py-2 text-right">Amount</th>
@@ -423,7 +427,7 @@ export function PurchasingItemLineEditor({
                     className={cn(
                       "border-b border-workspace-border align-top",
                       accountLine
-                        ? "border-l-2 border-l-amber-400 bg-warning-tint/30"
+                        ? "border-l-2 border-l-warning bg-warning-tint/30"
                         : "border-l-2 border-l-brand-caramel/60",
                       lineError ? "bg-danger-tint/60" : undefined,
                     )}
@@ -476,7 +480,7 @@ export function PurchasingItemLineEditor({
                           </SelectContent>
                         </Select>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-brand-mocha">
+                        <span className="inline-flex items-center gap-1 text-meta font-medium text-brand-mocha">
                           <Package className="h-3.5 w-3.5" />
                           Item {index + 1}
                         </span>
@@ -500,7 +504,7 @@ export function PurchasingItemLineEditor({
                             placeholder="Description, e.g. Delivery Charge"
                             value={line.description ?? line.itemNameSnapshot ?? ""}
                           />
-                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-brand-mocha">
+                          <div className="flex flex-wrap items-center gap-2 text-meta text-brand-mocha">
                             <span className="inline-flex items-center gap-1 rounded bg-warning-tint px-1.5 py-0.5 font-semibold text-warning-text">
                               <FileText className="h-3 w-3" />
                               Account Row
@@ -610,7 +614,7 @@ export function PurchasingItemLineEditor({
                               />
                             </div>
                           ) : null}
-                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-brand-mocha">
+                          <div className="flex flex-wrap items-center gap-2 text-meta text-brand-mocha">
                             <span className="inline-flex items-center gap-1 rounded bg-brand-cappuccino/60 px-1.5 py-0.5 font-semibold text-brand-espresso">
                               <Package className="h-3 w-3" />
                               {selectedProduct
@@ -709,7 +713,8 @@ export function PurchasingItemLineEditor({
                         aria-label={`Quantity for item line ${String(index + 1)}`}
                         className="h-8 text-right text-xs tabular-nums"
                         disabled={accountLine && isLineLocked}
-                        min={lineLock ? String(lineLock.minQuantity) : "0"}
+                        min={lineLock ? String(lineLock.minQuantity) : "0.001"}
+                        step="0.001"
                         onChange={(event) =>
                           onLinesChange(
                             updateLine(safeLines, line.lineId, {
@@ -721,18 +726,18 @@ export function PurchasingItemLineEditor({
                         value={line.quantity}
                       />
                       {lineLock ? (
-                        <p className="mt-1 flex items-center justify-end gap-1 text-right text-[11px] leading-4 text-warning-text">
+                        <p className="mt-1 flex items-center justify-end gap-1 text-right text-meta leading-4 text-warning-text">
                           <Lock aria-hidden="true" className="h-3 w-3 shrink-0" />
                           Received {formatAmount(lineLock.receivedQuantity)} · can&apos;t go lower
                         </p>
                       ) : null}
                       {selectedProduct?.isStockTracked ? (
-                        <p className="mt-1 text-right text-[11px] leading-4 text-brand-mocha">
+                        <p className="mt-1 text-right text-meta leading-4 text-brand-mocha">
                           Stock
                         </p>
                       ) : null}
                       {lineError ? (
-                        <p className="mt-1 text-right text-[11px] font-semibold leading-4 text-danger-text">
+                        <p className="mt-1 text-right text-meta font-medium leading-4 text-danger-text">
                           {lineError}
                         </p>
                       ) : null}
@@ -796,8 +801,8 @@ export function PurchasingItemLineEditor({
                         </SelectContent>
                       </Select>
                       {selectedTaxRate ? (
-                        <p className="mt-1 text-[11px] tabular-nums text-brand-mocha">
-                          Tax {formatAmount(lineTaxAmount(line, taxRates))}
+                        <p className="mt-1 text-meta tabular-nums text-brand-mocha">
+                          Tax {formatMoney(lineTaxAmount(line, taxRates))}
                         </p>
                       ) : null}
                     </td>
@@ -820,8 +825,8 @@ export function PurchasingItemLineEditor({
                       )}
                     </td>
                     <td className="px-2 py-2 text-right">
-                      <span className="inline-flex rounded-md bg-brand-latte/60 px-2 py-1 text-sm font-bold tabular-nums text-brand-espresso">
-                        {formatAmount(lineNetAmount(line))}
+                      <span className="inline-flex rounded-md bg-brand-latte/60 px-2 py-1 text-sm font-semibold tabular-nums text-brand-espresso">
+                        {formatMoney(lineNetAmount(line))}
                       </span>
                     </td>
                     <td className="px-1.5 py-2">
@@ -895,7 +900,7 @@ export function PurchasingItemLineEditor({
             <div className="flex items-center justify-between">
               <span className="text-brand-mocha">Subtotal</span>
               <span className="font-semibold tabular-nums text-brand-espresso">
-                {formatAmount(totals.subtotal)}
+                {formatMoney(totals.subtotal)}
               </span>
             </div>
             <div className="flex items-start justify-between gap-6 border-t border-workspace-border pt-2">
@@ -904,7 +909,7 @@ export function PurchasingItemLineEditor({
                 <p className="text-xs text-info-text">Applied per line</p>
               </div>
               <span className="font-semibold tabular-nums text-danger-text">
-                -{formatAmount(totals.discount)}
+                -{formatMoney(totals.discount)}
               </span>
             </div>
             {showAccountRows && onBillDiscountAmountChange ? (
@@ -923,28 +928,28 @@ export function PurchasingItemLineEditor({
               <div className="flex items-center justify-between border-t border-workspace-border pt-2">
                 <span className="text-brand-mocha">Bill discount</span>
                 <span className="font-semibold tabular-nums text-danger-text">
-                  -{formatAmount(billDiscountAmount)}
+                  -{formatMoney(billDiscountAmount)}
                 </span>
               </div>
             ) : null}
             <div className="flex items-center justify-between border-t border-workspace-border pt-2">
               <span className="text-brand-mocha">Tax</span>
               <span className="font-semibold tabular-nums text-brand-espresso">
-                {formatAmount(totals.tax)}
+                {formatMoney(totals.tax)}
               </span>
             </div>
             {totals.legacyCharges > 0 ? (
               <div className="flex items-center justify-between border-t border-workspace-border pt-2">
                 <span className="text-brand-mocha">Legacy charges</span>
                 <span className="font-semibold tabular-nums text-brand-espresso">
-                  {formatAmount(totals.legacyCharges)}
+                  {formatMoney(totals.legacyCharges)}
                 </span>
               </div>
             ) : null}
             <div className="flex items-center justify-between rounded-md bg-brand-latte px-3 py-2.5 text-base">
               <span className="font-semibold text-brand-mocha">Grand total</span>
-              <span className="text-lg font-bold tabular-nums text-brand-espresso">
-                {formatAmount(totals.total)}
+              <span className="text-lg font-semibold tabular-nums text-brand-espresso">
+                {formatMoney(totals.total)}
               </span>
             </div>
             {showAccountRows ? (
@@ -952,13 +957,13 @@ export function PurchasingItemLineEditor({
                 <div className="flex items-center justify-between">
                   <span className="text-brand-mocha">Paid</span>
                   <span className="font-semibold tabular-nums text-brand-espresso">
-                    {formatAmount(paidAmount)}
+                    {formatMoney(paidAmount)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-brand-mocha">Balance due</span>
                   <span className="font-semibold tabular-nums text-brand-espresso">
-                    {formatAmount(totals.balanceDue)}
+                    {formatMoney(totals.balanceDue)}
                   </span>
                 </div>
               </>

@@ -207,7 +207,7 @@ function StepBadge({
     >
       <span
         className={cn(
-          "flex h-4 w-4 items-center justify-center rounded-full text-[10px]",
+          "flex h-5 w-5 items-center justify-center rounded-full text-meta",
           active ? "bg-card/25" : "bg-workspace-border/70",
         )}
       >
@@ -229,10 +229,10 @@ function ReviewFigure({
 }): JSX.Element {
   return (
     <div className="rounded-md border border-workspace-border bg-brand-latte/30 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-workspace-muted">{label}</p>
+      <p className="text-meta font-medium text-workspace-muted">{label}</p>
       <p
         className={cn(
-          "mt-1 text-xl font-bold tabular-nums",
+          "mt-1 text-xl font-semibold tabular-nums",
           tone === "increase"
             ? "text-danger-text"
             : tone === "decrease"

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, CheckCircle2, FileDown, ReceiptText, Truck } from "lucide-react";
+import { ArrowRight, CheckCircle2, ReceiptText, Truck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
@@ -19,6 +19,14 @@ import { PurchasingItemLines } from "@/components/purchasing/purchasing-item-lin
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useAllChartAccounts } from "@/hooks/use-accounting";
@@ -88,7 +96,7 @@ function WorkflowStep({
           className={cn("h-4 w-4", isDone ? "text-primary-foreground" : "text-brand-mocha")}
           aria-hidden="true"
         />
-        <p className="text-xs font-bold">{title}</p>
+        <p className="text-meta font-semibold">{title}</p>
       </div>
       <p className={cn("mt-2 text-sm", isDone ? "text-primary-foreground/80" : "text-brand-mocha")}>
         {description}
@@ -124,6 +132,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
     PERMISSIONS.purchasingManage,
   ]);
   const [convertOpen, setConvertOpen] = useState(false);
+  const [pendingStatusAction, setPendingStatusAction] = useState<"issue" | "cancel" | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const orderQuery = usePurchaseOrder(orderId, canView);
@@ -200,10 +209,18 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   const billInitialValues = purchaseOrderToBillInitialValues(order);
   const purchaseAccounts = [...(purchaseAccountsQuery.data ?? [])];
 
-  const handleMarkIssued = async (): Promise<void> => {
+  const handleConfirmStatusAction = async (): Promise<void> => {
+    if (!pendingStatusAction) return;
+
     try {
-      await statusMutation.mutateAsync({ id: order.id, payload: { status: "ordered" } });
-      toast.success("Purchase order marked as issued.");
+      if (pendingStatusAction === "issue") {
+        await statusMutation.mutateAsync({ id: order.id, payload: { status: "ordered" } });
+        toast.success("Purchase order marked as issued.");
+      } else {
+        await statusMutation.mutateAsync({ id: order.id, payload: { status: "cancelled" } });
+        toast.success("Purchase order cancelled.");
+      }
+      setPendingStatusAction(null);
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -286,7 +303,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
       return (
         <Button
           disabled={statusMutation.isPending}
-          onClick={() => void handleMarkIssued()}
+          onClick={() => setPendingStatusAction("issue")}
           type="button"
         >
           Mark as issued
@@ -369,6 +386,16 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
                       : "Edit"}
                 </Button>
               ) : null}
+              {canIssue && order.status !== "received" && order.status !== "cancelled" ? (
+                <Button
+                  disabled={statusMutation.isPending}
+                  onClick={() => setPendingStatusAction("cancel")}
+                  type="button"
+                  variant="outline"
+                >
+                  Cancel order
+                </Button>
+              ) : null}
               {canReopen && order.status === "cancelled" ? (
                 <Button
                   disabled={reopenMutation.isPending}
@@ -389,14 +416,6 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
                   Duplicate as draft
                 </Button>
               ) : null}
-              <Button
-                onClick={() => toast.info("Print and download support will be connected later.")}
-                type="button"
-                variant="outline"
-              >
-                <FileDown className="h-4 w-4" />
-                Print / Download
-              </Button>
               {primaryAction()}
             </div>
           </div>
@@ -407,7 +426,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
         <CardHeader className="border-b border-brand-cappuccino">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-bold text-brand-mocha">Purchase workflow</p>
+              <p className="text-meta font-medium text-brand-mocha">Purchase workflow</p>
               <CardTitle className="mt-1 text-2xl text-brand-espresso">
                 Ordered - Received - Billed - Paid
               </CardTitle>
@@ -578,6 +597,50 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
         </CardContent>
       </Card>
 
+      <Dialog
+        open={pendingStatusAction !== null}
+        onOpenChange={(nextOpen) => (!nextOpen ? setPendingStatusAction(null) : undefined)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {pendingStatusAction === "issue"
+                ? `Issue ${order.purchaseOrderNumber} to ${order.supplierName}?`
+                : `Cancel ${order.purchaseOrderNumber}?`}
+            </DialogTitle>
+            <DialogDescription>
+              {pendingStatusAction === "issue"
+                ? "The order moves from Draft to Ordered and becomes receivable. Items, supplier, and branch can still be edited until goods arrive."
+                : order.status === "partially_received"
+                  ? "This order already has received goods against it. Cancelling stops further receiving; posted receipts and stock stay as they are."
+                  : "The order moves to Cancelled and can no longer be received. It can be reopened as a draft later if nothing else links to it."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setPendingStatusAction(null)} type="button" variant="outline">
+              Keep as is
+            </Button>
+            <Button
+              className={
+                pendingStatusAction === "cancel"
+                  ? "bg-danger text-primary-foreground hover:bg-danger"
+                  : undefined
+              }
+              disabled={statusMutation.isPending}
+              onClick={() => void handleConfirmStatusAction()}
+              type="button"
+            >
+              {pendingStatusAction === "issue"
+                ? statusMutation.isPending
+                  ? "Issuing..."
+                  : "Issue order"
+                : statusMutation.isPending
+                  ? "Cancelling..."
+                  : "Cancel order"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <PurchaseOrderReceiveGoodsDialog
         isSubmitting={receiveMutation.isPending}
         onClose={() => setReceiveOpen(false)}
