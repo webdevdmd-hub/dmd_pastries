@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { JSX, KeyboardEvent } from "react";
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import {
   SEGMENT_BADGE_CLASS,
@@ -64,8 +64,10 @@ type Tab =
  * Two things keep the cost bounded:
  *
  * 1. The route tabs stay real `<Link>` anchors, so cmd/ctrl-click, middle-click
- *    and "open in new tab" all still work. `tabIndex={-1}` removes them from the
- *    tab sequence for roving focus without touching any of that.
+ *    and "open in new tab" all still work. Roving tabindex collapses the six to
+ *    one tab stop without touching any of that -- but only because the cursor
+ *    below tracks focus; pinning `tabIndex` to the *selected* tab instead makes
+ *    the unfocusable four unreachable rather than merely un-tabbed.
  * 2. The strip renders on all five pages with the current one marked selected,
  *    so `aria-selected` is truthful wherever you are. An earlier cut rendered it
  *    only on /inventory, which meant activating a "tab" made the whole tablist
@@ -161,6 +163,20 @@ export function InventoryViewTabs({
     0,
   );
 
+  // The roving cursor tracks FOCUS, which on this strip is not the same thing
+  // as selection: arrowing onto a route tab deliberately does not navigate, so
+  // `active` stays put while focus keeps moving. An earlier cut computed the
+  // arrow target from `activeIndex` instead, which meant every press recomputed
+  // the same neighbour of the selected tab -- focus never advanced past one
+  // step, and because `tabIndex` was also pinned to the selected tab, up to
+  // three of the six had no keyboard path at all (WCAG 2.1.1). The cursor is
+  // updated from the elements' own `onFocus`, so mouse, arrow keys and
+  // focus restoration all feed the same single source of truth.
+  const [cursor, setCursor] = useState(activeIndex);
+  // Permissions can shrink `visible` after the cursor was set; fall back to the
+  // selected tab rather than leaving the strip with no tab stop.
+  const cursorIndex = cursor < visible.length ? cursor : activeIndex;
+
   const focusAt = useCallback((index: number): void => {
     const items = containerRef.current?.querySelectorAll<HTMLElement>("[data-tab]");
     items?.[index]?.focus();
@@ -173,11 +189,11 @@ export function InventoryViewTabs({
       switch (event.key) {
         case "ArrowRight":
         case "ArrowDown":
-          next = (activeIndex + 1) % visible.length;
+          next = (cursorIndex + 1) % visible.length;
           break;
         case "ArrowLeft":
         case "ArrowUp":
-          next = (activeIndex - 1 + visible.length) % visible.length;
+          next = (cursorIndex - 1 + visible.length) % visible.length;
           break;
         case "Home":
           next = 0;
@@ -204,7 +220,7 @@ export function InventoryViewTabs({
         onViewChange?.(target.key);
       }
     },
-    [activeIndex, focusAt, onViewChange, visible],
+    [cursorIndex, focusAt, onViewChange, visible],
   );
 
   return (
@@ -232,8 +248,9 @@ export function InventoryViewTabs({
               data-tab=""
               key={tab.key}
               onClick={() => onViewChange?.(tab.key)}
+              onFocus={() => setCursor(index)}
               role="tab"
-              tabIndex={selected ? 0 : -1}
+              tabIndex={index === cursorIndex ? 0 : -1}
               type="button"
             >
               {body}
@@ -251,6 +268,7 @@ export function InventoryViewTabs({
             // An anchor ignores Space and scrolls the page instead. The tabs
             // pattern requires it, so route it through the same click handler
             // Enter already uses -- one navigation path, not two.
+            onFocus={() => setCursor(index)}
             onKeyDown={(event) => {
               if (event.key === " ") {
                 event.preventDefault();
@@ -258,7 +276,7 @@ export function InventoryViewTabs({
               }
             }}
             role="tab"
-            tabIndex={selected ? 0 : -1}
+            tabIndex={index === cursorIndex ? 0 : -1}
           >
             {body}
           </Link>
