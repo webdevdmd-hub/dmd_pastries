@@ -127,7 +127,7 @@ export function InventoryTable({
                 <div className="space-y-1">
                   <p className="font-medium tabular-nums">{formatMoney(item.inventoryValue)}</p>
                   {item.accountingStatus === "pending_bill_posting" ? (
-                    <Badge className="border-warning/30 bg-warning-tint text-warning-text">
+                    <Badge variant="warning">
                       {item.accountingStatusLabel || "Pending Bill Posting"}
                     </Badge>
                   ) : null}

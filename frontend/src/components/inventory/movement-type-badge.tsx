@@ -33,17 +33,9 @@ export function MovementTypeBadge({ type }: MovementTypeBadgeProps): JSX.Element
     type === "purchase_bill_cancel_out";
   const isDanger = type === "wastage";
 
-  return (
-    <Badge
-      className={
-        isDanger
-          ? "bg-danger-tint text-danger-text hover:bg-danger-tint"
-          : isOut
-            ? "bg-warning-tint text-warning-text hover:bg-warning-tint"
-            : "bg-money-tint text-money-text hover:bg-money-tint"
-      }
-    >
-      {labels[type]}
-    </Badge>
-  );
+  // Semantic variants rather than className overrides, so the badge carries a
+  // dot (DESIGN.md sections 6 and 9). Tint and text colours are unchanged.
+  // This one renders inside the details drawer, so leaving it dotless would
+  // have put dotted and dotless badges directly above each other.
+  return <Badge variant={isDanger ? "danger" : isOut ? "warning" : "money"}>{labels[type]}</Badge>;
 }

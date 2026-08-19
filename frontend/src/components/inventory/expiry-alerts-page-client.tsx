@@ -51,16 +51,15 @@ function formatDate(value: string): string {
   return value ? new Date(value).toLocaleDateString("en-AE") : "Not recorded";
 }
 
+// Semantic variants so the expiry state carries a dot (DESIGN.md sections 6
+// and 9). Expired and expires-today are both danger; anything further out is
+// warning -- the same split the className colours already made.
 function expiryStateBadge(state: ExpiryState, label: string): JSX.Element {
-  if (state === "expired") {
-    return <Badge className="border-danger/30 bg-danger-tint text-danger-text">{label}</Badge>;
+  if (state === "expired" || state === "expires_today") {
+    return <Badge variant="danger">{label}</Badge>;
   }
 
-  if (state === "expires_today") {
-    return <Badge className="border-danger/30 bg-danger-tint text-danger-text">{label}</Badge>;
-  }
-
-  return <Badge className="bg-warning-tint text-warning-text hover:bg-warning-tint">{label}</Badge>;
+  return <Badge variant="warning">{label}</Badge>;
 }
 
 function itemTypeLabel(itemType: ExpiryBatch["itemType"]): string {

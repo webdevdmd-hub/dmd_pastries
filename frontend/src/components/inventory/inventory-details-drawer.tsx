@@ -169,7 +169,7 @@ export function InventoryDetailsDrawer({
                   </p>
                   {item.accountingStatus === "pending_bill_posting" ? (
                     <div className="space-y-1 pt-1">
-                      <Badge className="border-warning/30 bg-warning-tint text-warning-text">
+                      <Badge variant="warning">
                         {item.accountingStatusLabel || "Pending Bill Posting"}
                       </Badge>
                       <p className="text-xs text-foreground-muted">{item.accountingStatusDetail}</p>

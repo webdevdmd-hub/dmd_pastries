@@ -13,16 +13,19 @@ type ExpiryBatchesSectionProps = {
   onStatusChange: (batchId: string, status: ExpiryBatchStatus) => void;
 };
 
+// Semantic variants so each batch state carries a dot (DESIGN.md sections 6
+// and 9). Depleted moves from the legacy `secondary` to `draft`: a depleted
+// batch is spent, which is the absence of a state rather than a state.
 function statusBadge(status: ExpiryBatchStatus): JSX.Element {
   if (status === "expired") {
-    return <Badge className="border-danger/30 bg-danger-tint text-danger-text">Expired</Badge>;
+    return <Badge variant="danger">Expired</Badge>;
   }
 
   if (status === "depleted") {
-    return <Badge variant="secondary">Depleted</Badge>;
+    return <Badge variant="draft">Depleted</Badge>;
   }
 
-  return <Badge className="bg-money-tint text-money-text hover:bg-money-tint">Active</Badge>;
+  return <Badge variant="money">Active</Badge>;
 }
 
 function formatDate(value: string): string {
