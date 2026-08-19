@@ -21,12 +21,35 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
  */
 export type TableDensity = "compact" | "default" | "comfortable";
 
-const STORAGE_KEY = "pastries-pos-table-density";
+export const TABLE_DENSITY_STORAGE_KEY = "pastries-pos-table-density";
+export const TABLE_DENSITY_ATTRIBUTE = "data-table-density";
+
+const STORAGE_KEY = TABLE_DENSITY_STORAGE_KEY;
 const DENSITIES: TableDensity[] = ["compact", "default", "comfortable"];
 
 function isTableDensity(value: unknown): value is TableDensity {
   return DENSITIES.some((density) => density === value);
 }
+
+/**
+ * The same read, as a string to inline in the document before first paint.
+ *
+ * The hook below can only stamp the attribute in an effect, which is after the
+ * first paint — so on a hard load the tables render at `default` and then jump
+ * to the stored height. That is fine on a page that mounts the toggle and was
+ * invisible while only a few screens did, but the attribute is global and the
+ * preference is meant to be too: every table on every route reads it.
+ *
+ * Running this before paint is the standard fix (it is what theme scripts do)
+ * and it is why <html> already carries suppressHydrationWarning. Built from the
+ * constants above rather than hand-written so the key and the valid values
+ * cannot drift away from the hook that writes them.
+ */
+export const TABLE_DENSITY_BOOT_SCRIPT = `try{var d=localStorage.getItem(${JSON.stringify(
+  STORAGE_KEY,
+)});if(${JSON.stringify(DENSITIES)}.indexOf(d)>-1){document.documentElement.setAttribute(${JSON.stringify(
+  TABLE_DENSITY_ATTRIBUTE,
+)},d)}}catch(e){}`;
 
 /**
  * Forward-compatible read: an unknown or corrupt value resolves to `default`
@@ -60,12 +83,12 @@ export function useTableDensity(): [TableDensity, (density: TableDensity) => voi
   useEffect(() => {
     const stored = readStoredDensity();
     setDensityState(stored);
-    document.documentElement.setAttribute("data-table-density", stored);
+    document.documentElement.setAttribute(TABLE_DENSITY_ATTRIBUTE, stored);
   }, []);
 
   const setDensity = useCallback((next: TableDensity): void => {
     setDensityState(next);
-    document.documentElement.setAttribute("data-table-density", next);
+    document.documentElement.setAttribute(TABLE_DENSITY_ATTRIBUTE, next);
     writeStoredDensity(next);
   }, []);
 

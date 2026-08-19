@@ -5,6 +5,7 @@ import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import type { JSX, ReactNode } from "react";
 
+import { TABLE_DENSITY_BOOT_SCRIPT } from "@/components/density/table-density";
 import { AppProviders } from "@/providers/app-providers";
 
 const fontSans = Geist({
@@ -59,6 +60,21 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="font-sans" suppressHydrationWarning>
+        {/* Stamps the stored table density onto <html> before the first paint.
+            useTableDensity can only do it in an effect, which runs after paint,
+            so a hard load rendered every table at `default` and then jumped to
+            the stored row height. It also only ran on routes that mount the
+            toggle, while the attribute and the preference are both global.
+
+            This has to be a raw inline <script> rather than a component: the
+            dashboard layout is auth-gated and server-renders its loading
+            fallback, so nothing in that subtree reaches the initial HTML, and
+            an effect anywhere is by definition too late. <html> already carries
+            suppressHydrationWarning for exactly this kind of pre-hydration
+            attribute. Failure is silent and harmless -- an unreadable or
+            invalid value leaves the attribute off, which globals.css already
+            treats as `default`. */}
+        <script dangerouslySetInnerHTML={{ __html: TABLE_DENSITY_BOOT_SCRIPT }} />
         <Script src="/env-config.js" strategy="beforeInteractive" />
         <AppProviders>{children}</AppProviders>
       </body>
