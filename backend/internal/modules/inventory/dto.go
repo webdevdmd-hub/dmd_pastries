@@ -26,6 +26,7 @@ type MovementListQuery struct {
 	BranchID          string
 	InventoryItemID   string
 	ItemType          string
+	ProductType       string
 	MovementType      string
 	MovementDirection string
 	ReferenceType     string

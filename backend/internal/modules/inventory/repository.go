@@ -545,10 +545,16 @@ func (r *Repository) CreateAdjustment(tx *gorm.DB, adjustment *InventoryAdjustme
 	return tx.Create(adjustment).Error
 }
 
+// Every predicate here is table-qualified, and must stay that way.
+// applyMovementFilters joins inventory_items, products, product_variants,
+// ingredients and packaging_items whenever a search term is present, and all
+// five carry business_id and created_at of their own. An unqualified column
+// resolves fine with no search term and becomes ambiguous the moment one is
+// typed, which is how `search` alone could take this endpoint down.
 func (r *Repository) ListMovements(businessID, inventoryItemID string, query MovementListQuery) ([]StockMovement, int64, error) {
-	db := r.db.Model(&StockMovement{}).Where("business_id = ?", businessID)
+	db := r.db.Model(&StockMovement{}).Where("stock_movements.business_id = ?", businessID)
 	if inventoryItemID != "" {
-		db = db.Where("inventory_item_id = ?", inventoryItemID)
+		db = db.Where("stock_movements.inventory_item_id = ?", inventoryItemID)
 	}
 	db = applyMovementFilters(db, query)
 
@@ -569,8 +575,11 @@ func (r *Repository) ListMovements(businessID, inventoryItemID string, query Mov
 	return movements, total, err
 }
 
+// Qualified for the same reason as ListMovements. This one does not fail today
+// only because the frontend never sends a search term to the summary endpoint;
+// it was the same latent bug waiting for the first caller that did.
 func (r *Repository) MovementSummary(businessID string, query MovementListQuery) (*StockMovementSummaryResponse, error) {
-	db := r.db.Model(&StockMovement{}).Where("business_id = ?", businessID)
+	db := r.db.Model(&StockMovement{}).Where("stock_movements.business_id = ?", businessID)
 	db = applyMovementFilters(db, query)
 	var rows []MovementTypeSummaryItem
 	if err := db.Select("movement_type, movement_direction AS direction, COALESCE(SUM(quantity), 0) AS total_quantity, COUNT(*) AS count").
@@ -1460,6 +1469,21 @@ func applyMovementFilters(db *gorm.DB, query MovementListQuery) *gorm.DB {
 	if query.ItemType != "" {
 		db = db.Where("stock_movements.item_type = ?", query.ItemType)
 	}
+	if query.ProductType != "" {
+		// MovementListQuery has carried ProductType and the handler has bound
+		// product_type for as long as the filter has existed, but nothing ever
+		// read it here -- so choosing a product type returned the whole ledger.
+		//
+		// EXISTS rather than a join, for the same two reasons as the inventory
+		// list: the search branch above already aliases `products p`, so a
+		// second join would collide, and this builder feeds Count as well as
+		// Find, where a join would multiply rows and inflate the total. Aliased
+		// mi/mp to stay clear of the search branch's ii/p.
+		db = db.Where(
+			"EXISTS (SELECT 1 FROM inventory_items mi JOIN products mp ON mp.id = mi.product_id AND mp.business_id = mi.business_id WHERE mi.id = stock_movements.inventory_item_id AND mi.business_id = stock_movements.business_id AND mp.product_type = ?)",
+			query.ProductType,
+		)
+	}
 	if query.MovementType != "" {
 		db = db.Where("stock_movements.movement_type = ?", query.MovementType)
 	}
@@ -1540,12 +1564,16 @@ func applyStockTransferFilters(db *gorm.DB, query StockTransferListQuery) *gorm.
 	return db
 }
 
+// Table-qualified because ListMovements sorts on the joined query. `created_at`
+// is the default and exists on all five joined tables, so a bare column here
+// would move the ambiguity error from the WHERE clause to the ORDER BY rather
+// than fixing it.
 func safeMovementSortBy(value string) string {
 	switch value {
 	case "quantity", "movement_type", "movement_direction":
-		return value
+		return "stock_movements." + value
 	default:
-		return "created_at"
+		return "stock_movements.created_at"
 	}
 }
 

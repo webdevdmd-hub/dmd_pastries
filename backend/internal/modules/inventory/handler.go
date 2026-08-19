@@ -473,6 +473,7 @@ func parseMovementListQuery(c *gin.Context) MovementListQuery {
 		BranchID:          c.Query("branch_id"),
 		InventoryItemID:   c.Query("inventory_item_id"),
 		ItemType:          c.Query("item_type"),
+		ProductType:       c.Query("product_type"),
 		MovementType:      c.Query("movement_type"),
 		MovementDirection: c.Query("movement_direction"),
 		ReferenceType:     c.Query("reference_type"),
