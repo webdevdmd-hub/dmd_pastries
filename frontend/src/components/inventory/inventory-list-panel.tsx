@@ -130,6 +130,31 @@ export function InventoryListPanel({ lowStockOnly }: InventoryListPanelProps): J
     [debouncedSearch, filters, lowStockOnly],
   );
   const inventoryQuery = useInventory(inventoryQueryFilters, canView && branchScope.hasBranchScope);
+  // The KPI strip follows scope, not filters. It answers "what does this branch
+  // hold", which must not change because the tab narrowed to low stock or
+  // someone typed in search -- and on the Low stock tab it did exactly that,
+  // reading "Total items 0 / Total stock value AED 0.00" whenever nothing was
+  // low, which says the branch is empty when it is holding thousands.
+  //
+  // Branch stays in, because branch is scope: narrowing to one branch should
+  // change what these totals describe. Everything else is pinned to its default
+  // so the numbers stay comparable across tabs. React Query keys on the filter
+  // object, so this shares a cache entry with the module container's identical
+  // badge query rather than issuing a second request.
+  const summaryFilters = useMemo<InventoryFilters>(
+    () => ({
+      search: "",
+      branchId: filters.branchId,
+      itemType: "all",
+      productType: "all",
+      status: "all",
+      lowStockOnly: false,
+      expiryTrackedOnly: false,
+      includeUninitialized: false,
+    }),
+    [filters.branchId],
+  );
+  const summaryQuery = useInventory(summaryFilters, canView && branchScope.hasBranchScope);
   const expiryAlertsQuery = useExpiryAlerts(
     {
       branchId: filters.branchId,
@@ -312,7 +337,7 @@ export function InventoryListPanel({ lowStockOnly }: InventoryListPanelProps): J
         </div>
       ) : null}
 
-      <InventorySummaryCards expiryAlerts={expiryAlerts} items={items} />
+      <InventorySummaryCards expiryAlerts={expiryAlerts} items={summaryQuery.data ?? []} />
 
       <InventoryToolbar
         allowAllBranches={branchScope.canAccessAllBranches}
