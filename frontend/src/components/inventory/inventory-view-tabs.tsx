@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { JSX, KeyboardEvent, MouseEvent } from "react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { inventoryTabHref, type InventoryTabKey } from "@/components/inventory/inventory-tabs";
 import {
@@ -124,12 +124,27 @@ export function InventoryViewTabs({
   // Deriving the next index from `active` -- as an earlier cut did -- meant
   // every press recomputed the same neighbour of the selected tab, so focus
   // never advanced and, because `tabIndex` was pinned there too, up to three
-  // tabs had no keyboard path at all (WCAG 2.1.1). Fed by each item's own
-  // `onFocus`, so mouse, arrows and focus restoration share one path.
+  // tabs had no keyboard path at all (WCAG 2.1.1).
+  //
+  // The handler sets it directly rather than waiting for the focus event it is
+  // about to cause. Leaving `onFocus` as the only writer deadlocks whenever the
+  // computed target already holds focus -- no focus event fires, the cursor
+  // never advances, and every later press recomputes the same index. `onFocus`
+  // stays as the writer for focus this component did not initiate: a real
+  // click, or focus restored from outside.
   const [cursor, setCursor] = useState(activeIndex);
   // Permissions can shrink `visible` after the cursor was set; fall back to the
   // selected tab rather than leaving the strip with no tab stop.
   const cursorIndex = cursor < visible.length ? cursor : activeIndex;
+
+  // Selection can move without any focus event -- browser back/forward fires
+  // popstate, which swaps the tab while focus is wherever it was. Without this
+  // the single tab stop stays stranded on the previously selected tab, so
+  // Tabbing into the strip lands somewhere that is neither current nor where
+  // the user last was. Arrowing does not activate, so it never triggers this.
+  useEffect(() => {
+    setCursor(activeIndex);
+  }, [activeIndex]);
 
   const focusAt = useCallback((index: number): void => {
     const items = containerRef.current?.querySelectorAll<HTMLElement>("[data-tab]");
@@ -169,6 +184,7 @@ export function InventoryViewTabs({
       }
 
       event.preventDefault();
+      setCursor(next);
       focusAt(next);
     },
     [cursorIndex, focusAt, onViewChange, visible],
