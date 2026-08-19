@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { totalsByUnit } from "@/lib/purchasing/purchase-order-quantities";
 import type {
   PurchaseOrder,
   ReceivePurchaseOrderItemPayload,
@@ -37,8 +38,21 @@ type PurchaseOrderReceiveGoodsDialogProps = {
   order: PurchaseOrder | null;
 };
 
+const quantityFormat = new Intl.NumberFormat("en-AE", { maximumFractionDigits: 3 });
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function unitLabel(item: PurchaseOrder["items"][number]): string {
+  return item.unitSymbol || item.unitName || "";
+}
+
+/** A bare number in a receiving grid is a guess. Always ship the unit with it. */
+function withUnit(value: number, item: PurchaseOrder["items"][number]): string {
+  const unit = unitLabel(item);
+  const amount = quantityFormat.format(value);
+  return unit ? `${amount} ${unit}` : amount;
 }
 
 function remainingQuantity(order: PurchaseOrder, purchaseOrderItemId: string): number {
@@ -110,6 +124,34 @@ export function PurchaseOrderReceiveGoodsDialog({
       }, 0),
     [rows],
   );
+
+  /**
+   * Receiving quantities only add up within a unit. The old footer summed every
+   * row into one "units" figure, so 200 kg of flour plus 12 litres of extract
+   * read as "212 units" -- a number that describes nothing and that counted
+   * rows the operator had deliberately zeroed. Group by unit instead, and count
+   * only the rows that will actually post.
+   */
+  const receivingByUnit = useMemo(() => {
+    if (!order) return [];
+
+    const entries = rows.flatMap((row) => {
+      const item = order.items.find((line) => line.id === row.purchaseOrderItemId);
+      if (!item) return [];
+
+      return [{ quantity: Number(row.quantityReceived), unit: unitLabel(item) }];
+    });
+
+    return totalsByUnit(entries).map(({ quantity, unit }) => ({
+      label: unit ? `${quantityFormat.format(quantity)} ${unit}` : quantityFormat.format(quantity),
+      unit,
+    }));
+  }, [order, rows]);
+
+  const receivingLineCount = rows.filter((row) => {
+    const quantity = Number(row.quantityReceived);
+    return Number.isFinite(quantity) && quantity > 0;
+  }).length;
 
   const updateRow = (
     purchaseOrderItemId: string,
@@ -251,10 +293,18 @@ export function PurchaseOrderReceiveGoodsDialog({
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-border bg-background">
-            <div className="grid grid-cols-[1.8fr_0.7fr_0.7fr_0.85fr_1fr_1fr] gap-3 border-b bg-muted/50 px-4 py-3 text-xs font-semibold text-muted-foreground">
+            {/* Remaining is what the operator is actually counting against. It
+                was computed to pre-fill the input but never shown, leaving
+                "Received" (to date) sitting next to the entry field as the only
+                context -- two different quantities, one word apart. */}
+            <div className="grid grid-cols-[1.8fr_0.75fr_0.85fr_0.85fr_0.9fr_1fr_1fr] gap-3 border-b bg-muted/50 px-4 py-3 text-meta font-medium text-foreground-muted">
               <span>Item</span>
-              <span>Ordered</span>
-              <span>Received</span>
+              <span className="text-right">Ordered</span>
+              <span className="text-right">
+                Received
+                <span className="block font-normal text-foreground-muted">to date</span>
+              </span>
+              <span className="text-right">Remaining</span>
               <span>Receive now</span>
               <span>Batch</span>
               <span>Expiry</span>
@@ -273,18 +323,31 @@ export function PurchaseOrderReceiveGoodsDialog({
 
                   return (
                     <div
-                      className="grid grid-cols-[1.8fr_0.7fr_0.7fr_0.85fr_1fr_1fr] gap-3 border-b px-4 py-3 text-sm last:border-b-0"
+                      className="grid grid-cols-[1.8fr_0.75fr_0.85fr_0.85fr_0.9fr_1fr_1fr] gap-3 border-b px-4 py-3 text-sm last:border-b-0"
                       key={item.id}
                     >
                       <div>
-                        <p className="font-semibold text-foreground">{item.itemNameSnapshot}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.unitSymbol || item.unitName}
+                        <p className="font-medium text-foreground">{item.itemNameSnapshot}</p>
+                        <p className="text-meta text-foreground-muted">
+                          {remaining === 0
+                            ? "Fully received"
+                            : `Measured in ${item.unitName || unitLabel(item)}`}
                         </p>
                       </div>
-                      <span>{item.quantityOrdered}</span>
-                      <span>{item.quantityReceived}</span>
+                      <span className="text-right tabular-nums">
+                        {withUnit(item.quantityOrdered, item)}
+                      </span>
+                      <span className="text-right tabular-nums">
+                        {withUnit(item.quantityReceived, item)}
+                      </span>
+                      <span className="text-right font-medium tabular-nums">
+                        {withUnit(remaining, item)}
+                      </span>
                       <Input
+                        aria-label={`Receiving now for ${item.itemNameSnapshot}${
+                          unitLabel(item) ? ` in ${item.unitName || unitLabel(item)}` : ""
+                        }`}
+                        className="text-right tabular-nums"
                         min={0}
                         max={remaining}
                         onChange={(event) =>
@@ -315,8 +378,21 @@ export function PurchaseOrderReceiveGoodsDialog({
         </div>
 
         <DialogFooter className="items-center gap-3">
-          <span className="mr-auto text-sm text-muted-foreground">
-            Receiving {receiveTotal.toLocaleString("en-AE")} units across selected rows.
+          <span className="mr-auto text-sm text-foreground-muted">
+            {receivingByUnit.length === 0 ? (
+              "Nothing to receive yet."
+            ) : (
+              <>
+                Receiving{" "}
+                {receivingByUnit.map((entry, index) => (
+                  <span key={entry.unit}>
+                    {index > 0 ? (index === receivingByUnit.length - 1 ? " and " : ", ") : null}
+                    <span className="font-medium tabular-nums text-foreground">{entry.label}</span>
+                  </span>
+                ))}{" "}
+                across {receivingLineCount} {receivingLineCount === 1 ? "line" : "lines"}.
+              </>
+            )}
           </span>
           <Button onClick={onClose} type="button" variant="outline">
             Cancel

@@ -42,6 +42,7 @@ import {
 import { getErrorMessage } from "@/lib/api/client";
 import { formatDateOnly } from "@/lib/format/date";
 import { purchaseOrderToBillInitialValues } from "@/lib/purchasing/purchase-order-bill-draft";
+import { hasOutstandingStock, unreceivedValue } from "@/lib/purchasing/purchase-order-quantities";
 import { cn } from "@/lib/utils/cn";
 import type {
   CreatePurchaseInvoicePayload,
@@ -97,12 +98,7 @@ function WorkflowStep({
 }
 
 function hasRemainingReceivableProducts(order: PurchaseOrder): boolean {
-  return order.items.some(
-    (item) =>
-      item.lineType !== "account" &&
-      item.itemType !== "account" &&
-      item.quantityOrdered - item.quantityReceived > 0,
-  );
+  return hasOutstandingStock(order);
 }
 
 export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string }): JSX.Element {
@@ -194,7 +190,11 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   const canEditWithCorrection = canEdit && order.status === "received";
   const canConvertOrder = canConvert && order.status === "received" && !activeBill;
   const orderedDone = order.status !== "draft" && order.status !== "cancelled";
-  const receivedDone = order.status === "received" || Boolean(activeBill);
+  // Receiving is settled by goods arriving, never by a bill being raised. This
+  // used to be `|| Boolean(activeBill)`, so a partially received order that had
+  // already been billed showed "Received" as complete while stock was still
+  // outstanding.
+  const receivedDone = order.status === "received";
   const billedDone = Boolean(activeBill);
   const paidDone = isPaid;
   const billInitialValues = purchaseOrderToBillInitialValues(order);
@@ -426,7 +426,10 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
           />
           <WorkflowStep
             description="Goods are received against ordered quantities."
-            isActive={canReceiveOrder}
+            // Where the order has got to, not what this viewer may do about it.
+            // Binding this to `canReceiveOrder` left a read-only user looking at
+            // a tracker with no active step at all.
+            isActive={!receivedDone && hasRemainingReceivableProducts(order) && orderedDone}
             isDone={receivedDone}
             title="Received"
           />
@@ -497,10 +500,21 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
                 {activeBill ? activeBill.paymentStatus : "Pending"}
               </span>
             </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-brand-mocha">Not yet received</span>
+              <span className="font-semibold tabular-nums text-brand-espresso">
+                {hasRemainingReceivableProducts(order)
+                  ? formatCurrency(unreceivedValue(order))
+                  : "Nothing outstanding"}
+              </span>
+            </div>
+            {/* Balance due is what the supplier is owed, which only a bill can
+                establish. Falling back to the order total presented an un-billed
+                PO as money owed. */}
             <div className="flex justify-between gap-4 border-t border-brand-cappuccino pt-3">
               <span className="text-brand-mocha">Balance due</span>
-              <span className="font-semibold text-brand-espresso">
-                {formatCurrency(activeBill?.balanceAmount ?? order.totalAmount)}
+              <span className="font-semibold tabular-nums text-brand-espresso">
+                {activeBill ? formatCurrency(activeBill.balanceAmount) : "No bill yet"}
               </span>
             </div>
           </CardContent>
@@ -511,7 +525,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-brand-mocha">Subtotal</p>
-            <p className="text-2xl font-semibold text-brand-espresso">
+            <p className="text-2xl font-semibold tabular-nums text-brand-espresso">
               {formatCurrency(order.subtotalAmount)}
             </p>
           </CardContent>
@@ -519,7 +533,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-brand-mocha">Discount</p>
-            <p className="text-2xl font-semibold text-brand-espresso">
+            <p className="text-2xl font-semibold tabular-nums text-brand-espresso">
               {formatCurrency(order.discountAmount)}
             </p>
           </CardContent>
@@ -527,7 +541,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-brand-mocha">Tax</p>
-            <p className="text-2xl font-semibold text-brand-espresso">
+            <p className="text-2xl font-semibold tabular-nums text-brand-espresso">
               {formatCurrency(order.taxAmount)}
             </p>
           </CardContent>
@@ -535,7 +549,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-brand-mocha">Total</p>
-            <p className="text-2xl font-semibold text-brand-espresso">
+            <p className="text-2xl font-semibold tabular-nums text-brand-espresso">
               {formatCurrency(order.totalAmount)}
             </p>
           </CardContent>

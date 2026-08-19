@@ -26,21 +26,35 @@ function formatDate(value: string | null): string {
   return formatDateOnly(value);
 }
 
-function nextStepForOrder(order: PurchaseOrder): string {
+type NextStepPermissions = {
+  canConvertToBill: boolean;
+  canReceiveOrder: boolean;
+  canUpdateStatus: boolean;
+};
+
+/**
+ * The next step depends on who is reading it. This used to instruct every
+ * viewer to "Mark as issued" or "Receive goods" regardless of their role, so a
+ * view-only user was told to take an action the row's own menu denied them.
+ * Without the permission, the cell reports the state instead.
+ */
+function nextStepForOrder(order: PurchaseOrder, permissions: NextStepPermissions): string {
   if (order.status === "draft") {
-    return "Mark as issued";
+    return permissions.canUpdateStatus ? "Mark as issued" : "Awaiting issue";
   }
 
   if (order.status === "ordered") {
-    return "Receive goods";
+    return permissions.canReceiveOrder ? "Receive goods" : "Awaiting delivery";
   }
 
   if (order.status === "partially_received") {
-    return "Receive remaining goods";
+    return permissions.canReceiveOrder ? "Receive remaining goods" : "Part delivered";
   }
 
   if (order.status === "received") {
-    return "Convert to bill";
+    // The list response carries no document chain, so this cannot yet tell a
+    // billable order from one that is already billed. See TODOS.md.
+    return permissions.canConvertToBill ? "Ready to bill" : "Received in full";
   }
 
   return "No action";
@@ -89,7 +103,7 @@ export function PurchaseOrdersTable({
           <TableHead>Order Date</TableHead>
           <TableHead>Expected Delivery</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead>Total</TableHead>
+          <TableHead className="text-right">Total</TableHead>
           <TableHead>Created By</TableHead>
           <TableHead>Next Step</TableHead>
           <TableHead>Actions</TableHead>
@@ -108,16 +122,22 @@ export function PurchaseOrdersTable({
             </TableCell>
             <TableCell>{order.supplierName}</TableCell>
             <TableCell>{order.branchName}</TableCell>
-            <TableCell>{formatDate(order.orderDate)}</TableCell>
-            <TableCell>{formatDate(order.expectedDeliveryDate)}</TableCell>
+            <TableCell className="tabular-nums">{formatDate(order.orderDate)}</TableCell>
+            <TableCell className="tabular-nums">{formatDate(order.expectedDeliveryDate)}</TableCell>
             <TableCell>
               <PurchaseOrderStatusBadge status={order.status} />
             </TableCell>
-            <TableCell>{formatCurrency(order.totalAmount)}</TableCell>
+            <TableCell className="text-right tabular-nums">
+              {formatCurrency(order.totalAmount)}
+            </TableCell>
             <TableCell>{order.createdByUserName}</TableCell>
             <TableCell>
-              <span className="text-sm font-medium text-brand-mocha">
-                {nextStepForOrder(order)}
+              <span className="text-meta text-foreground-muted">
+                {nextStepForOrder(order, {
+                  canConvertToBill,
+                  canReceiveOrder,
+                  canUpdateStatus,
+                })}
               </span>
             </TableCell>
             <TableCell>
