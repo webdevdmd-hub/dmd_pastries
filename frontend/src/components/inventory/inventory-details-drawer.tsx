@@ -8,6 +8,7 @@ import { ExpiryBatchesSection } from "@/components/inventory/expiry-batches-sect
 import { InventoryStatusBadge } from "@/components/inventory/inventory-status-badge";
 import { StockLevelBadge } from "@/components/inventory/stock-level-badge";
 import { StockMovementsTable } from "@/components/inventory/stock-movements-table";
+import { ReorderLevelHelpIcon } from "@/components/shared/reorder-level-help";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,10 +38,25 @@ type InventoryDetailsDrawerProps = {
   open: boolean;
   batchesLoading: boolean;
   movementsLoading: boolean;
+  /**
+   * Whether the batch affordances (add a batch, change a batch's status) are
+   * live. False on surfaces that show the drawer for reading but do not wire
+   * the batch mutations -- the batches stay visible, they just are not
+   * editable, which beats rendering controls that call a no-op.
+   */
+  showBatchActions?: boolean;
 };
 
 function formatQuantity(value: number, unit: string): string {
   return `${new Intl.NumberFormat("en-AE", { maximumFractionDigits: 3 }).format(value)} ${unit}`;
+}
+
+/** The structural kind of the row, previously the list's "Type" column. */
+function typeLabel(value: InventoryItem["itemType"]): string {
+  if (value === "product") return "Product Master";
+  if (value === "product_variant") return "Product Variant";
+  if (value === "ingredient") return "Legacy Ingredient";
+  return "Legacy Packaging";
 }
 
 function formatMoney(value: number): string {
@@ -63,7 +79,10 @@ export function InventoryDetailsDrawer({
   onBatchStatusChange,
   onOpenChange,
   open,
+  showBatchActions = true,
 }: InventoryDetailsDrawerProps): JSX.Element {
+  const canManageBatches = canManage && showBatchActions;
+
   return (
     <Sheet onOpenChange={onOpenChange} open={open}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-3xl" side="right">
@@ -79,19 +98,38 @@ export function InventoryDetailsDrawer({
             <div className="grid gap-3 md:grid-cols-2">
               <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
                 <p className="text-xs text-brand-mocha">Current</p>
-                <p className="mt-2 text-2xl font-medium text-brand-espresso">
+                <p className="mt-2 text-2xl font-medium tabular-nums text-brand-espresso">
                   {formatQuantity(item.currentQuantity, item.unitSymbol)}
                 </p>
               </div>
               <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
                 <p className="text-xs text-brand-mocha">Available</p>
-                <p className="mt-2 text-2xl font-medium text-brand-espresso">
+                <p className="mt-2 text-2xl font-medium tabular-nums text-brand-espresso">
                   {formatQuantity(item.availableQuantity, item.unitSymbol)}
+                </p>
+              </div>
+              {/* Reserved and Reorder level are here because the list no longer
+                  carries them. Reserved only means anything next to Current and
+                  Available -- it is the difference between them -- so the three
+                  belong together, which a 14-column list could never show. */}
+              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
+                <p className="text-xs text-brand-mocha">Reserved</p>
+                <p className="mt-2 text-2xl font-medium tabular-nums text-brand-espresso">
+                  {formatQuantity(item.reservedQuantity, item.unitSymbol)}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
+                <div className="flex items-center gap-1">
+                  <p className="text-xs text-brand-mocha">Reorder level</p>
+                  <ReorderLevelHelpIcon />
+                </div>
+                <p className="mt-2 text-2xl font-medium tabular-nums text-brand-espresso">
+                  {formatQuantity(item.reorderLevel, item.unitSymbol)}
                 </p>
               </div>
               <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
                 <p className="text-xs text-brand-mocha">Branch</p>
-                <p className="mt-2 font-bold text-brand-espresso">{item.branchName}</p>
+                <p className="mt-2 font-medium text-brand-espresso">{item.branchName}</p>
               </div>
               <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
                 <p className="text-xs text-brand-mocha">Status</p>
@@ -103,21 +141,31 @@ export function InventoryDetailsDrawer({
               <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
                 <p className="text-xs text-brand-mocha">Item Identity</p>
                 <div className="mt-2 space-y-1 text-sm text-brand-espresso">
-                  <p className="font-bold">
+                  <p className="font-medium">
                     {item.productType ? PRODUCT_TYPE_LABELS[item.productType] : "Legacy item"}
                   </p>
+                  {/* The list's "Type" column landed here. It is the structural
+                      kind (Product Master / Variant / legacy), which is a
+                      different axis from productType above. */}
+                  <p className="text-brand-mocha">{typeLabel(item.itemType)}</p>
                   {item.variantName ? <p>Variant: {item.variantName}</p> : null}
-                  <p className="text-brand-mocha">{item.itemCode || item.id.slice(0, 8)}</p>
+                  <p className="text-brand-mocha">{item.itemCode || "No code"}</p>
                 </div>
               </div>
               <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
                 <p className="text-xs text-brand-mocha">Inventory Value</p>
                 <div className="mt-2 space-y-1 text-sm text-brand-espresso">
                   <p>
-                    Avg cost: <span className="font-bold">{formatMoney(item.averageCost)}</span>
+                    Avg cost:{" "}
+                    <span className="font-medium tabular-nums">
+                      {formatMoney(item.averageCost)}
+                    </span>
                   </p>
                   <p>
-                    Value: <span className="font-bold">{formatMoney(item.inventoryValue)}</span>
+                    Value:{" "}
+                    <span className="font-medium tabular-nums">
+                      {formatMoney(item.inventoryValue)}
+                    </span>
                   </p>
                   {item.accountingStatus === "pending_bill_posting" ? (
                     <div className="space-y-1 pt-1">
@@ -138,7 +186,7 @@ export function InventoryDetailsDrawer({
                   Adjust stock
                 </Button>
               ) : null}
-              {canManage && item.isExpiryTracked ? (
+              {canManageBatches && item.isExpiryTracked ? (
                 <Button onClick={() => onAddBatch(item)} type="button" variant="outline">
                   <PackagePlus className="h-4 w-4" />
                   Add expiry batch
@@ -168,7 +216,7 @@ export function InventoryDetailsDrawer({
               {item.isExpiryTracked ? (
                 <ExpiryBatchesSection
                   batches={batches}
-                  canManage={canManage}
+                  canManage={canManageBatches}
                   isLoading={batchesLoading}
                   onStatusChange={onBatchStatusChange}
                 />

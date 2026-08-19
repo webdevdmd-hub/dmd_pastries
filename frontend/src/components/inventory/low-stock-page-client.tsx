@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/inventory/access-denied-card";
+import { InventoryDetailsDrawer } from "@/components/inventory/inventory-details-drawer";
 import { InventoryEmptyState } from "@/components/inventory/inventory-empty-state";
 import { InventoryErrorState } from "@/components/inventory/inventory-error-state";
 import { InventoryTable } from "@/components/inventory/inventory-table";
@@ -27,7 +28,12 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useBranches } from "@/hooks/use-branches";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { useAdjustStock, useLowStock } from "@/hooks/use-inventory";
+import {
+  useAdjustStock,
+  useExpiryBatches,
+  useInventoryItemMovements,
+  useLowStock,
+} from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 import type { InventoryItem, LowStockFilters, StockAdjustmentPayload } from "@/types/inventory";
@@ -54,6 +60,21 @@ export function LowStockPageClient(): JSX.Element {
     branchId: branchScope.defaultBranchId,
   });
   const [adjustmentItem, setAdjustmentItem] = useState<InventoryItem | null>(null);
+  // The list dropped to eight columns, so Reorder level, Current, Reserved,
+  // Avg cost and Type now live in the details drawer. This page previously had
+  // no drawer at all, which would have made those unreachable here -- and
+  // reorder level is this page's whole subject, since "low stock" is defined
+  // against it. Same drawer, same hooks the main inventory page already uses.
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const movementsQuery = useInventoryItemMovements(
+    selectedItem?.id ?? null,
+    {},
+    selectedItem !== null,
+  );
+  const batchesQuery = useExpiryBatches(
+    selectedItem?.id ?? null,
+    selectedItem?.isExpiryTracked === true,
+  );
   const debouncedSearch = useDebouncedValue(filters.search);
   const lowStockQueryFilters = useMemo(
     () => ({ ...filters, search: debouncedSearch }),
@@ -222,13 +243,32 @@ export function LowStockPageClient(): JSX.Element {
               onAddBatch={() => undefined}
               onAddOpeningStock={() => undefined}
               onAdjust={setAdjustmentItem}
-              onView={() => undefined}
+              onView={setSelectedItem}
               showBatchAction={false}
-              showViewAction={false}
             />
           </CardContent>
         </Card>
       ) : null}
+
+      <InventoryDetailsDrawer
+        batches={batchesQuery.data ?? []}
+        batchesLoading={batchesQuery.isLoading}
+        canManage={canManage}
+        item={selectedItem}
+        movements={movementsQuery.data ?? []}
+        movementsLoading={movementsQuery.isLoading}
+        onAddBatch={() => undefined}
+        onAdjust={(item) => {
+          setSelectedItem(null);
+          setAdjustmentItem(item);
+        }}
+        onBatchStatusChange={() => undefined}
+        onOpenChange={(open) => {
+          if (!open) setSelectedItem(null);
+        }}
+        open={selectedItem !== null}
+        showBatchActions={false}
+      />
 
       <StockAdjustmentDialog
         isSubmitting={adjustmentMutation.isPending}

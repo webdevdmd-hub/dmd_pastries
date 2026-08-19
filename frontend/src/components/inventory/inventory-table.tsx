@@ -4,7 +4,6 @@ import type { JSX } from "react";
 import { InventoryActionsMenu } from "@/components/inventory/inventory-actions-menu";
 import { InventoryStatusBadge } from "@/components/inventory/inventory-status-badge";
 import { StockLevelBadge } from "@/components/inventory/stock-level-badge";
-import { ReorderLevelHeader } from "@/components/shared/reorder-level-help";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +15,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { InventoryItem } from "@/types/inventory";
-import { PRODUCT_TYPE_LABELS } from "@/types/product";
 
 type InventoryTableProps = {
   canManage: boolean;
@@ -28,13 +26,6 @@ type InventoryTableProps = {
   showBatchAction?: boolean;
   showViewAction?: boolean;
 };
-
-function typeLabel(value: InventoryItem["itemType"]): string {
-  if (value === "product") return "Product Master";
-  if (value === "product_variant") return "Product Variant";
-  if (value === "ingredient") return "Legacy Ingredient";
-  return "Legacy Packaging";
-}
 
 function formatQuantity(value: number): string {
   return new Intl.NumberFormat("en-AE", { maximumFractionDigits: 3 }).format(value);
@@ -48,6 +39,20 @@ function formatMoney(value: number): string {
   }).format(value);
 }
 
+/**
+ * Eight columns, down from fourteen.
+ *
+ * A list is scanned, not read. The six columns that left -- Type, Current Qty,
+ * Reserved, Avg Cost, Reorder, Expiry -- are what you check about one item once
+ * it has caught your eye, and every one of them is in the details drawer behind
+ * the row's View action. What stays is what you scan a stock list for: what it
+ * is, where it is, how much you can sell, what it is worth, and whether it
+ * needs attention.
+ *
+ * Available is the quantity kept rather than Current, because it is the number
+ * that answers "can I sell this" -- Current minus what is already committed.
+ * Both are in the drawer where the difference between them is the point.
+ */
 export function InventoryTable({
   canManage,
   items,
@@ -65,19 +70,11 @@ export function InventoryTable({
       <TableHeader>
         <TableRow>
           <TableHead>Item</TableHead>
-          <TableHead>Type</TableHead>
           <TableHead>Branch</TableHead>
-          <TableHead>Current Qty</TableHead>
-          <TableHead>Reserved</TableHead>
-          <TableHead>Available</TableHead>
-          <TableHead>Avg Cost</TableHead>
-          <TableHead>Value</TableHead>
-          <TableHead>
-            <ReorderLevelHeader>Reorder</ReorderLevelHeader>
-          </TableHead>
+          <TableHead className="text-right">Available</TableHead>
           <TableHead>Unit</TableHead>
+          <TableHead className="text-right">Value</TableHead>
           <TableHead>Stock Level</TableHead>
-          <TableHead>Expiry</TableHead>
           <TableHead>Status</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
@@ -112,7 +109,7 @@ export function InventoryTable({
             >
               <TableCell>
                 <div>
-                  <p className="font-bold">{item.itemName}</p>
+                  <p className="font-medium">{item.itemName}</p>
                   <p className="text-xs text-brand-mocha">
                     {item.itemCode || (isNotInitialized ? "Catalog item without stock" : "No code")}
                   </p>
@@ -121,24 +118,14 @@ export function InventoryTable({
                   ) : null}
                 </div>
               </TableCell>
-              <TableCell>
-                <div className="space-y-1">
-                  <p>{typeLabel(item.itemType)}</p>
-                  {item.productType ? (
-                    <p className="text-xs text-brand-mocha">
-                      {PRODUCT_TYPE_LABELS[item.productType]}
-                    </p>
-                  ) : null}
-                </div>
-              </TableCell>
               <TableCell>{item.branchName}</TableCell>
-              <TableCell>{formatQuantity(item.currentQuantity)}</TableCell>
-              <TableCell>{formatQuantity(item.reservedQuantity)}</TableCell>
-              <TableCell className="font-bold">{formatQuantity(item.availableQuantity)}</TableCell>
-              <TableCell>{formatMoney(item.averageCost)}</TableCell>
-              <TableCell>
+              <TableCell className="text-right font-medium tabular-nums">
+                {formatQuantity(item.availableQuantity)}
+              </TableCell>
+              <TableCell>{item.unitSymbol || item.unitName}</TableCell>
+              <TableCell className="text-right">
                 <div className="space-y-1">
-                  <p className="font-semibold">{formatMoney(item.inventoryValue)}</p>
+                  <p className="font-medium tabular-nums">{formatMoney(item.inventoryValue)}</p>
                   {item.accountingStatus === "pending_bill_posting" ? (
                     <Badge className="border-warning/30 bg-warning-tint text-warning-text">
                       {item.accountingStatusLabel || "Pending Bill Posting"}
@@ -146,12 +133,9 @@ export function InventoryTable({
                   ) : null}
                 </div>
               </TableCell>
-              <TableCell>{formatQuantity(item.reorderLevel)}</TableCell>
-              <TableCell>{item.unitSymbol || item.unitName}</TableCell>
               <TableCell>
                 <StockLevelBadge item={item} />
               </TableCell>
-              <TableCell>{item.isExpiryTracked ? "Tracked" : "Not tracked"}</TableCell>
               <TableCell>
                 <InventoryStatusBadge status={item.status} />
               </TableCell>
