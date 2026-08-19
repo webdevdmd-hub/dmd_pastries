@@ -63,6 +63,46 @@ export function movementTypeLabel(type: InventoryMovementType | StockMovementTyp
   return STOCK_MOVEMENT_TYPE_LABELS[type];
 }
 
+/**
+ * The badge tone for a movement type, in one place because there are two
+ * MovementTypeBadge components -- one under components/inventory rendering
+ * inside the item drawer, one under components/stock-movements rendering the
+ * Movements tab. They had drifted: the same "Sale Out" was amber in the drawer
+ * and grey on the tab, and a pass that converted "the movement type badge" to
+ * semantic variants only reached one of them, because the two files share a
+ * basename.
+ *
+ * Outflows are `draft`, not `warning`. DESIGN.md 3.3 reserves warning for
+ * things needing attention, and stock leaving on a sale is the most routine
+ * event this ledger records -- amber on every sale would make a healthy day
+ * look like an incident. Wastage is genuinely `danger`, and a reversal is the
+ * one type that really does want a second look.
+ */
+export function movementTypeTone(
+  type: InventoryMovementType | StockMovementType,
+): "danger" | "warning" | "draft" | "money" {
+  if (type === "wastage") {
+    return "danger";
+  }
+
+  if (type === "reversal") {
+    return "warning";
+  }
+
+  if (
+    type === "sale_out" ||
+    type === "adjustment_out" ||
+    type === "production_out" ||
+    type === "purchase_return_out" ||
+    type === "purchase_bill_cancel_out" ||
+    type === "transfer_out"
+  ) {
+    return "draft";
+  }
+
+  return "money";
+}
+
 export function stockMovementDescription(movement: StockMovementDisplaySource): string {
   const backendDescription = clean(movement.movementDescription);
   if (backendDescription) return backendDescription;

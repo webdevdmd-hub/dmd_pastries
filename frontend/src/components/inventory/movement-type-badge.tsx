@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { movementTypeTone } from "@/lib/inventory/stock-movement-display";
 import type { MovementType } from "@/types/inventory";
 
 type MovementTypeBadgeProps = {
@@ -24,18 +25,15 @@ const labels: Record<MovementType, string> = {
   purchase_bill_cancel_out: "Purchase Cancellation",
 };
 
+/**
+ * Semantic variant rather than a className override, so the badge carries a dot
+ * (DESIGN.md sections 6 and 9). This copy renders inside the item drawer.
+ *
+ * The tone comes from movementTypeTone, shared with the same-named component
+ * under components/stock-movements. The two had drifted -- outflows were amber
+ * here and grey there for the same movement -- which is why the mapping now
+ * lives in one place instead of being written out twice.
+ */
 export function MovementTypeBadge({ type }: MovementTypeBadgeProps): JSX.Element {
-  const isOut =
-    type === "sale_out" ||
-    type === "adjustment_out" ||
-    type === "production_out" ||
-    type === "purchase_return_out" ||
-    type === "purchase_bill_cancel_out";
-  const isDanger = type === "wastage";
-
-  // Semantic variants rather than className overrides, so the badge carries a
-  // dot (DESIGN.md sections 6 and 9). Tint and text colours are unchanged.
-  // This one renders inside the details drawer, so leaving it dotless would
-  // have put dotted and dotless badges directly above each other.
-  return <Badge variant={isDanger ? "danger" : isOut ? "warning" : "money"}>{labels[type]}</Badge>;
+  return <Badge variant={movementTypeTone(type)}>{labels[type]}</Badge>;
 }

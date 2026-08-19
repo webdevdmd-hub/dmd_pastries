@@ -1,8 +1,6 @@
 import type { JSX } from "react";
 
-import { AccountingJournalLink } from "@/components/shared/accounting-reference-links";
 import { MovementActionsMenu } from "@/components/stock-movements/movement-actions-menu";
-import { MovementDirectionBadge } from "@/components/stock-movements/movement-direction-badge";
 import { MovementTypeBadge } from "@/components/stock-movements/movement-type-badge";
 import {
   Table,
@@ -12,11 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  sourceModuleLabel,
-  sourceReferenceLabel,
-  stockMovementDescription,
-} from "@/lib/inventory/stock-movement-display";
+import { stockMovementDescription } from "@/lib/inventory/stock-movement-display";
 import type { StockMovement } from "@/types/stock-movements";
 
 type MovementsTableProps = {
@@ -69,6 +63,25 @@ function TransferDetails({ movement }: { movement: StockMovement }): JSX.Element
   );
 }
 
+/**
+ * Fourteen columns became eight.
+ *
+ * This table was the last thing in the module still overflowing sideways -- the
+ * Description column was cut off by the viewport, so the ledger's "why" was the
+ * one thing you could not read. The same treatment the item list got: keep what
+ * you scan and compare down a column, move the rest into the drawer that was
+ * already there.
+ *
+ * Every removed column is already in MovementDetailsDrawer -- Branch, Direction,
+ * Before, the unit-cost and valuation detail, the Journal link, Created by, and
+ * the source-module line -- so nothing became unreachable. That check is the
+ * point: cutting the item list to eight columns once left Reorder level with no
+ * home on the page defined by it.
+ *
+ * Two pairs merged rather than dropped, because splitting them cost a column
+ * and bought nothing: quantity now carries its unit, and Before/After is one
+ * "Stock" cell reading `13 -> 193`, which is the ledger's actual subject.
+ */
 export function MovementsTable({
   canReverse,
   movements,
@@ -81,24 +94,18 @@ export function MovementsTable({
         <TableRow>
           <TableHead>Date</TableHead>
           <TableHead>Item</TableHead>
-          <TableHead>Branch</TableHead>
           <TableHead>Movement</TableHead>
-          <TableHead>Direction</TableHead>
-          <TableHead>Quantity</TableHead>
-          <TableHead>Before</TableHead>
-          <TableHead>After</TableHead>
-          <TableHead>Unit</TableHead>
-          <TableHead>Cost</TableHead>
-          <TableHead>Journal</TableHead>
+          <TableHead className="text-right">Quantity</TableHead>
+          <TableHead className="text-right">Stock</TableHead>
+          <TableHead className="text-right">Cost</TableHead>
           <TableHead>Description</TableHead>
-          <TableHead>Created By</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {movements.map((movement) => (
           <TableRow className={rowClassName(movement)} key={movement.id}>
-            <TableCell>{formatDate(movement.createdAt)}</TableCell>
+            <TableCell className="tabular-nums">{formatDate(movement.createdAt)}</TableCell>
             <TableCell>
               <div>
                 <p className="font-medium">{movement.itemName}</p>
@@ -107,41 +114,29 @@ export function MovementsTable({
                 </p>
               </div>
             </TableCell>
-            <TableCell>{movement.branchName}</TableCell>
             <TableCell>
               <MovementTypeBadge type={movement.movementType} />
               <TransferDetails movement={movement} />
             </TableCell>
-            <TableCell>
-              <MovementDirectionBadge direction={movement.movementDirection} />
+            <TableCell className="text-right font-medium tabular-nums">
+              {formatQuantity(movement.quantity)}
+              <span className="ml-1 text-foreground-muted">{movement.unitSymbol}</span>
             </TableCell>
-            <TableCell className="font-medium">{formatQuantity(movement.quantity)}</TableCell>
-            <TableCell>{formatQuantity(movement.beforeQuantity)}</TableCell>
-            <TableCell>{formatQuantity(movement.afterQuantity)}</TableCell>
-            <TableCell>{movement.unitSymbol}</TableCell>
-            <TableCell>
-              {movement.totalCost > 0 ? (
-                <div>
-                  <p className="font-semibold">{formatMoney(movement.totalCost)}</p>
-                  <p className="text-xs text-foreground-muted">
-                    Unit {formatMoney(movement.unitCostSnapshot)}
-                    {movement.valuationMethod ? ` / ${movement.valuationMethod}` : ""}
-                  </p>
-                </div>
-              ) : (
-                "-"
-              )}
+            <TableCell className="text-right tabular-nums text-foreground-muted">
+              {formatQuantity(movement.beforeQuantity)}
+              <span className="mx-1">&rarr;</span>
+              <span className="font-medium text-foreground">
+                {formatQuantity(movement.afterQuantity)}
+              </span>
             </TableCell>
-            <TableCell>
-              <AccountingJournalLink id={movement.accountingJournalEntryId} />
+            <TableCell className="text-right tabular-nums">
+              {movement.totalCost > 0 ? formatMoney(movement.totalCost) : "-"}
             </TableCell>
-            <TableCell className="min-w-72">
-              <p className="font-medium text-foreground">{stockMovementDescription(movement)}</p>
-              <p className="text-xs text-foreground-muted">
-                {sourceModuleLabel(movement)} - {sourceReferenceLabel(movement)}
+            <TableCell className="max-w-72">
+              <p className="truncate font-medium text-foreground">
+                {stockMovementDescription(movement)}
               </p>
             </TableCell>
-            <TableCell>{movement.createdByUserName}</TableCell>
             <TableCell className="text-right">
               <MovementActionsMenu
                 canReverse={canReverse}

@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { movementTypeTone } from "@/lib/inventory/stock-movement-display";
 import type { MovementType } from "@/types/stock-movements";
 
 type MovementTypeBadgeProps = {
@@ -25,27 +26,16 @@ const labels: Record<MovementType, string> = {
   reversal: "Reversal",
 };
 
+/**
+ * Semantic variant rather than a className tint, so the badge carries its dot
+ * (DESIGN.md sections 6 and 9).
+ *
+ * This is the copy that renders the Movements tab and the movement detail
+ * drawer. A previous pass converted only the same-named file under
+ * components/inventory, so every badge on this screen stayed colour-only --
+ * which is exactly the kind of miss a shared basename produces. The tone now
+ * comes from movementTypeTone so the two cannot drift again.
+ */
 export function MovementTypeBadge({ type }: MovementTypeBadgeProps): JSX.Element {
-  if (type === "reversal") {
-    return (
-      <Badge className="bg-warning-tint text-warning-text hover:bg-warning-tint">
-        {labels[type]}
-      </Badge>
-    );
-  }
-
-  if (
-    type === "sale_out" ||
-    type === "adjustment_out" ||
-    type === "wastage" ||
-    type === "production_out" ||
-    type === "purchase_return_out" ||
-    type === "purchase_bill_cancel_out"
-  ) {
-    return <Badge className="bg-muted text-foreground-muted hover:bg-muted">{labels[type]}</Badge>;
-  }
-
-  return (
-    <Badge className="bg-money-tint text-money-text hover:bg-money-tint">{labels[type]}</Badge>
-  );
+  return <Badge variant={movementTypeTone(type)}>{labels[type]}</Badge>;
 }
