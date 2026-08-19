@@ -582,9 +582,15 @@ func (r *Repository) MovementSummary(businessID string, query MovementListQuery)
 	db := r.db.Model(&StockMovement{}).Where("stock_movements.business_id = ?", businessID)
 	db = applyMovementFilters(db, query)
 	var rows []MovementTypeSummaryItem
-	if err := db.Select("movement_type, movement_direction AS direction, COALESCE(SUM(quantity), 0) AS total_quantity, COUNT(*) AS count").
-		Group("movement_type, movement_direction").
-		Order("movement_type ASC").
+	// The projection is qualified too, not only the predicates. These three
+	// columns happen to be unique to stock_movements today, so bare names
+	// resolve -- but that is a property of the current schema, not of this
+	// query. Adding a `quantity` to any table the search branch joins would
+	// break this the same way business_id did, and the failure would surface as
+	// a 500 on a screen nobody changed.
+	if err := db.Select("stock_movements.movement_type, stock_movements.movement_direction AS direction, COALESCE(SUM(stock_movements.quantity), 0) AS total_quantity, COUNT(*) AS count").
+		Group("stock_movements.movement_type, stock_movements.movement_direction").
+		Order("stock_movements.movement_type ASC").
 		Scan(&rows).Error; err != nil {
 		return nil, err
 	}
