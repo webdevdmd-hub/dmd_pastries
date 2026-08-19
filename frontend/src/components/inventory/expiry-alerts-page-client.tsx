@@ -153,7 +153,7 @@ export function ExpiryAlertsPageClient(): JSX.Element {
         title="Expiry Alerts"
         description="Track stock batches that are expiring soon or already expired."
       />
-      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-card/70 p-4 shadow-soft md:grid-cols-6">
+      <div className="grid gap-3 rounded-3xl border border-border bg-card/70 p-4 shadow-soft md:grid-cols-6">
         <Select
           onValueChange={(branchId) => setFilters({ ...filters, branchId })}
           value={filters.branchId}
@@ -301,10 +301,10 @@ export function ExpiryAlertsPageClient(): JSX.Element {
                   return (
                     <TableRow key={batch.id}>
                       <TableCell>
-                        <div className="font-bold text-brand-espresso">
+                        <div className="font-medium text-foreground">
                           {batch.itemName ?? "Item details unavailable"}
                         </div>
-                        <div className="text-xs text-brand-mocha">
+                        <div className="text-xs text-foreground-muted">
                           {compactList([
                             batch.sku ? `SKU: ${batch.sku}` : null,
                             batch.itemCode ? `Code: ${batch.itemCode}` : null,
@@ -314,13 +314,13 @@ export function ExpiryAlertsPageClient(): JSX.Element {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className="border-brand-cappuccino bg-brand-latte/70 text-brand-espresso">
+                        <Badge className="border-border bg-muted/70 text-foreground">
                           {itemTypeLabel(batch.itemType)}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="font-bold">{batch.batchNumber || "-"}</div>
-                        <div className="text-xs text-brand-mocha">
+                        <div className="font-medium">{batch.batchNumber || "-"}</div>
+                        <div className="text-xs text-foreground-muted">
                           {batch.purchaseReferenceNumber
                             ? `Purchase: ${batch.purchaseReferenceNumber}`
                             : "-"}
@@ -328,7 +328,7 @@ export function ExpiryAlertsPageClient(): JSX.Element {
                       </TableCell>
                       <TableCell>
                         <div>{getBranchLabel(batch)}</div>
-                        <div className="text-xs text-brand-mocha">
+                        <div className="text-xs text-foreground-muted">
                           {compactList([batch.stockLocationName, batch.supplierName]) || "-"}
                         </div>
                       </TableCell>
@@ -339,7 +339,7 @@ export function ExpiryAlertsPageClient(): JSX.Element {
                       <TableCell>{formatDate(batch.receivedDate)}</TableCell>
                       <TableCell>{formatDate(batch.expiryDate)}</TableCell>
                       <TableCell
-                        className={remaining < 0 ? "font-bold text-danger-text" : undefined}
+                        className={remaining < 0 ? "font-medium text-danger-text" : undefined}
                       >
                         {remaining < 0
                           ? `${String(Math.abs(remaining))} days overdue`

@@ -185,8 +185,10 @@ export function LocationBalancesPageClient(): JSX.Element {
               {balances.map((balance) => (
                 <TableRow key={`${balance.inventoryItemId}-${balance.stockLocationId}`}>
                   <TableCell>
-                    <div className="font-semibold text-brand-espresso">{balance.itemName}</div>
-                    <div className="text-sm text-brand-mocha">{balance.itemCode || "No code"}</div>
+                    <div className="font-semibold text-foreground">{balance.itemName}</div>
+                    <div className="text-sm text-foreground-muted">
+                      {balance.itemCode || "No code"}
+                    </div>
                   </TableCell>
                   <TableCell>{balance.stockLocationName}</TableCell>
                   <TableCell>
@@ -207,7 +209,7 @@ export function LocationBalancesPageClient(): JSX.Element {
               ))}
               {!balancesQuery.isLoading && balances.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-brand-mocha">
+                  <TableCell colSpan={6} className="py-10 text-center text-foreground-muted">
                     {balancesQuery.error
                       ? isPermissionDenied
                         ? "The backend denied access to location balances."

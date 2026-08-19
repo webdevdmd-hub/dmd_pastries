@@ -96,15 +96,15 @@ export function InventoryDetailsDrawer({
         {item ? (
           <div className="mt-6 space-y-6">
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
-                <p className="text-xs text-brand-mocha">Current</p>
-                <p className="mt-2 text-2xl font-medium tabular-nums text-brand-espresso">
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
+                <p className="text-xs text-foreground-muted">Current</p>
+                <p className="mt-2 text-2xl font-medium tabular-nums text-foreground">
                   {formatQuantity(item.currentQuantity, item.unitSymbol)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
-                <p className="text-xs text-brand-mocha">Available</p>
-                <p className="mt-2 text-2xl font-medium tabular-nums text-brand-espresso">
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
+                <p className="text-xs text-foreground-muted">Available</p>
+                <p className="mt-2 text-2xl font-medium tabular-nums text-foreground">
                   {formatQuantity(item.availableQuantity, item.unitSymbol)}
                 </p>
               </div>
@@ -112,49 +112,49 @@ export function InventoryDetailsDrawer({
                   carries them. Reserved only means anything next to Current and
                   Available -- it is the difference between them -- so the three
                   belong together, which a 14-column list could never show. */}
-              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
-                <p className="text-xs text-brand-mocha">Reserved</p>
-                <p className="mt-2 text-2xl font-medium tabular-nums text-brand-espresso">
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
+                <p className="text-xs text-foreground-muted">Reserved</p>
+                <p className="mt-2 text-2xl font-medium tabular-nums text-foreground">
                   {formatQuantity(item.reservedQuantity, item.unitSymbol)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
                 <div className="flex items-center gap-1">
-                  <p className="text-xs text-brand-mocha">Reorder level</p>
+                  <p className="text-xs text-foreground-muted">Reorder level</p>
                   <ReorderLevelHelpIcon />
                 </div>
-                <p className="mt-2 text-2xl font-medium tabular-nums text-brand-espresso">
+                <p className="mt-2 text-2xl font-medium tabular-nums text-foreground">
                   {formatQuantity(item.reorderLevel, item.unitSymbol)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
-                <p className="text-xs text-brand-mocha">Branch</p>
-                <p className="mt-2 font-medium text-brand-espresso">{item.branchName}</p>
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
+                <p className="text-xs text-foreground-muted">Branch</p>
+                <p className="mt-2 font-medium text-foreground">{item.branchName}</p>
               </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
-                <p className="text-xs text-brand-mocha">Status</p>
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
+                <p className="text-xs text-foreground-muted">Status</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <InventoryStatusBadge status={item.status} />
                   <StockLevelBadge item={item} />
                 </div>
               </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
-                <p className="text-xs text-brand-mocha">Item Identity</p>
-                <div className="mt-2 space-y-1 text-sm text-brand-espresso">
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
+                <p className="text-xs text-foreground-muted">Item Identity</p>
+                <div className="mt-2 space-y-1 text-sm text-foreground">
                   <p className="font-medium">
                     {item.productType ? PRODUCT_TYPE_LABELS[item.productType] : "Legacy item"}
                   </p>
                   {/* The list's "Type" column landed here. It is the structural
                       kind (Product Master / Variant / legacy), which is a
                       different axis from productType above. */}
-                  <p className="text-brand-mocha">{typeLabel(item.itemType)}</p>
+                  <p className="text-foreground-muted">{typeLabel(item.itemType)}</p>
                   {item.variantName ? <p>Variant: {item.variantName}</p> : null}
-                  <p className="text-brand-mocha">{item.itemCode || "No code"}</p>
+                  <p className="text-foreground-muted">{item.itemCode || "No code"}</p>
                 </div>
               </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
-                <p className="text-xs text-brand-mocha">Inventory Value</p>
-                <div className="mt-2 space-y-1 text-sm text-brand-espresso">
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
+                <p className="text-xs text-foreground-muted">Inventory Value</p>
+                <div className="mt-2 space-y-1 text-sm text-foreground">
                   <p>
                     Avg cost:{" "}
                     <span className="font-medium tabular-nums">
@@ -172,7 +172,7 @@ export function InventoryDetailsDrawer({
                       <Badge className="border-warning/30 bg-warning-tint text-warning-text">
                         {item.accountingStatusLabel || "Pending Bill Posting"}
                       </Badge>
-                      <p className="text-xs text-brand-mocha">{item.accountingStatusDetail}</p>
+                      <p className="text-xs text-foreground-muted">{item.accountingStatusDetail}</p>
                     </div>
                   ) : null}
                 </div>
@@ -201,18 +201,18 @@ export function InventoryDetailsDrawer({
             </div>
 
             <section className="space-y-3">
-              <h3 className="text-lg font-bold text-brand-espresso">Recent movements</h3>
+              <h3 className="text-lg font-medium text-foreground">Recent movements</h3>
               {movementsLoading ? (
-                <p className="text-sm text-brand-mocha">Loading movements...</p>
+                <p className="text-sm text-foreground-muted">Loading movements...</p>
               ) : movements.length > 0 ? (
                 <StockMovementsTable movements={movements.slice(0, 5)} />
               ) : (
-                <p className="text-sm text-brand-mocha">No movements recorded.</p>
+                <p className="text-sm text-foreground-muted">No movements recorded.</p>
               )}
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-lg font-bold text-brand-espresso">Expiry batches</h3>
+              <h3 className="text-lg font-medium text-foreground">Expiry batches</h3>
               {item.isExpiryTracked ? (
                 <ExpiryBatchesSection
                   batches={batches}
@@ -221,7 +221,7 @@ export function InventoryDetailsDrawer({
                   onStatusChange={onBatchStatusChange}
                 />
               ) : (
-                <p className="text-sm text-brand-mocha">Expiry tracking is disabled.</p>
+                <p className="text-sm text-foreground-muted">Expiry tracking is disabled.</p>
               )}
             </section>
           </div>

@@ -110,11 +110,11 @@ export function InventoryTable({
               <TableCell>
                 <div>
                   <p className="font-medium">{item.itemName}</p>
-                  <p className="text-xs text-brand-mocha">
+                  <p className="text-xs text-foreground-muted">
                     {item.itemCode || (isNotInitialized ? "Catalog item without stock" : "No code")}
                   </p>
                   {item.variantName ? (
-                    <p className="text-xs text-brand-mocha">Variant: {item.variantName}</p>
+                    <p className="text-xs text-foreground-muted">Variant: {item.variantName}</p>
                   ) : null}
                 </div>
               </TableCell>
@@ -157,7 +157,7 @@ export function InventoryTable({
                   isNotInitialized &&
                   item.canAddOpeningStock &&
                   !canCreateProductMasterOpeningStock ? (
-                    <span className="rounded-full border border-brand-cappuccino px-2 py-1 text-xs text-brand-mocha">
+                    <span className="rounded-full border border-border px-2 py-1 text-xs text-foreground-muted">
                       Legacy read-only
                     </span>
                   ) : null}

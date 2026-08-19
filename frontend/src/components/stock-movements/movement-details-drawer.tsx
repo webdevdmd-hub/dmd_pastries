@@ -51,9 +51,9 @@ function formatItemType(value: StockMovement["itemType"]): string {
 
 function DetailRow({ label, value }: { label: string; value: string }): JSX.Element {
   return (
-    <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-3">
-      <p className="text-xs text-brand-mocha">{label}</p>
-      <p className="mt-1 font-semibold text-brand-espresso">{value}</p>
+    <div className="rounded-2xl border border-border bg-card/70 p-3">
+      <p className="text-xs text-foreground-muted">{label}</p>
+      <p className="mt-1 font-semibold text-foreground">{value}</p>
     </div>
   );
 }
@@ -80,12 +80,12 @@ export function MovementDetailsDrawer({
               <MovementTypeBadge type={movement.movementType} />
               <MovementDirectionBadge direction={movement.movementDirection} />
             </div>
-            <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
-              <p className="text-xs text-brand-mocha">What happened</p>
-              <p className="mt-2 font-semibold text-brand-espresso">
+            <div className="rounded-2xl border border-border bg-card/70 p-4">
+              <p className="text-xs text-foreground-muted">What happened</p>
+              <p className="mt-2 font-semibold text-foreground">
                 {stockMovementDescription(movement)}
               </p>
-              <p className="mt-1 text-sm text-brand-mocha">
+              <p className="mt-1 text-sm text-foreground-muted">
                 {sourceModuleLabel(movement)} - {sourceReferenceLabel(movement)}
               </p>
             </div>
@@ -137,9 +137,9 @@ export function MovementDetailsDrawer({
               <DetailRow label="Created at" value={formatDate(movement.createdAt)} />
             </div>
             {movement.accountingJournalEntryId ? (
-              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
-                <p className="text-xs text-brand-mocha">Accounting journal</p>
-                <p className="mt-2 text-sm text-brand-espresso">
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
+                <p className="text-xs text-foreground-muted">Accounting journal</p>
+                <p className="mt-2 text-sm text-foreground">
                   This movement was posted to accounting journal {movement.accountingJournalEntryId}
                   .
                 </p>
@@ -148,22 +148,22 @@ export function MovementDetailsDrawer({
                 </div>
               </div>
             ) : null}
-            <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
-              <p className="text-xs text-brand-mocha">Reason</p>
-              <p className="mt-2 text-sm text-brand-espresso">
+            <div className="rounded-2xl border border-border bg-card/70 p-4">
+              <p className="text-xs text-foreground-muted">Reason</p>
+              <p className="mt-2 text-sm text-foreground">
                 {movement.reason ?? stockMovementDescription(movement)}
               </p>
               {movement.notes ? (
                 <>
-                  <p className="mt-4 text-xs text-brand-mocha">Notes</p>
-                  <p className="mt-2 text-sm text-brand-espresso">{movement.notes}</p>
+                  <p className="mt-4 text-xs text-foreground-muted">Notes</p>
+                  <p className="mt-2 text-sm text-foreground">{movement.notes}</p>
                 </>
               ) : null}
             </div>
             {movement.reversedMovementId ? (
               <div className="rounded-2xl border border-warning/30 bg-warning-tint p-4">
-                <p className="font-bold text-brand-espresso">Reversal information</p>
-                <p className="mt-1 text-sm text-brand-mocha">
+                <p className="font-medium text-foreground">Reversal information</p>
+                <p className="mt-1 text-sm text-foreground-muted">
                   Related movement: {movement.reversedMovementId}
                 </p>
                 <Button asChild className="mt-3" size="sm" type="button" variant="outline">

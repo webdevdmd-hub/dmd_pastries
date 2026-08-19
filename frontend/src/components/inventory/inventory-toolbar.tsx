@@ -102,7 +102,7 @@ export function InventoryToolbar({
             <SlidersHorizontal className="h-4 w-4" />
             Filters
             {hiddenFilterCount > 0 ? (
-              <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-espresso px-1.5 text-xs font-medium tabular-nums text-brand-latte">
+              <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1.5 text-xs font-medium tabular-nums text-muted">
                 {hiddenFilterCount}
               </span>
             ) : null}
@@ -114,7 +114,7 @@ export function InventoryToolbar({
 
             {allowAllBranches ? (
               <div className="flex flex-col gap-1.5">
-                <Label className="text-xs text-brand-mocha" htmlFor="inventoryFilterBranch">
+                <Label className="text-xs text-foreground-muted" htmlFor="inventoryFilterBranch">
                   Branch
                 </Label>
                 <Select
@@ -137,7 +137,7 @@ export function InventoryToolbar({
             ) : null}
 
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-brand-mocha" htmlFor="inventoryFilterItemType">
+              <Label className="text-xs text-foreground-muted" htmlFor="inventoryFilterItemType">
                 Item type
               </Label>
               <Select
@@ -158,7 +158,7 @@ export function InventoryToolbar({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-brand-mocha" htmlFor="inventoryFilterProductType">
+              <Label className="text-xs text-foreground-muted" htmlFor="inventoryFilterProductType">
                 Product type
               </Label>
               <Select
@@ -182,7 +182,7 @@ export function InventoryToolbar({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-brand-mocha" htmlFor="inventoryFilterStatus">
+              <Label className="text-xs text-foreground-muted" htmlFor="inventoryFilterStatus">
                 Status
               </Label>
               <Select
@@ -202,8 +202,8 @@ export function InventoryToolbar({
               </Select>
             </div>
 
-            <div className="flex flex-col gap-2.5 border-t border-brand-cappuccino pt-3">
-              <label className="flex items-center gap-2 text-sm text-brand-espresso">
+            <div className="flex flex-col gap-2.5 border-t border-border pt-3">
+              <label className="flex items-center gap-2 text-sm text-foreground">
                 <Checkbox
                   checked={filters.expiryTrackedOnly}
                   onCheckedChange={(checked) =>
@@ -212,7 +212,7 @@ export function InventoryToolbar({
                 />
                 Expiry tracked
               </label>
-              <label className="flex items-center gap-2 text-sm text-brand-espresso">
+              <label className="flex items-center gap-2 text-sm text-foreground">
                 <Checkbox
                   checked={filters.includeUninitialized}
                   onCheckedChange={(checked) =>

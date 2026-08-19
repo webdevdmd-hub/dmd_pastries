@@ -14,8 +14,8 @@ export function AccessDeniedCard({
     <Card className="border-danger/30 bg-danger-tint/70">
       <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
         <ShieldAlert className="h-10 w-10 text-danger-text" />
-        <h2 className="text-xl font-bold text-brand-espresso">Access denied</h2>
-        <p className="max-w-md text-sm text-brand-mocha">{message}</p>
+        <h2 className="text-xl font-medium text-foreground">Access denied</h2>
+        <p className="max-w-md text-sm text-foreground-muted">{message}</p>
       </CardContent>
     </Card>
   );

@@ -195,23 +195,23 @@ export function StockLocationsPageClient(): JSX.Element {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Total locations</p>
-            <p className="mt-2 text-3xl font-bold text-brand-espresso">{locations.length}</p>
+            <p className="text-sm text-foreground-muted">Total locations</p>
+            <p className="mt-2 text-3xl font-medium text-foreground">{locations.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Active locations</p>
-            <p className="mt-2 text-3xl font-bold text-brand-espresso">{activeCount}</p>
+            <p className="text-sm text-foreground-muted">Active locations</p>
+            <p className="mt-2 text-3xl font-medium text-foreground">{activeCount}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Default location</p>
-            <p className="mt-2 text-xl font-bold text-brand-espresso">
+            <p className="text-sm text-foreground-muted">Default location</p>
+            <p className="mt-2 text-xl font-medium text-foreground">
               {defaultLocation?.locationName ?? "Main Stock"}
             </p>
-            <p className="mt-1 text-xs text-brand-mocha">
+            <p className="mt-1 text-xs text-foreground-muted">
               Normal receiving uses this location automatically.
             </p>
           </CardContent>
@@ -235,11 +235,11 @@ export function StockLocationsPageClient(): JSX.Element {
               {locations.map((location) => (
                 <TableRow key={location.id}>
                   <TableCell>
-                    <div className="flex flex-wrap items-center gap-2 font-semibold text-brand-espresso">
+                    <div className="flex flex-wrap items-center gap-2 font-semibold text-foreground">
                       <span>{location.locationName}</span>
                       {location.isDefault ? <Badge>Default</Badge> : null}
                     </div>
-                    <div className="text-sm text-brand-mocha">
+                    <div className="text-sm text-foreground-muted">
                       {location.description ?? "No description"}
                     </div>
                   </TableCell>
@@ -254,7 +254,7 @@ export function StockLocationsPageClient(): JSX.Element {
                     {location.isDefault ? (
                       <Badge>Default</Badge>
                     ) : (
-                      <span className="text-brand-mocha">-</span>
+                      <span className="text-foreground-muted">-</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -295,7 +295,7 @@ export function StockLocationsPageClient(): JSX.Element {
                           </Button>
                         </>
                       ) : (
-                        <span className="text-sm text-brand-mocha">View only</span>
+                        <span className="text-sm text-foreground-muted">View only</span>
                       )}
                     </div>
                   </TableCell>
@@ -303,7 +303,7 @@ export function StockLocationsPageClient(): JSX.Element {
               ))}
               {!locationsQuery.isLoading && locations.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-brand-mocha">
+                  <TableCell colSpan={6} className="py-10 text-center text-foreground-muted">
                     No stock locations found. Backend should create Main Stock automatically for
                     each branch.
                   </TableCell>

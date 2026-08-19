@@ -84,108 +84,108 @@ export function MovementDetailsPageClient({
               <MovementTypeBadge type={movement.movementType} />
               <MovementDirectionBadge direction={movement.movementDirection} />
             </div>
-            <div className="rounded-2xl bg-brand-latte p-4">
-              <p className="text-sm text-brand-mocha">What happened</p>
-              <p className="mt-1 font-bold text-brand-espresso">
+            <div className="rounded-2xl bg-muted p-4">
+              <p className="text-sm text-foreground-muted">What happened</p>
+              <p className="mt-1 font-medium text-foreground">
                 {stockMovementDescription(movement)}
               </p>
-              <p className="mt-1 text-sm text-brand-mocha">
+              <p className="mt-1 text-sm text-foreground-muted">
                 {sourceModuleLabel(movement)} - {sourceReferenceLabel(movement)}
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div>
-                <p className="text-sm text-brand-mocha">Item</p>
-                <p className="font-bold text-brand-espresso">{movement.itemName}</p>
+                <p className="text-sm text-foreground-muted">Item</p>
+                <p className="font-medium text-foreground">{movement.itemName}</p>
               </div>
               <div>
-                <p className="text-sm text-brand-mocha">Branch</p>
-                <p className="font-bold text-brand-espresso">{movement.branchName}</p>
+                <p className="text-sm text-foreground-muted">Branch</p>
+                <p className="font-medium text-foreground">{movement.branchName}</p>
               </div>
               <div>
-                <p className="text-sm text-brand-mocha">Quantity</p>
-                <p className="font-bold text-brand-espresso">
+                <p className="text-sm text-foreground-muted">Quantity</p>
+                <p className="font-medium text-foreground">
                   {formatQuantity(movement.quantity, movement.unitSymbol)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-brand-mocha">Before / After</p>
-                <p className="font-bold text-brand-espresso">
+                <p className="text-sm text-foreground-muted">Before / After</p>
+                <p className="font-medium text-foreground">
                   {formatQuantity(movement.beforeQuantity, movement.unitSymbol)} →{" "}
                   {formatQuantity(movement.afterQuantity, movement.unitSymbol)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-brand-mocha">Reference</p>
-                <p className="font-bold text-brand-espresso">
+                <p className="text-sm text-foreground-muted">Reference</p>
+                <p className="font-medium text-foreground">
                   {movement.referenceNumber ?? movement.referenceType ?? "Manual"}
                 </p>
               </div>
               {movement.movementType === "transfer" ? (
                 <>
                   <div>
-                    <p className="text-sm text-brand-mocha">From location</p>
-                    <p className="font-bold text-brand-espresso">
+                    <p className="text-sm text-foreground-muted">From location</p>
+                    <p className="font-medium text-foreground">
                       {locationName(movement.fromStockLocationName)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-brand-mocha">To location</p>
-                    <p className="font-bold text-brand-espresso">
+                    <p className="text-sm text-foreground-muted">To location</p>
+                    <p className="font-medium text-foreground">
                       {locationName(movement.toStockLocationName)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-brand-mocha">Transfer number</p>
-                    <p className="font-bold text-brand-espresso">
+                    <p className="text-sm text-foreground-muted">Transfer number</p>
+                    <p className="font-medium text-foreground">
                       {movement.referenceNumber ?? "None"}
                     </p>
                   </div>
                 </>
               ) : null}
               <div>
-                <p className="text-sm text-brand-mocha">Total cost</p>
-                <p className="font-bold text-brand-espresso">
+                <p className="text-sm text-foreground-muted">Total cost</p>
+                <p className="font-medium text-foreground">
                   {movement.totalCost > 0 ? formatMoney(movement.totalCost) : "Not costed"}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-brand-mocha">Unit cost</p>
-                <p className="font-bold text-brand-espresso">
+                <p className="text-sm text-foreground-muted">Unit cost</p>
+                <p className="font-medium text-foreground">
                   {movement.unitCostSnapshot > 0
                     ? formatMoney(movement.unitCostSnapshot)
                     : "Not costed"}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-brand-mocha">Valuation method</p>
-                <p className="font-bold text-brand-espresso">
+                <p className="text-sm text-foreground-muted">Valuation method</p>
+                <p className="font-medium text-foreground">
                   {movement.valuationMethod ?? "Not available"}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-brand-mocha">Created by</p>
-                <p className="font-bold text-brand-espresso">{movement.createdByUserName}</p>
+                <p className="text-sm text-foreground-muted">Created by</p>
+                <p className="font-medium text-foreground">{movement.createdByUserName}</p>
               </div>
               <div>
-                <p className="text-sm text-brand-mocha">Created at</p>
-                <p className="font-bold text-brand-espresso">
+                <p className="text-sm text-foreground-muted">Created at</p>
+                <p className="font-medium text-foreground">
                   {movement.createdAt ? new Date(movement.createdAt).toLocaleString("en-AE") : "-"}
                 </p>
               </div>
             </div>
             {movement.accountingJournalEntryId ? (
-              <div className="rounded-2xl border border-brand-cappuccino bg-card/70 p-4">
-                <p className="text-sm text-brand-mocha">Accounting journal</p>
-                <p className="mt-1 text-brand-espresso">{movement.accountingJournalEntryId}</p>
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
+                <p className="text-sm text-foreground-muted">Accounting journal</p>
+                <p className="mt-1 text-foreground">{movement.accountingJournalEntryId}</p>
                 <div className="mt-3">
                   <AccountingJournalLink id={movement.accountingJournalEntryId} />
                 </div>
               </div>
             ) : null}
-            <div className="rounded-2xl bg-brand-latte p-4">
-              <p className="text-sm text-brand-mocha">Reason</p>
-              <p className="mt-1 text-brand-espresso">
+            <div className="rounded-2xl bg-muted p-4">
+              <p className="text-sm text-foreground-muted">Reason</p>
+              <p className="mt-1 text-foreground">
                 {movement.reason ?? stockMovementDescription(movement)}
               </p>
             </div>

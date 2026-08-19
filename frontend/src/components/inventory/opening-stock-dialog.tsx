@@ -381,7 +381,9 @@ export function OpeningStockDialog({
                     {form.formState.errors.productVariantId.message}
                   </p>
                 ) : selectedProductId && activeProductVariants.length === 0 ? (
-                  <p className="text-sm text-brand-mocha">This product has no active variants.</p>
+                  <p className="text-sm text-foreground-muted">
+                    This product has no active variants.
+                  </p>
                 ) : null}
               </div>
             ) : null}
@@ -433,7 +435,7 @@ export function OpeningStockDialog({
               {form.formState.errors.unitCost ? (
                 <p className="text-sm text-danger-text">{form.formState.errors.unitCost.message}</p>
               ) : (
-                <p className="text-xs text-brand-mocha">
+                <p className="text-xs text-foreground-muted">
                   Estimated opening value: {formatMoney(estimatedOpeningValue)}
                 </p>
               )}
@@ -447,7 +449,7 @@ export function OpeningStockDialog({
                 {...form.register("reorderLevel")}
               />
             </div>
-            <label className="flex items-center gap-2 pt-6 text-sm text-brand-espresso">
+            <label className="flex items-center gap-2 pt-6 text-sm text-foreground">
               <Checkbox
                 checked={expiryTracked}
                 onCheckedChange={(checked) => form.setValue("isExpiryTracked", checked === true)}

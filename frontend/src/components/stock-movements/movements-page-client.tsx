@@ -206,10 +206,10 @@ export function MovementsPageClient(): JSX.Element {
       />
 
       {itemIdParam ? (
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte px-4 py-3 text-sm text-brand-mocha">
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted px-4 py-3 text-sm text-foreground-muted">
           <span>
             Showing movements for{" "}
-            <span className="font-semibold text-brand-espresso">{scopedItemName}</span> only.
+            <span className="font-semibold text-foreground">{scopedItemName}</span> only.
           </span>
           <Button asChild size="sm" type="button" variant="ghost">
             <Link href="/inventory/movements">
@@ -227,7 +227,7 @@ export function MovementsPageClient(): JSX.Element {
               <CardContent className="flex flex-wrap gap-2 p-4">
                 {summaryQuery.data.byMovementType.map((entry) => (
                   <span
-                    className="rounded-full border border-brand-cappuccino bg-brand-latte px-3 py-1 text-xs font-semibold text-brand-mocha"
+                    className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-semibold text-foreground-muted"
                     key={entry.movementType}
                   >
                     {movementTypeLabel(entry.movementType)} - {entry.quantity} - {entry.count} moves

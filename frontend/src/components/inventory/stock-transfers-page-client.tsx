@@ -347,17 +347,17 @@ export function StockTransfersPageClient(): JSX.Element {
               {transfers.map((transfer) => (
                 <TableRow key={transfer.id}>
                   <TableCell>
-                    <div className="font-semibold text-brand-espresso">{transfer.itemName}</div>
-                    <div className="text-sm text-brand-mocha">{transfer.reason}</div>
+                    <div className="font-semibold text-foreground">{transfer.itemName}</div>
+                    <div className="text-sm text-foreground-muted">{transfer.reason}</div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2 text-sm">
                       <span>{transfer.fromStockLocationName}</span>
-                      <ArrowRight className="h-4 w-4 text-brand-mocha" />
+                      <ArrowRight className="h-4 w-4 text-foreground-muted" />
                       <span>{transfer.toStockLocationName}</span>
                     </div>
                     {transfer.notes ? (
-                      <div className="text-sm text-brand-mocha">{transfer.notes}</div>
+                      <div className="text-sm text-foreground-muted">{transfer.notes}</div>
                     ) : null}
                   </TableCell>
                   <TableCell>
@@ -389,7 +389,7 @@ export function StockTransfersPageClient(): JSX.Element {
               ))}
               {!transfersQuery.isLoading && transfers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-brand-mocha">
+                  <TableCell colSpan={6} className="py-10 text-center text-foreground-muted">
                     No stock transfers found for the active branch.
                   </TableCell>
                 </TableRow>

@@ -131,7 +131,7 @@ export function LowStockPageClient(): JSX.Element {
         title="Low Stock Alerts"
         description="Items where available quantity is at or below reorder level."
       />
-      <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-card/70 p-4 shadow-soft md:grid-cols-5">
+      <div className="grid gap-3 rounded-3xl border border-border bg-card/70 p-4 shadow-soft md:grid-cols-5">
         <Input
           aria-label="Search low stock"
           onChange={(event) => setFilters({ ...filters, search: event.target.value })}
