@@ -118,3 +118,57 @@ func TestInventorySearchAndProductTypeCombine(t *testing.T) {
 		t.Fatalf("combined filters returned %d items, want only the finished product", len(items))
 	}
 }
+
+// The include-uninitialized path builds its own union SQL rather than going
+// through applyInventoryFilters, and it shipped without the ProductType
+// predicate -- so flipping "include uninitialized" on silently un-filtered the
+// list while the filter chip stayed lit. Both rows here are uninitialized
+// products (no inventory_items row), which forces the union's catalog arm.
+func TestInventoryProductTypeFilterSurvivesIncludeUninitialized(t *testing.T) {
+	db := testdb.Tx(t)
+	seed := testdb.Seed(t, db)
+
+	exec := func(query string, args ...interface{}) {
+		t.Helper()
+		if err := db.Exec(query, args...).Error; err != nil {
+			t.Fatalf("seed uninitialized product: %v", err)
+		}
+	}
+
+	var unitID string
+	if err := db.Raw(`SELECT id FROM units WHERE business_id IS NULL AND deleted_at IS NULL LIMIT 1`).Scan(&unitID).Error; err != nil {
+		t.Fatalf("look up a system unit: %v", err)
+	}
+
+	categoryID := testdb.NewUUID()
+	exec(`INSERT INTO product_categories (id, business_id, branch_id, category_name, category_code) VALUES (?, ?, ?, ?, ?)`,
+		categoryID, seed.BusinessID, seed.BranchID, "Cat "+categoryID[:8], "CAT-"+categoryID[:8])
+
+	plant := func(name, productType string) {
+		productID := testdb.NewUUID()
+		exec(`INSERT INTO products
+			(id, business_id, branch_id, category_id, unit_id, product_name, product_code, product_type, is_stock_tracked, created_by, updated_by)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, true, ?, ?)`,
+			productID, seed.BusinessID, seed.BranchID, categoryID, unitID, name, "PRD-"+productID[:8], productType, seed.UserID, seed.UserID)
+	}
+	plant("Sourdough Loaf", "finished_product")
+	plant("Stand Mixer", "equipment")
+
+	repository := NewRepository(db)
+
+	responses, total, err := repository.ListInventoryWithUninitializedResponses(seed.BusinessID, InventoryListQuery{
+		IncludeUninitialized: true,
+		ProductType:          "finished_product",
+		Page:                 1,
+		Limit:                20,
+	})
+	if err != nil {
+		t.Fatalf("list with uninitialized and product type: %v", err)
+	}
+	if total != 1 {
+		t.Fatalf("product type on the uninitialized path matched %d rows, want 1", total)
+	}
+	if len(responses) != 1 || responses[0].ItemName != "Sourdough Loaf" {
+		t.Fatalf("uninitialized path returned %d rows, want only the finished product", len(responses))
+	}
+}

@@ -1396,7 +1396,7 @@ WITH inventory_catalog AS (
         AND ii.product_variant_id = pv.id AND ii.deleted_at IS NULL
     )
 )
-SELECT ` + selectClause + ` FROM inventory_catalog WHERE 1 = 1`
+SELECT ` + selectClause + ` FROM inventory_catalog ic WHERE 1 = 1`
 
 	if query.BranchID != "" {
 		sql += " AND branch_id = ?"
@@ -1405,6 +1405,16 @@ SELECT ` + selectClause + ` FROM inventory_catalog WHERE 1 = 1`
 	if query.ItemType != "" {
 		sql += " AND item_type = ?"
 		args = append(args, query.ItemType)
+	}
+	if query.ProductType != "" {
+		// The paginated path grew this filter in applyInventoryFilters; without
+		// the same predicate here, switching on "include uninitialized" made
+		// the product type chip a silent no-op -- an unfiltered catalog
+		// presented as filtered. The catalog's business_id/product_id columns
+		// are ::text casts, so the products side casts to match, and the outer
+		// alias keeps business_id from resolving to the inner table.
+		sql += " AND EXISTS (SELECT 1 FROM products fpt WHERE fpt.id::text = ic.product_id AND fpt.business_id::text = ic.business_id AND fpt.product_type = ?)"
+		args = append(args, query.ProductType)
 	}
 	if query.Status != "" {
 		sql += " AND status = ?"
@@ -1476,9 +1486,10 @@ func applyMovementFilters(db *gorm.DB, query MovementListQuery) *gorm.DB {
 		db = db.Where("stock_movements.item_type = ?", query.ItemType)
 	}
 	if query.ProductType != "" {
-		// MovementListQuery has carried ProductType and the handler has bound
-		// product_type for as long as the filter has existed, but nothing ever
-		// read it here -- so choosing a product type returned the whole ledger.
+		// The frontend has sent product_type for as long as its select has
+		// existed, but the DTO field and handler binding only arrive in this
+		// change -- before it, choosing a product type returned the whole
+		// ledger.
 		//
 		// EXISTS rather than a join, for the same two reasons as the inventory
 		// list: the search branch above already aliases `products p`, so a
