@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle } from "lucide-react";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -15,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { totalsByUnit } from "@/lib/purchasing/purchase-order-quantities";
+import { cn } from "@/lib/utils/cn";
 import type {
   PurchaseOrder,
   ReceivePurchaseOrderItemPayload,
@@ -28,6 +30,8 @@ type ReceiveGoodsRow = {
   quantityReceived: string;
 };
 
+type ReceiveStep = "count" | "confirm";
+
 type PurchaseOrderReceiveGoodsDialogProps = {
   isSubmitting: boolean;
   isLoading?: boolean;
@@ -38,18 +42,24 @@ type PurchaseOrderReceiveGoodsDialogProps = {
   order: PurchaseOrder | null;
 };
 
+type PurchaseOrderLine = PurchaseOrder["items"][number];
+
 const quantityFormat = new Intl.NumberFormat("en-AE", { maximumFractionDigits: 3 });
+const currencyFormat = new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" });
+
+/** The 7-column desktop grid. Below lg each row becomes a stacked card. */
+const GRID = "lg:grid-cols-[1.8fr_0.75fr_0.85fr_0.85fr_0.9fr_1fr_1fr]";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function unitLabel(item: PurchaseOrder["items"][number]): string {
+function unitLabel(item: PurchaseOrderLine): string {
   return item.unitSymbol || item.unitName || "";
 }
 
 /** A bare number in a receiving grid is a guess. Always ship the unit with it. */
-function withUnit(value: number, item: PurchaseOrder["items"][number]): string {
+function withUnit(value: number, item: PurchaseOrderLine): string {
   const unit = unitLabel(item);
   const amount = quantityFormat.format(value);
   return unit ? `${amount} ${unit}` : amount;
@@ -76,6 +86,13 @@ function hasRowChanges(order: PurchaseOrder, rows: ReceiveGoodsRow[]): boolean {
   });
 }
 
+/** A cell label that only appears once the row has collapsed into a card. */
+function StackedLabel({ children }: { children: string }): JSX.Element {
+  return (
+    <span className="block text-meta font-normal text-foreground-muted lg:hidden">{children}</span>
+  );
+}
+
 export function PurchaseOrderReceiveGoodsDialog({
   isSubmitting,
   isLoading = false,
@@ -89,23 +106,20 @@ export function PurchaseOrderReceiveGoodsDialog({
   const [notes, setNotes] = useState("");
   const [rows, setRows] = useState<ReceiveGoodsRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<ReceiveStep>("count");
 
   useEffect(() => {
-    if (!open) {
+    if (!open || !order) {
       setRows([]);
       setError(null);
-      return;
-    }
-
-    if (!order) {
-      setRows([]);
-      setError(null);
+      setStep("count");
       return;
     }
 
     setReceivedDate(today());
     setNotes("");
     setError(null);
+    setStep("count");
     setRows(
       receivableItems(order).map((item) => ({
         batchNumber: "",
@@ -126,32 +140,119 @@ export function PurchaseOrderReceiveGoodsDialog({
   );
 
   /**
-   * Receiving quantities only add up within a unit. The old footer summed every
-   * row into one "units" figure, so 200 kg of flour plus 12 litres of extract
-   * read as "212 units" -- a number that describes nothing and that counted
-   * rows the operator had deliberately zeroed. Group by unit instead, and count
-   * only the rows that will actually post.
+   * One message per offending row, so the error lands beside the field that
+   * caused it. The single unanchored paragraph this replaces said "Receive
+   * quantity cannot exceed the remaining ordered quantity" without naming the
+   * item, which on a ten-line delivery is a hunt rather than a correction.
    */
-  const receivingByUnit = useMemo(() => {
-    if (!order) return [];
+  const rowIssues = useMemo(() => {
+    const issues = new Map<string, string>();
+    if (!order) return issues;
 
-    const entries = rows.flatMap((row) => {
+    for (const row of rows) {
       const item = order.items.find((line) => line.id === row.purchaseOrderItemId);
-      if (!item) return [];
+      if (!item) continue;
 
-      return [{ quantity: Number(row.quantityReceived), unit: unitLabel(item) }];
-    });
+      const remaining = Math.max(item.quantityOrdered - item.quantityReceived, 0);
+      const raw = row.quantityReceived.trim();
 
-    return totalsByUnit(entries).map(({ quantity, unit }) => ({
-      label: unit ? `${quantityFormat.format(quantity)} ${unit}` : quantityFormat.format(quantity),
-      unit,
-    }));
+      if (raw === "") {
+        issues.set(item.id, `Enter a quantity for ${item.itemNameSnapshot}, or 0 to skip it.`);
+        continue;
+      }
+
+      const quantity = Number(raw);
+
+      if (!Number.isFinite(quantity)) {
+        issues.set(item.id, `${item.itemNameSnapshot} needs a number.`);
+        continue;
+      }
+
+      if (quantity < 0) {
+        issues.set(item.id, `${item.itemNameSnapshot} cannot be received as a negative quantity.`);
+        continue;
+      }
+
+      if (quantity > remaining) {
+        issues.set(
+          item.id,
+          `Only ${withUnit(remaining, item)} of ${item.itemNameSnapshot} is still outstanding.`,
+        );
+      }
+    }
+
+    return issues;
   }, [order, rows]);
 
-  const receivingLineCount = rows.filter((row) => {
-    const quantity = Number(row.quantityReceived);
-    return Number.isFinite(quantity) && quantity > 0;
-  }).length;
+  /** Rows that will actually post: a real quantity, and nothing wrong with it. */
+  const postingRows = useMemo(() => {
+    if (!order) return [];
+
+    return rows.flatMap((row) => {
+      const item = order.items.find((line) => line.id === row.purchaseOrderItemId);
+      if (!item || rowIssues.has(item.id)) return [];
+
+      const quantity = Number(row.quantityReceived);
+      if (!Number.isFinite(quantity) || quantity <= 0) return [];
+
+      return [{ item, quantity }];
+    });
+  }, [order, rows, rowIssues]);
+
+  /**
+   * Receiving quantities only add up within a unit. The old footer summed every
+   * row into one "units" figure, so 200 kg of flour plus 12 litres of extract
+   * read as "212 units" -- a number that describes nothing. It also totalled
+   * rows that were zeroed or invalid, cheerfully reporting quantities the
+   * backend would refuse.
+   */
+  const receivingByUnit = useMemo(
+    () =>
+      totalsByUnit(
+        postingRows.map(({ item, quantity }) => ({ quantity, unit: unitLabel(item) })),
+      ).map(({ quantity, unit }) => ({
+        label: unit
+          ? `${quantityFormat.format(quantity)} ${unit}`
+          : quantityFormat.format(quantity),
+        unit,
+      })),
+    [postingRows],
+  );
+
+  const skippedLines = useMemo(() => {
+    if (!order) return [];
+
+    return rows.flatMap((row) => {
+      const item = order.items.find((line) => line.id === row.purchaseOrderItemId);
+      if (!item || rowIssues.has(item.id)) return [];
+
+      const remaining = Math.max(item.quantityOrdered - item.quantityReceived, 0);
+      const quantity = Number(row.quantityReceived);
+      if (remaining <= 0 || quantity > 0) return [];
+
+      return [{ item, remaining }];
+    });
+  }, [order, rows, rowIssues]);
+
+  const receiptValue = postingRows.reduce(
+    (total, { item, quantity }) => total + quantity * item.unitCost,
+    0,
+  );
+
+  /** Does this receipt close every outstanding line, or leave the order open? */
+  const willCompleteOrder = useMemo(() => {
+    if (!order) return false;
+
+    return receivableItems(order).every((item) => {
+      const row = rows.find((line) => line.purchaseOrderItemId === item.id);
+      const quantity = Number(row?.quantityReceived);
+      const received = item.quantityReceived + (Number.isFinite(quantity) ? quantity : 0);
+      return received >= item.quantityOrdered;
+    });
+  }, [order, rows]);
+
+  const blocked = isLoading || loadError !== null || !order;
+  const canReview = !blocked && rowIssues.size === 0 && postingRows.length > 0;
 
   const updateRow = (
     purchaseOrderItemId: string,
@@ -170,6 +271,7 @@ export function PurchaseOrderReceiveGoodsDialog({
 
     if (!receivedDate) {
       setError("Received date is required.");
+      setStep("count");
       return;
     }
 
@@ -181,11 +283,13 @@ export function PurchaseOrderReceiveGoodsDialog({
       setError(
         "This purchase order was created with legacy item data. Recreate it using Product Master items before receiving.",
       );
+      setStep("count");
       return;
     }
 
     if (receiveTotal <= 0) {
       setError("There are no remaining quantities to receive for this purchase order.");
+      setStep("count");
       return;
     }
 
@@ -208,11 +312,13 @@ export function PurchaseOrderReceiveGoodsDialog({
 
       if (!Number.isFinite(quantity) || quantity < 0) {
         setError("Receive quantity must be a valid positive number.");
+        setStep("count");
         return;
       }
 
       if (quantity > remaining) {
         setError("Receive quantity cannot exceed the remaining ordered quantity.");
+        setStep("count");
         return;
       }
 
@@ -221,11 +327,13 @@ export function PurchaseOrderReceiveGoodsDialog({
           setError(
             "This purchase order was created with legacy item data. Recreate it using Product Master items before receiving.",
           );
+          setStep("count");
           return;
         }
 
         if (!orderItem.unitId) {
           setError("Every received line must have a unit. Update the purchase order item first.");
+          setStep("count");
           return;
         }
 
@@ -243,6 +351,7 @@ export function PurchaseOrderReceiveGoodsDialog({
 
     if (items.length === 0) {
       setError("Enter a receive quantity for at least one item.");
+      setStep("count");
       return;
     }
 
@@ -251,6 +360,31 @@ export function PurchaseOrderReceiveGoodsDialog({
       notes: notes.trim() || null,
       receivedDate,
     });
+  };
+
+  const summary = (): JSX.Element => {
+    if (rowIssues.size > 0) {
+      return (
+        <span className="font-medium text-danger-text">
+          {rowIssues.size} {rowIssues.size === 1 ? "line needs" : "lines need"} a valid quantity.
+        </span>
+      );
+    }
+
+    if (receivingByUnit.length === 0) return <>Nothing to receive yet.</>;
+
+    return (
+      <>
+        Receiving{" "}
+        {receivingByUnit.map((entry, index) => (
+          <span key={entry.unit}>
+            {index > 0 ? (index === receivingByUnit.length - 1 ? " and " : ", ") : null}
+            <span className="font-medium tabular-nums text-foreground">{entry.label}</span>
+          </span>
+        ))}{" "}
+        across {postingRows.length} {postingRows.length === 1 ? "line" : "lines"}.
+      </>
+    );
   };
 
   return (
@@ -264,144 +398,282 @@ export function PurchaseOrderReceiveGoodsDialog({
         <DialogHeader>
           <DialogTitle>Receive goods</DialogTitle>
           <DialogDescription>
-            Receive supplier goods against {order?.purchaseOrderNumber ?? "this purchase order"}.
-            Stock is received into the branch default location unless an advanced workflow overrides
-            it. No accounting journal is posted from this receive-goods record.
+            {step === "count"
+              ? `Record what physically arrived against ${order?.purchaseOrderNumber ?? "this purchase order"}. Stock is received into the branch default location unless an advanced workflow overrides it.`
+              : "Check this against the delivery note. Posting writes stock and cannot be undone from here."}
           </DialogDescription>
+          <div className="mt-2 flex items-center gap-2 text-meta text-foreground-muted">
+            <span className={cn("font-medium", step === "count" && "text-foreground")}>
+              1. Count what arrived
+            </span>
+            <span aria-hidden="true" className="h-px w-4 bg-border" />
+            <span className={cn("font-medium", step === "confirm" && "text-foreground")}>
+              2. Confirm and post
+            </span>
+          </div>
         </DialogHeader>
 
-        <div className="grid gap-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="po-receive-date">Received date</Label>
-              <Input
-                id="po-receive-date"
-                onChange={(event) => setReceivedDate(event.target.value)}
-                type="date"
-                value={receivedDate}
-              />
+        {step === "count" ? (
+          <div className="grid gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="po-receive-date">Received date</Label>
+                <Input
+                  id="po-receive-date"
+                  onChange={(event) => setReceivedDate(event.target.value)}
+                  type="date"
+                  value={receivedDate}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="po-receive-notes">Notes</Label>
+                <Input
+                  id="po-receive-notes"
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Optional receiving note"
+                  value={notes}
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="po-receive-notes">Notes</Label>
-              <Input
-                id="po-receive-notes"
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Optional receiving note"
-                value={notes}
-              />
-            </div>
-          </div>
 
-          <div className="overflow-hidden rounded-2xl border border-border bg-background">
-            {/* Remaining is what the operator is actually counting against. It
-                was computed to pre-fill the input but never shown, leaving
-                "Received" (to date) sitting next to the entry field as the only
-                context -- two different quantities, one word apart. */}
-            <div className="grid grid-cols-[1.8fr_0.75fr_0.85fr_0.85fr_0.9fr_1fr_1fr] gap-3 border-b bg-muted/50 px-4 py-3 text-meta font-medium text-foreground-muted">
-              <span>Item</span>
-              <span className="text-right">Ordered</span>
-              <span className="text-right">
-                Received
-                <span className="block font-normal text-foreground-muted">to date</span>
-              </span>
-              <span className="text-right">Remaining</span>
-              <span>Receive now</span>
-              <span>Batch</span>
-              <span>Expiry</span>
-            </div>
-            <div className="max-h-[22rem] overflow-y-auto">
-              {isLoading ? (
-                <div className="px-4 py-6 text-sm text-muted-foreground">
-                  Loading purchase order items...
-                </div>
-              ) : loadError ? (
-                <div className="px-4 py-6 text-sm font-medium text-danger-text">{loadError}</div>
-              ) : order ? (
-                receivableItems(order).map((item) => {
-                  const row = rows.find((line) => line.purchaseOrderItemId === item.id);
-                  const remaining = Math.max(item.quantityOrdered - item.quantityReceived, 0);
+            <div className="overflow-hidden rounded-2xl border border-border bg-background">
+              {/* Remaining is what the operator is actually counting against. It
+                  was computed to pre-fill the input but never shown, leaving
+                  "Received" (to date) sitting next to the entry field as the only
+                  context -- two different quantities, one word apart. */}
+              <div
+                className={cn(
+                  "hidden gap-3 border-b bg-muted/50 px-4 py-3 text-meta font-medium text-foreground-muted lg:grid",
+                  GRID,
+                )}
+              >
+                <span>Item</span>
+                <span className="text-right">Ordered</span>
+                <span className="text-right">
+                  Received
+                  <span className="block font-normal text-foreground-muted">to date</span>
+                </span>
+                <span className="text-right">Remaining</span>
+                <span>Receive now</span>
+                <span>Batch</span>
+                <span>Expiry</span>
+              </div>
+              <div className="max-h-[22rem] overflow-y-auto">
+                {isLoading ? (
+                  <div className="px-4 py-6 text-sm text-foreground-muted">
+                    Loading purchase order items...
+                  </div>
+                ) : loadError ? (
+                  <div className="px-4 py-6 text-sm font-medium text-danger-text" role="alert">
+                    {loadError}
+                  </div>
+                ) : order ? (
+                  receivableItems(order).map((item) => {
+                    const row = rows.find((line) => line.purchaseOrderItemId === item.id);
+                    const remaining = Math.max(item.quantityOrdered - item.quantityReceived, 0);
+                    const issue = rowIssues.get(item.id);
+                    const errorId = `po-receive-error-${item.id}`;
 
-                  return (
-                    <div
-                      className="grid grid-cols-[1.8fr_0.75fr_0.85fr_0.85fr_0.9fr_1fr_1fr] gap-3 border-b px-4 py-3 text-sm last:border-b-0"
-                      key={item.id}
-                    >
-                      <div>
-                        <p className="font-medium text-foreground">{item.itemNameSnapshot}</p>
-                        <p className="text-meta text-foreground-muted">
-                          {remaining === 0 ? "Fully received" : `Measured in ${unitLabel(item)}`}
-                        </p>
+                    return (
+                      <div
+                        className={cn(
+                          // Inputs size from the --field-h token (h-field), so
+                          // the stockroom-tablet 44px comes from rebinding the
+                          // token below lg, not from fighting the class.
+                          "grid grid-cols-2 gap-3 border-b px-4 py-3 text-sm [--field-h:2.75rem] last:border-b-0 lg:items-center lg:[--field-h:2.25rem]",
+                          GRID,
+                          issue && "bg-danger-tint",
+                        )}
+                        key={item.id}
+                      >
+                        <div className="col-span-2 lg:col-span-1">
+                          <p className="font-medium text-foreground">{item.itemNameSnapshot}</p>
+                          <p className="text-meta text-foreground-muted">
+                            {remaining === 0 ? "Fully received" : `Measured in ${unitLabel(item)}`}
+                          </p>
+                        </div>
+                        <span className="tabular-nums lg:text-right">
+                          <StackedLabel>Ordered</StackedLabel>
+                          {withUnit(item.quantityOrdered, item)}
+                        </span>
+                        <span className="tabular-nums lg:text-right">
+                          <StackedLabel>Received to date</StackedLabel>
+                          {withUnit(item.quantityReceived, item)}
+                        </span>
+                        <span className="font-medium tabular-nums lg:text-right">
+                          <StackedLabel>Remaining</StackedLabel>
+                          {withUnit(remaining, item)}
+                        </span>
+                        <div className="col-span-2 lg:col-span-1">
+                          <StackedLabel>Receive now</StackedLabel>
+                          <Input
+                            aria-describedby={issue ? errorId : undefined}
+                            aria-invalid={issue ? true : undefined}
+                            aria-label={`Receiving now for ${item.itemNameSnapshot}${
+                              unitLabel(item) ? ` in ${unitLabel(item)}` : ""
+                            }`}
+                            className="text-right tabular-nums"
+                            min={0}
+                            max={remaining}
+                            onChange={(event) =>
+                              updateRow(item.id, "quantityReceived", event.target.value)
+                            }
+                            step="0.001"
+                            type="number"
+                            value={row?.quantityReceived ?? "0"}
+                          />
+                        </div>
+                        <div>
+                          <StackedLabel>Batch</StackedLabel>
+                          <Input
+                            aria-label={`Batch number for ${item.itemNameSnapshot}`}
+                            className=""
+                            onChange={(event) =>
+                              updateRow(item.id, "batchNumber", event.target.value)
+                            }
+                            placeholder="Optional"
+                            value={row?.batchNumber ?? ""}
+                          />
+                        </div>
+                        <div>
+                          <StackedLabel>Expiry</StackedLabel>
+                          <Input
+                            aria-label={`Expiry date for ${item.itemNameSnapshot}`}
+                            className=""
+                            onChange={(event) =>
+                              updateRow(item.id, "expiryDate", event.target.value)
+                            }
+                            type="date"
+                            value={row?.expiryDate ?? ""}
+                          />
+                        </div>
+                        {issue ? (
+                          <p
+                            className="col-span-2 text-meta font-medium text-danger-text lg:col-span-7"
+                            id={errorId}
+                            role="alert"
+                          >
+                            {issue}
+                          </p>
+                        ) : null}
                       </div>
-                      <span className="text-right tabular-nums">
-                        {withUnit(item.quantityOrdered, item)}
-                      </span>
-                      <span className="text-right tabular-nums">
-                        {withUnit(item.quantityReceived, item)}
-                      </span>
-                      <span className="text-right font-medium tabular-nums">
-                        {withUnit(remaining, item)}
-                      </span>
-                      <Input
-                        aria-label={`Receiving now for ${item.itemNameSnapshot}${
-                          unitLabel(item) ? ` in ${unitLabel(item)}` : ""
-                        }`}
-                        className="text-right tabular-nums"
-                        min={0}
-                        max={remaining}
-                        onChange={(event) =>
-                          updateRow(item.id, "quantityReceived", event.target.value)
-                        }
-                        step="0.001"
-                        type="number"
-                        value={row?.quantityReceived ?? "0"}
-                      />
-                      <Input
-                        onChange={(event) => updateRow(item.id, "batchNumber", event.target.value)}
-                        placeholder="Optional"
-                        value={row?.batchNumber ?? ""}
-                      />
-                      <Input
-                        onChange={(event) => updateRow(item.id, "expiryDate", event.target.value)}
-                        type="date"
-                        value={row?.expiryDate ?? ""}
-                      />
-                    </div>
-                  );
-                })
-              ) : null}
+                    );
+                  })
+                ) : null}
+              </div>
             </div>
-          </div>
 
-          {error ? <p className="text-sm font-medium text-danger-text">{error}</p> : null}
-        </div>
+            <p className="text-meta text-foreground-muted">
+              Leave a line at 0 to receive it on a later delivery. The order stays open until every
+              line is complete.
+            </p>
+
+            {error ? (
+              <p className="text-sm font-medium text-danger-text" role="alert">
+                {error}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            <div className="overflow-hidden rounded-2xl border border-border bg-background">
+              <p className="border-b bg-muted/50 px-4 py-3 text-meta font-medium text-foreground-muted">
+                Posting this receipt adds the following to stock
+              </p>
+              {postingRows.map(({ item, quantity }) => {
+                const after = item.quantityReceived + quantity;
+
+                return (
+                  <div
+                    className="flex flex-wrap items-baseline justify-between gap-3 border-b px-4 py-3 last:border-b-0"
+                    key={item.id}
+                  >
+                    <div>
+                      <p className="font-medium text-foreground">{item.itemNameSnapshot}</p>
+                      <p className="text-meta text-foreground-muted">
+                        {withUnit(after, item)} of {withUnit(item.quantityOrdered, item)} received
+                        after this
+                        {after >= item.quantityOrdered ? " - line complete" : ""}
+                      </p>
+                    </div>
+                    <span className="font-medium tabular-nums text-foreground">
+                      + {withUnit(quantity, item)}
+                    </span>
+                  </div>
+                );
+              })}
+              {skippedLines.map(({ item, remaining }) => (
+                <div
+                  className="flex flex-wrap items-baseline justify-between gap-3 border-b bg-muted/40 px-4 py-3 text-foreground-muted last:border-b-0"
+                  key={item.id}
+                >
+                  <div>
+                    <p className="font-medium">{item.itemNameSnapshot}</p>
+                    <p className="text-meta">Not receiving on this delivery</p>
+                  </div>
+                  <span className="tabular-nums">{withUnit(remaining, item)} stays open</span>
+                </div>
+              ))}
+            </div>
+
+            <ul className="grid gap-2 text-sm text-foreground-muted">
+              <li>
+                A goods receipt worth{" "}
+                <span className="font-medium tabular-nums text-foreground">
+                  {currencyFormat.format(receiptValue)}
+                </span>{" "}
+                is created and linked to {order?.purchaseOrderNumber ?? "this order"}.
+              </li>
+              <li>
+                {willCompleteOrder
+                  ? "This order moves to Received and becomes billable."
+                  : "This order stays partially received. The remaining lines stay open."}
+              </li>
+              <li>
+                No accounting journal is posted from this receive-goods record. That happens when
+                the supplier bill is posted.
+              </li>
+            </ul>
+
+            {error ? (
+              <div
+                className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger-tint px-4 py-3 text-sm font-medium text-danger-text"
+                role="alert"
+              >
+                <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>{error}</p>
+              </div>
+            ) : null}
+          </div>
+        )}
 
         <DialogFooter className="items-center gap-3">
-          <span className="mr-auto text-sm text-foreground-muted">
-            {receivingByUnit.length === 0 ? (
-              "Nothing to receive yet."
-            ) : (
-              <>
-                Receiving{" "}
-                {receivingByUnit.map((entry, index) => (
-                  <span key={entry.unit}>
-                    {index > 0 ? (index === receivingByUnit.length - 1 ? " and " : ", ") : null}
-                    <span className="font-medium tabular-nums text-foreground">{entry.label}</span>
-                  </span>
-                ))}{" "}
-                across {receivingLineCount} {receivingLineCount === 1 ? "line" : "lines"}.
-              </>
-            )}
+          <span aria-live="polite" className="mr-auto text-sm text-foreground-muted">
+            {step === "confirm" ? "Step 2 of 2 - nothing has been written yet." : summary()}
           </span>
           <Button onClick={onClose} type="button" variant="outline">
             Cancel
           </Button>
-          <Button
-            disabled={isSubmitting || isLoading || loadError !== null || !order}
-            onClick={() => void submit()}
-            type="button"
-          >
-            {isSubmitting ? "Receiving..." : "Receive goods"}
-          </Button>
+          {step === "confirm" ? (
+            <Button
+              disabled={isSubmitting}
+              onClick={() => setStep("count")}
+              type="button"
+              variant="outline"
+            >
+              Back to counting
+            </Button>
+          ) : null}
+          {step === "count" ? (
+            <Button disabled={!canReview} onClick={() => setStep("confirm")} type="button">
+              Review {postingRows.length > 0 ? postingRows.length : ""}{" "}
+              {postingRows.length === 1 ? "line" : "lines"}
+            </Button>
+          ) : (
+            <Button disabled={isSubmitting} onClick={() => void submit()} type="button">
+              {isSubmitting ? "Posting receipt..." : "Post receipt"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
