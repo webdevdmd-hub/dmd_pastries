@@ -329,9 +329,7 @@ export function PurchaseOrderReceiveGoodsDialog({
                       <div>
                         <p className="font-medium text-foreground">{item.itemNameSnapshot}</p>
                         <p className="text-meta text-foreground-muted">
-                          {remaining === 0
-                            ? "Fully received"
-                            : `Measured in ${item.unitName || unitLabel(item)}`}
+                          {remaining === 0 ? "Fully received" : `Measured in ${unitLabel(item)}`}
                         </p>
                       </div>
                       <span className="text-right tabular-nums">
@@ -345,7 +343,7 @@ export function PurchaseOrderReceiveGoodsDialog({
                       </span>
                       <Input
                         aria-label={`Receiving now for ${item.itemNameSnapshot}${
-                          unitLabel(item) ? ` in ${item.unitName || unitLabel(item)}` : ""
+                          unitLabel(item) ? ` in ${unitLabel(item)}` : ""
                         }`}
                         className="text-right tabular-nums"
                         min={0}
