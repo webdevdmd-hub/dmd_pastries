@@ -106,14 +106,13 @@ export function MovementsTable({
         {movements.map((movement) => (
           <TableRow className={rowClassName(movement)} key={movement.id}>
             <TableCell className="tabular-nums">{formatDate(movement.createdAt)}</TableCell>
-            <TableCell>
-              <div>
-                <p className="font-medium">{movement.itemName}</p>
-                <p className="text-xs text-foreground-muted">
-                  {movement.inventoryItemId.slice(0, 8)}
-                </p>
-              </div>
-            </TableCell>
+            {/* Name only. The line under it used to be the first eight
+                characters of inventoryItemId, which sits exactly where an item
+                code goes and reads like one -- `5279d113` is entirely plausible
+                as a SKU. StockMovement carries no itemCode, so there was
+                nothing true to put there; the full id is in the drawer as
+                "Movement ID" for anyone who needs to trace a row. */}
+            <TableCell className="font-medium">{movement.itemName}</TableCell>
             <TableCell>
               <MovementTypeBadge type={movement.movementType} />
               <TransferDetails movement={movement} />
