@@ -95,12 +95,17 @@ export const ROUTES = {
   ingredients: "/ingredients",
   packaging: "/packaging",
   inventory: "/inventory",
-  inventoryLocationBalances: "/inventory/location-balances",
-  inventoryMovements: "/inventory/movements",
-  inventoryLowStock: "/inventory/low-stock",
-  inventoryExpiryAlerts: "/inventory/expiry-alerts",
+  // Tabs on /inventory, not pages. The old paths still resolve -- they are
+  // redirect routes now, kept for bookmarks -- but link to these so an in-app
+  // click lands on the tab directly instead of flashing through a redirect.
+  inventoryLocationBalances: "/inventory?view=locations",
+  inventoryMovements: "/inventory?view=movements",
+  inventoryLowStock: "/inventory?view=low_stock",
+  inventoryExpiryAlerts: "/inventory?view=expiring",
+  inventoryStockTransfers: "/inventory?view=transfers",
+  // Still a page of its own: reached from the item list's overflow menu, not
+  // part of the tab set.
   inventoryStockLocations: "/inventory/stock-locations",
-  inventoryStockTransfers: "/inventory/stock-transfers",
   manufacturing: "/manufacturing",
   manufacturingBatches: "/manufacturing/batches",
   settings: "/settings",

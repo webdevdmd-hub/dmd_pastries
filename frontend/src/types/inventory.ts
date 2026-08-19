@@ -280,6 +280,15 @@ export type InventoryFilters = {
   lowStockOnly: boolean;
   expiryTrackedOnly: boolean;
   includeUninitialized: boolean;
+  /**
+   * Optional so the existing call sites keep compiling. The Low stock tab sets
+   * `available_quantity` / `asc` to preserve the ordering the retired
+   * /inventory/low-stock page got from the backend's LowStock service, which
+   * hardcoded it -- most-depleted-first is the whole point of that view, and
+   * folding the page into a tab would otherwise silently drop it.
+   */
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 };
 
 export type StockMovementFilters = {

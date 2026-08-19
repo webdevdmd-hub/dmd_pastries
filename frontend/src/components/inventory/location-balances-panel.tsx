@@ -4,9 +4,7 @@ import type { JSX } from "react";
 import { useMemo, useState } from "react";
 
 import { AccessDeniedCard } from "@/components/inventory/access-denied-card";
-import { InventoryViewTabs } from "@/components/inventory/inventory-view-tabs";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
-import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -52,7 +50,15 @@ function formatQuantity(value: number, symbol: string): string {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 3 })} ${symbol}`.trim();
 }
 
-export function LocationBalancesPageClient(): JSX.Element {
+/**
+ * The "By location" tab. Was /inventory/location-balances, a sibling route with
+ * its own H1 and breadcrumb; it is now a panel, so the header and tab strip
+ * above it belong to the module and stay put when you switch tabs.
+ *
+ * The permission gate stays here rather than moving to the container: the
+ * container gates the module broadly, this gates the one thing this panel reads.
+ */
+export function LocationBalancesPanel(): JSX.Element {
   const branchScope = useBranchScope();
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.inventoryView]);
@@ -80,14 +86,7 @@ export function LocationBalancesPageClient(): JSX.Element {
   }
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <PageHeader
-        title="Location Balances"
-        description="View the physical breakdown of branch inventory by stock location. Branch total stock remains the sum of all location balances."
-      />
-
-      <InventoryViewTabs active="locations" />
-
+    <>
       <Card>
         <CardContent className="grid gap-4 p-5 md:grid-cols-4">
           <div className="space-y-1">
@@ -225,6 +224,6 @@ export function LocationBalancesPageClient(): JSX.Element {
           </Table>
         </CardContent>
       </Card>
-    </div>
+    </>
   );
 }

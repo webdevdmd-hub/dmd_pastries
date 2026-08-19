@@ -50,11 +50,15 @@ export const routes = [
   { path: "/packaging", name: "packaging" },
 
   // --- Inventory ---------------------------------------------------------
+  // Five of these are tabs on one page, not routes, so each declares
+  // /inventory as its landing pathname -- the strip swaps the panel without
+  // changing the path. "By location" was never baselined before; it is now.
   { path: "/inventory", name: "inventory" },
-  { path: "/inventory/low-stock", name: "inventory-low-stock" },
-  { path: "/inventory/movements", name: "inventory-movements" },
-  { path: "/inventory/expiry-alerts", name: "inventory-expiry" },
-  { path: "/inventory/stock-transfers", name: "inventory-transfers" },
+  { path: "/inventory?view=low_stock", name: "inventory-low-stock", redirectsTo: "/inventory" },
+  { path: "/inventory?view=expiring", name: "inventory-expiry", redirectsTo: "/inventory" },
+  { path: "/inventory?view=locations", name: "inventory-locations", redirectsTo: "/inventory" },
+  { path: "/inventory?view=movements", name: "inventory-movements", redirectsTo: "/inventory" },
+  { path: "/inventory?view=transfers", name: "inventory-transfers", redirectsTo: "/inventory" },
 
   // --- Manufacturing -----------------------------------------------------
   { path: "/manufacturing", name: "manufacturing", redirectsTo: "/manufacturing/batches" },

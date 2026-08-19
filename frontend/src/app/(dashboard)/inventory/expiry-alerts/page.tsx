@@ -1,7 +1,12 @@
-import type { JSX } from "react";
+import { redirect } from "next/navigation";
 
-import { ExpiryAlertsPageClient } from "@/components/inventory/expiry-alerts-page-client";
+import { inventoryTabRedirect } from "@/components/inventory/inventory-tabs";
 
-export default function ExpiryAlertsPage(): JSX.Element {
-  return <ExpiryAlertsPageClient />;
+type PageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+/** Now the "Expiring soon" tab on /inventory. Kept so bookmarks keep working. */
+export default async function ExpiryAlertsPage({ searchParams }: PageProps): Promise<never> {
+  redirect(inventoryTabRedirect("expiring", await searchParams));
 }

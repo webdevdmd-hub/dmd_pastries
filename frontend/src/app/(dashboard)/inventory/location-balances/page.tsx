@@ -1,7 +1,12 @@
-import type { JSX } from "react";
+import { redirect } from "next/navigation";
 
-import { LocationBalancesPageClient } from "@/components/inventory/location-balances-page-client";
+import { inventoryTabRedirect } from "@/components/inventory/inventory-tabs";
 
-export default function LocationBalancesPage(): JSX.Element {
-  return <LocationBalancesPageClient />;
+type PageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+/** Now the "By location" tab on /inventory. Kept so bookmarks keep working. */
+export default async function LocationBalancesPage({ searchParams }: PageProps): Promise<never> {
+  redirect(inventoryTabRedirect("locations", await searchParams));
 }

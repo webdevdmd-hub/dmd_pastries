@@ -1,16 +1,12 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { InventoryViewTabs } from "@/components/inventory/inventory-view-tabs";
 import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
-import { PageHeader } from "@/components/shared/page-header";
 import { AccessDeniedCard } from "@/components/stock-movements/access-denied-card";
 import { ManualMovementDialog } from "@/components/stock-movements/manual-movement-dialog";
 import { MovementDetailsDrawer } from "@/components/stock-movements/movement-details-drawer";
@@ -56,10 +52,23 @@ const defaultFilters: StockMovementFilters = {
   createdBy: "",
 };
 
-export function MovementsPageClient(): JSX.Element {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const itemIdParam = searchParams.get("item");
+type MovementsPanelProps = {
+  /**
+   * From `?item=` on the module URL. "Movements for [item]" links elsewhere in
+   * the app deep-link here; when present the ledger is scoped to that one item
+   * instead of silently showing everything with the param ignored.
+   */
+  itemId: string | null;
+  onClearItemScope: () => void;
+};
+
+/**
+ * The "Movements" tab. Was /inventory/movements, a sibling route with its own
+ * H1 and breadcrumb. The item deep-link now lives on the module URL as
+ * `/inventory?view=movements&item=<id>`, which is why this takes `itemId` as a
+ * prop rather than reading the URL itself -- the container owns the URL.
+ */
+export function MovementsPanel({ itemId, onClearItemScope }: MovementsPanelProps): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
   const { normalizeBranchId } = branchScope;
@@ -79,20 +88,16 @@ export function MovementsPageClient(): JSX.Element {
   const [manualOpen, setManualOpen] = useState(false);
   const [selectedMovement, setSelectedMovement] = useState<StockMovement | null>(null);
   const [reversalMovement, setReversalMovement] = useState<StockMovement | null>(null);
-  // "Movements for [item]" links elsewhere in the app deep-link here with
-  // ?item=<inventoryItemId>. When present, scope the ledger to that one item
-  // (same endpoint the item detail drawer already uses correctly) instead of
-  // silently showing the whole ledger with the param ignored.
   const movementsQuery = useStockMovements(
     filters,
-    canView && branchScope.hasBranchScope && !itemIdParam,
+    canView && branchScope.hasBranchScope && !itemId,
   );
   const itemMovementsQuery = useInventoryItemMovements(
-    itemIdParam,
+    itemId,
     filters,
-    canView && branchScope.hasBranchScope && Boolean(itemIdParam),
+    canView && branchScope.hasBranchScope && Boolean(itemId),
   );
-  const activeMovementsQuery = itemIdParam ? itemMovementsQuery : movementsQuery;
+  const activeMovementsQuery = itemId ? itemMovementsQuery : movementsQuery;
   const summaryQuery = useStockMovementSummary(
     {
       branchId: filters.branchId,
@@ -103,7 +108,7 @@ export function MovementsPageClient(): JSX.Element {
       dateFrom: filters.dateFrom,
       dateTo: filters.dateTo,
     },
-    canView && branchScope.hasBranchScope && !itemIdParam,
+    canView && branchScope.hasBranchScope && !itemId,
   );
   const branchesQuery = useBranches(canView);
   const inventoryQuery = useInventory(
@@ -125,10 +130,10 @@ export function MovementsPageClient(): JSX.Element {
     activeMovementsQuery.error instanceof ApiError && activeMovementsQuery.error.status === 403;
   // Branch is scope, not a filter: it always carries a value, so counting it
   // would make a genuinely empty ledger look like a narrow search and the
-  // empty state would never appear. The item deep-link is a filter too — an
+  // empty state would never appear. The item deep-link is a filter too -- an
   // item with zero movements should read as "narrowed", not "ledger is empty".
   const hasActiveFilters =
-    Boolean(itemIdParam) ||
+    Boolean(itemId) ||
     filters.search.trim().length > 0 ||
     filters.itemType !== defaultFilters.itemType ||
     filters.productType !== defaultFilters.productType ||
@@ -184,41 +189,33 @@ export function MovementsPageClient(): JSX.Element {
   };
 
   const movements = activeMovementsQuery.data ?? [];
-  const scopedItemName = itemIdParam ? (movements[0]?.itemName ?? "this item") : null;
+  const scopedItemName = itemId ? (movements[0]?.itemName ?? "this item") : null;
 
   const clearItemScope = (): void => {
     setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId });
-    router.push("/inventory/movements");
+    onClearItemScope();
   };
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <PageHeader
-        title="Stock Movements"
-        description="Track every stock change including purchases, sales, adjustments, wastage, and transfers."
-        actions={
-          canManage ? (
-            <Button onClick={() => setManualOpen(true)} type="button">
-              <Plus className="h-4 w-4" />
-              Manual movement
-            </Button>
-          ) : undefined
-        }
-      />
+    <>
+      {canManage ? (
+        <div className="flex justify-end">
+          <Button onClick={() => setManualOpen(true)} type="button">
+            <Plus className="h-4 w-4" />
+            Manual movement
+          </Button>
+        </div>
+      ) : null}
 
-      <InventoryViewTabs active="movements" />
-
-      {itemIdParam ? (
+      {itemId ? (
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted px-4 py-3 text-sm text-foreground-muted">
           <span>
             Showing movements for{" "}
             <span className="font-semibold text-foreground">{scopedItemName}</span> only.
           </span>
-          <Button asChild size="sm" type="button" variant="ghost">
-            <Link href="/inventory/movements">
-              <X className="h-4 w-4" />
-              Clear
-            </Link>
+          <Button onClick={clearItemScope} size="sm" type="button" variant="ghost">
+            <X className="h-4 w-4" />
+            Clear
           </Button>
         </div>
       ) : (
@@ -322,6 +319,6 @@ export function MovementsPageClient(): JSX.Element {
         onSubmit={handleReverse}
         open={reversalMovement !== null}
       />
-    </div>
+    </>
   );
 }

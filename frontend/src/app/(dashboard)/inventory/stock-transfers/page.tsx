@@ -1,7 +1,12 @@
-import type { JSX } from "react";
+import { redirect } from "next/navigation";
 
-import { StockTransfersPageClient } from "@/components/inventory/stock-transfers-page-client";
+import { inventoryTabRedirect } from "@/components/inventory/inventory-tabs";
 
-export default function StockTransfersPage(): JSX.Element {
-  return <StockTransfersPageClient />;
+type PageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+/** Now the "Transfers" tab on /inventory. Kept so bookmarks keep working. */
+export default async function StockTransfersPage({ searchParams }: PageProps): Promise<never> {
+  redirect(inventoryTabRedirect("transfers", await searchParams));
 }

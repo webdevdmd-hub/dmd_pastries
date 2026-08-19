@@ -6,9 +6,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/inventory/access-denied-card";
-import { InventoryViewTabs } from "@/components/inventory/inventory-view-tabs";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
-import { PageHeader } from "@/components/shared/page-header";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import { Badge } from "@/components/ui/badge";
@@ -94,7 +92,7 @@ function formatDate(value: string | null): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-export function StockTransfersPageClient(): JSX.Element {
+export function StockTransfersPanel(): JSX.Element {
   const branchScope = useBranchScope();
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.inventoryView]);
@@ -232,21 +230,15 @@ export function StockTransfersPageClient(): JSX.Element {
   };
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <PageHeader
-        title="Stock Transfers"
-        description="Move stock between physical locations inside the active branch. Completing a transfer changes location balances while keeping branch total stock unchanged."
-        actions={
-          canCreate ? (
-            <Button onClick={openCreate} type="button">
-              <Plus className="h-4 w-4" />
-              New transfer
-            </Button>
-          ) : undefined
-        }
-      />
-
-      <InventoryViewTabs active="transfers" />
+    <>
+      {canCreate ? (
+        <div className="flex justify-end">
+          <Button onClick={openCreate} type="button">
+            <Plus className="h-4 w-4" />
+            New transfer
+          </Button>
+        </div>
+      ) : null}
 
       <Card>
         <CardContent className="grid gap-4 p-5 md:grid-cols-4">
@@ -495,6 +487,6 @@ export function StockTransfersPageClient(): JSX.Element {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

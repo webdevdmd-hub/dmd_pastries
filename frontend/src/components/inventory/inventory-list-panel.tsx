@@ -15,13 +15,10 @@ import { InventorySummaryCards } from "@/components/inventory/inventory-summary-
 import { InventoryTable } from "@/components/inventory/inventory-table";
 import { InventoryTableSkeleton } from "@/components/inventory/inventory-table-skeleton";
 import { InventoryToolbar } from "@/components/inventory/inventory-toolbar";
-import type { InventoryView } from "@/components/inventory/inventory-view-tabs";
-import { InventoryViewTabs } from "@/components/inventory/inventory-view-tabs";
 import { OpeningStockDialog } from "@/components/inventory/opening-stock-dialog";
 import { StockAdjustmentDialog } from "@/components/inventory/stock-adjustment-dialog";
 import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
-import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -73,7 +70,17 @@ function buildDefaultFilters(branchId: string): InventoryFilters {
   };
 }
 
-export function InventoryPageClient(): JSX.Element {
+type InventoryListPanelProps = {
+  /**
+   * Driven by the active tab, not by a control in here. The Low stock tab and
+   * the All items tab are the same list with one predicate flipped, so they
+   * share this panel -- switching between them keeps search, branch and every
+   * other filter exactly where the user left them.
+   */
+  lowStockOnly: boolean;
+};
+
+export function InventoryListPanel({ lowStockOnly }: InventoryListPanelProps): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
   const { normalizeBranchId } = branchScope;
@@ -88,10 +95,10 @@ export function InventoryPageClient(): JSX.Element {
     PERMISSIONS.inventoryAdjust,
     PERMISSIONS.inventoryExpiryBatchesManage,
   ]);
-  // The four destination gates used to live here and be threaded into the tab
-  // strip. They now resolve inside InventoryViewTabs, which renders on all five
-  // inventory pages -- keeping a second copy here would be a second thing to
-  // update whenever a destination's permissions change.
+  // The destination gates used to live here and be threaded into the tab strip.
+  // They now resolve inside InventoryViewTabs, which the module container owns
+  // -- keeping a second copy here would be a second thing to update whenever a
+  // tab's permissions change.
   const canViewStockLocations = hasAnyPermission([
     PERMISSIONS.inventoryView,
     PERMISSIONS.inventoryLocationsManage,
@@ -109,8 +116,18 @@ export function InventoryPageClient(): JSX.Element {
   // the query, or every keystroke fetches and caches a new list.
   const debouncedSearch = useDebouncedValue(filters.search);
   const inventoryQueryFilters = useMemo(
-    () => ({ ...filters, search: debouncedSearch }),
-    [debouncedSearch, filters],
+    () => ({
+      ...filters,
+      search: debouncedSearch,
+      // The tab is the predicate, so it wins over local filter state.
+      lowStockOnly,
+      // Preserves the ordering the retired /inventory/low-stock page got from
+      // the backend's LowStock service, which hardcoded it. Most-depleted first
+      // is the point of the view; without this, folding the page into a tab
+      // would silently reorder it to the default list ordering.
+      ...(lowStockOnly ? { sortBy: "available_quantity", sortOrder: "asc" as const } : {}),
+    }),
+    [debouncedSearch, filters, lowStockOnly],
   );
   const inventoryQuery = useInventory(inventoryQueryFilters, canView && branchScope.hasBranchScope);
   const expiryAlertsQuery = useExpiryAlerts(
@@ -265,62 +282,37 @@ export function InventoryPageClient(): JSX.Element {
 
   const items = inventoryQuery.data ?? [];
   const expiryAlerts = expiryAlertsQuery.data ?? [];
-  const lowStockCount = items.filter((item) => item.lowStock).length;
-
-  // The tab is the filter. Selecting "Low stock" sets the same lowStockOnly
-  // field the toolbar checkbox always set, so nothing about the query shape
-  // changes -- only where the control lives.
-  const view: InventoryView = filters.lowStockOnly ? "low_stock" : "all";
-  const handleViewChange = (nextView: InventoryView): void => {
-    setFilters({ ...filters, lowStockOnly: nextView === "low_stock" });
-  };
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <PageHeader
-        title="Inventory"
-        description="Track product stock, branch quantities, movements, low stock, and expiry-sensitive items."
-        actions={
-          // Gate the wrapper, not just its children. PageHeader tests the node
-          // for truthiness, and a React element is always truthy -- so an
-          // always-rendered wrapper makes the actions region exist even when
-          // both children are gated away, leaving an empty flex child that
-          // still draws the parent's gap.
-          canManage || canViewStockLocations ? (
-            <div className="flex items-center gap-2">
-              {canViewStockLocations ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button aria-label="More inventory options" size="icon" variant="outline">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link href={ROUTES.inventoryStockLocations}>Manage stock locations</Link>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : null}
-              {canManage ? (
-                <Button onClick={() => setOpeningStockOpen(true)} type="button">
-                  <Plus className="h-4 w-4" />
-                  Opening Stock
+    <>
+      {/* Gate the wrapper, not just its children: an always-rendered wrapper
+          leaves an empty flex child that still draws the parent's gap. */}
+      {canManage || canViewStockLocations ? (
+        <div className="flex items-center justify-end gap-2">
+          {canViewStockLocations ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button aria-label="More inventory options" size="icon" variant="outline">
+                  <MoreHorizontal className="h-4 w-4" />
                 </Button>
-              ) : null}
-            </div>
-          ) : undefined
-        }
-      />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href={ROUTES.inventoryStockLocations}>Manage stock locations</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+          {canManage ? (
+            <Button onClick={() => setOpeningStockOpen(true)} type="button">
+              <Plus className="h-4 w-4" />
+              Opening Stock
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <InventorySummaryCards expiryAlerts={expiryAlerts} items={items} />
-
-      <InventoryViewTabs
-        active={view}
-        expiringCount={expiryAlerts.length}
-        lowStockCount={lowStockCount}
-        onViewChange={handleViewChange}
-      />
 
       <InventoryToolbar
         allowAllBranches={branchScope.canAccessAllBranches}
@@ -430,6 +422,6 @@ export function InventoryPageClient(): JSX.Element {
         }}
         open={selectedItem !== null}
       />
-    </div>
+    </>
   );
 }

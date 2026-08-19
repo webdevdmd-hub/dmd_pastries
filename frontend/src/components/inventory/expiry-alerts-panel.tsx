@@ -7,10 +7,8 @@ import { AccessDeniedCard } from "@/components/inventory/access-denied-card";
 import { InventoryEmptyState } from "@/components/inventory/inventory-empty-state";
 import { InventoryErrorState } from "@/components/inventory/inventory-error-state";
 import { InventoryTableSkeleton } from "@/components/inventory/inventory-table-skeleton";
-import { InventoryViewTabs } from "@/components/inventory/inventory-view-tabs";
 import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
-import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -91,7 +89,7 @@ function compactList(values: (string | null | undefined)[]): string {
   return values.filter((value): value is string => Boolean(value?.trim())).join(" · ");
 }
 
-export function ExpiryAlertsPageClient(): JSX.Element {
+export function ExpiryAlertsPanel(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
   const { normalizeBranchId } = branchScope;
@@ -148,13 +146,7 @@ export function ExpiryAlertsPageClient(): JSX.Element {
   }
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <PageHeader
-        title="Expiry Alerts"
-        description="Track stock batches that are expiring soon or already expired."
-      />
-
-      <InventoryViewTabs active="expiring" />
+    <>
       <div className="grid gap-3 rounded-3xl border border-border bg-card/70 p-4 shadow-soft md:grid-cols-6">
         <Select
           onValueChange={(branchId) => setFilters({ ...filters, branchId })}
@@ -358,6 +350,6 @@ export function ExpiryAlertsPageClient(): JSX.Element {
           </CardContent>
         </Card>
       ) : null}
-    </div>
+    </>
   );
 }
