@@ -193,7 +193,14 @@ export function POSWorkspace(): JSX.Element {
     useState<string | null>(null);
   const [externalOrderNumber, setExternalOrderNumber] = useState("");
   const [checkoutFeedback, setCheckoutFeedback] = useState<CheckoutFeedback | null>(null);
-  const [checkoutReference, setCheckoutReference] = useState<string | null>(null);
+  // useRef, not useState: `getOrCreateCheckoutReference` both reads and writes
+  // this in the same call. Two `submitCheckout` invocations landing in the same
+  // tick (a stuck touchscreen firing twice in one frame) would otherwise both
+  // read the pre-update state value, see null, and each mint a fresh UUID --
+  // silently defeating the idempotency key the backend relies on to collapse
+  // a duplicate submission into one sale. A ref is updated synchronously, so
+  // the second call always sees what the first one just wrote.
+  const checkoutReferenceRef = useRef<string | null>(null);
   const [variantProduct, setVariantProduct] = useState<POSProduct | null>(null);
   const debouncedSearch = useDebouncedValue(search, 250);
   const branchId = branchScope.effectiveBranchId ?? "";
@@ -316,7 +323,7 @@ export function POSWorkspace(): JSX.Element {
             return;
           }
 
-          setCheckoutReference(null);
+          checkoutReferenceRef.current = null;
           setAutoSelectedPaymentMethodId(null);
           setPaymentAutoSelectionSuppressedChannelId(null);
           cart.clearCart();
@@ -398,12 +405,12 @@ export function POSWorkspace(): JSX.Element {
   };
 
   const getOrCreateCheckoutReference = (): string => {
-    if (checkoutReference) {
-      return checkoutReference;
+    if (checkoutReferenceRef.current) {
+      return checkoutReferenceRef.current;
     }
 
     const reference = createUuid();
-    setCheckoutReference(reference);
+    checkoutReferenceRef.current = reference;
     return reference;
   };
 
@@ -424,7 +431,7 @@ export function POSWorkspace(): JSX.Element {
     setCheckoutOpen(false);
     setReceiptOpen(true);
     setExternalOrderNumber("");
-    setCheckoutReference(null);
+    checkoutReferenceRef.current = null;
     setAutoSelectedPaymentMethodId(null);
     setPaymentAutoSelectionSuppressedChannelId(null);
     cart.clearCart();
@@ -504,10 +511,11 @@ export function POSWorkspace(): JSX.Element {
         });
       } catch (verificationError) {
         showCheckoutFeedback({
-          message: `The checkout result could not be verified. Retry will use the same checkout reference to prevent a duplicate sale. ${getErrorMessage(
+          message: `We can't confirm whether this sale went through. Do not re-run the customer's card. Tap "Retry checkout" below — it's safe, and will not create a duplicate sale even if the first attempt actually succeeded. (${getErrorMessage(
             verificationError,
-          )}`,
-          title: "Checkout status unknown",
+          )})`,
+          showRetry: true,
+          title: "Checkout status unknown — do not re-charge the customer",
           tone: "warning",
         });
       }
@@ -518,7 +526,7 @@ export function POSWorkspace(): JSX.Element {
 
   const resetCheckoutReference = (): void => {
     if (!isCheckoutProcessing) {
-      setCheckoutReference(null);
+      checkoutReferenceRef.current = null;
     }
   };
 
@@ -1113,6 +1121,7 @@ export function POSWorkspace(): JSX.Element {
         customerCreditBalance={customerCreditBalance}
         customerId={customerId}
         feedback={checkoutFeedback}
+        hasBlocker={checkoutBlocker !== null}
         isSubmitting={isCheckoutProcessing}
         onConfirm={() => {
           void submitCheckout();

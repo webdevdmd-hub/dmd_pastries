@@ -1,12 +1,16 @@
+"use client";
+
 import { X } from "lucide-react";
 import type { JSX } from "react";
+import { useRef, useState } from "react";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { POSNumberInput } from "@/components/pos/pos-number-input";
 import { POSPaymentMethodButton } from "@/components/pos/pos-payment-method-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
-import type { PaymentInput } from "@/types/pos";
+import type { CartTotals, PaymentInput } from "@/types/pos";
 import type { PaymentMethod } from "@/types/settings";
 
 type POSPaymentPanelProps = {
@@ -19,10 +23,14 @@ type POSPaymentPanelProps = {
   methods: PaymentMethod[];
   onPaymentsChange: (payments: PaymentInput[]) => void;
   payments: PaymentInput[];
-  total: number;
+  // Sourced from `cart.totals` so this panel and the checkout summary card
+  // below it read the same Paid / Balance / Change numbers (P-11) instead of
+  // each re-deriving them from `payments`.
+  totals: CartTotals;
 };
 
 type PaymentRow = PaymentInput & {
+  methodType: string;
   requiresReference: boolean;
 };
 
@@ -35,6 +43,32 @@ function formatMoney(value: number): string {
 
 function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function roundUpTo(value: number, step: number): number {
+  return roundMoney(Math.ceil(value / step) * step);
+}
+
+// Quick-tender presets for a cash row: the exact amount due, then the next
+// AED 50 and AED 100 note above it. Duplicates (amount already a round 50/100)
+// are dropped so the row never shows two buttons that fill the same value.
+function tenderPresets(amountDue: number): { label: string; value: number }[] {
+  if (amountDue <= 0) {
+    return [];
+  }
+
+  const presets = [{ label: "Exact", value: roundMoney(amountDue) }];
+  const next50 = roundUpTo(amountDue, 50);
+  const next100 = roundUpTo(amountDue, 100);
+
+  if (next50 !== presets[0]?.value) {
+    presets.push({ label: formatMoney(next50), value: next50 });
+  }
+  if (next100 !== presets[0]?.value && next100 !== next50) {
+    presets.push({ label: formatMoney(next100), value: next100 });
+  }
+
+  return presets;
 }
 
 function getPaymentMethodsErrorMessage(error: Error | null): string | null {
@@ -57,8 +91,15 @@ export function POSPaymentPanel({
   methods,
   onPaymentsChange,
   payments,
-  total,
+  totals,
 }: POSPaymentPanelProps): JSX.Element {
+  const confirm = useConfirm();
+  const rowRefs = useRef(new Map<string, HTMLDivElement>());
+  // Display-only: what the cashier says the customer handed over, per cash
+  // tender. Never sent in the checkout payload — `payment.amount` (what's
+  // actually applied to the sale) is untouched. Drives the Change figure only.
+  const [tenderedByMethodId, setTenderedByMethodId] = useState<Record<string, number | null>>({});
+
   const activeMethods = methods.filter(
     (method) =>
       method.status === "active" &&
@@ -69,19 +110,37 @@ export function POSPaymentPanel({
   );
   const unavailableMethods = activeMethods.filter((method) => !method.defaultPaymentAccountId);
   const errorMessage = getPaymentMethodsErrorMessage(error);
-  const paidAmount = roundMoney(payments.reduce((sum, payment) => sum + payment.amount, 0));
-  const balanceDue = roundMoney(Math.max(total - paidAmount, 0));
-  const changeAmount = roundMoney(Math.max(paidAmount - total, 0));
   const paymentRows: PaymentRow[] = payments.map((payment) => {
     const method = activeMethods.find((entry) => entry.id === payment.paymentMethodId);
 
     return {
       ...payment,
+      methodType: method?.methodType ?? "",
       requiresReference: method?.requiresReference ?? false,
     };
   });
+  const totalTendered = roundMoney(
+    payments.reduce(
+      (sum, payment) => sum + (tenderedByMethodId[payment.paymentMethodId] ?? payment.amount),
+      0,
+    ),
+  );
+  const displayChangeAmount = roundMoney(Math.max(totalTendered - totals.total, 0));
 
-  const addOrReplacePayment = (method: PaymentMethod): void => {
+  const focusPaymentRow = (paymentMethodId: string): void => {
+    rowRefs.current.get(paymentMethodId)?.querySelector<HTMLInputElement>("input")?.focus();
+  };
+
+  const clearTenderedFor = (paymentMethodId: string): void => {
+    setTenderedByMethodId((prev) => {
+      if (!(paymentMethodId in prev)) {
+        return prev;
+      }
+      return Object.fromEntries(Object.entries(prev).filter(([id]) => id !== paymentMethodId));
+    });
+  };
+
+  const addOrReplacePayment = async (method: PaymentMethod): Promise<void> => {
     if (!method.defaultPaymentAccountId) {
       return;
     }
@@ -89,10 +148,13 @@ export function POSPaymentPanel({
     const existingPayment = payments.find((payment) => payment.paymentMethodId === method.id);
 
     if (existingPayment) {
+      // Tapping the method that's already selected did nothing before, with
+      // no explanation. Send the cashier to the field they'd tap next instead.
+      focusPaymentRow(method.id);
       return;
     }
 
-    let amount = payments.length === 0 ? total : balanceDue;
+    let amount = payments.length === 0 ? totals.total : totals.balanceDue;
     if (method.methodType === "store_credit") {
       amount = roundMoney(Math.min(amount, customerCreditBalance));
     }
@@ -102,6 +164,23 @@ export function POSPaymentPanel({
       amount,
       referenceNumber: null,
     };
+
+    const willReplaceEnteredTenders = payments.length > 0 && !method.allowSplitPayment;
+
+    if (willReplaceEnteredTenders) {
+      const enteredMethodNames = payments.map((payment) => payment.paymentMethodName).join(", ");
+      const confirmed = await confirm({
+        cancelLabel: "Keep current payment",
+        confirmLabel: `Switch to ${method.methodName}`,
+        consequence: `This clears the ${enteredMethodNames} payment already entered and starts a single ${method.methodName} tender for the full total.`,
+        detail: "Nothing has been charged yet — this only clears what's entered on this screen.",
+        title: "Replace the current payment?",
+      });
+
+      if (!confirmed) {
+        return;
+      }
+    }
 
     if (payments.length === 0 || !method.allowSplitPayment) {
       onPaymentsChange([nextPayment]);
@@ -121,28 +200,29 @@ export function POSPaymentPanel({
 
   const removePayment = (paymentMethodId: string): void => {
     onPaymentsChange(payments.filter((payment) => payment.paymentMethodId !== paymentMethodId));
+    clearTenderedFor(paymentMethodId);
   };
 
   return (
     <div className="space-y-3 rounded-lg border border-border bg-card p-3">
       <div className="flex items-center justify-between">
-        <p className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-foreground-muted">
-          Payment
+        <p className="text-cell font-medium text-foreground-muted">Payment</p>
+        <p className="font-mono text-cell font-medium tabular-nums text-foreground">
+          {formatMoney(totals.balanceDue)}
         </p>
-        <p className="font-mono font-bold text-foreground">{formatMoney(balanceDue)}</p>
       </div>
       {isLoading ? (
-        <p className="rounded-md border border-border bg-muted px-3 py-2 text-[0.7rem] text-foreground-muted">
+        <p className="text-cell rounded-md border border-border bg-muted px-3 py-2 text-foreground-muted">
           Loading POS payment methods...
         </p>
       ) : null}
       {errorMessage ? (
-        <p className="rounded-md border border-danger/30 bg-danger-tint px-3 py-2 text-[0.7rem] font-semibold text-danger-text">
+        <p className="text-cell rounded-md border border-danger/30 bg-danger-tint px-3 py-2 font-medium text-danger-text">
           {errorMessage}
         </p>
       ) : null}
       {!isLoading && !errorMessage && activeMethods.length === 0 ? (
-        <p className="rounded-md border border-dashed border-border bg-muted px-3 py-2 text-[0.7rem] text-foreground-muted">
+        <p className="text-cell rounded-md border border-dashed border-border bg-card px-3 py-2 text-foreground-muted">
           No POS payment methods are available for this branch.
         </p>
       ) : null}
@@ -153,84 +233,154 @@ export function POSPaymentPanel({
               key={method.id}
               disabled={!method.defaultPaymentAccountId}
               method={method}
-              onSelect={addOrReplacePayment}
+              onSelect={(selectedMethod) => {
+                void addOrReplacePayment(selectedMethod);
+              }}
               selected={payments.some((payment) => payment.paymentMethodId === method.id)}
             />
           ))}
         </div>
       ) : null}
       {unavailableMethods.length > 0 ? (
-        <p className="rounded-md border border-border bg-muted px-3 py-2 text-[0.7rem] text-foreground-muted">
+        <p className="text-cell rounded-md border border-border bg-muted px-3 py-2 text-foreground-muted">
           Active POS payment methods need linked default payment accounts before they can be used.
         </p>
       ) : null}
       {paymentRows.length > 0 ? (
         <div className="space-y-2">
-          {paymentRows.map((payment) => (
-            <div
-              className="rounded-md border border-border bg-muted p-2"
-              key={payment.paymentMethodId}
-            >
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-sm font-bold text-foreground">{payment.paymentMethodName}</p>
-                <Button
-                  aria-label={`Remove ${payment.paymentMethodName} payment`}
-                  className="h-7 w-7 text-foreground-muted"
-                  onClick={() => removePayment(payment.paymentMethodId)}
-                  size="icon"
-                  type="button"
-                  variant="ghost"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <POSNumberInput
-                className="h-9 rounded-md border-border bg-card font-mono shadow-none focus-visible:ring-black"
-                onValueChange={(amount) =>
-                  updatePayment(payment.paymentMethodId, {
-                    amount: amount ?? 0,
-                  })
-                }
-                placeholder="Paid amount"
-                value={payment.amount}
-              />
-              {payment.requiresReference ? (
-                <div className="mt-2 space-y-1">
-                  <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-foreground-muted">
-                    Reference number required
+          {paymentRows.map((payment) => {
+            const isCash = payment.methodType === "cash";
+            const isStoreCredit = payment.methodType === "store_credit";
+            const tendered = tenderedByMethodId[payment.paymentMethodId] ?? null;
+            const rowChange =
+              tendered !== null ? roundMoney(Math.max(tendered - payment.amount, 0)) : 0;
+
+            return (
+              <div
+                className="rounded-md border border-border bg-muted p-2"
+                key={payment.paymentMethodId}
+                ref={(node) => {
+                  if (node) {
+                    rowRefs.current.set(payment.paymentMethodId, node);
+                  } else {
+                    rowRefs.current.delete(payment.paymentMethodId);
+                  }
+                }}
+              >
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-cell font-medium text-foreground">
+                    {payment.paymentMethodName}
                   </p>
-                  <Input
-                    className="h-9 rounded-md border-border bg-card font-mono shadow-none focus-visible:ring-black"
-                    onChange={(event) =>
-                      updatePayment(payment.paymentMethodId, {
-                        referenceNumber: event.target.value,
-                      })
-                    }
-                    placeholder="Card approval / transfer reference"
-                    value={payment.referenceNumber ?? ""}
-                  />
+                  <Button
+                    aria-label={`Remove ${payment.paymentMethodName} payment`}
+                    className="min-h-tap min-w-tap text-foreground-muted"
+                    onClick={() => removePayment(payment.paymentMethodId)}
+                    size="icon"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-              ) : null}
-            </div>
-          ))}
+                <POSNumberInput
+                  className="min-h-tap rounded-md border-border bg-card font-mono shadow-none focus-visible:ring-ring"
+                  onValueChange={(amount) => {
+                    const nextAmount = isStoreCredit
+                      ? roundMoney(Math.min(amount ?? 0, customerCreditBalance))
+                      : (amount ?? 0);
+                    updatePayment(payment.paymentMethodId, { amount: nextAmount });
+                  }}
+                  placeholder="Paid amount"
+                  value={payment.amount}
+                />
+                {isStoreCredit ? (
+                  <p className="mt-1 text-meta text-foreground-muted">
+                    Store credit balance: {formatMoney(customerCreditBalance)}
+                  </p>
+                ) : null}
+                {payment.requiresReference ? (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-meta font-medium text-foreground-muted">
+                      Reference number required
+                    </p>
+                    <Input
+                      className="min-h-tap rounded-md border-border bg-card font-mono shadow-none focus-visible:ring-ring"
+                      onChange={(event) =>
+                        updatePayment(payment.paymentMethodId, {
+                          referenceNumber: event.target.value,
+                        })
+                      }
+                      placeholder="Card approval / transfer reference"
+                      value={payment.referenceNumber ?? ""}
+                    />
+                  </div>
+                ) : null}
+                {isCash ? (
+                  <div className="mt-2 space-y-1.5 border-t border-border pt-2">
+                    <p className="text-meta font-medium text-foreground-muted">Cash tendered</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tenderPresets(payment.amount).map((preset) => (
+                        <Button
+                          className="min-h-tap rounded-md border-border bg-card px-2.5 font-mono text-meta font-medium text-foreground hover:bg-muted"
+                          key={preset.label}
+                          onClick={() =>
+                            setTenderedByMethodId((prev) => ({
+                              ...prev,
+                              [payment.paymentMethodId]: preset.value,
+                            }))
+                          }
+                          type="button"
+                          variant="outline"
+                        >
+                          {preset.label}
+                        </Button>
+                      ))}
+                    </div>
+                    <POSNumberInput
+                      className="min-h-tap rounded-md border-border bg-card font-mono shadow-none focus-visible:ring-ring"
+                      onValueChange={(value) =>
+                        setTenderedByMethodId((prev) => ({
+                          ...prev,
+                          [payment.paymentMethodId]: value,
+                        }))
+                      }
+                      placeholder="Cash handed over"
+                      value={tendered}
+                    />
+                    {rowChange > 0 ? (
+                      <p className="text-meta font-medium tabular-nums text-money-text">
+                        Change due: {formatMoney(rowChange)}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       ) : (
-        <p className="rounded-md border border-dashed border-border bg-muted px-3 py-2 text-[0.7rem] text-foreground-muted">
-          Select a payment method to start. Add another method for split payments.
+        <p className="text-cell rounded-md border border-dashed border-border bg-card px-3 py-2 text-foreground-muted">
+          Select a payment method to start.
         </p>
       )}
-      <div className="grid grid-cols-3 gap-2 text-[0.7rem]">
+      <div className="text-cell grid grid-cols-3 gap-2">
         <div>
           <p className="text-foreground-muted">Paid</p>
-          <p className="font-mono font-bold text-foreground">{formatMoney(paidAmount)}</p>
+          <p className="font-mono font-medium tabular-nums text-foreground">
+            {formatMoney(totals.paidAmount)}
+          </p>
         </div>
         <div>
           <p className="text-foreground-muted">Balance</p>
-          <p className="font-mono font-bold text-foreground">{formatMoney(balanceDue)}</p>
+          <p className="font-mono font-medium tabular-nums text-foreground">
+            {formatMoney(totals.balanceDue)}
+          </p>
         </div>
         <div>
           <p className="text-foreground-muted">Change</p>
-          <p className="font-mono font-bold text-foreground">{formatMoney(changeAmount)}</p>
+          <p className="font-mono font-medium tabular-nums text-foreground">
+            {formatMoney(displayChangeAmount)}
+          </p>
         </div>
       </div>
     </div>

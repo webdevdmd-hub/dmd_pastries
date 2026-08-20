@@ -3,6 +3,12 @@ import type { PaymentMethod, SalesChannel } from "@/types/settings";
 
 export type CheckoutFeedback = {
   message: string;
+  // Only set for the "checkout status unknown" state: the request itself
+  // failed AND the follow-up verify call also failed, so we genuinely don't
+  // know whether the sale landed. Retrying is safe (same checkoutReference),
+  // but the cashier needs an explicit action rather than having to guess that
+  // pressing Confirm again is the right move.
+  showRetry?: boolean;
   title: string;
   tone: "error" | "info" | "success" | "warning";
 };
