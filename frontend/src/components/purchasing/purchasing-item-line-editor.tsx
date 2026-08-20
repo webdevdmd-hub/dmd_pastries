@@ -386,7 +386,12 @@ export function PurchasingItemLineEditor({
         <div className="min-h-0 w-full flex-1 overflow-x-auto overflow-y-auto">
           <table className="w-full min-w-[1050px] table-fixed border-collapse text-xs">
             <thead>
-              <tr className="sticky top-0 z-10 border-b border-workspace-border bg-brand-latte/40 text-left text-xs font-semibold text-brand-mocha">
+              {/* font-semibold must sit on the th cells, not the row: the UA
+                  stylesheet's `th { font-weight: bold }` targets th directly,
+                  so it beats anything the row tries to pass down by
+                  inheritance -- the headers rendered at 700 despite the class
+                  (DESIGN.md caps weight at 600). */}
+              <tr className="sticky top-0 z-10 border-b border-workspace-border bg-brand-latte/40 text-left text-xs text-brand-mocha [&>th]:font-semibold">
                 <th className="w-[92px] px-1.5 py-2">{showAccountRows ? "Row type" : ""}</th>
                 <th className="w-[220px] px-2 py-2">Item Details</th>
                 <th className="w-[200px] px-2 py-2">Account</th>
