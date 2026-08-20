@@ -63,6 +63,13 @@ type PurchasingItemLineEditorProps = {
    */
   compactLayout?: boolean;
   disableAddRows?: boolean;
+  /**
+   * Start compact layout with the tax and discount columns already showing.
+   * Purchase orders rarely carry either, so they open closed; bills carry tax
+   * most of the time, so making a biller press a toggle on every bill is the
+   * wrong default for them. No effect unless compactLayout is set.
+   */
+  extrasDefaultOpen?: boolean;
   legacyChargeAmount?: number;
   legacyChargeTaxAmount?: number;
   lineErrors?: Record<string, string>;
@@ -197,6 +204,7 @@ export function PurchasingItemLineEditor({
   canCreateProducts = false,
   compactLayout = false,
   disableAddRows = false,
+  extrasDefaultOpen = false,
   legacyChargeAmount = 0,
   legacyChargeTaxAmount = 0,
   lineErrors = {},
@@ -214,7 +222,7 @@ export function PurchasingItemLineEditor({
   const queryClient = useQueryClient();
   const { hasAnyPermission } = usePermission();
   const [accountSearch, setAccountSearch] = useState("");
-  const [extrasRequested, setExtrasRequested] = useState(false);
+  const [extrasRequested, setExtrasRequested] = useState(extrasDefaultOpen);
   const [productCreateLineId, setProductCreateLineId] = useState<string | null>(null);
   const createProductMutation = useCreateProduct();
   const safeLines = useMemo(() => (lines.length > 0 ? lines : [createLine()]), [lines]);
