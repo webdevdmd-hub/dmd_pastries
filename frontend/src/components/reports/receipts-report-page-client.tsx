@@ -302,14 +302,19 @@ export function ReceiptsReportPageClient(): JSX.Element {
             </div>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-brand-espresso">Payment status</label>
+            <label
+              htmlFor="receipts-report-payment-status"
+              className="text-sm font-medium text-brand-espresso"
+            >
+              Payment status
+            </label>
             <Select
               value={draft.paymentStatus}
               onValueChange={(paymentStatus) =>
                 setDraft((current) => ({ ...current, paymentStatus }))
               }
             >
-              <SelectTrigger>
+              <SelectTrigger id="receipts-report-payment-status">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -321,12 +326,17 @@ export function ReceiptsReportPageClient(): JSX.Element {
             </Select>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-brand-espresso">Sale status</label>
+            <label
+              htmlFor="receipts-report-sale-status"
+              className="text-sm font-medium text-brand-espresso"
+            >
+              Sale status
+            </label>
             <Select
               value={draft.saleStatus}
               onValueChange={(saleStatus) => setDraft((current) => ({ ...current, saleStatus }))}
             >
-              <SelectTrigger>
+              <SelectTrigger id="receipts-report-sale-status">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

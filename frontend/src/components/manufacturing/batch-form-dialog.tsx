@@ -510,7 +510,9 @@ export function BatchFormDialog({
         <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
           <div className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Branch</label>
+              <label htmlFor="batch-form-branch" className="text-sm font-medium text-foreground">
+                Branch
+              </label>
               {batch ? (
                 <div className="min-h-10 rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground">
                   {batch.branchName}
@@ -524,7 +526,7 @@ export function BatchFormDialog({
                     setRecipeId("");
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="batch-form-branch">
                     <SelectValue placeholder="Branch" />
                   </SelectTrigger>
                   <SelectContent>
@@ -540,8 +542,14 @@ export function BatchFormDialog({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Production date</label>
+              <label
+                htmlFor="batch-form-production-date"
+                className="text-sm font-medium text-foreground"
+              >
+                Production date
+              </label>
               <Input
+                id="batch-form-production-date"
                 aria-label="Production date"
                 onChange={(event) => {
                   clearFeedback();
@@ -553,7 +561,12 @@ export function BatchFormDialog({
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium text-foreground">Output product</label>
+              <label
+                htmlFor="batch-form-output-product"
+                className="text-sm font-medium text-foreground"
+              >
+                Output product
+              </label>
               {batch ? (
                 <div className="min-h-10 rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground">
                   {batch.productVariantName
@@ -562,7 +575,7 @@ export function BatchFormDialog({
                 </div>
               ) : (
                 <Select value={productId || "none"} onValueChange={handleProductChange}>
-                  <SelectTrigger>
+                  <SelectTrigger id="batch-form-output-product">
                     <SelectValue placeholder="Product" />
                   </SelectTrigger>
                   <SelectContent>
@@ -579,7 +592,12 @@ export function BatchFormDialog({
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium text-foreground">Active recipe</label>
+              <label
+                htmlFor="batch-form-active-recipe"
+                className="text-sm font-medium text-foreground"
+              >
+                Active recipe
+              </label>
               {batch ? (
                 <div className="min-h-10 rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground">
                   {batch.recipeName}{" "}
@@ -593,7 +611,7 @@ export function BatchFormDialog({
                     setRecipeId(value === "none" ? "" : value);
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="batch-form-active-recipe">
                     <SelectValue placeholder="Recipe" />
                   </SelectTrigger>
                   <SelectContent>
@@ -764,10 +782,11 @@ export function BatchFormDialog({
             ) : null}
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
+              <label htmlFor="batch-form-field" className="text-sm font-medium text-foreground">
                 {batch ? "Quantity to produce now" : "Quantity to produce"}
               </label>
               <Input
+                id="batch-form-field"
                 aria-label="Quantity to produce"
                 min="0"
                 onChange={(event) => {
@@ -781,8 +800,11 @@ export function BatchFormDialog({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Notes</label>
+              <label htmlFor="batch-form-notes" className="text-sm font-medium text-foreground">
+                Notes
+              </label>
               <Input
+                id="batch-form-notes"
                 aria-label="Notes"
                 onChange={(event) => {
                   clearFeedback();

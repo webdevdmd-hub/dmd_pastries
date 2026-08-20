@@ -55,8 +55,17 @@ function ErrorNotice({ message }: { message: string }): JSX.Element {
   );
 }
 
-function FieldLabel({ children }: { children: string }): JSX.Element {
-  return <label className="text-xs font-semibold text-muted-foreground">{children}</label>;
+function FieldLabel({ children, htmlFor }: { children: string; htmlFor?: string }): JSX.Element {
+  // Some of these sit above a control and some above a read-only value.
+  // Only the first kind is a label; the second renders as a caption so it
+  // does not claim an association it does not have.
+  return htmlFor ? (
+    <label className="text-xs font-semibold text-muted-foreground" htmlFor={htmlFor}>
+      {children}
+    </label>
+  ) : (
+    <p className="text-xs font-semibold text-muted-foreground">{children}</p>
+  );
 }
 
 export function OpeningBalancesPageClient(): JSX.Element {
@@ -273,8 +282,9 @@ export function OpeningBalancesPageClient(): JSX.Element {
             {canManage ? (
               <div className="grid gap-3 md:grid-cols-4">
                 <div className="md:col-span-2">
-                  <FieldLabel>Account</FieldLabel>
+                  <FieldLabel htmlFor="opening-balance-account">Account</FieldLabel>
                   <SearchableCombobox
+                    id="opening-balance-account"
                     options={accountOptions}
                     placeholder="Select an account"
                     value={accountId}
@@ -282,8 +292,9 @@ export function OpeningBalancesPageClient(): JSX.Element {
                   />
                 </div>
                 <div>
-                  <FieldLabel>Amount</FieldLabel>
+                  <FieldLabel htmlFor="opening-balance-amount">Amount</FieldLabel>
                   <Input
+                    id="opening-balance-amount"
                     onChange={(event) => setAccountAmount(event.target.value)}
                     step="0.01"
                     type="number"
@@ -291,8 +302,9 @@ export function OpeningBalancesPageClient(): JSX.Element {
                   />
                 </div>
                 <div>
-                  <FieldLabel>As of</FieldLabel>
+                  <FieldLabel htmlFor="opening-balance-as-of">As of</FieldLabel>
                   <Input
+                    id="opening-balance-as-of"
                     onChange={(event) => setAccountDate(event.target.value)}
                     type="date"
                     value={accountDate}
@@ -377,8 +389,11 @@ export function OpeningBalancesPageClient(): JSX.Element {
             {canManage ? (
               <div className="grid gap-3 md:grid-cols-4">
                 <div className="md:col-span-2">
-                  <FieldLabel>{partyType === "supplier" ? "Supplier" : "Customer"}</FieldLabel>
+                  <FieldLabel htmlFor="opening-balance-partytype-supplier-supplier-custom">
+                    {partyType === "supplier" ? "Supplier" : "Customer"}
+                  </FieldLabel>
                   <SearchableCombobox
+                    id="opening-balance-partytype-supplier-supplier-custom"
                     options={partyOptions}
                     placeholder={`Select a ${partyType}`}
                     value={partyId}
@@ -386,8 +401,9 @@ export function OpeningBalancesPageClient(): JSX.Element {
                   />
                 </div>
                 <div>
-                  <FieldLabel>Amount</FieldLabel>
+                  <FieldLabel htmlFor="opening-balance-amount-2">Amount</FieldLabel>
                   <Input
+                    id="opening-balance-amount-2"
                     onChange={(event) => setPartyAmount(event.target.value)}
                     step="0.01"
                     type="number"
@@ -395,8 +411,9 @@ export function OpeningBalancesPageClient(): JSX.Element {
                   />
                 </div>
                 <div>
-                  <FieldLabel>As of</FieldLabel>
+                  <FieldLabel htmlFor="opening-balance-as-of-2">As of</FieldLabel>
                   <Input
+                    id="opening-balance-as-of-2"
                     onChange={(event) => setPartyDate(event.target.value)}
                     type="date"
                     value={partyDate}

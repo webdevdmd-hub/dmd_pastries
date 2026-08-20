@@ -19,9 +19,14 @@ export function ReportPresetSelector({
 }): JSX.Element {
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium text-brand-espresso">Date preset</label>
+      <label
+        htmlFor="report-preset-selector-date-preset"
+        className="text-sm font-medium text-brand-espresso"
+      >
+        Date preset
+      </label>
       <Select value={value} onValueChange={(nextValue: ReportDatePreset) => onChange(nextValue)}>
-        <SelectTrigger>
+        <SelectTrigger id="report-preset-selector-date-preset">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

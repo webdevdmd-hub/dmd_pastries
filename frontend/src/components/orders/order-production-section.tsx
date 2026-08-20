@@ -215,7 +215,12 @@ export function OrderProductionSection({
           </div>
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-brand-espresso">Order item</label>
+              <label
+                htmlFor="order-production-section-order-item"
+                className="text-sm font-medium text-brand-espresso"
+              >
+                Order item
+              </label>
               <Select
                 disabled={!canManage || order.items.length === 0}
                 onValueChange={(itemId) => {
@@ -234,7 +239,7 @@ export function OrderProductionSection({
                 }}
                 value={productionForm.itemId}
               >
-                <SelectTrigger>
+                <SelectTrigger id="order-production-section-order-item">
                   <SelectValue placeholder="Select item to produce" />
                 </SelectTrigger>
                 <SelectContent>
@@ -247,10 +252,14 @@ export function OrderProductionSection({
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium text-brand-espresso">
+              <label
+                htmlFor="order-production-section-recipe"
+                className="text-sm font-medium text-brand-espresso"
+              >
                 Recipe {selectedItem?.itemSource === "custom" ? "(required for custom item)" : ""}
               </label>
               <SearchableCombobox
+                id="order-production-section-recipe"
                 disabled={!canManage || !productionForm.itemId}
                 emptyMessage={NO_VALID_RECIPE_MESSAGE}
                 isLoading={recipesQuery.isLoading}
@@ -271,8 +280,14 @@ export function OrderProductionSection({
               ) : null}
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium text-brand-espresso">Planned quantity</label>
+              <label
+                htmlFor="order-production-section-planned-quantity"
+                className="text-sm font-medium text-brand-espresso"
+              >
+                Planned quantity
+              </label>
               <Input
+                id="order-production-section-planned-quantity"
                 disabled={!canManage || !productionForm.itemId}
                 min="0"
                 onChange={(event) =>
@@ -287,8 +302,14 @@ export function OrderProductionSection({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium text-brand-espresso">Production date</label>
+              <label
+                htmlFor="order-production-section-production-date"
+                className="text-sm font-medium text-brand-espresso"
+              >
+                Production date
+              </label>
               <Input
+                id="order-production-section-production-date"
                 disabled={!canManage || !productionForm.itemId}
                 onChange={(event) =>
                   setProductionForm((current) => ({
@@ -301,8 +322,14 @@ export function OrderProductionSection({
               />
             </div>
             <div className="space-y-1 lg:col-span-2">
-              <label className="text-sm font-medium text-brand-espresso">Notes</label>
+              <label
+                htmlFor="order-production-section-notes"
+                className="text-sm font-medium text-brand-espresso"
+              >
+                Notes
+              </label>
               <Input
+                id="order-production-section-notes"
                 disabled={!canManage || !productionForm.itemId}
                 onChange={(event) =>
                   setProductionForm((current) => ({ ...current, notes: event.target.value }))

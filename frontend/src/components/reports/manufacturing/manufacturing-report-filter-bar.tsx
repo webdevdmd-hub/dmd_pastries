@@ -95,14 +95,19 @@ export function ManufacturingReportFilterBar({
           onChange={(branchId) => onChange({ ...filters, branchId })}
         />
         <div className="space-y-2">
-          <label className="text-sm font-medium text-brand-espresso">Group by</label>
+          <label
+            htmlFor="manufacturing-report-filter-bar-group-by"
+            className="text-sm font-medium text-brand-espresso"
+          >
+            Group by
+          </label>
           <Select
             value={filters.groupBy}
             onValueChange={(groupBy: ManufacturingReportGroupBy) =>
               onChange({ ...filters, groupBy })
             }
           >
-            <SelectTrigger>
+            <SelectTrigger id="manufacturing-report-filter-bar-group-by">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -141,12 +146,17 @@ export function ManufacturingReportFilterBar({
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-brand-espresso">Batch status</label>
+          <label
+            htmlFor="manufacturing-report-filter-bar-batch-status"
+            className="text-sm font-medium text-brand-espresso"
+          >
+            Batch status
+          </label>
           <Select
             value={filters.batchStatus}
             onValueChange={(batchStatus) => onChange({ ...filters, batchStatus })}
           >
-            <SelectTrigger>
+            <SelectTrigger id="manufacturing-report-filter-bar-batch-status">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

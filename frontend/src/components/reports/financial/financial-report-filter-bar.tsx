@@ -146,12 +146,17 @@ export function FinancialReportFilterBar({
         </div>
         {showGroupBy ? (
           <div className="space-y-2">
-            <label className="text-sm font-medium text-brand-espresso">Group by</label>
+            <label
+              htmlFor="financial-report-filter-bar-group-by"
+              className="text-sm font-medium text-brand-espresso"
+            >
+              Group by
+            </label>
             <Select
               value={filters.groupBy}
               onValueChange={(groupBy: FinancialReportGroupBy) => onChange({ ...filters, groupBy })}
             >
-              <SelectTrigger>
+              <SelectTrigger id="financial-report-filter-bar-group-by">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -164,12 +169,17 @@ export function FinancialReportFilterBar({
         ) : null}
         {sourceTypeOptions.length > 0 ? (
           <div className="space-y-2">
-            <label className="text-sm font-medium text-brand-espresso">Source type</label>
+            <label
+              htmlFor="financial-report-filter-bar-source-type"
+              className="text-sm font-medium text-brand-espresso"
+            >
+              Source type
+            </label>
             <Select
               value={filters.sourceType}
               onValueChange={(sourceType) => onChange({ ...filters, sourceType })}
             >
-              <SelectTrigger>
+              <SelectTrigger id="financial-report-filter-bar-source-type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -184,12 +194,17 @@ export function FinancialReportFilterBar({
         ) : null}
         {statusOptions.length > 0 ? (
           <div className="space-y-2">
-            <label className="text-sm font-medium text-brand-espresso">Status</label>
+            <label
+              htmlFor="financial-report-filter-bar-status"
+              className="text-sm font-medium text-brand-espresso"
+            >
+              Status
+            </label>
             <Select
               value={filters.status}
               onValueChange={(status) => onChange({ ...filters, status })}
             >
-              <SelectTrigger>
+              <SelectTrigger id="financial-report-filter-bar-status">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -204,12 +219,17 @@ export function FinancialReportFilterBar({
         ) : null}
         {refundStatusOptions.length > 0 ? (
           <div className="space-y-2">
-            <label className="text-sm font-medium text-brand-espresso">Refund status</label>
+            <label
+              htmlFor="financial-report-filter-bar-refund-status"
+              className="text-sm font-medium text-brand-espresso"
+            >
+              Refund status
+            </label>
             <Select
               value={filters.refundStatus}
               onValueChange={(refundStatus) => onChange({ ...filters, refundStatus })}
             >
-              <SelectTrigger>
+              <SelectTrigger id="financial-report-filter-bar-refund-status">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

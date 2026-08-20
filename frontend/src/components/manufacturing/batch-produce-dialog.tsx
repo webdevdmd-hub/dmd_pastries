@@ -51,8 +51,14 @@ export function BatchProduceDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2 px-7 py-6">
-          <label className="text-sm font-medium text-foreground">Quantity produced</label>
+          <label
+            htmlFor="batch-produce-quantity-produced"
+            className="text-sm font-medium text-foreground"
+          >
+            Quantity produced
+          </label>
           <Input
+            id="batch-produce-quantity-produced"
             aria-label="Quantity produced"
             min="0"
             onChange={(event) => setQuantityProduced(Number(event.target.value))}

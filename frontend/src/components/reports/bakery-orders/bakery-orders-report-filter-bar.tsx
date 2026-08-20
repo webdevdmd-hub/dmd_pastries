@@ -139,14 +139,19 @@ export function BakeryOrdersReportFilterBar({
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-brand-espresso">Order type</label>
+          <label
+            htmlFor="bakery-orders-report-filter-bar-order-type"
+            className="text-sm font-medium text-brand-espresso"
+          >
+            Order type
+          </label>
           <Select
             value={filters.orderType}
             onValueChange={(orderType: BakeryOrdersReportFilterDraft["orderType"]) =>
               onChange({ ...filters, orderType })
             }
           >
-            <SelectTrigger>
+            <SelectTrigger id="bakery-orders-report-filter-bar-order-type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -157,14 +162,19 @@ export function BakeryOrdersReportFilterBar({
           </Select>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-brand-espresso">Group by</label>
+          <label
+            htmlFor="bakery-orders-report-filter-bar-group-by"
+            className="text-sm font-medium text-brand-espresso"
+          >
+            Group by
+          </label>
           <Select
             value={filters.groupBy}
             onValueChange={(groupBy: BakeryOrdersReportGroupBy) =>
               onChange({ ...filters, groupBy })
             }
           >
-            <SelectTrigger>
+            <SelectTrigger id="bakery-orders-report-filter-bar-group-by">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -175,12 +185,17 @@ export function BakeryOrdersReportFilterBar({
           </Select>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-brand-espresso">Order status</label>
+          <label
+            htmlFor="bakery-orders-report-filter-bar-order-status"
+            className="text-sm font-medium text-brand-espresso"
+          >
+            Order status
+          </label>
           <Select
             value={filters.orderStatus}
             onValueChange={(orderStatus) => onChange({ ...filters, orderStatus })}
           >
-            <SelectTrigger>
+            <SelectTrigger id="bakery-orders-report-filter-bar-order-status">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -194,12 +209,17 @@ export function BakeryOrdersReportFilterBar({
           </Select>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-brand-espresso">Payment status</label>
+          <label
+            htmlFor="bakery-orders-report-filter-bar-payment-status"
+            className="text-sm font-medium text-brand-espresso"
+          >
+            Payment status
+          </label>
           <Select
             value={filters.paymentStatus}
             onValueChange={(paymentStatus) => onChange({ ...filters, paymentStatus })}
           >
-            <SelectTrigger>
+            <SelectTrigger id="bakery-orders-report-filter-bar-payment-status">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

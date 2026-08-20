@@ -178,8 +178,17 @@ function ErrorNotice({ message }: { message: string }): JSX.Element {
   );
 }
 
-function FieldLabel({ children }: { children: string }): JSX.Element {
-  return <label className="text-xs font-semibold text-muted-foreground">{children}</label>;
+function FieldLabel({ children, htmlFor }: { children: string; htmlFor?: string }): JSX.Element {
+  // Some of these sit above a control and some above a read-only value.
+  // Only the first kind is a label; the second renders as a caption so it
+  // does not claim an association it does not have.
+  return htmlFor ? (
+    <label className="text-xs font-semibold text-muted-foreground" htmlFor={htmlFor}>
+      {children}
+    </label>
+  ) : (
+    <p className="text-xs font-semibold text-muted-foreground">{children}</p>
+  );
 }
 
 function StatusBadge({ matched, status }: { matched: boolean; status: string }): JSX.Element {
@@ -274,13 +283,13 @@ export function AccountingSettingsPageClient(): JSX.Element {
             </p>
           </div>
           <div className="flex flex-col gap-2">
-            <FieldLabel>Start month</FieldLabel>
+            <FieldLabel htmlFor="recovery-start-month">Start month</FieldLabel>
             <Select
               disabled={!canManage}
               onValueChange={(value) => setMonth(Number(value))}
               value={String(month)}
             >
-              <SelectTrigger>
+              <SelectTrigger id="recovery-start-month">
                 <SelectValue placeholder="Select month" />
               </SelectTrigger>
               <SelectContent>
@@ -293,13 +302,13 @@ export function AccountingSettingsPageClient(): JSX.Element {
             </Select>
           </div>
           <div className="flex flex-col gap-2">
-            <FieldLabel>Start day</FieldLabel>
+            <FieldLabel htmlFor="recovery-start-day">Start day</FieldLabel>
             <Select
               disabled={!canManage}
               onValueChange={(value) => setDay(Number(value))}
               value={String(day)}
             >
-              <SelectTrigger>
+              <SelectTrigger id="recovery-start-day">
                 <SelectValue placeholder="Select day" />
               </SelectTrigger>
               <SelectContent>
@@ -346,8 +355,9 @@ export function AccountingSettingsPageClient(): JSX.Element {
             </p>
           </div>
           <div className="flex flex-col gap-2">
-            <FieldLabel>Closed through</FieldLabel>
+            <FieldLabel htmlFor="recovery-closed-through">Closed through</FieldLabel>
             <Input
+              id="recovery-closed-through"
               disabled={!canLockPeriods}
               max={yesterdayString()}
               onChange={(event) => setLockDate(event.target.value)}
@@ -359,8 +369,9 @@ export function AccountingSettingsPageClient(): JSX.Element {
             </p>
           </div>
           <div className="flex flex-col gap-2">
-            <FieldLabel>Reason (optional)</FieldLabel>
+            <FieldLabel htmlFor="recovery-reason-optional">Reason (optional)</FieldLabel>
             <Input
+              id="recovery-reason-optional"
               disabled={!canLockPeriods}
               onChange={(event) => setLockReason(event.target.value)}
               placeholder="e.g. VAT Q2 filed"
@@ -898,21 +909,22 @@ export function AccountingReconciliationPageClient(): JSX.Element {
       <Card className="border-workspace-panel-border bg-workspace-panel shadow-sm">
         <CardContent className="grid gap-4 p-4 md:grid-cols-[1fr_1fr_auto]">
           <div className="flex flex-col gap-2">
-            <FieldLabel>As of date</FieldLabel>
+            <FieldLabel htmlFor="recovery-as-of-date">As of date</FieldLabel>
             <Input
+              id="recovery-as-of-date"
               onChange={(event) => setAsOfDate(event.target.value)}
               type="date"
               value={asOfDate}
             />
           </div>
           <div className="flex flex-col gap-2">
-            <FieldLabel>Branch</FieldLabel>
+            <FieldLabel htmlFor="recovery-branch">Branch</FieldLabel>
             <Select
               disabled={!canLoadBranches || branchesQuery.isLoading}
               onValueChange={(value) => setBranchId(value === allBranchesValue ? "" : value)}
               value={branchId || allBranchesValue}
             >
-              <SelectTrigger>
+              <SelectTrigger id="recovery-branch">
                 <SelectValue placeholder="All branches" />
               </SelectTrigger>
               <SelectContent>
@@ -1103,8 +1115,9 @@ export function AccountingBackfillPageClient(): JSX.Element {
       <Card className="border-workspace-panel-border bg-workspace-panel shadow-sm">
         <CardContent className="grid gap-4 p-4 md:grid-cols-4">
           <div className="flex flex-col gap-2">
-            <FieldLabel>Date from</FieldLabel>
+            <FieldLabel htmlFor="recovery-date-from">Date from</FieldLabel>
             <Input
+              id="recovery-date-from"
               onChange={(event) => {
                 resetDryRun();
                 setDateFrom(event.target.value);
@@ -1114,8 +1127,9 @@ export function AccountingBackfillPageClient(): JSX.Element {
             />
           </div>
           <div className="flex flex-col gap-2">
-            <FieldLabel>Date to</FieldLabel>
+            <FieldLabel htmlFor="recovery-date-to">Date to</FieldLabel>
             <Input
+              id="recovery-date-to"
               onChange={(event) => {
                 resetDryRun();
                 setDateTo(event.target.value);
@@ -1125,7 +1139,7 @@ export function AccountingBackfillPageClient(): JSX.Element {
             />
           </div>
           <div className="flex flex-col gap-2">
-            <FieldLabel>Branch</FieldLabel>
+            <FieldLabel htmlFor="recovery-branch-2">Branch</FieldLabel>
             <Select
               disabled={!canLoadBranches || branchesQuery.isLoading}
               onValueChange={(value) => {
@@ -1134,7 +1148,7 @@ export function AccountingBackfillPageClient(): JSX.Element {
               }}
               value={branchId || allBranchesValue}
             >
-              <SelectTrigger>
+              <SelectTrigger id="recovery-branch-2">
                 <SelectValue placeholder="All branches" />
               </SelectTrigger>
               <SelectContent>
@@ -1148,8 +1162,9 @@ export function AccountingBackfillPageClient(): JSX.Element {
             </Select>
           </div>
           <div className="flex flex-col gap-2">
-            <FieldLabel>Limit</FieldLabel>
+            <FieldLabel htmlFor="recovery-limit">Limit</FieldLabel>
             <Input
+              id="recovery-limit"
               onChange={(event) => {
                 resetDryRun();
                 setLimit(Math.max(1, Number(event.target.value) || 1));

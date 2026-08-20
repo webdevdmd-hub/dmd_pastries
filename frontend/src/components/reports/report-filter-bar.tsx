@@ -81,12 +81,17 @@ export function ReportFilterBar({
           onChange={(branchId) => onChange({ ...filters, branchId })}
         />
         <div className="space-y-2">
-          <label className="text-sm font-medium text-brand-espresso">Group by</label>
+          <label
+            htmlFor="report-filter-bar-group-by"
+            className="text-sm font-medium text-brand-espresso"
+          >
+            Group by
+          </label>
           <Select
             value={filters.groupBy}
             onValueChange={(groupBy: ReportGroupBy) => onChange({ ...filters, groupBy })}
           >
-            <SelectTrigger>
+            <SelectTrigger id="report-filter-bar-group-by">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
