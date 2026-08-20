@@ -517,6 +517,7 @@ export function OrderFormPage({
                     </label>
                     <SearchableCombobox
                       emptyMessage="No matching branches found."
+                      id="bakeryOrderBranch"
                       onValueChange={setBranchId}
                       options={branchOptions}
                       placeholder="Select branch"
@@ -533,6 +534,7 @@ export function OrderFormPage({
                     </label>
                     <SearchableCombobox
                       emptyMessage="No active sales channels found."
+                      id="bakeryOrderChannel"
                       onValueChange={setSalesChannelId}
                       options={salesChannelOptions}
                       placeholder="Default sales channel"
