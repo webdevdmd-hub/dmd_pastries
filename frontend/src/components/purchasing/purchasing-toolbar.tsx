@@ -43,17 +43,25 @@ export function PurchasingToolbar({
     onFiltersChange({ ...filters, ...patch });
   };
 
+  // Six or seven controls used to snap onto one grid row the moment the
+  // VIEWPORT hit lg. The viewport is not the width this toolbar gets: with the
+  // sidebar open, a 1030px window leaves main 742px, so each control was
+  // allotted 91px and the date-to input rendered 25px wide -- a date field you
+  // cannot read or type into. Wrapping on the toolbar's own width needs no
+  // breakpoint to be guessed right: each control asks for a readable basis,
+  // takes a share of what is left, and drops to the next row when there is no
+  // room.
+  //
+  // The sizing sits on each control rather than on the parent as [&>*]:flex-1.
+  // That arbitrary variant compiles to a two-class selector, which outranks a
+  // plain .flex-none on a child, so Reset could not opt out of stretching and
+  // rendered 629px wide.
+  const control = "min-w-0 flex-1 basis-36";
   return (
-    <div
-      className={cn(
-        "grid gap-3 rounded-md border border-brand-cappuccino/60 bg-card p-4",
-        paymentStatuses
-          ? "lg:grid-cols-[1.4fr_repeat(6,minmax(0,1fr))]"
-          : "lg:grid-cols-[1.4fr_repeat(5,minmax(0,1fr))]",
-      )}
-    >
+    <div className="flex flex-wrap items-center gap-3 rounded-md border border-brand-cappuccino/60 bg-card p-4">
       <Input
         aria-label="Search purchasing records"
+        className={cn(control, "basis-48")}
         onChange={(event) => updateFilter({ search: event.target.value })}
         placeholder="Search number, supplier..."
         value={filters.search}
@@ -62,7 +70,7 @@ export function PurchasingToolbar({
         value={filters.supplierId}
         onValueChange={(supplierId) => updateFilter({ supplierId })}
       >
-        <SelectTrigger>
+        <SelectTrigger className={control}>
           <SelectValue placeholder="Supplier" />
         </SelectTrigger>
         <SelectContent>
@@ -75,7 +83,7 @@ export function PurchasingToolbar({
         </SelectContent>
       </Select>
       <Select value={filters.branchId} onValueChange={(branchId) => updateFilter({ branchId })}>
-        <SelectTrigger>
+        <SelectTrigger className={control}>
           <SelectValue placeholder="Branch" />
         </SelectTrigger>
         <SelectContent>
@@ -88,7 +96,7 @@ export function PurchasingToolbar({
         </SelectContent>
       </Select>
       <Select value={filters.status} onValueChange={(status) => updateFilter({ status })}>
-        <SelectTrigger>
+        <SelectTrigger className={control}>
           <SelectValue placeholder="Status" />
         </SelectTrigger>
         <SelectContent>
@@ -105,7 +113,7 @@ export function PurchasingToolbar({
           value={filters.paymentStatus ?? "all"}
           onValueChange={(paymentStatus) => updateFilter({ paymentStatus })}
         >
-          <SelectTrigger>
+          <SelectTrigger className={control}>
             <SelectValue placeholder="Payment" />
           </SelectTrigger>
           <SelectContent>
@@ -120,46 +128,41 @@ export function PurchasingToolbar({
       ) : null}
       <Input
         aria-label="Date from"
+        className={cn(control, "min-w-36")}
         onChange={(event) => updateFilter({ dateFrom: event.target.value })}
         type="date"
         value={filters.dateFrom}
       />
-      {/* A date input and a button share one minmax(0,1fr) grid cell. Flex
-          children default to min-width:auto, so the input refused to shrink
-          below its intrinsic width and the pair pushed 11px past the viewport,
-          scrolling the whole page sideways. min-w-0 lets the input give. */}
-      <div className="flex min-w-0 gap-3">
-        <Input
-          aria-label="Date to"
-          className="min-w-0"
-          onChange={(event) => updateFilter({ dateTo: event.target.value })}
-          type="date"
-          value={filters.dateTo}
-        />
-        <Button
-          onClick={() => {
-            const resetFilters: PurchasingFilters = {
-              branchId: resetBranchId,
-              dateFrom: "",
-              dateTo: "",
-              search: "",
-              status: "all",
-              supplierId: "all",
-            };
+      <Input
+        aria-label="Date to"
+        className={cn(control, "min-w-36")}
+        onChange={(event) => updateFilter({ dateTo: event.target.value })}
+        type="date"
+        value={filters.dateTo}
+      />
+      <Button
+        onClick={() => {
+          const resetFilters: PurchasingFilters = {
+            branchId: resetBranchId,
+            dateFrom: "",
+            dateTo: "",
+            search: "",
+            status: "all",
+            supplierId: "all",
+          };
 
-            if (paymentStatuses) {
-              resetFilters.paymentStatus = "all";
-            }
+          if (paymentStatuses) {
+            resetFilters.paymentStatus = "all";
+          }
 
-            onFiltersChange(resetFilters);
-          }}
-          className="shrink-0"
-          type="button"
-          variant="outline"
-        >
-          Reset
-        </Button>
-      </div>
+          onFiltersChange(resetFilters);
+        }}
+        className="flex-none"
+        type="button"
+        variant="outline"
+      >
+        Reset
+      </Button>
     </div>
   );
 }
