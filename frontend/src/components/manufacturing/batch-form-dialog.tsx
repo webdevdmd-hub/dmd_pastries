@@ -782,11 +782,11 @@ export function BatchFormDialog({
             ) : null}
 
             <div className="space-y-2">
-              <label htmlFor="batch-form-field" className="text-sm font-medium text-foreground">
+              <label htmlFor="batch-form-quantity" className="text-sm font-medium text-foreground">
                 {batch ? "Quantity to produce now" : "Quantity to produce"}
               </label>
               <Input
-                id="batch-form-field"
+                id="batch-form-quantity"
                 aria-label="Quantity to produce"
                 min="0"
                 onChange={(event) => {

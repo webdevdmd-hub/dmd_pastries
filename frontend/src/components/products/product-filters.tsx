@@ -169,7 +169,7 @@ export function ProductFilters({
             { key: "isPurchasable", label: "Purchasable" },
           ].map((item) => (
             <div key={item.key}>
-              <Label htmlFor="product-filters-field">{item.label}</Label>
+              <Label htmlFor={`product-filters-${item.key}`}>{item.label}</Label>
               <Select
                 onValueChange={(value) =>
                   onFiltersChange({
@@ -180,7 +180,7 @@ export function ProductFilters({
                 }
                 value={filters[item.key as "isPosVisible" | "isPurchasable" | "isSellable"]}
               >
-                <SelectTrigger id="product-filters-field" className="mt-1">
+                <SelectTrigger className="mt-1" id={`product-filters-${item.key}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
