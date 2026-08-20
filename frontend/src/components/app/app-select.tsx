@@ -36,9 +36,9 @@ export function AppSelect({
 }: AppSelectProps): JSX.Element {
   return (
     <div className="grid gap-2">
-      {label ? <Label>{label}</Label> : null}
+      {label ? <Label htmlFor="app-select-field">{label}</Label> : null}
       <Select onValueChange={onValueChange} value={value}>
-        <SelectTrigger aria-invalid={error ? true : undefined}>
+        <SelectTrigger id="app-select-field" aria-invalid={error ? true : undefined}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>

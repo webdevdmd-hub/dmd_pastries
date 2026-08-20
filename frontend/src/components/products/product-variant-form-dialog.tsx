@@ -205,7 +205,7 @@ export function ProductVariantFormDialog({
                 <FieldError message={form.formState.errors.costPrice?.message} />
               </div>
               <div className="flex flex-col gap-1">
-                <Label>Cost update policy</Label>
+                <Label htmlFor="product-variant-form-cost-update-policy">Cost update policy</Label>
                 <Select
                   onValueChange={(value) =>
                     form.setValue(
@@ -215,7 +215,7 @@ export function ProductVariantFormDialog({
                   }
                   value={form.watch("costUpdatePolicy")}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="product-variant-form-cost-update-policy">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -228,14 +228,14 @@ export function ProductVariantFormDialog({
                 </Select>
               </div>
               <div className="flex flex-col gap-1">
-                <Label>Pricing type</Label>
+                <Label htmlFor="product-variant-form-pricing-type">Pricing type</Label>
                 <Select
                   onValueChange={(value) =>
                     form.setValue("pricingType", value as ProductVariantSchema["pricingType"])
                   }
                   value={form.watch("pricingType")}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="product-variant-form-pricing-type">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -292,12 +292,12 @@ export function ProductVariantFormDialog({
                 <Input id="barcode" {...form.register("barcode")} />
               </div>
               <div className="flex flex-col gap-1">
-                <Label>Status</Label>
+                <Label htmlFor="product-variant-form-status">Status</Label>
                 <Select
                   onValueChange={(value) => form.setValue("status", value as "active" | "inactive")}
                   value={form.watch("status")}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="product-variant-form-status">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

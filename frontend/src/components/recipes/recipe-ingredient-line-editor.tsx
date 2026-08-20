@@ -152,8 +152,9 @@ export function RecipeIngredientLineEditor({
     <div className="grid gap-4 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4">
       <div className="grid gap-4 lg:grid-cols-2">
         <label className="grid gap-2">
-          <Label>Component product</Label>
+          <Label htmlFor="recipe-ingredient-line-editor-component-product">Component product</Label>
           <SearchableCombobox
+            id="recipe-ingredient-line-editor-component-product"
             emptyMessage="No matching Product Master components found."
             onValueChange={(value) => {
               setComponentProductId(value);
@@ -176,8 +177,9 @@ export function RecipeIngredientLineEditor({
           ) : null}
         </label>
         <label className="grid gap-2">
-          <Label>Unit</Label>
+          <Label htmlFor="recipe-ingredient-line-editor-unit">Unit</Label>
           <SearchableCombobox
+            id="recipe-ingredient-line-editor-unit"
             emptyMessage="No matching units found."
             onValueChange={setUnitId}
             options={unitOptions}
@@ -199,8 +201,9 @@ export function RecipeIngredientLineEditor({
       </div>
       {selectedVariants.length > 0 ? (
         <label className="grid gap-2">
-          <Label>Component variant</Label>
+          <Label htmlFor="recipe-ingredient-line-editor-component-variant">Component variant</Label>
           <SearchableCombobox
+            id="recipe-ingredient-line-editor-component-variant"
             emptyMessage="No matching variants found."
             onValueChange={setComponentVariantId}
             options={variantOptions}

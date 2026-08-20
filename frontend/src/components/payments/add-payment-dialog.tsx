@@ -105,13 +105,13 @@ export function AddPaymentDialog({
             <p className="text-xs text-danger-text">{form.formState.errors.saleId?.message}</p>
           </div>
           <div className="grid gap-2">
-            <Label>Payment method</Label>
+            <Label htmlFor="add-payment-payment-method">Payment method</Label>
             <Controller
               control={form.control}
               name="paymentMethodId"
               render={({ field }) => (
                 <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger>
+                  <SelectTrigger id="add-payment-payment-method">
                     <SelectValue placeholder="Select method" />
                   </SelectTrigger>
                   <SelectContent>

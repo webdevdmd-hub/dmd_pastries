@@ -97,12 +97,12 @@ export function ManualMovementDialog({
           }}
         >
           <div className="space-y-1">
-            <Label>Inventory item</Label>
+            <Label htmlFor="manual-movement-inventory-item">Inventory item</Label>
             <Select
               onValueChange={(value) => form.setValue("inventoryItemId", value)}
               value={form.watch("inventoryItemId")}
             >
-              <SelectTrigger>
+              <SelectTrigger id="manual-movement-inventory-item">
                 <SelectValue placeholder="Select inventory item" />
               </SelectTrigger>
               <SelectContent>
@@ -115,14 +115,14 @@ export function ManualMovementDialog({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label>Movement type</Label>
+            <Label htmlFor="manual-movement-movement-type">Movement type</Label>
             <Select
               onValueChange={(value) =>
                 form.setValue("movementType", value as ManualMovementSchema["movementType"])
               }
               value={movementType}
             >
-              <SelectTrigger>
+              <SelectTrigger id="manual-movement-movement-type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

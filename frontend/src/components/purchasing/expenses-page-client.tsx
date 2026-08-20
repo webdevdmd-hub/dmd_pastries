@@ -480,8 +480,9 @@ function ExpenseFormDialog({
         >
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
-              <Label>Branch</Label>
+              <Label htmlFor="expenses-branch">Branch</Label>
               <SearchableCombobox
+                id="expenses-branch"
                 emptyMessage="No branches found."
                 onValueChange={(branchId) => updateForm({ branchId })}
                 options={branches.map((branch) => ({
@@ -503,8 +504,9 @@ function ExpenseFormDialog({
               />
             </div>
             <div className="grid gap-2">
-              <Label>Expense account</Label>
+              <Label htmlFor="expenses-expense-account">Expense account</Label>
               <SearchableCombobox
+                id="expenses-expense-account"
                 emptyMessage="No active Expense or COGS accounts allow manual posting."
                 errorMessage={accountErrorMessage}
                 groupLabel="Expense accounts"
@@ -522,8 +524,9 @@ function ExpenseFormDialog({
               </p>
             </div>
             <div className="grid gap-2">
-              <Label>Paid through</Label>
+              <Label htmlFor="expenses-paid-through">Paid through</Label>
               <SearchableCombobox
+                id="expenses-paid-through"
                 disabled={hasNoPaidThroughOptions}
                 emptyMessage="No active payment accounts are available for this branch."
                 errorMessage={accountErrorMessage}
@@ -547,8 +550,9 @@ function ExpenseFormDialog({
               ) : null}
             </div>
             <div className="grid gap-2">
-              <Label>Vendor</Label>
+              <Label htmlFor="expenses-vendor">Vendor</Label>
               <SearchableCombobox
+                id="expenses-vendor"
                 emptyMessage="No suppliers found."
                 onValueChange={(supplierId) => updateForm({ supplierId })}
                 options={supplierComboboxOptions}
@@ -558,8 +562,9 @@ function ExpenseFormDialog({
               />
             </div>
             <div className="grid gap-2">
-              <Label>Customer</Label>
+              <Label htmlFor="expenses-customer">Customer</Label>
               <SearchableCombobox
+                id="expenses-customer"
                 emptyMessage="Search by customer name, phone, or email."
                 isLoading={customerLookupQuery.isFetching}
                 onSearchChange={setCustomerSearch}

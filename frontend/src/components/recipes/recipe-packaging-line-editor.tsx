@@ -149,8 +149,9 @@ export function RecipePackagingLineEditor({
     <div className="grid gap-4 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4">
       <div className="grid gap-4 lg:grid-cols-2">
         <label className="grid gap-2">
-          <Label>Packaging product</Label>
+          <Label htmlFor="recipe-packaging-line-editor-packaging-product">Packaging product</Label>
           <SearchableCombobox
+            id="recipe-packaging-line-editor-packaging-product"
             emptyMessage="No matching packaging products found."
             onValueChange={(value) => {
               setComponentProductId(value);
@@ -173,8 +174,9 @@ export function RecipePackagingLineEditor({
           ) : null}
         </label>
         <label className="grid gap-2">
-          <Label>Unit</Label>
+          <Label htmlFor="recipe-packaging-line-editor-unit">Unit</Label>
           <SearchableCombobox
+            id="recipe-packaging-line-editor-unit"
             emptyMessage="No matching units found."
             onValueChange={setUnitId}
             options={unitOptions}
@@ -196,8 +198,9 @@ export function RecipePackagingLineEditor({
       </div>
       {selectedVariants.length > 0 ? (
         <label className="grid gap-2">
-          <Label>Packaging variant</Label>
+          <Label htmlFor="recipe-packaging-line-editor-packaging-variant">Packaging variant</Label>
           <SearchableCombobox
+            id="recipe-packaging-line-editor-packaging-variant"
             emptyMessage="No matching variants found."
             onValueChange={setComponentVariantId}
             options={variantOptions}

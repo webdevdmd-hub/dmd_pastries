@@ -669,7 +669,7 @@ export function RecipeFormPage({
               <CardContent className="grid gap-4 lg:grid-cols-2">
                 <div className="grid gap-2">
                   <div className="flex items-center justify-between gap-3">
-                    <Label>Product</Label>
+                    <Label htmlFor="recipe-form-page-product">Product</Label>
                     {canCreateProduct ? (
                       <Button
                         disabled={!canEditRecipeForm || productReferenceDataQuery.isLoading}
@@ -684,6 +684,7 @@ export function RecipeFormPage({
                     ) : null}
                   </div>
                   <SearchableCombobox
+                    id="recipe-form-page-product"
                     disabled={!canEditRecipeForm}
                     emptyMessage="No matching products found."
                     onValueChange={handleProductChange}
@@ -697,7 +698,7 @@ export function RecipeFormPage({
                   ) : null}
                 </div>
                 <label className="grid gap-2">
-                  <Label>Recipe output</Label>
+                  <Label htmlFor="recipe-form-page-recipe-output">Recipe output</Label>
                   <Select
                     disabled={!canEditRecipeForm || selectedProductId.length === 0}
                     onValueChange={(value) => {
@@ -710,7 +711,7 @@ export function RecipeFormPage({
                     }}
                     value={outputVariantMode}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="recipe-form-page-recipe-output">
                       <SelectValue placeholder="Select output stock target" />
                     </SelectTrigger>
                     <SelectContent>
@@ -727,8 +728,9 @@ export function RecipeFormPage({
                 </label>
                 {outputVariantMode === "existing" ? (
                   <label className="grid gap-2">
-                    <Label>Product variant</Label>
+                    <Label htmlFor="recipe-form-page-product-variant">Product variant</Label>
                     <SearchableCombobox
+                      id="recipe-form-page-product-variant"
                       disabled={!canEditRecipeForm}
                       emptyMessage="No matching variants found."
                       onValueChange={(value) => form.setValue("productVariantId", value)}
@@ -833,8 +835,9 @@ export function RecipeFormPage({
                   />
                 </label>
                 <label className="grid gap-2">
-                  <Label>Yield unit</Label>
+                  <Label htmlFor="recipe-form-page-yield-unit">Yield unit</Label>
                   <SearchableCombobox
+                    id="recipe-form-page-yield-unit"
                     disabled={!canEditRecipeForm}
                     emptyMessage="No matching units found."
                     onValueChange={(value) => form.setValue("batchYieldUnitId", value)}

@@ -270,7 +270,7 @@ export function ChartAccountFormDialog({
               />
             </div>
             <div className="grid gap-2">
-              <Label>Account type</Label>
+              <Label htmlFor="chart-account-form-account-type">Account type</Label>
               <Select
                 disabled={isClassificationLocked}
                 onValueChange={(accountType: AccountingAccountType) => {
@@ -295,7 +295,7 @@ export function ChartAccountFormDialog({
                 }}
                 value={formState.accountType}
               >
-                <SelectTrigger>
+                <SelectTrigger id="chart-account-form-account-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -308,12 +308,12 @@ export function ChartAccountFormDialog({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>Account group</Label>
+              <Label htmlFor="chart-account-form-account-group">Account group</Label>
               <Select
                 onValueChange={(accountGroup) => updateForm({ accountGroup })}
                 {...(formState.accountGroup !== "" ? { value: formState.accountGroup } : {})}
               >
-                <SelectTrigger>
+                <SelectTrigger id="chart-account-form-account-group">
                   <SelectValue placeholder="Select account group" />
                 </SelectTrigger>
                 <SelectContent>
@@ -326,7 +326,7 @@ export function ChartAccountFormDialog({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>Normal balance</Label>
+              <p className="text-sm font-medium leading-none text-brand-espresso">Normal balance</p>
               <div className="rounded-xl border border-brand-cappuccino/70 bg-brand-latte/50 px-3 py-2.5 text-sm text-brand-espresso">
                 <span className="font-medium">
                   {formatNormalBalanceLabel(displayNormalBalance)}
@@ -334,7 +334,7 @@ export function ChartAccountFormDialog({
               </div>
             </div>
             <div className="grid gap-2">
-              <Label>Parent account</Label>
+              <Label htmlFor="chart-account-form-parent-account">Parent account</Label>
               <Select
                 onValueChange={(parentAccountId) =>
                   updateForm({
@@ -343,7 +343,7 @@ export function ChartAccountFormDialog({
                 }
                 value={formState.parentAccountId ?? noParentValue}
               >
-                <SelectTrigger>
+                <SelectTrigger id="chart-account-form-parent-account">
                   <SelectValue placeholder="No parent" />
                 </SelectTrigger>
                 <SelectContent>

@@ -38,7 +38,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -536,7 +535,7 @@ export function SalesChannelsPageClient(): JSX.Element {
       </Card>
 
       <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4 text-sm text-brand-mocha">
-        <Label className="text-brand-espresso">Quick distinction</Label>
+        <p className="text-sm font-medium leading-none text-brand-espresso">Quick distinction</p>
         <p className="mt-1">
           Sales Channel is where the order came from. Payment Method is how the customer paid.
           Payment Account is where that money is held for accounting.

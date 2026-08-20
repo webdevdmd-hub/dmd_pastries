@@ -176,12 +176,12 @@ export function IngredientFormDialog({
               ) : null}
             </label>
             <label className="grid gap-2">
-              <Label>Ingredient category</Label>
+              <Label htmlFor="ingredient-form-ingredient-category">Ingredient category</Label>
               <Select
                 onValueChange={(value) => form.setValue("ingredientCategoryId", value)}
                 value={form.watch("ingredientCategoryId")}
               >
-                <SelectTrigger>
+                <SelectTrigger id="ingredient-form-ingredient-category">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -199,14 +199,14 @@ export function IngredientFormDialog({
               ) : null}
             </label>
             <label className="grid gap-2">
-              <Label>Supplier</Label>
+              <Label htmlFor="ingredient-form-supplier">Supplier</Label>
               <Select
                 onValueChange={(value) =>
                   form.setValue("supplierId", value === "none" ? null : value)
                 }
                 value={form.watch("supplierId") ?? "none"}
               >
-                <SelectTrigger>
+                <SelectTrigger id="ingredient-form-supplier">
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent>
@@ -220,12 +220,12 @@ export function IngredientFormDialog({
               </Select>
             </label>
             <label className="grid gap-2">
-              <Label>Unit</Label>
+              <Label htmlFor="ingredient-form-unit">Unit</Label>
               <Select
                 onValueChange={(value) => form.setValue("unitId", value)}
                 value={form.watch("unitId")}
               >
-                <SelectTrigger>
+                <SelectTrigger id="ingredient-form-unit">
                   <SelectValue placeholder="Select unit" />
                 </SelectTrigger>
                 <SelectContent>

@@ -176,12 +176,12 @@ export function PackagingFormDialog({
               ) : null}
             </label>
             <label className="grid gap-2">
-              <Label>Packaging category</Label>
+              <Label htmlFor="packaging-form-packaging-category">Packaging category</Label>
               <Select
                 onValueChange={(value) => form.setValue("packagingCategoryId", value)}
                 value={form.watch("packagingCategoryId")}
               >
-                <SelectTrigger>
+                <SelectTrigger id="packaging-form-packaging-category">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -199,14 +199,14 @@ export function PackagingFormDialog({
               ) : null}
             </label>
             <label className="grid gap-2">
-              <Label>Supplier</Label>
+              <Label htmlFor="packaging-form-supplier">Supplier</Label>
               <Select
                 onValueChange={(value) =>
                   form.setValue("supplierId", value === "none" ? null : value)
                 }
                 value={form.watch("supplierId") ?? "none"}
               >
-                <SelectTrigger>
+                <SelectTrigger id="packaging-form-supplier">
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent>
@@ -220,12 +220,12 @@ export function PackagingFormDialog({
               </Select>
             </label>
             <label className="grid gap-2">
-              <Label>Unit</Label>
+              <Label htmlFor="packaging-form-unit">Unit</Label>
               <Select
                 onValueChange={(value) => form.setValue("unitId", value)}
                 value={form.watch("unitId")}
               >
-                <SelectTrigger>
+                <SelectTrigger id="packaging-form-unit">
                   <SelectValue placeholder="Select unit" />
                 </SelectTrigger>
                 <SelectContent>

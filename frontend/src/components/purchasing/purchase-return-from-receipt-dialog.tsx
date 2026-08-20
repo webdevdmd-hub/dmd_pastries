@@ -316,8 +316,9 @@ export function PurchaseReturnFromReceiptDialog({
 
         <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
-            <Label>Branch</Label>
+            <Label htmlFor="purchase-return-from-receipt-dialo-branch">Branch</Label>
             <SearchableCombobox
+              id="purchase-return-from-receipt-dialo-branch"
               emptyMessage="No branches found."
               onValueChange={setSelectedBranchId}
               options={branchOptions}
@@ -327,8 +328,9 @@ export function PurchaseReturnFromReceiptDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label>Supplier *</Label>
+            <Label htmlFor="purchase-return-from-receipt-dialo-supplier">Supplier *</Label>
             <SearchableCombobox
+              id="purchase-return-from-receipt-dialo-supplier"
               emptyMessage="No suppliers found."
               onValueChange={setSelectedSupplierId}
               options={supplierOptions}
@@ -338,8 +340,11 @@ export function PurchaseReturnFromReceiptDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label>Posted receipt *</Label>
+            <Label htmlFor="purchase-return-from-receipt-dialo-posted-receipt">
+              Posted receipt *
+            </Label>
             <SearchableCombobox
+              id="purchase-return-from-receipt-dialo-posted-receipt"
               disabled={selectedSupplierId === ""}
               emptyMessage="No posted receipt with returnable items found."
               errorMessage={receiptsQuery.error ? getErrorMessage(receiptsQuery.error) : null}

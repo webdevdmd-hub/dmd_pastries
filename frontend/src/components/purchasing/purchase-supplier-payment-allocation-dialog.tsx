@@ -381,7 +381,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
         <div className="flex-1 overflow-y-auto px-6 py-5">
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="grid gap-2">
-              <Label>Branch *</Label>
+              <Label htmlFor="purchase-supplier-payment-allocati-branch">Branch *</Label>
               <Select
                 onValueChange={(nextBranchId) => {
                   setSubmitError(null);
@@ -389,7 +389,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
                 }}
                 value={selectedBranchId}
               >
-                <SelectTrigger>
+                <SelectTrigger id="purchase-supplier-payment-allocati-branch">
                   <SelectValue placeholder="Select branch" />
                 </SelectTrigger>
                 <SelectContent>
@@ -406,8 +406,9 @@ export function PurchaseSupplierPaymentAllocationDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label>Supplier *</Label>
+              <Label htmlFor="purchase-supplier-payment-allocati-supplier">Supplier *</Label>
               <SupplierLookupSelect
+                id="purchase-supplier-payment-allocati-supplier"
                 onValueChange={onSupplierChange}
                 suppliers={suppliers}
                 value={selectedSupplierId}
@@ -450,7 +451,9 @@ export function PurchaseSupplierPaymentAllocationDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label>Payment method *</Label>
+              <Label htmlFor="purchase-supplier-payment-allocati-payment-method">
+                Payment method *
+              </Label>
               <Select
                 disabled={!hasPaymentMethods}
                 onValueChange={(nextPaymentMethodId) => {
@@ -459,7 +462,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
                 }}
                 value={paymentMethodId}
               >
-                <SelectTrigger>
+                <SelectTrigger id="purchase-supplier-payment-allocati-payment-method">
                   <SelectValue placeholder="Select payment method" />
                 </SelectTrigger>
                 <SelectContent>
@@ -667,8 +670,11 @@ export function PurchaseSupplierPaymentAllocationDialog({
                           </div>
                         </div>
                         <div className="grid gap-1">
-                          <Label>Payment</Label>
+                          <Label htmlFor="purchase-supplier-payment-allocati-payment">
+                            Payment
+                          </Label>
                           <Input
+                            id="purchase-supplier-payment-allocati-payment"
                             aria-label={`Payment for ${invoiceLabel(invoice)}`}
                             inputMode="decimal"
                             min={0}

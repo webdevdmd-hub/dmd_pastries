@@ -195,7 +195,7 @@ export function PurchaseSupplierPaymentDialog({
           </div>
 
           <div className="grid gap-2">
-            <Label>Payment method</Label>
+            <Label htmlFor="purchase-supplier-payment-payment-method">Payment method</Label>
             <Controller
               control={form.control}
               name="paymentMethodId"
@@ -205,7 +205,7 @@ export function PurchaseSupplierPaymentDialog({
                   onValueChange={field.onChange}
                   value={field.value}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="purchase-supplier-payment-payment-method">
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
                   <SelectContent>

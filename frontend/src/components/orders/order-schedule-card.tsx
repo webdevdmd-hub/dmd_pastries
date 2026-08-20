@@ -45,12 +45,12 @@ export function OrderScheduleCard({
       </p>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <div className="grid gap-2">
-          <Label>Order type</Label>
+          <Label htmlFor="order-schedule-card-order-type">Order type</Label>
           <Select
             onValueChange={(value: OrderType) => onChange({ orderType: value })}
             value={orderType}
           >
-            <SelectTrigger>
+            <SelectTrigger id="order-schedule-card-order-type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

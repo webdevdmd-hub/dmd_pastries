@@ -167,13 +167,13 @@ export function ReconciliationFormDialog({
         >
           <div className="grid gap-2 md:grid-cols-2">
             <div className="grid gap-2">
-              <Label>Branch</Label>
+              <Label htmlFor="reconciliation-form-branch">Branch</Label>
               <Controller
                 control={form.control}
                 name="branchId"
                 render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger aria-label="Branch">
+                    <SelectTrigger id="reconciliation-form-branch" aria-label="Branch">
                       <SelectValue placeholder="Select branch" />
                     </SelectTrigger>
                     <SelectContent>
@@ -194,13 +194,16 @@ export function ReconciliationFormDialog({
             </div>
           </div>
           <div className="grid gap-2">
-            <Label>Payment method</Label>
+            <Label htmlFor="reconciliation-form-payment-method">Payment method</Label>
             <Controller
               control={form.control}
               name="paymentMethodId"
               render={({ field }) => (
                 <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger aria-label="Payment method">
+                  <SelectTrigger
+                    id="reconciliation-form-payment-method"
+                    aria-label="Payment method"
+                  >
                     <SelectValue placeholder="Select method" />
                   </SelectTrigger>
                   <SelectContent>

@@ -152,14 +152,14 @@ export function CustomerFormDialog({
               <Input id="customer-date-of-birth" type="date" {...form.register("dateOfBirth")} />
             </label>
             <label className="grid gap-2">
-              <Label>Gender</Label>
+              <Label htmlFor="customer-form-gender">Gender</Label>
               <Select
                 onValueChange={(value) =>
                   form.setValue("gender", value === "none" ? null : (value as CustomerGender))
                 }
                 value={form.watch("gender") ?? "none"}
               >
-                <SelectTrigger>
+                <SelectTrigger id="customer-form-gender">
                   <SelectValue placeholder="Select gender" />
                 </SelectTrigger>
                 <SelectContent>

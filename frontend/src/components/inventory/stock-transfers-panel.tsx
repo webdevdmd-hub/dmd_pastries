@@ -379,8 +379,9 @@ export function StockTransfersPanel(): JSX.Element {
           </DialogHeader>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1 md:col-span-2">
-              <Label>Inventory item</Label>
+              <Label htmlFor="stock-transfers-panel-inventory-item">Inventory item</Label>
               <SearchableCombobox
+                id="stock-transfers-panel-inventory-item"
                 emptyMessage="No matching inventory items found."
                 isLoading={inventoryQuery.isLoading}
                 loadingMessage="Loading inventory items..."
@@ -397,8 +398,9 @@ export function StockTransfersPanel(): JSX.Element {
               />
             </div>
             <div className="space-y-1">
-              <Label>From location</Label>
+              <Label htmlFor="stock-transfers-panel-from-location">From location</Label>
               <SearchableCombobox
+                id="stock-transfers-panel-from-location"
                 emptyMessage="No matching source locations found."
                 value={payload.fromStockLocationId}
                 onValueChange={(value) =>
@@ -410,8 +412,9 @@ export function StockTransfersPanel(): JSX.Element {
               />
             </div>
             <div className="space-y-1">
-              <Label>To location</Label>
+              <Label htmlFor="stock-transfers-panel-to-location">To location</Label>
               <SearchableCombobox
+                id="stock-transfers-panel-to-location"
                 emptyMessage="No matching target locations found."
                 value={payload.toStockLocationId}
                 onValueChange={(value) =>
@@ -423,8 +426,9 @@ export function StockTransfersPanel(): JSX.Element {
               />
             </div>
             <div className="space-y-1">
-              <Label>Quantity</Label>
+              <Label htmlFor="stock-transfers-panel-quantity">Quantity</Label>
               <Input
+                id="stock-transfers-panel-quantity"
                 type="number"
                 step="0.001"
                 value={payload.quantity}
@@ -434,8 +438,9 @@ export function StockTransfersPanel(): JSX.Element {
               />
             </div>
             <div className="space-y-1">
-              <Label>Reason</Label>
+              <Label htmlFor="stock-transfers-panel-reason">Reason</Label>
               <Input
+                id="stock-transfers-panel-reason"
                 value={payload.reason}
                 onChange={(event) =>
                   setPayload((current) => ({ ...current, reason: event.target.value }))
@@ -443,8 +448,9 @@ export function StockTransfersPanel(): JSX.Element {
               />
             </div>
             <div className="space-y-1 md:col-span-2">
-              <Label>Notes</Label>
+              <Label htmlFor="stock-transfers-panel-notes">Notes</Label>
               <Input
+                id="stock-transfers-panel-notes"
                 value={payload.notes ?? ""}
                 onChange={(event) =>
                   setPayload((current) => ({ ...current, notes: event.target.value }))
