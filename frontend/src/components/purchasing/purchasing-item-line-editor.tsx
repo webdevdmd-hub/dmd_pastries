@@ -464,7 +464,10 @@ export function PurchasingItemLineEditor({
                 ) : null}
                 <th className="w-[104px] px-2 py-2">Unit</th>
                 <th className="w-[92px] px-2 py-2 text-right">Amount</th>
-                <th className="w-[36px] px-1.5 py-2" aria-label="Actions" />
+                <th
+                  aria-label="Actions"
+                  className={cn("px-1.5 py-2", compactLayout ? "w-[76px]" : "w-[36px]")}
+                />
               </tr>
             </thead>
             <tbody>
@@ -903,7 +906,14 @@ export function PurchasingItemLineEditor({
                       </span>
                     </td>
                     <td className="px-1.5 py-2">
-                      {showRowTypeColumn || !showAccountRows ? (
+                      {/* Remove stays a button you can see. It was folded into
+                          the overflow menu with the convert action, and the
+                          first thing asked about the compact row was how to
+                          delete one -- a destructive action being hard to find
+                          is not the same as it being safely tucked away, it
+                          just means people cannot undo a mistyped row. Convert
+                          keeps the menu: it is genuinely rare. */}
+                      <div className="flex items-center justify-end gap-0.5">
                         <Button
                           aria-label={`Remove item line ${String(index + 1)}`}
                           disabled={disableAddRows || safeLines.length === 1 || isLineLocked}
@@ -916,55 +926,41 @@ export function PurchasingItemLineEditor({
                         >
                           <Trash2 className="h-4 w-4 text-danger-text" />
                         </Button>
-                      ) : (
-                        // Converting a row is rare -- you picked the type with
-                        // "Add product row" or "Add account row" -- so it moves
-                        // out of a permanent 92px column and in here beside
-                        // remove, the same overflow pattern the order rows use.
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              aria-label={`Actions for item line ${String(index + 1)}`}
-                              size="icon"
-                              type="button"
-                              variant="ghost"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              disabled={disableAddRows || isLineLocked}
-                              onSelect={() => {
-                                convertLine(line.lineId, accountLine ? "product" : "account");
-                              }}
-                            >
-                              {accountLine ? (
-                                <>
-                                  <Package className="mr-2 h-3.5 w-3.5" />
-                                  Convert to product row
-                                </>
-                              ) : (
-                                <>
-                                  <FileText className="mr-2 h-3.5 w-3.5" />
-                                  Convert to account row
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={disableAddRows || safeLines.length === 1 || isLineLocked}
-                              onSelect={() => {
-                                onLinesChange(
-                                  safeLines.filter((item) => item.lineId !== line.lineId),
-                                );
-                              }}
-                            >
-                              <Trash2 className="mr-2 h-3.5 w-3.5 text-danger-text" />
-                              Remove line
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
+                        {showAccountRows && !showRowTypeColumn ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                aria-label={`More actions for item line ${String(index + 1)}`}
+                                size="icon"
+                                type="button"
+                                variant="ghost"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                disabled={disableAddRows || isLineLocked}
+                                onSelect={() => {
+                                  convertLine(line.lineId, accountLine ? "product" : "account");
+                                }}
+                              >
+                                {accountLine ? (
+                                  <>
+                                    <Package className="mr-2 h-3.5 w-3.5" />
+                                    Convert to product row
+                                  </>
+                                ) : (
+                                  <>
+                                    <FileText className="mr-2 h-3.5 w-3.5" />
+                                    Convert to account row
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 );
