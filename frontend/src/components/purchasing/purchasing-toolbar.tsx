@@ -124,9 +124,14 @@ export function PurchasingToolbar({
         type="date"
         value={filters.dateFrom}
       />
-      <div className="flex gap-3">
+      {/* A date input and a button share one minmax(0,1fr) grid cell. Flex
+          children default to min-width:auto, so the input refused to shrink
+          below its intrinsic width and the pair pushed 11px past the viewport,
+          scrolling the whole page sideways. min-w-0 lets the input give. */}
+      <div className="flex min-w-0 gap-3">
         <Input
           aria-label="Date to"
+          className="min-w-0"
           onChange={(event) => updateFilter({ dateTo: event.target.value })}
           type="date"
           value={filters.dateTo}
@@ -148,6 +153,7 @@ export function PurchasingToolbar({
 
             onFiltersChange(resetFilters);
           }}
+          className="shrink-0"
           type="button"
           variant="outline"
         >
