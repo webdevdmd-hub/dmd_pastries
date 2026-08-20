@@ -70,6 +70,7 @@ import type {
   PurchaseDocumentChain,
   PurchaseInvoice,
   PurchaseOrder,
+  PurchaseOrderPage,
   PurchaseOrderRevision,
   PurchaseReceipt,
   PurchaseReturn,
@@ -108,13 +109,22 @@ export function usePurchasingSummary(enabled = true) {
   });
 }
 
-export function usePurchaseOrders(filters: PurchasingFilters, enabled = true) {
+/**
+ * `page` is part of the query key, so React Query caches each page and moving
+ * back to one already seen is instant. Callers that only ever want the first
+ * page can leave it at the default.
+ */
+export function usePurchaseOrders(filters: PurchasingFilters, enabled = true, page = 1) {
   const branchQueryKey = useBranchQueryKey();
 
-  return useQuery<PurchaseOrder[]>({
-    queryKey: [purchasingQueryKey, branchQueryKey, "orders", filters],
-    queryFn: async () => getPurchaseOrders(filters),
+  return useQuery<PurchaseOrderPage>({
+    queryKey: [purchasingQueryKey, branchQueryKey, "orders", filters, page],
+    queryFn: async () => getPurchaseOrders(filters, page),
     enabled,
+    // Without this the table blanks to a skeleton on every page step. Keeping
+    // the previous page on screen while the next loads is what makes paging
+    // feel like paging instead of a reload.
+    placeholderData: (previous) => previous,
   });
 }
 

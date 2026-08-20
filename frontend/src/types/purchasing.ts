@@ -336,6 +336,24 @@ export type PurchasingBranchOption = {
   status: BranchStatus;
 };
 
+/**
+ * What the backend already told us and the frontend used to throw away. The
+ * list endpoint has always answered with a pagination block; `getPurchaseOrders`
+ * returned only `items`, so page two was unreachable and nothing on screen said
+ * a page two existed.
+ */
+export type PurchasePagination = {
+  limit: number;
+  page: number;
+  total: number;
+  totalPages: number;
+};
+
+export type PurchaseOrderPage = {
+  items: PurchaseOrder[];
+  pagination: PurchasePagination;
+};
+
 export type PurchasingFilters = {
   search: string;
   supplierId: string;

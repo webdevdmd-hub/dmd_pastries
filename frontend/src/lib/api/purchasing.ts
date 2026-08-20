@@ -20,6 +20,7 @@ import type {
   PurchaseItemType,
   PurchaseOrder,
   PurchaseOrderItem,
+  PurchaseOrderPage,
   PurchaseOrderRevision,
   PurchaseOrderRevisionPaymentExcessAction,
   PurchaseOrderStatus,
@@ -1076,6 +1077,32 @@ function parseProduct(value: unknown): PurchasingProductOption {
   };
 }
 
+/** The list page size. One constant so the request and the footer agree. */
+export const PURCHASE_ORDER_PAGE_SIZE = 20;
+
+function parseOrderPage(value: unknown, requestedLimit: number): PurchaseOrderPage {
+  const items = parseList(value, parseOrder);
+  const source = isObject(value) && isObject(value.pagination) ? value.pagination : {};
+  const limit = numberValue(source.limit, requestedLimit);
+  const total = numberValue(source.total, items.length);
+
+  return {
+    items,
+    pagination: {
+      limit,
+      page: Math.max(1, numberValue(source.page, 1)),
+      total,
+      // An older backend that answers with a bare array gives no total, so the
+      // count falls back to what arrived and the bar renders a single page
+      // rather than inventing a second one.
+      totalPages: Math.max(
+        1,
+        numberValue(source.total_pages, limit > 0 ? Math.ceil(total / limit) : 1),
+      ),
+    },
+  };
+}
+
 function parseProductPage(value: unknown): PurchasingProductPage {
   const items = parseList(value, parseProduct);
 
@@ -1400,8 +1427,12 @@ export async function getPurchasingSummary(): Promise<PurchasingSummary> {
   return response.data;
 }
 
-export async function getPurchaseOrders(params: PurchasingFilters): Promise<PurchaseOrder[]> {
-  const response = await apiRequest<PurchaseOrder[]>(
+export async function getPurchaseOrders(
+  params: PurchasingFilters,
+  page = 1,
+  limit = PURCHASE_ORDER_PAGE_SIZE,
+): Promise<PurchaseOrderPage> {
+  const response = await apiRequest<PurchaseOrderPage>(
     `/api/v1/purchasing/orders${toQueryString({
       search: params.search,
       supplier_id: params.supplierId,
@@ -1409,10 +1440,12 @@ export async function getPurchaseOrders(params: PurchasingFilters): Promise<Purc
       status: params.status,
       date_from: params.dateFrom,
       date_to: params.dateTo,
+      page: String(page),
+      limit: String(limit),
     })}`,
     {
       authMode: "appwrite",
-      parse: (data) => parseList(data, parseOrder),
+      parse: (data) => parseOrderPage(data, limit),
     },
   );
 
