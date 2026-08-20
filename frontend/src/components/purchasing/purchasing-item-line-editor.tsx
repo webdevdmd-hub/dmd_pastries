@@ -51,16 +51,17 @@ type PurchasingItemLineEditorProps = {
   billDiscountAmount?: number;
   canCreateProducts?: boolean;
   /**
-   * Opt-in column reduction. Ten columns is what shipped, and bills and
-   * expenses render through this same editor, so the reduced layout has to be
-   * asked for: purchase orders pass it, the other two keep today's grid until
-   * they choose to adopt.
+   * Opt-in compact layout. Ten columns and a 430px totals panel are what
+   * shipped, and bills render through this same editor, so the reduction has to
+   * be asked for: purchase orders pass it, bills keep today's layout until they
+   * choose to adopt.
    *
    * Compact drops the row-type column (the Add button already chose the type)
    * and the account column (it renders the static words "Inventory Asset" on
-   * every product row), and hides discount and tax behind a toggle.
+   * every product row), hides discount and tax behind a toggle, and replaces
+   * the settlement panel with a one-line total strip.
    */
-  compactColumns?: boolean;
+  compactLayout?: boolean;
   disableAddRows?: boolean;
   legacyChargeAmount?: number;
   legacyChargeTaxAmount?: number;
@@ -194,7 +195,7 @@ export function PurchasingItemLineEditor({
   allowBatchFields = false,
   billDiscountAmount = 0,
   canCreateProducts = false,
-  compactColumns = false,
+  compactLayout = false,
   disableAddRows = false,
   legacyChargeAmount = 0,
   legacyChargeTaxAmount = 0,
@@ -224,10 +225,10 @@ export function PurchasingItemLineEditor({
   const hasLineExtras = safeLines.some(
     (line) => line.discountAmount > 0 || Boolean(line.taxRateId),
   );
-  const showExtras = !compactColumns || extrasRequested || hasLineExtras;
-  const showRowTypeColumn = !compactColumns;
-  const showAccountColumn = !compactColumns;
-  const tableMinWidth = !compactColumns
+  const showExtras = !compactLayout || extrasRequested || hasLineExtras;
+  const showRowTypeColumn = !compactLayout;
+  const showAccountColumn = !compactLayout;
+  const tableMinWidth = !compactLayout
     ? "min-w-[1050px]"
     : showExtras
       ? "min-w-[820px]"
@@ -400,16 +401,11 @@ export function PurchasingItemLineEditor({
       <section className="flex min-h-0 w-full flex-1 flex-col rounded-md border border-workspace-border bg-card shadow-sm">
         <div className="flex flex-col gap-2 border-b border-workspace-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-brand-mocha">Item Rates Are</span>
-            <Select value="tax-exclusive">
-              <SelectTrigger className="h-8 w-36 border-0 border-b border-dashed border-brand-mocha/40 bg-transparent px-0 text-xs font-semibold shadow-none focus:ring-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tax-exclusive">Tax Exclusive</SelectItem>
-              </SelectContent>
-            </Select>
-            {compactColumns ? (
+            {/* This was a Select with exactly one option, so it looked like a
+                choice and could not be operated. It states a fact, so it reads
+                as one. */}
+            <span className="text-xs font-semibold text-brand-mocha">Rates are tax exclusive</span>
+            {compactLayout ? (
               hasLineExtras ? (
                 <span className="text-meta text-brand-mocha">
                   Tax &amp; discount shown — a line uses them.
@@ -429,9 +425,6 @@ export function PurchasingItemLineEditor({
               )
             ) : null}
           </div>
-          <p className="text-xs text-brand-mocha">
-            Add purchase lines exactly as they should move through receiving and billing.
-          </p>
         </div>
 
         {referenceNotices.length > 0 ? (
@@ -457,7 +450,7 @@ export function PurchasingItemLineEditor({
                 {showRowTypeColumn ? (
                   <th className="w-[92px] px-1.5 py-2">{showAccountRows ? "Row type" : ""}</th>
                 ) : null}
-                <th className={cn("px-2 py-2", compactColumns ? "w-[280px]" : "w-[220px]")}>
+                <th className={cn("px-2 py-2", compactLayout ? "w-[280px]" : "w-[220px]")}>
                   Item Details
                 </th>
                 {showAccountColumn ? <th className="w-[200px] px-2 py-2">Account</th> : null}
@@ -980,7 +973,13 @@ export function PurchasingItemLineEditor({
           </table>
         </div>
 
-        <div className="grid gap-3 border-t border-workspace-border px-3 py-3 lg:grid-cols-[1fr_430px]">
+        <div
+          className={
+            compactLayout
+              ? "flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-workspace-border px-3 py-3"
+              : "grid gap-3 border-t border-workspace-border px-3 py-3 lg:grid-cols-[1fr_430px]"
+          }
+        >
           <div className="flex flex-wrap items-center gap-2">
             {disableAddRows ? (
               <p className="text-xs text-workspace-muted">
@@ -1026,79 +1025,118 @@ export function PurchasingItemLineEditor({
             )}
           </div>
 
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-brand-mocha">Subtotal</span>
-              <span className="font-semibold tabular-nums text-brand-espresso">
-                {formatMoney(totals.subtotal)}
-              </span>
-            </div>
-            <div className="flex items-start justify-between gap-6 border-t border-workspace-border pt-2">
-              <div>
-                <span className="text-brand-mocha">Line discounts</span>
-                <p className="text-xs text-info-text">Applied per line</p>
+          {/* A purchase order settles nothing, so the tall right-hand stack is
+              wrong twice over: four of its seven rows (Bill discount, Paid,
+              Balance due, and a line-discount row reading -AED 0.00) describe a
+              bill, and the 430px column forced the whole row to its own height,
+              leaving the add-buttons cell 222px of blank. Four figures read
+              left to right in one line instead, and the order total stays
+              pinned in the dialog footer where scrolling cannot lose it.
+              Bills keep the full panel below. */}
+          {compactLayout ? (
+            <dl className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm">
+              <div className="flex items-baseline gap-2">
+                <dt className="text-brand-mocha">Subtotal</dt>
+                <dd className="font-semibold tabular-nums text-brand-espresso">
+                  {formatMoney(totals.subtotal)}
+                </dd>
               </div>
-              <span className="font-semibold tabular-nums text-danger-text">
-                -{formatMoney(totals.discount)}
-              </span>
-            </div>
-            {showAccountRows && onBillDiscountAmountChange ? (
-              <div className="grid grid-cols-[1fr_150px] items-center gap-3 border-t border-workspace-border pt-2">
-                <span className="text-brand-mocha">Bill discount</span>
-                <Input
-                  aria-label="Bill discount"
-                  className="h-9 text-right text-xs tabular-nums"
-                  min="0"
-                  onChange={(event) => onBillDiscountAmountChange(Number(event.target.value))}
-                  type="number"
-                  value={billDiscountAmount}
-                />
+              {totals.discount > 0 ? (
+                <div className="flex items-baseline gap-2">
+                  <dt className="text-brand-mocha">Discount</dt>
+                  <dd className="font-semibold tabular-nums text-danger-text">
+                    -{formatMoney(totals.discount)}
+                  </dd>
+                </div>
+              ) : null}
+              <div className="flex items-baseline gap-2">
+                <dt className="text-brand-mocha">Tax</dt>
+                <dd className="font-semibold tabular-nums text-brand-espresso">
+                  {formatMoney(totals.tax)}
+                </dd>
               </div>
-            ) : showAccountRows || billDiscountAmount > 0 ? (
-              <div className="flex items-center justify-between border-t border-workspace-border pt-2">
-                <span className="text-brand-mocha">Bill discount</span>
-                <span className="font-semibold tabular-nums text-danger-text">
-                  -{formatMoney(billDiscountAmount)}
-                </span>
+              <div className="flex items-baseline gap-2 rounded-md bg-brand-latte px-3 py-1.5">
+                <dt className="font-semibold text-brand-mocha">Order total</dt>
+                <dd className="text-base font-semibold tabular-nums text-brand-espresso">
+                  {formatMoney(totals.total)}
+                </dd>
               </div>
-            ) : null}
-            <div className="flex items-center justify-between border-t border-workspace-border pt-2">
-              <span className="text-brand-mocha">Tax</span>
-              <span className="font-semibold tabular-nums text-brand-espresso">
-                {formatMoney(totals.tax)}
-              </span>
-            </div>
-            {totals.legacyCharges > 0 ? (
-              <div className="flex items-center justify-between border-t border-workspace-border pt-2">
-                <span className="text-brand-mocha">Legacy charges</span>
+            </dl>
+          ) : (
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-brand-mocha">Subtotal</span>
                 <span className="font-semibold tabular-nums text-brand-espresso">
-                  {formatMoney(totals.legacyCharges)}
+                  {formatMoney(totals.subtotal)}
                 </span>
               </div>
-            ) : null}
-            <div className="flex items-center justify-between rounded-md bg-brand-latte px-3 py-2.5 text-base">
-              <span className="font-semibold text-brand-mocha">Grand total</span>
-              <span className="text-lg font-semibold tabular-nums text-brand-espresso">
-                {formatMoney(totals.total)}
-              </span>
+              <div className="flex items-start justify-between gap-6 border-t border-workspace-border pt-2">
+                <div>
+                  <span className="text-brand-mocha">Line discounts</span>
+                  <p className="text-xs text-info-text">Applied per line</p>
+                </div>
+                <span className="font-semibold tabular-nums text-danger-text">
+                  -{formatMoney(totals.discount)}
+                </span>
+              </div>
+              {showAccountRows && onBillDiscountAmountChange ? (
+                <div className="grid grid-cols-[1fr_150px] items-center gap-3 border-t border-workspace-border pt-2">
+                  <span className="text-brand-mocha">Bill discount</span>
+                  <Input
+                    aria-label="Bill discount"
+                    className="h-9 text-right text-xs tabular-nums"
+                    min="0"
+                    onChange={(event) => onBillDiscountAmountChange(Number(event.target.value))}
+                    type="number"
+                    value={billDiscountAmount}
+                  />
+                </div>
+              ) : showAccountRows || billDiscountAmount > 0 ? (
+                <div className="flex items-center justify-between border-t border-workspace-border pt-2">
+                  <span className="text-brand-mocha">Bill discount</span>
+                  <span className="font-semibold tabular-nums text-danger-text">
+                    -{formatMoney(billDiscountAmount)}
+                  </span>
+                </div>
+              ) : null}
+              <div className="flex items-center justify-between border-t border-workspace-border pt-2">
+                <span className="text-brand-mocha">Tax</span>
+                <span className="font-semibold tabular-nums text-brand-espresso">
+                  {formatMoney(totals.tax)}
+                </span>
+              </div>
+              {totals.legacyCharges > 0 ? (
+                <div className="flex items-center justify-between border-t border-workspace-border pt-2">
+                  <span className="text-brand-mocha">Legacy charges</span>
+                  <span className="font-semibold tabular-nums text-brand-espresso">
+                    {formatMoney(totals.legacyCharges)}
+                  </span>
+                </div>
+              ) : null}
+              <div className="flex items-center justify-between rounded-md bg-brand-latte px-3 py-2.5 text-base">
+                <span className="font-semibold text-brand-mocha">Grand total</span>
+                <span className="text-lg font-semibold tabular-nums text-brand-espresso">
+                  {formatMoney(totals.total)}
+                </span>
+              </div>
+              {showAccountRows ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-brand-mocha">Paid</span>
+                    <span className="font-semibold tabular-nums text-brand-espresso">
+                      {formatMoney(paidAmount)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-brand-mocha">Balance due</span>
+                    <span className="font-semibold tabular-nums text-brand-espresso">
+                      {formatMoney(totals.balanceDue)}
+                    </span>
+                  </div>
+                </>
+              ) : null}
             </div>
-            {showAccountRows ? (
-              <>
-                <div className="flex items-center justify-between">
-                  <span className="text-brand-mocha">Paid</span>
-                  <span className="font-semibold tabular-nums text-brand-espresso">
-                    {formatMoney(paidAmount)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-brand-mocha">Balance due</span>
-                  <span className="font-semibold tabular-nums text-brand-espresso">
-                    {formatMoney(totals.balanceDue)}
-                  </span>
-                </div>
-              </>
-            ) : null}
-          </div>
+          )}
         </div>
       </section>
       <ProductFormDialog
