@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, FileText, Lock, Package, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, FileText, Lock, MoreHorizontal, Package, Plus, Trash2 } from "lucide-react";
 import type { JSX, ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -10,6 +10,12 @@ import { ProductFormDialog } from "@/components/products/product-form-dialog";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -44,6 +50,17 @@ type PurchasingItemLineEditorProps = {
   allowBatchFields?: boolean;
   billDiscountAmount?: number;
   canCreateProducts?: boolean;
+  /**
+   * Opt-in column reduction. Ten columns is what shipped, and bills and
+   * expenses render through this same editor, so the reduced layout has to be
+   * asked for: purchase orders pass it, the other two keep today's grid until
+   * they choose to adopt.
+   *
+   * Compact drops the row-type column (the Add button already chose the type)
+   * and the account column (it renders the static words "Inventory Asset" on
+   * every product row), and hides discount and tax behind a toggle.
+   */
+  compactColumns?: boolean;
   disableAddRows?: boolean;
   legacyChargeAmount?: number;
   legacyChargeTaxAmount?: number;
@@ -177,6 +194,7 @@ export function PurchasingItemLineEditor({
   allowBatchFields = false,
   billDiscountAmount = 0,
   canCreateProducts = false,
+  compactColumns = false,
   disableAddRows = false,
   legacyChargeAmount = 0,
   legacyChargeTaxAmount = 0,
@@ -195,9 +213,25 @@ export function PurchasingItemLineEditor({
   const queryClient = useQueryClient();
   const { hasAnyPermission } = usePermission();
   const [accountSearch, setAccountSearch] = useState("");
+  const [extrasRequested, setExtrasRequested] = useState(false);
   const [productCreateLineId, setProductCreateLineId] = useState<string | null>(null);
   const createProductMutation = useCreateProduct();
   const safeLines = useMemo(() => (lines.length > 0 ? lines : [createLine()]), [lines]);
+  // Hiding a column must never hide a figure. A line that already carries tax
+  // or a discount forces those columns back on, whatever the toggle says --
+  // which is also why editing an existing order never opens with data tucked
+  // away.
+  const hasLineExtras = safeLines.some(
+    (line) => line.discountAmount > 0 || Boolean(line.taxRateId),
+  );
+  const showExtras = !compactColumns || extrasRequested || hasLineExtras;
+  const showRowTypeColumn = !compactColumns;
+  const showAccountColumn = !compactColumns;
+  const tableMinWidth = !compactColumns
+    ? "min-w-[1050px]"
+    : showExtras
+      ? "min-w-[820px]"
+      : "min-w-[600px]";
   const isPurchaseOrderEditor = showAccountRows && !allowBatchFields && !onBillDiscountAmountChange;
   const canCreateProductInEditor =
     !disableAddRows &&
@@ -311,6 +345,15 @@ export function PurchasingItemLineEditor({
     }
     return notices;
   }, [accounts.length, products.length, showAccountRows, taxRates.length, units.length]);
+  const convertLine = (lineId: string, target: "product" | "account"): void => {
+    onLinesChange(
+      updateLine(
+        safeLines,
+        lineId,
+        target === "account" ? { ...createAccountLine(), lineId } : { ...createLine(), lineId },
+      ),
+    );
+  };
   const applyCreatedProductToLine = (product: Product): void => {
     const targetLineId =
       productCreateLineId ??
@@ -366,6 +409,25 @@ export function PurchasingItemLineEditor({
                 <SelectItem value="tax-exclusive">Tax Exclusive</SelectItem>
               </SelectContent>
             </Select>
+            {compactColumns ? (
+              hasLineExtras ? (
+                <span className="text-meta text-brand-mocha">
+                  Tax &amp; discount shown — a line uses them.
+                </span>
+              ) : (
+                <Button
+                  className="h-8 text-xs"
+                  onClick={() => {
+                    setExtrasRequested((value) => !value);
+                  }}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {extrasRequested ? "Hide tax & discount" : "Show tax & discount"}
+                </Button>
+              )
+            ) : null}
           </div>
           <p className="text-xs text-brand-mocha">
             Add purchase lines exactly as they should move through receiving and billing.
@@ -384,7 +446,7 @@ export function PurchasingItemLineEditor({
         ) : null}
 
         <div className="min-h-0 w-full flex-1 overflow-x-auto overflow-y-auto">
-          <table className="w-full min-w-[1050px] table-fixed border-collapse text-xs">
+          <table className={cn("w-full table-fixed border-collapse text-xs", tableMinWidth)}>
             <thead>
               {/* font-semibold must sit on the th cells, not the row: the UA
                   stylesheet's `th { font-weight: bold }` targets th directly,
@@ -392,13 +454,21 @@ export function PurchasingItemLineEditor({
                   inheritance -- the headers rendered at 700 despite the class
                   (DESIGN.md caps weight at 600). */}
               <tr className="sticky top-0 z-10 border-b border-workspace-border bg-brand-latte/40 text-left text-xs text-brand-mocha [&>th]:font-semibold">
-                <th className="w-[92px] px-1.5 py-2">{showAccountRows ? "Row type" : ""}</th>
-                <th className="w-[220px] px-2 py-2">Item Details</th>
-                <th className="w-[200px] px-2 py-2">Account</th>
+                {showRowTypeColumn ? (
+                  <th className="w-[92px] px-1.5 py-2">{showAccountRows ? "Row type" : ""}</th>
+                ) : null}
+                <th className={cn("px-2 py-2", compactColumns ? "w-[280px]" : "w-[220px]")}>
+                  Item Details
+                </th>
+                {showAccountColumn ? <th className="w-[200px] px-2 py-2">Account</th> : null}
                 <th className="w-[64px] px-2 py-2 text-right">Qty</th>
                 <th className="w-[88px] px-2 py-2 text-right">Rate (AED)</th>
-                <th className="w-[96px] px-2 py-2 text-right">Discount (AED)</th>
-                <th className="w-[118px] px-2 py-2">Tax</th>
+                {showExtras ? (
+                  <>
+                    <th className="w-[96px] px-2 py-2 text-right">Discount (AED)</th>
+                    <th className="w-[118px] px-2 py-2">Tax</th>
+                  </>
+                ) : null}
                 <th className="w-[104px] px-2 py-2">Unit</th>
                 <th className="w-[92px] px-2 py-2 text-right">Amount</th>
                 <th className="w-[36px] px-1.5 py-2" aria-label="Actions" />
@@ -426,6 +496,41 @@ export function PurchasingItemLineEditor({
                   line.itemType !== "product" ||
                   (!line.productId && Boolean(line.itemNameSnapshot));
                 const selectedTaxRate = taxRates.find((rate) => rate.id === line.taxRateId);
+                // Account rows genuinely need this control; product rows only
+                // ever showed it the static words "Inventory Asset". Compact
+                // drops the column and moves the control next to the
+                // description it belongs to.
+                const accountPicker = (
+                  <SearchableCombobox
+                    emptyMessage="No active chart accounts found."
+                    contentClassName="w-[min(560px,92vw)]"
+                    disabled={isLineLocked}
+                    filterOptionsLocally
+                    groupLabel={accountGroupLabel}
+                    listClassName="max-h-[28rem] overscroll-contain overflow-y-auto"
+                    onSearchChange={setAccountSearch}
+                    onValueChange={(accountId) => {
+                      const selected = accounts.find((account) => account.id === accountId);
+                      onLinesChange(
+                        updateLine(safeLines, line.lineId, {
+                          accountId: accountId.length === 0 ? null : accountId,
+                          itemNameSnapshot:
+                            line.description ??
+                            selected?.accountName ??
+                            line.itemNameSnapshot ??
+                            null,
+                        }),
+                      );
+                    }}
+                    options={accountOptions}
+                    optionTextWrap
+                    placeholder="Select account"
+                    searchPlaceholder="Search account code, name, type, group..."
+                    searchValue={accountSearch}
+                    triggerClassName="h-8 text-xs"
+                    value={line.accountId ?? ""}
+                  />
+                );
 
                 return (
                   <tr
@@ -438,59 +543,50 @@ export function PurchasingItemLineEditor({
                     )}
                     key={line.lineId}
                   >
-                    <td className="px-1.5 py-2 text-brand-mocha">
-                      {showAccountRows ? (
-                        <Select
-                          disabled={disableAddRows || isLineLocked}
-                          value={accountLine ? "account" : "product"}
-                          onValueChange={(lineType) => {
-                            onLinesChange(
-                              updateLine(
-                                safeLines,
+                    {showRowTypeColumn ? (
+                      <td className="px-1.5 py-2 text-brand-mocha">
+                        {showAccountRows ? (
+                          <Select
+                            disabled={disableAddRows || isLineLocked}
+                            value={accountLine ? "account" : "product"}
+                            onValueChange={(lineType) => {
+                              convertLine(
                                 line.lineId,
-                                lineType === "account"
-                                  ? {
-                                      ...createAccountLine(),
-                                      lineId: line.lineId,
-                                    }
-                                  : {
-                                      ...createLine(),
-                                      lineId: line.lineId,
-                                    },
-                              ),
-                            );
-                          }}
-                        >
-                          <SelectTrigger
-                            className={cn(
-                              "h-8 text-xs font-semibold",
-                              accountLine ? "text-warning-text" : "text-brand-espresso",
-                            )}
+                                lineType === "account" ? "account" : "product",
+                              );
+                            }}
                           >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="product">
-                              <span className="inline-flex items-center gap-1.5">
-                                <Package className="h-3.5 w-3.5" />
-                                Product Row
-                              </span>
-                            </SelectItem>
-                            <SelectItem value="account">
-                              <span className="inline-flex items-center gap-1.5">
-                                <FileText className="h-3.5 w-3.5" />
-                                Account Row
-                              </span>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-meta font-medium text-brand-mocha">
-                          <Package className="h-3.5 w-3.5" />
-                          Item {index + 1}
-                        </span>
-                      )}
-                    </td>
+                            <SelectTrigger
+                              className={cn(
+                                "h-8 text-xs font-semibold",
+                                accountLine ? "text-warning-text" : "text-brand-espresso",
+                              )}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="product">
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Package className="h-3.5 w-3.5" />
+                                  Product Row
+                                </span>
+                              </SelectItem>
+                              <SelectItem value="account">
+                                <span className="inline-flex items-center gap-1.5">
+                                  <FileText className="h-3.5 w-3.5" />
+                                  Account Row
+                                </span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-meta font-medium text-brand-mocha">
+                            <Package className="h-3.5 w-3.5" />
+                            Item {index + 1}
+                          </span>
+                        )}
+                      </td>
+                    ) : null}
                     <td className="bg-brand-latte/10 px-2 py-2">
                       {accountLine ? (
                         <div className="space-y-2">
@@ -516,6 +612,7 @@ export function PurchasingItemLineEditor({
                             </span>
                             {selectedAccount ? <span>{selectedAccount.accountName}</span> : null}
                           </div>
+                          {showAccountColumn ? null : accountPicker}
                         </div>
                       ) : (
                         <div className="space-y-2">
@@ -675,43 +772,17 @@ export function PurchasingItemLineEditor({
                         </div>
                       )}
                     </td>
-                    <td className="px-2 py-2">
-                      {accountLine ? (
-                        <SearchableCombobox
-                          emptyMessage="No active chart accounts found."
-                          contentClassName="w-[min(560px,92vw)]"
-                          disabled={isLineLocked}
-                          filterOptionsLocally
-                          groupLabel={accountGroupLabel}
-                          listClassName="max-h-[28rem] overscroll-contain overflow-y-auto"
-                          onSearchChange={setAccountSearch}
-                          onValueChange={(accountId) => {
-                            const selected = accounts.find((account) => account.id === accountId);
-                            onLinesChange(
-                              updateLine(safeLines, line.lineId, {
-                                accountId: accountId.length === 0 ? null : accountId,
-                                itemNameSnapshot:
-                                  line.description ??
-                                  selected?.accountName ??
-                                  line.itemNameSnapshot ??
-                                  null,
-                              }),
-                            );
-                          }}
-                          options={accountOptions}
-                          optionTextWrap
-                          placeholder="Select account"
-                          searchPlaceholder="Search account code, name, type, group..."
-                          searchValue={accountSearch}
-                          triggerClassName="h-8 text-xs"
-                          value={line.accountId ?? ""}
-                        />
-                      ) : (
-                        <div className="rounded-md border border-workspace-border bg-card px-2 py-1.5 text-xs font-semibold text-brand-espresso">
-                          Inventory Asset
-                        </div>
-                      )}
-                    </td>
+                    {showAccountColumn ? (
+                      <td className="px-2 py-2">
+                        {accountLine ? (
+                          accountPicker
+                        ) : (
+                          <div className="rounded-md border border-workspace-border bg-card px-2 py-1.5 text-xs font-semibold text-brand-espresso">
+                            Inventory Asset
+                          </div>
+                        )}
+                      </td>
+                    ) : null}
                     <td className="px-2 py-2">
                       <Input
                         aria-invalid={isLineLocked && Boolean(lineError)}
@@ -764,53 +835,57 @@ export function PurchasingItemLineEditor({
                         value={line.unitCost}
                       />
                     </td>
-                    <td className="px-2 py-2">
-                      <Input
-                        aria-label={`Discount for item line ${String(index + 1)}`}
-                        className="h-8 text-right text-xs tabular-nums"
-                        disabled={isLineLocked}
-                        min="0"
-                        onChange={(event) =>
-                          onLinesChange(
-                            updateLine(safeLines, line.lineId, {
-                              discountAmount: Number(event.target.value),
-                            }),
-                          )
-                        }
-                        type="number"
-                        value={line.discountAmount}
-                      />
-                    </td>
-                    <td className="px-2 py-2">
-                      <Select
-                        disabled={isLineLocked}
-                        value={line.taxRateId ?? "none"}
-                        onValueChange={(taxRateId) =>
-                          onLinesChange(
-                            updateLine(safeLines, line.lineId, {
-                              taxRateId: taxRateId === "none" ? null : taxRateId,
-                            }),
-                          )
-                        }
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Tax rate" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No tax</SelectItem>
-                          {taxRates.filter(isSelectableTaxRate).map((rate) => (
-                            <SelectItem key={rate.id} value={rate.id}>
-                              {rate.taxName} ({rate.taxPercentage}%)
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {selectedTaxRate ? (
-                        <p className="mt-1 text-meta tabular-nums text-brand-mocha">
-                          Tax {formatMoney(lineTaxAmount(line, taxRates))}
-                        </p>
-                      ) : null}
-                    </td>
+                    {showExtras ? (
+                      <>
+                        <td className="px-2 py-2">
+                          <Input
+                            aria-label={`Discount for item line ${String(index + 1)}`}
+                            className="h-8 text-right text-xs tabular-nums"
+                            disabled={isLineLocked}
+                            min="0"
+                            onChange={(event) =>
+                              onLinesChange(
+                                updateLine(safeLines, line.lineId, {
+                                  discountAmount: Number(event.target.value),
+                                }),
+                              )
+                            }
+                            type="number"
+                            value={line.discountAmount}
+                          />
+                        </td>
+                        <td className="px-2 py-2">
+                          <Select
+                            disabled={isLineLocked}
+                            value={line.taxRateId ?? "none"}
+                            onValueChange={(taxRateId) =>
+                              onLinesChange(
+                                updateLine(safeLines, line.lineId, {
+                                  taxRateId: taxRateId === "none" ? null : taxRateId,
+                                }),
+                              )
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Tax rate" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No tax</SelectItem>
+                              {taxRates.filter(isSelectableTaxRate).map((rate) => (
+                                <SelectItem key={rate.id} value={rate.id}>
+                                  {rate.taxName} ({rate.taxPercentage}%)
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {selectedTaxRate ? (
+                            <p className="mt-1 text-meta tabular-nums text-brand-mocha">
+                              Tax {formatMoney(lineTaxAmount(line, taxRates))}
+                            </p>
+                          ) : null}
+                        </td>
+                      </>
+                    ) : null}
                     <td className="px-2 py-2">
                       {accountLine ? (
                         <span className="text-xs text-brand-mocha">Not required</span>
@@ -835,18 +910,68 @@ export function PurchasingItemLineEditor({
                       </span>
                     </td>
                     <td className="px-1.5 py-2">
-                      <Button
-                        aria-label={`Remove item line ${String(index + 1)}`}
-                        disabled={disableAddRows || safeLines.length === 1 || isLineLocked}
-                        onClick={() =>
-                          onLinesChange(safeLines.filter((item) => item.lineId !== line.lineId))
-                        }
-                        size="icon"
-                        type="button"
-                        variant="ghost"
-                      >
-                        <Trash2 className="h-4 w-4 text-danger-text" />
-                      </Button>
+                      {showRowTypeColumn || !showAccountRows ? (
+                        <Button
+                          aria-label={`Remove item line ${String(index + 1)}`}
+                          disabled={disableAddRows || safeLines.length === 1 || isLineLocked}
+                          onClick={() =>
+                            onLinesChange(safeLines.filter((item) => item.lineId !== line.lineId))
+                          }
+                          size="icon"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <Trash2 className="h-4 w-4 text-danger-text" />
+                        </Button>
+                      ) : (
+                        // Converting a row is rare -- you picked the type with
+                        // "Add product row" or "Add account row" -- so it moves
+                        // out of a permanent 92px column and in here beside
+                        // remove, the same overflow pattern the order rows use.
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              aria-label={`Actions for item line ${String(index + 1)}`}
+                              size="icon"
+                              type="button"
+                              variant="ghost"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              disabled={disableAddRows || isLineLocked}
+                              onSelect={() => {
+                                convertLine(line.lineId, accountLine ? "product" : "account");
+                              }}
+                            >
+                              {accountLine ? (
+                                <>
+                                  <Package className="mr-2 h-3.5 w-3.5" />
+                                  Convert to product row
+                                </>
+                              ) : (
+                                <>
+                                  <FileText className="mr-2 h-3.5 w-3.5" />
+                                  Convert to account row
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={disableAddRows || safeLines.length === 1 || isLineLocked}
+                              onSelect={() => {
+                                onLinesChange(
+                                  safeLines.filter((item) => item.lineId !== line.lineId),
+                                );
+                              }}
+                            >
+                              <Trash2 className="mr-2 h-3.5 w-3.5 text-danger-text" />
+                              Remove line
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </td>
                   </tr>
                 );

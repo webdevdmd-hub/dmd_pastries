@@ -373,6 +373,10 @@ export function PurchaseOrderFormDialog({
     return sum + subtotal + tax;
   }, 0);
   const revisionDifference = estimatedRevisedTotal - (order?.totalAmount ?? 0);
+  const orderTotalDisplay = new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    style: "currency",
+  }).format(estimatedRevisedTotal);
 
   const submit = async (): Promise<void> => {
     setLineErrors({});
@@ -726,6 +730,7 @@ export function PurchaseOrderFormDialog({
                   ) : null}
                   <PurchasingItemLineEditor
                     accounts={accounts}
+                    compactColumns
                     disableAddRows={fieldsDisabled}
                     lineErrors={lineErrors}
                     lineLocks={lineLocks}
@@ -770,7 +775,16 @@ export function PurchaseOrderFormDialog({
               </>
             )}
           </div>
-          <DialogFooter className="shrink-0 border-t border-workspace-border bg-card px-5 py-3">
+          <DialogFooter className="shrink-0 flex-row items-center justify-end gap-3 border-t border-workspace-border bg-card px-5 py-3">
+            {/* The order total lived only at the bottom of the line editor,
+                inside the scroll area. The submit button is pinned; the number
+                it commits should be pinned beside it. */}
+            <span className="mr-auto text-cell text-brand-mocha">
+              Order total{" "}
+              <span className="font-semibold tabular-nums text-brand-espresso">
+                {orderTotalDisplay}
+              </span>
+            </span>
             <Button onClick={requestClose} type="button" variant="outline">
               Cancel
             </Button>
