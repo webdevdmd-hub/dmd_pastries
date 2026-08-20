@@ -67,7 +67,7 @@ export function POSQuickCustomerDialog({
             void form.handleSubmit(submit)(event);
           }}
         >
-          <label className="grid gap-2">
+          <div className="grid gap-2">
             <Label htmlFor="pos-customer-name">Full name</Label>
             <Input
               className="rounded-md border-border bg-card shadow-none focus-visible:ring-black"
@@ -79,8 +79,8 @@ export function POSQuickCustomerDialog({
                 {form.formState.errors.fullName.message}
               </span>
             ) : null}
-          </label>
-          <label className="grid gap-2">
+          </div>
+          <div className="grid gap-2">
             <Label htmlFor="pos-customer-phone">Phone</Label>
             <Input
               className="rounded-md border-border bg-card shadow-none focus-visible:ring-black"
@@ -92,8 +92,8 @@ export function POSQuickCustomerDialog({
                 {form.formState.errors.phone.message}
               </span>
             ) : null}
-          </label>
-          <label className="grid gap-2">
+          </div>
+          <div className="grid gap-2">
             <Label htmlFor="pos-customer-email">Email</Label>
             <Input
               className="rounded-md border-border bg-card shadow-none focus-visible:ring-black"
@@ -106,7 +106,7 @@ export function POSQuickCustomerDialog({
                 {form.formState.errors.email.message}
               </span>
             ) : null}
-          </label>
+          </div>
           <p className="text-xs leading-5 text-foreground-muted">
             Phone or email is optional for quick walk-in capture, but recommended for future lookup.
             If an active customer already exists with the same contact, the backend returns that

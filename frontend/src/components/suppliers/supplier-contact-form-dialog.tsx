@@ -102,29 +102,29 @@ export function SupplierContactFormDialog({
             void form.handleSubmit(submit)(event);
           }}
         >
-          <label className="grid gap-2">
+          <div className="grid gap-2">
             <Label htmlFor="supplier-contact-name">Contact name</Label>
             <Input id="supplier-contact-name" {...form.register("contactName")} />
             {fieldError("contactName") ? (
               <span className="text-sm text-danger-text">{fieldError("contactName")}</span>
             ) : null}
-          </label>
-          <label className="grid gap-2">
+          </div>
+          <div className="grid gap-2">
             <Label htmlFor="supplier-contact-role">Role</Label>
             <Input id="supplier-contact-role" {...form.register("contactRole")} />
-          </label>
+          </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="grid gap-2">
+            <div className="grid gap-2">
               <Label htmlFor="supplier-contact-phone">Phone</Label>
               <Input id="supplier-contact-phone" {...form.register("phone")} />
-            </label>
-            <label className="grid gap-2">
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="supplier-contact-email">Email</Label>
               <Input id="supplier-contact-email" type="email" {...form.register("email")} />
               {fieldError("email") ? (
                 <span className="text-sm text-danger-text">{fieldError("email")}</span>
               ) : null}
-            </label>
+            </div>
           </div>
           <label className="flex items-center gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte p-3">
             <Checkbox
@@ -133,14 +133,14 @@ export function SupplierContactFormDialog({
             />
             <span className="text-sm font-medium text-brand-espresso">Primary contact</span>
           </label>
-          <label className="grid gap-2">
+          <div className="grid gap-2">
             <Label htmlFor="supplier-contact-notes">Notes</Label>
             <textarea
               className="min-h-24 rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso focus:outline-none focus:ring-2 focus:ring-brand-caramel"
               id="supplier-contact-notes"
               {...form.register("notes")}
             />
-          </label>
+          </div>
           <DialogFooter>
             <Button disabled={isSubmitting} onClick={onClose} type="button" variant="outline">
               Cancel

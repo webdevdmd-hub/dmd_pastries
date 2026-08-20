@@ -126,32 +126,32 @@ export function CustomerFormDialog({
         >
           <section className="grid gap-4 md:grid-cols-2">
             <h3 className="md:col-span-2 text-sm font-bold text-brand-mocha">Basic Information</h3>
-            <label className="grid gap-2">
+            <div className="grid gap-2">
               <Label htmlFor="customer-full-name">Full name</Label>
               <Input id="customer-full-name" {...form.register("fullName")} />
               {fieldError("fullName") ? (
                 <span className="text-sm text-danger-text">{fieldError("fullName")}</span>
               ) : null}
-            </label>
-            <label className="grid gap-2">
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="customer-phone">Phone</Label>
               <Input id="customer-phone" {...form.register("phone")} />
               {fieldError("phone") ? (
                 <span className="text-sm text-danger-text">{fieldError("phone")}</span>
               ) : null}
-            </label>
-            <label className="grid gap-2">
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="customer-email">Email</Label>
               <Input id="customer-email" type="email" {...form.register("email")} />
               {fieldError("email") ? (
                 <span className="text-sm text-danger-text">{fieldError("email")}</span>
               ) : null}
-            </label>
-            <label className="grid gap-2">
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="customer-date-of-birth">Date of birth</Label>
               <Input id="customer-date-of-birth" type="date" {...form.register("dateOfBirth")} />
-            </label>
-            <label className="grid gap-2">
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="customer-form-gender">Gender</Label>
               <Select
                 onValueChange={(value) =>
@@ -170,7 +170,7 @@ export function CustomerFormDialog({
                   <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
                 </SelectContent>
               </Select>
-            </label>
+            </div>
           </section>
 
           <section className="grid gap-4 md:grid-cols-2">

@@ -697,7 +697,7 @@ export function RecipeFormPage({
                     <span className="text-sm text-danger-text">{fieldError("productId")}</span>
                   ) : null}
                 </div>
-                <label className="grid gap-2">
+                <div className="grid gap-2">
                   <Label htmlFor="recipe-form-page-recipe-output">Recipe output</Label>
                   <Select
                     disabled={!canEditRecipeForm || selectedProductId.length === 0}
@@ -725,9 +725,9 @@ export function RecipeFormPage({
                       <SelectItem value="new">Create new product variant</SelectItem>
                     </SelectContent>
                   </Select>
-                </label>
+                </div>
                 {outputVariantMode === "existing" ? (
-                  <label className="grid gap-2">
+                  <div className="grid gap-2">
                     <Label htmlFor="recipe-form-page-product-variant">Product variant</Label>
                     <SearchableCombobox
                       id="recipe-form-page-product-variant"
@@ -744,11 +744,11 @@ export function RecipeFormPage({
                         {fieldError("productVariantId")}
                       </span>
                     ) : null}
-                  </label>
+                  </div>
                 ) : null}
                 {outputVariantMode === "new" ? (
                   <div className="grid gap-4 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/50 p-4 lg:col-span-2 lg:grid-cols-3">
-                    <label className="grid gap-2">
+                    <div className="grid gap-2">
                       <Label htmlFor="new-variant-name">New variant name</Label>
                       <Input
                         disabled={!canEditRecipeForm}
@@ -761,8 +761,8 @@ export function RecipeFormPage({
                           {fieldError("newProductVariantName")}
                         </span>
                       ) : null}
-                    </label>
-                    <label className="grid gap-2">
+                    </div>
+                    <div className="grid gap-2">
                       <Label htmlFor="new-variant-sku">Variant SKU</Label>
                       <Input
                         disabled={!canEditRecipeForm}
@@ -770,8 +770,8 @@ export function RecipeFormPage({
                         placeholder="Optional"
                         {...form.register("newProductVariantSku")}
                       />
-                    </label>
-                    <label className="grid gap-2">
+                    </div>
+                    <div className="grid gap-2">
                       <Label htmlFor="new-variant-price">Variant sale price</Label>
                       <Input
                         disabled={!canEditRecipeForm}
@@ -786,10 +786,10 @@ export function RecipeFormPage({
                           {fieldError("newProductVariantSalePrice")}
                         </span>
                       ) : null}
-                    </label>
+                    </div>
                   </div>
                 ) : null}
-                <label className="grid gap-2">
+                <div className="grid gap-2">
                   <Label htmlFor="recipe-name">Recipe name</Label>
                   <Input
                     disabled={!canEditRecipeForm}
@@ -799,8 +799,8 @@ export function RecipeFormPage({
                   {fieldError("recipeName") ? (
                     <span className="text-sm text-danger-text">{fieldError("recipeName")}</span>
                   ) : null}
-                </label>
-                <label className="grid gap-2 lg:col-span-2">
+                </div>
+                <div className="grid gap-2 lg:col-span-2">
                   <Label htmlFor="recipe-description">Description</Label>
                   <Textarea
                     className="min-h-20"
@@ -808,7 +808,7 @@ export function RecipeFormPage({
                     id="recipe-description"
                     {...form.register("description")}
                   />
-                </label>
+                </div>
               </CardContent>
             </Card>
 
@@ -821,7 +821,7 @@ export function RecipeFormPage({
                 </p>
               </CardHeader>
               <CardContent className="grid gap-4 md:grid-cols-3">
-                <label className="grid gap-2">
+                <div className="grid gap-2">
                   <Label htmlFor="yield-quantity">Yield quantity</Label>
                   <Input
                     disabled={!canEditRecipeForm}
@@ -833,8 +833,8 @@ export function RecipeFormPage({
                       setValueAs: numberFieldValue,
                     })}
                   />
-                </label>
-                <label className="grid gap-2">
+                </div>
+                <div className="grid gap-2">
                   <Label htmlFor="recipe-form-page-yield-unit">Yield unit</Label>
                   <SearchableCombobox
                     id="recipe-form-page-yield-unit"
@@ -846,8 +846,8 @@ export function RecipeFormPage({
                     searchPlaceholder="Search unit..."
                     value={batchYieldUnitId}
                   />
-                </label>
-                <label className="grid gap-2">
+                </div>
+                <div className="grid gap-2">
                   <Label htmlFor="prep-time">Preparation minutes</Label>
                   <Input
                     disabled={!canEditRecipeForm}
@@ -859,7 +859,7 @@ export function RecipeFormPage({
                       setValueAs: numberFieldValue,
                     })}
                   />
-                </label>
+                </div>
               </CardContent>
             </Card>
 
