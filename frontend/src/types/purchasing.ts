@@ -349,10 +349,17 @@ export type PurchasePagination = {
   totalPages: number;
 };
 
-export type PurchaseOrderPage = {
-  items: PurchaseOrder[];
+/** One page of any purchasing list. Every list endpoint answers this shape. */
+export type PurchasePage<TItem> = {
+  items: TItem[];
   pagination: PurchasePagination;
 };
+
+export type PurchaseOrderPage = PurchasePage<PurchaseOrder>;
+export type PurchaseInvoicePage = PurchasePage<PurchaseInvoice>;
+export type PurchaseReceiptPage = PurchasePage<PurchaseReceipt>;
+export type PurchaseReturnPage = PurchasePage<PurchaseReturn>;
+export type SupplierPaymentPage = PurchasePage<SupplierPayment>;
 
 export type PurchasingFilters = {
   search: string;

@@ -45,6 +45,7 @@ import {
   postPurchaseInvoice,
   postPurchaseReceipt,
   postPurchaseReturn,
+  PURCHASE_LIST_PAGE_SIZE,
   receivePurchase,
   receivePurchaseOrder,
   reopenPurchaseOrder,
@@ -69,12 +70,15 @@ import type {
   CreateSupplierPaymentPayload,
   PurchaseDocumentChain,
   PurchaseInvoice,
+  PurchaseInvoicePage,
   PurchaseOrder,
   PurchaseOrderPage,
   PurchaseOrderRevision,
   PurchaseReceipt,
+  PurchaseReceiptPage,
   PurchaseReturn,
   PurchaseReturnFilters,
+  PurchaseReturnPage,
   PurchasingBranchOption,
   PurchasingFilters,
   PurchasingIngredientOption,
@@ -89,6 +93,7 @@ import type {
   ReversePurchaseReturnPayload,
   SupplierPayment,
   SupplierPaymentFilters,
+  SupplierPaymentPage,
   UpdatePurchaseInvoicePayload,
   UpdatePurchaseOrderPayload,
   UpdatePurchaseOrderStatusPayload,
@@ -112,14 +117,21 @@ export function usePurchasingSummary(enabled = true) {
 /**
  * `page` is part of the query key, so React Query caches each page and moving
  * back to one already seen is instant. Callers that only ever want the first
- * page can leave it at the default.
+ * page can leave it at the default. `limit` exists for pickers, which render a
+ * dropdown with no way to step to page two and so must ask for a window wide
+ * enough to hold the answer.
  */
-export function usePurchaseOrders(filters: PurchasingFilters, enabled = true, page = 1) {
+export function usePurchaseOrders(
+  filters: PurchasingFilters,
+  enabled = true,
+  page = 1,
+  limit = PURCHASE_LIST_PAGE_SIZE,
+) {
   const branchQueryKey = useBranchQueryKey();
 
   return useQuery<PurchaseOrderPage>({
-    queryKey: [purchasingQueryKey, branchQueryKey, "orders", filters, page],
-    queryFn: async () => getPurchaseOrders(filters, page),
+    queryKey: [purchasingQueryKey, branchQueryKey, "orders", filters, page, limit],
+    queryFn: async () => getPurchaseOrders(filters, page, limit),
     enabled,
     // Without this the table blanks to a skeleton on every page step. Keeping
     // the previous page on screen while the next loads is what makes paging
@@ -160,13 +172,19 @@ export function usePurchaseOrderDocumentChain(orderId: string | null, enabled = 
   });
 }
 
-export function usePurchaseInvoices(filters: PurchasingFilters, enabled = true) {
+export function usePurchaseInvoices(
+  filters: PurchasingFilters,
+  enabled = true,
+  page = 1,
+  limit = PURCHASE_LIST_PAGE_SIZE,
+) {
   const branchQueryKey = useBranchQueryKey();
 
-  return useQuery<PurchaseInvoice[]>({
-    queryKey: [purchasingQueryKey, branchQueryKey, "invoices", filters],
-    queryFn: async () => getPurchaseInvoices(filters),
+  return useQuery<PurchaseInvoicePage>({
+    queryKey: [purchasingQueryKey, branchQueryKey, "invoices", filters, page, limit],
+    queryFn: async () => getPurchaseInvoices(filters, page, limit),
     enabled,
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -186,13 +204,19 @@ export function usePurchaseInvoice(id: string | null, enabled = true) {
   });
 }
 
-export function usePurchaseReceipts(filters: PurchasingFilters, enabled = true) {
+export function usePurchaseReceipts(
+  filters: PurchasingFilters,
+  enabled = true,
+  page = 1,
+  limit = PURCHASE_LIST_PAGE_SIZE,
+) {
   const branchQueryKey = useBranchQueryKey();
 
-  return useQuery<PurchaseReceipt[]>({
-    queryKey: [purchasingQueryKey, branchQueryKey, "receipts", filters],
-    queryFn: async () => getPurchaseReceipts(filters),
+  return useQuery<PurchaseReceiptPage>({
+    queryKey: [purchasingQueryKey, branchQueryKey, "receipts", filters, page, limit],
+    queryFn: async () => getPurchaseReceipts(filters, page, limit),
     enabled,
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -212,13 +236,19 @@ export function usePurchaseReceipt(id: string | null, enabled = true) {
   });
 }
 
-export function usePurchaseReturns(filters: PurchaseReturnFilters, enabled = true) {
+export function usePurchaseReturns(
+  filters: PurchaseReturnFilters,
+  enabled = true,
+  page = 1,
+  limit = PURCHASE_LIST_PAGE_SIZE,
+) {
   const branchQueryKey = useBranchQueryKey();
 
-  return useQuery<PurchaseReturn[]>({
-    queryKey: [purchasingQueryKey, branchQueryKey, "returns", filters],
-    queryFn: async () => getPurchaseReturns(filters),
+  return useQuery<PurchaseReturnPage>({
+    queryKey: [purchasingQueryKey, branchQueryKey, "returns", filters, page, limit],
+    queryFn: async () => getPurchaseReturns(filters, page, limit),
     enabled,
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -270,13 +300,19 @@ export function usePurchaseReceiptReturns(receiptId: string | null, enabled = tr
   });
 }
 
-export function useSupplierPayments(filters: SupplierPaymentFilters, enabled = true) {
+export function useSupplierPayments(
+  filters: SupplierPaymentFilters,
+  enabled = true,
+  page = 1,
+  limit = PURCHASE_LIST_PAGE_SIZE,
+) {
   const branchQueryKey = useBranchQueryKey();
 
-  return useQuery<SupplierPayment[]>({
-    queryKey: [purchasingQueryKey, branchQueryKey, "supplier-payments", filters],
-    queryFn: async () => getSupplierPayments(filters),
+  return useQuery<SupplierPaymentPage>({
+    queryKey: [purchasingQueryKey, branchQueryKey, "supplier-payments", filters, page, limit],
+    queryFn: async () => getSupplierPayments(filters, page, limit),
     enabled,
+    placeholderData: (previous) => previous,
   });
 }
 

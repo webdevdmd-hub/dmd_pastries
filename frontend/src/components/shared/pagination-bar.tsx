@@ -24,8 +24,11 @@ export function PaginationBar({
   /** Dims the count while the next page is in flight, without blanking it. */
   isFetching?: boolean;
   limit: number;
-  /** Plural noun for the count line, e.g. "purchase orders". */
-  noun: string;
+  /**
+   * Both forms of the noun. A single plural renders "1 bills", and no trimming
+   * rule survives "payments made", so callers name both.
+   */
+  noun: { one: string; other: string };
   onPageChange: (page: number) => void;
   page: number;
   total: number;
@@ -45,15 +48,11 @@ export function PaginationBar({
             : "text-meta tabular-nums text-foreground-muted"
         }
       >
-        {total === 0 ? (
-          `No ${noun}`
-        ) : hasPages ? (
-          <>
-            Showing {first}&ndash;{last} of {total} {noun}
-          </>
-        ) : (
-          `${String(total)} ${noun}`
-        )}
+        {total === 0
+          ? `No ${noun.other}`
+          : hasPages
+            ? `Showing ${String(first)}–${String(last)} of ${String(total)} ${noun.other}`
+            : `${String(total)} ${total === 1 ? noun.one : noun.other}`}
       </p>
 
       {hasPages ? (

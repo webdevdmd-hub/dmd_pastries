@@ -462,7 +462,7 @@ export function PurchaseOrdersPageClient(): JSX.Element {
               <PaginationBar
                 isFetching={ordersQuery.isFetching}
                 limit={pagination.limit}
-                noun="purchase orders"
+                noun={{ one: "purchase order", other: "purchase orders" }}
                 onPageChange={setPage}
                 page={pagination.page}
                 total={pagination.total}

@@ -27,6 +27,7 @@ import {
   usePurchaseReceipts,
 } from "@/hooks/use-purchasing";
 import { getErrorMessage } from "@/lib/api/client";
+import { PURCHASE_PICKER_PAGE_SIZE } from "@/lib/api/purchasing";
 import type { StockLocation } from "@/types/inventory";
 import type {
   PurchasingBranchOption,
@@ -110,9 +111,11 @@ export function PurchaseReturnFromReceiptDialog({
       supplierId: selectedSupplierId || "all",
     },
     open && selectedSupplierId !== "",
+    1,
+    PURCHASE_PICKER_PAGE_SIZE,
   );
   const selectedReceipt =
-    (receiptsQuery.data ?? []).find((receipt) => receipt.id === selectedReceiptId) ?? null;
+    (receiptsQuery.data?.items ?? []).find((receipt) => receipt.id === selectedReceiptId) ?? null;
   const returnableItemsQuery = usePurchaseReceiptReturnableItems(
     selectedReceiptId || null,
     open && selectedReceiptId !== "",
@@ -149,7 +152,7 @@ export function PurchaseReturnFromReceiptDialog({
 
   const receiptOptions = useMemo(
     () =>
-      (receiptsQuery.data ?? []).map((receipt) => ({
+      (receiptsQuery.data?.items ?? []).map((receipt) => ({
         description: [
           formatDate(receipt.receivedDate),
           receipt.purchaseOrderNumber ? `PO ${receipt.purchaseOrderNumber}` : null,
