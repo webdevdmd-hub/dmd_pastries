@@ -290,13 +290,12 @@ export function PurchaseInvoiceFormDialog({
             </Select>
           </Field>
           <Field htmlFor="bill-supplier" label="Supplier" required>
-            <div id="bill-supplier">
-              <SupplierLookupSelect
-                onValueChange={setSupplierId}
-                suppliers={suppliers}
-                value={supplierId}
-              />
-            </div>
+            <SupplierLookupSelect
+              id="bill-supplier"
+              onValueChange={setSupplierId}
+              suppliers={suppliers}
+              value={supplierId}
+            />
           </Field>
           {purchaseOrderId ? (
             <div className="flex h-9 items-center rounded-md border border-input bg-brand-latte/40 px-3 text-xs text-brand-espresso">

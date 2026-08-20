@@ -678,9 +678,10 @@ export function PurchaseOrderFormDialog({
                         Supplier
                         <RequiredMark />
                       </Label>
-                      <div className="mt-1.5" id="po-supplier">
+                      <div className="mt-1.5">
                         <SupplierLookupSelect
                           disabled={fieldsDisabled}
+                          id="po-supplier"
                           onValueChange={setSupplierId}
                           suppliers={suppliers}
                           value={supplierId}

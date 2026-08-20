@@ -9,11 +9,14 @@ import type { PurchasingSupplierOption } from "@/types/purchasing";
 
 export function SupplierLookupSelect({
   disabled = false,
+  id,
   onValueChange,
   suppliers,
   value,
 }: {
   disabled?: boolean;
+  /** Passed to the combobox trigger so a visible label can point at it. */
+  id?: string | undefined;
   onValueChange: (supplierId: string) => void;
   suppliers: PurchasingSupplierOption[];
   value: string;
@@ -32,6 +35,7 @@ export function SupplierLookupSelect({
     <SearchableCombobox
       disabled={disabled}
       emptyMessage="No matching suppliers found."
+      id={id}
       onValueChange={onValueChange}
       options={supplierOptions}
       placeholder="Select supplier"

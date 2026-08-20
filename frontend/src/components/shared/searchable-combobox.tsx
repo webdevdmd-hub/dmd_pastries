@@ -33,6 +33,8 @@ type SearchableComboboxProps = {
   errorMessage?: string | null | undefined;
   filterOptionsLocally?: boolean | undefined;
   groupLabel?: string | undefined;
+  /** Lands on the trigger button, so `<label htmlFor>` associates with it. */
+  id?: string | undefined;
   isLoading?: boolean | undefined;
   listClassName?: string | undefined;
   loadingMessage?: string | undefined;
@@ -67,6 +69,7 @@ export function SearchableCombobox({
   errorMessage = null,
   filterOptionsLocally = false,
   groupLabel,
+  id,
   isLoading = false,
   listClassName,
   loadingMessage = "Searching...",
@@ -84,7 +87,11 @@ export function SearchableCombobox({
 }: SearchableComboboxProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const [internalSearch, setInternalSearch] = useState("");
-  const triggerId = useId();
+  // The trigger carries the id, so a caller that owns a <label htmlFor> can name
+  // it. Without an explicit id the generated one still applies, which is what
+  // every existing call site relies on.
+  const generatedId = useId();
+  const triggerId = id ?? generatedId;
   const selectedOption = options.find((option) => option.value === value) ?? null;
   const activeSearch = searchValue ?? internalSearch;
   const normalizedSearch = activeSearch.trim().toLowerCase();
