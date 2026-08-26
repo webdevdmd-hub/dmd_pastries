@@ -70,6 +70,9 @@ func (s *Service) CreateSupplier(currentUser *utils.AuthContext, req CreateSuppl
 	if err := s.validateSupplierPayload(req.SupplierName, req.Phone, req.Email, req.Website); err != nil {
 		return nil, err
 	}
+	if err := validatePurchasingTerms(req.PaymentTerms, req.LeadTimeDays); err != nil {
+		return nil, err
+	}
 	var id string
 	if err := s.withTransaction(func(tx *gorm.DB) error {
 		code, err := s.generateSupplierCode(tx, currentUser.BusinessID, branchID)
@@ -93,6 +96,9 @@ func (s *Service) CreateSupplier(currentUser *utils.AuthContext, req CreateSuppl
 			PostalCode:      strings.TrimSpace(req.PostalCode),
 			TaxNumber:       strings.TrimSpace(req.TaxNumber),
 			Notes:           strings.TrimSpace(req.Notes),
+			PaymentTerms:    strings.TrimSpace(req.PaymentTerms),
+			LeadTimeDays:    req.LeadTimeDays,
+			IsPreferred:     req.IsPreferred != nil && *req.IsPreferred,
 			Status:          "active",
 			CreatedByUserID: currentUser.UserID,
 			UpdatedByUserID: currentUser.UserID,
@@ -135,6 +141,9 @@ func (s *Service) UpdateSupplier(currentUser *utils.AuthContext, id string, req 
 	if err := s.validateSupplierPayload(firstNonEmpty(req.SupplierName, "valid"), req.Phone, req.Email, req.Website); err != nil {
 		return nil, err
 	}
+	if err := validatePurchasingTerms(req.PaymentTerms, req.LeadTimeDays); err != nil {
+		return nil, err
+	}
 	updates := map[string]interface{}{"updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
 	setString(updates, "supplier_name", req.SupplierName)
 	setString(updates, "phone", req.Phone)
@@ -148,6 +157,16 @@ func (s *Service) UpdateSupplier(currentUser *utils.AuthContext, id string, req 
 	setString(updates, "postal_code", req.PostalCode)
 	setString(updates, "tax_number", req.TaxNumber)
 	setString(updates, "notes", req.Notes)
+	setString(updates, "payment_terms", req.PaymentTerms)
+	// Pointers, not strings: 0 is a real lead time (same-day) and false is a
+	// real preference, so neither can be encoded as "empty means no change"
+	// the way the string fields above are.
+	if req.LeadTimeDays != nil {
+		updates["lead_time_days"] = *req.LeadTimeDays
+	}
+	if req.IsPreferred != nil {
+		updates["is_preferred"] = *req.IsPreferred
+	}
 	if err := s.withTransaction(func(tx *gorm.DB) error {
 		if err := s.repo.Update(tx, id, currentUser.BusinessID, branchID, updates); err != nil {
 			return mapSupplierNotFound(err, "supplier not found")
@@ -448,6 +467,30 @@ func (s *Service) validateSupplierPayload(name, phone, email, website string) er
 	}
 	if err := validateSupplierContact(phone, email, website); err != nil {
 		return err
+	}
+	return nil
+}
+
+// validPaymentTerms mirrors the CHECK constraint in migration 000109. Kept in
+// step with it deliberately: without this the DB rejects a bad value and the
+// user sees a 500 instead of being told which terms are allowed.
+var validPaymentTerms = map[string]bool{
+	"":        true, // not set yet, which every pre-000109 row is
+	"prepaid": true,
+	"net_7":   true,
+	"net_15":  true,
+	"net_30":  true,
+	"net_45":  true,
+	"net_60":  true,
+	"net_90":  true,
+}
+
+func validatePurchasingTerms(paymentTerms string, leadTimeDays *int) error {
+	if !validPaymentTerms[strings.TrimSpace(paymentTerms)] {
+		return apperrors.BadRequest("payment_terms must be one of prepaid, net_7, net_15, net_30, net_45, net_60, net_90", nil)
+	}
+	if leadTimeDays != nil && (*leadTimeDays < 0 || *leadTimeDays > 365) {
+		return apperrors.BadRequest("lead_time_days must be between 0 and 365", nil)
 	}
 	return nil
 }

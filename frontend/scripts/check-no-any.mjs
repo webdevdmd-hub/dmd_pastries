@@ -44,7 +44,13 @@ function stripCommentsAndLiterals(source) {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, blank) // block comments
     .replace(/\/\/[^\n]*/g, blank) // line comments
-    .replace(/(["'`])(?:\\.|(?!\1)[^\\])*\1/g, blank); // string + template literals
+    .replace(/(["'`])(?:\\.|(?!\1)[^\\])*\1/g, blank) // string + template literals
+    .replace(/>[^<>{}]*</g, blank); // JSX text nodes: prose between a tag and the next
+  // The JSX pattern excludes {} so an expression child (`>{value}<`) survives,
+  // and a generic like `Array<any>` keeps its `any` between `<` and `>`, not
+  // `>` and `<`. The `>` of `=>` can start a match, but that only ever blanks
+  // comparison operands (`x => x.count < limit`), where a bare `any` cannot
+  // legally occur.
 }
 
 async function walk(directory) {

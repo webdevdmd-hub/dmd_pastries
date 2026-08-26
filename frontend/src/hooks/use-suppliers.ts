@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { useBranchQueryKey } from "@/hooks/use-branch-scope";
+import type { SupplierListResult } from "@/lib/api/suppliers";
 import {
   createSupplier,
   createSupplierContact,
@@ -44,7 +45,7 @@ const suppliersQueryKey = "suppliers";
 export function useSuppliers(filters: SupplierFilters, enabled = true) {
   const branchQueryKey = useBranchQueryKey();
 
-  return useQuery<Supplier[]>({
+  return useQuery<SupplierListResult>({
     queryKey: [suppliersQueryKey, branchQueryKey, "list", filters],
     queryFn: async () => getSuppliers(filters),
     enabled,

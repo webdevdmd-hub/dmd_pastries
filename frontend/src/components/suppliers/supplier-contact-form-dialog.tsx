@@ -102,11 +102,26 @@ export function SupplierContactFormDialog({
             void form.handleSubmit(submit)(event);
           }}
         >
+          {/* These wrappers are <div>, not <label>. Each already contains a
+              real <Label htmlFor>, and labels cannot nest: the outer one
+              swallows clicks meant for the control it wraps. */}
           <div className="grid gap-2">
-            <Label htmlFor="supplier-contact-name">Contact name</Label>
-            <Input id="supplier-contact-name" {...form.register("contactName")} />
+            <Label htmlFor="supplier-contact-name">
+              Contact name
+              <span aria-hidden="true" className="text-danger-text">
+                {" *"}
+              </span>
+            </Label>
+            <Input
+              aria-invalid={fieldError("contactName") ? true : undefined}
+              aria-required="true"
+              id="supplier-contact-name"
+              {...form.register("contactName")}
+            />
             {fieldError("contactName") ? (
-              <span className="text-sm text-danger-text">{fieldError("contactName")}</span>
+              <span className="text-meta text-danger-text" role="alert">
+                {fieldError("contactName")}
+              </span>
             ) : null}
           </div>
           <div className="grid gap-2">
@@ -116,27 +131,50 @@ export function SupplierContactFormDialog({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="supplier-contact-phone">Phone</Label>
-              <Input id="supplier-contact-phone" {...form.register("phone")} />
+              <Input
+                aria-invalid={fieldError("phone") ? true : undefined}
+                id="supplier-contact-phone"
+                inputMode="tel"
+                placeholder="+971 4 000 0000"
+                type="tel"
+                {...form.register("phone")}
+              />
+              {fieldError("phone") ? (
+                <span className="text-meta text-danger-text" role="alert">
+                  {fieldError("phone")}
+                </span>
+              ) : null}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="supplier-contact-email">Email</Label>
-              <Input id="supplier-contact-email" type="email" {...form.register("email")} />
+              <Input
+                aria-invalid={fieldError("email") ? true : undefined}
+                id="supplier-contact-email"
+                inputMode="email"
+                type="email"
+                {...form.register("email")}
+              />
               {fieldError("email") ? (
-                <span className="text-sm text-danger-text">{fieldError("email")}</span>
+                <span className="text-meta text-danger-text" role="alert">
+                  {fieldError("email")}
+                </span>
               ) : null}
             </div>
           </div>
-          <label className="flex items-center gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte p-3">
+          {/* This one stays a <label>: it wraps the control directly with no
+              nested <Label>, and Radix renders the checkbox as a <button>,
+              which is a labelable element. */}
+          <label className="flex items-center gap-3 rounded-lg bg-muted p-3">
             <Checkbox
               checked={form.watch("isPrimary")}
               onCheckedChange={(checked) => form.setValue("isPrimary", checked === true)}
             />
-            <span className="text-sm font-medium text-brand-espresso">Primary contact</span>
+            <span className="text-cell font-medium">Primary contact</span>
           </label>
           <div className="grid gap-2">
             <Label htmlFor="supplier-contact-notes">Notes</Label>
             <textarea
-              className="min-h-24 rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso focus:outline-none focus:ring-2 focus:ring-brand-caramel"
+              className="min-h-24 rounded-lg border border-border bg-card px-3 py-2 text-cell text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               id="supplier-contact-notes"
               {...form.register("notes")}
             />

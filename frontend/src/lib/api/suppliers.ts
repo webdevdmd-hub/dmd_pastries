@@ -18,6 +18,7 @@ import type {
   UpdateSupplierPayload,
   UpdateSupplierStatusPayload,
 } from "@/types/supplier";
+import { isPaymentTerms } from "@/types/supplier";
 
 type BackendSupplierPayload = {
   supplier_name?: string;
@@ -32,6 +33,9 @@ type BackendSupplierPayload = {
   postal_code?: string | null;
   tax_number?: string | null;
   notes?: string | null;
+  payment_terms?: string;
+  lead_time_days?: number | null;
+  is_preferred?: boolean;
 };
 
 type BackendSupplierContactPayload = {
@@ -151,6 +155,10 @@ function parseSupplier(value: unknown): Supplier {
     taxNumber: optionalString(value.tax_number),
     notes: optionalString(value.notes),
     status: isSupplierStatus(value.status) ? value.status : "active",
+    paymentTerms: isPaymentTerms(value.payment_terms) ? value.payment_terms : "",
+    // 0 is a real lead time (same-day), so only a genuine number counts.
+    leadTimeDays: typeof value.lead_time_days === "number" ? value.lead_time_days : null,
+    isPreferred: value.is_preferred === true,
     primaryContact: parseContactOrNull(value.primary_contact),
     createdByUserId: optionalString(value.created_by_user_id),
     updatedByUserId: optionalString(value.updated_by_user_id),
@@ -271,6 +279,9 @@ function supplierPayload(
   if (payload.postalCode !== undefined) nextPayload.postal_code = payload.postalCode;
   if (payload.taxNumber !== undefined) nextPayload.tax_number = payload.taxNumber;
   if (payload.notes !== undefined) nextPayload.notes = payload.notes;
+  if (payload.paymentTerms !== undefined) nextPayload.payment_terms = payload.paymentTerms;
+  if (payload.leadTimeDays !== undefined) nextPayload.lead_time_days = payload.leadTimeDays;
+  if (payload.isPreferred !== undefined) nextPayload.is_preferred = payload.isPreferred;
 
   return nextPayload;
 }
@@ -290,16 +301,36 @@ function contactPayload(
   return nextPayload;
 }
 
-export async function getSuppliers(params: SupplierFilters): Promise<Supplier[]> {
-  const response = await apiRequest<Supplier[]>(
+export type SupplierListResult = {
+  items: Supplier[];
+  /** Server-side row count for the filter, before the page limit truncates. */
+  total: number;
+};
+
+export async function getSuppliers(params: SupplierFilters): Promise<SupplierListResult> {
+  // The backend defaults a missing limit to 20 rows and returns the count in a
+  // `pagination` envelope this call used to discard, so supplier 21 onward was
+  // unreachable from any screen -- invisible in dev, where tenants have a
+  // handful. Ask for the maximum and carry the server's total so callers can
+  // tell a complete answer from a truncated one.
+  const response = await apiRequest<SupplierListResult>(
     `/api/v1/suppliers${toQueryString({
       search: params.search,
       status: params.status,
       country: params.country,
+      page: 1,
+      limit: 100,
     })}`,
     {
       authMode: "appwrite",
-      parse: (data) => parseList(data, parseSupplier),
+      parse: (data) => {
+        const items = parseList(data, parseSupplier);
+        const total =
+          isObject(data) && isObject(data.pagination) && typeof data.pagination.total === "number"
+            ? data.pagination.total
+            : items.length;
+        return { items, total };
+      },
     },
   );
 
