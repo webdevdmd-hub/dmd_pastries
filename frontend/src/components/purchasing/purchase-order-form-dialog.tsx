@@ -373,6 +373,10 @@ export function PurchaseOrderFormDialog({
     return sum + subtotal + tax;
   }, 0);
   const revisionDifference = estimatedRevisedTotal - (order?.totalAmount ?? 0);
+  const orderTotalDisplay = new Intl.NumberFormat("en-AE", {
+    currency: "AED",
+    style: "currency",
+  }).format(estimatedRevisedTotal);
 
   const submit = async (): Promise<void> => {
     setLineErrors({});
@@ -635,11 +639,10 @@ export function PurchaseOrderFormDialog({
                   </div>
                 ) : null}
 
-                <FormSection
-                  description="Who this order is for, and where it will be received."
-                  title="Order details"
-                >
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <FormSection title="Order details">
+                  {/* Four fields, one row. At lg:grid-cols-3 the fourth wrapped
+                      and cost 82px of section height to save 24px elsewhere. */}
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div>
                       <Label htmlFor="po-branch">
                         Branch
@@ -675,9 +678,10 @@ export function PurchaseOrderFormDialog({
                         Supplier
                         <RequiredMark />
                       </Label>
-                      <div className="mt-1.5" id="po-supplier">
+                      <div className="mt-1.5">
                         <SupplierLookupSelect
                           disabled={fieldsDisabled}
+                          id="po-supplier"
                           onValueChange={setSupplierId}
                           suppliers={suppliers}
                           value={supplierId}
@@ -705,6 +709,17 @@ export function PurchaseOrderFormDialog({
                       {lockReason ? <FieldHint>{lockReason}</FieldHint> : null}
                       <FieldError message={orderDateFieldError} />
                     </div>
+                    <div>
+                      <Label htmlFor="po-expected-delivery">Expected delivery date</Label>
+                      <Input
+                        className="mt-1.5 h-10"
+                        id="po-expected-delivery"
+                        onChange={(event) => setExpectedDeliveryDate(event.target.value)}
+                        type="date"
+                        value={expectedDeliveryDate}
+                      />
+                      <FieldError message={expectedDeliveryFieldError} />
+                    </div>
                   </div>
                 </FormSection>
 
@@ -726,6 +741,7 @@ export function PurchaseOrderFormDialog({
                   ) : null}
                   <PurchasingItemLineEditor
                     accounts={accounts}
+                    compactLayout
                     disableAddRows={fieldsDisabled}
                     lineErrors={lineErrors}
                     lineLocks={lineLocks}
@@ -738,24 +754,12 @@ export function PurchaseOrderFormDialog({
                   />
                 </FormSection>
 
-                <FormSection
-                  description="Optional delivery expectations and internal notes for this order."
-                  title="Delivery & notes"
-                >
-                  <div className="grid gap-4 sm:grid-cols-[220px_1fr]">
+                <FormSection title="Notes">
+                  <div>
                     <div>
-                      <Label htmlFor="po-expected-delivery">Expected delivery date</Label>
-                      <Input
-                        className="mt-1.5 h-10"
-                        id="po-expected-delivery"
-                        onChange={(event) => setExpectedDeliveryDate(event.target.value)}
-                        type="date"
-                        value={expectedDeliveryDate}
-                      />
-                      <FieldError message={expectedDeliveryFieldError} />
-                    </div>
-                    <div>
-                      <Label htmlFor="po-notes">Notes</Label>
+                      <Label className="sr-only" htmlFor="po-notes">
+                        Notes
+                      </Label>
                       <Textarea
                         className="mt-1.5 min-h-[42px]"
                         id="po-notes"
@@ -770,7 +774,16 @@ export function PurchaseOrderFormDialog({
               </>
             )}
           </div>
-          <DialogFooter className="shrink-0 border-t border-workspace-border bg-card px-5 py-3">
+          <DialogFooter className="shrink-0 flex-row items-center justify-end gap-3 border-t border-workspace-border bg-card px-5 py-3">
+            {/* The order total lived only at the bottom of the line editor,
+                inside the scroll area. The submit button is pinned; the number
+                it commits should be pinned beside it. */}
+            <span className="mr-auto text-cell text-brand-mocha">
+              Order total{" "}
+              <span className="font-semibold tabular-nums text-brand-espresso">
+                {orderTotalDisplay}
+              </span>
+            </span>
             <Button onClick={requestClose} type="button" variant="outline">
               Cancel
             </Button>

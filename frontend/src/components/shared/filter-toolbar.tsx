@@ -88,7 +88,7 @@ export function FilterToolbar({
         </PopoverTrigger>
         <PopoverContent align="start" className="w-80 p-4">
           <div className="flex flex-col gap-3">
-            <Label className="text-sm font-semibold">{popoverTitle}</Label>
+            <p className="text-sm font-semibold text-brand-espresso">{popoverTitle}</p>
             {children}
           </div>
         </PopoverContent>

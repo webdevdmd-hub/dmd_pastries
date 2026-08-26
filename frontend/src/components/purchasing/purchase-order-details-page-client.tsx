@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, CheckCircle2, ReceiptText, Truck } from "lucide-react";
+import { ArrowRight, MoreHorizontal, ReceiptText, Truck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
@@ -16,9 +16,7 @@ import { PurchaseOrderReceiveGoodsDialog } from "@/components/purchasing/purchas
 import { PurchaseOrderStatusBadge } from "@/components/purchasing/purchase-order-status-badge";
 import { PurchaseDetailSkeleton } from "@/components/purchasing/purchase-table-skeleton";
 import { PurchasingItemLines } from "@/components/purchasing/purchasing-item-lines";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +25,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useAllChartAccounts } from "@/hooks/use-accounting";
@@ -50,7 +61,11 @@ import {
 import { getErrorMessage } from "@/lib/api/client";
 import { formatDateOnly } from "@/lib/format/date";
 import { purchaseOrderToBillInitialValues } from "@/lib/purchasing/purchase-order-bill-draft";
-import { hasOutstandingStock, unreceivedValue } from "@/lib/purchasing/purchase-order-quantities";
+import {
+  hasOutstandingStock,
+  receivingProgress,
+  unreceivedValue,
+} from "@/lib/purchasing/purchase-order-quantities";
 import { cn } from "@/lib/utils/cn";
 import type {
   CreatePurchaseInvoicePayload,
@@ -69,45 +84,76 @@ function formatDate(value: string | null): string {
   return formatDateOnly(value);
 }
 
-function WorkflowStep({
-  description,
-  isActive,
-  isDone,
-  title,
-}: {
-  description: string;
-  isActive: boolean;
-  isDone: boolean;
-  title: string;
-}): JSX.Element {
-  return (
-    <div
-      className={cn(
-        "rounded-md border p-4 transition",
-        isDone
-          ? "border-brand-espresso bg-brand-espresso text-primary-foreground"
-          : isActive
-            ? "border-brand-espresso bg-card text-brand-espresso shadow-sm"
-            : "border-brand-cappuccino bg-card text-brand-mocha",
-      )}
-    >
-      <div className="flex items-center gap-2">
-        <CheckCircle2
-          className={cn("h-4 w-4", isDone ? "text-primary-foreground" : "text-brand-mocha")}
-          aria-hidden="true"
-        />
-        <p className="text-meta font-semibold">{title}</p>
-      </div>
-      <p className={cn("mt-2 text-sm", isDone ? "text-primary-foreground/80" : "text-brand-mocha")}>
-        {description}
-      </p>
-    </div>
-  );
-}
-
 function hasRemainingReceivableProducts(order: PurchaseOrder): boolean {
   return hasOutstandingStock(order);
 }
+
+type OrderStanding = {
+  /** Fraction of goods lines complete, for the inline meter. 0-1. */
+  progress: number;
+  /** One sentence: where this order actually is. */
+  summary: string;
+  tone: "muted" | "warning" | "info" | "money";
+};
+
+/**
+ * The status badge, the four-step workflow tracker and the "What's next?" card
+ * all answered one question: where is this order, and what happens next. Three
+ * widgets, 663px, and a duplicated primary button. This computes that answer
+ * once so the header can state it in a line.
+ */
+function orderStanding(
+  order: PurchaseOrder,
+  activeBill: { balanceAmount: number; paymentStatus: string; status: string } | undefined,
+): OrderStanding {
+  const { completeLines, stockLines } = receivingProgress(order);
+  const progress = stockLines === 0 ? 0 : completeLines / stockLines;
+
+  if (order.status === "cancelled") {
+    return {
+      progress: 0,
+      summary: "Cancelled. This order can no longer be received.",
+      tone: "muted",
+    };
+  }
+
+  if (order.status === "draft") {
+    return {
+      progress: 0,
+      summary: `Draft, not yet issued to ${order.supplierName}.`,
+      tone: "muted",
+    };
+  }
+
+  // Receiving is settled by goods arriving, never by a bill being raised. The
+  // old tracker read `|| Boolean(activeBill)`, so a partially received order
+  // that had been billed claimed "Received" while stock was still outstanding.
+  // Outstanding goods therefore win over any billing state below.
+  if (hasRemainingReceivableProducts(order)) {
+    return {
+      progress,
+      summary: `${String(completeLines)} of ${String(stockLines)} lines received`,
+      tone: "warning",
+    };
+  }
+
+  if (!activeBill) {
+    return { progress: 1, summary: "All goods received. Ready to bill.", tone: "money" };
+  }
+
+  if (activeBill.paymentStatus === "paid") {
+    return { progress: 1, summary: "Received, billed and paid in full.", tone: "money" };
+  }
+
+  return { progress: 1, summary: "Received and billed. Payment outstanding.", tone: "info" };
+}
+
+const STANDING_TONE: Record<OrderStanding["tone"], string> = {
+  info: "bg-info-tint text-info-text",
+  money: "bg-money-tint text-money-text",
+  muted: "bg-muted text-foreground-muted",
+  warning: "bg-warning-tint text-warning-text",
+};
 
 export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string }): JSX.Element {
   const router = useRouter();
@@ -135,6 +181,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   const [pendingStatusAction, setPendingStatusAction] = useState<"issue" | "cancel" | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const orderQuery = usePurchaseOrder(orderId, canView);
   const chainQuery = usePurchaseOrderDocumentChain(orderId, canView);
   const branchesQuery = usePurchasingBranches(canView);
@@ -198,14 +245,6 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   const canAdjustRemaining = canEdit && order.status === "partially_received";
   const canEditWithCorrection = canEdit && order.status === "received";
   const canConvertOrder = canConvert && order.status === "received" && !activeBill;
-  const orderedDone = order.status !== "draft" && order.status !== "cancelled";
-  // Receiving is settled by goods arriving, never by a bill being raised. This
-  // used to be `|| Boolean(activeBill)`, so a partially received order that had
-  // already been billed showed "Received" as complete while stock was still
-  // outstanding.
-  const receivedDone = order.status === "received";
-  const billedDone = Boolean(activeBill);
-  const paidDone = isPaid;
   const billInitialValues = purchaseOrderToBillInitialValues(order);
   const purchaseAccounts = [...(purchaseAccountsQuery.data ?? [])];
 
@@ -354,248 +393,225 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
     return null;
   };
 
+  const standing = orderStanding(order, activeBill);
+  const outstandingValue = hasRemainingReceivableProducts(order) ? unreceivedValue(order) : 0;
+  const hasSecondaryActions =
+    canEditOrder ||
+    canAdjustRemaining ||
+    canEditWithCorrection ||
+    canCreate ||
+    (canIssue && order.status !== "received" && order.status !== "cancelled") ||
+    (canReopen && order.status === "cancelled");
+
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <Card className="overflow-hidden border-brand-cappuccino bg-card shadow-sm">
-        <CardContent className="p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <Link
-                className="text-sm font-semibold text-brand-mocha hover:text-brand-espresso"
-                href={ROUTES.purchasingOrders}
-              >
-                Back to Purchase Orders
-              </Link>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <h1 className="font-serif text-4xl text-brand-espresso">
-                  {order.purchaseOrderNumber}
-                </h1>
-                <PurchaseOrderStatusBadge status={order.status} />
-              </div>
-              <p className="mt-3 max-w-2xl text-sm text-brand-mocha">
-                {order.supplierName} / {order.branchName} / Ordered {formatDate(order.orderDate)}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {canEditOrder || canAdjustRemaining || canEditWithCorrection ? (
-                <Button onClick={() => setFormOpen(true)} type="button" variant="outline">
-                  {canEditWithCorrection
-                    ? "Edit with correction"
-                    : canAdjustRemaining
-                      ? "Adjust remaining"
-                      : "Edit"}
-                </Button>
-              ) : null}
-              {canIssue && order.status !== "received" && order.status !== "cancelled" ? (
-                <Button
-                  disabled={statusMutation.isPending}
-                  onClick={() => setPendingStatusAction("cancel")}
-                  type="button"
-                  variant="outline"
-                >
-                  Cancel order
-                </Button>
-              ) : null}
-              {canReopen && order.status === "cancelled" ? (
-                <Button
-                  disabled={reopenMutation.isPending}
-                  onClick={() => void handleReopen()}
-                  type="button"
-                  variant="outline"
-                >
-                  Reopen
-                </Button>
-              ) : null}
-              {canCreate ? (
-                <Button
-                  disabled={duplicateMutation.isPending}
-                  onClick={() => void handleDuplicate()}
-                  type="button"
-                  variant="outline"
-                >
-                  Duplicate as draft
-                </Button>
-              ) : null}
-              {primaryAction()}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-brand-cappuccino bg-card shadow-sm">
-        <CardHeader className="border-b border-brand-cappuccino">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-meta font-medium text-brand-mocha">Purchase workflow</p>
-              <CardTitle className="mt-1 text-2xl text-brand-espresso">
-                Ordered - Received - Billed - Paid
-              </CardTitle>
-            </div>
-            <Badge variant="secondary">
-              Expected delivery: {formatDate(order.expectedDeliveryDate)}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-3 p-5 md:grid-cols-4">
-          <WorkflowStep
-            description="Supplier PO is issued and ready for fulfilment."
-            isActive={order.status === "draft"}
-            isDone={orderedDone}
-            title="Ordered"
-          />
-          <WorkflowStep
-            description="Goods are received against ordered quantities."
-            // Where the order has got to, not what this viewer may do about it.
-            // Binding this to `canReceiveOrder` left a read-only user looking at
-            // a tracker with no active step at all.
-            isActive={!receivedDone && hasRemainingReceivableProducts(order) && orderedDone}
-            isDone={receivedDone}
-            title="Received"
-          />
-          <WorkflowStep
-            description="Supplier bill is created from the received order."
-            isActive={canConvertOrder}
-            isDone={billedDone}
-            title="Billed"
-          />
-          <WorkflowStep
-            description="Payment made closes the supplier payable."
-            isActive={Boolean(activeBill && activeBill.balanceAmount > 0)}
-            isDone={paidDone}
-            title="Paid"
-          />
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <Card className="border-brand-cappuccino bg-card shadow-sm">
-          <CardHeader>
-            <CardTitle>What's next?</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <p className="text-sm text-brand-mocha">
-              Complete the next purchasing step from this order instead of creating receipts, bills,
-              and payments from separate pages. Supplier, branch, item, tax, and quantity details
-              carry forward automatically.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {primaryAction()}
-              <Button asChild type="button" variant="outline">
-                <a href="#purchase-timeline">
-                  View purchase timeline
-                  <ArrowRight className="h-4 w-4" />
-                </a>
-              </Button>
-            </div>
-            {order.status === "partially_received" ? (
-              <p className="rounded-md border border-brand-cappuccino bg-brand-latte p-4 text-sm text-brand-mocha">
-                Partially received purchase orders must be fully received before converting to a
-                bill in this workflow.
-              </p>
+    <div className="mx-auto flex max-w-7xl flex-col gap-4">
+      {/* One header, sticky, carrying the identity, the standing and the single
+          next action. It replaces the header card, the four-step tracker and
+          the What's next card -- 663px of chrome that answered one question
+          three times and rendered the primary button twice. */}
+      <div className="sticky top-0 z-20 -mx-4 border-b border-border bg-card px-4 py-4 sm:mx-0 sm:rounded-md sm:border sm:px-5">
+        <Link
+          className="text-meta text-foreground-muted hover:text-foreground"
+          href={ROUTES.purchasingOrders}
+        >
+          &larr; Purchase orders
+        </Link>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <h1 className="font-serif text-3xl text-brand-espresso">{order.purchaseOrderNumber}</h1>
+          <PurchaseOrderStatusBadge status={order.status} />
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {hasSecondaryActions ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    aria-label={`More actions for ${order.purchaseOrderNumber}`}
+                    size="icon"
+                    type="button"
+                    variant="outline"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {canEditOrder || canAdjustRemaining || canEditWithCorrection ? (
+                    <DropdownMenuItem onSelect={() => setFormOpen(true)}>
+                      {canEditWithCorrection
+                        ? "Edit with correction"
+                        : canAdjustRemaining
+                          ? "Adjust remaining"
+                          : "Edit"}
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canCreate ? (
+                    <DropdownMenuItem
+                      disabled={duplicateMutation.isPending}
+                      onSelect={() => void handleDuplicate()}
+                    >
+                      Duplicate as draft
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canReopen && order.status === "cancelled" ? (
+                    <DropdownMenuItem
+                      disabled={reopenMutation.isPending}
+                      onSelect={() => void handleReopen()}
+                    >
+                      Reopen
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canIssue && order.status !== "received" && order.status !== "cancelled" ? (
+                    <DropdownMenuItem
+                      disabled={statusMutation.isPending}
+                      onSelect={() => setPendingStatusAction("cancel")}
+                    >
+                      Cancel order
+                    </DropdownMenuItem>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : null}
-          </CardContent>
-        </Card>
+            {primaryAction()}
+          </div>
+        </div>
+        <p className="mt-1.5 text-sm text-foreground-muted">
+          {order.supplierName} &middot; {order.branchName} &middot; Ordered{" "}
+          <span className="tabular-nums">{formatDate(order.orderDate)}</span>
+          {order.expectedDeliveryDate ? (
+            <>
+              {" "}
+              &middot; Expected{" "}
+              <span className="tabular-nums">{formatDate(order.expectedDeliveryDate)}</span>
+            </>
+          ) : null}
+        </p>
 
-        <Card className="border-brand-cappuccino bg-card shadow-sm">
-          <CardHeader>
-            <CardTitle>Document summary</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex justify-between gap-4">
-              <span className="text-brand-mocha">Bill</span>
-              <span className="font-semibold text-brand-espresso">
-                {activeBill?.supplierBillNumber ?? activeBill?.invoiceNumber ?? "Not created"}
+        <div
+          className={cn(
+            "mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md px-3 py-2 text-sm",
+            STANDING_TONE[standing.tone],
+          )}
+        >
+          {standing.tone === "warning" ? (
+            <span
+              aria-hidden="true"
+              className="h-1 w-16 overflow-hidden rounded-full bg-current/20"
+            >
+              <span
+                className="block h-full rounded-full bg-current"
+                style={{ width: `${String(Math.round(standing.progress * 100))}%` }}
+              />
+            </span>
+          ) : null}
+          <span className="tabular-nums">{standing.summary}</span>
+          {outstandingValue > 0 ? (
+            <>
+              <span aria-hidden="true">&middot;</span>
+              <span>
+                <span className="font-semibold tabular-nums">
+                  {formatCurrency(outstandingValue)}
+                </span>{" "}
+                still to arrive
               </span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-brand-mocha">Bill status</span>
-              <span className="font-semibold text-brand-espresso">
-                {activeBill ? activeBill.status : "Pending"}
-              </span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-brand-mocha">Payment status</span>
-              <span className="font-semibold text-brand-espresso">
-                {activeBill ? activeBill.paymentStatus : "Pending"}
-              </span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-brand-mocha">Not yet received</span>
-              <span className="font-semibold tabular-nums text-brand-espresso">
-                {hasRemainingReceivableProducts(order)
-                  ? formatCurrency(unreceivedValue(order))
-                  : "Nothing outstanding"}
-              </span>
-            </div>
-            {/* Balance due is what the supplier is owed, which only a bill can
-                establish. Falling back to the order total presented an un-billed
-                PO as money owed. */}
-            <div className="flex justify-between gap-4 border-t border-brand-cappuccino pt-3">
-              <span className="text-brand-mocha">Balance due</span>
-              <span className="font-semibold tabular-nums text-brand-espresso">
-                {activeBill ? formatCurrency(activeBill.balanceAmount) : "No bill yet"}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+            </>
+          ) : null}
+          <Button
+            className="ml-auto"
+            onClick={() => setTimelineOpen(true)}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            Timeline &amp; documents
+          </Button>
+        </div>
+
+        {order.status === "partially_received" ? (
+          <p className="mt-2 text-meta text-foreground-muted">
+            Every line must be received before this order can be converted to a bill.
+          </p>
+        ) : null}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Subtotal</p>
-            <p className="text-2xl font-semibold tabular-nums text-brand-espresso">
-              {formatCurrency(order.subtotalAmount)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Discount</p>
-            <p className="text-2xl font-semibold tabular-nums text-brand-espresso">
-              {formatCurrency(order.discountAmount)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Tax</p>
-            <p className="text-2xl font-semibold tabular-nums text-brand-espresso">
-              {formatCurrency(order.taxAmount)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Total</p>
-            <p className="text-2xl font-semibold tabular-nums text-brand-espresso">
-              {formatCurrency(order.totalAmount)}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <PurchasingItemLines
+        lines={order.items}
+        title="Purchase order items"
+        totals={{
+          discount: order.discountAmount,
+          subtotal: order.subtotalAmount,
+          tax: order.taxAmount,
+          total: order.totalAmount,
+        }}
+      />
 
-      <PurchasingItemLines lines={order.items} title="Purchase order items" />
+      {/* Timeline, linked documents and notes are reference material: needed
+          when someone asks "what happened here", not on every visit. As a
+          drawer they cost one click instead of 2,111px of permanent scroll. */}
+      <Sheet onOpenChange={setTimelineOpen} open={timelineOpen}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-xl" side="right">
+          <SheetHeader>
+            <SheetTitle>Timeline &amp; documents</SheetTitle>
+            <SheetDescription>
+              {order.purchaseOrderNumber} &middot; {order.supplierName}
+            </SheetDescription>
+          </SheetHeader>
 
-      <div id="purchase-timeline">
-        <PurchaseDocumentChain
-          chain={chainQuery.data}
-          error={chainQuery.error}
-          isLoading={chainQuery.isLoading}
-          onRetry={() => {
-            void chainQuery.refetch();
-          }}
-        />
-      </div>
+          <div className="mt-6 space-y-6">
+            <div className="rounded-md bg-muted p-4">
+              <h3 className="text-meta font-medium text-foreground-muted">Document summary</h3>
+              <dl className="mt-3 space-y-2 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-foreground-muted">Bill</dt>
+                  <dd className="font-medium">
+                    {activeBill?.supplierBillNumber ?? activeBill?.invoiceNumber ?? "Not created"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-foreground-muted">Bill status</dt>
+                  <dd className="font-medium">{activeBill ? activeBill.status : "Pending"}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-foreground-muted">Payment status</dt>
+                  <dd className="font-medium">
+                    {activeBill ? activeBill.paymentStatus : "Pending"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-foreground-muted">Not yet received</dt>
+                  <dd className="font-medium tabular-nums">
+                    {hasRemainingReceivableProducts(order)
+                      ? formatCurrency(unreceivedValue(order))
+                      : "Nothing outstanding"}
+                  </dd>
+                </div>
+                {/* Balance due is what the supplier is owed, which only a bill
+                    can establish. Falling back to the order total presented an
+                    un-billed PO as money owed. */}
+                <div className="flex justify-between gap-4 border-t border-border pt-2">
+                  <dt className="text-foreground-muted">Balance due</dt>
+                  <dd className="font-medium tabular-nums">
+                    {activeBill ? formatCurrency(activeBill.balanceAmount) : "No bill yet"}
+                  </dd>
+                </div>
+              </dl>
+            </div>
 
-      <Card className="bg-card">
-        <CardHeader>
-          <CardTitle>Notes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-brand-mocha">{order.notes ?? "No notes recorded."}</p>
-        </CardContent>
-      </Card>
+            <PurchaseDocumentChain
+              chain={chainQuery.data}
+              error={chainQuery.error}
+              isLoading={chainQuery.isLoading}
+              onRetry={() => {
+                void chainQuery.refetch();
+              }}
+            />
+
+            <div>
+              <h3 className="text-meta font-medium text-foreground-muted">Notes</h3>
+              <p className="mt-2 text-sm text-foreground-muted">
+                {order.notes ?? "No notes recorded."}
+              </p>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Dialog
         open={pendingStatusAction !== null}

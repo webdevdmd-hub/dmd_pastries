@@ -349,7 +349,7 @@ function ReceiptLayoutDialog({
               />
             </div>
             <div className="grid gap-2">
-              <Label>Receipt type</Label>
+              <Label htmlFor="receipt-layouts-receipt-type">Receipt type</Label>
               <Select
                 onValueChange={(value) =>
                   setFormState((current) => ({
@@ -359,7 +359,7 @@ function ReceiptLayoutDialog({
                 }
                 value={formState.receiptType}
               >
-                <SelectTrigger>
+                <SelectTrigger id="receipt-layouts-receipt-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -372,7 +372,7 @@ function ReceiptLayoutDialog({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>Branch scope</Label>
+              <Label htmlFor="receipt-layouts-branch-scope">Branch scope</Label>
               <Select
                 onValueChange={(value) =>
                   setFormState((current) => ({
@@ -384,7 +384,7 @@ function ReceiptLayoutDialog({
                 }
                 value={formState.branchId ?? businessWideBranchValue}
               >
-                <SelectTrigger>
+                <SelectTrigger id="receipt-layouts-branch-scope">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -398,7 +398,7 @@ function ReceiptLayoutDialog({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>Status</Label>
+              <Label htmlFor="receipt-layouts-status">Status</Label>
               <Select
                 onValueChange={(value) =>
                   setFormState((current) => ({
@@ -409,7 +409,7 @@ function ReceiptLayoutDialog({
                 }
                 value={formState.status}
               >
-                <SelectTrigger>
+                <SelectTrigger id="receipt-layouts-status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -483,7 +483,7 @@ function ReceiptLayoutDialog({
             </Card>
 
             <div className="grid gap-2">
-              <Label>Font size</Label>
+              <Label htmlFor="receipt-layouts-font-size">Font size</Label>
               <Select
                 onValueChange={(value) =>
                   updateConfig(
@@ -493,7 +493,7 @@ function ReceiptLayoutDialog({
                 }
                 value={formState.layoutConfig.fontSize}
               >
-                <SelectTrigger>
+                <SelectTrigger id="receipt-layouts-font-size">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -504,14 +504,14 @@ function ReceiptLayoutDialog({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>Alignment</Label>
+              <Label htmlFor="receipt-layouts-alignment">Alignment</Label>
               <Select
                 onValueChange={(value) =>
                   updateConfig("alignment", value === "left" ? "left" : "center")
                 }
                 value={formState.layoutConfig.alignment}
               >
-                <SelectTrigger>
+                <SelectTrigger id="receipt-layouts-alignment">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -521,7 +521,7 @@ function ReceiptLayoutDialog({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>Spacing</Label>
+              <Label htmlFor="receipt-layouts-spacing">Spacing</Label>
               <Select
                 onValueChange={(value) =>
                   updateConfig(
@@ -531,7 +531,7 @@ function ReceiptLayoutDialog({
                 }
                 value={formState.layoutConfig.spacing}
               >
-                <SelectTrigger>
+                <SelectTrigger id="receipt-layouts-spacing">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

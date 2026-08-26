@@ -15,21 +15,26 @@ import type {
   PurchaseDocumentChain,
   PurchaseInvoice,
   PurchaseInvoiceItem,
+  PurchaseInvoicePage,
   PurchaseInvoiceStatus,
   PurchaseItemLinePayload,
   PurchaseItemType,
   PurchaseOrder,
   PurchaseOrderItem,
+  PurchaseOrderPage,
   PurchaseOrderRevision,
   PurchaseOrderRevisionPaymentExcessAction,
   PurchaseOrderStatus,
+  PurchasePage,
   PurchasePaymentStatus,
   PurchaseReceipt,
   PurchaseReceiptItem,
+  PurchaseReceiptPage,
   PurchaseReceiptStatus,
   PurchaseReturn,
   PurchaseReturnFilters,
   PurchaseReturnItem,
+  PurchaseReturnPage,
   PurchaseReturnStatus,
   PurchasingBranchOption,
   PurchasingFilters,
@@ -46,6 +51,7 @@ import type {
   SupplierPayment,
   SupplierPaymentAllocation,
   SupplierPaymentFilters,
+  SupplierPaymentPage,
   SupplierPaymentStatus,
   UpdatePurchaseInvoicePayload,
   UpdatePurchaseOrderPayload,
@@ -1076,6 +1082,43 @@ function parseProduct(value: unknown): PurchasingProductOption {
   };
 }
 
+/** The page size every purchasing list uses, so request and footer agree. */
+export const PURCHASE_LIST_PAGE_SIZE = 20;
+
+/**
+ * What a picker asks for. A dropdown has no Next button, so whatever does
+ * not come back in the first response is unreachable -- a supplier with 25
+ * unpaid bills could not be paid for the last five.
+ */
+export const PURCHASE_PICKER_PAGE_SIZE = 200;
+
+function parsePurchasePage<TItem>(
+  value: unknown,
+  parser: (item: unknown) => TItem,
+  requestedLimit: number,
+): PurchasePage<TItem> {
+  const items = parseList(value, parser);
+  const source = isObject(value) && isObject(value.pagination) ? value.pagination : {};
+  const limit = numberValue(source.limit, requestedLimit);
+  const total = numberValue(source.total, items.length);
+
+  return {
+    items,
+    pagination: {
+      limit,
+      page: Math.max(1, numberValue(source.page, 1)),
+      total,
+      // An older backend that answers with a bare array gives no total, so the
+      // count falls back to what arrived and the bar renders a single page
+      // rather than inventing a second one.
+      totalPages: Math.max(
+        1,
+        numberValue(source.total_pages, limit > 0 ? Math.ceil(total / limit) : 1),
+      ),
+    },
+  };
+}
+
 function parseProductPage(value: unknown): PurchasingProductPage {
   const items = parseList(value, parseProduct);
 
@@ -1400,8 +1443,12 @@ export async function getPurchasingSummary(): Promise<PurchasingSummary> {
   return response.data;
 }
 
-export async function getPurchaseOrders(params: PurchasingFilters): Promise<PurchaseOrder[]> {
-  const response = await apiRequest<PurchaseOrder[]>(
+export async function getPurchaseOrders(
+  params: PurchasingFilters,
+  page = 1,
+  limit = PURCHASE_LIST_PAGE_SIZE,
+): Promise<PurchaseOrderPage> {
+  const response = await apiRequest<PurchaseOrderPage>(
     `/api/v1/purchasing/orders${toQueryString({
       search: params.search,
       supplier_id: params.supplierId,
@@ -1409,10 +1456,12 @@ export async function getPurchaseOrders(params: PurchasingFilters): Promise<Purc
       status: params.status,
       date_from: params.dateFrom,
       date_to: params.dateTo,
+      page: String(page),
+      limit: String(limit),
     })}`,
     {
       authMode: "appwrite",
-      parse: (data) => parseList(data, parseOrder),
+      parse: (data) => parsePurchasePage(data, parseOrder, limit),
     },
   );
 
@@ -1583,8 +1632,12 @@ export async function getPurchaseDocumentChainByOrder(
   return response.data;
 }
 
-export async function getPurchaseInvoices(params: PurchasingFilters): Promise<PurchaseInvoice[]> {
-  const response = await apiRequest<PurchaseInvoice[]>(
+export async function getPurchaseInvoices(
+  params: PurchasingFilters,
+  page = 1,
+  limit = PURCHASE_LIST_PAGE_SIZE,
+): Promise<PurchaseInvoicePage> {
+  const response = await apiRequest<PurchaseInvoicePage>(
     `/api/v1/purchasing/invoices${toQueryString({
       search: params.search,
       supplier_id: params.supplierId,
@@ -1593,10 +1646,12 @@ export async function getPurchaseInvoices(params: PurchasingFilters): Promise<Pu
       payment_status: params.paymentStatus,
       date_from: params.dateFrom,
       date_to: params.dateTo,
+      page: String(page),
+      limit: String(limit),
     })}`,
     {
       authMode: "appwrite",
-      parse: (data) => parseList(data, parseInvoice),
+      parse: (data) => parsePurchasePage(data, parseInvoice, limit),
     },
   );
 
@@ -1708,8 +1763,10 @@ export async function receivePurchaseOrder(
 
 export async function getSupplierPayments(
   params: SupplierPaymentFilters,
-): Promise<SupplierPayment[]> {
-  const response = await apiRequest<SupplierPayment[]>(
+  page = 1,
+  limit = PURCHASE_LIST_PAGE_SIZE,
+): Promise<SupplierPaymentPage> {
+  const response = await apiRequest<SupplierPaymentPage>(
     `/api/v1/purchasing/supplier-payments${toQueryString({
       branch_id: params.branchId,
       date_from: params.dateFrom,
@@ -1722,10 +1779,12 @@ export async function getSupplierPayments(
       sort_by: params.sortBy,
       sort_order: params.sortOrder,
       supplier_id: params.supplierId,
+      page: String(page),
+      limit: String(limit),
     })}`,
     {
       authMode: "appwrite",
-      parse: (data) => parseList(data, parseSupplierPayment),
+      parse: (data) => parsePurchasePage(data, parseSupplierPayment, limit),
     },
   );
 
@@ -1848,8 +1907,12 @@ export async function receivePurchase(payload: ReceivePurchasePayload): Promise<
   return response.data;
 }
 
-export async function getPurchaseReceipts(params: PurchasingFilters): Promise<PurchaseReceipt[]> {
-  const response = await apiRequest<PurchaseReceipt[]>(
+export async function getPurchaseReceipts(
+  params: PurchasingFilters,
+  page = 1,
+  limit = PURCHASE_LIST_PAGE_SIZE,
+): Promise<PurchaseReceiptPage> {
+  const response = await apiRequest<PurchaseReceiptPage>(
     `/api/v1/purchasing/receipts${toQueryString({
       search: params.search,
       supplier_id: params.supplierId,
@@ -1857,18 +1920,24 @@ export async function getPurchaseReceipts(params: PurchasingFilters): Promise<Pu
       status: params.status,
       date_from: params.dateFrom,
       date_to: params.dateTo,
+      page: String(page),
+      limit: String(limit),
     })}`,
     {
       authMode: "appwrite",
-      parse: (data) => parseList(data, parseReceipt),
+      parse: (data) => parsePurchasePage(data, parseReceipt, limit),
     },
   );
 
   return response.data;
 }
 
-export async function getPurchaseReturns(params: PurchaseReturnFilters): Promise<PurchaseReturn[]> {
-  const response = await apiRequest<PurchaseReturn[]>(
+export async function getPurchaseReturns(
+  params: PurchaseReturnFilters,
+  page = 1,
+  limit = PURCHASE_LIST_PAGE_SIZE,
+): Promise<PurchaseReturnPage> {
+  const response = await apiRequest<PurchaseReturnPage>(
     `/api/v1/purchasing/returns${toQueryString({
       branch_id: params.branchId,
       date_from: params.dateFrom,
@@ -1876,10 +1945,12 @@ export async function getPurchaseReturns(params: PurchaseReturnFilters): Promise
       search: params.search,
       status: params.status,
       supplier_id: params.supplierId,
+      page: String(page),
+      limit: String(limit),
     })}`,
     {
       authMode: "appwrite",
-      parse: (data) => parseList(data, parsePurchaseReturn),
+      parse: (data) => parsePurchasePage(data, parsePurchaseReturn, limit),
     },
   );
 

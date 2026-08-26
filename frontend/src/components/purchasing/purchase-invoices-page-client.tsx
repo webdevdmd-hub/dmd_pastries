@@ -17,6 +17,7 @@ import { PurchasingToolbar } from "@/components/purchasing/purchasing-toolbar";
 import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
+import { PaginationBar } from "@/components/shared/pagination-bar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -111,7 +112,22 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [loadingInvoiceDetailId, setLoadingInvoiceDetailId] = useState<string | null>(null);
-  const invoicesQuery = usePurchaseInvoices(filters, canView && branchScope.hasBranchScope);
+  const [page, setPage] = useState(1);
+  const invoicesQuery = usePurchaseInvoices(filters, canView && branchScope.hasBranchScope, page);
+  const invoicesTotalPages = invoicesQuery.data?.pagination.totalPages ?? 1;
+  // Narrowing the filters, or deleting the last row on the final page,
+  // both leave the page pointing past the end. The empty response that
+  // comes back reads as "nothing found", which is a lie about the data
+  // rather than about the page, so snap back into range.
+  const filterKey = JSON.stringify(filters);
+  useEffect(() => {
+    setPage(1);
+  }, [filterKey]);
+  useEffect(() => {
+    if (page > invoicesTotalPages) {
+      setPage(invoicesTotalPages);
+    }
+  }, [page, invoicesTotalPages]);
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const branchesQuery = usePurchasingBranches(canView);
   const productsQuery = usePurchasingProducts(canView);
@@ -280,7 +296,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
     }
   };
 
-  const invoices = invoicesQuery.data ?? [];
+  const invoices = invoicesQuery.data?.items ?? [];
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -368,6 +384,17 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
               onPost={(invoice) => setPendingAction({ invoice, type: "post" })}
               onReceive={(invoice) => void handleOpenReceive(invoice)}
             />
+            {invoicesQuery.data?.pagination ? (
+              <PaginationBar
+                isFetching={invoicesQuery.isFetching}
+                limit={invoicesQuery.data.pagination.limit}
+                noun={{ one: "bill", other: "bills" }}
+                onPageChange={setPage}
+                page={invoicesQuery.data.pagination.page}
+                total={invoicesQuery.data.pagination.total}
+                totalPages={invoicesQuery.data.pagination.totalPages}
+              />
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { JSX } from "react";
+import type { JSX, MouseEvent as ReactMouseEvent } from "react";
 
 import { PurchaseOrderActionsMenu } from "@/components/purchasing/purchase-order-actions-menu";
 import { PurchaseOrderStatusBadge } from "@/components/purchasing/purchase-order-status-badge";
@@ -24,6 +24,29 @@ function formatCurrency(value: number): string {
 
 function formatDate(value: string | null): string {
   return formatDateOnly(value);
+}
+
+/**
+ * Branch and who raised it are how you recognise a row once you have found it,
+ * not how you find it -- nobody scans a column of "Main Branch (MAIN)" looking
+ * for one order. They ride under the number they belong to, the same move the
+ * movements ledger made when it went to eight columns.
+ */
+function orderSubline(order: PurchaseOrder): string {
+  return [order.branchName, order.createdByUserName].filter(Boolean).join(" · ");
+}
+
+/**
+ * A click anywhere in the row opens the order, except where the row already
+ * has something else to do: the number is a link, the last cell is a menu, and
+ * a click that ends a text selection is a read, not a navigation.
+ */
+function shouldOpenOrder(event: ReactMouseEvent<HTMLTableRowElement>): boolean {
+  if (event.target instanceof Element && event.target.closest("a,button,[role='menuitem']")) {
+    return false;
+  }
+
+  return (window.getSelection()?.toString().length ?? 0) === 0;
 }
 
 type NextStepPermissions = {
@@ -99,29 +122,36 @@ export function PurchaseOrdersTable({
         <TableRow>
           <TableHead>PO Number</TableHead>
           <TableHead>Supplier</TableHead>
-          <TableHead>Branch</TableHead>
           <TableHead>Order Date</TableHead>
           <TableHead>Expected Delivery</TableHead>
           <TableHead>Status</TableHead>
           <TableHead className="text-right">Total</TableHead>
-          <TableHead>Created By</TableHead>
           <TableHead>Next Step</TableHead>
-          <TableHead>Actions</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {orders.map((order) => (
-          <TableRow key={order.id}>
+          <TableRow
+            className="cursor-pointer"
+            key={order.id}
+            onClick={(event) => {
+              if (!shouldOpenOrder(event)) return;
+              router.push(`${ROUTES.purchasingOrders}/${order.id}`);
+            }}
+          >
             <TableCell>
-              <Link
-                className="font-semibold text-brand-espresso"
-                href={`${ROUTES.purchasingOrders}/${order.id}`}
-              >
-                {order.purchaseOrderNumber}
-              </Link>
+              <div>
+                <Link
+                  className="font-semibold text-brand-espresso"
+                  href={`${ROUTES.purchasingOrders}/${order.id}`}
+                >
+                  {order.purchaseOrderNumber}
+                </Link>
+                <p className="text-meta text-foreground-muted">{orderSubline(order)}</p>
+              </div>
             </TableCell>
             <TableCell>{order.supplierName}</TableCell>
-            <TableCell>{order.branchName}</TableCell>
             <TableCell className="tabular-nums">{formatDate(order.orderDate)}</TableCell>
             <TableCell className="tabular-nums">{formatDate(order.expectedDeliveryDate)}</TableCell>
             <TableCell>
@@ -130,7 +160,6 @@ export function PurchaseOrdersTable({
             <TableCell className="text-right tabular-nums">
               {formatCurrency(order.totalAmount)}
             </TableCell>
-            <TableCell>{order.createdByUserName}</TableCell>
             <TableCell>
               <span className="text-meta text-foreground-muted">
                 {nextStepForOrder(order, {
@@ -140,7 +169,7 @@ export function PurchaseOrdersTable({
                 })}
               </span>
             </TableCell>
-            <TableCell>
+            <TableCell className="text-right">
               <PurchaseOrderActionsMenu
                 canCreate={canCreate}
                 canDelete={canDelete}

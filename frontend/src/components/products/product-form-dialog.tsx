@@ -494,14 +494,14 @@ export function ProductFormDialog({
                   <FieldError message={form.formState.errors.productName?.message} />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label>Product type</Label>
+                  <Label htmlFor="product-form-product-type">Product type</Label>
                   <Select
                     onValueChange={(value) =>
                       handleProductTypeChange(value as ProductSchema["productType"])
                     }
                     value={form.watch("productType")}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="product-form-product-type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -514,14 +514,14 @@ export function ProductFormDialog({
                   </Select>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label>Item structure</Label>
+                  <Label htmlFor="product-form-item-structure">Item structure</Label>
                   <Select
                     onValueChange={(value) =>
                       form.setValue("itemStructure", value as ProductSchema["itemStructure"])
                     }
                     value={form.watch("itemStructure")}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="product-form-item-structure">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -539,13 +539,13 @@ export function ProductFormDialog({
                   ) : null}
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label>Category</Label>
+                  <Label htmlFor="product-form-category">Category</Label>
                   <Select
                     disabled={compatibleCategories.length === 0}
                     onValueChange={handleCategoryChange}
                     value={selectedCategoryId}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="product-form-category">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
@@ -569,7 +569,7 @@ export function ProductFormDialog({
                   <FieldError message={form.formState.errors.categoryId?.message} />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label>Unit</Label>
+                  <Label htmlFor="product-form-unit">Unit</Label>
                   <Controller
                     control={form.control}
                     name="unitId"
@@ -585,7 +585,7 @@ export function ProductFormDialog({
                         }}
                         value={field.value}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger id="product-form-unit">
                           <SelectValue placeholder="Select unit" />
                         </SelectTrigger>
                         <SelectContent>
@@ -624,14 +624,14 @@ export function ProductFormDialog({
                   <FieldError message={form.formState.errors.costPrice?.message} />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label>Cost update policy</Label>
+                  <Label htmlFor="product-form-cost-update-policy">Cost update policy</Label>
                   <Select
                     onValueChange={(value) =>
                       form.setValue("costUpdatePolicy", value as ProductSchema["costUpdatePolicy"])
                     }
                     value={form.watch("costUpdatePolicy")}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="product-form-cost-update-policy">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -644,14 +644,14 @@ export function ProductFormDialog({
                   </Select>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label>Pricing type</Label>
+                  <Label htmlFor="product-form-pricing-type">Pricing type</Label>
                   <Select
                     onValueChange={(value) =>
                       form.setValue("pricingType", value as ProductSchema["pricingType"])
                     }
                     value={form.watch("pricingType")}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="product-form-pricing-type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -678,14 +678,14 @@ export function ProductFormDialog({
                   <FieldError message={form.formState.errors.minimumSalePrice?.message} />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label>Tax rate</Label>
+                  <Label htmlFor="product-form-tax-rate">Tax rate</Label>
                   <Select
                     onValueChange={(value) =>
                       form.setValue("taxRateId", value === "__none" ? "" : value)
                     }
                     value={watchedTaxRateId.trim() ? watchedTaxRateId : "__none"}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="product-form-tax-rate">
                       <SelectValue placeholder="Optional tax rate" />
                     </SelectTrigger>
                     <SelectContent>

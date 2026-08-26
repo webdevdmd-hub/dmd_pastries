@@ -26,9 +26,14 @@ export function ReportBranchSelect({
 }: ReportBranchSelectProps): JSX.Element {
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium text-brand-espresso">Branch</label>
+      <label
+        htmlFor="report-branch-select-branch"
+        className="text-sm font-medium text-brand-espresso"
+      >
+        Branch
+      </label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
+        <SelectTrigger id="report-branch-select-branch">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

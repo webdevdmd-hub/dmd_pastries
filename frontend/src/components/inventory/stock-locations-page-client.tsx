@@ -329,8 +329,9 @@ export function StockLocationsPageClient(): JSX.Element {
           </DialogHeader>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
-              <Label>Location name</Label>
+              <Label htmlFor="stock-locations-location-name">Location name</Label>
               <Input
+                id="stock-locations-location-name"
                 value={form.locationName}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, locationName: event.target.value }))
@@ -338,8 +339,9 @@ export function StockLocationsPageClient(): JSX.Element {
               />
             </div>
             <div className="space-y-1">
-              <Label>Location code</Label>
+              <Label htmlFor="stock-locations-location-code">Location code</Label>
               <Input
+                id="stock-locations-location-code"
                 value={form.locationCode}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, locationCode: event.target.value }))
@@ -347,14 +349,14 @@ export function StockLocationsPageClient(): JSX.Element {
               />
             </div>
             <div className="space-y-1">
-              <Label>Location type</Label>
+              <Label htmlFor="stock-locations-location-type">Location type</Label>
               <Select
                 value={form.locationType}
                 onValueChange={(value) =>
                   setForm((current) => ({ ...current, locationType: value as StockLocationType }))
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger id="stock-locations-location-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -367,14 +369,14 @@ export function StockLocationsPageClient(): JSX.Element {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Status</Label>
+              <Label htmlFor="stock-locations-status">Status</Label>
               <Select
                 value={form.status}
                 onValueChange={(value) =>
                   setForm((current) => ({ ...current, status: value as InventoryStatus }))
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger id="stock-locations-status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -384,8 +386,9 @@ export function StockLocationsPageClient(): JSX.Element {
               </Select>
             </div>
             <div className="space-y-1 md:col-span-2">
-              <Label>Description</Label>
+              <Label htmlFor="stock-locations-description">Description</Label>
               <Input
+                id="stock-locations-description"
                 value={form.description ?? ""}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, description: event.target.value }))

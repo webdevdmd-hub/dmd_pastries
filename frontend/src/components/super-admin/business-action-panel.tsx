@@ -2,7 +2,7 @@
 
 import { Building2, Save, ShieldAlert } from "lucide-react";
 import type { JSX } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useId, useMemo, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -183,10 +183,18 @@ export function SuperAdminBusinessActionPanel({ detail }: BusinessActionPanelPro
 }
 
 function Field({ children, label }: { children: JSX.Element; label: string }): JSX.Element {
+  // The control arrives as children, so this wrapper mints the id and hands it
+  // down. Without it the label named nothing: children keeps whatever id it
+  // already carries, so a caller that sets its own still wins.
+  const fieldId = useId();
+  const control = isValidElement<{ id?: string }>(children)
+    ? cloneElement(children, { id: children.props.id ?? fieldId })
+    : children;
+
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
-      {children}
+      <Label htmlFor={fieldId}>{label}</Label>
+      {control}
     </div>
   );
 }

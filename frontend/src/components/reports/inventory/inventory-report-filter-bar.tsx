@@ -97,14 +97,19 @@ export function InventoryReportFilterBar({
           onChange={(branchId) => onChange({ ...filters, branchId })}
         />
         <div className="space-y-2">
-          <label className="text-sm font-medium text-brand-espresso">Item type</label>
+          <label
+            htmlFor="inventory-report-filter-bar-item-type"
+            className="text-sm font-medium text-brand-espresso"
+          >
+            Item type
+          </label>
           <Select
             value={filters.itemType}
             onValueChange={(itemType: InventoryReportFilterDraft["itemType"]) =>
               onChange({ ...filters, itemType })
             }
           >
-            <SelectTrigger>
+            <SelectTrigger id="inventory-report-filter-bar-item-type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -117,12 +122,17 @@ export function InventoryReportFilterBar({
           </Select>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-brand-espresso">Status</label>
+          <label
+            htmlFor="inventory-report-filter-bar-status"
+            className="text-sm font-medium text-brand-espresso"
+          >
+            Status
+          </label>
           <Select
             value={filters.status}
             onValueChange={(status) => onChange({ ...filters, status })}
           >
-            <SelectTrigger>
+            <SelectTrigger id="inventory-report-filter-bar-status">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

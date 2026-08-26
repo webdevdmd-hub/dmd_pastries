@@ -319,8 +319,9 @@ export function OpeningStockDialog({
         >
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
-              <Label>Branch</Label>
+              <Label htmlFor="opening-stock-branch">Branch</Label>
               <SearchableCombobox
+                id="opening-stock-branch"
                 emptyMessage="No matching branches found."
                 onValueChange={(value) => form.setValue("branchId", value)}
                 options={branchOptions}
@@ -330,14 +331,14 @@ export function OpeningStockDialog({
               />
             </div>
             <div className="space-y-1">
-              <Label>Item type</Label>
+              <Label htmlFor="opening-stock-item-type">Item type</Label>
               <Select
                 onValueChange={(value) =>
                   handleItemTypeChange(value as OpeningStockSchema["itemType"])
                 }
                 value={itemType}
               >
-                <SelectTrigger>
+                <SelectTrigger id="opening-stock-item-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -347,8 +348,9 @@ export function OpeningStockDialog({
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Product</Label>
+              <Label htmlFor="opening-stock-product">Product</Label>
               <SearchableCombobox
+                id="opening-stock-product"
                 emptyMessage="No matching products found."
                 onValueChange={handleProductChange}
                 options={productOptions}
@@ -364,8 +366,9 @@ export function OpeningStockDialog({
             </div>
             {itemType === "product_variant" ? (
               <div className="space-y-1">
-                <Label>Variant</Label>
+                <Label htmlFor="opening-stock-variant">Variant</Label>
                 <SearchableCombobox
+                  id="opening-stock-variant"
                   disabled={!selectedProductId}
                   emptyMessage="No matching variants found."
                   onValueChange={handleVariantChange}
@@ -389,8 +392,9 @@ export function OpeningStockDialog({
             ) : null}
             {stockLocations.length > 0 ? (
               <div className="space-y-1">
-                <Label>Stock location</Label>
+                <Label htmlFor="opening-stock-stock-location">Stock location</Label>
                 <SearchableCombobox
+                  id="opening-stock-stock-location"
                   emptyMessage="No matching stock locations found."
                   onValueChange={(value) => form.setValue("stockLocationId", value)}
                   options={stockLocationOptions}
@@ -401,8 +405,9 @@ export function OpeningStockDialog({
               </div>
             ) : null}
             <div className="space-y-1">
-              <Label>Unit</Label>
+              <Label htmlFor="opening-stock-unit">Unit</Label>
               <SearchableCombobox
+                id="opening-stock-unit"
                 emptyMessage="No matching units found."
                 onValueChange={(value) => form.setValue("unitId", value)}
                 options={unitOptions}

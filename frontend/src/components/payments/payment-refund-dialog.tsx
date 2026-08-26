@@ -156,13 +156,13 @@ export function PaymentRefundDialog({
             </p>
           </div>
           <div className="grid gap-2">
-            <Label>Approved by</Label>
+            <Label htmlFor="payment-refund-approved-by">Approved by</Label>
             <Select
               disabled={!canSelectApprover}
               onValueChange={(value) => form.setValue("approvedByUserId", value)}
               value={selectedApproverId}
             >
-              <SelectTrigger>
+              <SelectTrigger id="payment-refund-approved-by">
                 <SelectValue placeholder="Select approver" />
               </SelectTrigger>
               <SelectContent>

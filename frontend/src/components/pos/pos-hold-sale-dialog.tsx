@@ -135,10 +135,14 @@ export function POSHoldSaleDialog({
           <div className="rounded-lg border border-border bg-muted p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="flex-1 space-y-1">
-                <label className="text-xs font-bold uppercase tracking-[0.16em] text-foreground-muted">
+                <label
+                  htmlFor="pos-hold-sale-hold-current-cart"
+                  className="text-xs font-bold uppercase tracking-[0.16em] text-foreground-muted"
+                >
                   Hold current cart
                 </label>
                 <Input
+                  id="pos-hold-sale-hold-current-cart"
                   className="rounded-md border-border bg-card shadow-none focus-visible:ring-black"
                   onChange={(event) => setNotes(event.target.value)}
                   placeholder="Optional note, customer name, or pickup reminder"

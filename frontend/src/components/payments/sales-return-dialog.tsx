@@ -406,8 +406,11 @@ export function SalesReturnDialog({
                 {refundMode === "refund" ? (
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label>Refund payment method</Label>
+                      <Label htmlFor="sales-return-refund-payment-method">
+                        Refund payment method
+                      </Label>
                       <SearchableCombobox
+                        id="sales-return-refund-payment-method"
                         emptyMessage="No active POS refund methods with payment accounts found."
                         onValueChange={setRefundPaymentMethodId}
                         options={paymentMethodOptions}

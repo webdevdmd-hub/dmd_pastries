@@ -15,6 +15,7 @@ import { PurchasingToolbar } from "@/components/purchasing/purchasing-toolbar";
 import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
+import { PaginationBar } from "@/components/shared/pagination-bar";
 import { ReturnReversalDialog } from "@/components/shared/return-reversal-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -87,7 +88,22 @@ export function PurchaseReturnsPageClient(): JSX.Element {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [reversalReturn, setReversalReturn] = useState<PurchaseReturn | null>(null);
-  const returnsQuery = usePurchaseReturns(filters, canView && branchScope.hasBranchScope);
+  const [page, setPage] = useState(1);
+  const returnsQuery = usePurchaseReturns(filters, canView && branchScope.hasBranchScope, page);
+  const purchaseReturnsTotalPages = returnsQuery.data?.pagination.totalPages ?? 1;
+  // Narrowing the filters, or deleting the last row on the final page,
+  // both leave the page pointing past the end. The empty response that
+  // comes back reads as "nothing found", which is a lie about the data
+  // rather than about the page, so snap back into range.
+  const filterKey = JSON.stringify(filters);
+  useEffect(() => {
+    setPage(1);
+  }, [filterKey]);
+  useEffect(() => {
+    if (page > purchaseReturnsTotalPages) {
+      setPage(purchaseReturnsTotalPages);
+    }
+  }, [page, purchaseReturnsTotalPages]);
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const branchesQuery = usePurchasingBranches(canView);
   const stockLocationsQuery = useStockLocations(canView && canCreate);
@@ -163,7 +179,7 @@ export function PurchaseReturnsPageClient(): JSX.Element {
     }
   };
 
-  const purchaseReturns = returnsQuery.data ?? [];
+  const purchaseReturns = returnsQuery.data?.items ?? [];
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -252,6 +268,17 @@ export function PurchaseReturnsPageClient(): JSX.Element {
               onReverse={setReversalReturn}
               returns={purchaseReturns}
             />
+            {returnsQuery.data?.pagination ? (
+              <PaginationBar
+                isFetching={returnsQuery.isFetching}
+                limit={returnsQuery.data.pagination.limit}
+                noun={{ one: "vendor credit", other: "vendor credits" }}
+                onPageChange={setPage}
+                page={returnsQuery.data.pagination.page}
+                total={returnsQuery.data.pagination.total}
+                totalPages={returnsQuery.data.pagination.totalPages}
+              />
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

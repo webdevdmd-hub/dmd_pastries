@@ -95,14 +95,14 @@ export function StockAdjustmentDialog({
           }}
         >
           <div className="space-y-1">
-            <Label>Adjustment type</Label>
+            <Label htmlFor="stock-adjustment-adjustment-type">Adjustment type</Label>
             <Select
               onValueChange={(value) =>
                 form.setValue("adjustmentType", value as StockAdjustmentSchema["adjustmentType"])
               }
               value={form.watch("adjustmentType")}
             >
-              <SelectTrigger>
+              <SelectTrigger id="stock-adjustment-adjustment-type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

@@ -268,10 +268,12 @@ export function SupplierPurchasingHistory({
     return <HistorySkeleton />;
   }
 
-  const orders = ordersQuery.data ?? [];
-  const invoices = invoicesQuery.data ?? [];
-  const returns = returnsQuery.data ?? [];
-  const payments = paymentsQuery.data ?? [];
+  // This panel shows a supplier's recent orders, not a browsable list, so it
+  // takes the first page and leaves paging to the purchase orders page.
+  const orders = ordersQuery.data?.items ?? [];
+  const invoices = invoicesQuery.data?.items ?? [];
+  const returns = returnsQuery.data?.items ?? [];
+  const payments = paymentsQuery.data?.items ?? [];
   const statement = statementQuery.data;
   const queryError =
     ordersQuery.error ??

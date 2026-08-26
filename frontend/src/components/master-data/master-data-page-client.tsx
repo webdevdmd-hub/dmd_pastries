@@ -1819,13 +1819,18 @@ function CategoryCopyDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-brand-espresso">Copy from branch</label>
+            <label
+              htmlFor="master-data-copy-from-branch"
+              className="text-sm font-medium text-brand-espresso"
+            >
+              Copy from branch
+            </label>
             <Select
               disabled={Boolean(disabledReason) || isBranchesLoading || isSubmitting}
               onValueChange={onSourceBranchChange}
               {...(selectedSourceBranchId ? { value: selectedSourceBranchId } : {})}
             >
-              <SelectTrigger>
+              <SelectTrigger id="master-data-copy-from-branch">
                 <SelectValue
                   placeholder={isBranchesLoading ? "Loading branches..." : "Select source branch"}
                 />

@@ -148,9 +148,10 @@ export function RecipePackagingLineEditor({
   return (
     <div className="grid gap-4 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4">
       <div className="grid gap-4 lg:grid-cols-2">
-        <label className="grid gap-2">
-          <Label>Packaging product</Label>
+        <div className="grid gap-2">
+          <Label htmlFor="recipe-packaging-line-editor-packaging-product">Packaging product</Label>
           <SearchableCombobox
+            id="recipe-packaging-line-editor-packaging-product"
             emptyMessage="No matching packaging products found."
             onValueChange={(value) => {
               setComponentProductId(value);
@@ -171,10 +172,11 @@ export function RecipePackagingLineEditor({
               product before saving changes.
             </span>
           ) : null}
-        </label>
-        <label className="grid gap-2">
-          <Label>Unit</Label>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="recipe-packaging-line-editor-unit">Unit</Label>
           <SearchableCombobox
+            id="recipe-packaging-line-editor-unit"
             emptyMessage="No matching units found."
             onValueChange={setUnitId}
             options={unitOptions}
@@ -192,12 +194,13 @@ export function RecipePackagingLineEditor({
               another unit.
             </span>
           ) : null}
-        </label>
+        </div>
       </div>
       {selectedVariants.length > 0 ? (
-        <label className="grid gap-2">
-          <Label>Packaging variant</Label>
+        <div className="grid gap-2">
+          <Label htmlFor="recipe-packaging-line-editor-packaging-variant">Packaging variant</Label>
           <SearchableCombobox
+            id="recipe-packaging-line-editor-packaging-variant"
             emptyMessage="No matching variants found."
             onValueChange={setComponentVariantId}
             options={variantOptions}
@@ -205,10 +208,10 @@ export function RecipePackagingLineEditor({
             searchPlaceholder="Search variant, SKU..."
             value={componentVariantId}
           />
-        </label>
+        </div>
       ) : null}
       <div className="grid gap-4 md:grid-cols-3">
-        <label className="grid gap-2">
+        <div className="grid gap-2">
           <Label htmlFor="packaging-qty">Quantity</Label>
           <Input
             id="packaging-qty"
@@ -218,8 +221,8 @@ export function RecipePackagingLineEditor({
             type="number"
             value={quantityRequired}
           />
-        </label>
-        <label className="grid gap-2">
+        </div>
+        <div className="grid gap-2">
           <Label htmlFor="packaging-sort">Sort order</Label>
           <Input
             id="packaging-sort"
@@ -229,7 +232,7 @@ export function RecipePackagingLineEditor({
             type="number"
             value={sortOrder}
           />
-        </label>
+        </div>
         <label className="flex items-end gap-2 pb-3 text-sm font-medium text-brand-espresso">
           <Checkbox
             checked={isOptional}

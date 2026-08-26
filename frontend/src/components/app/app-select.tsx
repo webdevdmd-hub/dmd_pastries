@@ -1,6 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
+import { useId } from "react";
 
 import { Label } from "@/components/ui/label";
 import {
@@ -34,11 +35,15 @@ export function AppSelect({
   placeholder = "Select option",
   value,
 }: AppSelectProps): JSX.Element {
+  // Every AppSelect on a page shared one hardcoded id, so a second instance
+  // stole the first one's label. useId gives each render its own.
+  const fieldId = useId();
+
   return (
     <div className="grid gap-2">
-      {label ? <Label>{label}</Label> : null}
+      {label ? <Label htmlFor={fieldId}>{label}</Label> : null}
       <Select onValueChange={onValueChange} value={value}>
-        <SelectTrigger aria-invalid={error ? true : undefined}>
+        <SelectTrigger aria-invalid={error ? true : undefined} id={fieldId}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>

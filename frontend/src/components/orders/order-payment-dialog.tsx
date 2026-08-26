@@ -141,7 +141,7 @@ export function OrderPaymentDialog({
           }}
         >
           <div className="grid gap-2">
-            <Label>Payment method</Label>
+            <Label htmlFor="order-payment-payment-method">Payment method</Label>
             <Select
               disabled={methods.length === 0}
               onValueChange={(value) =>
@@ -149,7 +149,7 @@ export function OrderPaymentDialog({
               }
               value={selectedPaymentMethodId}
             >
-              <SelectTrigger>
+              <SelectTrigger id="order-payment-payment-method">
                 <SelectValue placeholder="Select payment method" />
               </SelectTrigger>
               <SelectContent>
@@ -170,7 +170,7 @@ export function OrderPaymentDialog({
             </p>
           </div>
           <div className="grid gap-2">
-            <Label>Payment stage</Label>
+            <p className="text-sm font-medium leading-none text-brand-espresso">Payment stage</p>
             <div className="rounded-xl border border-brand-cappuccino/70 bg-brand-latte/70 px-3 py-2 text-sm font-semibold text-brand-espresso">
               {orderPaymentTypeLabel(paymentType)}
             </div>

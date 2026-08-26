@@ -168,20 +168,20 @@ export function PackagingFormDialog({
         >
           <section className="grid gap-4 md:grid-cols-2">
             <h3 className="text-sm font-bold text-brand-mocha md:col-span-2">Basic Information</h3>
-            <label className="grid gap-2">
+            <div className="grid gap-2">
               <Label htmlFor="packaging-name">Packaging name</Label>
               <Input id="packaging-name" {...form.register("packagingName")} />
               {fieldError("packagingName") ? (
                 <span className="text-sm text-danger-text">{fieldError("packagingName")}</span>
               ) : null}
-            </label>
-            <label className="grid gap-2">
-              <Label>Packaging category</Label>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="packaging-form-packaging-category">Packaging category</Label>
               <Select
                 onValueChange={(value) => form.setValue("packagingCategoryId", value)}
                 value={form.watch("packagingCategoryId")}
               >
-                <SelectTrigger>
+                <SelectTrigger id="packaging-form-packaging-category">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -197,16 +197,16 @@ export function PackagingFormDialog({
                   {fieldError("packagingCategoryId")}
                 </span>
               ) : null}
-            </label>
-            <label className="grid gap-2">
-              <Label>Supplier</Label>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="packaging-form-supplier">Supplier</Label>
               <Select
                 onValueChange={(value) =>
                   form.setValue("supplierId", value === "none" ? null : value)
                 }
                 value={form.watch("supplierId") ?? "none"}
               >
-                <SelectTrigger>
+                <SelectTrigger id="packaging-form-supplier">
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent>
@@ -218,14 +218,14 @@ export function PackagingFormDialog({
                   ))}
                 </SelectContent>
               </Select>
-            </label>
-            <label className="grid gap-2">
-              <Label>Unit</Label>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="packaging-form-unit">Unit</Label>
               <Select
                 onValueChange={(value) => form.setValue("unitId", value)}
                 value={form.watch("unitId")}
               >
-                <SelectTrigger>
+                <SelectTrigger id="packaging-form-unit">
                   <SelectValue placeholder="Select unit" />
                 </SelectTrigger>
                 <SelectContent>
@@ -239,8 +239,8 @@ export function PackagingFormDialog({
               {fieldError("unitId") ? (
                 <span className="text-sm text-danger-text">{fieldError("unitId")}</span>
               ) : null}
-            </label>
-            <label className="grid gap-2">
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="packaging-cost">Cost per unit</Label>
               <Input
                 id="packaging-cost"
@@ -252,7 +252,7 @@ export function PackagingFormDialog({
               {fieldError("costPerUnit") ? (
                 <span className="text-sm text-danger-text">{fieldError("costPerUnit")}</span>
               ) : null}
-            </label>
+            </div>
           </section>
 
           <section className="grid gap-4 md:grid-cols-3">
@@ -285,7 +285,7 @@ export function PackagingFormDialog({
 
           <section className="grid gap-4 md:grid-cols-2">
             <h3 className="text-sm font-bold text-brand-mocha md:col-span-2">Media & Notes</h3>
-            <label className="grid gap-2">
+            <div className="grid gap-2">
               <Label htmlFor="packaging-image">Packaging image</Label>
               <div className="flex flex-col gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-3 sm:flex-row sm:items-center">
                 {previewUrl ? (
@@ -309,15 +309,15 @@ export function PackagingFormDialog({
                   type="file"
                 />
               </div>
-            </label>
-            <label className="grid gap-2">
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="packaging-description">Description</Label>
               <textarea
                 className="min-h-24 rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso focus:outline-none focus:ring-2 focus:ring-brand-caramel"
                 id="packaging-description"
                 {...form.register("description")}
               />
-            </label>
+            </div>
           </section>
 
           <DialogFooter>

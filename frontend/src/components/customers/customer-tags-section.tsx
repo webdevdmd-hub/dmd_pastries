@@ -171,15 +171,15 @@ export function CustomerTagsSection({
               Create a reusable tag and assign it to this customer.
             </DialogDescription>
           </DialogHeader>
-          <label className="grid gap-2">
+          <div className="grid gap-2">
             <Label htmlFor="customer-tag-name">Tag name</Label>
             <Input
               id="customer-tag-name"
               onChange={(event) => setTagName(event.target.value)}
               value={tagName}
             />
-          </label>
-          <label className="grid gap-2">
+          </div>
+          <div className="grid gap-2">
             <Label htmlFor="customer-tag-color">Color</Label>
             <Input
               id="customer-tag-color"
@@ -187,7 +187,7 @@ export function CustomerTagsSection({
               placeholder="#B08968"
               value={tagColor}
             />
-          </label>
+          </div>
           <DialogFooter>
             <Button onClick={() => setOpen(false)} type="button" variant="outline">
               Cancel

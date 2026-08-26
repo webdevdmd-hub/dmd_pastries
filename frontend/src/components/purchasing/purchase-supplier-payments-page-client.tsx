@@ -17,6 +17,7 @@ import { FilteredState } from "@/components/shared/collection-state";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
+import { PaginationBar } from "@/components/shared/pagination-bar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,7 @@ import {
   useUpdateSupplierPayment,
 } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { PURCHASE_PICKER_PAGE_SIZE } from "@/lib/api/purchasing";
 import type {
   CreateSupplierPaymentPayload,
   PurchaseInvoice,
@@ -120,7 +122,22 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [selectedPaymentBranchId, setSelectedPaymentBranchId] = useState("");
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
-  const paymentsQuery = useSupplierPayments(filters, canView && branchScope.hasBranchScope);
+  const [page, setPage] = useState(1);
+  const paymentsQuery = useSupplierPayments(filters, canView && branchScope.hasBranchScope, page);
+  const paymentsTotalPages = paymentsQuery.data?.pagination.totalPages ?? 1;
+  // Narrowing the filters, or deleting the last row on the final page, both
+  // leave the page pointing past the end. The empty response that comes back
+  // reads as "nothing found", which is a lie about the data rather than about
+  // the page, so snap back into range.
+  const filterKey = JSON.stringify(filters);
+  useEffect(() => {
+    setPage(1);
+  }, [filterKey]);
+  useEffect(() => {
+    if (page > paymentsTotalPages) {
+      setPage(paymentsTotalPages);
+    }
+  }, [page, paymentsTotalPages]);
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const branchesQuery = usePurchasingBranches(canView);
   const editingPaymentQuery = useSupplierPayment(
@@ -166,6 +183,8 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
       manualDialogOpen &&
       manualBranchId.length > 0 &&
       selectedSupplierId.length > 0,
+    1,
+    PURCHASE_PICKER_PAGE_SIZE,
   );
   const createPaymentMutation = useCreateSupplierPayment();
   const updatePaymentMutation = useUpdateSupplierPayment();
@@ -189,8 +208,8 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
     if (!selectedSupplierId) return [];
 
     return editingPaymentId
-      ? mergeEditableInvoices(payableInvoicesQuery.data ?? [], editingPaymentQuery.data)
-      : (payableInvoicesQuery.data ?? []).filter(
+      ? mergeEditableInvoices(payableInvoicesQuery.data?.items ?? [], editingPaymentQuery.data)
+      : (payableInvoicesQuery.data?.items ?? []).filter(
           (invoice) => invoice.status === "posted" && invoice.balanceAmount > 0,
         );
   }, [editingPaymentId, editingPaymentQuery.data, payableInvoicesQuery.data, selectedSupplierId]);
@@ -261,8 +280,8 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
     if (!selectedSupplierId) return [];
 
     return editingPaymentId
-      ? mergeEditableInvoices(result.data ?? [], editingPaymentQuery.data)
-      : (result.data ?? []).filter(
+      ? mergeEditableInvoices(result.data?.items ?? [], editingPaymentQuery.data)
+      : (result.data?.items ?? []).filter(
           (invoice) => invoice.status === "posted" && invoice.balanceAmount > 0,
         );
   };
@@ -432,7 +451,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
           never paid this supplier", which may be flatly untrue. DESIGN.md 8. */}
       {!paymentsQuery.isLoading &&
       !paymentsQuery.error &&
-      (paymentsQuery.data ?? []).length === 0 &&
+      (paymentsQuery.data?.items ?? []).length === 0 &&
       hasActiveFilters ? (
         <FilteredState
           noun="supplier payments"
@@ -445,12 +464,14 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
 
       {!paymentsQuery.isLoading &&
       !paymentsQuery.error &&
-      (paymentsQuery.data ?? []).length === 0 &&
+      (paymentsQuery.data?.items ?? []).length === 0 &&
       !hasActiveFilters ? (
         <PurchaseEmptyState title="No payments made found." />
       ) : null}
 
-      {!paymentsQuery.isLoading && !paymentsQuery.error && (paymentsQuery.data ?? []).length > 0 ? (
+      {!paymentsQuery.isLoading &&
+      !paymentsQuery.error &&
+      (paymentsQuery.data?.items ?? []).length > 0 ? (
         <Card>
           <CardContent className="p-0">
             <PurchaseSupplierPaymentsTable
@@ -458,8 +479,19 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
                 void deletePayment(payment);
               }}
               onEdit={openEditPayment}
-              payments={paymentsQuery.data ?? []}
+              payments={paymentsQuery.data?.items ?? []}
             />
+            {paymentsQuery.data?.pagination ? (
+              <PaginationBar
+                isFetching={paymentsQuery.isFetching}
+                limit={paymentsQuery.data.pagination.limit}
+                noun={{ one: "payment made", other: "payments made" }}
+                onPageChange={setPage}
+                page={paymentsQuery.data.pagination.page}
+                total={paymentsQuery.data.pagination.total}
+                totalPages={paymentsQuery.data.pagination.totalPages}
+              />
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

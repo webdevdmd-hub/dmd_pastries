@@ -325,21 +325,22 @@ function PaymentAccountDialog({
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="grid gap-2">
-            <Label>Account name</Label>
+            <Label htmlFor="settlement-pages-account-name">Account name</Label>
             <Input
+              id="settlement-pages-account-name"
               value={form.accountName}
               onChange={(event) => update({ accountName: event.target.value })}
             />
           </div>
           <div className="grid gap-2">
-            <Label>Account type</Label>
+            <Label htmlFor="settlement-pages-account-type">Account type</Label>
             <Select
               value={form.accountType}
               onValueChange={(accountType) =>
                 update({ accountType: accountType as PaymentAccountType })
               }
             >
-              <SelectTrigger aria-label="Account type">
+              <SelectTrigger id="settlement-pages-account-type" aria-label="Account type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -352,8 +353,9 @@ function PaymentAccountDialog({
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label>Branch</Label>
+            <Label htmlFor="settlement-pages-branch">Branch</Label>
             <SearchableCombobox
+              id="settlement-pages-branch"
               emptyMessage="No branches found."
               options={[
                 { value: noBranchValue, label: "Business-wide account" },
@@ -366,8 +368,9 @@ function PaymentAccountDialog({
             />
           </div>
           <div className="grid gap-2">
-            <Label>Linked asset ledger</Label>
+            <Label htmlFor="settlement-pages-linked-asset-ledger">Linked asset ledger</Label>
             <SearchableCombobox
+              id="settlement-pages-linked-asset-ledger"
               emptyMessage="No active Asset ledgers found. Create or activate an Asset account such as Cash, Bank, Petty Cash, Card Clearing, or Platform Settlement in Chart of Accounts."
               options={chartOptions}
               placeholder="Select active Asset ledger"
@@ -381,14 +384,14 @@ function PaymentAccountDialog({
             </p>
           </div>
           <div className="grid gap-2">
-            <Label>Status</Label>
+            <Label htmlFor="settlement-pages-status">Status</Label>
             <Select
               value={form.status}
               onValueChange={(status) =>
                 update({ status: status as PaymentAccountFormState["status"] })
               }
             >
-              <SelectTrigger aria-label="Status">
+              <SelectTrigger id="settlement-pages-status" aria-label="Status">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -400,8 +403,9 @@ function PaymentAccountDialog({
           {supportsOpeningBalance(form.accountType) ? (
             <>
               <div className="grid gap-2">
-                <Label>Opening balance</Label>
+                <Label htmlFor="settlement-pages-opening-balance">Opening balance</Label>
                 <Input
+                  id="settlement-pages-opening-balance"
                   onChange={(event) => update({ openingBalance: event.target.value })}
                   placeholder="0.00"
                   step="0.01"
@@ -414,8 +418,11 @@ function PaymentAccountDialog({
                 </p>
               </div>
               <div className="grid gap-2">
-                <Label>Opening balance as of</Label>
+                <Label htmlFor="settlement-pages-opening-balance-as-of">
+                  Opening balance as of
+                </Label>
                 <Input
+                  id="settlement-pages-opening-balance-as-of"
                   onChange={(event) => update({ openingBalanceDate: event.target.value })}
                   type="date"
                   value={form.openingBalanceDate}
@@ -427,8 +434,9 @@ function PaymentAccountDialog({
             </>
           ) : null}
           <div className="grid gap-2 md:col-span-2">
-            <Label>Description</Label>
+            <Label htmlFor="settlement-pages-description">Description</Label>
             <Input
+              id="settlement-pages-description"
               value={form.description}
               onChange={(event) => update({ description: event.target.value })}
             />
@@ -826,8 +834,9 @@ function AccountTransferDialog({
         </DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="grid gap-2">
-            <Label>Branch</Label>
+            <Label htmlFor="settlement-pages-branch-2">Branch</Label>
             <SearchableCombobox
+              id="settlement-pages-branch-2"
               options={[
                 { value: noBranchValue, label: "Business-wide transfer" },
                 ...branchesOptions,
@@ -838,16 +847,18 @@ function AccountTransferDialog({
             />
           </div>
           <div className="grid gap-2">
-            <Label>Transfer date</Label>
+            <Label htmlFor="settlement-pages-transfer-date">Transfer date</Label>
             <Input
+              id="settlement-pages-transfer-date"
               type="date"
               value={form.transferDate}
               onChange={(event) => update({ transferDate: event.target.value })}
             />
           </div>
           <div className="grid gap-2">
-            <Label>From account</Label>
+            <Label htmlFor="settlement-pages-from-account">From account</Label>
             <SearchableCombobox
+              id="settlement-pages-from-account"
               emptyMessage="No active payment accounts found."
               options={accountSelectorOptions}
               placeholder="Select source account"
@@ -856,8 +867,9 @@ function AccountTransferDialog({
             />
           </div>
           <div className="grid gap-2">
-            <Label>To account</Label>
+            <Label htmlFor="settlement-pages-to-account">To account</Label>
             <SearchableCombobox
+              id="settlement-pages-to-account"
               emptyMessage="No active payment accounts found."
               options={accountSelectorOptions}
               placeholder="Select target account"
@@ -866,8 +878,9 @@ function AccountTransferDialog({
             />
           </div>
           <div className="grid gap-2">
-            <Label>Amount</Label>
+            <Label htmlFor="settlement-pages-amount">Amount</Label>
             <Input
+              id="settlement-pages-amount"
               min={0}
               step="0.01"
               type="number"
@@ -876,15 +889,20 @@ function AccountTransferDialog({
             />
           </div>
           <div className="grid gap-2">
-            <Label>Reference number</Label>
+            <Label htmlFor="settlement-pages-reference-number">Reference number</Label>
             <Input
+              id="settlement-pages-reference-number"
               value={form.referenceNumber}
               onChange={(event) => update({ referenceNumber: event.target.value })}
             />
           </div>
           <div className="grid gap-2 md:col-span-2">
-            <Label>Notes</Label>
-            <Input value={form.notes} onChange={(event) => update({ notes: event.target.value })} />
+            <Label htmlFor="settlement-pages-notes">Notes</Label>
+            <Input
+              id="settlement-pages-notes"
+              value={form.notes}
+              onChange={(event) => update({ notes: event.target.value })}
+            />
           </div>
         </div>
         <DialogFooter>
@@ -1130,8 +1148,9 @@ function PlatformSettlementDialog({
         </DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="grid gap-2">
-            <Label>Branch</Label>
+            <Label htmlFor="settlement-pages-branch-3">Branch</Label>
             <SearchableCombobox
+              id="settlement-pages-branch-3"
               options={[
                 { value: noBranchValue, label: "Business-wide settlement" },
                 ...branchesOptions,
@@ -1142,16 +1161,18 @@ function PlatformSettlementDialog({
             />
           </div>
           <div className="grid gap-2">
-            <Label>Settlement date</Label>
+            <Label htmlFor="settlement-pages-settlement-date">Settlement date</Label>
             <Input
+              id="settlement-pages-settlement-date"
               type="date"
               value={form.settlementDate}
               onChange={(event) => update({ settlementDate: event.target.value })}
             />
           </div>
           <div className="grid gap-2">
-            <Label>Clearing account</Label>
+            <Label htmlFor="settlement-pages-clearing-account">Clearing account</Label>
             <SearchableCombobox
+              id="settlement-pages-clearing-account"
               emptyMessage="No platform or card clearing payment accounts found."
               options={clearingAccountOptions}
               placeholder="Select platform or card clearing account"
@@ -1160,8 +1181,9 @@ function PlatformSettlementDialog({
             />
           </div>
           <div className="grid gap-2">
-            <Label>Deposit account</Label>
+            <Label htmlFor="settlement-pages-deposit-account">Deposit account</Label>
             <SearchableCombobox
+              id="settlement-pages-deposit-account"
               emptyMessage="No non-clearing payment accounts found."
               options={depositAccountOptions}
               placeholder="Select deposit account"
@@ -1170,8 +1192,9 @@ function PlatformSettlementDialog({
             />
           </div>
           <div className="grid gap-2">
-            <Label>Gross amount</Label>
+            <Label htmlFor="settlement-pages-gross-amount">Gross amount</Label>
             <Input
+              id="settlement-pages-gross-amount"
               min={0}
               step="0.01"
               type="number"
@@ -1180,8 +1203,9 @@ function PlatformSettlementDialog({
             />
           </div>
           <div className="grid gap-2">
-            <Label>Net received</Label>
+            <Label htmlFor="settlement-pages-net-received">Net received</Label>
             <Input
+              id="settlement-pages-net-received"
               min={0}
               step="0.01"
               type="number"
@@ -1193,15 +1217,17 @@ function PlatformSettlementDialog({
             <p className="font-medium text-brand-espresso">Optional deduction</p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div className="grid gap-2">
-                <Label>Deduction type</Label>
+                <Label htmlFor="settlement-pages-deduction-type">Deduction type</Label>
                 <Input
+                  id="settlement-pages-deduction-type"
                   value={form.deductionType}
                   onChange={(event) => update({ deductionType: event.target.value })}
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Deduction amount</Label>
+                <Label htmlFor="settlement-pages-deduction-amount">Deduction amount</Label>
                 <Input
+                  id="settlement-pages-deduction-amount"
                   min={0}
                   step="0.01"
                   type="number"
@@ -1210,8 +1236,9 @@ function PlatformSettlementDialog({
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Expense account</Label>
+                <Label htmlFor="settlement-pages-expense-account">Expense account</Label>
                 <SearchableCombobox
+                  id="settlement-pages-expense-account"
                   options={expenseOptions}
                   placeholder="Select expense account"
                   value={form.expenseAccountId}
@@ -1219,8 +1246,9 @@ function PlatformSettlementDialog({
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Description</Label>
+                <Label htmlFor="settlement-pages-description-2">Description</Label>
                 <Input
+                  id="settlement-pages-description-2"
                   value={form.deductionDescription}
                   onChange={(event) => update({ deductionDescription: event.target.value })}
                 />
@@ -1228,15 +1256,20 @@ function PlatformSettlementDialog({
             </div>
           </div>
           <div className="grid gap-2">
-            <Label>Reference number</Label>
+            <Label htmlFor="settlement-pages-reference-number-2">Reference number</Label>
             <Input
+              id="settlement-pages-reference-number-2"
               value={form.referenceNumber}
               onChange={(event) => update({ referenceNumber: event.target.value })}
             />
           </div>
           <div className="grid gap-2">
-            <Label>Notes</Label>
-            <Input value={form.notes} onChange={(event) => update({ notes: event.target.value })} />
+            <Label htmlFor="settlement-pages-notes-2">Notes</Label>
+            <Input
+              id="settlement-pages-notes-2"
+              value={form.notes}
+              onChange={(event) => update({ notes: event.target.value })}
+            />
           </div>
         </div>
         <DialogFooter>

@@ -112,7 +112,7 @@ export function ProductFilters({
       {advancedOpen ? (
         <div className="grid gap-3 border-t border-brand-cappuccino/70 pt-3 sm:grid-cols-2 xl:grid-cols-7">
           <div>
-            <Label>Type</Label>
+            <Label htmlFor="product-filters-type">Type</Label>
             <Select
               onValueChange={(value) =>
                 onFiltersChange({
@@ -123,7 +123,7 @@ export function ProductFilters({
               }
               value={filters.productType}
             >
-              <SelectTrigger className="mt-1">
+              <SelectTrigger id="product-filters-type" className="mt-1">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -138,7 +138,7 @@ export function ProductFilters({
           </div>
 
           <div>
-            <Label>Structure</Label>
+            <Label htmlFor="product-filters-structure">Structure</Label>
             <Select
               onValueChange={(value) =>
                 onFiltersChange({
@@ -149,7 +149,7 @@ export function ProductFilters({
               }
               value={filters.itemStructure}
             >
-              <SelectTrigger className="mt-1">
+              <SelectTrigger id="product-filters-structure" className="mt-1">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -169,7 +169,7 @@ export function ProductFilters({
             { key: "isPurchasable", label: "Purchasable" },
           ].map((item) => (
             <div key={item.key}>
-              <Label>{item.label}</Label>
+              <Label htmlFor={`product-filters-${item.key}`}>{item.label}</Label>
               <Select
                 onValueChange={(value) =>
                   onFiltersChange({
@@ -180,7 +180,7 @@ export function ProductFilters({
                 }
                 value={filters[item.key as "isPosVisible" | "isPurchasable" | "isSellable"]}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="mt-1" id={`product-filters-${item.key}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -193,7 +193,7 @@ export function ProductFilters({
           ))}
 
           <div>
-            <Label>Sort</Label>
+            <Label htmlFor="product-filters-sort">Sort</Label>
             <Select
               onValueChange={(value) => {
                 const [sortBy, sortOrder] = value.split(":");
@@ -206,7 +206,7 @@ export function ProductFilters({
               }}
               value={`${filters.sortBy}:${filters.sortOrder}`}
             >
-              <SelectTrigger className="mt-1">
+              <SelectTrigger id="product-filters-sort" className="mt-1">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -220,14 +220,14 @@ export function ProductFilters({
           </div>
 
           <div>
-            <Label>Rows</Label>
+            <Label htmlFor="product-filters-rows">Rows</Label>
             <Select
               onValueChange={(value) =>
                 onFiltersChange({ ...filters, limit: Number(value), page: 1 })
               }
               value={String(filters.limit)}
             >
-              <SelectTrigger className="mt-1">
+              <SelectTrigger id="product-filters-rows" className="mt-1">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

@@ -112,25 +112,25 @@ export function SupplierFormDialog({
         >
           <section className="grid gap-4 md:grid-cols-2">
             <h3 className="text-sm font-bold text-brand-mocha md:col-span-2">Basic Information</h3>
-            <label className="grid gap-2">
+            <div className="grid gap-2">
               <Label htmlFor="supplier-name">Supplier name</Label>
               <Input id="supplier-name" {...form.register("supplierName")} />
               {fieldError("supplierName") ? (
                 <span className="text-sm text-danger-text">{fieldError("supplierName")}</span>
               ) : null}
-            </label>
-            <label className="grid gap-2">
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="supplier-phone">Phone</Label>
               <Input id="supplier-phone" {...form.register("phone")} />
-            </label>
-            <label className="grid gap-2">
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="supplier-email">Email</Label>
               <Input id="supplier-email" type="email" {...form.register("email")} />
               {fieldError("email") ? (
                 <span className="text-sm text-danger-text">{fieldError("email")}</span>
               ) : null}
-            </label>
-            <label className="grid gap-2">
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="supplier-website">Website</Label>
               <Input
                 id="supplier-website"
@@ -140,11 +140,11 @@ export function SupplierFormDialog({
               {fieldError("website") ? (
                 <span className="text-sm text-danger-text">{fieldError("website")}</span>
               ) : null}
-            </label>
-            <label className="grid gap-2">
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="supplier-tax-number">Tax number / TRN</Label>
               <Input id="supplier-tax-number" {...form.register("taxNumber")} />
-            </label>
+            </div>
           </section>
 
           <section className="grid gap-4 md:grid-cols-2">

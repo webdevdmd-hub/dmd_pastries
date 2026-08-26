@@ -144,7 +144,12 @@ export function ExportReportDialog({
           }}
         >
           <div className="space-y-2">
-            <label className="text-sm font-medium text-brand-espresso">Category</label>
+            <label
+              htmlFor="export-report-category"
+              className="text-sm font-medium text-brand-espresso"
+            >
+              Category
+            </label>
             <Select
               disabled={isSubmitting}
               value={selectedCategory}
@@ -160,7 +165,7 @@ export function ExportReportDialog({
                 }
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger id="export-report-category">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
@@ -173,7 +178,12 @@ export function ExportReportDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-brand-espresso">Report type</label>
+            <label
+              htmlFor="export-report-report-type"
+              className="text-sm font-medium text-brand-espresso"
+            >
+              Report type
+            </label>
             <Select
               disabled={isSubmitting}
               value={selectedReportType}
@@ -183,7 +193,7 @@ export function ExportReportDialog({
                 onReportTypeChange(value);
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger id="export-report-report-type">
                 <SelectValue placeholder="Select report" />
               </SelectTrigger>
               <SelectContent>
@@ -210,7 +220,12 @@ export function ExportReportDialog({
             ) : null}
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-brand-espresso">Branch</label>
+            <label
+              htmlFor="export-report-branch"
+              className="text-sm font-medium text-brand-espresso"
+            >
+              Branch
+            </label>
             <Select
               disabled={isSubmitting}
               value={selectedBranchId ?? ""}
@@ -219,7 +234,7 @@ export function ExportReportDialog({
                 form.setValue("filters.branchId", branchId, { shouldValidate: true });
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger id="export-report-branch">
                 <SelectValue placeholder="Current branch" />
               </SelectTrigger>
               <SelectContent>

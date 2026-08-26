@@ -108,13 +108,13 @@ export function OrderRefundDialog({
         </DialogHeader>
         <div className="grid gap-4">
           <div className="grid gap-2">
-            <Label>Refund method</Label>
+            <Label htmlFor="order-refund-refund-method">Refund method</Label>
             <Select
               disabled={methods.length === 0}
               onValueChange={setPaymentMethodId}
               value={paymentMethodId}
             >
-              <SelectTrigger>
+              <SelectTrigger id="order-refund-refund-method">
                 <SelectValue placeholder="Select payment method" />
               </SelectTrigger>
               <SelectContent>

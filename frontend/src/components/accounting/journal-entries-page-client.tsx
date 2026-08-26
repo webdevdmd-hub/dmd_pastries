@@ -439,14 +439,14 @@ function JournalEntryFormDialog({
           >
             <div className="grid gap-3 md:grid-cols-4">
               <div className="grid gap-2">
-                <Label>Branch</Label>
+                <Label htmlFor="journal-entries-branch">Branch</Label>
                 <Select
                   onValueChange={(branchId) =>
                     setFormState((current) => ({ ...current, branchId }))
                   }
                   value={formState.branchId}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="journal-entries-branch">
                     <SelectValue placeholder="Business-level" />
                   </SelectTrigger>
                   <SelectContent>

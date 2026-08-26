@@ -16,6 +16,7 @@ import { PurchasingToolbar } from "@/components/purchasing/purchasing-toolbar";
 import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
+import { PaginationBar } from "@/components/shared/pagination-bar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -87,7 +88,22 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [returnReceipt, setReturnReceipt] = useState<PurchaseReceipt | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
-  const receiptsQuery = usePurchaseReceipts(filters, canView && branchScope.hasBranchScope);
+  const [page, setPage] = useState(1);
+  const receiptsQuery = usePurchaseReceipts(filters, canView && branchScope.hasBranchScope, page);
+  const receiptsTotalPages = receiptsQuery.data?.pagination.totalPages ?? 1;
+  // Narrowing the filters, or deleting the last row on the final page,
+  // both leave the page pointing past the end. The empty response that
+  // comes back reads as "nothing found", which is a lie about the data
+  // rather than about the page, so snap back into range.
+  const filterKey = JSON.stringify(filters);
+  useEffect(() => {
+    setPage(1);
+  }, [filterKey]);
+  useEffect(() => {
+    if (page > receiptsTotalPages) {
+      setPage(receiptsTotalPages);
+    }
+  }, [page, receiptsTotalPages]);
   const suppliersQuery = usePurchasingSuppliers("", canView);
   const branchesQuery = usePurchasingBranches(canView);
   const productsQuery = usePurchasingProducts(canView);
@@ -162,7 +178,7 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
     }
   };
 
-  const receipts = receiptsQuery.data ?? [];
+  const receipts = receiptsQuery.data?.items ?? [];
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -242,6 +258,17 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
               onReturn={(receipt) => setReturnReceipt(receipt)}
               receipts={receipts}
             />
+            {receiptsQuery.data?.pagination ? (
+              <PaginationBar
+                isFetching={receiptsQuery.isFetching}
+                limit={receiptsQuery.data.pagination.limit}
+                noun={{ one: "goods receipt", other: "goods receipts" }}
+                onPageChange={setPage}
+                page={receiptsQuery.data.pagination.page}
+                total={receiptsQuery.data.pagination.total}
+                totalPages={receiptsQuery.data.pagination.totalPages}
+              />
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowRight,
   CircleDot,
   FileCheck2,
   FileText,
@@ -11,6 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { JSX, ReactNode } from "react";
+import { Fragment } from "react";
 
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
 import { PurchaseInvoiceStatusBadge } from "@/components/purchasing/purchase-invoice-status-badge";
@@ -37,7 +37,17 @@ function formatDate(value: string | null): string {
     : "Not set";
 }
 
-function ChainCard({
+/**
+ * One stage of the chain, as a row on a vertical rail.
+ *
+ * This used to be a column in a nine-track `xl:` grid. Breakpoints read the
+ * viewport, not the box you are actually in, so on a 1440px desktop the nine
+ * tracks still applied inside a 576px drawer: each stage got about 100px and
+ * the cards overlapped each other. The horizontal chain was also what made the
+ * timeline 2,002px tall -- five side-by-side columns all stretch to match the
+ * tallest. A rail has no width to run out of.
+ */
+function ChainStep({
   children,
   description,
   href,
@@ -57,47 +67,46 @@ function ChainCard({
   const content = (
     <div
       className={cn(
-        "h-full rounded-2xl border p-4 transition",
+        "rounded-md border p-3 transition",
         isEmpty
           ? "border-dashed border-brand-cappuccino bg-brand-latte/40"
           : "border-brand-cappuccino bg-card hover:border-brand-caramel/70 hover:shadow-sm",
       )}
     >
-      <div className="flex items-start gap-3">
-        <div
-          className={cn(
-            "rounded-xl p-2",
-            isEmpty ? "bg-card text-brand-mocha" : "bg-brand-latte text-brand-mocha",
-          )}
-        >
-          {icon}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-meta font-medium text-brand-mocha">{stage}</p>
-          <p className="truncate text-sm font-semibold text-brand-espresso">{title}</p>
-          <p className="mt-1 text-xs text-brand-mocha">{description}</p>
-          {children ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2">{children}</div>
-          ) : null}
-        </div>
-      </div>
+      <p className="text-meta font-medium text-brand-mocha">{stage}</p>
+      <p className="text-sm font-semibold text-brand-espresso">{title}</p>
+      <p className="mt-1 text-xs text-brand-mocha">{description}</p>
+      {children ? <div className="mt-2 flex flex-wrap items-center gap-2">{children}</div> : null}
     </div>
   );
 
-  if (!href) {
-    return content;
-  }
-
   return (
-    <Link className="block h-full" href={href}>
-      {content}
-    </Link>
+    <li className="relative pl-11">
+      <span
+        aria-hidden="true"
+        className={cn(
+          "absolute left-0 top-1 flex h-8 w-8 items-center justify-center rounded-full border",
+          isEmpty
+            ? "border-dashed border-brand-cappuccino bg-card text-brand-mocha"
+            : "border-brand-cappuccino bg-brand-latte text-brand-mocha",
+        )}
+      >
+        {icon}
+      </span>
+      {href ? (
+        <Link className="block" href={href}>
+          {content}
+        </Link>
+      ) : (
+        content
+      )}
+    </li>
   );
 }
 
 function PaymentCard({ payment }: { payment: SupplierPayment }): JSX.Element {
   return (
-    <ChainCard
+    <ChainStep
       description={`${formatDate(payment.paidAt)} - ${payment.paymentMethodName}`}
       icon={<ReceiptText className="h-4 w-4" />}
       stage="Payment made"
@@ -107,7 +116,7 @@ function PaymentCard({ payment }: { payment: SupplierPayment }): JSX.Element {
       <PurchasePaymentStatusBadge
         status={payment.paymentStatus === "completed" ? "paid" : "unpaid"}
       />
-    </ChainCard>
+    </ChainStep>
   );
 }
 
@@ -157,8 +166,10 @@ export function PurchaseDocumentChain({
       <CardHeader className="border-b border-brand-cappuccino bg-card">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-bold text-brand-mocha">Purchase timeline</p>
-            <CardTitle className="mt-1 text-xl text-brand-espresso">Purchase Timeline</CardTitle>
+            {/* The eyebrow said "Purchase timeline" directly above a title
+                reading "Purchase Timeline", and the drawer that holds this
+                already names both the timeline and the order. One title. */}
+            <CardTitle className="text-xl text-brand-espresso">Purchase Timeline</CardTitle>
             <p className="mt-2 text-sm text-brand-mocha">{nextStep}</p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-brand-cappuccino bg-brand-latte px-3 py-2 text-xs font-semibold text-brand-mocha">
@@ -168,8 +179,10 @@ export function PurchaseDocumentChain({
         </div>
       </CardHeader>
       <CardContent className="p-5">
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]">
-          <ChainCard
+        {/* The rail is one pseudo-element on the list, so it stays continuous
+            whatever number of receipts, returns or payments a stage renders. */}
+        <ol className="relative space-y-3 before:absolute before:bottom-4 before:left-4 before:top-4 before:w-px before:bg-brand-cappuccino before:content-['']">
+          <ChainStep
             description={purchaseOrder ? formatDate(purchaseOrder.orderDate) : "Current order"}
             href={purchaseOrder ? `${ROUTES.purchasingOrders}/${purchaseOrder.id}` : undefined}
             icon={<FileText className="h-4 w-4" />}
@@ -177,137 +190,111 @@ export function PurchaseDocumentChain({
             title={purchaseOrder?.purchaseOrderNumber ?? "Purchase order"}
           >
             {purchaseOrder ? <PurchaseOrderStatusBadge status={purchaseOrder.status} /> : null}
-          </ChainCard>
+          </ChainStep>
 
-          <div className="hidden items-center justify-center text-brand-mocha xl:flex">
-            <ArrowRight className="h-4 w-4" />
-          </div>
-
-          <div className="grid gap-3">
-            {invoices.length > 0 ? (
-              invoices.map((invoice) => (
-                <ChainCard
-                  description={`${formatDate(invoice.invoiceDate)} - ${formatCurrency(invoice.totalAmount)}`}
-                  href={`${ROUTES.purchasingInvoices}/${invoice.id}`}
-                  icon={<FileCheck2 className="h-4 w-4" />}
-                  key={invoice.id}
-                  stage="Bill"
-                  title={invoice.supplierBillNumber ?? invoice.invoiceNumber}
-                >
-                  <PurchaseInvoiceStatusBadge status={invoice.status} />
-                  <PurchasePaymentStatusBadge status={invoice.paymentStatus} />
-                </ChainCard>
-              ))
-            ) : (
-              <ChainCard
-                description="Convert this PO to create a draft bill."
+          {invoices.length > 0 ? (
+            invoices.map((invoice) => (
+              <ChainStep
+                description={`${formatDate(invoice.invoiceDate)} - ${formatCurrency(invoice.totalAmount)}`}
+                href={`${ROUTES.purchasingInvoices}/${invoice.id}`}
                 icon={<FileCheck2 className="h-4 w-4" />}
-                isEmpty
+                key={invoice.id}
                 stage="Bill"
-                title="No bill yet"
-              />
-            )}
-          </div>
+                title={invoice.supplierBillNumber ?? invoice.invoiceNumber}
+              >
+                <PurchaseInvoiceStatusBadge status={invoice.status} />
+                <PurchasePaymentStatusBadge status={invoice.paymentStatus} />
+              </ChainStep>
+            ))
+          ) : (
+            <ChainStep
+              description="Convert this PO to create a draft bill."
+              icon={<FileCheck2 className="h-4 w-4" />}
+              isEmpty
+              stage="Bill"
+              title="No bill yet"
+            />
+          )}
 
-          <div className="hidden items-center justify-center text-brand-mocha xl:flex">
-            <ArrowRight className="h-4 w-4" />
-          </div>
-
-          <div className="grid gap-3">
-            {receipts.length > 0 ? (
-              receipts.map((receipt) => (
-                <ChainCard
-                  description={formatDate(receipt.receivedDate)}
-                  href={`${ROUTES.purchasingReceipts}/${receipt.id}`}
-                  icon={<PackageCheck className="h-4 w-4" />}
-                  key={receipt.id}
-                  stage="Receive goods"
-                  title={receipt.receiptNumber}
-                >
-                  <div className="flex flex-wrap gap-2">
-                    <PurchaseReceiptStatusBadge status={receipt.status} />
-                    <PurchaseReceiptAccountingBadge receipt={receipt} />
-                  </div>
-                  {receipt.accountingStatus === "pending_bill_posting" ? (
-                    <p className="mt-2 text-xs text-brand-mocha">
-                      {receipt.accountingStatusDetail}
-                    </p>
-                  ) : null}
-                </ChainCard>
-              ))
-            ) : (
-              <ChainCard
-                description="Receive goods from the PO or from a posted bill when required."
+          {receipts.length > 0 ? (
+            receipts.map((receipt) => (
+              <ChainStep
+                description={formatDate(receipt.receivedDate)}
+                href={`${ROUTES.purchasingReceipts}/${receipt.id}`}
                 icon={<PackageCheck className="h-4 w-4" />}
-                isEmpty
+                key={receipt.id}
                 stage="Receive goods"
-                title="No receive record yet"
-              />
-            )}
-          </div>
-
-          <div className="hidden items-center justify-center text-brand-mocha xl:flex">
-            <ArrowRight className="h-4 w-4" />
-          </div>
-
-          <div className="grid gap-3">
-            {purchaseReturns.length > 0 ? (
-              purchaseReturns.map((purchaseReturn) => (
-                <div className="grid gap-2" key={purchaseReturn.id}>
-                  <ChainCard
-                    description={`${formatDate(purchaseReturn.returnDate)} - ${formatCurrency(purchaseReturn.returnTotal)}`}
-                    href={`${ROUTES.purchasingReturns}/${purchaseReturn.id}`}
-                    icon={<RotateCcwSquare className="h-4 w-4" />}
-                    stage="Vendor credit"
-                    title={purchaseReturn.returnNumber}
-                  >
-                    <PurchaseReturnStatusBadge status={purchaseReturn.status} />
-                    <Badge variant="secondary">
-                      Open {formatCurrency(purchaseReturn.openCreditAmount)}
-                    </Badge>
-                  </ChainCard>
-                  {purchaseReturn.reversalReturnId ? (
-                    <ChainCard
-                      description={purchaseReturn.reversalReason ?? "Linked reversal note"}
-                      href={`${ROUTES.purchasingReturns}/${purchaseReturn.reversalReturnId}`}
-                      icon={<RotateCcwSquare className="h-4 w-4" />}
-                      stage="Reversal"
-                      title={purchaseReturn.reversalReturnNumber ?? purchaseReturn.reversalReturnId}
-                    >
-                      <PurchaseReturnStatusBadge status="reversed" />
-                    </ChainCard>
-                  ) : null}
+                title={receipt.receiptNumber}
+              >
+                <div className="flex flex-wrap gap-2">
+                  <PurchaseReceiptStatusBadge status={receipt.status} />
+                  <PurchaseReceiptAccountingBadge receipt={receipt} />
                 </div>
-              ))
-            ) : (
-              <ChainCard
-                description="Vendor credits appear here when posted receipts are returned."
-                icon={<RotateCcwSquare className="h-4 w-4" />}
-                isEmpty
-                stage="Vendor credit"
-                title="No vendor credit"
-              />
-            )}
-          </div>
+                {receipt.accountingStatus === "pending_bill_posting" ? (
+                  <p className="mt-2 text-xs text-brand-mocha">{receipt.accountingStatusDetail}</p>
+                ) : null}
+              </ChainStep>
+            ))
+          ) : (
+            <ChainStep
+              description="Receive goods from the PO or from a posted bill when required."
+              icon={<PackageCheck className="h-4 w-4" />}
+              isEmpty
+              stage="Receive goods"
+              title="No receive record yet"
+            />
+          )}
 
-          <div className="hidden items-center justify-center text-brand-mocha xl:flex">
-            <ArrowRight className="h-4 w-4" />
-          </div>
+          {purchaseReturns.length > 0 ? (
+            purchaseReturns.map((purchaseReturn) => (
+              <Fragment key={purchaseReturn.id}>
+                <ChainStep
+                  description={`${formatDate(purchaseReturn.returnDate)} - ${formatCurrency(purchaseReturn.returnTotal)}`}
+                  href={`${ROUTES.purchasingReturns}/${purchaseReturn.id}`}
+                  icon={<RotateCcwSquare className="h-4 w-4" />}
+                  stage="Vendor credit"
+                  title={purchaseReturn.returnNumber}
+                >
+                  <PurchaseReturnStatusBadge status={purchaseReturn.status} />
+                  <Badge variant="secondary">
+                    Open {formatCurrency(purchaseReturn.openCreditAmount)}
+                  </Badge>
+                </ChainStep>
+                {purchaseReturn.reversalReturnId ? (
+                  <ChainStep
+                    description={purchaseReturn.reversalReason ?? "Linked reversal note"}
+                    href={`${ROUTES.purchasingReturns}/${purchaseReturn.reversalReturnId}`}
+                    icon={<RotateCcwSquare className="h-4 w-4" />}
+                    stage="Reversal"
+                    title={purchaseReturn.reversalReturnNumber ?? purchaseReturn.reversalReturnId}
+                  >
+                    <PurchaseReturnStatusBadge status="reversed" />
+                  </ChainStep>
+                ) : null}
+              </Fragment>
+            ))
+          ) : (
+            <ChainStep
+              description="Vendor credits appear here when posted receipts are returned."
+              icon={<RotateCcwSquare className="h-4 w-4" />}
+              isEmpty
+              stage="Vendor credit"
+              title="No vendor credit"
+            />
+          )}
 
-          <div className="grid gap-3">
-            {payments.length > 0 ? (
-              payments.map((payment) => <PaymentCard key={payment.id} payment={payment} />)
-            ) : (
-              <ChainCard
-                description="Payments made appear here after bill payment."
-                icon={<ReceiptText className="h-4 w-4" />}
-                isEmpty
-                stage="Payment made"
-                title="No payment made yet"
-              />
-            )}
-          </div>
-        </div>
+          {payments.length > 0 ? (
+            payments.map((payment) => <PaymentCard key={payment.id} payment={payment} />)
+          ) : (
+            <ChainStep
+              description="Payments made appear here after bill payment."
+              icon={<ReceiptText className="h-4 w-4" />}
+              isEmpty
+              stage="Payment made"
+              title="No payment made yet"
+            />
+          )}
+        </ol>
 
         {!hasNextSteps ? (
           <p className="mt-4 text-sm text-brand-mocha">

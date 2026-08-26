@@ -18,6 +18,7 @@ import { PurchasingToolbar } from "@/components/purchasing/purchasing-toolbar";
 import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
+import { PaginationBar } from "@/components/shared/pagination-bar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -131,10 +132,23 @@ export function PurchaseOrdersPageClient(): JSX.Element {
   // object fed the query key directly. Debounce only the search half; the
   // dropdowns and dates still apply instantly.
   const debouncedSearch = useDebouncedValue(filters.search);
-  const ordersQuery = usePurchaseOrders(
-    { ...filters, search: debouncedSearch },
-    canView && branchScope.hasBranchScope,
-  );
+  const [page, setPage] = useState(1);
+  const activeFilters = { ...filters, search: debouncedSearch };
+  const ordersQuery = usePurchaseOrders(activeFilters, canView && branchScope.hasBranchScope, page);
+  const totalPages = ordersQuery.data?.pagination.totalPages ?? 1;
+  // Two ways to end up pointing past the end: narrowing the filters, and
+  // deleting the last order on the final page. Both land on an empty response
+  // that reads as "no purchase orders found", which is a lie about the data
+  // rather than about the page, so snap back into range.
+  const filterKey = JSON.stringify(activeFilters);
+  useEffect(() => {
+    setPage(1);
+  }, [filterKey]);
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
   const editingOrderQuery = usePurchaseOrder(
     editingOrderId,
     canView && branchScope.hasBranchScope && editingOrderId !== null,
@@ -344,7 +358,8 @@ export function PurchaseOrdersPageClient(): JSX.Element {
     }
   };
 
-  const orders = ordersQuery.data ?? [];
+  const orders = ordersQuery.data?.items ?? [];
+  const pagination = ordersQuery.data?.pagination;
   const convertingOrder = convertingOrderQuery.data ?? null;
   const convertingOrderHasActiveBill = Boolean(
     convertingOrderChainQuery.data?.purchaseInvoices.some(
@@ -443,6 +458,17 @@ export function PurchaseOrdersPageClient(): JSX.Element {
               }
               orders={orders}
             />
+            {pagination ? (
+              <PaginationBar
+                isFetching={ordersQuery.isFetching}
+                limit={pagination.limit}
+                noun={{ one: "purchase order", other: "purchase orders" }}
+                onPageChange={setPage}
+                page={pagination.page}
+                total={pagination.total}
+                totalPages={pagination.totalPages}
+              />
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

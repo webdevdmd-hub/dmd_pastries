@@ -168,20 +168,20 @@ export function IngredientFormDialog({
         >
           <section className="grid gap-4 md:grid-cols-2">
             <h3 className="text-sm font-bold text-brand-mocha md:col-span-2">Basic Information</h3>
-            <label className="grid gap-2">
+            <div className="grid gap-2">
               <Label htmlFor="ingredient-name">Ingredient name</Label>
               <Input id="ingredient-name" {...form.register("ingredientName")} />
               {fieldError("ingredientName") ? (
                 <span className="text-sm text-danger-text">{fieldError("ingredientName")}</span>
               ) : null}
-            </label>
-            <label className="grid gap-2">
-              <Label>Ingredient category</Label>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ingredient-form-ingredient-category">Ingredient category</Label>
               <Select
                 onValueChange={(value) => form.setValue("ingredientCategoryId", value)}
                 value={form.watch("ingredientCategoryId")}
               >
-                <SelectTrigger>
+                <SelectTrigger id="ingredient-form-ingredient-category">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -197,16 +197,16 @@ export function IngredientFormDialog({
                   {fieldError("ingredientCategoryId")}
                 </span>
               ) : null}
-            </label>
-            <label className="grid gap-2">
-              <Label>Supplier</Label>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ingredient-form-supplier">Supplier</Label>
               <Select
                 onValueChange={(value) =>
                   form.setValue("supplierId", value === "none" ? null : value)
                 }
                 value={form.watch("supplierId") ?? "none"}
               >
-                <SelectTrigger>
+                <SelectTrigger id="ingredient-form-supplier">
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent>
@@ -218,14 +218,14 @@ export function IngredientFormDialog({
                   ))}
                 </SelectContent>
               </Select>
-            </label>
-            <label className="grid gap-2">
-              <Label>Unit</Label>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ingredient-form-unit">Unit</Label>
               <Select
                 onValueChange={(value) => form.setValue("unitId", value)}
                 value={form.watch("unitId")}
               >
-                <SelectTrigger>
+                <SelectTrigger id="ingredient-form-unit">
                   <SelectValue placeholder="Select unit" />
                 </SelectTrigger>
                 <SelectContent>
@@ -239,8 +239,8 @@ export function IngredientFormDialog({
               {fieldError("unitId") ? (
                 <span className="text-sm text-danger-text">{fieldError("unitId")}</span>
               ) : null}
-            </label>
-            <label className="grid gap-2">
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="ingredient-cost">Cost per unit</Label>
               <Input
                 id="ingredient-cost"
@@ -249,7 +249,7 @@ export function IngredientFormDialog({
                 type="number"
                 {...form.register("costPerUnit")}
               />
-            </label>
+            </div>
           </section>
 
           <section className="grid gap-4 md:grid-cols-3">
@@ -282,7 +282,7 @@ export function IngredientFormDialog({
 
           <section className="grid gap-4 md:grid-cols-2">
             <h3 className="text-sm font-bold text-brand-mocha md:col-span-2">Media & Notes</h3>
-            <label className="grid gap-2">
+            <div className="grid gap-2">
               <Label htmlFor="ingredient-image">Ingredient image</Label>
               <div className="flex flex-col gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-3 sm:flex-row sm:items-center">
                 {previewUrl ? (
@@ -306,15 +306,15 @@ export function IngredientFormDialog({
                   type="file"
                 />
               </div>
-            </label>
-            <label className="grid gap-2">
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="ingredient-description">Description</Label>
               <textarea
                 className="min-h-24 rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso focus:outline-none focus:ring-2 focus:ring-brand-caramel"
                 id="ingredient-description"
                 {...form.register("description")}
               />
-            </label>
+            </div>
           </section>
 
           <DialogFooter>

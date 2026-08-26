@@ -5,6 +5,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -101,12 +102,27 @@ function withUnit(value: number, line: Line): string {
   return unit === "-" ? quantity.format(value) : `${quantity.format(value)} ${unit}`;
 }
 
+export type ItemLineTotals = {
+  discount: number;
+  subtotal: number;
+  tax: number;
+  total: number;
+};
+
 export function PurchasingItemLines({
   lines,
   title = "Item lines",
+  totals,
 }: {
   lines: Line[];
   title?: string;
+  /**
+   * Money summary rendered in the table's own foot. Four separate KPI cards
+   * above a table is four bordered boxes restating what the rows already add
+   * up to; a totals row belongs to the table it totals. Optional, so callers
+   * without a money summary (goods receipts) render unchanged.
+   */
+  totals?: ItemLineTotals;
 }): JSX.Element {
   const quantitiesByLine = lines.map(getQuantities);
   const tracksReceiving = quantitiesByLine.some((entry) => entry.kind === "ordered");
@@ -114,6 +130,9 @@ export function PurchasingItemLines({
     (entry) => entry.kind === "ordered" && entry.outstanding === 0,
   ).length;
   const receivableLines = quantitiesByLine.filter((entry) => entry.kind === "ordered").length;
+  // Item, Type, Unit + (Ordered/Received/Outstanding | Received), minus the
+  // Total column the figure itself occupies.
+  const labelSpan = tracksReceiving ? 6 : 4;
 
   return (
     <Card>
@@ -195,6 +214,44 @@ export function PurchasingItemLines({
               );
             })}
           </TableBody>
+          {totals ? (
+            <TableFooter>
+              <TableRow>
+                <TableCell className="text-foreground-muted" colSpan={labelSpan}>
+                  Subtotal
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {currency.format(totals.subtotal)}
+                </TableCell>
+              </TableRow>
+              {totals.discount > 0 ? (
+                <TableRow>
+                  <TableCell className="text-foreground-muted" colSpan={labelSpan}>
+                    Discount
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-danger-text">
+                    -{currency.format(totals.discount)}
+                  </TableCell>
+                </TableRow>
+              ) : null}
+              <TableRow>
+                <TableCell className="text-foreground-muted" colSpan={labelSpan}>
+                  Tax
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {currency.format(totals.tax)}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-semibold" colSpan={labelSpan}>
+                  Total
+                </TableCell>
+                <TableCell className="text-right font-semibold tabular-nums">
+                  {currency.format(totals.total)}
+                </TableCell>
+              </TableRow>
+            </TableFooter>
+          ) : null}
         </Table>
       </CardContent>
     </Card>

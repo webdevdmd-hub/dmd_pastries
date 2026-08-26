@@ -105,7 +105,7 @@ export function PackagingUsageSection({
               </div>
               {canManage ? (
                 <div className="grid gap-3 md:grid-cols-[10rem_auto_auto]">
-                  <label className="grid gap-1">
+                  <div className="grid gap-1">
                     <Label htmlFor="usage-quantity">Quantity</Label>
                     <Input
                       id="usage-quantity"
@@ -115,7 +115,7 @@ export function PackagingUsageSection({
                       type="number"
                       value={quantityRequired}
                     />
-                  </label>
+                  </div>
                   <label className="flex items-end gap-2 pb-3 text-sm font-medium text-brand-espresso">
                     <Checkbox
                       checked={isDefault}
