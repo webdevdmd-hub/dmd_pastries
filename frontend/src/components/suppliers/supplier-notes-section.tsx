@@ -5,8 +5,10 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { EmptyState, FailedState } from "@/components/shared/collection-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   useCreateSupplierNote,
   useDeleteSupplierNote,
@@ -51,7 +53,7 @@ export function SupplierNotesSection({
   );
 
   return (
-    <Card className="bg-card/80">
+    <Card>
       <CardHeader>
         <CardTitle>Notes</CardTitle>
       </CardHeader>
@@ -60,13 +62,15 @@ export function SupplierNotesSection({
           <div className="grid gap-3">
             <textarea
               aria-label="New supplier note"
-              className="min-h-24 rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso focus:outline-none focus:ring-2 focus:ring-brand-caramel"
+              className="min-h-24 rounded-lg border border-border bg-card px-3 py-2 text-cell text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               maxLength={1000}
               onChange={(event) => setNote(event.target.value)}
               placeholder="Add an internal supplier note..."
               value={note}
             />
-            <p className="text-xs text-brand-mocha">{note.length}/1000 characters</p>
+            <p className="text-meta tabular-nums text-foreground-muted">
+              {note.length}/1000 characters
+            </p>
             <Button
               className="w-fit"
               disabled={createMutation.isPending}
@@ -81,18 +85,32 @@ export function SupplierNotesSection({
         ) : null}
 
         <div className="space-y-3">
-          {notes.length === 0 ? (
-            <p className="text-sm text-brand-mocha">No supplier notes yet.</p>
+          {notesQuery.isLoading ? <Skeleton className="h-20 w-full" /> : null}
+
+          {/* Failed is not empty: a dropped request used to read as "this
+              supplier has no notes". DESIGN.md §8. */}
+          {!notesQuery.isLoading && notesQuery.error ? (
+            <FailedState
+              detail={getErrorMessage(notesQuery.error)}
+              noun="notes"
+              onRetry={() => {
+                void notesQuery.refetch();
+              }}
+            />
+          ) : null}
+
+          {!notesQuery.isLoading && !notesQuery.error && notes.length === 0 ? (
+            <EmptyState
+              description="Anything your team should know before ordering: quality issues, delivery quirks, who to chase."
+              title="No notes yet"
+            />
           ) : null}
           {notes.map((supplierNote) => (
-            <div
-              className="rounded-2xl border border-brand-cappuccino bg-brand-latte/70 p-4"
-              key={supplierNote.id}
-            >
+            <div className="rounded-lg border border-border p-4" key={supplierNote.id}>
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm leading-6 text-brand-espresso">{supplierNote.note}</p>
-                  <p className="mt-2 text-xs text-brand-mocha">
+                <div className="min-w-0">
+                  <p className="text-cell">{supplierNote.note}</p>
+                  <p className="mt-2 text-meta tabular-nums text-foreground-muted">
                     {supplierNote.createdByUserName} /{" "}
                     {supplierNote.createdAt
                       ? new Intl.DateTimeFormat("en-AE", {

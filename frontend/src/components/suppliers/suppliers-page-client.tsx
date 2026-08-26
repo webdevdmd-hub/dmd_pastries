@@ -9,22 +9,19 @@ import { FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { AccessDeniedCard } from "@/components/suppliers/access-denied-card";
 import { SupplierFormDialog } from "@/components/suppliers/supplier-form-dialog";
+import {
+  type SupplierPendingAction,
+  SupplierStatusConfirmDialog,
+} from "@/components/suppliers/supplier-status-confirm-dialog";
+import { SuppliersAttentionStrip } from "@/components/suppliers/suppliers-attention-strip";
 import { SuppliersEmptyState } from "@/components/suppliers/suppliers-empty-state";
 import { SuppliersErrorState } from "@/components/suppliers/suppliers-error-state";
-import { SuppliersSummaryCards } from "@/components/suppliers/suppliers-summary-cards";
+import { SuppliersPagination } from "@/components/suppliers/suppliers-pagination";
 import { SuppliersTable } from "@/components/suppliers/suppliers-table";
 import { SuppliersTableSkeleton } from "@/components/suppliers/suppliers-table-skeleton";
 import { SuppliersToolbar } from "@/components/suppliers/suppliers-toolbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { PERMISSIONS } from "@/constants/permissions";
 import { usePermission } from "@/hooks/use-permission";
 import {
@@ -47,12 +44,10 @@ const defaultFilters: SupplierFilters = {
   search: "",
   status: "all",
   country: "",
+  missingTermsOnly: false,
 };
 
-type PendingAction =
-  | { type: "status"; supplier: Supplier; status: SupplierStatus }
-  | { type: "delete"; supplier: Supplier }
-  | null;
+const PAGE_SIZE = 10;
 
 export function SuppliersPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -66,9 +61,10 @@ export function SuppliersPageClient(): JSX.Element {
     PERMISSIONS.suppliersNotesManage,
   ]);
   const [filters, setFilters] = useState<SupplierFilters>(defaultFilters);
+  const [page, setPage] = useState(1);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [pendingAction, setPendingAction] = useState<SupplierPendingAction>(null);
   const suppliersQuery = useSuppliers(filters, canView);
   const createMutation = useCreateSupplier();
   const updateMutation = useUpdateSupplier();
@@ -81,11 +77,20 @@ export function SuppliersPageClient(): JSX.Element {
   const hasActiveFilters =
     filters.search.trim().length > 0 ||
     filters.status !== defaultFilters.status ||
-    filters.country.trim().length > 0;
+    filters.country.trim().length > 0 ||
+    filters.missingTermsOnly;
 
   if (!canView) {
     return <AccessDeniedCard />;
   }
+
+  // Any filter change returns to page 1: page 3 of the old result set is
+  // rarely page 3 of the new one, and silently landing there looks like the
+  // filter dropped rows.
+  const applyFilters = (next: SupplierFilters): void => {
+    setFilters(next);
+    setPage(1);
+  };
 
   const openCreate = (): void => {
     setEditingSupplier(null);
@@ -102,9 +107,18 @@ export function SuppliersPageClient(): JSX.Element {
     }
   };
 
-  const handleUpdate = async (id: string, payload: UpdateSupplierPayload): Promise<void> => {
+  const handleUpdate = async (
+    id: string,
+    payload: UpdateSupplierPayload,
+    nextStatus?: SupplierStatus,
+  ): Promise<void> => {
     try {
       await updateMutation.mutateAsync({ id, payload });
+
+      if (nextStatus) {
+        await statusMutation.mutateAsync({ id, payload: { status: nextStatus } });
+      }
+
       toast.success("Supplier updated.");
       setFormOpen(false);
       setEditingSupplier(null);
@@ -135,7 +149,18 @@ export function SuppliersPageClient(): JSX.Element {
     }
   };
 
-  const suppliers = suppliersQuery.data ?? [];
+  const loaded = suppliersQuery.data?.items ?? [];
+  // Applied here rather than server-side: see SupplierFilters.missingTermsOnly.
+  const suppliers = filters.missingTermsOnly
+    ? loaded.filter((supplier) => supplier.status !== "blocked" && supplier.paymentTerms === "")
+    : loaded;
+  const total = suppliersQuery.data?.total ?? loaded.length;
+  const pageCount = Math.max(1, Math.ceil(suppliers.length / PAGE_SIZE));
+  // A filter that shrinks the result set can strand the viewer on a page that
+  // no longer exists; clamping in render alone would show an empty table for
+  // one frame before the state caught up.
+  const safePage = Math.min(page, pageCount);
+  const pageRows = suppliers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -152,9 +177,14 @@ export function SuppliersPageClient(): JSX.Element {
         }
       />
 
-      <SuppliersSummaryCards suppliers={suppliers} />
+      <SuppliersAttentionStrip
+        onFilterMissingTerms={() => applyFilters({ ...filters, missingTermsOnly: true })}
+        onFilterStatus={(status) => applyFilters({ ...filters, status })}
+        suppliers={loaded}
+        total={total}
+      />
 
-      <SuppliersToolbar filters={filters} onFiltersChange={setFilters} />
+      <SuppliersToolbar filters={filters} onFiltersChange={applyFilters} />
 
       {suppliersQuery.isLoading ? <SuppliersTableSkeleton /> : null}
 
@@ -179,7 +209,7 @@ export function SuppliersPageClient(): JSX.Element {
       hasActiveFilters ? (
         <FilteredState
           noun="suppliers"
-          onClearFilters={() => setFilters(defaultFilters)}
+          onClearFilters={() => applyFilters(defaultFilters)}
           query={filters.search.trim() || undefined}
         />
       ) : null}
@@ -204,9 +234,16 @@ export function SuppliersPageClient(): JSX.Element {
               onStatusChange={(supplier, status) =>
                 setPendingAction({ type: "status", supplier, status })
               }
-              suppliers={suppliers}
+              suppliers={pageRows}
             />
           </CardContent>
+          <SuppliersPagination
+            loaded={suppliers.length}
+            onPageChange={setPage}
+            page={safePage}
+            pageSize={PAGE_SIZE}
+            total={total}
+          />
         </Card>
       ) : null}
 
@@ -222,37 +259,14 @@ export function SuppliersPageClient(): JSX.Element {
         supplier={editingSupplier}
       />
 
-      <Dialog
-        open={pendingAction !== null}
-        onOpenChange={(open) => (!open ? setPendingAction(null) : undefined)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {pendingAction?.type === "delete" ? "Delete supplier" : "Change supplier status"}
-            </DialogTitle>
-            <DialogDescription>
-              {pendingAction?.type === "delete"
-                ? "This soft-deletes the supplier from active purchasing workflows."
-                : `Update ${pendingAction?.supplier.supplierName ?? "supplier"} to ${pendingAction?.status ?? "status"}?`}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => setPendingAction(null)} type="button" variant="outline">
-              Cancel
-            </Button>
-            <Button
-              disabled={statusMutation.isPending || deleteMutation.isPending}
-              onClick={() => {
-                void confirmAction();
-              }}
-              type="button"
-            >
-              Confirm
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SupplierStatusConfirmDialog
+        isSubmitting={statusMutation.isPending || deleteMutation.isPending}
+        onCancel={() => setPendingAction(null)}
+        onConfirm={() => {
+          void confirmAction();
+        }}
+        pendingAction={pendingAction}
+      />
     </div>
   );
 }

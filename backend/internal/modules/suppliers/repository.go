@@ -134,8 +134,10 @@ func (r *Repository) LoadSupplierResponse(businessID string, supplier Supplier) 
 		ID: supplier.ID, BusinessID: supplier.BusinessID, BranchID: supplier.BranchID, SupplierCode: supplier.SupplierCode, SupplierName: supplier.SupplierName,
 		Phone: supplier.Phone, Email: supplier.Email, Website: supplier.Website,
 		AddressLine1: supplier.AddressLine1, AddressLine2: supplier.AddressLine2, City: supplier.City, State: supplier.State, Country: supplier.Country,
-		PostalCode: supplier.PostalCode, TaxNumber: supplier.TaxNumber, Notes: supplier.Notes, Status: supplier.Status, PrimaryContact: primaryContact,
-		CreatedAt: supplier.CreatedAt, UpdatedAt: supplier.UpdatedAt,
+		PostalCode: supplier.PostalCode, TaxNumber: supplier.TaxNumber, Notes: supplier.Notes, Status: supplier.Status,
+		PaymentTerms: supplier.PaymentTerms, LeadTimeDays: supplier.LeadTimeDays, IsPreferred: supplier.IsPreferred,
+		PrimaryContact: primaryContact,
+		CreatedAt:      supplier.CreatedAt, UpdatedAt: supplier.UpdatedAt,
 	}, nil
 }
 

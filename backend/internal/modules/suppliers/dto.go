@@ -43,6 +43,9 @@ type CreateSupplierRequest struct {
 	PostalCode   string `json:"postal_code"`
 	TaxNumber    string `json:"tax_number"`
 	Notes        string `json:"notes"`
+	PaymentTerms string `json:"payment_terms"`
+	LeadTimeDays *int   `json:"lead_time_days"`
+	IsPreferred  *bool  `json:"is_preferred"`
 }
 
 type UpdateSupplierRequest struct {
@@ -58,6 +61,9 @@ type UpdateSupplierRequest struct {
 	PostalCode   string `json:"postal_code"`
 	TaxNumber    string `json:"tax_number"`
 	Notes        string `json:"notes"`
+	PaymentTerms string `json:"payment_terms"`
+	LeadTimeDays *int   `json:"lead_time_days"`
+	IsPreferred  *bool  `json:"is_preferred"`
 }
 
 type UpdateSupplierStatusRequest struct {
@@ -104,6 +110,9 @@ type SupplierResponse struct {
 	TaxNumber      string                   `json:"tax_number"`
 	Notes          string                   `json:"notes"`
 	Status         string                   `json:"status"`
+	PaymentTerms   string                   `json:"payment_terms"`
+	LeadTimeDays   *int                     `json:"lead_time_days"`
+	IsPreferred    bool                     `json:"is_preferred"`
 	PrimaryContact *SupplierContactResponse `json:"primary_contact"`
 	CreatedAt      time.Time                `json:"created_at"`
 	UpdatedAt      time.Time                `json:"updated_at"`

@@ -344,7 +344,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
     if (isPaid) {
       return (
         <Button asChild>
-          <Link href={`${ROUTES.suppliers}/${order.supplierId}#statement`}>
+          <Link href={`${ROUTES.suppliers}/${order.supplierId}?tab=statement`}>
             View vendor statement
           </Link>
         </Button>

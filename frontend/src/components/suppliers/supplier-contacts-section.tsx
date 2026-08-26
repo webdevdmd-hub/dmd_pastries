@@ -5,9 +5,12 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { EmptyState, FailedState } from "@/components/shared/collection-state";
 import { SupplierContactFormDialog } from "@/components/suppliers/supplier-contact-form-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   useCreateSupplierContact,
   useDeleteSupplierContact,
@@ -72,7 +75,7 @@ export function SupplierContactsSection({
   };
 
   return (
-    <Card className="bg-card/80">
+    <Card>
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <CardTitle>Contacts</CardTitle>
@@ -93,35 +96,67 @@ export function SupplierContactsSection({
       </CardHeader>
       <CardContent className="space-y-3">
         {contactsQuery.isLoading ? (
-          <p className="text-sm text-brand-mocha">Loading contacts...</p>
+          <div className="grid gap-3">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
         ) : null}
-        {!contactsQuery.isLoading && contacts.length === 0 ? (
-          <p className="text-sm text-brand-mocha">No supplier contacts yet.</p>
+
+        {/* A failed request used to render "No supplier contacts yet.", which
+            reads as "this supplier has no contacts" when the truth is that we
+            do not know. Empty and failed are different situations with opposite
+            remedies. DESIGN.md §8. */}
+        {!contactsQuery.isLoading && contactsQuery.error ? (
+          <FailedState
+            detail={getErrorMessage(contactsQuery.error)}
+            noun="contacts"
+            onRetry={() => {
+              void contactsQuery.refetch();
+            }}
+          />
         ) : null}
+
+        {!contactsQuery.isLoading && !contactsQuery.error && contacts.length === 0 ? (
+          <EmptyState
+            description="The person you call when an order is late. Add whoever answers the phone."
+            {...(canManage
+              ? {
+                  action: {
+                    label: "Add contact",
+                    onClick: () => {
+                      setEditingContact(null);
+                      setFormOpen(true);
+                    },
+                  },
+                }
+              : {})}
+            title="No contacts yet"
+          />
+        ) : null}
+
         {contacts.map((contact) => (
-          <div
-            className="rounded-2xl border border-brand-cappuccino bg-brand-latte/70 p-4"
-            key={contact.id}
-          >
+          <div className="rounded-lg border border-border p-4" key={contact.id}>
             <div className="flex items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-bold text-brand-espresso">{contact.contactName}</p>
+                  <p className="font-medium">{contact.contactName}</p>
                   {contact.isPrimary ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-brand-caramel px-2 py-1 text-xs font-bold text-brand-latte">
-                      <Star className="h-3 w-3" />
+                    <Badge variant="info">
+                      <Star aria-hidden="true" className="h-3 w-3" />
                       Primary
-                    </span>
+                    </Badge>
                   ) : null}
                 </div>
-                <p className="mt-1 text-sm text-brand-mocha">
+                <p className="mt-1 text-cell text-foreground-muted">
                   {contact.contactRole ?? "No role recorded"}
                 </p>
-                <p className="mt-2 text-sm text-brand-espresso">
-                  {contact.phone ?? "No phone"} / {contact.email ?? "No email"}
+                <p className="mt-2 text-cell tabular-nums">
+                  {contact.phone ?? <span className="text-foreground-muted">&mdash;</span>}
+                  <span className="text-foreground-muted"> · </span>
+                  {contact.email ?? <span className="text-foreground-muted">&mdash;</span>}
                 </p>
                 {contact.notes ? (
-                  <p className="mt-2 text-sm text-brand-mocha">{contact.notes}</p>
+                  <p className="mt-2 text-cell text-foreground-muted">{contact.notes}</p>
                 ) : null}
               </div>
               {canManage ? (

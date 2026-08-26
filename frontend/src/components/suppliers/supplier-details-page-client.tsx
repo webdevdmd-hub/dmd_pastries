@@ -1,27 +1,47 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/suppliers/access-denied-card";
 import { SupplierContactsSection } from "@/components/suppliers/supplier-contacts-section";
+import {
+  parseSupplierDetailTab,
+  supplierDetailTabHref,
+  type SupplierDetailTabKey,
+} from "@/components/suppliers/supplier-detail-tabs";
+import {
+  SUPPLIER_DETAIL_TABPANEL_ID,
+  SupplierDetailViewTabs,
+} from "@/components/suppliers/supplier-detail-view-tabs";
+import { SupplierDocumentsPanel } from "@/components/suppliers/supplier-documents-panel";
 import { SupplierFormDialog } from "@/components/suppliers/supplier-form-dialog";
+import { SupplierHistoryPanel } from "@/components/suppliers/supplier-history-panel";
 import { SupplierNotesSection } from "@/components/suppliers/supplier-notes-section";
 import { SupplierProfileCard } from "@/components/suppliers/supplier-profile-card";
-import { SupplierPurchasingHistory } from "@/components/suppliers/supplier-purchasing-history";
+import { SupplierStatementPanel } from "@/components/suppliers/supplier-statement-panel";
 import { SupplierStatsCards } from "@/components/suppliers/supplier-stats-cards";
 import { SupplierStatusBadge } from "@/components/suppliers/supplier-status-badge";
+import { SUPPLIER_STATUS_COPY } from "@/components/suppliers/supplier-status-copy";
 import { SuppliersErrorState } from "@/components/suppliers/suppliers-error-state";
 import { SuppliersTableSkeleton } from "@/components/suppliers/suppliers-table-skeleton";
 import { Button } from "@/components/ui/button";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { usePermission } from "@/hooks/use-permission";
-import { useSupplier, useSupplierStats, useUpdateSupplier } from "@/hooks/use-suppliers";
+import {
+  useSupplier,
+  useSupplierContacts,
+  useSupplierNotes,
+  useSupplierStats,
+  useUpdateSupplier,
+  useUpdateSupplierStatus,
+} from "@/hooks/use-suppliers";
 import { getErrorMessage } from "@/lib/api/client";
-import type { UpdateSupplierPayload } from "@/types/supplier";
+import type { SupplierStatus, UpdateSupplierPayload } from "@/types/supplier";
 
 export function SupplierDetailsPageClient({ supplierId }: { supplierId: string }): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -32,11 +52,43 @@ export function SupplierDetailsPageClient({ supplierId }: { supplierId: string }
     PERMISSIONS.suppliersContactsManage,
     PERMISSIONS.suppliersNotesManage,
   ]);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [editOpen, setEditOpen] = useState(false);
   const supplierQuery = useSupplier(supplierId, canView);
   const statsQuery = useSupplierStats(supplierId, canView);
+  // Contacts and notes are small, cheap lists and their counts badge the strip,
+  // so they load with the page rather than only when their tab opens.
+  const contactsQuery = useSupplierContacts(supplierId, canView);
+  const notesQuery = useSupplierNotes(supplierId, canView);
   const updateMutation = useUpdateSupplier();
+  const statusMutation = useUpdateSupplierStatus();
   const noopCreate = (): Promise<void> => Promise.resolve();
+
+  const activeTab = parseSupplierDetailTab(searchParams.get("tab"));
+
+  // Purchasing links to `${supplier}#statement`, which predates these tabs and
+  // would otherwise land on Profile with no such anchor on the page. Honour it
+  // once on mount and rewrite it to the query form.
+  useEffect(() => {
+    if (typeof window === "undefined" || window.location.hash !== "#statement") {
+      return;
+    }
+
+    router.replace(supplierDetailTabHref(supplierId, "statement"), { scroll: false });
+  }, [router, supplierId]);
+
+  const changeTab = (tab: SupplierDetailTabKey): void => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (tab === "profile") {
+      next.delete("tab");
+    } else {
+      next.set("tab", tab);
+    }
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -61,10 +113,24 @@ export function SupplierDetailsPageClient({ supplierId }: { supplierId: string }
 
   const supplier = supplierQuery.data;
 
-  const updateSupplier = async (id: string, payload: UpdateSupplierPayload): Promise<void> => {
+  // The details and the status live on different endpoints, so a save that
+  // changes both is two calls. Status goes second: if it fails, the field edits
+  // are already saved and only the status needs retrying.
+  const updateSupplier = async (
+    id: string,
+    payload: UpdateSupplierPayload,
+    nextStatus?: SupplierStatus,
+  ): Promise<void> => {
     try {
       await updateMutation.mutateAsync({ id, payload });
-      toast.success("Supplier updated.");
+
+      if (nextStatus) {
+        await statusMutation.mutateAsync({ id, payload: { status: nextStatus } });
+        toast.success(`Supplier updated and set to ${SUPPLIER_STATUS_COPY[nextStatus].label}.`);
+      } else {
+        toast.success("Supplier updated.");
+      }
+
       setEditOpen(false);
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -73,22 +139,24 @@ export function SupplierDetailsPageClient({ supplierId }: { supplierId: string }
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
           <Link
-            className="text-sm font-semibold text-brand-mocha hover:text-brand-espresso"
+            className="inline-flex items-center gap-1.5 text-cell text-foreground-muted transition-colors hover:text-foreground"
             href={ROUTES.suppliers}
           >
-            Back to Suppliers
+            Back to suppliers
           </Link>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <h1 className="font-serif text-4xl text-brand-espresso">{supplier.supplierName}</h1>
-            <SupplierStatusBadge status={supplier.status} />
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <h1 className="text-page">{supplier.supplierName}</h1>
+            {/* One badge, exceptions only: Active is the default state and
+                badging it everywhere is what made the header noisy. */}
+            {supplier.status === "active" ? null : <SupplierStatusBadge status={supplier.status} />}
           </div>
-          <p className="mt-2 text-sm text-brand-mocha">{supplier.supplierCode}</p>
+          <p className="mt-1 font-mono text-meta text-foreground-muted">{supplier.supplierCode}</p>
         </div>
         {canManage ? (
-          <Button onClick={() => setEditOpen(true)} type="button">
+          <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
             Edit supplier
           </Button>
         ) : null}
@@ -96,14 +164,35 @@ export function SupplierDetailsPageClient({ supplierId }: { supplierId: string }
 
       <SupplierStatsCards stats={statsQuery.data} />
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
-        <SupplierProfileCard supplier={supplier} />
-        <SupplierContactsSection canManage={canManage} supplierId={supplier.id} />
+      <SupplierDetailViewTabs
+        active={activeTab}
+        contactsCount={contactsQuery.data?.length}
+        notesCount={notesQuery.data?.length}
+        onTabChange={changeTab}
+        supplierId={supplierId}
+      />
+
+      {/* One panel element that swaps, which is what `aria-controls` on every
+          tab points at. Each panel owns its own queries and only mounts when
+          selected. */}
+      <div id={SUPPLIER_DETAIL_TABPANEL_ID} role="tabpanel" tabIndex={-1}>
+        {activeTab === "profile" ? <SupplierProfileCard supplier={supplier} /> : null}
+        {activeTab === "contacts" ? (
+          <SupplierContactsSection canManage={canManage} supplierId={supplier.id} />
+        ) : null}
+        {activeTab === "notes" ? (
+          <SupplierNotesSection canManage={canManage} supplierId={supplier.id} />
+        ) : null}
+        {activeTab === "history" ? (
+          <SupplierHistoryPanel canView={canView} supplierId={supplier.id} />
+        ) : null}
+        {activeTab === "documents" ? (
+          <SupplierDocumentsPanel canView={canView} supplierId={supplier.id} />
+        ) : null}
+        {activeTab === "statement" ? (
+          <SupplierStatementPanel canView={canView} supplierId={supplier.id} />
+        ) : null}
       </div>
-
-      <SupplierNotesSection canManage={canManage} supplierId={supplier.id} />
-
-      <SupplierPurchasingHistory canView={canView} supplierId={supplier.id} />
 
       <SupplierFormDialog
         isSubmitting={updateMutation.isPending}

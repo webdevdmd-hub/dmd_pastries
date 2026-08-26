@@ -97,7 +97,7 @@ export function OpeningBalancesPageClient(): JSX.Element {
     canView && tab === "counterparties" && partyType === "customer",
   );
   const suppliersQuery = useSuppliers(
-    { search: "", status: "all", country: "" },
+    { search: "", status: "all", country: "", missingTermsOnly: false },
     canView && tab === "counterparties" && partyType === "supplier",
   );
 
@@ -125,7 +125,7 @@ export function OpeningBalancesPageClient(): JSX.Element {
 
   const partyOptions = useMemo(() => {
     if (partyType === "supplier") {
-      return (suppliersQuery.data ?? []).map((supplier) => ({
+      return (suppliersQuery.data?.items ?? []).map((supplier) => ({
         value: supplier.id,
         label: supplier.supplierName,
         keywords: [supplier.supplierName, supplier.supplierCode],
