@@ -130,7 +130,7 @@ export function ManufacturingPageClient(): JSX.Element {
         </section>
         <section className="flex min-h-64 flex-col justify-end rounded-2xl bg-primary p-8 text-primary-foreground">
           <PackageCheck className="mb-auto h-7 w-7" />
-          <p className="font-mono text-4xl font-semibold">
+          <p className="text-kpi tabular-nums text-foreground">
             {summaryQuery.data?.totalProductionOutput ?? 0}
           </p>
           <p className="mt-2 text-primary-foreground/70">Recorded production output</p>

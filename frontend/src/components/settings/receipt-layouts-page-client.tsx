@@ -700,14 +700,14 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
           <CardContent className="p-5">
             <ReceiptText className="h-5 w-5 text-brand-caramel" />
             <p className="mt-3 text-xs text-brand-mocha">Layouts</p>
-            <p className="font-serif text-3xl text-brand-espresso">{layouts.length}</p>
+            <p className="text-kpi tabular-nums text-foreground">{layouts.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
             <Star className="h-5 w-5 text-brand-caramel" />
             <p className="mt-3 text-xs text-brand-mocha">Defaults</p>
-            <p className="font-serif text-3xl text-brand-espresso">
+            <p className="text-kpi tabular-nums text-foreground">
               {layouts.filter((layout) => layout.isDefault).length}
             </p>
           </CardContent>
@@ -716,7 +716,7 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
           <CardContent className="p-5">
             <FileText className="h-5 w-5 text-brand-caramel" />
             <p className="mt-3 text-xs text-brand-mocha">Supported</p>
-            <p className="font-serif text-3xl text-brand-espresso">58 / 80 / A4</p>
+            <p className="text-kpi tabular-nums text-foreground">58 / 80 / A4</p>
           </CardContent>
         </Card>
       </div>

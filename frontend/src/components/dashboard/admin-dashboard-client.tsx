@@ -564,9 +564,7 @@ export function AdminDashboardClient(): JSX.Element {
                       </p>
                       <Icon className="h-4 w-4 text-foreground-muted" aria-hidden="true" />
                     </div>
-                    <p className="mt-4 text-2xl font-semibold text-brand-espresso">
-                      {metric.value}
-                    </p>
+                    <p className="mt-4 text-kpi tabular-nums text-foreground">{metric.value}</p>
                     <p className="mt-1 text-xs text-workspace-muted">{metric.detail}</p>
                   </div>
                 );

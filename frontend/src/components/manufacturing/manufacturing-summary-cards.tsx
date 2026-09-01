@@ -46,9 +46,7 @@ export function ManufacturingSummaryCards({
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-foreground-muted">{card.label}</p>
                 <div className="mt-4 flex items-end gap-2">
-                  <p className="font-mono text-4xl font-semibold leading-none text-foreground">
-                    {card.value}
-                  </p>
+                  <p className="text-kpi tabular-nums text-foreground">{card.value}</p>
                   <p className="pb-1 text-sm text-foreground-muted">{card.meta}</p>
                 </div>
               </div>

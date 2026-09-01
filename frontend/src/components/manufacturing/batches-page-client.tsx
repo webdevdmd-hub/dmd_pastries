@@ -316,8 +316,8 @@ export function BatchesPageClient(): JSX.Element {
               <p
                 className={
                   metric.tone === "danger"
-                    ? "font-mono text-4xl font-semibold leading-none text-danger-text"
-                    : "font-mono text-4xl font-semibold leading-none text-foreground"
+                    ? "text-kpi tabular-nums text-danger-text"
+                    : "text-kpi tabular-nums text-foreground"
                 }
               >
                 {metric.value}

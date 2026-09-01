@@ -357,7 +357,7 @@ function SummaryCards({
         <Card key={card.label}>
           <CardContent className="p-5">
             <p className="text-xs text-brand-mocha">{card.label}</p>
-            <p className="mt-3 font-serif text-3xl text-brand-espresso">{card.value}</p>
+            <p className="mt-3 text-kpi tabular-nums text-foreground">{card.value}</p>
             <p className="mt-1 text-sm text-brand-mocha">{card.detail}</p>
           </CardContent>
         </Card>

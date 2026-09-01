@@ -47,7 +47,7 @@ export function CustomersSummaryCards({ customers }: { customers: Customer[] }):
             <CardContent className="flex items-center justify-between p-6">
               <div>
                 <p className="text-sm text-brand-mocha">{item.label}</p>
-                <p className="mt-2 text-3xl font-semibold text-brand-espresso">{item.value}</p>
+                <p className="mt-2 text-kpi tabular-nums text-foreground">{item.value}</p>
               </div>
               <div className="rounded-2xl bg-brand-cappuccino/35 p-3 text-brand-mocha">
                 <Icon className="h-6 w-6" />
