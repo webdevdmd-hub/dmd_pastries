@@ -3,10 +3,10 @@
 import {
   Activity,
   Archive,
-  ArrowRight,
   BadgeDollarSign,
   Bell,
   Building2,
+  ChevronRight,
   CreditCard,
   Gift,
   ListChecks,
@@ -23,10 +23,6 @@ import {
 } from "lucide-react";
 import type { JSX } from "react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { SettingsIconName, SettingsSection } from "@/types/settings";
 
 const icons: Record<SettingsIconName, LucideIcon> = {
@@ -55,14 +51,26 @@ type SettingsSectionCardProps = {
   section: SettingsSection;
 };
 
-function getBadgeLabel(section: SettingsSection, canManage: boolean): string {
+function statusLabel(section: SettingsSection, canManage: boolean): string {
   if (section.status !== "available") {
-    return "Coming Soon";
+    return "Coming soon";
   }
 
-  return canManage ? "Manage" : "View Only";
+  return canManage ? section.actionLabel : "View only";
 }
 
+/**
+ * A row, not a card.
+ *
+ * The card version put the only interactive element in a circular
+ * icon-only button whose label was sr-only, so a sighted user saw a bare
+ * arrow and had to infer it. The card itself changed border colour on hover
+ * while doing nothing on click. The icon sat in a 48px tinted tile, which is
+ * the one AI-slop pattern DESIGN.md calls out by name.
+ *
+ * The whole row is now the control, it carries its own visible label, and the
+ * status reads as text instead of a badge competing with the title.
+ */
 export function SettingsSectionCard({
   canManage,
   onOpen,
@@ -70,58 +78,33 @@ export function SettingsSectionCard({
 }: SettingsSectionCardProps): JSX.Element {
   const Icon = icons[section.iconName];
   const disabled = section.status === "disabled";
-  const disabledReason = "This section is prepared for the next development phase.";
 
   return (
-    <Card className="group/card overflow-hidden transition-colors hover:border-brand-caramel/60">
-      <CardContent className="flex h-full flex-col gap-5 p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-cappuccino/35 text-brand-caramel">
-            <Icon className="h-5 w-5" aria-hidden="true" />
-          </div>
-          <Badge
-            className={
-              section.status === "disabled"
-                ? "border-brand-cappuccino bg-brand-cappuccino/35 text-brand-mocha"
-                : canManage
-                  ? "border-brand-caramel/70 bg-brand-caramel/15 text-brand-mocha"
-                  : "border-brand-cappuccino bg-brand-latte text-brand-mocha"
-            }
+    <li className="bg-card">
+      <button
+        className="flex min-h-tap w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed"
+        disabled={disabled}
+        onClick={onOpen}
+        type="button"
+      >
+        <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-foreground-muted" />
+        <span className="min-w-0 flex-1">
+          <span
+            className={`block text-cell font-medium ${
+              disabled ? "text-foreground-muted" : "text-foreground"
+            }`}
           >
-            {getBadgeLabel(section, canManage)}
-          </Badge>
-        </div>
-
-        <div className="flex flex-1 flex-col gap-2">
-          <h3 className="text-lg font-semibold text-brand-espresso">{section.title}</h3>
-          <p className="text-sm leading-6 text-brand-mocha">{section.description}</p>
-        </div>
-
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-flex justify-end">
-                <Button
-                  aria-label={`${section.actionLabel} ${section.title}`}
-                  className="group/action rounded-full"
-                  disabled={disabled}
-                  onClick={onOpen}
-                  type="button"
-                  variant="outline"
-                >
-                  <span className="sr-only">{canManage ? section.actionLabel : "View"}</span>
-                  <ArrowRight
-                    aria-hidden="true"
-                    className="transition-transform duration-200 ease-out motion-reduce:transition-none group-hover/card:translate-x-1 group-focus-visible/action:translate-x-1"
-                    data-icon="inline-end"
-                  />
-                </Button>
-              </span>
-            </TooltipTrigger>
-            {disabled ? <TooltipContent>{disabledReason}</TooltipContent> : null}
-          </Tooltip>
-        </TooltipProvider>
-      </CardContent>
-    </Card>
+            {section.title}
+          </span>
+          <span className="block text-meta text-foreground-muted">{section.description}</span>
+        </span>
+        <span className="shrink-0 text-meta text-foreground-muted">
+          {statusLabel(section, canManage)}
+        </span>
+        {disabled ? null : (
+          <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-foreground-muted" />
+        )}
+      </button>
+    </li>
   );
 }
