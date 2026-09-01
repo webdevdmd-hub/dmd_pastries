@@ -238,7 +238,7 @@ export function PaymentsPageClient(): JSX.Element {
   };
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <PageHeader
         title="Payments"
         description="Track incoming customer collections from POS sales and bakery orders."
