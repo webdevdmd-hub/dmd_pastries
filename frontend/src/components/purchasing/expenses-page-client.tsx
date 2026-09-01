@@ -404,41 +404,67 @@ function ExpenseFormDialog({
     setFormState((current) => ({ ...current, ...patch }));
   };
 
-  const submitForm = async (): Promise<void> => {
-    const payload = buildPayload(formState);
+  /**
+   * Every failing field, collected in one pass and reported together.
+   *
+   * This used to be a chain of `if (…) { setError(…); return; }`, so a form
+   * with three empty required fields told the operator about one of them,
+   * then the next after they resubmitted. The id is here so submit can move
+   * focus to the first offender: the message renders at the foot of the
+   * dialog, which measured 394px below the field it names.
+   */
+  const collectValidationErrors = (
+    payload: ReturnType<typeof buildPayload>,
+  ): { fieldId: string; message: string }[] => {
+    const found: { fieldId: string; message: string }[] = [];
 
     if (!payload.branchId) {
-      setError("Branch is required.");
-      return;
+      found.push({ fieldId: "expenses-branch", message: "Branch is required." });
     }
 
     if (!payload.expenseDate) {
-      setError("Expense date is required.");
-      return;
+      found.push({ fieldId: "expenseDate", message: "Expense date is required." });
     }
 
     if (!payload.expenseAccountId) {
-      setError("Expense account is required.");
-      return;
+      found.push({ fieldId: "expenses-expense-account", message: "Expense account is required." });
     }
 
     if (!payload.paidThroughAccountId) {
-      setError("Paid through account is required.");
-      return;
-    }
-
-    if (
+      found.push({
+        fieldId: "expenses-paid-through",
+        message: "Paid through account is required.",
+      });
+    } else if (
       !paidThroughAccountOptions.some((option) => option.value === payload.paidThroughAccountId)
     ) {
-      setError("Select an active payment account available for this branch.");
-      return;
+      found.push({
+        fieldId: "expenses-paid-through",
+        message: "Select an active payment account available for this branch.",
+      });
     }
 
     if (!Number.isFinite(payload.amount) || payload.amount <= 0) {
-      setError("Amount must be greater than zero.");
+      found.push({ fieldId: "amount", message: "Amount must be greater than zero." });
+    }
+
+    return found;
+  };
+
+  const submitForm = async (): Promise<void> => {
+    const payload = buildPayload(formState);
+
+    const validationErrors = collectValidationErrors(payload);
+
+    if (validationErrors.length > 0) {
+      setError(validationErrors.map((item) => item.message).join(" "));
+      // Take the operator to the first field that needs them rather than
+      // leaving them to find it from a message at the foot of the form.
+      document.getElementById(validationErrors[0]?.fieldId ?? "")?.focus();
       return;
     }
 
+    setError(null);
     setError(null);
 
     if (receiptFile) {
@@ -633,7 +659,11 @@ function ExpenseFormDialog({
             />
           </div>
 
-          {error ? <p className="text-sm font-medium text-danger-text">{error}</p> : null}
+          {error ? (
+            <p className="text-sm font-medium text-danger-text" role="alert">
+              {error}
+            </p>
+          ) : null}
 
           <DialogFooter>
             <Button onClick={onClose} type="button" variant="outline">
