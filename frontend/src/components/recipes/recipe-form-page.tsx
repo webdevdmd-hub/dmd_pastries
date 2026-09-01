@@ -885,15 +885,19 @@ export function RecipeFormPage({
             />
             <Card className="rounded-2xl border-workspace-border bg-card shadow-none">
               <CardHeader>
-                <CardTitle className="text-2xl text-brand-espresso">
+                <CardTitle
+                  className="text-2xl text-brand-espresso"
+                  id="recipe-instructions-heading"
+                >
                   Production Instructions
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <Textarea
+                  aria-labelledby="recipe-instructions-heading"
                   className="min-h-44"
                   disabled={!canEditRecipeForm}
-                  placeholder="1. Mix ingredients...\n2. Rest or proof...\n3. Bake or finish..."
+                  placeholder={"1. Mix ingredients…\n2. Rest or proof…\n3. Bake or finish…"}
                   {...form.register("instructions")}
                 />
               </CardContent>
