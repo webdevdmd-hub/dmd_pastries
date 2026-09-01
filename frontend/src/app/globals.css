@@ -190,6 +190,17 @@
     @apply outline-none;
   }
 
+  /* The UA stylesheet renders <strong>, <b> and <th> at 700, above the 600
+   * ceiling. No class is involved, so no lint rule and no grep for font-bold
+   * sees them: 22 elements measured across /dashboard/admin, the trial
+   * balance and the recipe editor. Reset once here, not per component --
+   * ISSUE-001 (41c71e1) already fixed one instance of this by hand. */
+  strong,
+  b,
+  th {
+    font-weight: 600;
+  }
+
   /* Any number that can change without its row changing MUST be tabular, or
    * the column shifts and the eye loses its place. */
   .tnum,
