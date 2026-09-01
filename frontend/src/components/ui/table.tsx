@@ -65,12 +65,28 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
 );
 TableRow.displayName = "TableRow";
 
+/**
+ * `numeric` marks a column that holds money, counts, dates or percentages.
+ * It sets `data-numeric`, which globals.css already styles with
+ * `font-variant-numeric: tabular-nums`, right alignment and the tighter
+ * tracking those columns want.
+ *
+ * The primitive owns this because leaving it to the call site does not work:
+ * measured live, /purchasing/orders had tabular figures on its money cells
+ * while /dashboard/admin had none on nine, the recipe editor none on eleven,
+ * and /products none on eighteen -- all rendering the same TableCell. Counting
+ * files that mention `tabular-nums` says the migration is progressing; counting
+ * money cells that carry it says otherwise.
+ */
+type NumericCellProps = { numeric?: boolean };
+
 const TableHead = React.forwardRef<
   HTMLTableCellElement,
-  React.ThHTMLAttributes<HTMLTableCellElement>
->(({ className, ...props }, ref) => (
+  React.ThHTMLAttributes<HTMLTableCellElement> & NumericCellProps
+>(({ className, numeric, ...props }, ref) => (
   <th
     ref={ref}
+    data-numeric={numeric ? "" : undefined}
     className={cn(
       // Sticky so the column names survive a long ledger. Was `text-[0.7rem]`
       // (11.2px), under the 12px floor in DESIGN.md §9.
@@ -84,9 +100,14 @@ TableHead.displayName = "TableHead";
 
 const TableCell = React.forwardRef<
   HTMLTableCellElement,
-  React.TdHTMLAttributes<HTMLTableCellElement>
->(({ className, ...props }, ref) => (
-  <td ref={ref} className={cn("px-cell-x align-middle text-foreground", className)} {...props} />
+  React.TdHTMLAttributes<HTMLTableCellElement> & NumericCellProps
+>(({ className, numeric, ...props }, ref) => (
+  <td
+    ref={ref}
+    data-numeric={numeric ? "" : undefined}
+    className={cn("px-cell-x align-middle text-foreground", className)}
+    {...props}
+  />
 ));
 TableCell.displayName = "TableCell";
 
