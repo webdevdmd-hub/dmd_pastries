@@ -39,7 +39,7 @@ export function DesktopSidebar(): JSX.Element {
             >
               {workspaceName}
             </p>
-            <p className="mt-1 text-[0.68rem] text-workspace-sidebar-muted">Operations OS</p>
+            <p className="mt-1 text-meta text-workspace-sidebar-muted">Operations OS</p>
           </div>
         ) : null}
         <Button

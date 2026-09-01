@@ -259,7 +259,7 @@ export function AppNavigationList({
             <button
               aria-expanded={isOpen}
               className={cn(
-                "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[0.66rem] font-semibold transition-colors",
+                "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-meta font-semibold transition-colors",
                 isPosTheme
                   ? "text-foreground-muted hover:bg-muted hover:text-foreground"
                   : "text-workspace-sidebar-muted hover:bg-card/[0.06] hover:text-primary-foreground",
