@@ -143,7 +143,7 @@ export function POSHoldSaleDialog({
                 </label>
                 <Input
                   id="pos-hold-sale-hold-current-cart"
-                  className="rounded-md border-border bg-card shadow-none focus-visible:ring-black"
+                  className="rounded-md border-border bg-card shadow-none focus-visible:ring-ring"
                   onChange={(event) => setNotes(event.target.value)}
                   placeholder="Optional note, customer name, or pickup reminder"
                   value={notes}

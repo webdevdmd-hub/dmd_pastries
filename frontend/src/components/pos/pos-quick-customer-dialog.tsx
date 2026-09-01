@@ -70,7 +70,7 @@ export function POSQuickCustomerDialog({
           <div className="grid gap-2">
             <Label htmlFor="pos-customer-name">Full name</Label>
             <Input
-              className="rounded-md border-border bg-card shadow-none focus-visible:ring-black"
+              className="rounded-md border-border bg-card shadow-none focus-visible:ring-ring"
               id="pos-customer-name"
               {...form.register("fullName")}
             />
@@ -83,7 +83,7 @@ export function POSQuickCustomerDialog({
           <div className="grid gap-2">
             <Label htmlFor="pos-customer-phone">Phone</Label>
             <Input
-              className="rounded-md border-border bg-card shadow-none focus-visible:ring-black"
+              className="rounded-md border-border bg-card shadow-none focus-visible:ring-ring"
               id="pos-customer-phone"
               {...form.register("phone")}
             />
@@ -96,7 +96,7 @@ export function POSQuickCustomerDialog({
           <div className="grid gap-2">
             <Label htmlFor="pos-customer-email">Email</Label>
             <Input
-              className="rounded-md border-border bg-card shadow-none focus-visible:ring-black"
+              className="rounded-md border-border bg-card shadow-none focus-visible:ring-ring"
               id="pos-customer-email"
               type="email"
               {...form.register("email")}

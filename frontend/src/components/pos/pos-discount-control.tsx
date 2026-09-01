@@ -35,7 +35,7 @@ export function POSDiscountControl({
           }
           value={type ?? "none"}
         >
-          <SelectTrigger className="h-8 rounded-md border-border bg-card text-xs shadow-none focus:ring-black">
+          <SelectTrigger className="h-8 rounded-md border-border bg-card text-xs shadow-none focus:ring-ring">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -45,7 +45,7 @@ export function POSDiscountControl({
           </SelectContent>
         </Select>
         <POSNumberInput
-          className="h-8 rounded-md border-border bg-card text-xs shadow-none focus-visible:ring-black"
+          className="h-8 rounded-md border-border bg-card text-xs shadow-none focus-visible:ring-ring"
           disabled={!type}
           onValueChange={(nextValue) => onChange(type, nextValue)}
           placeholder="0.00"
