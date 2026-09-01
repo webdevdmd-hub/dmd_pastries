@@ -47,7 +47,7 @@ export function POSCategorySidebar({
             variant="outline"
           >
             <Icon className="h-5 w-5 shrink-0" />
-            <span className="whitespace-normal text-left text-[0.72rem] font-bold leading-tight">
+            <span className="whitespace-normal text-left text-meta font-medium leading-tight">
               {category.categoryName}
             </span>
           </Button>
