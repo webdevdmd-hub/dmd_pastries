@@ -20,5 +20,5 @@ export function ErrorState({
   retryLabel?: string | undefined;
   onRetry?: (() => void) | undefined;
 }): JSX.Element {
-  return <FailedState detail={description} noun={title} onRetry={onRetry} />;
+  return <FailedState detail={description} heading={title} noun={title} onRetry={onRetry} />;
 }

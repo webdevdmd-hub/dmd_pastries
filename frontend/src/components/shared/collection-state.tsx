@@ -188,6 +188,13 @@ export function FilteredState({
 type FailedStateProps = {
   /** What failed to load, e.g. "products". */
   noun: string;
+  /**
+   * A complete heading, for callers whose subject is not a collection noun.
+   * app/error.tsx passes an arbitrary title ("Something went wrong"), and
+   * feeding that through the noun slot rendered "Couldn't load Something went
+   * wrong".
+   */
+  heading?: string | undefined;
   /** Optional detail from the API. Never the raw stack. */
   detail?: ReactNode | undefined;
   onRetry?: (() => void) | undefined;
@@ -208,13 +215,13 @@ type FailedStateProps = {
  * `role="alert"`, because unlike the filtered row this is not a refinement of what
  * the user just did — it is something that went wrong and warrants interrupting.
  */
-export function FailedState({ detail, noun, onRetry }: FailedStateProps): JSX.Element {
+export function FailedState({ detail, heading, noun, onRetry }: FailedStateProps): JSX.Element {
   return (
     <div
       className="flex flex-col items-center gap-3 rounded-lg border border-danger/30 bg-danger-tint px-6 py-10 text-center"
       role="alert"
     >
-      <h2 className="text-title text-danger-text">Couldn&rsquo;t load {noun}</h2>
+      <h2 className="text-title text-danger-text">{heading ?? <>Couldn&rsquo;t load {noun}</>}</h2>
 
       <p className="text-body max-w-[54ch] text-danger-text">
         {detail ?? "The request failed."} Nothing has changed and no data was lost.
