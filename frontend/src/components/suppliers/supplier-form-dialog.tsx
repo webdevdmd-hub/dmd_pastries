@@ -52,6 +52,14 @@ type SupplierFormDialogProps = {
   supplier: Supplier | null;
 };
 
+/**
+ * `PAYMENT_TERMS` carries "" as its not-set state (see types/supplier.ts), but
+ * Radix reserves "" for "no selection" and throws if a SelectItem uses it. The
+ * sentinel keeps the option selectable in the list; it is mapped back to "" on
+ * the way into the form so the payload the backend sees is unchanged.
+ */
+const PAYMENT_TERMS_UNSET = "__unset";
+
 function defaultValues(supplier: Supplier | null): CreateSupplierFormValues {
   return {
     supplierName: supplier?.supplierName ?? "",
@@ -244,18 +252,27 @@ export function SupplierFormDialog({
               <Label htmlFor="supplier-payment-terms">Payment terms</Label>
               <Select
                 onValueChange={(next) =>
-                  form.setValue("paymentTerms", next as CreateSupplierFormValues["paymentTerms"], {
-                    shouldDirty: true,
-                  })
+                  form.setValue(
+                    "paymentTerms",
+                    (next === PAYMENT_TERMS_UNSET
+                      ? ""
+                      : next) as CreateSupplierFormValues["paymentTerms"],
+                    {
+                      shouldDirty: true,
+                    },
+                  )
                 }
-                value={form.watch("paymentTerms")}
+                value={form.watch("paymentTerms") || PAYMENT_TERMS_UNSET}
               >
                 <SelectTrigger aria-label="Payment terms" id="supplier-payment-terms">
                   <SelectValue placeholder="Not set" />
                 </SelectTrigger>
                 <SelectContent>
                   {PAYMENT_TERMS.map((term) => (
-                    <SelectItem key={term || "unset"} value={term}>
+                    <SelectItem
+                      key={term || PAYMENT_TERMS_UNSET}
+                      value={term || PAYMENT_TERMS_UNSET}
+                    >
                       {PAYMENT_TERMS_LABEL[term]}
                     </SelectItem>
                   ))}
