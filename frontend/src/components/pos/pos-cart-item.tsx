@@ -68,7 +68,7 @@ export function POSCartItem({
           onChange={(quantity) => onQuantityChange(item.cartItemId, quantity)}
           quantity={item.quantity}
         />
-        <p className="font-mono text-right text-meta font-medium text-foreground">
+        <p className="font-mono text-right text-meta font-medium tabular-nums text-foreground">
           {formatMoney(item.lineTotal)}
         </p>
       </div>
