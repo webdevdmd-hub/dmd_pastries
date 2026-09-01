@@ -430,7 +430,7 @@ export function PermissionMatrix({
                             <span className="block font-semibold text-brand-espresso">
                               {getModuleTitle(group.moduleName)}
                             </span>
-                            <span className="block text-xs font-medium text-brand-mocha/70">
+                            <span className="block text-xs font-medium text-brand-mocha">
                               {selectedCount}/{group.permissions.length} selected
                             </span>
                           </span>
@@ -448,7 +448,7 @@ export function PermissionMatrix({
                           >
                             <div className="grid gap-2">
                               {cellPermissions.length === 0 ? (
-                                <span className="text-brand-mocha/40">-</span>
+                                <span className="text-foreground-muted">-</span>
                               ) : (
                                 cellPermissions.map((permission) => {
                                   const checked = selectedPermissionIds.has(permission.id);
@@ -484,7 +484,7 @@ export function PermissionMatrix({
                                         <span className="block text-xs font-semibold text-brand-espresso">
                                           {permission.actionLabel}
                                         </span>
-                                        <span className="block text-[11px] leading-4 text-brand-mocha/70">
+                                        <span className="block text-[11px] leading-4 text-brand-mocha">
                                           {permission.permissionKey}
                                         </span>
                                       </span>
@@ -536,7 +536,7 @@ export function PermissionMatrix({
                                     <span className="block text-xs font-semibold text-brand-espresso">
                                       {permission.actionLabel}
                                     </span>
-                                    <span className="block text-[11px] leading-4 text-brand-mocha/70">
+                                    <span className="block text-[11px] leading-4 text-brand-mocha">
                                       {permission.permissionKey}
                                     </span>
                                   </span>
@@ -546,7 +546,7 @@ export function PermissionMatrix({
                           {group.permissions.every(
                             (permission) => permission.column !== "advanced",
                           ) ? (
-                            <span className="text-brand-mocha/40">-</span>
+                            <span className="text-foreground-muted">-</span>
                           ) : null}
                         </div>
                       </td>

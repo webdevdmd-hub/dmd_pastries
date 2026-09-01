@@ -298,25 +298,25 @@ export function ExportReportDialog({
             <p className="font-semibold text-brand-espresso">Export preview</p>
             <dl className="mt-3 grid gap-2 md:grid-cols-2">
               <div>
-                <dt className="text-xs font-semibold text-brand-mocha/70">Report</dt>
+                <dt className="text-xs font-semibold text-brand-mocha">Report</dt>
                 <dd>{selectedOption?.label ?? "Select a report"}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold text-brand-mocha/70">Category</dt>
+                <dt className="text-xs font-semibold text-brand-mocha">Category</dt>
                 <dd>{selectedOption?.category ?? selectedCategory}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold text-brand-mocha/70">Date range</dt>
+                <dt className="text-xs font-semibold text-brand-mocha">Date range</dt>
                 <dd>
                   {dateFrom} to {dateTo}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold text-brand-mocha/70">Branch</dt>
+                <dt className="text-xs font-semibold text-brand-mocha">Branch</dt>
                 <dd>{branchLabel}</dd>
               </div>
               <div className="md:col-span-2">
-                <dt className="text-xs font-semibold text-brand-mocha/70">File</dt>
+                <dt className="text-xs font-semibold text-brand-mocha">File</dt>
                 <dd className="break-all font-mono text-xs">{previewFilename}</dd>
               </div>
             </dl>

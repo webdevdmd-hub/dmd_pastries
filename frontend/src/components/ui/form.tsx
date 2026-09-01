@@ -115,7 +115,7 @@ function FormDescription({
   const { formDescriptionId } = useFormField();
 
   return (
-    <p id={formDescriptionId} className={cn("text-sm text-brand-mocha/80", className)} {...props} />
+    <p id={formDescriptionId} className={cn("text-sm text-brand-mocha", className)} {...props} />
   );
 }
 

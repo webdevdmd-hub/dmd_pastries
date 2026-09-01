@@ -96,9 +96,7 @@ export function PermissionModuleCard({
                 <p className="text-sm font-medium text-brand-espresso">
                   {getPermissionActionLabel(permission.permissionKey)}
                 </p>
-                <p className="text-xs font-medium text-brand-mocha/70">
-                  {permission.permissionKey}
-                </p>
+                <p className="text-xs font-medium text-brand-mocha">{permission.permissionKey}</p>
                 <p className="text-sm leading-6 text-brand-mocha">{permission.description}</p>
               </div>
             </label>

@@ -267,7 +267,7 @@ export function RoleFormDialog({
                         <FormLabel>Description</FormLabel>
                         <FormControl>
                           <textarea
-                            className="min-h-24 w-full rounded-2xl border border-brand-cappuccino bg-brand-latte px-4 py-3 text-sm text-brand-espresso outline-none ring-offset-background placeholder:text-brand-mocha/60 focus-visible:ring-2 focus-visible:ring-brand-caramel"
+                            className="min-h-24 w-full rounded-2xl border border-brand-cappuccino bg-brand-latte px-4 py-3 text-sm text-brand-espresso outline-none ring-offset-background placeholder:text-brand-mocha focus-visible:ring-2 focus-visible:ring-brand-caramel"
                             placeholder="Handles counter operations, end-of-shift reconciliation, and staff oversight."
                             {...field}
                             onChange={(event) => {
@@ -439,7 +439,7 @@ export function RoleFormDialog({
                       <FormLabel>Description</FormLabel>
                       <FormControl>
                         <textarea
-                          className="min-h-24 w-full rounded-2xl border border-brand-cappuccino bg-brand-latte px-4 py-3 text-sm text-brand-espresso outline-none ring-offset-background placeholder:text-brand-mocha/60 focus-visible:ring-2 focus-visible:ring-brand-caramel"
+                          className="min-h-24 w-full rounded-2xl border border-brand-cappuccino bg-brand-latte px-4 py-3 text-sm text-brand-espresso outline-none ring-offset-background placeholder:text-brand-mocha focus-visible:ring-2 focus-visible:ring-brand-caramel"
                           {...field}
                         />
                       </FormControl>

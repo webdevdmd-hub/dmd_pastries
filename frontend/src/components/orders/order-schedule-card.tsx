@@ -91,7 +91,7 @@ export function OrderScheduleCard({
         <div className="grid gap-2 md:col-span-2">
           <Label htmlFor="orderDeliveryAddress">Delivery address</Label>
           <textarea
-            className="min-h-24 rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso outline-none ring-offset-background placeholder:text-brand-mocha/70 focus-visible:ring-2 focus-visible:ring-brand-caramel focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-24 rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso outline-none ring-offset-background placeholder:text-brand-mocha focus-visible:ring-2 focus-visible:ring-brand-caramel focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={orderType !== "delivery"}
             id="orderDeliveryAddress"
             onChange={(event) => onChange({ deliveryAddress: event.target.value })}
@@ -102,7 +102,7 @@ export function OrderScheduleCard({
         <div className="grid gap-2 md:col-span-2">
           <Label htmlFor="orderNotes">Notes</Label>
           <textarea
-            className="min-h-24 rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso outline-none ring-offset-background placeholder:text-brand-mocha/70 focus-visible:ring-2 focus-visible:ring-brand-caramel focus-visible:ring-offset-2"
+            className="min-h-24 rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso outline-none ring-offset-background placeholder:text-brand-mocha focus-visible:ring-2 focus-visible:ring-brand-caramel focus-visible:ring-offset-2"
             id="orderNotes"
             onChange={(event) => onChange({ notes: event.target.value })}
             placeholder="Internal order notes"

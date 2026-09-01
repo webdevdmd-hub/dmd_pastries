@@ -503,7 +503,7 @@ function CompanySettingsDialog({
                   <FormLabel>Address</FormLabel>
                   <FormControl>
                     <textarea
-                      className="min-h-24 w-full rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso placeholder:text-brand-mocha/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel focus-visible:ring-offset-2"
+                      className="min-h-24 w-full rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso placeholder:text-brand-mocha focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel focus-visible:ring-offset-2"
                       {...field}
                     />
                   </FormControl>
@@ -519,7 +519,7 @@ function CompanySettingsDialog({
                   <FormLabel>Invoice footer</FormLabel>
                   <FormControl>
                     <textarea
-                      className="min-h-24 w-full rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso placeholder:text-brand-mocha/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel focus-visible:ring-offset-2"
+                      className="min-h-24 w-full rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso placeholder:text-brand-mocha focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel focus-visible:ring-offset-2"
                       {...field}
                     />
                   </FormControl>
@@ -535,7 +535,7 @@ function CompanySettingsDialog({
                   <FormLabel>Receipt footer</FormLabel>
                   <FormControl>
                     <textarea
-                      className="min-h-24 w-full rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso placeholder:text-brand-mocha/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel focus-visible:ring-offset-2"
+                      className="min-h-24 w-full rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso placeholder:text-brand-mocha focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel focus-visible:ring-offset-2"
                       {...field}
                     />
                   </FormControl>

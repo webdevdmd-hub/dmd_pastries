@@ -205,7 +205,7 @@ export function OnboardingPageClient(): JSX.Element {
                     <p className="mt-2 flex-1 text-sm leading-6 text-brand-mocha">
                       {metadata.description}
                     </p>
-                    <p className="mt-3 text-xs font-medium text-brand-mocha/70">
+                    <p className="mt-3 text-xs font-medium text-brand-mocha">
                       Backend step: {step.label}
                     </p>
                     {metadata.href ? (
