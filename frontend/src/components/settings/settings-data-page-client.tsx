@@ -485,8 +485,7 @@ function CompanySettingsDialog({
                         />
                         <input type="hidden" {...field} />
                         <p className="text-xs leading-5 text-brand-mocha">
-                          Upload a logo to Appwrite Storage. The backend stores the returned file
-                          reference in company settings.
+                          Your logo appears on receipts, invoices and printed reports.
                         </p>
                       </div>
                     </div>

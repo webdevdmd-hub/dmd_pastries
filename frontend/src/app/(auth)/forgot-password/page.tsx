@@ -6,7 +6,7 @@ import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
 export default function ForgotPasswordPage(): JSX.Element {
   return (
     <AuthShell
-      description="Request a secure Appwrite recovery link to reset the password for your owner or staff account."
+      description="We will email you a secure link to set a new password."
       title="Reset your password"
     >
       <ForgotPasswordForm />

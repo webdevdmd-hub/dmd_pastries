@@ -100,7 +100,7 @@ export function ProfilePageClient(): JSX.Element {
               </div>
               <CardTitle>Email verification</CardTitle>
               <CardDescription>
-                Appwrite verification is wired through the existing verification page.
+                Confirm your email address so password recovery works.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -119,8 +119,7 @@ export function ProfilePageClient(): JSX.Element {
               </div>
               <CardTitle>Password recovery</CardTitle>
               <CardDescription>
-                Password reset is handled by Appwrite recovery links and should be tested end-to-end
-                with your production Appwrite domain.
+                Send yourself a reset link by email if you ever lose access.
               </CardDescription>
             </CardHeader>
             <CardContent>

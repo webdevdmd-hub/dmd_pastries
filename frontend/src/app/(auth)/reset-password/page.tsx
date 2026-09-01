@@ -16,10 +16,7 @@ export default async function ResetPasswordPage({
   const params = await searchParams;
 
   return (
-    <AuthShell
-      description="Set a new secure password after confirming your Appwrite recovery link."
-      title="Create a new password"
-    >
+    <AuthShell description="Choose a new password for your account." title="Create a new password">
       <ResetPasswordForm secret={params.secret ?? ""} userId={params.userId ?? ""} />
     </AuthShell>
   );

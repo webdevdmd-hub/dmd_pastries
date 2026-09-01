@@ -185,8 +185,8 @@ export function LoginForm(): JSX.Element {
                 <AlertTitle>Session already active</AlertTitle>
                 <AlertDescription className="space-y-3">
                   <p>
-                    Appwrite already has an active session in this browser. Continue with that
-                    session or restart login with the credentials below.
+                    You are already signed in on this browser. Continue with that session or restart
+                    login with the credentials below.
                   </p>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Button
@@ -217,14 +217,14 @@ export function LoginForm(): JSX.Element {
 
             {rateLimited ? (
               <Alert className="border-warning/30 bg-warning-tint text-warning-text">
-                <AlertTitle>Too many login sync attempts</AlertTitle>
+                <AlertTitle>Too many attempts</AlertTitle>
                 <AlertDescription className="space-y-3">
                   <p>
-                    Appwrite is temporarily blocking JWT/session requests for this browser. Wait{" "}
+                    Sign-in is paused on this browser for a moment. Wait{" "}
                     {cooldownRemainingSeconds > 0
                       ? `${String(cooldownRemainingSeconds)} seconds`
                       : "60 seconds"}
-                    , then continue the existing session instead of creating another login attempt.
+                    , then continue with your existing session rather than signing in again.
                   </p>
                   {submitError ? <p className="text-sm text-warning-text">{submitError}</p> : null}
                   <Button

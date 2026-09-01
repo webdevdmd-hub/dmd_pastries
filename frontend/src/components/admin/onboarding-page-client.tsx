@@ -74,8 +74,7 @@ const onboardingStepMetadata: Record<OnboardingStepKey, OnboardingStepMetadata> 
 const supplementalSteps: OnboardingStepMetadata[] = [
   {
     title: "Verify owner email",
-    description:
-      "Confirm the owner email in Appwrite so recovery and account security work safely.",
+    description: "Confirm the owner email address so password recovery works.",
     icon: MailCheck,
     href: ROUTES.verifyEmail,
   },
