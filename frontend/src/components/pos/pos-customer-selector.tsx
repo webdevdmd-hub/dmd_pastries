@@ -134,7 +134,7 @@ export function POSCustomerSelector({ onChange, value }: POSCustomerSelectorProp
         searchPlaceholder="Search by name, code, phone, or email..."
         searchValue={search}
         showSelectedDescription={false}
-        triggerClassName="h-9 min-h-9 rounded-md border-border bg-card text-sm shadow-none hover:bg-muted focus-visible:ring-ring"
+        triggerClassName="min-h-tap rounded-md border-border bg-card text-sm shadow-none hover:bg-muted focus-visible:ring-ring"
         value={value}
       />
 

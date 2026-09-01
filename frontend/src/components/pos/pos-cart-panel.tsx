@@ -96,7 +96,7 @@ export function POSCartPanel({
           <POSCustomerSelector onChange={onCustomerChange} value={customerId} />
         </div>
 
-        <div className="grid min-w-0 grid-rows-[24px_36px] gap-1 rounded-md border border-border bg-card p-2.5">
+        <div className="grid min-w-0 grid-rows-[24px_auto] gap-1 rounded-md border border-border bg-card p-2.5">
           <div className="flex h-6 items-center gap-2 text-foreground-muted">
             <Store className="h-4 w-4" />
             <p className="text-meta text-foreground-muted">Sales channel</p>
@@ -133,7 +133,7 @@ export function POSCartPanel({
             placeholder="Default channel"
             searchPlaceholder="Search channels..."
             showSelectedDescription={false}
-            triggerClassName="h-9 min-h-9 rounded-md border-border bg-muted text-sm font-semibold shadow-none hover:bg-card focus-visible:ring-ring"
+            triggerClassName="min-h-tap rounded-md border-border bg-muted text-sm font-semibold shadow-none hover:bg-card focus-visible:ring-ring"
             value={salesChannelId || defaultChannelValue}
           />
         </div>
@@ -198,7 +198,7 @@ export function POSCartPanel({
               .map((option) => (
                 <button
                   aria-pressed={taxMode === option.value}
-                  className={`text-meta rounded px-2.5 py-1 font-medium transition-colors ${
+                  className={`text-meta min-h-tap min-w-tap rounded px-2.5 py-1 font-medium transition-colors ${
                     taxMode === option.value
                       ? "bg-card text-foreground shadow-xs"
                       : "text-foreground-muted hover:text-foreground"
