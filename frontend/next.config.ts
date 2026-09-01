@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import type { NextConfig } from "next";
 
 import { ROUTES } from "./src/constants/routes";
@@ -5,6 +7,20 @@ import { ROUTES } from "./src/constants/routes";
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
+  /**
+   * Pin the workspace root to this directory.
+   *
+   * Turbopack walks upwards looking for lockfiles to infer the root. A stray
+   * package-lock.json in the user's home directory outranked our own
+   * pnpm-lock.yaml, so the inferred root became the home directory and every
+   * externalised server dependency was resolved against a node_modules that
+   * only ever held two unrelated packages -- "Cannot find module
+   * 'lucide-react'" on an install that was perfectly intact. Pinning the root
+   * removes the guess.
+   */
+  turbopack: {
+    root: path.join(__dirname),
+  },
   /**
    * Index and legacy routes that only ever forwarded somewhere else.
    *
