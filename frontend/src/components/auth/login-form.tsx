@@ -1,15 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  ArrowRight,
-  Eye,
-  EyeOff,
-  LoaderCircle,
-  LockKeyhole,
-  Mail,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
@@ -331,13 +323,6 @@ export function LoginForm(): JSX.Element {
                 </>
               )}
             </Button>
-
-            <div className="flex items-start gap-3 border-t border-border pt-5 text-xs leading-5 text-foreground-muted">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-foreground-muted" />
-              <span>
-                Login restores backend permissions, branch access, and active workspace context.
-              </span>
-            </div>
 
             <p className="text-center text-sm text-foreground-muted">
               Need an owner account?{" "}

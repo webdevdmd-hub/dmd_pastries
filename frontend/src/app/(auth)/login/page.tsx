@@ -5,10 +5,7 @@ import { LoginForm } from "@/components/auth/login-form";
 
 export default function LoginPage(): JSX.Element {
   return (
-    <AuthShell
-      description="Enter your secure operations cockpit and restore your branch, role, and live workspace context."
-      title="Welcome back"
-    >
+    <AuthShell description="Sign in to your bakery." title="Welcome back">
       <LoginForm />
     </AuthShell>
   );
