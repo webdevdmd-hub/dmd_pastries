@@ -3,6 +3,7 @@
 import {
   BarChart3,
   Boxes,
+  ChevronRight,
   Download,
   PackageSearch,
   ReceiptText,
@@ -16,9 +17,6 @@ import type { JSX } from "react";
 
 import { AccessDeniedCard } from "@/components/reports/access-denied-card";
 import { ReportPageHeader } from "@/components/reports/report-page-header";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { usePermission } from "@/hooks/use-permission";
@@ -48,10 +46,6 @@ const reportStatusLabels: Record<ReportCardStatus, string> = {
   coming_soon: "Coming Soon",
   partial: "In Progress",
 };
-
-function reportStatusVariant(status: ReportCardStatus): "outline" | "secondary" {
-  return status === "available" ? "secondary" : "outline";
-}
 
 const reportCards: ReportCard[] = [
   {
@@ -138,44 +132,63 @@ export function ReportsPageClient(): JSX.Element {
         title="Reports"
         description="Review sales, payments, inventory, manufacturing, purchasing, and bakery order performance."
       />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {reportCards.map((card) => {
-          const Icon = card.icon;
-          const isOpenable = card.status !== "coming_soon";
+      {/* A list, not a card grid. The grid gave ten destinations identical
+          weight, put each behind a 60px "Open" button while the card itself
+          carried a hover-lift it could not honour, and spent two full cells on
+          reports that do not exist yet. Rows are scannable in one pass and the
+          whole row is the target. */}
+      <div className="overflow-hidden rounded-lg border border-border">
+        <ul className="grid gap-px bg-border">
+          {reportCards.map((card) => {
+            const Icon = card.icon;
 
-          return (
-            <Card
-              className={`bg-card/85 shadow-soft ${
-                isOpenable ? "transition hover:-translate-y-0.5 hover:shadow-float" : ""
-              }`}
-              key={card.title}
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between gap-3">
-                  <span className="rounded-2xl bg-brand-latte p-3 text-brand-mocha">
-                    <Icon className="h-5 w-5" />
+            if (card.status === "coming_soon") {
+              return (
+                <li className="bg-card" key={card.title}>
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <Icon className="h-4 w-4 shrink-0 text-foreground-muted" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-cell font-medium text-foreground-muted">
+                        {card.title}
+                      </span>
+                      <span className="block text-meta text-foreground-muted">
+                        {card.description}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-meta text-foreground-muted">
+                      {reportStatusLabels[card.status]}
+                    </span>
+                  </div>
+                </li>
+              );
+            }
+
+            return (
+              <li className="bg-card" key={card.title}>
+                <Link
+                  className="flex min-h-tap items-center gap-3 px-4 py-3 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  href={card.href}
+                >
+                  <Icon className="h-4 w-4 shrink-0 text-foreground-muted" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-cell font-medium text-foreground">
+                      {card.title}
+                    </span>
+                    <span className="block text-meta text-foreground-muted">
+                      {card.description}
+                    </span>
                   </span>
-                  <Badge variant={reportStatusVariant(card.status)}>
-                    {reportStatusLabels[card.status]}
-                  </Badge>
-                </div>
-                <CardTitle className="text-brand-espresso">{card.title}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="min-h-12 text-sm text-brand-mocha">{card.description}</p>
-                {isOpenable ? (
-                  <Button asChild>
-                    <Link href={card.href}>Open</Link>
-                  </Button>
-                ) : (
-                  <p className="text-sm font-medium text-brand-mocha">
-                    This report is not available yet.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+                  {card.status === "partial" ? (
+                    <span className="shrink-0 text-meta text-foreground-muted">
+                      {reportStatusLabels[card.status]}
+                    </span>
+                  ) : null}
+                  <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-foreground-muted" />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </div>
   );
