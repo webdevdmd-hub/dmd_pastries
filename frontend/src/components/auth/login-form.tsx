@@ -48,6 +48,12 @@ export function LoginForm(): JSX.Element {
   const cooldownRemainingMs = Math.max(0, rateLimitUntil - cooldownNow);
   const cooldownRemainingSeconds = Math.ceil(cooldownRemainingMs / 1000);
   const isCooldownActive = cooldownRemainingSeconds > 0;
+  // Appwrite's limits reset on the hour, so the wait is usually minutes, not
+  // seconds. Say minutes while it is, and seconds only for the last one.
+  const cooldownLabel =
+    cooldownRemainingSeconds >= 60
+      ? `${String(Math.ceil(cooldownRemainingSeconds / 60))} min`
+      : `${String(cooldownRemainingSeconds)} s`;
 
   useEffect(() => {
     if (!rateLimited || !isCooldownActive) {
@@ -209,14 +215,14 @@ export function LoginForm(): JSX.Element {
 
             {rateLimited ? (
               <Alert className="border-warning/30 bg-warning-tint text-warning-text">
-                <AlertTitle>Too many attempts</AlertTitle>
+                <AlertTitle>Sign-in limit reached</AlertTitle>
                 <AlertDescription className="space-y-3">
                   <p>
-                    Sign-in is paused on this browser for a moment. Wait{" "}
-                    {cooldownRemainingSeconds > 0
-                      ? `${String(cooldownRemainingSeconds)} seconds`
-                      : "60 seconds"}
-                    , then continue with your existing session rather than signing in again.
+                    Appwrite allows a limited number of sign-in attempts and tokens per hour, and
+                    this browser has used them. The limit resets at the top of the hour
+                    {isCooldownActive ? `, in about ${cooldownLabel}` : ""}. Retrying before then
+                    counts against the same limit, so wait, then continue with your existing
+                    session.
                   </p>
                   {submitError ? <p className="text-sm text-warning-text">{submitError}</p> : null}
                   <Button
@@ -228,9 +234,7 @@ export function LoginForm(): JSX.Element {
                     className="border-warning/30 bg-card text-warning-text hover:bg-warning-tint"
                     variant="outline"
                   >
-                    {isCooldownActive
-                      ? `Wait ${String(cooldownRemainingSeconds)}s`
-                      : "Continue existing session"}
+                    {isCooldownActive ? `Wait ${cooldownLabel}` : "Continue existing session"}
                   </Button>
                 </AlertDescription>
               </Alert>

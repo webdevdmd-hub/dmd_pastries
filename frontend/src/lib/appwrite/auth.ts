@@ -23,9 +23,87 @@ let jwtRequestPromise: Promise<string> | null = null;
 let jwtRateLimitUntil = 0;
 
 const e2eSessionKey = "pastries-pos:e2e-session";
-const jwtRateLimitCooldownMs = 60_000;
+
+/**
+ * The JWT and the rate-limit marker survive a reload within the tab.
+ *
+ * Appwrite allows a fixed number of JWT creations per user per hour, and the
+ * app asks for one on every full page load. Held only in module memory, a
+ * refresh, a shared link or a run through forty report pages each cost a
+ * fresh token, and one afternoon of QA locked the account out for the rest of
+ * the hour. A 15-minute token in sessionStorage costs one request per tab
+ * instead. The Appwrite session itself already sits in localStorage as
+ * `cookieFallback`, so this adds no new exposure class.
+ */
+const jwtStorageKey = "pastries-pos:appwrite-jwt";
+const jwtRateLimitStorageKey = "pastries-pos:appwrite-jwt-rate-limit-until";
+
 const jwtRateLimitMessage =
-  "Unable to create an Appwrite JWT for login sync. Rate limit for the current endpoint has been exceeded. Wait 60 seconds, then continue the existing session.";
+  "Appwrite limits how many sign-in tokens this account can create per hour, and this browser has used them. The limit resets at the top of the hour; retrying sooner counts against the same limit.";
+
+/**
+ * Appwrite's abuse limits are counted in fixed hourly buckets, so the honest
+ * cooldown runs to the top of the next hour, never a flat minute.
+ */
+function rateLimitRetryAfterMs(now = Date.now()): number {
+  const nextHour = new Date(now);
+  nextHour.setMinutes(60, 0, 0);
+  return Math.max(nextHour.getTime() - now, 60_000);
+}
+
+function readStorage(key: string): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key: string, value: string | null): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    if (value === null) {
+      window.sessionStorage.removeItem(key);
+    } else {
+      window.sessionStorage.setItem(key, value);
+    }
+  } catch {
+    // Private mode or blocked storage: memory caching still applies.
+  }
+}
+
+function readPersistedJwt(): CachedJwt | null {
+  const raw = readStorage(jwtStorageKey);
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (
+      isObject(parsed) &&
+      typeof parsed.jwt === "string" &&
+      typeof parsed.expiresAt === "number" &&
+      parsed.jwt.length > 0
+    ) {
+      return { expiresAt: parsed.expiresAt, jwt: parsed.jwt };
+    }
+  } catch {
+    // Fall through and treat it as absent.
+  }
+  writeStorage(jwtStorageKey, null);
+  return null;
+}
+
+function readPersistedRateLimitUntil(): number {
+  const raw = readStorage(jwtRateLimitStorageKey);
+  const until = raw ? Number(raw) : 0;
+  return Number.isFinite(until) ? until : 0;
+}
 
 export class AppwriteSessionAlreadyExistsError extends Error {
   constructor(message = "An Appwrite session is already active in this browser.") {
@@ -38,8 +116,8 @@ export class AppwriteRateLimitError extends Error {
   readonly retryAfterMs: number;
 
   constructor(
-    message = "Appwrite rate limit has been exceeded. Please wait a moment before trying again.",
-    retryAfterMs = jwtRateLimitCooldownMs,
+    message = "Appwrite limits sign-in attempts per hour, and this browser has reached the limit. It resets at the top of the hour; retrying sooner counts against the same limit.",
+    retryAfterMs = rateLimitRetryAfterMs(),
   ) {
     super(message);
     this.name = "AppwriteRateLimitError";
@@ -197,6 +275,9 @@ export async function createAppwriteJwt(): Promise<string> {
     return getE2EAuthToken();
   }
 
+  // A fresh module scope after a reload starts from whatever the tab saved.
+  cachedJwt ??= readPersistedJwt();
+
   if (cachedJwt && cachedJwt.expiresAt - Date.now() > 60_000) {
     return cachedJwt.jwt;
   }
@@ -226,12 +307,16 @@ async function createFreshAppwriteJwt(): Promise<string> {
       jwt: jwt.jwt,
       expiresAt: resolveJwtExpiry(jwt.jwt),
     };
+    writeStorage(jwtStorageKey, JSON.stringify(cachedJwt));
     jwtRateLimitUntil = 0;
+    writeStorage(jwtRateLimitStorageKey, null);
     return jwt.jwt;
   } catch (error) {
     if (isAppwriteRateLimitError(error)) {
-      jwtRateLimitUntil = Date.now() + jwtRateLimitCooldownMs;
-      throw new AppwriteRateLimitError(jwtRateLimitMessage, jwtRateLimitCooldownMs);
+      const retryAfterMs = rateLimitRetryAfterMs();
+      jwtRateLimitUntil = Date.now() + retryAfterMs;
+      writeStorage(jwtRateLimitStorageKey, String(jwtRateLimitUntil));
+      throw new AppwriteRateLimitError(jwtRateLimitMessage, retryAfterMs);
     }
 
     const message = getAppwriteErrorMessage(error);
@@ -242,9 +327,13 @@ async function createFreshAppwriteJwt(): Promise<string> {
 export function clearCachedAppwriteJwt(): void {
   cachedJwt = null;
   jwtRequestPromise = null;
+  writeStorage(jwtStorageKey, null);
 }
 
 export function getJwtRateLimitRemainingMs(): number {
+  if (jwtRateLimitUntil === 0) {
+    jwtRateLimitUntil = readPersistedRateLimitUntil();
+  }
   return Math.max(0, jwtRateLimitUntil - Date.now());
 }
 
