@@ -3238,6 +3238,7 @@ func (r *Repository) ListInventoryReconciliationDetailRows(businessID, inventory
 			COALESCE(ms.linked_unposted_count, 0) AS linked_unposted_count,
 			COALESCE(ms.linked_no_inventory_line_count, 0) AS linked_no_inventory_line_count,
 			COALESCE(ms.grn_only_count, 0) AS grn_only_count,
+			COALESCE(ms.grn_only_value, 0) AS grn_only_value,
 			COALESCE(ms.purchase_return_missing_count, 0) AS purchase_return_missing_count,
 			COALESCE(ms.pos_cogs_missing_count, 0) AS pos_cogs_missing_count,
 			COALESCE(ms.manufacturing_missing_count, 0) AS manufacturing_missing_count,

@@ -56,17 +56,25 @@ function displayText(value: string, fallback = "-"): string {
 function statusBadge(row: InventoryAccountingReconciliationRow): JSX.Element {
   if (row.possibleReasonKey === "pending_bill_posting") {
     return (
-      <Badge className="border-warning/30 bg-warning-tint text-warning-text">
-        Pending Bill Posting
+      <Badge className="whitespace-nowrap border-warning/30 bg-warning-tint text-warning-text">
+        Pending bill posting
       </Badge>
     );
   }
 
   if (row.status === "matched") {
-    return <Badge className="border-money/30 bg-money-tint text-money-text">Matched</Badge>;
+    return (
+      <Badge className="whitespace-nowrap border-money/30 bg-money-tint text-money-text">
+        Matched
+      </Badge>
+    );
   }
 
-  return <Badge className="border-danger/30 bg-danger-tint text-danger-text">Mismatch</Badge>;
+  return (
+    <Badge className="whitespace-nowrap border-danger/30 bg-danger-tint text-danger-text">
+      Mismatch
+    </Badge>
+  );
 }
 
 export function InventoryAccountingReconciliationTable({
@@ -79,17 +87,20 @@ export function InventoryAccountingReconciliationTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Status</TableHead>
-            <TableHead>Item</TableHead>
-            <TableHead>Branch</TableHead>
-            <TableHead>Stock location</TableHead>
-            <TableHead>Operational qty</TableHead>
-            <TableHead>Operational value</TableHead>
-            <TableHead>Stock ledger</TableHead>
-            <TableHead>Accounting value</TableHead>
-            <TableHead>Difference</TableHead>
-            <TableHead>Last transaction</TableHead>
-            <TableHead>Possible reason</TableHead>
+            {/* Eleven columns scroll sideways inside the card. Headers, names
+                and figures never wrap; only the reason text does, so a row
+                stays one line tall instead of five. */}
+            <TableHead className="whitespace-nowrap">Status</TableHead>
+            <TableHead className="whitespace-nowrap">Item</TableHead>
+            <TableHead className="whitespace-nowrap">Branch</TableHead>
+            <TableHead className="whitespace-nowrap">Stock location</TableHead>
+            <TableHead className="whitespace-nowrap text-right">Operational qty</TableHead>
+            <TableHead className="whitespace-nowrap text-right">Operational value</TableHead>
+            <TableHead className="whitespace-nowrap text-right">Stock ledger</TableHead>
+            <TableHead className="whitespace-nowrap text-right">Accounting value</TableHead>
+            <TableHead className="whitespace-nowrap text-right">Difference</TableHead>
+            <TableHead className="whitespace-nowrap">Last transaction</TableHead>
+            <TableHead className="whitespace-nowrap">Possible reason</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -102,17 +113,27 @@ export function InventoryAccountingReconciliationTable({
                   <p className="text-xs text-brand-mocha">{formatLabel(row.itemType) || "-"}</p>
                 </div>
               </TableCell>
-              <TableCell>{row.branchName || "-"}</TableCell>
-              <TableCell>{row.stockLocationName || "Unassigned"}</TableCell>
-              <TableCell>{formatNumber(row.operationalQuantity)}</TableCell>
-              <TableCell>{formatMoney(row.operationalInventoryValue)}</TableCell>
-              <TableCell>{formatMoney(row.inventoryLedgerValue)}</TableCell>
-              <TableCell>{formatMoney(row.accountingInventoryValue)}</TableCell>
+              <TableCell className="whitespace-nowrap">{row.branchName || "-"}</TableCell>
+              <TableCell className="whitespace-nowrap">
+                {row.stockLocationName || "Unassigned"}
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-right tabular-nums">
+                {formatNumber(row.operationalQuantity)}
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-right tabular-nums">
+                {formatMoney(row.operationalInventoryValue)}
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-right tabular-nums">
+                {formatMoney(row.inventoryLedgerValue)}
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-right tabular-nums">
+                {formatMoney(row.accountingInventoryValue)}
+              </TableCell>
               <TableCell
                 className={
                   Math.abs(row.differenceAmount) > 0.01
-                    ? "font-semibold text-danger-text"
-                    : "text-muted-foreground"
+                    ? "whitespace-nowrap text-right font-semibold tabular-nums text-danger-text"
+                    : "whitespace-nowrap text-right tabular-nums text-muted-foreground"
                 }
               >
                 {formatMoney(row.differenceAmount)}
@@ -156,14 +177,14 @@ export function InventoryAccountingUnassignedLinesTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Reason</TableHead>
-            <TableHead>Journal</TableHead>
-            <TableHead>Source</TableHead>
-            <TableHead>Branch</TableHead>
-            <TableHead>Debit</TableHead>
-            <TableHead>Credit</TableHead>
-            <TableHead>Signed amount</TableHead>
-            <TableHead>Description</TableHead>
+            <TableHead className="whitespace-nowrap">Reason</TableHead>
+            <TableHead className="whitespace-nowrap">Journal</TableHead>
+            <TableHead className="whitespace-nowrap">Source</TableHead>
+            <TableHead className="whitespace-nowrap">Branch</TableHead>
+            <TableHead className="whitespace-nowrap text-right">Debit</TableHead>
+            <TableHead className="whitespace-nowrap text-right">Credit</TableHead>
+            <TableHead className="whitespace-nowrap text-right">Signed amount</TableHead>
+            <TableHead className="whitespace-nowrap">Description</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -196,14 +217,20 @@ export function InventoryAccountingUnassignedLinesTable({
                   <p className="text-xs text-brand-mocha">{line.sourceId ?? "-"}</p>
                 </div>
               </TableCell>
-              <TableCell>{displayText(line.branchName, "All branches")}</TableCell>
-              <TableCell>{formatMoney(line.debitAmount)}</TableCell>
-              <TableCell>{formatMoney(line.creditAmount)}</TableCell>
+              <TableCell className="whitespace-nowrap">
+                {displayText(line.branchName, "All branches")}
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-right tabular-nums">
+                {formatMoney(line.debitAmount)}
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-right tabular-nums">
+                {formatMoney(line.creditAmount)}
+              </TableCell>
               <TableCell
                 className={
                   Math.abs(line.signedInventoryAmount) > 0.01
-                    ? "font-semibold text-danger-text"
-                    : "text-muted-foreground"
+                    ? "whitespace-nowrap text-right font-semibold tabular-nums text-danger-text"
+                    : "whitespace-nowrap text-right tabular-nums text-muted-foreground"
                 }
               >
                 {formatMoney(line.signedInventoryAmount)}
