@@ -32,6 +32,11 @@ type FilterToolbarProps = {
   onReset: () => void;
   /** Heading inside the popover, e.g. "Filter movements". */
   popoverTitle: string;
+  /**
+   * Hide the density switch below `md`. For a list that renders as cards on a
+   * phone, the switch would take a whole row and change nothing.
+   */
+  hideDensityBelowMd?: boolean;
   /** The panel's own filter fields. */
   children: ReactNode;
 };
@@ -60,6 +65,7 @@ export function FilterToolbar({
   hasAnyFilter,
   onReset,
   popoverTitle,
+  hideDensityBelowMd = false,
   children,
 }: FilterToolbarProps): JSX.Element {
   return (
@@ -100,7 +106,9 @@ export function FilterToolbar({
         </Button>
       ) : null}
 
-      <TableDensityToggle className="ml-auto" />
+      <TableDensityToggle
+        className={hideDensityBelowMd ? "ml-auto hidden md:inline-flex" : "ml-auto"}
+      />
     </div>
   );
 }

@@ -50,6 +50,7 @@ export function OrdersToolbar({
     <FilterToolbar
       hasAnyFilter={hasAnyFilter}
       hiddenFilterCount={hiddenFilterCount}
+      hideDensityBelowMd
       onReset={() => onFiltersChange(defaultFilters)}
       onSearchChange={(search) => update({ search })}
       popoverTitle="Filter orders"
