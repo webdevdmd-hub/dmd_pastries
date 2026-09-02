@@ -150,7 +150,7 @@ export function InventoryAccountingReconciliationTable({
                 </div>
               </TableCell>
               <TableCell>
-                <p className="min-w-64 text-sm text-muted-foreground">
+                <p className="min-w-[28rem] text-sm text-muted-foreground">
                   {row.possibleReason || "-"}
                 </p>
                 {row.possibleReasonKey === "pending_bill_posting" ? (
