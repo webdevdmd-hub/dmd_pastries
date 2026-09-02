@@ -52,12 +52,12 @@ export function OrderPaymentSection({
 
   return (
     <section className="rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold text-brand-espresso">Payments</h2>
           <p className="text-sm text-brand-mocha">Deposits, balance payments, and full payments.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             disabled={!order || !canManage || refundableAmount <= 0}
             onClick={() => setRefundOpen(true)}
@@ -134,11 +134,11 @@ export function OrderPaymentSection({
         ) : null}
         {(paymentsQuery.data ?? []).map((payment) => (
           <div
-            className="flex items-center justify-between rounded-2xl border border-brand-cappuccino/60 p-3 text-sm"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-brand-cappuccino/60 p-3 text-sm"
             key={payment.id}
           >
-            <span className="flex items-center gap-2 text-brand-espresso">
-              <CreditCard className="h-4 w-4" />
+            <span className="flex min-w-0 items-center gap-2 text-brand-espresso">
+              <CreditCard className="h-4 w-4 shrink-0" />
               {orderPaymentTypeLabel(payment.paymentType)}: {payment.paymentMethodName} -{" "}
               {formatCurrency(payment.amount)}
             </span>

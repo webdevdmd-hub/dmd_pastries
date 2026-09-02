@@ -163,9 +163,11 @@ export function OrdersPageClient(): JSX.Element {
         description="Manage custom cake orders, scheduling, payments, and production."
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            {/* Below md the list view renders as cards anyway, so the toggle
+                would switch between two identical layouts. */}
             <div
               aria-label="Order view"
-              className="inline-flex rounded-xl border border-workspace-border bg-workspace-panel p-1"
+              className="hidden rounded-xl border border-workspace-border bg-workspace-panel p-1 md:inline-flex"
               role="group"
             >
               <Button
@@ -242,10 +244,13 @@ export function OrdersPageClient(): JSX.Element {
         <OrdersEmptyState canManage={canManage} onCreate={openCreate} />
       ) : null}
 
+      {/* A ten-column ledger has no honest phone layout: it either scrolls
+          sideways or wraps every cell. Below md the list view shows the cards,
+          which carry the same fields, and the table takes over from md up. */}
       {!ordersQuery.isLoading && !ordersQuery.error && orders.length > 0 && viewMode === "list" ? (
-        <Card>
-          <CardContent className="p-0">
-            <OrdersTable
+        <>
+          <div className="md:hidden">
+            <OrdersCardGrid
               canManage={canManage}
               onDelete={(order) => setPendingAction({ order, type: "delete" })}
               onEdit={openEdit}
@@ -255,8 +260,22 @@ export function OrdersPageClient(): JSX.Element {
               onView={openDetails}
               orders={orders}
             />
-          </CardContent>
-        </Card>
+          </div>
+          <Card className="hidden md:block">
+            <CardContent className="p-0">
+              <OrdersTable
+                canManage={canManage}
+                onDelete={(order) => setPendingAction({ order, type: "delete" })}
+                onEdit={openEdit}
+                onStatusChange={(order, status) =>
+                  setPendingAction({ order, status, type: "status" })
+                }
+                onView={openDetails}
+                orders={orders}
+              />
+            </CardContent>
+          </Card>
+        </>
       ) : null}
 
       {!ordersQuery.isLoading && !ordersQuery.error && orders.length > 0 && viewMode === "card" ? (

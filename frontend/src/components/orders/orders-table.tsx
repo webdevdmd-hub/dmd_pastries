@@ -66,7 +66,7 @@ export function OrdersTable({
             key={order.id}
             onClick={() => onView(order)}
           >
-            <TableCell className="font-semibold text-brand-espresso">
+            <TableCell className="whitespace-nowrap font-semibold text-brand-espresso">
               <button
                 className="rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 onClick={(event) => {
@@ -84,7 +84,9 @@ export function OrdersTable({
                 {order.customerPhoneSnapshot ?? "No phone"}
               </div>
             </TableCell>
-            <TableCell className="tabular-nums">{formatDate(order.eventDate)}</TableCell>
+            <TableCell className="whitespace-nowrap tabular-nums">
+              {formatDate(order.eventDate)}
+            </TableCell>
             <TableCell className="capitalize">{order.orderType}</TableCell>
             <TableCell>
               <OrderStatusBadge status={order.orderStatus} />
@@ -92,9 +94,15 @@ export function OrdersTable({
             <TableCell>
               <OrderPaymentStatusBadge status={order.paymentStatus} />
             </TableCell>
-            <TableCell className="tabular-nums">{formatMoney(order.totalAmount)}</TableCell>
-            <TableCell className="tabular-nums">{formatMoney(order.balanceAmount)}</TableCell>
-            <TableCell className="tabular-nums">{formatDate(order.createdAt)}</TableCell>
+            <TableCell className="whitespace-nowrap tabular-nums">
+              {formatMoney(order.totalAmount)}
+            </TableCell>
+            <TableCell className="whitespace-nowrap tabular-nums">
+              {formatMoney(order.balanceAmount)}
+            </TableCell>
+            <TableCell className="whitespace-nowrap tabular-nums">
+              {formatDate(order.createdAt)}
+            </TableCell>
             <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
               <OrderActionsMenu
                 canManage={canManage}

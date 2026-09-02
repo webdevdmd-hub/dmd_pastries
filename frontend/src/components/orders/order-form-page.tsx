@@ -503,9 +503,13 @@ export function OrderFormPage({
           </button>
         </header>
 
-        <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_380px]">
-          <section className="flex min-h-0 flex-col overflow-hidden">
-            <div className="border-b border-border px-5 py-3 sm:px-8">
+        {/* Below lg the whole body is one scroll: form, then summary, then
+            Save. Splitting the height into two scroll windows left the form
+            a third of the screen on a phone. From lg up the two columns
+            scroll independently so the summary stays in view. */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:overflow-hidden">
+          <section className="flex flex-col lg:min-h-0 lg:overflow-hidden">
+            <div className="sticky top-0 z-10 border-b border-border bg-card px-5 py-3 sm:px-8 lg:static">
               <OrderFormTabs
                 active={activeTab}
                 itemsCount={items.length}
@@ -517,7 +521,7 @@ export function OrderFormPage({
                 every tab points at. Only the selected section renders; the
                 field state lives above, so nothing typed is lost. */}
             <div
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6 sm:px-8"
+              className="px-5 py-6 sm:px-8 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain"
               id={ORDER_FORM_TABPANEL_ID}
               role="tabpanel"
               tabIndex={-1}
@@ -691,8 +695,8 @@ export function OrderFormPage({
             </div>
           </section>
 
-          <aside className="min-h-0 overflow-y-auto overscroll-contain border-t border-border bg-muted px-5 py-5 lg:border-l lg:border-t-0">
-            <div className="sticky top-0 space-y-5">
+          <aside className="border-t border-border bg-muted px-5 py-5 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:border-l lg:border-t-0">
+            <div className="space-y-5 lg:sticky lg:top-0">
               <section className="overflow-hidden rounded-2xl border border-border bg-card">
                 <div className="border-b border-border bg-muted px-5 py-4">
                   <div className="flex items-center justify-between gap-3">
