@@ -784,7 +784,13 @@ function parseAccountMapping(value: unknown): AccountMapping {
 }
 
 function parseAccountMappingsResponse(value: unknown): AccountMappingsResponse {
-  const source = isObject(value) ? (value.mappings ?? value.items ?? value.data) : value;
+  // The backend returns a bare array. isObject is true for arrays too, so the
+  // wrapped-object branch must not be tried first or it looks for `mappings`
+  // on the array, finds nothing, and rejects a perfectly good payload.
+  const source =
+    isObject(value) && !Array.isArray(value)
+      ? (value.mappings ?? value.items ?? value.data)
+      : value;
 
   if (Array.isArray(source)) {
     return {
