@@ -29,33 +29,35 @@ export function RefundsTable({ refunds }: RefundsTableProps): JSX.Element {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Refund Number</TableHead>
-          <TableHead>Sale Number</TableHead>
-          <TableHead>Payment Method</TableHead>
-          <TableHead className="text-right">Refund Amount</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Reason</TableHead>
-          <TableHead>Created By</TableHead>
-          <TableHead>Refunded At</TableHead>
+          <TableHead className="whitespace-nowrap">Refund Number</TableHead>
+          <TableHead className="whitespace-nowrap">Sale Number</TableHead>
+          <TableHead className="whitespace-nowrap">Payment Method</TableHead>
+          <TableHead className="whitespace-nowrap text-right">Refund Amount</TableHead>
+          <TableHead className="whitespace-nowrap">Status</TableHead>
+          <TableHead className="whitespace-nowrap">Reason</TableHead>
+          <TableHead className="whitespace-nowrap">Created By</TableHead>
+          <TableHead className="whitespace-nowrap">Refunded At</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {refunds.map((refund) => (
           <TableRow key={refund.id}>
-            <TableCell className="font-bold">{refund.refundNumber}</TableCell>
-            <TableCell>{refund.saleNumber}</TableCell>
-            <TableCell>
+            <TableCell className="whitespace-nowrap font-bold">{refund.refundNumber}</TableCell>
+            <TableCell className="whitespace-nowrap">{refund.saleNumber}</TableCell>
+            <TableCell className="whitespace-nowrap">
               <PaymentMethodBadge methodName={refund.paymentMethodNameSnapshot} />
             </TableCell>
-            <TableCell className="text-right font-medium tabular-nums">
+            <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
               {formatMoney(refund.refundAmount)}
             </TableCell>
-            <TableCell>
+            <TableCell className="whitespace-nowrap">
               <PaymentStatusBadge status={refund.refundStatus} />
             </TableCell>
-            <TableCell className="max-w-64 truncate">{refund.refundReason}</TableCell>
-            <TableCell>{refund.createdByUserName}</TableCell>
-            <TableCell>{formatDate(refund.refundedAt)}</TableCell>
+            <TableCell className="whitespace-nowrap max-w-64 truncate">
+              {refund.refundReason}
+            </TableCell>
+            <TableCell className="whitespace-nowrap">{refund.createdByUserName}</TableCell>
+            <TableCell className="whitespace-nowrap">{formatDate(refund.refundedAt)}</TableCell>
           </TableRow>
         ))}
       </TableBody>

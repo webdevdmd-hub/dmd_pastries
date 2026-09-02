@@ -87,16 +87,16 @@ export function PurchaseReturnsTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Vendor Credit</TableHead>
-          <TableHead>Supplier</TableHead>
-          <TableHead>Receipt</TableHead>
-          <TableHead>Invoice</TableHead>
-          <TableHead>Return Date</TableHead>
-          <TableHead>Total</TableHead>
-          <TableHead>Open Credit</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Next Step</TableHead>
-          <TableHead>Actions</TableHead>
+          <TableHead className="whitespace-nowrap">Vendor Credit</TableHead>
+          <TableHead className="whitespace-nowrap">Supplier</TableHead>
+          <TableHead className="whitespace-nowrap">Receipt</TableHead>
+          <TableHead className="whitespace-nowrap">Invoice</TableHead>
+          <TableHead className="whitespace-nowrap">Return Date</TableHead>
+          <TableHead className="whitespace-nowrap">Total</TableHead>
+          <TableHead className="whitespace-nowrap">Open Credit</TableHead>
+          <TableHead className="whitespace-nowrap">Status</TableHead>
+          <TableHead className="whitespace-nowrap">Next Step</TableHead>
+          <TableHead className="whitespace-nowrap">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -105,7 +105,7 @@ export function PurchaseReturnsTable({
 
           return (
             <TableRow key={purchaseReturn.id}>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 <Link
                   className="font-semibold text-brand-espresso"
                   href={`${ROUTES.purchasingReturns}/${purchaseReturn.id}`}
@@ -113,8 +113,8 @@ export function PurchaseReturnsTable({
                   {purchaseReturn.returnNumber}
                 </Link>
               </TableCell>
-              <TableCell>{purchaseReturn.supplierName}</TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">{purchaseReturn.supplierName}</TableCell>
+              <TableCell className="whitespace-nowrap">
                 <Link
                   className="text-brand-mocha hover:text-brand-espresso"
                   href={`${ROUTES.purchasingReceipts}/${purchaseReturn.purchaseReceiptId}`}
@@ -122,24 +122,30 @@ export function PurchaseReturnsTable({
                   {purchaseReturn.purchaseReceiptNumber}
                 </Link>
               </TableCell>
-              <TableCell>{purchaseReturn.purchaseInvoiceNumber}</TableCell>
-              <TableCell>{formatDate(purchaseReturn.returnDate)}</TableCell>
-              <TableCell>{formatCurrency(purchaseReturn.returnTotal)}</TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
+                {purchaseReturn.purchaseInvoiceNumber}
+              </TableCell>
+              <TableCell className="whitespace-nowrap">
+                {formatDate(purchaseReturn.returnDate)}
+              </TableCell>
+              <TableCell className="whitespace-nowrap">
+                {formatCurrency(purchaseReturn.returnTotal)}
+              </TableCell>
+              <TableCell className="whitespace-nowrap">
                 <div className="font-medium text-brand-espresso">{creditDisplay.value}</div>
                 {creditDisplay.helper ? (
                   <div className="text-xs text-brand-mocha">{creditDisplay.helper}</div>
                 ) : null}
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 <PurchaseReturnStatusBadge status={purchaseReturn.status} />
               </TableCell>
-              <TableCell>
+              <TableCell className="min-w-56">
                 <span className="text-sm font-medium text-brand-mocha">
                   {nextStepForReturn(purchaseReturn)}
                 </span>
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button

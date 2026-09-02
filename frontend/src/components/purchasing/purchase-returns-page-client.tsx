@@ -257,7 +257,7 @@ export function PurchaseReturnsPageClient(): JSX.Element {
       ) : null}
 
       {!returnsQuery.isLoading && !returnsQuery.error && purchaseReturns.length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <PurchaseReturnsTable
               canCancel={canCancel}

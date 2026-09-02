@@ -190,7 +190,7 @@ export function SalesReturnsPageClient(): JSX.Element {
       ) : null}
 
       {!returnsQuery.isLoading && !returnsQuery.error && (returnsQuery.data ?? []).length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <SalesReturnsTable
               canManage={canManage}

@@ -235,7 +235,7 @@ export function ReconciliationPageClient(): JSX.Element {
       {!reconciliationsQuery.isLoading &&
       !reconciliationsQuery.error &&
       (reconciliationsQuery.data ?? []).length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <ReconciliationTable reconciliations={reconciliationsQuery.data ?? []} />
           </CardContent>

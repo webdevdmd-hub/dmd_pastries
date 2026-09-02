@@ -98,7 +98,7 @@ export function RefundsPageClient(): JSX.Element {
       ) : null}
 
       {!refundsQuery.isLoading && !refundsQuery.error && (refundsQuery.data ?? []).length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <RefundsTable refunds={refundsQuery.data ?? []} />
           </CardContent>

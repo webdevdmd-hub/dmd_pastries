@@ -44,33 +44,33 @@ export function ReconciliationTable({ reconciliations }: ReconciliationTableProp
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Date</TableHead>
-          <TableHead>Branch</TableHead>
-          <TableHead>Payment Method</TableHead>
-          <TableHead className="text-right">Expected</TableHead>
-          <TableHead className="text-right">Counted</TableHead>
-          <TableHead>Difference</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Created By</TableHead>
+          <TableHead className="whitespace-nowrap">Date</TableHead>
+          <TableHead className="whitespace-nowrap">Branch</TableHead>
+          <TableHead className="whitespace-nowrap">Payment Method</TableHead>
+          <TableHead className="whitespace-nowrap text-right">Expected</TableHead>
+          <TableHead className="whitespace-nowrap text-right">Counted</TableHead>
+          <TableHead className="whitespace-nowrap">Difference</TableHead>
+          <TableHead className="whitespace-nowrap">Status</TableHead>
+          <TableHead className="whitespace-nowrap">Created By</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {reconciliations.map((reconciliation) => (
           <TableRow key={reconciliation.id}>
-            <TableCell className="font-bold">
+            <TableCell className="whitespace-nowrap font-bold">
               {formatDate(reconciliation.reconciliationDate)}
             </TableCell>
-            <TableCell>{reconciliation.branchName}</TableCell>
-            <TableCell>
+            <TableCell className="whitespace-nowrap">{reconciliation.branchName}</TableCell>
+            <TableCell className="whitespace-nowrap">
               <PaymentMethodBadge methodName={reconciliation.paymentMethodName} />
             </TableCell>
-            <TableCell className="text-right tabular-nums">
+            <TableCell className="whitespace-nowrap text-right tabular-nums">
               {formatMoney(reconciliation.expectedAmount)}
             </TableCell>
-            <TableCell className="text-right tabular-nums">
+            <TableCell className="whitespace-nowrap text-right tabular-nums">
               {formatMoney(reconciliation.countedAmount)}
             </TableCell>
-            <TableCell className="text-right">
+            <TableCell className="whitespace-nowrap text-right">
               <div className="flex flex-col items-end gap-1">
                 <span className="font-medium tabular-nums">
                   {formatMoney(reconciliation.differenceAmount)}
@@ -83,10 +83,10 @@ export function ReconciliationTable({ reconciliations }: ReconciliationTableProp
                 </Badge>
               </div>
             </TableCell>
-            <TableCell>
+            <TableCell className="whitespace-nowrap">
               <PaymentStatusBadge status={reconciliation.status} />
             </TableCell>
-            <TableCell>{reconciliation.createdByUserName}</TableCell>
+            <TableCell className="whitespace-nowrap">{reconciliation.createdByUserName}</TableCell>
           </TableRow>
         ))}
       </TableBody>

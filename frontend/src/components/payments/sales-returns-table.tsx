@@ -49,19 +49,19 @@ export function SalesReturnsTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Credit Note</TableHead>
-          <TableHead>Sale</TableHead>
-          <TableHead>Customer</TableHead>
-          <TableHead>Return Date</TableHead>
-          <TableHead className="text-right">Refund</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
+          <TableHead className="whitespace-nowrap">Credit Note</TableHead>
+          <TableHead className="whitespace-nowrap">Sale</TableHead>
+          <TableHead className="whitespace-nowrap">Customer</TableHead>
+          <TableHead className="whitespace-nowrap">Return Date</TableHead>
+          <TableHead className="whitespace-nowrap text-right">Refund</TableHead>
+          <TableHead className="whitespace-nowrap">Status</TableHead>
+          <TableHead className="whitespace-nowrap text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {returns.map((salesReturn) => (
           <TableRow key={salesReturn.id}>
-            <TableCell>
+            <TableCell className="whitespace-nowrap">
               <span className="block font-mono font-medium">{salesReturn.returnNumber}</span>
               <span className="text-meta text-foreground-muted">
                 {salesReturn.reason ?? "No reason"}
@@ -72,13 +72,17 @@ export function SalesReturnsTable({
                 </span>
               ) : null}
             </TableCell>
-            <TableCell>
+            <TableCell className="whitespace-nowrap">
               <span className="block font-mono font-medium">{salesReturn.saleNumber}</span>
               <span className="text-meta text-foreground-muted">{salesReturn.branchName}</span>
             </TableCell>
-            <TableCell>{salesReturn.customerName ?? "Walk-in customer"}</TableCell>
-            <TableCell className="tabular-nums">{formatDate(salesReturn.returnDate)}</TableCell>
-            <TableCell className="text-right">
+            <TableCell className="whitespace-nowrap">
+              {salesReturn.customerName ?? "Walk-in customer"}
+            </TableCell>
+            <TableCell className="whitespace-nowrap tabular-nums">
+              {formatDate(salesReturn.returnDate)}
+            </TableCell>
+            <TableCell className="whitespace-nowrap text-right">
               <span className="block font-medium tabular-nums">
                 {salesReturn.refundMode === "refund"
                   ? formatMoney(salesReturn.refundAmount)
@@ -88,10 +92,10 @@ export function SalesReturnsTable({
                 {salesReturn.refundMode.replaceAll("_", " ")}
               </span>
             </TableCell>
-            <TableCell>
+            <TableCell className="whitespace-nowrap">
               <SalesReturnStatusBadge status={salesReturn.status} />
             </TableCell>
-            <TableCell>
+            <TableCell className="whitespace-nowrap">
               <div className="flex justify-end gap-2">
                 <Button asChild size="sm" type="button" variant="outline">
                   <Link href={`/payments/sales/${salesReturn.saleId}`}>
