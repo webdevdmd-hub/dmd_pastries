@@ -43,7 +43,7 @@ export function AppDataTable<TRow>({
   return (
     <div className="grid gap-4">
       {toolbar}
-      <Card>
+      <Card className="overflow-hidden">
         <CardContent className="p-0">
           <AppTable columns={columns} getRowId={getRowId} rows={rows} />
         </CardContent>

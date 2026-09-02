@@ -248,7 +248,7 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
       ) : null}
 
       {!receiptsQuery.isLoading && !receiptsQuery.error && receipts.length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <PurchaseReceiptsTable
               canManage={canManage}

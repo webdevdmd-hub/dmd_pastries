@@ -389,7 +389,7 @@ export function InventoryListPanel({ lowStockOnly }: InventoryListPanelProps): J
       ) : null}
 
       {!inventoryQuery.isLoading && !inventoryQuery.error && items.length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <InventoryTable
               canManage={canManage}

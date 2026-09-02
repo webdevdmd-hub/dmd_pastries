@@ -220,7 +220,7 @@ export function StockLocationsPageClient(): JSX.Element {
         </Card>
       </div>
 
-      <Card>
+      <Card className="overflow-hidden">
         <CardContent className="p-0">
           <Table>
             <TableHeader>

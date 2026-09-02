@@ -174,7 +174,7 @@ export function RecipesPageClient(): JSX.Element {
       ) : null}
 
       {!recipesQuery.isLoading && !recipesQuery.error && recipes.length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <RecipesTable
               canManage={canManage}

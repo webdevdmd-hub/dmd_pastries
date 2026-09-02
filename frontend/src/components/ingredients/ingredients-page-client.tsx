@@ -225,7 +225,7 @@ export function IngredientsPageClient(): JSX.Element {
       ) : null}
 
       {!ingredientsQuery.isLoading && !ingredientsQuery.error && items.length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <IngredientsTable
               canManage={canManage}

@@ -434,7 +434,7 @@ export function PurchaseOrdersPageClient(): JSX.Element {
       ) : null}
 
       {!ordersQuery.isLoading && !ordersQuery.error && orders.length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <PurchaseOrdersTable
               canCreate={canCreate}

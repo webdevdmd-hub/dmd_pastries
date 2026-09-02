@@ -311,7 +311,7 @@ export function ExpiryAlertsPanel(): JSX.Element {
         />
       ) : null}
       {!alertsQuery.isLoading && !alertsQuery.error && visibleBatches.length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <Table>
               <TableHeader>

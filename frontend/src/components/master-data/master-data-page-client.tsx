@@ -2516,7 +2516,7 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
       {activeQuery.isLoading ? <LoadingCard /> : null}
       {activeQuery.error ? <ErrorCard>{getErrorMessage(activeQuery.error)}</ErrorCard> : null}
       {collection === "units" && unitsQuery.data ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <UnitsTable
               canManage={canManage}
@@ -2544,7 +2544,7 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
         />
       ) : null}
       {collection === "product-categories" && productCategoriesQuery.data ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <ProductCategoriesTable
               canManage={canManage}
@@ -2570,7 +2570,7 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
         />
       ) : null}
       {collection === "ingredient-categories" && ingredientCategoriesQuery.data ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <SimpleCategoriesTable
               canManage={canManage}
@@ -2588,7 +2588,7 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
         </Card>
       ) : null}
       {collection === "packaging-categories" && packagingCategoriesQuery.data ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <SimpleCategoriesTable
               canManage={canManage}
@@ -2620,7 +2620,7 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
         />
       ) : null}
       {collection === "order-statuses" && orderStatusesQuery.data ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <OrderStatusesTable
               canManage={canManage}
@@ -2643,7 +2643,7 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
         />
       ) : null}
       {collection === "payment-statuses" && paymentStatusesQuery.data ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <PaymentStatusesTable
               canManage={canManage}

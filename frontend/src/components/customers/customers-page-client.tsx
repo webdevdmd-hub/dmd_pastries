@@ -204,7 +204,7 @@ export function CustomersPageClient(): JSX.Element {
       ) : null}
 
       {!customersQuery.isLoading && !customersQuery.error && customers.length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <CustomersTable
               canManage={canManage}

@@ -55,7 +55,7 @@ export function AuditPageClient({ inventoryItemId }: AuditPageClientProps): JSX.
           <AuditResultCard audit={auditQuery.data} />
         </>
       ) : null}
-      <Card>
+      <Card className="overflow-hidden">
         <CardContent className="p-0">
           {movementsQuery.isLoading ? (
             <div className="p-4">

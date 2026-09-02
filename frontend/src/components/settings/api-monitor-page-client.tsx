@@ -197,7 +197,7 @@ function RouteTable({
   totalCount: number;
 }): JSX.Element {
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <Table>

@@ -54,7 +54,7 @@ export function BranchesTable({
   const managerNameById = new Map(managerUsers.map((manager) => [manager.id, manager.fullName]));
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardContent className="p-0">
         <Table>
           <TableHeader>

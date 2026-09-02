@@ -284,7 +284,7 @@ export function MovementsPanel({ itemId, onClearItemScope }: MovementsPanelProps
       ) : null}
 
       {!activeMovementsQuery.isLoading && !activeMovementsQuery.error && movements.length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <MovementsTable
               canReverse={canManage}

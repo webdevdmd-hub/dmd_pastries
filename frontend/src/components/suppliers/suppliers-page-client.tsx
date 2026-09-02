@@ -222,7 +222,7 @@ export function SuppliersPageClient(): JSX.Element {
       ) : null}
 
       {!suppliersQuery.isLoading && !suppliersQuery.error && suppliers.length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <SuppliersTable
               canManage={canManage}

@@ -791,7 +791,7 @@ function TaxRatesTable({
   taxRates: TaxRate[];
 }): JSX.Element {
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardContent className="p-0">
         <Table>
           <TableHeader>
@@ -890,7 +890,7 @@ function PaymentMethodsTable({
   onStatusChange: (method: PaymentMethod, status: RecordStatus) => void;
 }): JSX.Element {
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardContent className="p-0">
         <Table>
           <TableHeader>

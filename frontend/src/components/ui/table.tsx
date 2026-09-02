@@ -90,7 +90,7 @@ const TableHead = React.forwardRef<
     className={cn(
       // Sticky so the column names survive a long ledger. Was `text-[0.7rem]`
       // (11.2px), under the 12px floor in DESIGN.md §9.
-      "sticky top-0 z-10 h-10 bg-card px-cell-x text-left align-middle text-meta font-medium text-foreground-muted",
+      "sticky top-0 z-10 h-10 whitespace-nowrap bg-card px-cell-x text-left align-middle text-meta font-medium text-foreground-muted",
       className,
     )}
     {...props}

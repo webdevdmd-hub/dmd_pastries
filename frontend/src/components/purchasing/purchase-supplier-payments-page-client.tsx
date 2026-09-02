@@ -472,7 +472,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
       {!paymentsQuery.isLoading &&
       !paymentsQuery.error &&
       (paymentsQuery.data?.items ?? []).length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <PurchaseSupplierPaymentsTable
               onDelete={(payment) => {
