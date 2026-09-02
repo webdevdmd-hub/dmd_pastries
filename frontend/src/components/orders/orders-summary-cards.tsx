@@ -35,7 +35,7 @@ export function OrdersSummaryCards({
           <Card className="border-brand-cappuccino/60 bg-card/85" key={card.key}>
             <CardContent className="flex items-center justify-between gap-2 p-4 md:p-5">
               <div className="min-w-0">
-                <p className="truncate text-cell text-brand-mocha">{card.label}</p>
+                <p className="text-cell leading-tight text-brand-mocha">{card.label}</p>
                 <p className="mt-2 text-kpi tabular-nums text-brand-espresso">
                   {summary?.[card.key] ?? 0}
                 </p>

@@ -261,7 +261,9 @@ export function OrdersPageClient(): JSX.Element {
               orders={orders}
             />
           </div>
-          <Card className="hidden md:block">
+          {/* overflow-hidden so the sticky header's square card-coloured cells
+              are clipped by the rounded corners instead of painting over them. */}
+          <Card className="hidden overflow-hidden md:block">
             <CardContent className="p-0">
               <OrdersTable
                 canManage={canManage}
