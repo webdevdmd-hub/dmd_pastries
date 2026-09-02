@@ -64,8 +64,6 @@ export function CustomerDetailsPanel({
 
   return (
     <div className="grid gap-6">
-      <CustomerStatsCards creditBalance={creditsQuery.data?.balance ?? 0} stats={statsQuery.data} />
-
       <CustomerDetailViewTabs
         active={activeTab}
         customerId={customer.id}
@@ -77,7 +75,18 @@ export function CustomerDetailsPanel({
       {/* One panel element that swaps, which is what `aria-controls` on every
           tab points at. */}
       <div id={CUSTOMER_DETAIL_TABPANEL_ID} role="tabpanel" tabIndex={-1}>
-        {activeTab === "profile" ? <CustomerProfileCard customer={customer} /> : null}
+        {/* The nine stat cards live on the Profile tab rather than above the
+            strip: on a phone they stand a full screen tall, which would put
+            the tabs below the fold and bring the long scroll back. */}
+        {activeTab === "profile" ? (
+          <div className="grid gap-6">
+            <CustomerStatsCards
+              creditBalance={creditsQuery.data?.balance ?? 0}
+              stats={statsQuery.data}
+            />
+            <CustomerProfileCard customer={customer} />
+          </div>
+        ) : null}
         {activeTab === "tags" ? (
           <CustomerTagsSection canManage={canManage} customer={customer} />
         ) : null}
