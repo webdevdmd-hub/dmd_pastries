@@ -673,7 +673,9 @@ export function AccountMappingsPageClient(): JSX.Element {
               key={mapping.mappingKey}
             >
               <div>
-                <p className="font-semibold text-foreground">{mapping.mappingKey}</p>
+                <p className="font-semibold text-foreground [overflow-wrap:anywhere]">
+                  {mapping.mappingKey}
+                </p>
                 <p className="text-sm text-muted-foreground">
                   {mapping.description || "No description"}
                 </p>
