@@ -2,9 +2,14 @@ import type { JSX } from "react";
 
 import { ReportBranchSelect } from "@/components/reports/report-branch-select";
 import { ReportDateRangePicker } from "@/components/reports/report-date-range-picker";
+import {
+  compactSummary,
+  countReportFilterChanges,
+  describeReportBranch,
+  describeReportPeriod,
+  ReportFilterPopover,
+} from "@/components/reports/report-filter-popover";
 import { ReportPresetSelector } from "@/components/reports/report-preset-selector";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -13,7 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { reportGroupByOptions, resolveReportPresetRange } from "@/constants/report-presets";
-import { cn } from "@/lib/utils/cn";
 import type { Branch } from "@/types/branch";
 import type { ReportDatePreset, ReportGroupBy } from "@/types/reports";
 
@@ -34,9 +38,9 @@ type ReportFilterBarProps = {
   onApply: () => void;
   onChange: (filters: ReportFilterDraft) => void;
   onReset: () => void;
-  compact?: boolean;
 };
 
+/** Period, branch and grouping: the filters every report shares. */
 export function ReportFilterBar({
   branches,
   canAccessAllBranches,
@@ -46,7 +50,6 @@ export function ReportFilterBar({
   onApply,
   onChange,
   onReset,
-  compact = false,
 }: ReportFilterBarProps): JSX.Element {
   const setPreset = (preset: ReportDatePreset): void => {
     if (preset === "custom") {
@@ -59,66 +62,58 @@ export function ReportFilterBar({
   };
 
   return (
-    <Card className={cn("bg-card/85 shadow-soft", compact && "rounded-md shadow-none")}>
-      <CardContent
-        className={cn(
-          "grid grid-cols-2 gap-3 p-4 sm:gap-4 sm:p-5 xl:grid-cols-6",
-          compact && "gap-3 p-4 xl:grid-cols-[8.5rem_9.5rem_9.5rem_minmax(10rem,1fr)_8.5rem_auto]",
-        )}
-      >
-        <ReportPresetSelector value={filters.datePreset} onChange={setPreset} />
-        <ReportDateRangePicker
-          dateFrom={filters.dateFrom}
-          dateTo={filters.dateTo}
-          onDateFromChange={(dateFrom) => onChange({ ...filters, dateFrom, datePreset: "custom" })}
-          onDateToChange={(dateTo) => onChange({ ...filters, dateTo, datePreset: "custom" })}
-        />
-        <ReportBranchSelect
-          branches={branches}
-          canAccessAllBranches={canAccessAllBranches}
-          currentBranchId={currentBranchId}
-          value={filters.branchId}
-          onChange={(branchId) => onChange({ ...filters, branchId })}
-        />
-        <div className="space-y-2">
-          <label
-            htmlFor="report-filter-bar-group-by"
-            className="text-sm font-medium text-brand-espresso"
-          >
-            Group by
-          </label>
-          <Select
-            value={filters.groupBy}
-            onValueChange={(groupBy: ReportGroupBy) => onChange({ ...filters, groupBy })}
-          >
-            <SelectTrigger id="report-filter-bar-group-by">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {reportGroupByOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className={cn("flex items-end gap-2 xl:col-span-6", compact && "xl:col-span-1")}>
-          <Button type="button" onClick={onApply}>
-            Apply
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              onChange(defaultFilters);
-              onReset();
-            }}
-          >
-            Reset
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <ReportFilterPopover
+      changedCount={countReportFilterChanges(filters, defaultFilters)}
+      draftKey={JSON.stringify(filters)}
+      onApply={onApply}
+      onReset={() => {
+        onChange(defaultFilters);
+        onReset();
+      }}
+      popoverTitle="Filter report"
+      summary={compactSummary([
+        describeReportPeriod(filters.datePreset, filters.dateFrom, filters.dateTo),
+        describeReportBranch(branches, filters.branchId),
+        `By ${filters.groupBy}`,
+      ])}
+    >
+      <ReportPresetSelector value={filters.datePreset} onChange={setPreset} />
+      <ReportDateRangePicker
+        dateFrom={filters.dateFrom}
+        dateTo={filters.dateTo}
+        onDateFromChange={(dateFrom) => onChange({ ...filters, dateFrom, datePreset: "custom" })}
+        onDateToChange={(dateTo) => onChange({ ...filters, dateTo, datePreset: "custom" })}
+      />
+      <ReportBranchSelect
+        branches={branches}
+        canAccessAllBranches={canAccessAllBranches}
+        currentBranchId={currentBranchId}
+        value={filters.branchId}
+        onChange={(branchId) => onChange({ ...filters, branchId })}
+      />
+      <div className="space-y-2">
+        <label
+          htmlFor="report-filter-bar-group-by"
+          className="text-sm font-medium text-brand-espresso"
+        >
+          Group by
+        </label>
+        <Select
+          value={filters.groupBy}
+          onValueChange={(groupBy: ReportGroupBy) => onChange({ ...filters, groupBy })}
+        >
+          <SelectTrigger id="report-filter-bar-group-by">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {reportGroupByOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </ReportFilterPopover>
   );
 }

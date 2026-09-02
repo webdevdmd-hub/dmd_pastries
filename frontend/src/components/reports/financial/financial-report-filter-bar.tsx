@@ -4,9 +4,15 @@ import type { JSX } from "react";
 
 import { ReportBranchSelect } from "@/components/reports/report-branch-select";
 import { ReportDateRangePicker } from "@/components/reports/report-date-range-picker";
+import {
+  compactSummary,
+  countReportFilterChanges,
+  describeReportBranch,
+  describeReportChoice,
+  describeReportPeriod,
+  ReportFilterPopover,
+} from "@/components/reports/report-filter-popover";
 import { ReportPresetSelector } from "@/components/reports/report-preset-selector";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -114,8 +120,30 @@ export function FinancialReportFilterBar({
   };
 
   return (
-    <Card className="bg-card/85 shadow-soft">
-      <CardContent className="grid grid-cols-2 gap-3 p-4 sm:gap-4 sm:p-5 xl:grid-cols-6">
+    <ReportFilterPopover
+      changedCount={countReportFilterChanges(filters, defaultFilters)}
+      draftKey={JSON.stringify(filters)}
+      onApply={onApply}
+      onReset={() => {
+        onChange(defaultFilters);
+        onReset();
+      }}
+      popoverTitle="Filter financial report"
+      summary={compactSummary([
+        describeReportPeriod(filters.datePreset, filters.dateFrom, filters.dateTo),
+        describeReportBranch(branches, filters.branchId),
+        showGroupBy ? `By ${filters.groupBy}` : null,
+        describeReportChoice(filters.sourceType, defaultFilters.sourceType, sourceTypeOptions),
+        describeReportChoice(filters.status, defaultFilters.status, statusOptions),
+        describeReportChoice(
+          filters.refundStatus,
+          defaultFilters.refundStatus,
+          refundStatusOptions,
+        ),
+        filters.paymentMethodId ? "Payment method set" : null,
+      ])}
+    >
+      <>
         <ReportPresetSelector value={filters.datePreset} onChange={setPreset} />
         <ReportDateRangePicker
           dateFrom={filters.dateFrom}
@@ -242,22 +270,7 @@ export function FinancialReportFilterBar({
             </Select>
           </div>
         ) : null}
-        <div className="flex items-end gap-2 xl:col-span-6">
-          <Button type="button" onClick={onApply}>
-            Apply
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              onChange(defaultFilters);
-              onReset();
-            }}
-          >
-            Reset
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      </>
+    </ReportFilterPopover>
   );
 }

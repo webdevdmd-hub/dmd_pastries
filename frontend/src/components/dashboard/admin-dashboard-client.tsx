@@ -523,7 +523,6 @@ export function AdminDashboardClient(): JSX.Element {
       <ReportFilterBar
         branches={branchesQuery.data ?? []}
         canAccessAllBranches={branchScope.canAccessAllBranches}
-        compact
         currentBranchId={branchScope.effectiveBranchId}
         defaultFilters={defaultDraft}
         filters={draftFilters}

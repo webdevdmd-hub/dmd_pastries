@@ -9,6 +9,14 @@ import { POSReceiptDialog } from "@/components/pos/pos-receipt-dialog";
 import { AccessDeniedCard } from "@/components/reports/access-denied-card";
 import { ReportBranchSelect } from "@/components/reports/report-branch-select";
 import { ReportDateRangePicker } from "@/components/reports/report-date-range-picker";
+import {
+  compactSummary,
+  countReportFilterChanges,
+  describeReportBranch,
+  describeReportChoice,
+  describeReportPeriod,
+  ReportFilterPopover,
+} from "@/components/reports/report-filter-popover";
 import { ReportPageHeader } from "@/components/reports/report-page-header";
 import { ReportPresetSelector } from "@/components/reports/report-preset-selector";
 import { formatCurrency, formatDate } from "@/components/reports/sales/sales-report-format";
@@ -189,6 +197,20 @@ function ReceiptsTable({
   );
 }
 
+const receiptPaymentStatusOptions = [
+  { label: "All payments", value: "all" },
+  { label: "Paid", value: "paid" },
+  { label: "Partial", value: "partial" },
+  { label: "Unpaid", value: "unpaid" },
+];
+
+const receiptSaleStatusOptions = [
+  { label: "All statuses", value: "all" },
+  { label: "Completed", value: "completed" },
+  { label: "Voided", value: "voided" },
+  { label: "Refunded", value: "refunded" },
+];
+
 export function ReceiptsReportPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
@@ -264,8 +286,43 @@ export function ReceiptsReportPageClient(): JSX.Element {
         description="Review completed POS sales, receipt view history, payment status, and printable bill details."
       />
 
-      <Card className="bg-card/85 shadow-soft">
-        <CardContent className="grid grid-cols-2 gap-3 p-4 sm:gap-4 sm:p-5 xl:grid-cols-6">
+      <ReportFilterPopover
+        changedCount={countReportFilterChanges(
+          { ...draft, search: initialDraft.search },
+          initialDraft,
+        )}
+        draftKey={JSON.stringify(draft)}
+        leading={
+          <div className="relative w-full min-w-[200px] max-w-sm flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mocha" />
+            <Input
+              aria-label="Search sale or customer"
+              className="pl-9"
+              id="receipt-search"
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, search: event.target.value }))
+              }
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  applyFilters();
+                }
+              }}
+              placeholder="Search SALE number or customer, then press Enter"
+              value={draft.search}
+            />
+          </div>
+        }
+        onApply={applyFilters}
+        onReset={resetFilters}
+        popoverTitle="Filter receipts"
+        summary={compactSummary([
+          describeReportPeriod(draft.datePreset, draft.dateFrom, draft.dateTo),
+          describeReportBranch(branchesQuery.data ?? [], draft.branchId),
+          describeReportChoice(draft.paymentStatus, "all", receiptPaymentStatusOptions),
+          describeReportChoice(draft.saleStatus, "all", receiptSaleStatusOptions),
+        ])}
+      >
+        <>
           <ReportPresetSelector value={draft.datePreset} onChange={setPreset} />
           <ReportDateRangePicker
             dateFrom={draft.dateFrom}
@@ -284,23 +341,6 @@ export function ReceiptsReportPageClient(): JSX.Element {
             value={draft.branchId}
             onChange={(branchId) => setDraft((current) => ({ ...current, branchId }))}
           />
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-brand-espresso" htmlFor="receipt-search">
-              Search sale / customer
-            </label>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mocha" />
-              <Input
-                className="pl-9"
-                id="receipt-search"
-                placeholder="SALE number or customer"
-                value={draft.search}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, search: event.target.value }))
-                }
-              />
-            </div>
-          </div>
           <div className="space-y-2">
             <label
               htmlFor="receipts-report-payment-status"
@@ -347,16 +387,8 @@ export function ReceiptsReportPageClient(): JSX.Element {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-end gap-2 xl:col-span-6">
-            <Button type="button" onClick={applyFilters}>
-              Apply
-            </Button>
-            <Button type="button" variant="outline" onClick={resetFilters}>
-              Reset
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        </>
+      </ReportFilterPopover>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-card/85 shadow-soft">

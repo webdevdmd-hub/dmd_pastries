@@ -4,8 +4,14 @@ import type { JSX } from "react";
 
 import { ReportBranchSelect } from "@/components/reports/report-branch-select";
 import { ReportDateRangePicker } from "@/components/reports/report-date-range-picker";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  compactSummary,
+  countReportFilterChanges,
+  describeReportBranch,
+  describeReportChoice,
+  describeReportPeriod,
+  ReportFilterPopover,
+} from "@/components/reports/report-filter-popover";
 import {
   Select,
   SelectContent,
@@ -65,6 +71,14 @@ export function toInventoryReportFilters(
   };
 }
 
+const itemTypeOptions = [
+  { label: "All item types", value: "all" },
+  { label: "Products", value: "product" },
+  { label: "Variants", value: "product_variant" },
+  { label: "Ingredients", value: "ingredient" },
+  { label: "Packaging", value: "packaging" },
+];
+
 export function InventoryReportFilterBar({
   branches,
   canAccessAllBranches,
@@ -87,8 +101,25 @@ export function InventoryReportFilterBar({
   statusOptions?: InventoryReportSelectOption[];
 }): JSX.Element {
   return (
-    <Card className="bg-card/85 shadow-soft">
-      <CardContent className="grid grid-cols-2 gap-3 p-4 sm:gap-4 sm:p-5 xl:grid-cols-6">
+    <ReportFilterPopover
+      changedCount={countReportFilterChanges(filters, defaultFilters)}
+      draftKey={JSON.stringify(filters)}
+      onApply={onApply}
+      onReset={() => {
+        onChange(defaultFilters);
+        onReset();
+      }}
+      popoverTitle="Filter inventory report"
+      summary={compactSummary([
+        describeReportBranch(branches, filters.branchId),
+        describeReportChoice(filters.itemType, defaultFilters.itemType, itemTypeOptions),
+        describeReportChoice(filters.status, defaultFilters.status, statusOptions),
+        filters.dateFrom || filters.dateTo
+          ? describeReportPeriod(undefined, filters.dateFrom, filters.dateTo)
+          : null,
+      ])}
+    >
+      <>
         <ReportBranchSelect
           branches={branches}
           canAccessAllBranches={canAccessAllBranches}
@@ -150,22 +181,7 @@ export function InventoryReportFilterBar({
           onDateFromChange={(dateFrom) => onChange({ ...filters, dateFrom })}
           onDateToChange={(dateTo) => onChange({ ...filters, dateTo })}
         />
-        <div className="flex items-end gap-2 xl:col-span-6">
-          <Button type="button" onClick={onApply}>
-            Apply
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              onChange(defaultFilters);
-              onReset();
-            }}
-          >
-            Reset
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      </>
+    </ReportFilterPopover>
   );
 }
