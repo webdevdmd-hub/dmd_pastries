@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { useBranchQueryKey } from "@/hooks/use-branch-scope";
+import { branchesQueryKey } from "@/hooks/use-branches";
+import { getBranches as getBranchList } from "@/lib/api/branches";
 import {
   addSupplierInvoicePayment,
   cancelPurchaseInvoice,
@@ -20,7 +22,6 @@ import {
   deletePurchaseOrder,
   deleteSupplierPayment,
   duplicatePurchaseOrder,
-  getBranches,
   getIngredients,
   getProducts,
   getPurchaseInvoiceById,
@@ -410,10 +411,14 @@ export function usePurchasingTaxRates(enabled = true) {
   });
 }
 
+// Reads the same cache entry as useBranches, which the header fills on every
+// page, and narrows it to the option shape purchasing forms use.
 export function usePurchasingBranches(enabled = true) {
-  return useQuery<PurchasingBranchOption[]>({
-    queryKey: [purchasingQueryKey, "branches"],
-    queryFn: async () => getBranches(),
+  return useQuery({
+    queryKey: [branchesQueryKey],
+    queryFn: async () => getBranchList(),
+    select: (branches): PurchasingBranchOption[] =>
+      branches.map((branch) => ({ id: branch.id, branchName: branch.name, status: branch.status })),
     enabled,
   });
 }

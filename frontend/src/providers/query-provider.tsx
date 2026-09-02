@@ -17,7 +17,12 @@ export function QueryProvider({ children }: QueryProviderProps): JSX.Element {
           queries: {
             retry: 1,
             refetchOnWindowFocus: false,
-            staleTime: 0,
+            // Reference data (branches, tags, mappings, product lists) is read
+            // by several components on one page. With staleTime 0 the second
+            // one to mount after the first fetch settled refetched the same
+            // URL. Half a minute of freshness dedupes those; mutations still
+            // invalidate their keys explicitly.
+            staleTime: 30_000,
           },
         },
       }),

@@ -503,6 +503,28 @@ export type InventoryListResult = {
   total: number;
 };
 
+/**
+ * The exact query the list request sends. Hooks key their cache on it, so two
+ * callers whose filter objects differ in shape but not in effect (the tab
+ * badge and the list panel) share one request.
+ */
+export function inventoryListQuery(params: InventoryFilters): string {
+  return queryString({
+    search: params.search,
+    branch_id: params.branchId,
+    item_type: params.itemType,
+    product_type: params.productType,
+    status: params.status,
+    low_stock_only: params.lowStockOnly,
+    expiry_tracked: params.expiryTrackedOnly,
+    include_uninitialized: params.includeUninitialized,
+    sort_by: params.sortBy,
+    sort_order: params.sortOrder,
+    page: 1,
+    limit: 100,
+  });
+}
+
 export async function getInventory(params: InventoryFilters): Promise<InventoryListResult> {
   // The backend clamps any missing or >100 limit down to 20 rows. This request
   // used to send no limit at all, so every consumer -- the list, the KPI strip,
@@ -510,20 +532,7 @@ export async function getInventory(params: InventoryFilters): Promise<InventoryL
   // were the whole branch. Ask for the maximum and carry the server's total so
   // callers can tell a complete answer from a truncated one.
   const response = await apiRequest<InventoryListResult>(
-    `/api/v1/inventory${queryString({
-      search: params.search,
-      branch_id: params.branchId,
-      item_type: params.itemType,
-      product_type: params.productType,
-      status: params.status,
-      low_stock_only: params.lowStockOnly,
-      expiry_tracked: params.expiryTrackedOnly,
-      include_uninitialized: params.includeUninitialized,
-      sort_by: params.sortBy,
-      sort_order: params.sortOrder,
-      page: 1,
-      limit: 100,
-    })}`,
+    `/api/v1/inventory${inventoryListQuery(params)}`,
     {
       authMode: "appwrite",
       parse: (data) => {
@@ -625,17 +634,22 @@ export async function getInventoryItemMovements(
   return response.data;
 }
 
+/** See inventoryListQuery: the request as sent, for cache keys. */
+export function expiryAlertsQuery(params: ExpiryAlertFilters): string {
+  return queryString({
+    branch_id: params.branchId,
+    item_type: params.itemType,
+    product_type: params.productType,
+    status: params.status,
+    expiry_state: params.expiryState,
+    timezone: params.timezone,
+    days: params.days,
+  });
+}
+
 export async function getExpiryAlerts(params: ExpiryAlertFilters): Promise<ExpiryBatch[]> {
   const response = await apiRequest<ExpiryBatch[]>(
-    `/api/v1/inventory/expiry-alerts${queryString({
-      branch_id: params.branchId,
-      item_type: params.itemType,
-      product_type: params.productType,
-      status: params.status,
-      expiry_state: params.expiryState,
-      timezone: params.timezone,
-      days: params.days,
-    })}`,
+    `/api/v1/inventory/expiry-alerts${expiryAlertsQuery(params)}`,
     {
       authMode: "appwrite",
       parse: (data) => parseList(data, parseExpiryBatch),

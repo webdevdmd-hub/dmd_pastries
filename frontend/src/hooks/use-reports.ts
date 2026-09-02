@@ -3,13 +3,14 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { useBranchQueryKey } from "@/hooks/use-branch-scope";
+import { branchesQueryKey } from "@/hooks/use-branches";
+import { getBranches } from "@/lib/api/branches";
 import { getSaleReceipt } from "@/lib/api/pos";
 import {
   exportReportCsv,
   getOrdersChart,
   getPaymentsChart,
   getReceiptRecords,
-  getReportBranches,
   getReportExportOptions,
   getReportsDashboardSummary,
   getSalesChart,
@@ -112,10 +113,12 @@ export function useReportExportOptions(enabled = true) {
   });
 }
 
+// Same key as useBranches: the header already loads the branch list on every
+// page, so a report must not fetch it a second time under its own key.
 export function useReportBranches(enabled = true) {
   return useQuery<Branch[]>({
-    queryKey: [reportsQueryKey, "branches"],
-    queryFn: async () => getReportBranches(),
+    queryKey: [branchesQueryKey],
+    queryFn: async () => getBranches(),
     enabled,
   });
 }

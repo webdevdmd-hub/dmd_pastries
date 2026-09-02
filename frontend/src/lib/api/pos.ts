@@ -875,7 +875,7 @@ function parseLookupProduct(value: unknown): {
   };
 }
 
-function filterPOSProducts(products: POSProduct[], params: POSProductFilters): POSProduct[] {
+export function filterPOSProducts(products: POSProduct[], params: POSProductFilters): POSProduct[] {
   const normalizedSearch = params.search.trim().toLowerCase();
 
   return products
@@ -1291,11 +1291,18 @@ function parseHeldSaleResumeData(value: unknown): HeldSaleResumeData {
   };
 }
 
-export async function getPOSProducts(params: POSProductFilters): Promise<POSProduct[]> {
+/**
+ * The catalogue the register filters from. Only item_structure goes to the
+ * server; category, search and limit are applied client-side, so two callers
+ * with different filters can share one request and one cache entry.
+ */
+export async function getPOSProductCatalog(
+  itemStructure: POSProductFilters["itemStructure"],
+): Promise<POSProduct[]> {
   const searchParams = new URLSearchParams();
 
-  if (params.itemStructure) {
-    searchParams.set("item_structure", params.itemStructure);
+  if (itemStructure) {
+    searchParams.set("item_structure", itemStructure);
   }
 
   const query = searchParams.toString();
@@ -1307,7 +1314,11 @@ export async function getPOSProducts(params: POSProductFilters): Promise<POSProd
     },
   );
 
-  return filterPOSProducts(response.data, params);
+  return response.data;
+}
+
+export async function getPOSProducts(params: POSProductFilters): Promise<POSProduct[]> {
+  return filterPOSProducts(await getPOSProductCatalog(params.itemStructure), params);
 }
 
 export async function lookupPOSProduct(params: POSLookupParams): Promise<POSProduct | null> {

@@ -12,6 +12,7 @@ import {
   createStockLocation,
   createStockTransfer,
   deleteStockLocation,
+  expiryAlertsQuery,
   getExpiryAlerts,
   getExpiryBatches,
   getInventory,
@@ -24,6 +25,7 @@ import {
   getStockLocations,
   getStockTransferById,
   getStockTransfers,
+  inventoryListQuery,
   setDefaultStockLocation,
   updateExpiryBatch,
   updateExpiryBatchStatus,
@@ -64,7 +66,7 @@ export function useInventory(filters: InventoryFilters, enabled = true) {
   const branchQueryKey = useBranchQueryKey();
 
   return useQuery({
-    queryKey: [inventoryQueryKey, branchQueryKey, "list", filters],
+    queryKey: [inventoryQueryKey, branchQueryKey, "list", inventoryListQuery(filters)],
     queryFn: async () => getInventory(filters),
     enabled,
   });
@@ -149,7 +151,7 @@ export function useExpiryAlerts(filters: ExpiryAlertFilters, enabled = true) {
   const branchQueryKey = useBranchQueryKey();
 
   return useQuery<ExpiryBatch[]>({
-    queryKey: [inventoryQueryKey, branchQueryKey, "expiry-alerts", filters],
+    queryKey: [inventoryQueryKey, branchQueryKey, "expiry-alerts", expiryAlertsQuery(filters)],
     queryFn: async () => getExpiryAlerts(filters),
     enabled,
   });

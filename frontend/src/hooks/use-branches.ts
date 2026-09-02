@@ -19,7 +19,7 @@ import type {
 } from "@/types/branch";
 import type { User } from "@/types/user";
 
-const branchesQueryKey = "branches";
+export const branchesQueryKey = "branches";
 const usersQueryKey = "users";
 
 export function useBranches(enabled = true) {
