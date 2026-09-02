@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { ResponsiveChartFrame } from "@/components/reports/responsive-chart-frame";
 import { AccessDeniedCard } from "@/components/reports/sales/access-denied-card";
 import { CategorySalesTable } from "@/components/reports/sales/category-sales-table";
@@ -80,7 +80,7 @@ export function CategorySalesPageClient(): JSX.Element {
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Category Sales"
         description="Compare sales performance across product categories."
       />

@@ -1,7 +1,6 @@
 "use client";
 
-import { Landmark, ReceiptText, RotateCcw, Scale, Truck, WalletCards } from "lucide-react";
-import Link from "next/link";
+import { Landmark } from "lucide-react";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
 
@@ -20,12 +19,9 @@ import { FinancialSummaryCards } from "@/components/reports/financial/financial-
 import { FinancialTrendChart } from "@/components/reports/financial/financial-trend-chart";
 import { ReportLedgerNotice } from "@/components/reports/financial/report-ledger-notice";
 import { ReportChartCard } from "@/components/reports/report-chart-card";
-import { ReportPageHeader } from "@/components/reports/report-page-header";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
-import { ROUTES } from "@/constants/routes";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useFinancialSummary, useFinancialTrend } from "@/hooks/use-financial-reports";
 import { usePermission } from "@/hooks/use-permission";
@@ -33,18 +29,6 @@ import { useReportBranches } from "@/hooks/use-reports";
 import { getErrorMessage } from "@/lib/api/client";
 import { isReportFiltered } from "@/lib/reports/is-report-filtered";
 import type { FinancialTrendChart as FinancialTrendChartData } from "@/types/financial-reports";
-
-const navigationCards = [
-  { href: ROUTES.reportsFinancialPayments, icon: WalletCards, label: "Payments" },
-  { href: ROUTES.reportsFinancialRefunds, icon: RotateCcw, label: "Refunds" },
-  {
-    href: ROUTES.reportsFinancialOutstandingBalances,
-    icon: ReceiptText,
-    label: "Outstanding Balances",
-  },
-  { href: ROUTES.reportsFinancialSupplierPayables, icon: Truck, label: "Supplier Payables" },
-  { href: ROUTES.reportsFinancialReconciliation, icon: Scale, label: "Reconciliation" },
-] as const;
 
 function isTrendEmpty(chart: FinancialTrendChartData | undefined): boolean {
   return (
@@ -80,10 +64,6 @@ export function FinancialReportsPageClient(): JSX.Element {
   };
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
-        title="Financial Reports"
-        description="Analyze collections, refunds, balances, supplier payables, and financial performance."
-      />
       <FinancialReportFilterBar
         branches={branchesQuery.data ?? []}
         canAccessAllBranches={branchScope.canAccessAllBranches}
@@ -135,26 +115,6 @@ export function FinancialReportsPageClient(): JSX.Element {
           />
         )}
       </ReportChartCard>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {navigationCards.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link href={item.href} key={item.href}>
-              <Card className="h-full bg-card/85 shadow-soft transition hover:-translate-y-0.5 hover:shadow-float">
-                <CardContent className="flex items-center justify-between gap-4 p-5">
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-2xl bg-brand-latte p-3 text-brand-mocha">
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <p className="font-semibold text-brand-espresso">{item.label}</p>
-                  </div>
-                  <Badge variant="secondary">Open</Badge>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
       <Card className="bg-card/85 shadow-soft">
         <CardContent className="flex items-center gap-3 p-5 text-brand-mocha">
           <Landmark className="h-5 w-5 text-brand-mocha" aria-hidden="true" />

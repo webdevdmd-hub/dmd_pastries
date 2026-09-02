@@ -4,7 +4,7 @@ import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { AccessDeniedCard } from "@/components/reports/sales/access-denied-card";
 import { SalesReportEmptyState } from "@/components/reports/sales/sales-report-empty-state";
 import { SalesReportErrorState } from "@/components/reports/sales/sales-report-error-state";
@@ -77,7 +77,7 @@ export function TaxReportPageClient(): JSX.Element {
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Tax Report"
         description="Review tax snapshot amounts collected from sale items."
       />

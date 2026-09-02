@@ -19,7 +19,7 @@ import { PaymentMethodChart } from "@/components/reports/financial/payment-metho
 import { PaymentMethodReportCard } from "@/components/reports/financial/payment-method-report-card";
 import { PaymentsReportTable } from "@/components/reports/financial/payments-report-table";
 import { ReportChartCard } from "@/components/reports/report-chart-card";
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -56,7 +56,7 @@ export function PaymentsReportPageClient(): JSX.Element {
   };
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Payments Report"
         description="Review collections by source, branch, payment method, status, and cashier."
       />

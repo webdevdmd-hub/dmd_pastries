@@ -15,7 +15,7 @@ import {
 import { defaultBakeryOrdersReportDraft } from "@/components/reports/bakery-orders/bakery-orders-report-page-utils";
 import { PendingPaymentsSummaryCard } from "@/components/reports/bakery-orders/pending-payments-summary-card";
 import { PendingPaymentsTable } from "@/components/reports/bakery-orders/pending-payments-table";
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -83,7 +83,7 @@ export function PendingPaymentsPageClient(): JSX.Element {
   };
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Pending Payments"
         description="Review customer balances for custom bakery orders."
       />

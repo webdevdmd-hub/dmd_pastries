@@ -18,7 +18,7 @@ import {
 import { OutstandingBalancesTable } from "@/components/reports/financial/outstanding-balances-table";
 import { ReportLedgerNotice } from "@/components/reports/financial/report-ledger-notice";
 import { ReportKpiCard } from "@/components/reports/report-kpi-card";
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { formatCurrency } from "@/components/reports/sales/sales-report-format";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Card, CardContent } from "@/components/ui/card";
@@ -62,7 +62,7 @@ export function OutstandingBalancesPageClient(): JSX.Element {
   };
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Outstanding Balances"
         description="Track unpaid and partial customer balances across POS and bakery order sources."
       />

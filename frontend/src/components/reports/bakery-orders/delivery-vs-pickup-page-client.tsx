@@ -16,7 +16,7 @@ import {
 } from "@/components/reports/bakery-orders/bakery-orders-report-page-utils";
 import { DeliveryVsPickupChart } from "@/components/reports/bakery-orders/delivery-vs-pickup-chart";
 import { DeliveryVsPickupSummary } from "@/components/reports/bakery-orders/delivery-vs-pickup-summary";
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -48,7 +48,7 @@ export function DeliveryVsPickupPageClient(): JSX.Element {
   };
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Delivery vs Pickup"
         description="Compare pickup and delivery order counts and revenue."
       />

@@ -16,7 +16,7 @@ import {
   parseFinancialReportDraft,
 } from "@/components/reports/financial/financial-report-page-utils";
 import { ReconciliationReportTable } from "@/components/reports/financial/reconciliation-report-table";
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -52,7 +52,7 @@ export function ReconciliationReportPageClient(): JSX.Element {
   };
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Reconciliation Report"
         description="Review completed collection, refund, and supplier-payment transactions by branch and method."
       />

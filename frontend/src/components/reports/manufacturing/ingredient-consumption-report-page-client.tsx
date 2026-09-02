@@ -16,7 +16,7 @@ import {
   defaultManufacturingReportDraft,
   parseManufacturingReportDraft,
 } from "@/components/reports/manufacturing/manufacturing-report-page-utils";
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -54,7 +54,7 @@ export function IngredientConsumptionReportPageClient(): JSX.Element {
   };
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Ingredient Consumption"
         description="Review consumed ingredients, estimated cost, and batch count."
       />

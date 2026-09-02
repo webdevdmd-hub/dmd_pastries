@@ -4,7 +4,7 @@ import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { AccessDeniedCard } from "@/components/reports/sales/access-denied-card";
 import { DiscountSalesTable } from "@/components/reports/sales/discount-sales-table";
 import { DiscountSummaryCard } from "@/components/reports/sales/discount-summary-card";
@@ -78,7 +78,7 @@ export function DiscountReportPageClient(): JSX.Element {
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Discount Report"
         description="Review sale-level and line-level discounts."
       />

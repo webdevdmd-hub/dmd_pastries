@@ -1,15 +1,5 @@
 "use client";
 
-import {
-  ClipboardCheck,
-  ClockAlert,
-  PackageSearch,
-  PackageX,
-  Scale,
-  ShieldAlert,
-  Trash2,
-} from "lucide-react";
-import Link from "next/link";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
 
@@ -26,33 +16,13 @@ import {
 import { InventorySummaryCards } from "@/components/reports/inventory/inventory-summary-cards";
 import { InventoryTrendChart } from "@/components/reports/inventory/inventory-trend-chart";
 import { ReportChartCard } from "@/components/reports/report-chart-card";
-import { ReportPageHeader } from "@/components/reports/report-page-header";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
-import { ROUTES } from "@/constants/routes";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useInventorySummary, useInventoryTrend } from "@/hooks/use-inventory-reports";
 import { usePermission } from "@/hooks/use-permission";
 import { useReportBranches } from "@/hooks/use-reports";
 import { resolveDashboardTimezone } from "@/lib/reports/dashboard-filters";
-
-const navigationCards = [
-  { href: ROUTES.reportsInventoryCurrentStock, icon: PackageSearch, label: "Current Stock" },
-  { href: ROUTES.reportsInventoryValuation, icon: ClipboardCheck, label: "Stock Valuation" },
-  { href: ROUTES.reportsInventoryLowStock, icon: PackageX, label: "Low Stock" },
-  { href: ROUTES.reportsInventoryExpiry, icon: ClockAlert, label: "Expiry Report" },
-  { href: ROUTES.reportsInventoryMovements, icon: ClipboardCheck, label: "Stock Movements" },
-  { href: ROUTES.reportsInventoryWastage, icon: Trash2, label: "Wastage" },
-  { href: ROUTES.reportsInventoryPackaging, icon: PackageSearch, label: "Packaging Stock" },
-  { href: ROUTES.reportsInventoryAudit, icon: ShieldAlert, label: "Inventory Audit" },
-  {
-    href: ROUTES.reportsInventoryAccountingReconciliation,
-    icon: Scale,
-    label: "Inventory Accounting",
-  },
-] as const;
 
 function isTrendEmpty(chart: ReturnType<typeof useInventoryTrend>["data"]): boolean {
   return (
@@ -95,10 +65,6 @@ export function InventoryReportsPageClient(): JSX.Element {
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
-        title="Inventory Reports"
-        description="Analyze stock levels, valuation, expiry risks, movements, wastage, packaging, and audit accuracy."
-      />
       <InventoryReportFilterBar
         branches={branchesQuery.data ?? []}
         canAccessAllBranches={branchScope.canAccessAllBranches}
@@ -120,26 +86,6 @@ export function InventoryReportsPageClient(): JSX.Element {
       >
         {trendQuery.data ? <InventoryTrendChart chart={trendQuery.data} /> : null}
       </ReportChartCard>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {navigationCards.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link href={item.href} key={item.href}>
-              <Card className="h-full bg-card/85 shadow-soft transition hover:-translate-y-0.5 hover:shadow-float">
-                <CardContent className="flex items-center justify-between gap-4 p-5">
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-2xl bg-brand-latte p-3 text-brand-mocha">
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <p className="font-semibold text-brand-espresso">{item.label}</p>
-                  </div>
-                  <Badge variant="secondary">Open</Badge>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
     </div>
   );
 }

@@ -17,7 +17,7 @@ import {
 } from "@/components/reports/inventory/inventory-report-page-utils";
 import { StockValuationSummary } from "@/components/reports/inventory/stock-valuation-summary";
 import { StockValuationTable } from "@/components/reports/inventory/stock-valuation-table";
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -57,7 +57,7 @@ export function StockValuationPageClient(): JSX.Element {
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Stock Valuation"
         description="Review stock value by item, type, branch, quantity, and unit cost."
       />

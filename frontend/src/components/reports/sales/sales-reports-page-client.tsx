@@ -1,13 +1,10 @@
 "use client";
 
-import { BarChart3, Boxes, ReceiptText, Tags, UserRound, WalletCards } from "lucide-react";
-import Link from "next/link";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ReportChartCard } from "@/components/reports/report-chart-card";
-import { ReportPageHeader } from "@/components/reports/report-page-header";
 import { AccessDeniedCard } from "@/components/reports/sales/access-denied-card";
 import { DailySalesTable } from "@/components/reports/sales/daily-sales-table";
 import { SalesReportEmptyState } from "@/components/reports/sales/sales-report-empty-state";
@@ -23,7 +20,6 @@ import { SalesTrendChart } from "@/components/reports/sales/sales-trend-chart";
 import { SlowMovingProductsCard } from "@/components/reports/sales/slow-moving-products-card";
 import { TopProductsCard } from "@/components/reports/sales/top-products-card";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
 import { resolveReportPresetRange } from "@/constants/report-presets";
@@ -69,15 +65,6 @@ function isTrendEmpty(chart: SalesTrendChartData | undefined): boolean {
     chart.datasets.every((dataset) => dataset.data.length === 0)
   );
 }
-
-const navigationCards = [
-  { href: "/reports/sales/products", icon: ReceiptText, label: "Product Sales" },
-  { href: "/reports/sales/categories", icon: Tags, label: "Category Sales" },
-  { href: "/reports/sales/cashiers", icon: UserRound, label: "Cashier Performance" },
-  { href: "/reports/sales/branches", icon: Boxes, label: "Branch Sales" },
-  { href: "/reports/sales/discounts", icon: WalletCards, label: "Discount Report" },
-  { href: "/reports/sales/taxes", icon: BarChart3, label: "Tax Report" },
-] as const;
 
 export function SalesReportsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -166,10 +153,6 @@ export function SalesReportsPageClient(): JSX.Element {
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
-        title="Sales Reports"
-        description="Analyze sales performance, trends, products, categories, cashiers, branches, discounts, and taxes."
-      />
       <SalesReportFilterBar
         branches={branchesQuery.data ?? []}
         canAccessAllBranches={branchScope.canAccessAllBranches}
@@ -225,26 +208,6 @@ export function SalesReportsPageClient(): JSX.Element {
           </Card>
         </>
       ) : null}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {navigationCards.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link href={item.href} key={item.href}>
-              <Card className="h-full bg-card/85 shadow-soft transition hover:-translate-y-0.5 hover:shadow-float">
-                <CardContent className="flex items-center justify-between gap-4 p-5">
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-2xl bg-brand-latte p-3 text-brand-mocha">
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <p className="font-semibold text-brand-espresso">{item.label}</p>
-                  </div>
-                  <Badge variant="secondary">Open</Badge>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
     </div>
   );
 }

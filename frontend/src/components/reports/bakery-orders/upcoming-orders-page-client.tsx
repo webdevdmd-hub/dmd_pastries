@@ -17,7 +17,7 @@ import {
   parseBakeryOrdersReportDraft,
 } from "@/components/reports/bakery-orders/bakery-orders-report-page-utils";
 import { UpcomingOrdersTable } from "@/components/reports/bakery-orders/upcoming-orders-table";
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -65,7 +65,7 @@ export function UpcomingOrdersPageClient(): JSX.Element {
   };
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Upcoming Orders"
         description="Review scheduled upcoming custom orders by event date."
       />

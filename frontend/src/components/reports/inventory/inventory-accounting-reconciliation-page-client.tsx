@@ -19,7 +19,7 @@ import {
   defaultInventoryReportDraft,
   parseInventoryReportDraft,
 } from "@/components/reports/inventory/inventory-report-page-utils";
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -133,7 +133,7 @@ export function InventoryAccountingReconciliationPageClient(): JSX.Element {
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Inventory Accounting Reconciliation"
         description="Compare operational stock valuation, stock movement valuation, linked accounting journals, and the mapped Inventory / Stock GL balance."
       />

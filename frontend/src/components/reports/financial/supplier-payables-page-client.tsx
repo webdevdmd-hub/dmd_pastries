@@ -19,7 +19,7 @@ import {
 import { ReportLedgerNotice } from "@/components/reports/financial/report-ledger-notice";
 import { SupplierPayablesTable } from "@/components/reports/financial/supplier-payables-table";
 import { ReportKpiCard } from "@/components/reports/report-kpi-card";
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { formatCurrency } from "@/components/reports/sales/sales-report-format";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,7 +61,7 @@ export function SupplierPayablesPageClient(): JSX.Element {
   };
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Supplier Payables"
         description="Track unpaid supplier invoice balances and oldest due dates."
       />

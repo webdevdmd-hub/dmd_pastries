@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ReportKpiCard } from "@/components/reports/report-kpi-card";
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { AccessDeniedCard } from "@/components/reports/sales/access-denied-card";
 import { CashierSalesTable } from "@/components/reports/sales/cashier-sales-table";
 import { SalesReportEmptyState } from "@/components/reports/sales/sales-report-empty-state";
@@ -94,7 +94,7 @@ export function CashierSalesPageClient(): JSX.Element {
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Cashier Performance"
         description="Review cashier sales count, net sales, refunds, and voids."
       />

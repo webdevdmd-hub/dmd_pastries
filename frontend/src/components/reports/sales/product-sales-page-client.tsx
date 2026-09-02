@@ -4,7 +4,7 @@ import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { ReportPageHeader } from "@/components/reports/report-page-header";
+import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { AccessDeniedCard } from "@/components/reports/sales/access-denied-card";
 import { ProductSalesTable } from "@/components/reports/sales/product-sales-table";
 import { SalesReportEmptyState } from "@/components/reports/sales/sales-report-empty-state";
@@ -95,7 +95,7 @@ export function ProductSalesPageClient(): JSX.Element {
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <ReportPageHeader
+      <ReportSectionHeader
         title="Product Sales"
         description="Review product-level quantity sold, gross sales, discounts, taxes, and net sales."
         actions={<Button variant="outline">Export placeholder</Button>}
