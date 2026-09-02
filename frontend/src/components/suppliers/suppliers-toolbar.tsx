@@ -1,11 +1,10 @@
 "use client";
 
 import type { JSX } from "react";
-import { useId } from "react";
 
-import { Button } from "@/components/ui/button";
+import { FilterField, FilterToolbar } from "@/components/shared/filter-toolbar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -15,52 +14,56 @@ import {
 } from "@/components/ui/select";
 import type { SupplierFilters } from "@/types/supplier";
 
+const defaultFilters: SupplierFilters = {
+  search: "",
+  status: "all",
+  country: "",
+  missingTermsOnly: false,
+};
+
 type SuppliersToolbarProps = {
   filters: SupplierFilters;
   onFiltersChange: (filters: SupplierFilters) => void;
 };
 
 /**
- * Every control carries a visible label.
- *
- * These were placeholder-only with an aria-label: screen readers were served,
- * but a placeholder disappears the moment you type, so a sighted user reviewing
- * a filtered list could not tell which box held "Dubai" -- the country filter
- * or the search. Labels are 12.5px muted above each field.
+ * Search stays in the toolbar; status, country and the missing-terms switch
+ * live in the Filters popover, the same idiom as the customers and orders
+ * lists. The attention strip above can set the missing-terms filter with one
+ * click; the popover is where it is turned off again, so it must show there.
  */
 export function SuppliersToolbar({ filters, onFiltersChange }: SuppliersToolbarProps): JSX.Element {
-  const searchId = useId();
-  const statusId = useId();
-  const countryId = useId();
-
   const update = (patch: Partial<SupplierFilters>): void => {
     onFiltersChange({ ...filters, ...patch });
   };
 
-  return (
-    <div className="flex flex-wrap items-end gap-3">
-      <div className="grid min-w-[220px] flex-1 gap-1.5">
-        <Label className="text-meta text-foreground-muted" htmlFor={searchId}>
-          Search
-        </Label>
-        <Input
-          id={searchId}
-          onChange={(event) => update({ search: event.target.value })}
-          placeholder="Name, code, contact, phone"
-          value={filters.search}
-        />
-      </div>
+  // Only what sits inside the popover counts toward the badge. Search is
+  // visible in the toolbar and shows its own state.
+  const hiddenFilterCount =
+    (filters.status !== defaultFilters.status ? 1 : 0) +
+    (filters.country.trim().length > 0 ? 1 : 0) +
+    (filters.missingTermsOnly ? 1 : 0);
+  const hasAnyFilter = hiddenFilterCount > 0 || filters.search.trim().length > 0;
 
-      <div className="grid w-[150px] gap-1.5">
-        <Label className="text-meta text-foreground-muted" htmlFor={statusId}>
-          Status
-        </Label>
+  return (
+    <FilterToolbar
+      hasAnyFilter={hasAnyFilter}
+      hiddenFilterCount={hiddenFilterCount}
+      hideDensityBelowMd
+      onReset={() => onFiltersChange(defaultFilters)}
+      onSearchChange={(search) => update({ search })}
+      popoverTitle="Filter suppliers"
+      searchAriaLabel="Search suppliers"
+      searchPlaceholder="Search name, code, contact, phone..."
+      searchValue={filters.search}
+    >
+      <FilterField htmlFor="suppliersFilterStatus" label="Status">
         <Select
           onValueChange={(status) => update({ status: status as SupplierFilters["status"] })}
           value={filters.status}
         >
-          <SelectTrigger id={statusId}>
-            <SelectValue placeholder="All statuses" />
+          <SelectTrigger id="suppliersFilterStatus">
+            <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
@@ -69,34 +72,29 @@ export function SuppliersToolbar({ filters, onFiltersChange }: SuppliersToolbarP
             <SelectItem value="blocked">Blocked</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </FilterField>
 
-      <div className="grid w-[150px] gap-1.5">
-        <Label className="text-meta text-foreground-muted" htmlFor={countryId}>
-          Country
-        </Label>
+      <FilterField htmlFor="suppliersFilterCountry" label="Country">
         <Input
-          id={countryId}
+          id="suppliersFilterCountry"
           onChange={(event) => update({ country: event.target.value })}
           placeholder="Any"
           value={filters.country}
         />
-      </div>
+      </FilterField>
 
-      <Button
-        onClick={() =>
-          onFiltersChange({
-            search: "",
-            status: "all",
-            country: "",
-            missingTermsOnly: false,
-          })
-        }
-        type="button"
-        variant="outline"
-      >
-        Reset
-      </Button>
-    </div>
+      <label className="flex items-center gap-3 text-cell">
+        <Checkbox
+          checked={filters.missingTermsOnly}
+          onCheckedChange={(checked) => update({ missingTermsOnly: checked === true })}
+        />
+        <span className="grid gap-0.5">
+          <span className="font-medium">Missing payment terms only</span>
+          <span className="text-meta text-foreground-muted">
+            Suppliers a purchase order cannot be costed against yet.
+          </span>
+        </span>
+      </label>
+    </FilterToolbar>
   );
 }

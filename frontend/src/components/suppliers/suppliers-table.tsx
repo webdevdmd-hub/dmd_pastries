@@ -1,8 +1,6 @@
 "use client";
 
 import { Star } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 
 import { SupplierActionsMenu } from "@/components/suppliers/supplier-actions-menu";
@@ -16,11 +14,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ROUTES } from "@/constants/routes";
 import { PAYMENT_TERMS_LABEL, type Supplier } from "@/types/supplier";
 
 /** The unit is on the screen: a bare "3" in a Terms cell means nothing. */
-function leadTimeText(days: number | null): string {
+export function leadTimeText(days: number | null): string {
   if (days === null) return "no lead time";
   if (days === 0) return "same day";
   return days === 1 ? "1 day lead" : `${String(days)} days lead`;
@@ -31,6 +28,8 @@ type SuppliersTableProps = {
   onDelete: (supplier: Supplier) => void;
   onEdit: (supplier: Supplier) => void;
   onStatusChange: (supplier: Supplier, status: Supplier["status"]) => void;
+  /** Opens the supplier's details; the whole row is the target. */
+  onView: (supplier: Supplier) => void;
   suppliers: Supplier[];
 };
 
@@ -39,11 +38,11 @@ type SuppliersTableProps = {
  * "Not set" at full contrast: four of those in a row read as content, and gave
  * a filled contact the same visual weight as a missing one.
  */
-function Absent(): JSX.Element {
+export function Absent(): JSX.Element {
   return <span className="text-foreground-muted">&mdash;</span>;
 }
 
-function locationText(supplier: Supplier): string | null {
+export function locationText(supplier: Supplier): string | null {
   const parts = [supplier.city, supplier.country].filter(
     (value): value is string => typeof value === "string" && value.length > 0,
   );
@@ -56,10 +55,9 @@ export function SuppliersTable({
   onDelete,
   onEdit,
   onStatusChange,
+  onView,
   suppliers,
 }: SuppliersTableProps): JSX.Element {
-  const router = useRouter();
-
   return (
     <Table>
       <TableHeader>
@@ -80,9 +78,18 @@ export function SuppliersTable({
           const contactName = supplier.primaryContact?.contactName ?? null;
 
           return (
-            <TableRow key={supplier.id}>
+            // The row opens the drawer; the name is also a button so the
+            // keyboard has a focusable target for the same action.
+            <TableRow className="cursor-pointer" key={supplier.id} onClick={() => onView(supplier)}>
               <TableCell>
-                <Link className="grid gap-0.5" href={`${ROUTES.suppliers}/${supplier.id}`}>
+                <button
+                  className="grid gap-0.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onView(supplier);
+                  }}
+                  type="button"
+                >
                   <span className="flex items-center gap-1.5">
                     {supplier.isPreferred ? (
                       <Star
@@ -97,7 +104,7 @@ export function SuppliersTable({
                   <span className="whitespace-nowrap font-mono text-meta text-foreground-muted">
                     {supplier.supplierCode}
                   </span>
-                </Link>
+                </button>
               </TableCell>
 
               {/* Contact and phone share a cell: two facts about one person, and
@@ -155,15 +162,13 @@ export function SuppliersTable({
                 {location ?? <Absent />}
               </TableCell>
 
-              <TableCell>
+              {/* The menu must not also open the drawer. */}
+              <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                 <SupplierActionsMenu
                   canManage={canManage}
                   onDelete={onDelete}
                   onEdit={onEdit}
                   onStatusChange={onStatusChange}
-                  onView={(selectedSupplier) =>
-                    router.push(`${ROUTES.suppliers}/${selectedSupplier.id}`)
-                  }
                   supplier={supplier}
                 />
               </TableCell>

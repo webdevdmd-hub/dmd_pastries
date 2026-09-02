@@ -26,18 +26,24 @@ type SupplierActionsMenuProps = {
   onDelete: (supplier: Supplier) => void;
   onEdit: (supplier: Supplier) => void;
   onStatusChange: (supplier: Supplier, status: Supplier["status"]) => void;
-  onView: (supplier: Supplier) => void;
   supplier: Supplier;
 };
 
+/**
+ * Actions only. Viewing is the row's own click, so "View profile" no longer
+ * sits here; a reader with no manage rights sees no menu at all.
+ */
 export function SupplierActionsMenu({
   canManage,
   onDelete,
   onEdit,
   onStatusChange,
-  onView,
   supplier,
-}: SupplierActionsMenuProps): JSX.Element {
+}: SupplierActionsMenuProps): JSX.Element | null {
+  if (!canManage) {
+    return null;
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -51,37 +57,30 @@ export function SupplierActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => onView(supplier)}>View profile</DropdownMenuItem>
-        {canManage ? (
-          <>
-            <DropdownMenuItem onSelect={() => onEdit(supplier)}>Edit supplier</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {/* Deactivate and Block used to sit here as two bare words with
-                nothing saying how they differ or what either does to an open
-                order. Both read as "stop using this supplier"; only one of
-                them also stops billing. */}
-            {STATUS_ACTIONS.filter((action) => action.status !== supplier.status).map((action) => (
-              <DropdownMenuItem
-                className="flex-col items-start gap-0.5"
-                key={action.status}
-                onSelect={() => onStatusChange(supplier, action.status)}
-              >
-                <span>{SUPPLIER_STATUS_COPY[action.status].verb}</span>
-                <span className="text-meta text-foreground-muted">{action.hint}</span>
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="flex-col items-start gap-0.5 text-danger-text"
-              onSelect={() => onDelete(supplier)}
-            >
-              <span>Delete</span>
-              <span className="text-meta text-foreground-muted">
-                Only if nothing references it.
-              </span>
-            </DropdownMenuItem>
-          </>
-        ) : null}
+        <DropdownMenuItem onSelect={() => onEdit(supplier)}>Edit supplier</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {/* Deactivate and Block used to sit here as two bare words with
+            nothing saying how they differ or what either does to an open
+            order. Both read as "stop using this supplier"; only one of
+            them also stops billing. */}
+        {STATUS_ACTIONS.filter((action) => action.status !== supplier.status).map((action) => (
+          <DropdownMenuItem
+            className="flex-col items-start gap-0.5"
+            key={action.status}
+            onSelect={() => onStatusChange(supplier, action.status)}
+          >
+            <span>{SUPPLIER_STATUS_COPY[action.status].verb}</span>
+            <span className="text-meta text-foreground-muted">{action.hint}</span>
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="flex-col items-start gap-0.5 text-danger-text"
+          onSelect={() => onDelete(supplier)}
+        >
+          <span>Delete</span>
+          <span className="text-meta text-foreground-muted">Only if nothing references it.</span>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

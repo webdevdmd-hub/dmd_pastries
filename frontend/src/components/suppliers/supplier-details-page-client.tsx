@@ -7,61 +7,31 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/suppliers/access-denied-card";
-import { SupplierContactsSection } from "@/components/suppliers/supplier-contacts-section";
 import {
   parseSupplierDetailTab,
   supplierDetailTabHref,
   type SupplierDetailTabKey,
 } from "@/components/suppliers/supplier-detail-tabs";
-import {
-  SUPPLIER_DETAIL_TABPANEL_ID,
-  SupplierDetailViewTabs,
-} from "@/components/suppliers/supplier-detail-view-tabs";
-import { SupplierDocumentsPanel } from "@/components/suppliers/supplier-documents-panel";
+import { SupplierDetailsPanel } from "@/components/suppliers/supplier-details-panel";
 import { SupplierFormDialog } from "@/components/suppliers/supplier-form-dialog";
-import { SupplierHistoryPanel } from "@/components/suppliers/supplier-history-panel";
-import { SupplierNotesSection } from "@/components/suppliers/supplier-notes-section";
-import { SupplierProfileCard } from "@/components/suppliers/supplier-profile-card";
-import { SupplierStatementPanel } from "@/components/suppliers/supplier-statement-panel";
-import { SupplierStatsCards } from "@/components/suppliers/supplier-stats-cards";
 import { SupplierStatusBadge } from "@/components/suppliers/supplier-status-badge";
 import { SUPPLIER_STATUS_COPY } from "@/components/suppliers/supplier-status-copy";
 import { SuppliersErrorState } from "@/components/suppliers/suppliers-error-state";
 import { SuppliersTableSkeleton } from "@/components/suppliers/suppliers-table-skeleton";
+import { useSupplierDetailPermissions } from "@/components/suppliers/use-supplier-detail-permissions";
 import { Button } from "@/components/ui/button";
-import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
-import { usePermission } from "@/hooks/use-permission";
-import {
-  useSupplier,
-  useSupplierContacts,
-  useSupplierNotes,
-  useSupplierStats,
-  useUpdateSupplier,
-  useUpdateSupplierStatus,
-} from "@/hooks/use-suppliers";
+import { useSupplier, useUpdateSupplier, useUpdateSupplierStatus } from "@/hooks/use-suppliers";
 import { getErrorMessage } from "@/lib/api/client";
 import type { SupplierStatus, UpdateSupplierPayload } from "@/types/supplier";
 
 export function SupplierDetailsPageClient({ supplierId }: { supplierId: string }): JSX.Element {
-  const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.suppliersView, PERMISSIONS.inventoryView]);
-  const canManage = hasAnyPermission([
-    PERMISSIONS.suppliersEdit,
-    PERMISSIONS.suppliersStatusUpdate,
-    PERMISSIONS.suppliersContactsManage,
-    PERMISSIONS.suppliersNotesManage,
-  ]);
+  const { canManage, canView } = useSupplierDetailPermissions();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [editOpen, setEditOpen] = useState(false);
   const supplierQuery = useSupplier(supplierId, canView);
-  const statsQuery = useSupplierStats(supplierId, canView);
-  // Contacts and notes are small, cheap lists and their counts badge the strip,
-  // so they load with the page rather than only when their tab opens.
-  const contactsQuery = useSupplierContacts(supplierId, canView);
-  const notesQuery = useSupplierNotes(supplierId, canView);
   const updateMutation = useUpdateSupplier();
   const statusMutation = useUpdateSupplierStatus();
   const noopCreate = (): Promise<void> => Promise.resolve();
@@ -162,40 +132,16 @@ export function SupplierDetailsPageClient({ supplierId }: { supplierId: string }
         ) : null}
       </div>
 
-      <SupplierStatsCards stats={statsQuery.data} />
-
-      <SupplierDetailViewTabs
-        active={activeTab}
-        contactsCount={contactsQuery.data?.length}
-        notesCount={notesQuery.data?.length}
+      <SupplierDetailsPanel
+        activeTab={activeTab}
+        canManage={canManage}
+        canView={canView}
         onTabChange={changeTab}
-        supplierId={supplierId}
+        supplier={supplier}
       />
 
-      {/* One panel element that swaps, which is what `aria-controls` on every
-          tab points at. Each panel owns its own queries and only mounts when
-          selected. */}
-      <div id={SUPPLIER_DETAIL_TABPANEL_ID} role="tabpanel" tabIndex={-1}>
-        {activeTab === "profile" ? <SupplierProfileCard supplier={supplier} /> : null}
-        {activeTab === "contacts" ? (
-          <SupplierContactsSection canManage={canManage} supplierId={supplier.id} />
-        ) : null}
-        {activeTab === "notes" ? (
-          <SupplierNotesSection canManage={canManage} supplierId={supplier.id} />
-        ) : null}
-        {activeTab === "history" ? (
-          <SupplierHistoryPanel canView={canView} supplierId={supplier.id} />
-        ) : null}
-        {activeTab === "documents" ? (
-          <SupplierDocumentsPanel canView={canView} supplierId={supplier.id} />
-        ) : null}
-        {activeTab === "statement" ? (
-          <SupplierStatementPanel canView={canView} supplierId={supplier.id} />
-        ) : null}
-      </div>
-
       <SupplierFormDialog
-        isSubmitting={updateMutation.isPending}
+        isSubmitting={updateMutation.isPending || statusMutation.isPending}
         onClose={() => setEditOpen(false)}
         onCreate={noopCreate}
         onUpdate={updateSupplier}

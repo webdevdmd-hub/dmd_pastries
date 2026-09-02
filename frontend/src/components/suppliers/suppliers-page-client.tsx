@@ -8,12 +8,14 @@ import { toast } from "sonner";
 import { FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { AccessDeniedCard } from "@/components/suppliers/access-denied-card";
+import { SupplierDetailsDrawer } from "@/components/suppliers/supplier-details-drawer";
 import { SupplierFormDialog } from "@/components/suppliers/supplier-form-dialog";
 import {
   type SupplierPendingAction,
   SupplierStatusConfirmDialog,
 } from "@/components/suppliers/supplier-status-confirm-dialog";
 import { SuppliersAttentionStrip } from "@/components/suppliers/suppliers-attention-strip";
+import { SuppliersCardGrid } from "@/components/suppliers/suppliers-card-grid";
 import { SuppliersEmptyState } from "@/components/suppliers/suppliers-empty-state";
 import { SuppliersErrorState } from "@/components/suppliers/suppliers-error-state";
 import { SuppliersPagination } from "@/components/suppliers/suppliers-pagination";
@@ -64,6 +66,10 @@ export function SuppliersPageClient(): JSX.Element {
   const [page, setPage] = useState(1);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  // The id, not the supplier: the drawer fetches the detail record itself, so
+  // it shows stats, contacts and notes the list rows do not carry.
+  const [detailsSupplierId, setDetailsSupplierId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<SupplierPendingAction>(null);
   const suppliersQuery = useSuppliers(filters, canView);
   const createMutation = useCreateSupplier();
@@ -72,7 +78,7 @@ export function SuppliersPageClient(): JSX.Element {
   const deleteMutation = useDeleteSupplier();
   const isPermissionDenied =
     suppliersQuery.error instanceof ApiError && suppliersQuery.error.status === 403;
-  // Zero rows has two causes with opposite remedies. All three fields are
+  // Zero rows has two causes with opposite remedies. All four fields are
   // toolbar choices; this screen carries no branch scope to exclude.
   const hasActiveFilters =
     filters.search.trim().length > 0 ||
@@ -94,6 +100,20 @@ export function SuppliersPageClient(): JSX.Element {
 
   const openCreate = (): void => {
     setEditingSupplier(null);
+    setFormOpen(true);
+  };
+
+  const openDetails = (supplier: Supplier): void => {
+    setDetailsSupplierId(supplier.id);
+    setDetailsOpen(true);
+  };
+
+  const openEdit = (supplier: Supplier): void => {
+    // The drawer may be open underneath; a form on top of a sheet on top of
+    // the list is one layer too many, so the drawer closes first. Closing or
+    // saving the form then lands back on the list.
+    setDetailsOpen(false);
+    setEditingSupplier(supplier);
     setFormOpen(true);
   };
 
@@ -162,6 +182,26 @@ export function SuppliersPageClient(): JSX.Element {
   const safePage = Math.min(page, pageCount);
   const pageRows = suppliers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  const listHandlers = {
+    canManage,
+    onDelete: (supplier: Supplier) => setPendingAction({ type: "delete", supplier }),
+    onEdit: openEdit,
+    onStatusChange: (supplier: Supplier, status: SupplierStatus) =>
+      setPendingAction({ type: "status", supplier, status }),
+    onView: openDetails,
+    suppliers: pageRows,
+  };
+
+  const pagination = (
+    <SuppliersPagination
+      loaded={suppliers.length}
+      onPageChange={setPage}
+      page={safePage}
+      pageSize={PAGE_SIZE}
+      total={total}
+    />
+  );
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
@@ -221,34 +261,34 @@ export function SuppliersPageClient(): JSX.Element {
         <SuppliersEmptyState canManage={canManage} onCreate={openCreate} />
       ) : null}
 
+      {/* A six-column table has no honest phone layout. Below md the list is
+          cards carrying the same fields; the table takes over from md up. */}
       {!suppliersQuery.isLoading && !suppliersQuery.error && suppliers.length > 0 ? (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <SuppliersTable
-              canManage={canManage}
-              onDelete={(supplier) => setPendingAction({ type: "delete", supplier })}
-              onEdit={(supplier) => {
-                setEditingSupplier(supplier);
-                setFormOpen(true);
-              }}
-              onStatusChange={(supplier, status) =>
-                setPendingAction({ type: "status", supplier, status })
-              }
-              suppliers={pageRows}
-            />
-          </CardContent>
-          <SuppliersPagination
-            loaded={suppliers.length}
-            onPageChange={setPage}
-            page={safePage}
-            pageSize={PAGE_SIZE}
-            total={total}
-          />
-        </Card>
+        <>
+          <div className="grid gap-4 md:hidden">
+            <SuppliersCardGrid {...listHandlers} />
+            <Card className="overflow-hidden">{pagination}</Card>
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <SuppliersTable {...listHandlers} />
+            </CardContent>
+            {pagination}
+          </Card>
+        </>
       ) : null}
 
+      <SupplierDetailsDrawer
+        onEdit={openEdit}
+        onOpenChange={setDetailsOpen}
+        open={detailsOpen}
+        supplierId={detailsSupplierId}
+      />
+
       <SupplierFormDialog
-        isSubmitting={createMutation.isPending || updateMutation.isPending}
+        isSubmitting={
+          createMutation.isPending || updateMutation.isPending || statusMutation.isPending
+        }
         onClose={() => {
           setFormOpen(false);
           setEditingSupplier(null);

@@ -68,11 +68,13 @@ export function SupplierStatsCards({ stats }: SupplierStatsCardsProps): JSX.Elem
   ];
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+    // Two across on a phone: five stacked cards filled the screen before the
+    // profile was visible.
+    <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-5">
       {cards.map((card) => (
-        <div className="rounded-xl bg-muted p-4" key={card.label}>
+        <div className="min-w-0 rounded-xl bg-muted p-4" key={card.label}>
           <p className="text-meta text-foreground-muted">{card.label}</p>
-          <p className="mt-1.5 text-title tabular-nums">{card.value}</p>
+          <p className="mt-1.5 break-words text-title tabular-nums">{card.value}</p>
           <p className="mt-0.5 text-meta tabular-nums text-foreground-muted">{card.hint}</p>
         </div>
       ))}
