@@ -52,6 +52,19 @@ export function ReportAreaLayout({
     setCursor(activeIndex);
   }, [activeIndex]);
 
+  // Ten tabs do not fit a phone, and a deep link can land on one that starts
+  // off-screen inside the strip. Centre the selected tab horizontally without
+  // touching the page's own scroll position.
+  useEffect(() => {
+    const container = containerRef.current;
+    const selected = container?.querySelectorAll<HTMLElement>("[data-tab]")[activeIndex];
+    if (!container || !selected) {
+      return;
+    }
+    const target = selected.offsetLeft - (container.clientWidth - selected.offsetWidth) / 2;
+    container.scrollTo({ left: Math.max(target, 0) });
+  }, [activeIndex]);
+
   const focusAt = useCallback((index: number): void => {
     const items = containerRef.current?.querySelectorAll<HTMLElement>("[data-tab]");
     items?.[index]?.focus();
