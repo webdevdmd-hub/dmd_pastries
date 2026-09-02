@@ -146,6 +146,10 @@ export function SearchableCombobox({
             aria-expanded={open}
             className={cn(
               "h-11 w-full justify-between overflow-hidden px-3 text-left font-normal",
+              // The clear button floats over the trigger's right edge next to
+              // the chevron. Reserve that width so a long label truncates
+              // before it instead of running underneath the icon.
+              value && !disabled && "pr-16",
               triggerClassName,
             )}
             disabled={disabled}
