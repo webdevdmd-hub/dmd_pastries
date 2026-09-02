@@ -1,11 +1,9 @@
 import { CalendarDays, Clock, MapPin, Phone, Truck, UserRound } from "lucide-react";
-import Link from "next/link";
 import type { JSX } from "react";
 
 import { OrderActionsMenu } from "@/components/orders/order-actions-menu";
 import { OrderPaymentStatusBadge, OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { Card } from "@/components/ui/card";
-import { ROUTES } from "@/constants/routes";
 import { formatDateOnly } from "@/lib/utils/date-only";
 import type { BakeryOrder, OrderStatus } from "@/types/orders";
 
@@ -21,15 +19,22 @@ function formatOrderType(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+/**
+ * Clicking anywhere on a card opens the order's details drawer. The order
+ * number is also a real button so the keyboard has a focusable target, and the
+ * kebab stops the click so it does not also open the drawer.
+ */
 export function OrdersCardGrid({
   canManage,
   onDelete,
   onStatusChange,
+  onView,
   orders,
 }: {
   canManage: boolean;
   onDelete: (order: BakeryOrder) => void;
   onStatusChange: (order: BakeryOrder, status: OrderStatus) => void;
+  onView: (order: BakeryOrder) => void;
   orders: BakeryOrder[];
 }): JSX.Element {
   return (
@@ -37,28 +42,37 @@ export function OrdersCardGrid({
       {orders.map((order) => (
         <Card
           className={
-            order.orderStatus === "cancelled" ? "overflow-hidden opacity-60" : "overflow-hidden"
+            order.orderStatus === "cancelled"
+              ? "cursor-pointer overflow-hidden opacity-60 transition-shadow duration-fast ease-out hover:shadow-sm"
+              : "cursor-pointer overflow-hidden transition-shadow duration-fast ease-out hover:shadow-sm"
           }
           key={order.id}
+          onClick={() => onView(order)}
         >
           <div className="flex items-start justify-between gap-3 border-b border-workspace-border px-4 py-3">
             <div className="min-w-0">
-              <Link
-                className="block truncate text-base font-semibold text-brand-espresso underline-offset-4 hover:underline"
-                href={`${ROUTES.orders}/${order.id}`}
+              <button
+                className="block max-w-full truncate rounded-sm text-left text-base font-semibold text-brand-espresso focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onView(order);
+                }}
+                type="button"
               >
                 {order.orderNumber}
-              </Link>
+              </button>
               <p className="mt-0.5 truncate text-xs text-workspace-muted">
                 Created {formatDate(order.createdAt)}
               </p>
             </div>
-            <OrderActionsMenu
-              canManage={canManage}
-              onDelete={onDelete}
-              onStatusChange={onStatusChange}
-              order={order}
-            />
+            <div onClick={(event) => event.stopPropagation()}>
+              <OrderActionsMenu
+                canManage={canManage}
+                onDelete={onDelete}
+                onStatusChange={onStatusChange}
+                order={order}
+              />
+            </div>
           </div>
 
           <div className="space-y-4 p-4">

@@ -1,4 +1,4 @@
-import { Edit, Eye, MoreHorizontal, PackageCheck, Trash2 } from "lucide-react";
+import { Edit, MoreHorizontal, PackageCheck, Trash2 } from "lucide-react";
 import Link from "next/link";
 import type { JSX } from "react";
 
@@ -47,13 +47,9 @@ export function OrderActionsMenu({
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
+      {/* Viewing is not in here: clicking the row or card itself opens the
+          details drawer, so the menu holds only the actions. */}
       <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuItem asChild>
-          <Link href={`${ROUTES.orders}/${order.id}`}>
-            <Eye className="mr-2 h-4 w-4" />
-            View details
-          </Link>
-        </DropdownMenuItem>
         {canManage ? (
           <DropdownMenuItem asChild>
             <Link href={`${ROUTES.orders}/${order.id}?mode=edit`}>

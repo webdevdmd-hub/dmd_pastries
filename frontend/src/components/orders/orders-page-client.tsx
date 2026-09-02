@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/orders/access-denied-card";
+import { OrderDetailsDrawer } from "@/components/orders/order-details-drawer";
 import { OrderFormPage } from "@/components/orders/order-form-page";
 import { OrdersCardGrid } from "@/components/orders/orders-card-grid";
 import { OrdersEmptyState } from "@/components/orders/orders-empty-state";
@@ -74,6 +75,10 @@ export function OrdersPageClient(): JSX.Element {
   const [filters, setFilters] = useState<BakeryOrderFilters>(defaultFilters);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  // The id, not the order: the drawer fetches the detail record itself, so it
+  // shows payments and items the list rows do not carry.
+  const [detailsOrderId, setDetailsOrderId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<OrdersViewMode>("list");
   const ordersQuery = useOrders(filters, canView);
   const summaryQuery = useOrderSummary(canView);
@@ -110,6 +115,11 @@ export function OrdersPageClient(): JSX.Element {
 
   const openCreate = (): void => {
     setCreateOpen(true);
+  };
+
+  const openDetails = (order: BakeryOrder): void => {
+    setDetailsOrderId(order.id);
+    setDetailsOpen(true);
   };
 
   const confirmAction = async (): Promise<void> => {
@@ -231,6 +241,7 @@ export function OrdersPageClient(): JSX.Element {
               onStatusChange={(order, status) =>
                 setPendingAction({ order, status, type: "status" })
               }
+              onView={openDetails}
               orders={orders}
             />
           </CardContent>
@@ -242,9 +253,16 @@ export function OrdersPageClient(): JSX.Element {
           canManage={canManage}
           onDelete={(order) => setPendingAction({ order, type: "delete" })}
           onStatusChange={(order, status) => setPendingAction({ order, status, type: "status" })}
+          onView={openDetails}
           orders={orders}
         />
       ) : null}
+
+      <OrderDetailsDrawer
+        onOpenChange={setDetailsOpen}
+        open={detailsOpen}
+        orderId={detailsOrderId}
+      />
 
       <Dialog
         onOpenChange={(open) => (!open ? setPendingAction(null) : undefined)}

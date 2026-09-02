@@ -1,11 +1,9 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/orders/access-denied-card";
 import {
@@ -14,70 +12,29 @@ import {
   type OrderDetailTabKey,
   parseOrderDetailTab,
 } from "@/components/orders/order-detail-tabs";
-import {
-  ORDER_DETAIL_TABPANEL_ID,
-  OrderDetailViewTabs,
-} from "@/components/orders/order-detail-view-tabs";
+import { OrderDetailsPanel } from "@/components/orders/order-details-panel";
 import { OrderHeader } from "@/components/orders/order-header";
-import { OrderItemDetailsSheet } from "@/components/orders/order-item-details-sheet";
-import { OrderItemsList } from "@/components/orders/order-items-list";
-import { OrderPackagingSection } from "@/components/orders/order-packaging-section";
-import { OrderPaymentSection } from "@/components/orders/order-payment-section";
-import { OrderProductionSection } from "@/components/orders/order-production-section";
-import { OrderStatusBadge } from "@/components/orders/order-status-badge";
-import { OrderTimeline } from "@/components/orders/order-timeline";
 import { OrdersErrorState } from "@/components/orders/orders-error-state";
-import { Button } from "@/components/ui/button";
-import { PERMISSIONS } from "@/constants/permissions";
-import { ROUTES } from "@/constants/routes";
-import { useOrder, useUpdateOrderStatus } from "@/hooks/use-orders";
-import { usePermission } from "@/hooks/use-permission";
+import { useOrderDetailPermissions } from "@/components/orders/use-order-detail-permissions";
+import { useOrder } from "@/hooks/use-orders";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
-import { formatDateOnly } from "@/lib/utils/date-only";
-import type { OrderStatus } from "@/types/orders";
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
-}
 
 function isPermissionDenied(error: unknown): boolean {
   return error instanceof ApiError && error.status === 403;
 }
 
-const transitions: OrderStatus[] = [
-  "confirmed",
-  "in_production",
-  "ready",
-  "delivered",
-  "completed",
-  "cancelled",
-];
-
+/**
+ * The full-page view of one order at `/orders/[id]`.
+ *
+ * The orders list opens the same content in a drawer; this page remains for
+ * deep links, "open in new tab" from the drawer, and as the Edit target.
+ */
 export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.Element {
-  const { hasAnyPermission, hasPermission } = usePermission();
-  // TODO: Remove POS fallback after orders.* permissions are seeded for every tenant.
-  const canView = hasAnyPermission([PERMISSIONS.ordersView, PERMISSIONS.posView]);
-  const canManage = hasAnyPermission([
-    PERMISSIONS.ordersEdit,
-    PERMISSIONS.ordersStatusUpdate,
-    PERMISSIONS.ordersPaymentsManage,
-    PERMISSIONS.ordersProductionAssign,
-    PERMISSIONS.ordersPackagingManage,
-    PERMISSIONS.posSell,
-  ]);
-  const canManageOrderCatalogLinks = hasAnyPermission([
-    PERMISSIONS.ordersEdit,
-    PERMISSIONS.posSell,
-  ]);
-  const canConvertCustomItemToProduct =
-    canManageOrderCatalogLinks && hasPermission(PERMISSIONS.productsCreate);
-  const canConvertCustomItemToVariant =
-    canManageOrderCatalogLinks && hasPermission(PERMISSIONS.productsVariantsManage);
+  const permissions = useOrderDetailPermissions();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const orderQuery = useOrder(orderId, canView);
-  const statusMutation = useUpdateOrderStatus();
+  const orderQuery = useOrder(orderId, permissions.canView);
 
   const activeTab = parseOrderDetailTab(searchParams.get(ORDER_DETAIL_TAB_QUERY_KEY));
 
@@ -114,7 +71,7 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
     window.history.replaceState(null, "", query ? `${pathname}?${query}` : pathname);
   };
 
-  if (!canView) {
+  if (!permissions.canView) {
     return <AccessDeniedCard />;
   }
 
@@ -141,117 +98,20 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
   }
 
   const order = orderQuery.data;
-  const selectedItem = order.items.find((item) => item.id === selectedItemId) ?? null;
 
   return (
-    <>
-      <div className="grid gap-6">
-        <OrderHeader canManage={canManage} isSaving={false} order={order} />
-        <section className="rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 className="text-title text-brand-espresso">
-                {order.customerNameSnapshot || "Walk-in customer"}
-              </h2>
-              <p className="text-body text-brand-mocha">
-                {order.customerPhoneSnapshot ?? "No phone number"}
-              </p>
-              <p className="mt-2 text-cell capitalize text-brand-mocha">
-                {order.orderType} - Event {formatDateOnly(order.eventDate, "Not set")}
-              </p>
-            </div>
-            <div className="grid gap-2 text-right">
-              <div className="flex justify-end">
-                <OrderStatusBadge status={order.orderStatus} />
-              </div>
-              <p className="text-kpi tabular-nums text-brand-espresso">
-                {formatCurrency(order.totalAmount)}
-              </p>
-              <p className="text-cell tabular-nums text-brand-mocha">
-                Balance {formatCurrency(order.balanceAmount)}
-              </p>
-              {order.accountingJournalEntryId ? (
-                <Button asChild size="sm" variant="outline">
-                  <Link
-                    href={`${ROUTES.accountingJournalEntries}?search=${encodeURIComponent(
-                      order.accountingJournalEntryId,
-                    )}`}
-                  >
-                    View Journal
-                  </Link>
-                </Button>
-              ) : null}
-            </div>
-          </div>
-          <div className="mt-5 flex flex-wrap gap-2">
-            {transitions.map((status) => (
-              <Button
-                disabled={!canManage || order.orderStatus === status || statusMutation.isPending}
-                className={
-                  status === "cancelled"
-                    ? "border-danger/30 text-danger-text hover:bg-danger-tint"
-                    : undefined
-                }
-                key={status}
-                onClick={() => {
-                  void (async () => {
-                    try {
-                      await statusMutation.mutateAsync({ id: order.id, payload: { status } });
-                      toast.success("Order status updated.");
-                    } catch (error: unknown) {
-                      toast.error(getErrorMessage(error));
-                    }
-                  })();
-                }}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                {status.replace("_", " ")}
-              </Button>
-            ))}
-          </div>
-        </section>
-
-        <OrderDetailViewTabs
-          active={activeTab}
-          itemsCount={order.items.length}
-          onTabChange={changeTab}
-          orderId={order.id}
-        />
-
-        {/* One panel element that swaps, which is what `aria-controls` on every
-            tab points at. Payments, production and packaging own their own
-            queries and only mount when selected. */}
-        <div id={ORDER_DETAIL_TABPANEL_ID} role="tabpanel" tabIndex={-1}>
-          {activeTab === "items" ? (
-            <OrderItemsList onSelectItem={(item) => selectItem(item.id)} order={order} />
-          ) : null}
-          {activeTab === "payments" ? (
-            <OrderPaymentSection canManage={canManage} order={order} />
-          ) : null}
-          {activeTab === "production" ? (
-            <OrderProductionSection canManage={canManage} order={order} />
-          ) : null}
-          {activeTab === "packaging" ? (
-            <OrderPackagingSection canManage={canManage} order={order} />
-          ) : null}
-          {activeTab === "timeline" ? <OrderTimeline status={order.orderStatus} /> : null}
-        </div>
-      </div>
-
-      <OrderItemDetailsSheet
-        canConvertToProduct={canConvertCustomItemToProduct}
-        canConvertToVariant={canConvertCustomItemToVariant}
-        item={selectedItem}
-        onOpenChange={(open) => {
-          if (!open) {
-            selectItem(null);
-          }
-        }}
-        open={selectedItem !== null}
-        orderId={order.id}
+    <div className="grid gap-6">
+      <OrderHeader canManage={permissions.canManage} isSaving={false} order={order} />
+      <OrderDetailsPanel
+        activeTab={activeTab}
+        canConvertToProduct={permissions.canConvertToProduct}
+        canConvertToVariant={permissions.canConvertToVariant}
+        canManage={permissions.canManage}
+        onSelectItem={selectItem}
+        onTabChange={changeTab}
+        order={order}
+        selectedItemId={selectedItemId}
       />
-    </>
+    </div>
   );
 }
