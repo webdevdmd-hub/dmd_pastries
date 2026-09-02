@@ -141,8 +141,8 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
   const selectedItem = order.items.find((item) => item.id === selectedItemId) ?? null;
 
   return (
-    <main className="min-h-screen bg-brand-latte px-6 py-8">
-      <div className="mx-auto grid max-w-7xl gap-6">
+    <>
+      <div className="grid gap-6">
         <OrderHeader canManage={canManage} isSaving={false} order={order} />
         <section className="rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -249,6 +249,6 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
         open={selectedItem !== null}
         orderId={order.id}
       />
-    </main>
+    </>
   );
 }
