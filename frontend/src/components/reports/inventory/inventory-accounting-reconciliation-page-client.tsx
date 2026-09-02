@@ -70,14 +70,16 @@ function SummaryTile({
   value: string;
 }): JSX.Element {
   return (
-    <Card className="bg-card/85 shadow-soft">
-      <CardContent className="p-5">
-        <p className="text-sm text-brand-mocha">{label}</p>
+    // min-w-0 so a long AED figure wraps inside a half-width phone tile instead
+    // of stretching the grid past the screen.
+    <Card className="min-w-0 bg-card/85 shadow-soft">
+      <CardContent className="p-4 md:p-5">
+        <p className="text-cell leading-tight text-brand-mocha">{label}</p>
         <p
           className={
             tone === "danger"
-              ? "mt-2 text-2xl font-semibold text-danger-text"
-              : "mt-2 text-2xl font-semibold text-brand-espresso"
+              ? "mt-2 break-words text-kpi tabular-nums text-danger-text"
+              : "mt-2 break-words text-kpi tabular-nums text-brand-espresso"
           }
         >
           {value}
