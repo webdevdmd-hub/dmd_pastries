@@ -80,7 +80,12 @@ export function ReportFilterPopover({
             ) : null}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-[calc(100vw-2rem)] p-4 sm:w-96">
+        {/* Up to nine fields: cap the height so a short phone scrolls the
+            popover rather than losing Apply below the fold. */}
+        <PopoverContent
+          align="start"
+          className="max-h-[min(80vh,40rem)] w-[calc(100vw-2rem)] overflow-y-auto p-4 sm:w-96"
+        >
           <div className="flex flex-col gap-3">
             <p className="text-body font-medium text-brand-espresso">{popoverTitle}</p>
             {children}
