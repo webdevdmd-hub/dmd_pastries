@@ -54,23 +54,45 @@ export function OrderDetailsDrawer({
   const permissions = useOrderDetailPermissions();
   const orderQuery = useOrder(orderId, open && orderId !== null && permissions.canView);
 
+  // Radix requires a title in every dialog for screen readers. The body renders
+  // the order number as the visible title; the states before it name the sheet
+  // invisibly so the requirement holds while loading or on error.
+  const fallbackTitle = (
+    <SheetHeader className="sr-only">
+      <SheetTitle>Order details</SheetTitle>
+      <SheetDescription>Details of the selected bakery order.</SheetDescription>
+    </SheetHeader>
+  );
+
   return (
     <Sheet onOpenChange={onOpenChange} open={open}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-3xl">
         {!permissions.canView ? (
-          <AccessDeniedCard />
+          <>
+            {fallbackTitle}
+            <AccessDeniedCard />
+          </>
         ) : orderQuery.isLoading ? (
-          <div className="flex min-h-[50vh] items-center justify-center text-brand-mocha">
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            Loading order...
-          </div>
+          <>
+            {fallbackTitle}
+            <div className="flex min-h-[50vh] items-center justify-center text-brand-mocha">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Loading order...
+            </div>
+          </>
         ) : isPermissionDenied(orderQuery.error) ? (
-          <AccessDeniedCard />
+          <>
+            {fallbackTitle}
+            <AccessDeniedCard />
+          </>
         ) : orderQuery.isError || !orderQuery.data ? (
-          <OrdersErrorState
-            description={getErrorMessage(orderQuery.error)}
-            onRetry={() => void orderQuery.refetch()}
-          />
+          <>
+            {fallbackTitle}
+            <OrdersErrorState
+              description={getErrorMessage(orderQuery.error)}
+              onRetry={() => void orderQuery.refetch()}
+            />
+          </>
         ) : (
           // Keyed by order so switching orders resets the tab and open item
           // instead of carrying one order's Production tab into the next.
