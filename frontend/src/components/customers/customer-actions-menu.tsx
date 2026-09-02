@@ -19,16 +19,18 @@ type CustomerActionsMenuProps = {
   onDelete: (customer: Customer) => void;
   onEdit: (customer: Customer) => void;
   onStatusChange: (customer: Customer, status: Customer["status"]) => void;
-  onView: (customer: Customer) => void;
 };
 
+/**
+ * Viewing is not in here: clicking the row or card itself opens the details
+ * drawer, so the menu holds only the actions.
+ */
 export function CustomerActionsMenu({
   customer,
   canManage,
   onDelete,
   onEdit,
   onStatusChange,
-  onView,
 }: CustomerActionsMenuProps): JSX.Element {
   return (
     <DropdownMenu>
@@ -43,7 +45,6 @@ export function CustomerActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => onView(customer)}>View profile</DropdownMenuItem>
         {canManage ? (
           <>
             <DropdownMenuItem onSelect={() => onEdit(customer)}>Edit customer</DropdownMenuItem>
@@ -68,7 +69,9 @@ export function CustomerActionsMenu({
               Delete
             </DropdownMenuItem>
           </>
-        ) : null}
+        ) : (
+          <DropdownMenuItem disabled>No actions available</DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

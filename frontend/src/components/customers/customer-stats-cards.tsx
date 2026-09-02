@@ -67,21 +67,23 @@ export function CustomerStatsCards({
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-3">
       {cards.map((card) => {
         const Icon = card.icon;
 
         return (
           <Card className="bg-card/80" key={card.label}>
-            <CardContent className="flex items-center justify-between p-5">
-              <div>
-                <p className="text-sm text-brand-mocha">{card.label}</p>
-                <p className="mt-2 text-xl font-semibold text-brand-espresso">{card.value}</p>
+            <CardContent className="flex items-center justify-between gap-2 p-4 md:p-5">
+              <div className="min-w-0">
+                <p className="text-cell leading-tight text-brand-mocha">{card.label}</p>
+                <p className="mt-2 break-words text-title tabular-nums text-brand-espresso">
+                  {card.value}
+                </p>
                 {"detail" in card && card.detail ? (
                   <p className="mt-1 text-xs text-brand-mocha">{card.detail}</p>
                 ) : null}
               </div>
-              <Icon className="h-6 w-6 text-brand-mocha" />
+              <Icon className="hidden h-6 w-6 shrink-0 text-brand-mocha sm:block" />
             </CardContent>
           </Card>
         );

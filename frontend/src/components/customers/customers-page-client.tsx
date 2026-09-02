@@ -6,7 +6,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/customers/access-denied-card";
+import { CustomerDetailsDrawer } from "@/components/customers/customer-details-drawer";
 import { CustomerFormDialog } from "@/components/customers/customer-form-dialog";
+import { CustomersCardGrid } from "@/components/customers/customers-card-grid";
 import { CustomersEmptyState } from "@/components/customers/customers-empty-state";
 import { CustomersErrorState } from "@/components/customers/customers-error-state";
 import { CustomersSummaryCards } from "@/components/customers/customers-summary-cards";
@@ -72,6 +74,10 @@ export function CustomersPageClient(): JSX.Element {
   const [filters, setFilters] = useState<CustomerFilters>(defaultFilters);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  // The id, not the customer: the drawer fetches the detail record itself, so
+  // it shows tags, stats and notes the list rows do not carry.
+  const [detailsCustomerId, setDetailsCustomerId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const customersQuery = useCustomers(filters, canView);
   const tagsQuery = useCustomerTags(canView);
@@ -97,6 +103,20 @@ export function CustomersPageClient(): JSX.Element {
 
   const openCreate = (): void => {
     setEditingCustomer(null);
+    setFormOpen(true);
+  };
+
+  const openDetails = (customer: Customer): void => {
+    setDetailsCustomerId(customer.id);
+    setDetailsOpen(true);
+  };
+
+  const openEdit = (customer: Customer): void => {
+    // The drawer may be open underneath; a form on top of a sheet on top of
+    // the list is one layer too many, so the drawer closes first. Closing or
+    // saving the form then lands back on the list.
+    setDetailsOpen(false);
+    setEditingCustomer(customer);
     setFormOpen(true);
   };
 
@@ -144,6 +164,15 @@ export function CustomersPageClient(): JSX.Element {
   };
 
   const customers = customersQuery.data ?? [];
+  const listHandlers = {
+    canManage,
+    customers,
+    onDelete: (customer: Customer) => setPendingAction({ type: "delete", customer }),
+    onEdit: openEdit,
+    onStatusChange: (customer: Customer, status: CustomerStatus) =>
+      setPendingAction({ type: "status", customer, status }),
+    onView: openDetails,
+  };
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -203,24 +232,27 @@ export function CustomersPageClient(): JSX.Element {
         <CustomersEmptyState canManage={canManage} onCreate={openCreate} />
       ) : null}
 
+      {/* A ten-column ledger has no honest phone layout. Below md the list is
+          cards carrying the same fields; the table takes over from md up. */}
       {!customersQuery.isLoading && !customersQuery.error && customers.length > 0 ? (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <CustomersTable
-              canManage={canManage}
-              customers={customers}
-              onDelete={(customer) => setPendingAction({ type: "delete", customer })}
-              onEdit={(customer) => {
-                setEditingCustomer(customer);
-                setFormOpen(true);
-              }}
-              onStatusChange={(customer, status) =>
-                setPendingAction({ type: "status", customer, status })
-              }
-            />
-          </CardContent>
-        </Card>
+        <>
+          <div className="md:hidden">
+            <CustomersCardGrid {...listHandlers} />
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <CustomersTable {...listHandlers} />
+            </CardContent>
+          </Card>
+        </>
       ) : null}
+
+      <CustomerDetailsDrawer
+        customerId={detailsCustomerId}
+        onEdit={openEdit}
+        onOpenChange={setDetailsOpen}
+        open={detailsOpen}
+      />
 
       <CustomerFormDialog
         customer={editingCustomer}

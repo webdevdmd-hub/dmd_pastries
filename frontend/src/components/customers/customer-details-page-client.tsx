@@ -1,47 +1,58 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/customers/access-denied-card";
+import {
+  CUSTOMER_DETAIL_TAB_QUERY_KEY,
+  type CustomerDetailTabKey,
+  parseCustomerDetailTab,
+} from "@/components/customers/customer-detail-tabs";
+import { CustomerDetailsPanel } from "@/components/customers/customer-details-panel";
 import { CustomerFormDialog } from "@/components/customers/customer-form-dialog";
-import { CustomerNotesSection } from "@/components/customers/customer-notes-section";
-import { CustomerProfileCard } from "@/components/customers/customer-profile-card";
-import { CustomerRecentTransactionsTable } from "@/components/customers/customer-recent-transactions-table";
-import { CustomerStatsCards } from "@/components/customers/customer-stats-cards";
 import { CustomerStatusBadge } from "@/components/customers/customer-status-badge";
-import { CustomerTagsSection } from "@/components/customers/customer-tags-section";
 import { CustomersErrorState } from "@/components/customers/customers-error-state";
 import { CustomersTableSkeleton } from "@/components/customers/customers-table-skeleton";
+import { useCustomerDetailPermissions } from "@/components/customers/use-customer-detail-permissions";
 import { Button } from "@/components/ui/button";
-import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
-import { useCustomerCredits } from "@/hooks/use-customer-credits";
-import { useCustomer, useCustomerStats, useUpdateCustomer } from "@/hooks/use-customers";
-import { usePermission } from "@/hooks/use-permission";
+import { useCustomer, useUpdateCustomer } from "@/hooks/use-customers";
 import { getErrorMessage } from "@/lib/api/client";
 import type { UpdateCustomerPayload } from "@/types/customer";
 
+/**
+ * The full-page view of one customer at `/customers/[id]`. The customers list
+ * opens the same content in a drawer; this page remains for deep links and
+ * "open in new tab" from the drawer.
+ */
 export function CustomerDetailsPageClient({ customerId }: { customerId: string }): JSX.Element {
-  const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.customersView, PERMISSIONS.posView]);
-  const canManage = hasAnyPermission([
-    PERMISSIONS.customersEdit,
-    PERMISSIONS.customersStatusUpdate,
-    PERMISSIONS.customersNotesManage,
-    PERMISSIONS.customersTagsManage,
-    PERMISSIONS.posSell,
-  ]);
+  const permissions = useCustomerDetailPermissions();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [editOpen, setEditOpen] = useState(false);
-  const customerQuery = useCustomer(customerId, canView);
-  const statsQuery = useCustomerStats(customerId, canView);
-  const creditsQuery = useCustomerCredits(customerId, canView);
+  const customerQuery = useCustomer(customerId, permissions.canView);
   const updateMutation = useUpdateCustomer();
   const noopCreate = (): Promise<void> => Promise.resolve();
 
-  if (!canView) {
+  const activeTab = parseCustomerDetailTab(searchParams.get(CUSTOMER_DETAIL_TAB_QUERY_KEY));
+
+  const changeTab = (tab: CustomerDetailTabKey): void => {
+    const next = new URLSearchParams(window.location.search);
+    if (tab === "profile") {
+      next.delete(CUSTOMER_DETAIL_TAB_QUERY_KEY);
+    } else {
+      next.set(CUSTOMER_DETAIL_TAB_QUERY_KEY, tab);
+    }
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
+  if (!permissions.canView) {
     return <AccessDeniedCard />;
   }
 
@@ -76,71 +87,34 @@ export function CustomerDetailsPageClient({ customerId }: { customerId: string }
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
           <Link
-            className="text-sm font-semibold text-brand-mocha hover:text-brand-espresso"
+            className="inline-flex items-center gap-1.5 text-cell text-foreground-muted transition-colors hover:text-foreground"
             href={ROUTES.customers}
           >
-            Back to Customers
+            Back to customers
           </Link>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <h1 className="font-serif text-4xl text-brand-espresso">{customer.fullName}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <h1 className="text-page">{customer.fullName}</h1>
             <CustomerStatusBadge status={customer.status} />
           </div>
-          <p className="mt-2 text-sm text-brand-mocha">{customer.customerCode}</p>
+          <p className="mt-1 font-mono text-meta text-foreground-muted">{customer.customerCode}</p>
         </div>
-        {canManage ? (
-          <Button onClick={() => setEditOpen(true)} type="button">
+        {permissions.canManage ? (
+          <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
             Edit customer
           </Button>
         ) : null}
       </div>
 
-      <CustomerStatsCards creditBalance={creditsQuery.data?.balance ?? 0} stats={statsQuery.data} />
-
-      {(creditsQuery.data?.items.length ?? 0) > 0 ? (
-        <section className="rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-5">
-          <h2 className="text-xl font-semibold text-brand-espresso">Store credit history</h2>
-          <div className="mt-4 grid gap-2">
-            {(creditsQuery.data?.items ?? []).map((credit) => (
-              <div
-                className="flex items-center justify-between rounded-2xl border border-brand-cappuccino/60 p-3 text-sm"
-                key={credit.id}
-              >
-                <span className="text-brand-espresso">
-                  {credit.notes ||
-                    (credit.sourceType === "sales_return"
-                      ? "Sales return credit"
-                      : credit.sourceType === "bakery_order"
-                        ? "Bakery order credit"
-                        : "Manual credit")}
-                </span>
-                <span className="font-semibold text-brand-espresso">
-                  {new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(
-                    credit.balance,
-                  )}
-                  <span className="ml-1 text-xs font-normal text-brand-mocha">
-                    of{" "}
-                    {new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(
-                      credit.amount,
-                    )}
-                  </span>
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
-        <CustomerProfileCard customer={customer} />
-        <CustomerTagsSection canManage={canManage} customer={customer} />
-      </div>
-
-      <CustomerNotesSection canManage={canManage} customerId={customer.id} />
-
-      <CustomerRecentTransactionsTable transactions={statsQuery.data?.recentTransactions ?? []} />
+      <CustomerDetailsPanel
+        activeTab={activeTab}
+        canManage={permissions.canManage}
+        canView={permissions.canView}
+        customer={customer}
+        onTabChange={changeTab}
+      />
 
       <CustomerFormDialog
         customer={customer}
