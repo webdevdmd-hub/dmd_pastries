@@ -102,6 +102,9 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
   const profileRefreshPromiseRef = useRef<Promise<SafeUserProfile> | null>(null);
   const authOperationPromiseRef = useRef<Promise<SafeUserProfile> | null>(null);
   const sessionExpirationPromiseRef = useRef<Promise<void> | null>(null);
+  // When the profile was last loaded by any path, so the focus refresh can
+  // tell a real return to the tab from the same page it just loaded.
+  const profileLoadedAtRef = useRef(0);
 
   const refreshCurrentProfile = useCallback(async (): Promise<SafeUserProfile> => {
     if (profileRefreshPromiseRef.current) {
@@ -110,6 +113,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
 
     const profilePromise = (async () => {
       const profile = await repairAssignedBranchContext(await getCurrentProfile());
+      profileLoadedAtRef.current = Date.now();
       setUser(profile);
       setStatus("authenticated");
       return profile;
@@ -199,20 +203,23 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
 
     // focus and visibilitychange both fire for a single tab switch, and the
     // in-flight guard in refreshCurrentProfile only collapses them when they
-    // overlap — sequential ones each hit /auth/me. Coalesce on a short window
-    // so one user action costs one profile refresh.
-    let lastRefreshAt = 0;
+    // overlap. The refresh exists to notice a revoked role or a switched
+    // branch after time away, and nothing about the profile changes in the
+    // seconds after it was loaded. A one-second window still let a page that
+    // had just restored its session refresh again on the very next focus, and
+    // a tool-driven browser that toggles visibility every couple of seconds
+    // turned that into one /auth/me per toggle. Sixty seconds of freshness,
+    // counted from any load path, keeps one refresh per genuine return.
+    const profileFreshnessMs = 60_000;
 
     const refreshOnFocus = (): void => {
       if (document.visibilityState !== "visible") {
         return;
       }
 
-      const now = Date.now();
-      if (now - lastRefreshAt < 1000) {
+      if (Date.now() - profileLoadedAtRef.current < profileFreshnessMs) {
         return;
       }
-      lastRefreshAt = now;
 
       void refreshCurrentProfile().catch(() => {
         // Keep the current session state if a background profile refresh fails.
