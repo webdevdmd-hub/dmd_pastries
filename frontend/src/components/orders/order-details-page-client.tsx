@@ -2,12 +2,24 @@
 
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/orders/access-denied-card";
+import {
+  ORDER_DETAIL_ITEM_QUERY_KEY,
+  ORDER_DETAIL_TAB_QUERY_KEY,
+  type OrderDetailTabKey,
+  parseOrderDetailTab,
+} from "@/components/orders/order-detail-tabs";
+import {
+  ORDER_DETAIL_TABPANEL_ID,
+  OrderDetailViewTabs,
+} from "@/components/orders/order-detail-view-tabs";
 import { OrderHeader } from "@/components/orders/order-header";
-import { OrderItemConversionActions } from "@/components/orders/order-item-conversion-actions";
+import { OrderItemDetailsSheet } from "@/components/orders/order-item-details-sheet";
+import { OrderItemsList } from "@/components/orders/order-items-list";
 import { OrderPackagingSection } from "@/components/orders/order-packaging-section";
 import { OrderPaymentSection } from "@/components/orders/order-payment-section";
 import { OrderProductionSection } from "@/components/orders/order-production-section";
@@ -60,8 +72,44 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
     canManageOrderCatalogLinks && hasPermission(PERMISSIONS.productsCreate);
   const canConvertCustomItemToVariant =
     canManageOrderCatalogLinks && hasPermission(PERMISSIONS.productsVariantsManage);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const orderQuery = useOrder(orderId, canView);
   const statusMutation = useUpdateOrderStatus();
+
+  const activeTab = parseOrderDetailTab(searchParams.get(ORDER_DETAIL_TAB_QUERY_KEY));
+  const selectedItemId = searchParams.get(ORDER_DETAIL_ITEM_QUERY_KEY);
+
+  // Both the tab and the open item live in the URL, so a refresh or a shared
+  // link lands on the same view. One writer keeps them from clobbering each
+  // other.
+  const replaceParams = (mutate: (params: URLSearchParams) => void): void => {
+    const next = new URLSearchParams(searchParams.toString());
+    mutate(next);
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
+  const changeTab = (tab: OrderDetailTabKey): void => {
+    replaceParams((params) => {
+      if (tab === "items") {
+        params.delete(ORDER_DETAIL_TAB_QUERY_KEY);
+      } else {
+        params.set(ORDER_DETAIL_TAB_QUERY_KEY, tab);
+      }
+    });
+  };
+
+  const selectItem = (itemId: string | null): void => {
+    replaceParams((params) => {
+      if (itemId) {
+        params.set(ORDER_DETAIL_ITEM_QUERY_KEY, itemId);
+      } else {
+        params.delete(ORDER_DETAIL_ITEM_QUERY_KEY);
+      }
+    });
+  };
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -90,6 +138,7 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
   }
 
   const order = orderQuery.data;
+  const selectedItem = order.items.find((item) => item.id === selectedItemId) ?? null;
 
   return (
     <main className="min-h-screen bg-brand-latte px-6 py-8">
@@ -98,20 +147,24 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
         <section className="rounded-3xl border border-brand-cappuccino/60 bg-card/85 p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h2 className="text-2xl font-semibold text-brand-espresso">
+              <h2 className="text-title text-brand-espresso">
                 {order.customerNameSnapshot || "Walk-in customer"}
               </h2>
-              <p className="text-brand-mocha">{order.customerPhoneSnapshot ?? "No phone number"}</p>
-              <p className="mt-2 text-sm text-brand-mocha">
+              <p className="text-body text-brand-mocha">
+                {order.customerPhoneSnapshot ?? "No phone number"}
+              </p>
+              <p className="mt-2 text-cell capitalize text-brand-mocha">
                 {order.orderType} - Event {formatDateOnly(order.eventDate, "Not set")}
               </p>
             </div>
             <div className="grid gap-2 text-right">
-              <OrderStatusBadge status={order.orderStatus} />
-              <p className="text-3xl font-bold text-brand-espresso">
+              <div className="flex justify-end">
+                <OrderStatusBadge status={order.orderStatus} />
+              </div>
+              <p className="text-kpi tabular-nums text-brand-espresso">
                 {formatCurrency(order.totalAmount)}
               </p>
-              <p className="text-sm text-brand-mocha">
+              <p className="text-cell tabular-nums text-brand-mocha">
                 Balance {formatCurrency(order.balanceAmount)}
               </p>
               {order.accountingJournalEntryId ? (
@@ -127,70 +180,6 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
               ) : null}
             </div>
           </div>
-          <div className="mt-5 overflow-hidden rounded-2xl border border-brand-cappuccino/60">
-            {order.items.map((item) => (
-              <div
-                className="grid gap-2 border-b border-brand-cappuccino/40 p-4 text-sm last:border-b-0 md:grid-cols-[1fr_auto]"
-                key={item.id}
-              >
-                <div>
-                  <p className="font-semibold text-brand-espresso">{item.itemNameSnapshot}</p>
-                  {item.itemSource === "custom" ? (
-                    <p className="text-xs font-medium text-brand-mocha">Custom item</p>
-                  ) : null}
-                  <p className="text-brand-mocha">
-                    Qty {item.quantity} - {item.unitName}
-                    {item.weight !== null ? ` - ${String(item.weight)} kg` : ""}
-                    {item.flavor ? ` - ${item.flavor}` : ""}
-                    {item.messageText ? ` - "${item.messageText}"` : ""}
-                  </p>
-                  {item.designNotes ? (
-                    <p className="mt-1 text-brand-mocha">{item.designNotes}</p>
-                  ) : null}
-                  <div className="mt-3">
-                    <OrderItemConversionActions
-                      canConvertToProduct={canConvertCustomItemToProduct}
-                      canConvertToVariant={canConvertCustomItemToVariant}
-                      item={item}
-                      orderId={order.id}
-                    />
-                  </div>
-                </div>
-                <p className="font-semibold text-brand-espresso">
-                  {formatCurrency(item.lineTotal)}
-                </p>
-              </div>
-            ))}
-          </div>
-          {order.chargeAmount > 0 || order.chargeTaxAmount > 0 ? (
-            <div className="mt-5 rounded-2xl border border-brand-cappuccino/60 bg-brand-latte/60 p-4">
-              <h3 className="font-semibold text-brand-espresso">Charges</h3>
-              <div className="mt-3 grid gap-2 text-sm">
-                {order.charges.map((charge) => (
-                  <div
-                    className="flex items-start justify-between gap-3"
-                    key={charge.id || charge.chargeName}
-                  >
-                    <div>
-                      <p className="font-medium text-brand-espresso">{charge.chargeName}</p>
-                      {charge.description ? (
-                        <p className="text-xs text-brand-mocha">{charge.description}</p>
-                      ) : null}
-                    </div>
-                    <p className="font-semibold text-brand-espresso">
-                      {formatCurrency(charge.totalAmount)}
-                    </p>
-                  </div>
-                ))}
-                <div className="flex justify-between border-t border-brand-cappuccino/60 pt-2">
-                  <span className="text-brand-mocha">Charge tax</span>
-                  <strong className="text-brand-espresso">
-                    {formatCurrency(order.chargeTaxAmount)}
-                  </strong>
-                </div>
-              </div>
-            </div>
-          ) : null}
           <div className="mt-5 flex flex-wrap gap-2">
             {transitions.map((status) => (
               <Button
@@ -220,15 +209,46 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
             ))}
           </div>
         </section>
-        <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
-          <div className="grid gap-6">
+
+        <OrderDetailViewTabs
+          active={activeTab}
+          itemsCount={order.items.length}
+          onTabChange={changeTab}
+          orderId={order.id}
+        />
+
+        {/* One panel element that swaps, which is what `aria-controls` on every
+            tab points at. Payments, production and packaging own their own
+            queries and only mount when selected. */}
+        <div id={ORDER_DETAIL_TABPANEL_ID} role="tabpanel" tabIndex={-1}>
+          {activeTab === "items" ? (
+            <OrderItemsList onSelectItem={(item) => selectItem(item.id)} order={order} />
+          ) : null}
+          {activeTab === "payments" ? (
             <OrderPaymentSection canManage={canManage} order={order} />
+          ) : null}
+          {activeTab === "production" ? (
             <OrderProductionSection canManage={canManage} order={order} />
+          ) : null}
+          {activeTab === "packaging" ? (
             <OrderPackagingSection canManage={canManage} order={order} />
-          </div>
-          <OrderTimeline status={order.orderStatus} />
+          ) : null}
+          {activeTab === "timeline" ? <OrderTimeline status={order.orderStatus} /> : null}
         </div>
       </div>
+
+      <OrderItemDetailsSheet
+        canConvertToProduct={canConvertCustomItemToProduct}
+        canConvertToVariant={canConvertCustomItemToVariant}
+        item={selectedItem}
+        onOpenChange={(open) => {
+          if (!open) {
+            selectItem(null);
+          }
+        }}
+        open={selectedItem !== null}
+        orderId={order.id}
+      />
     </main>
   );
 }
