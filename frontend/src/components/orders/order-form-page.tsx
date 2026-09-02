@@ -8,6 +8,12 @@ import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/orders/access-denied-card";
 import { OrderCustomerSelector } from "@/components/orders/order-customer-selector";
+import {
+  DEFAULT_ORDER_FORM_TAB,
+  ORDER_FORM_TABPANEL_ID,
+  type OrderFormTabKey,
+  OrderFormTabs,
+} from "@/components/orders/order-form-tabs";
 import { OrderItemsSection } from "@/components/orders/order-items-section";
 import { OrderPackagingSection } from "@/components/orders/order-packaging-section";
 import { OrderPaymentSection } from "@/components/orders/order-payment-section";
@@ -83,23 +89,28 @@ function toMoney(value: number | null | undefined): number {
   return Number.isFinite(value) ? Number(value) : 0;
 }
 
+/**
+ * One tab's panel. The strip owns the section name, so the heading here is the
+ * panel's own title line plus any action that belongs beside it.
+ */
 function OrderFormSection({
   action,
   children,
-  index,
+  description,
   title,
 }: {
   action?: ReactNode;
   children: ReactNode;
-  index: number;
+  description: string;
   title: string;
 }): JSX.Element {
   return (
-    <section className="border-b border-border pb-8 last:border-b-0 last:pb-0">
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-body font-medium text-foreground">
-          {index}. {title}
-        </h2>
+    <section>
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-body font-medium text-foreground">{title}</h2>
+          <p className="mt-0.5 text-cell text-foreground-muted">{description}</p>
+        </div>
         {action}
       </div>
       {children}
@@ -237,6 +248,9 @@ export function OrderFormPage({
   const [items, setItems] = useState<CreateOrderItemPayload[]>([]);
   const [charges, setCharges] = useState<DocumentChargeDraft[]>([]);
   const [draftPackaging, setDraftPackaging] = useState<AddOrderPackagingPayload[]>([]);
+  // Which section is showing. Every field above is state on this component, so
+  // switching tabs never loses what was typed on another one.
+  const [activeTab, setActiveTab] = useState<OrderFormTabKey>(DEFAULT_ORDER_FORM_TAB);
 
   useEffect(() => {
     if (!branchId && defaultBranchId) {
@@ -360,6 +374,11 @@ export function OrderFormPage({
       if (orderId) {
         await updateMutation.mutateAsync({ id: orderId, payload: result.data });
         toast.success("Order updated.");
+        if (onClose) {
+          onClose();
+        } else {
+          router.replace(`/orders/${orderId}`);
+        }
       } else {
         const created = await createMutation.mutateAsync(result.data);
         await Promise.all(
@@ -438,14 +457,16 @@ export function OrderFormPage({
     );
   const showPreviewLoading = validPreviewPayload !== null && previewQuery.isFetching;
   const showPreviewError = validPreviewPayload !== null && previewQuery.isError;
-  const closeHref = orderId ? `/orders/${orderId}` : "/orders";
+  // Closing an edit used to land on that order's details page, which read as
+  // the form "going back" to a screen the user had not come from. Both modes
+  // now return to the orders list.
   const closeForm = (): void => {
     if (onClose) {
       onClose();
       return;
     }
 
-    router.push(closeHref);
+    router.push("/orders");
   };
 
   return (
@@ -483,146 +504,187 @@ export function OrderFormPage({
         </header>
 
         <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_380px]">
-          <section className="min-h-0 overflow-y-auto overscroll-contain px-5 py-6 sm:px-8">
-            <div className="space-y-8">
-              <OrderFormSection
-                action={
-                  <span className="rounded-full border border-border px-3 py-1 text-xs font-bold text-foreground-muted">
-                    {customerName ?? "Walk-in customer"}
-                  </span>
-                }
-                index={1}
-                title="Customer Details"
-              >
-                <OrderCustomerSelector
-                  customerId={customerId}
-                  customerName={customerName}
-                  customerPhone={customerPhone}
-                  onCustomerChange={(customer) => {
-                    setCustomerId(customer.id);
-                    setCustomerName(customer.name);
-                    setCustomerPhone(customer.phone);
-                  }}
-                />
-              </OrderFormSection>
+          <section className="flex min-h-0 flex-col overflow-hidden">
+            <div className="border-b border-border px-5 py-3 sm:px-8">
+              <OrderFormTabs
+                active={activeTab}
+                itemsCount={items.length}
+                onTabChange={setActiveTab}
+                showProduction={isEdit}
+              />
+            </div>
+            {/* One panel element that swaps, which is what `aria-controls` on
+                every tab points at. Only the selected section renders; the
+                field state lives above, so nothing typed is lost. */}
+            <div
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6 sm:px-8"
+              id={ORDER_FORM_TABPANEL_ID}
+              role="tabpanel"
+              tabIndex={-1}
+            >
+              {activeTab === "customer" ? (
+                <OrderFormSection
+                  action={
+                    <span className="rounded-full border border-border px-3 py-1 text-meta font-medium text-foreground-muted">
+                      {customerName ?? "Walk-in customer"}
+                    </span>
+                  }
+                  description="Who the order is for and how to reach them."
+                  title="Customer details"
+                >
+                  <OrderCustomerSelector
+                    customerId={customerId}
+                    customerName={customerName}
+                    customerPhone={customerPhone}
+                    onCustomerChange={(customer) => {
+                      setCustomerId(customer.id);
+                      setCustomerName(customer.name);
+                      setCustomerPhone(customer.phone);
+                    }}
+                  />
+                </OrderFormSection>
+              ) : null}
 
-              <OrderFormSection index={2} title="Logistics & Scheduling">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="grid gap-2">
-                    <label
-                      className="text-sm font-semibold text-foreground"
-                      htmlFor="bakeryOrderBranch"
-                    >
-                      Branch
-                    </label>
-                    <SearchableCombobox
-                      emptyMessage="No matching branches found."
-                      id="bakeryOrderBranch"
-                      onValueChange={setBranchId}
-                      options={branchOptions}
-                      placeholder="Select branch"
-                      searchPlaceholder="Search branch, code..."
-                      value={branchId}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <label
-                      className="text-sm font-semibold text-foreground"
-                      htmlFor="bakeryOrderChannel"
-                    >
-                      Sales Channel
-                    </label>
-                    <SearchableCombobox
-                      emptyMessage="No active sales channels found."
-                      id="bakeryOrderChannel"
-                      onValueChange={setSalesChannelId}
-                      options={salesChannelOptions}
-                      placeholder="Default sales channel"
-                      searchPlaceholder="Search channel..."
-                      value={salesChannelId}
-                    />
-                    <button
-                      className="w-fit text-xs font-bold text-foreground-muted underline-offset-4 hover:text-foreground hover:underline"
-                      onClick={() => {
-                        setSalesChannelId("");
-                        setExternalOrderNumber("");
-                      }}
-                      type="button"
-                    >
-                      Use default channel
-                    </button>
-                  </div>
-                  {selectedSalesChannel?.requiresExternalOrderNumber ? (
-                    <div className="grid gap-2 md:col-span-2">
+              {activeTab === "schedule" ? (
+                <OrderFormSection
+                  description="Branch, sales channel, event date, and pickup or delivery."
+                  title="Logistics and scheduling"
+                >
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
                       <label
                         className="text-sm font-semibold text-foreground"
-                        htmlFor="bakeryOrderExternalNumber"
+                        htmlFor="bakeryOrderBranch"
                       >
-                        External order number
+                        Branch
                       </label>
-                      <Input
-                        aria-label="External order number"
-                        id="bakeryOrderExternalNumber"
-                        onChange={(event) => setExternalOrderNumber(event.target.value)}
-                        placeholder="Platform / partner order number"
-                        value={externalOrderNumber}
+                      <SearchableCombobox
+                        emptyMessage="No matching branches found."
+                        id="bakeryOrderBranch"
+                        onValueChange={setBranchId}
+                        options={branchOptions}
+                        placeholder="Select branch"
+                        searchPlaceholder="Search branch, code..."
+                        value={branchId}
                       />
-                      <p className="text-xs text-foreground-muted">
-                        Required for {selectedSalesChannel.channelName}.
-                      </p>
                     </div>
-                  ) : null}
-                </div>
-                <div className="mt-5">
-                  <OrderScheduleCard
-                    deliveryAddress={deliveryAddress}
-                    deliveryTime={deliveryTime}
-                    eventDate={eventDate}
-                    notes={notes}
-                    onChange={(patch) => {
-                      setOrderType(patch.orderType ?? orderType);
-                      setEventDate(patch.eventDate ?? eventDate);
-                      setPickupTime(patch.pickupTime ?? pickupTime);
-                      setDeliveryTime(patch.deliveryTime ?? deliveryTime);
-                      setDeliveryAddress(patch.deliveryAddress ?? deliveryAddress);
-                      setNotes(patch.notes ?? notes);
-                    }}
-                    orderType={orderType}
-                    pickupTime={pickupTime}
+                    <div className="grid gap-2">
+                      <label
+                        className="text-sm font-semibold text-foreground"
+                        htmlFor="bakeryOrderChannel"
+                      >
+                        Sales Channel
+                      </label>
+                      <SearchableCombobox
+                        emptyMessage="No active sales channels found."
+                        id="bakeryOrderChannel"
+                        onValueChange={setSalesChannelId}
+                        options={salesChannelOptions}
+                        placeholder="Default sales channel"
+                        searchPlaceholder="Search channel..."
+                        value={salesChannelId}
+                      />
+                      <button
+                        className="w-fit text-xs font-bold text-foreground-muted underline-offset-4 hover:text-foreground hover:underline"
+                        onClick={() => {
+                          setSalesChannelId("");
+                          setExternalOrderNumber("");
+                        }}
+                        type="button"
+                      >
+                        Use default channel
+                      </button>
+                    </div>
+                    {selectedSalesChannel?.requiresExternalOrderNumber ? (
+                      <div className="grid gap-2 md:col-span-2">
+                        <label
+                          className="text-sm font-semibold text-foreground"
+                          htmlFor="bakeryOrderExternalNumber"
+                        >
+                          External order number
+                        </label>
+                        <Input
+                          aria-label="External order number"
+                          id="bakeryOrderExternalNumber"
+                          onChange={(event) => setExternalOrderNumber(event.target.value)}
+                          placeholder="Platform / partner order number"
+                          value={externalOrderNumber}
+                        />
+                        <p className="text-xs text-foreground-muted">
+                          Required for {selectedSalesChannel.channelName}.
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="mt-5">
+                    <OrderScheduleCard
+                      deliveryAddress={deliveryAddress}
+                      deliveryTime={deliveryTime}
+                      eventDate={eventDate}
+                      notes={notes}
+                      onChange={(patch) => {
+                        setOrderType(patch.orderType ?? orderType);
+                        setEventDate(patch.eventDate ?? eventDate);
+                        setPickupTime(patch.pickupTime ?? pickupTime);
+                        setDeliveryTime(patch.deliveryTime ?? deliveryTime);
+                        setDeliveryAddress(patch.deliveryAddress ?? deliveryAddress);
+                        setNotes(patch.notes ?? notes);
+                      }}
+                      orderType={orderType}
+                      pickupTime={pickupTime}
+                    />
+                  </div>
+                </OrderFormSection>
+              ) : null}
+
+              {activeTab === "items" ? (
+                <OrderFormSection
+                  description="Cakes, made-to-order items, and custom notes."
+                  title="Order items"
+                >
+                  <OrderItemsSection
+                    items={items}
+                    onChange={setItems}
+                    products={productsQuery.data?.items ?? []}
+                    units={referenceQuery.data?.units ?? []}
                   />
-                </div>
-              </OrderFormSection>
+                </OrderFormSection>
+              ) : null}
 
-              <OrderFormSection index={3} title="Order Items">
-                <OrderItemsSection
-                  items={items}
-                  onChange={setItems}
-                  products={productsQuery.data?.items ?? []}
-                  units={referenceQuery.data?.units ?? []}
-                />
-              </OrderFormSection>
+              {activeTab === "charges" ? (
+                <OrderFormSection
+                  description="Delivery, service, and other charges on top of the items."
+                  title="Charges"
+                >
+                  <div className="rounded-2xl border border-border bg-card p-5">
+                    <DocumentChargesEditor
+                      charges={charges}
+                      onChange={setCharges}
+                      taxRates={referenceQuery.data?.taxRates ?? []}
+                    />
+                  </div>
+                </OrderFormSection>
+              ) : null}
 
-              <OrderFormSection index={4} title="Charges">
-                <div className="rounded-2xl border border-border bg-card p-5">
-                  <DocumentChargesEditor
-                    charges={charges}
-                    onChange={setCharges}
-                    taxRates={referenceQuery.data?.taxRates ?? []}
+              {activeTab === "packaging" ? (
+                <OrderFormSection
+                  description="Boxes, boards, and other packaging this order needs."
+                  title="Packaging"
+                >
+                  <OrderPackagingSection
+                    canManage={canManage}
+                    draftPackaging={draftPackaging}
+                    onDraftPackagingChange={setDraftPackaging}
+                    order={order}
                   />
-                </div>
-              </OrderFormSection>
+                </OrderFormSection>
+              ) : null}
 
-              <OrderFormSection index={5} title="Packaging">
-                <OrderPackagingSection
-                  canManage={canManage}
-                  draftPackaging={draftPackaging}
-                  onDraftPackagingChange={setDraftPackaging}
-                  order={order}
-                />
-              </OrderFormSection>
-
-              {isEdit ? (
-                <OrderFormSection index={6} title="Production Control">
+              {activeTab === "production" && isEdit ? (
+                <OrderFormSection
+                  description="Link this order to a batch or create production from an item."
+                  title="Production control"
+                >
                   <OrderProductionSection canManage={canManage} order={order} />
                 </OrderFormSection>
               ) : null}
@@ -758,7 +820,7 @@ export function OrderFormPage({
                   type="button"
                   variant="outline"
                 >
-                  Cancel Order
+                  Cancel
                 </Button>
               </div>
 

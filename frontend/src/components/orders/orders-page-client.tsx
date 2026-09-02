@@ -79,6 +79,9 @@ export function OrdersPageClient(): JSX.Element {
   // shows payments and items the list rows do not carry.
   const [detailsOrderId, setDetailsOrderId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // Edit opens in the same full-height modal as Create, over the list. Closing
+  // it lands back here rather than on the order's details page.
+  const [editOrderId, setEditOrderId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<OrdersViewMode>("list");
   const ordersQuery = useOrders(filters, canView);
   const summaryQuery = useOrderSummary(canView);
@@ -120,6 +123,13 @@ export function OrdersPageClient(): JSX.Element {
   const openDetails = (order: BakeryOrder): void => {
     setDetailsOrderId(order.id);
     setDetailsOpen(true);
+  };
+
+  const openEdit = (order: BakeryOrder): void => {
+    // The drawer may be open underneath; a form on top of a sheet on top of
+    // the list is one layer too many, so the drawer closes first.
+    setDetailsOpen(false);
+    setEditOrderId(order.id);
   };
 
   const confirmAction = async (): Promise<void> => {
@@ -238,6 +248,7 @@ export function OrdersPageClient(): JSX.Element {
             <OrdersTable
               canManage={canManage}
               onDelete={(order) => setPendingAction({ order, type: "delete" })}
+              onEdit={openEdit}
               onStatusChange={(order, status) =>
                 setPendingAction({ order, status, type: "status" })
               }
@@ -252,6 +263,7 @@ export function OrdersPageClient(): JSX.Element {
         <OrdersCardGrid
           canManage={canManage}
           onDelete={(order) => setPendingAction({ order, type: "delete" })}
+          onEdit={openEdit}
           onStatusChange={(order, status) => setPendingAction({ order, status, type: "status" })}
           onView={openDetails}
           orders={orders}
@@ -259,10 +271,38 @@ export function OrdersPageClient(): JSX.Element {
       ) : null}
 
       <OrderDetailsDrawer
+        onEdit={openEdit}
         onOpenChange={setDetailsOpen}
         open={detailsOpen}
         orderId={detailsOrderId}
       />
+
+      <Dialog
+        onOpenChange={(open) => (open ? undefined : setEditOrderId(null))}
+        open={editOrderId !== null}
+      >
+        <DialogContent
+          className="top-3 flex h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-7xl translate-y-0 gap-0 overflow-hidden border-0 bg-transparent p-0 shadow-none sm:top-6 sm:h-[calc(100dvh-3rem)] sm:max-h-[calc(100dvh-3rem)] sm:w-[calc(100vw-3rem)]"
+          showCloseButton={false}
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>Edit bakery order</DialogTitle>
+            <DialogDescription>
+              Edit the customer, schedule, items, charges, packaging, and production of this order.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1">
+            {editOrderId ? (
+              <OrderFormPage
+                key={editOrderId}
+                onClose={() => setEditOrderId(null)}
+                orderId={editOrderId}
+                presentation="modal"
+              />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         onOpenChange={(open) => (!open ? setPendingAction(null) : undefined)}

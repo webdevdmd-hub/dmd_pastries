@@ -28,6 +28,11 @@ import { ApiError, getErrorMessage } from "@/lib/api/client";
 import type { BakeryOrder } from "@/types/orders";
 
 type OrderDetailsDrawerProps = {
+  /**
+   * Opens the edit form for this order. When the host provides it, Edit stays
+   * in the host's own modal flow instead of navigating to the edit route.
+   */
+  onEdit?: ((order: BakeryOrder) => void) | undefined;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   orderId: string | null;
@@ -47,6 +52,7 @@ function isPermissionDenied(error: unknown): boolean {
  * who wants a URL to share.
  */
 export function OrderDetailsDrawer({
+  onEdit,
   onOpenChange,
   open,
   orderId,
@@ -101,6 +107,7 @@ export function OrderDetailsDrawer({
             canConvertToVariant={permissions.canConvertToVariant}
             canManage={permissions.canManage}
             key={orderQuery.data.id}
+            onEdit={onEdit}
             order={orderQuery.data}
           />
         )}
@@ -113,11 +120,13 @@ function OrderDetailsDrawerBody({
   canConvertToProduct,
   canConvertToVariant,
   canManage,
+  onEdit,
   order,
 }: {
   canConvertToProduct: boolean;
   canConvertToVariant: boolean;
   canManage: boolean;
+  onEdit: ((order: BakeryOrder) => void) | undefined;
   order: BakeryOrder;
 }): JSX.Element {
   const [activeTab, setActiveTab] = useState<OrderDetailTabKey>(DEFAULT_ORDER_DETAIL_TAB);
@@ -142,7 +151,12 @@ function OrderDetailsDrawerBody({
               Open full page
             </Link>
           </Button>
-          {canManage ? (
+          {canManage && onEdit ? (
+            <Button onClick={() => onEdit(order)} size="sm" type="button" variant="outline">
+              <Pencil className="h-4 w-4" />
+              Edit order
+            </Button>
+          ) : canManage ? (
             <Button asChild size="sm" variant="outline">
               <Link href={`${detailHref}?mode=edit`}>
                 <Pencil className="h-4 w-4" />

@@ -29,12 +29,14 @@ function formatDate(value: string): string {
 export function OrdersTable({
   canManage,
   onDelete,
+  onEdit,
   onStatusChange,
   onView,
   orders,
 }: {
   canManage: boolean;
   onDelete: (order: BakeryOrder) => void;
+  onEdit: (order: BakeryOrder) => void;
   onStatusChange: (order: BakeryOrder, status: OrderStatus) => void;
   onView: (order: BakeryOrder) => void;
   orders: BakeryOrder[];
@@ -97,6 +99,7 @@ export function OrdersTable({
               <OrderActionsMenu
                 canManage={canManage}
                 onDelete={onDelete}
+                onEdit={onEdit}
                 onStatusChange={onStatusChange}
                 order={order}
               />

@@ -1,5 +1,4 @@
 import { Edit, MoreHorizontal, PackageCheck, Trash2 } from "lucide-react";
-import Link from "next/link";
 import type { JSX } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ROUTES } from "@/constants/routes";
 import type { BakeryOrder, OrderStatus } from "@/types/orders";
 
 const transitions: Record<OrderStatus, OrderStatus[]> = {
@@ -32,11 +30,13 @@ function label(status: OrderStatus): string {
 export function OrderActionsMenu({
   canManage,
   onDelete,
+  onEdit,
   onStatusChange,
   order,
 }: {
   canManage: boolean;
   onDelete: (order: BakeryOrder) => void;
+  onEdit: (order: BakeryOrder) => void;
   onStatusChange: (order: BakeryOrder, status: OrderStatus) => void;
   order: BakeryOrder;
 }): JSX.Element {
@@ -51,11 +51,9 @@ export function OrderActionsMenu({
           details drawer, so the menu holds only the actions. */}
       <DropdownMenuContent align="end" className="w-52">
         {canManage ? (
-          <DropdownMenuItem asChild>
-            <Link href={`${ROUTES.orders}/${order.id}?mode=edit`}>
-              <Edit className="mr-2 h-4 w-4" />
-              Edit order
-            </Link>
+          <DropdownMenuItem onClick={() => onEdit(order)}>
+            <Edit className="mr-2 h-4 w-4" />
+            Edit order
           </DropdownMenuItem>
         ) : null}
         {canManage
