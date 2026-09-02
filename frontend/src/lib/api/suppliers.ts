@@ -78,6 +78,11 @@ function isSupplierStatementTransactionType(
 }
 
 function parseList<TItem>(value: unknown, parser: (item: unknown) => TItem): TItem[] {
+  // Go marshals a nil slice as null, so an empty list arrives as `data: null`.
+  if (value === null || value === undefined) {
+    return [];
+  }
+
   if (Array.isArray(value)) {
     return value.map(parser);
   }
