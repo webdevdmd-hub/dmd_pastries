@@ -146,10 +146,6 @@ export function SearchableCombobox({
             aria-expanded={open}
             className={cn(
               "h-11 w-full justify-between overflow-hidden px-3 text-left font-normal",
-              // The clear button floats over the trigger's right edge next to
-              // the chevron. Reserve that width so a long label truncates
-              // before it instead of running underneath the icon.
-              value && !disabled && "pr-16",
               triggerClassName,
             )}
             disabled={disabled}
@@ -158,7 +154,10 @@ export function SearchableCombobox({
             type="button"
             variant="outline"
           >
-            <span className="min-w-0 flex-1 truncate">
+            {/* The clear button floats over the right edge, between the label
+                and the chevron. Reserve its width on the label so a long value
+                truncates before it instead of running underneath. */}
+            <span className={cn("min-w-0 flex-1 truncate", value && !disabled && "pr-9")}>
               {selectedOption ? selectedOption.label : placeholder}
             </span>
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-60" />

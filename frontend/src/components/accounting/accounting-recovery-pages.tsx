@@ -656,7 +656,7 @@ export function AccountMappingsPageClient(): JSX.Element {
       {updateMappings.isError ? <ErrorNotice message={updateMappings.error.message} /> : null}
 
       <Card className="overflow-hidden border-workspace-panel-border bg-workspace-panel shadow-sm">
-        <div className="grid gap-4 border-b bg-muted/40 px-4 py-3 text-xs font-semibold text-muted-foreground md:grid-cols-[1.25fr_2fr_1fr_8rem]">
+        <div className="grid gap-4 border-b bg-muted/40 px-4 py-3 text-xs font-semibold text-muted-foreground md:grid-cols-[minmax(0,1.25fr)_minmax(0,2fr)_minmax(0,1fr)_8rem]">
           <span>Mapping</span>
           <span>Chart account</span>
           <span>Type / group</span>
@@ -669,7 +669,7 @@ export function AccountMappingsPageClient(): JSX.Element {
 
           return (
             <div
-              className="grid items-center gap-4 border-b px-4 py-4 last:border-b-0 md:grid-cols-[1.25fr_2fr_1fr_8rem]"
+              className="grid items-center gap-4 border-b px-4 py-4 last:border-b-0 md:grid-cols-[minmax(0,1.25fr)_minmax(0,2fr)_minmax(0,1fr)_8rem]"
               key={mapping.mappingKey}
             >
               <div>
