@@ -6,12 +6,28 @@ Deploy three services in this order:
 2. `DMD_Pastries_backend`
 3. `DMD_Pastries_frontend`
 
-Use separate public domains:
+Use separate public domains, all under one registrable domain:
 
 ```txt
 Backend API:  https://api.<your-domain>
 Frontend App: https://app.<your-domain>
+Appwrite:     https://appwrite.<your-domain>
 ```
+
+The Appwrite endpoint has to sit under the same registrable domain as the
+frontend. Appwrite authenticates with a session cookie, and a browser only sends
+that cookie if the endpoint is first-party to the page. Put Appwrite on an
+unrelated domain and the cookie is third-party, the browser drops it, and the
+SDK falls back to keeping the session in `localStorage` — which any XSS on the
+page can read, where an httpOnly cookie cannot. The SDK says so in the console:
+
+> Appwrite is using localStorage for session management. Increase your security
+> by adding a custom domain as your API endpoint.
+
+Seeing that on `localhost` in development is expected and not worth chasing:
+`localhost` cannot share a registrable domain with any real endpoint, so the
+fallback is the only option there. Seeing it in production means the domains are
+wrong.
 
 ## PostgreSQL Service
 
@@ -108,7 +124,7 @@ Set the same `NEXT_PUBLIC_*` values in Dokploy runtime environment and Docker bu
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://api.<your-domain>
-NEXT_PUBLIC_APPWRITE_ENDPOINT=https://<your-domain>.com/v1
+NEXT_PUBLIC_APPWRITE_ENDPOINT=https://appwrite.<your-domain>/v1
 NEXT_PUBLIC_APPWRITE_PROJECT_ID=
 NEXT_PUBLIC_APPWRITE_PRODUCT_IMAGES_BUCKET_ID=
 NEXT_PUBLIC_APPWRITE_BUSINESS_ASSETS_BUCKET_ID=
@@ -133,4 +149,8 @@ Then verify:
 - Owner registration and login work.
 - `GET /api/v1/auth/me` returns business and branch context.
 - Dashboard and settings APIs do not return 404.
+- The browser console shows no Appwrite `localStorage` warning, and `localStorage`
+  has no `cookieFallback` key. Either one means the Appwrite endpoint is not
+  first-party to the frontend and sessions are being kept where an XSS can read
+  them.
 - Appwrite file previews/uploads work.
