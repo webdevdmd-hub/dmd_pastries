@@ -140,7 +140,7 @@ export function PurchaseReturnsTable({
               <TableCell className="whitespace-nowrap">
                 <PurchaseReturnStatusBadge status={purchaseReturn.status} />
               </TableCell>
-              <TableCell className="min-w-56">
+              <TableCell className="whitespace-normal min-w-56">
                 <span className="text-sm font-medium text-brand-mocha">
                   {nextStepForReturn(purchaseReturn)}
                 </span>

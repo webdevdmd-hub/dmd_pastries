@@ -68,18 +68,14 @@ export function BatchesTable({
     <Table>
       <TableHeader className="bg-muted">
         <TableRow className="border-border hover:bg-muted">
-          <TableHead className="h-14 text-xs font-bold text-foreground-muted">
-            Production Number
-          </TableHead>
-          <TableHead className="text-xs font-bold text-foreground-muted">Output Product</TableHead>
-          <TableHead className="text-xs font-bold text-foreground-muted">Recipe</TableHead>
-          <TableHead className="text-xs font-bold text-foreground-muted">Planned</TableHead>
-          <TableHead className="text-xs font-bold text-foreground-muted">Produced</TableHead>
+          <TableHead>Production Number</TableHead>
+          <TableHead>Output Product</TableHead>
+          <TableHead>Recipe</TableHead>
+          <TableHead>Planned</TableHead>
+          <TableHead>Produced</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead className="text-xs font-bold text-foreground-muted">Start Time</TableHead>
-          <TableHead className="text-right text-xs font-bold text-foreground-muted">
-            Actions
-          </TableHead>
+          <TableHead>Start Time</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -113,7 +109,7 @@ export function BatchesTable({
               <TableCell className="font-mono text-foreground">
                 {formatQuantity(batch.plannedQuantity, batch.batchUnitName)}
               </TableCell>
-              <TableCell className="min-w-44">
+              <TableCell className="whitespace-normal min-w-44">
                 <div className="space-y-2">
                   <span className="font-mono text-foreground">
                     {formatQuantity(batch.producedQuantity, batch.batchUnitName)}

@@ -331,7 +331,7 @@ export function RolesPageClient(): JSX.Element {
       ) : null}
 
       {!isLoading && !error ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardHeader>
             <CardTitle>Roles workspace</CardTitle>
             <CardDescription>

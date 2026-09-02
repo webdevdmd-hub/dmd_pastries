@@ -1141,7 +1141,7 @@ function ProductCategoriesTable({
                   <span className="text-sm text-muted-foreground">All product types</span>
                 )}
               </TableCell>
-              <TableCell>{category.description}</TableCell>
+              <TableCell className="min-w-64 whitespace-normal">{category.description}</TableCell>
               <TableCell>{category.sortOrder}</TableCell>
               <TableCell>
                 <StatusBadge status={category.status} />
@@ -1235,7 +1235,7 @@ function SimpleCategoriesTable({
         {categories.map((category) => (
           <TableRow key={category.id}>
             <TableCell className="font-medium">{category.categoryName}</TableCell>
-            <TableCell>{category.description}</TableCell>
+            <TableCell className="min-w-64 whitespace-normal">{category.description}</TableCell>
             <TableCell>
               <StatusBadge status={category.status} />
             </TableCell>

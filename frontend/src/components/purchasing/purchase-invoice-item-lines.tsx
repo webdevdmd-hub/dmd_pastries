@@ -167,7 +167,7 @@ export function PurchaseInvoiceItemLines({
 
               return (
                 <TableRow key={line.id}>
-                  <TableCell className="max-w-xs">
+                  <TableCell className="whitespace-normal max-w-xs">
                     <p className="truncate font-semibold text-brand-espresso">{lineName(line)}</p>
                     {secondary ? <p className="mt-0.5 truncate">{secondary}</p> : null}
                   </TableCell>

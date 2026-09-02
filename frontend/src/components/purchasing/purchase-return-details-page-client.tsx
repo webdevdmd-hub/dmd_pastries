@@ -351,7 +351,9 @@ export function PurchaseReturnDetailsPageClient({
                     {item.quantity} {item.unitSymbol}
                   </TableCell>
                   <TableCell>{item.stockLocationName ?? "Default location"}</TableCell>
-                  <TableCell>{item.reason ?? purchaseReturn.reason ?? "Not set"}</TableCell>
+                  <TableCell className="min-w-64 whitespace-normal">
+                    {item.reason ?? purchaseReturn.reason ?? "Not set"}
+                  </TableCell>
                   <TableCell>{formatCurrency(item.lineTotal)}</TableCell>
                 </TableRow>
               ))}

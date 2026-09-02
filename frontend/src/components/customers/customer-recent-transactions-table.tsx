@@ -84,7 +84,9 @@ export function CustomerRecentTransactionsTable({
                       <Badge variant="outline">{sourceLabel(transaction.sourceType)}</Badge>
                     </TableCell>
                     <TableCell>{transaction.sourceNumber || "-"}</TableCell>
-                    <TableCell>{transaction.description || "-"}</TableCell>
+                    <TableCell className="min-w-64 whitespace-normal">
+                      {transaction.description || "-"}
+                    </TableCell>
                     <TableCell>{transaction.status || transaction.paymentStatus || "-"}</TableCell>
                     <TableCell className="text-right font-medium">{amount(transaction)}</TableCell>
                   </TableRow>

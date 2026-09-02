@@ -105,7 +105,7 @@ export function StockMovementsTable({ movements }: StockMovementsTableProps): JS
             <TableCell>
               <AccountingJournalLink id={movement.accountingJournalEntryId} />
             </TableCell>
-            <TableCell className="min-w-72">
+            <TableCell className="whitespace-normal min-w-72">
               <p className="font-medium text-foreground">{stockMovementDescription(movement)}</p>
               <p className="text-xs text-foreground-muted">
                 {sourceModuleLabel(movement)} - {sourceReferenceLabel(movement)}

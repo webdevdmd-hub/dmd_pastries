@@ -48,7 +48,7 @@ export function RefundsReportTable({ rows }: { rows: RefundReportRow[] }): JSX.E
             <TableCell>{row.branchName || "-"}</TableCell>
             <TableCell>{row.paymentMethodName || "-"}</TableCell>
             <TableCell>{formatCurrency(row.refundAmount)}</TableCell>
-            <TableCell>{row.refundReason || "-"}</TableCell>
+            <TableCell className="min-w-64 whitespace-normal">{row.refundReason || "-"}</TableCell>
             <TableCell>{refundBadge(row.refundStatus)}</TableCell>
             <TableCell>{row.createdByUserName || "-"}</TableCell>
             <TableCell>{formatDate(row.refundedAt)}</TableCell>

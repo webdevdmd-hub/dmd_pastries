@@ -33,7 +33,7 @@ export function WastageReportTable({ rows }: { rows: WastageReportItem[] }): JSX
             <TableCell>{row.branchName || "-"}</TableCell>
             <TableCell>{row.quantity}</TableCell>
             <TableCell>{row.unitSymbol || "-"}</TableCell>
-            <TableCell>{row.reason || "-"}</TableCell>
+            <TableCell className="min-w-64 whitespace-normal">{row.reason || "-"}</TableCell>
             <TableCell>{formatDate(row.createdAt)}</TableCell>
           </TableRow>
         ))}

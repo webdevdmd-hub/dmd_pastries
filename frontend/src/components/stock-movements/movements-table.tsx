@@ -131,7 +131,7 @@ export function MovementsTable({
             <TableCell className="text-right tabular-nums">
               {movement.totalCost > 0 ? formatMoney(movement.totalCost) : "-"}
             </TableCell>
-            <TableCell className="max-w-72">
+            <TableCell className="whitespace-normal max-w-72">
               <p className="truncate font-medium text-foreground">
                 {stockMovementDescription(movement)}
               </p>

@@ -105,7 +105,7 @@ const TableCell = React.forwardRef<
   <td
     ref={ref}
     data-numeric={numeric ? "" : undefined}
-    className={cn("px-cell-x align-middle text-foreground", className)}
+    className={cn("whitespace-nowrap px-cell-x align-middle text-foreground", className)}
     {...props}
   />
 ));

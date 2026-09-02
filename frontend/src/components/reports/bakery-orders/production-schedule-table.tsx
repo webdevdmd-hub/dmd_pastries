@@ -63,7 +63,7 @@ export function ProductionScheduleTable({ rows }: { rows: ProductionScheduleRow[
             </TableCell>
             <TableCell>{formatNumber(row.quantity)}</TableCell>
             <TableCell>{row.branchName || "-"}</TableCell>
-            <TableCell className="max-w-xs text-sm text-muted-foreground">
+            <TableCell className="whitespace-normal max-w-xs text-sm text-muted-foreground">
               {row.productionNote || "-"}
             </TableCell>
           </TableRow>

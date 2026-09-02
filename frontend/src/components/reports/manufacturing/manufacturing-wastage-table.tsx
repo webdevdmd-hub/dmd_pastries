@@ -49,7 +49,7 @@ export function ManufacturingWastageTable({
             <TableCell>{wastageBadge(row.wastageType)}</TableCell>
             <TableCell>{formatNumber(row.quantity)}</TableCell>
             <TableCell>{row.unitSymbol || "-"}</TableCell>
-            <TableCell>{row.reason || "-"}</TableCell>
+            <TableCell className="min-w-64 whitespace-normal">{row.reason || "-"}</TableCell>
             <TableCell>{row.batchNumber || "-"}</TableCell>
             <TableCell>{formatDate(row.createdAt)}</TableCell>
           </TableRow>

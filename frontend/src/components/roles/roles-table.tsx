@@ -71,7 +71,7 @@ export function RolesTable({
               key={role.id}
               className={selectedRoleId === role.id ? "bg-brand-latte/80" : undefined}
             >
-              <TableCell className="min-w-[220px]">
+              <TableCell className="whitespace-normal min-w-[220px]">
                 <div className="space-y-2">
                   <div className="font-medium text-brand-espresso">{role.roleName}</div>
                   <div className="flex flex-wrap gap-2">
@@ -87,7 +87,7 @@ export function RolesTable({
                   </div>
                 </div>
               </TableCell>
-              <TableCell className="min-w-[240px] text-brand-mocha">
+              <TableCell className="whitespace-normal min-w-[240px] text-brand-mocha">
                 {role.description || "No description provided."}
               </TableCell>
               <TableCell>{role.isSystemDefault ? "System Default" : "Custom Role"}</TableCell>
