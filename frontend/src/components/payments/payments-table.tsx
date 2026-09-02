@@ -81,16 +81,16 @@ export function PaymentsTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Source</TableHead>
-          <TableHead>Customer</TableHead>
-          <TableHead>Payment Method</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead className="text-right">Amount</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Reference</TableHead>
-          <TableHead>Cashier</TableHead>
-          <TableHead>Paid At</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
+          <TableHead className="whitespace-nowrap">Source</TableHead>
+          <TableHead className="whitespace-nowrap">Customer</TableHead>
+          <TableHead className="whitespace-nowrap">Payment Method</TableHead>
+          <TableHead className="whitespace-nowrap">Type</TableHead>
+          <TableHead className="whitespace-nowrap text-right">Amount</TableHead>
+          <TableHead className="whitespace-nowrap">Status</TableHead>
+          <TableHead className="whitespace-nowrap">Reference</TableHead>
+          <TableHead className="whitespace-nowrap">Cashier</TableHead>
+          <TableHead className="whitespace-nowrap">Paid At</TableHead>
+          <TableHead className="whitespace-nowrap text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -103,20 +103,28 @@ export function PaymentsTable({
               <span className="block font-mono font-medium">{payment.sourceNumber}</span>
               <span className="text-meta text-foreground-muted">{sourceLabel(payment)}</span>
             </TableCell>
-            <TableCell>{payment.customerName ?? "Walk-in customer"}</TableCell>
-            <TableCell>
+            <TableCell className="whitespace-nowrap">
+              {payment.customerName ?? "Walk-in customer"}
+            </TableCell>
+            <TableCell className="whitespace-nowrap">
               <PaymentMethodBadge methodName={payment.paymentMethodNameSnapshot} />
             </TableCell>
-            <TableCell className="capitalize">{paymentTypeLabel(payment)}</TableCell>
-            <TableCell className="text-right font-medium tabular-nums">
+            <TableCell className="whitespace-nowrap capitalize">
+              {paymentTypeLabel(payment)}
+            </TableCell>
+            <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
               {formatMoney(payment.amount)}
             </TableCell>
-            <TableCell>
+            <TableCell className="whitespace-nowrap">
               <PaymentStatusBadge status={payment.paymentStatus} />
             </TableCell>
-            <TableCell className="font-mono">{payment.referenceNumber ?? "No reference"}</TableCell>
-            <TableCell>{payment.paidByUserName}</TableCell>
-            <TableCell className="tabular-nums">{formatDate(payment.paidAt)}</TableCell>
+            <TableCell className="whitespace-nowrap font-mono">
+              {payment.referenceNumber ?? "No reference"}
+            </TableCell>
+            <TableCell className="whitespace-nowrap">{payment.paidByUserName}</TableCell>
+            <TableCell className="whitespace-nowrap tabular-nums">
+              {formatDate(payment.paidAt)}
+            </TableCell>
             <TableCell>
               <div className="flex justify-end gap-2">
                 <Button

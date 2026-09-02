@@ -304,7 +304,7 @@ export function PaymentsPageClient(): JSX.Element {
       ) : null}
 
       {!paymentsQuery.isLoading && !paymentsQuery.error && (paymentsQuery.data ?? []).length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0">
             <PaymentsTable
               canRefund={canRefund}
