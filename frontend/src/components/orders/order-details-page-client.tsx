@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/orders/access-denied-card";
@@ -79,36 +80,38 @@ export function OrderDetailsPageClient({ orderId }: { orderId: string }): JSX.El
   const statusMutation = useUpdateOrderStatus();
 
   const activeTab = parseOrderDetailTab(searchParams.get(ORDER_DETAIL_TAB_QUERY_KEY));
-  const selectedItemId = searchParams.get(ORDER_DETAIL_ITEM_QUERY_KEY);
 
-  // Both the tab and the open item live in the URL, so a refresh or a shared
-  // link lands on the same view. One writer keeps them from clobbering each
-  // other.
-  const replaceParams = (mutate: (params: URLSearchParams) => void): void => {
-    const next = new URLSearchParams(searchParams.toString());
-    mutate(next);
+  // The open item is component state seeded from `?item=`, not read from the
+  // URL on every render. A router navigation for a search-param change makes
+  // the server re-render the page segment, which remounts this component about
+  // a second later: the focused row vanishes, Radix reads that as a dismiss,
+  // and the sheet closes itself. So the URL is mirrored through the history
+  // API instead, which Next syncs without a round trip.
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(() =>
+    searchParams.get(ORDER_DETAIL_ITEM_QUERY_KEY),
+  );
+
+  const changeTab = (tab: OrderDetailTabKey): void => {
+    const next = new URLSearchParams(window.location.search);
+    if (tab === "items") {
+      next.delete(ORDER_DETAIL_TAB_QUERY_KEY);
+    } else {
+      next.set(ORDER_DETAIL_TAB_QUERY_KEY, tab);
+    }
     const query = next.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
 
-  const changeTab = (tab: OrderDetailTabKey): void => {
-    replaceParams((params) => {
-      if (tab === "items") {
-        params.delete(ORDER_DETAIL_TAB_QUERY_KEY);
-      } else {
-        params.set(ORDER_DETAIL_TAB_QUERY_KEY, tab);
-      }
-    });
-  };
-
   const selectItem = (itemId: string | null): void => {
-    replaceParams((params) => {
-      if (itemId) {
-        params.set(ORDER_DETAIL_ITEM_QUERY_KEY, itemId);
-      } else {
-        params.delete(ORDER_DETAIL_ITEM_QUERY_KEY);
-      }
-    });
+    setSelectedItemId(itemId);
+    const next = new URLSearchParams(window.location.search);
+    if (itemId) {
+      next.set(ORDER_DETAIL_ITEM_QUERY_KEY, itemId);
+    } else {
+      next.delete(ORDER_DETAIL_ITEM_QUERY_KEY);
+    }
+    const query = next.toString();
+    window.history.replaceState(null, "", query ? `${pathname}?${query}` : pathname);
   };
 
   if (!canView) {
