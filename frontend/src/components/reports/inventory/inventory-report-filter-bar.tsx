@@ -88,7 +88,7 @@ export function InventoryReportFilterBar({
 }): JSX.Element {
   return (
     <Card className="bg-card/85 shadow-soft">
-      <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-6">
+      <CardContent className="grid grid-cols-2 gap-3 p-4 sm:gap-4 sm:p-5 xl:grid-cols-6">
         <ReportBranchSelect
           branches={branches}
           canAccessAllBranches={canAccessAllBranches}

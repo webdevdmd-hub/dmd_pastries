@@ -14,7 +14,7 @@ export function PaymentMethodReportCard({ rows }: { rows: PaymentMethodReportRow
   const netTransactions = rows.reduce((sum, row) => sum + row.netTransactionCount, 0);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
       <ReportKpiCard
         icon={CreditCard}
         label="Method Collected"

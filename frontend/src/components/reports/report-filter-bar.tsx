@@ -62,7 +62,7 @@ export function ReportFilterBar({
     <Card className={cn("bg-card/85 shadow-soft", compact && "rounded-md shadow-none")}>
       <CardContent
         className={cn(
-          "grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-6",
+          "grid grid-cols-2 gap-3 p-4 sm:gap-4 sm:p-5 xl:grid-cols-6",
           compact && "gap-3 p-4 xl:grid-cols-[8.5rem_9.5rem_9.5rem_minmax(10rem,1fr)_8.5rem_auto]",
         )}
       >

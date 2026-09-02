@@ -29,17 +29,18 @@ export function ReportKpiCard({
 }): JSX.Element {
   return (
     <Card className="bg-card/85 shadow-soft">
-      <CardContent className="flex items-start justify-between gap-4 p-5">
-        <div>
-          <p className="text-xs font-semibold text-brand-mocha">{label}</p>
-          <p className="mt-3 text-3xl font-semibold text-brand-espresso">{value}</p>
+      <CardContent className="flex items-start justify-between gap-3 p-4 md:p-5">
+        <div className="min-w-0">
+          <p className="text-cell leading-tight text-brand-mocha">{label}</p>
+          <p className="mt-2 break-words text-kpi tabular-nums text-brand-espresso">{value}</p>
           {changePercentage !== undefined ? (
-            <p className="mt-2 text-sm text-brand-mocha">
+            <p className="mt-2 text-meta text-brand-mocha">
               {trendLabel(trend)} by {String(changePercentage)}%
             </p>
           ) : null}
         </div>
-        <span className="rounded-2xl bg-brand-latte p-3 text-brand-mocha">
+        {/* Two cards share a phone's width; the icon is the first thing to go. */}
+        <span className="hidden shrink-0 rounded-2xl bg-brand-latte p-3 text-brand-mocha sm:inline-flex">
           <Icon className="h-5 w-5" />
         </span>
       </CardContent>

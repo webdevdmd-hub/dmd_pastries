@@ -148,7 +148,7 @@ export function InventoryAccountingReconciliationPageClient(): JSX.Element {
         onChange={setDraft}
         onReset={resetFilters}
       />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-5">
         <SummaryTile
           label="Operational value"
           value={formatMoney(report?.totalOperationalValue ?? 0)}

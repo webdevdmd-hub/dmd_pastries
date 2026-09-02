@@ -14,7 +14,7 @@ import type { SalesSummary } from "@/types/sales-reports";
 
 export function SalesSummaryCards({ summary }: { summary: SalesSummary | undefined }): JSX.Element {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
       <ReportKpiCard
         icon={ReceiptText}
         label="Gross Sales"

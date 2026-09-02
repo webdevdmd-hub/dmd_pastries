@@ -33,7 +33,7 @@ export function ReportKpiGrid({
 }): JSX.Element {
   if (isLoading && !summary) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-5">
         {Array.from({ length: 10 }).map((_, index) => (
           <Skeleton className="h-32 rounded-2xl" key={index} />
         ))}
@@ -42,7 +42,7 @@ export function ReportKpiGrid({
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-5">
       <ReportKpiCard
         icon={ReceiptText}
         label="Total Sales"
