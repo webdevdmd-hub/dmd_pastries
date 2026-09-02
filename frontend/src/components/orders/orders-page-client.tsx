@@ -310,7 +310,7 @@ export function OrdersPageClient(): JSX.Element {
               Edit the customer, schedule, items, charges, packaging, and production of this order.
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 flex-1">
+          <div className="min-h-0 min-w-0 flex-1">
             {editOrderId ? (
               <OrderFormPage
                 key={editOrderId}
@@ -367,7 +367,7 @@ export function OrdersPageClient(): JSX.Element {
               packaging.
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 flex-1">
+          <div className="min-h-0 min-w-0 flex-1">
             <OrderFormPage
               onClose={() => setCreateOpen(false)}
               orderId={null}
