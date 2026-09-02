@@ -821,6 +821,37 @@ export async function getRecipeComponentProducts(): Promise<RecipeProductOption[
   );
 }
 
+/**
+ * Output products and component products in one round of requests.
+ *
+ * The two lists overlap: finished and semi-finished products are both
+ * outputs and valid components, and fetching the lists separately asked the
+ * server for those types twice. One page fetch per distinct type feeds both.
+ */
+export async function getRecipeProductCatalog(): Promise<{
+  componentProducts: RecipeProductOption[];
+  products: RecipeProductOption[];
+}> {
+  const productTypes = Array.from(
+    new Set([...RECIPE_OUTPUT_PRODUCT_TYPES, ...RECIPE_COMPONENT_PRODUCT_TYPES]),
+  );
+  const pages = await Promise.all(
+    productTypes.map((productType) =>
+      getRecipeProductPages({ status: "active", product_type: productType }),
+    ),
+  );
+  const all = pages.flat();
+
+  return {
+    componentProducts: mergeRecipeProductOptions(
+      all.filter((product) => RECIPE_COMPONENT_PRODUCT_TYPES.includes(product.productType)),
+    ),
+    products: mergeRecipeProductOptions(
+      all.filter((product) => RECIPE_OUTPUT_PRODUCT_TYPES.includes(product.productType)),
+    ),
+  };
+}
+
 export async function getRecipeUnits(): Promise<RecipeUnitOption[]> {
   const response = await apiRequest<RecipeUnitOption[]>("/api/v1/master-data/units", {
     authMode: "appwrite",

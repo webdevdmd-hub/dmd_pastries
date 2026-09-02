@@ -3,6 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useBranchQueryKey } from "@/hooks/use-branch-scope";
+import { branchesQueryKey } from "@/hooks/use-branches";
+import { getBranches as getBranchList } from "@/lib/api/branches";
 import {
   addBatchWastage,
   cancelBatch,
@@ -17,7 +19,6 @@ import {
   getBatchOutputs,
   getBatchPackaging,
   getBatchWastage,
-  getManufacturingBranches,
   getManufacturingInventory,
   getManufacturingProducts,
   getManufacturingRecipeByProduct,
@@ -205,10 +206,14 @@ export function useManufacturingUnits(enabled = true) {
   });
 }
 
+// Reads the same cache entry as useBranches, which the header fills on every
+// page, and narrows it to the option shape manufacturing forms use.
 export function useManufacturingBranches(enabled = true) {
-  return useQuery<ManufacturingBranchOption[]>({
-    queryKey: [manufacturingQueryKey, "branches"],
-    queryFn: async () => getManufacturingBranches(),
+  return useQuery({
+    queryKey: [branchesQueryKey],
+    queryFn: async () => getBranchList(),
+    select: (branches): ManufacturingBranchOption[] =>
+      branches.map((branch) => ({ id: branch.id, branchName: branch.name, status: branch.status })),
     enabled,
   });
 }

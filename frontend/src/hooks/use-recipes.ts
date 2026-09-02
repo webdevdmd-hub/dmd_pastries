@@ -14,11 +14,10 @@ import {
   deleteRecipePackaging,
   getRecipeById,
   getRecipeByProduct,
-  getRecipeComponentProducts,
   getRecipeCost,
   getRecipeIngredients,
   getRecipePackaging,
-  getRecipeProducts,
+  getRecipeProductCatalog,
   getRecipes,
   getRecipeUnits,
   getRecipeVersions,
@@ -185,9 +184,8 @@ export function useRecipeReferenceData(enabled = true) {
   }>({
     queryKey: [recipeQueryKey, branchQueryKey, "reference-data"],
     queryFn: async () => {
-      const [products, componentProducts, units] = await Promise.all([
-        getRecipeProducts(),
-        getRecipeComponentProducts(),
+      const [{ componentProducts, products }, units] = await Promise.all([
+        getRecipeProductCatalog(),
         getRecipeUnits(),
       ]);
 
