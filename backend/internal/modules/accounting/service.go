@@ -2114,6 +2114,13 @@ func (s *Service) ReverseBakeryOrderCOGSJournal(tx *gorm.DB, currentUser *utils.
 	if err := s.repo.UpdateBakeryOrderCOGSReversalJournalID(tx, currentUser.BusinessID, order.ID, reversalID); err != nil {
 		return "", apperrors.Internal("failed to update bakery order COGS reversal journal")
 	}
+	// The restock has already written the return_in movements (reference
+	// type bakery_order_cancelled). Link them the way the posting links the
+	// sale_out movements, or the reversal shows up on the inventory
+	// reconciliation as an unassigned Inventory / Stock line.
+	if err := s.repo.UpdateStockMovementJournalByReference(tx, currentUser.BusinessID, "bakery_order_cancelled", order.ID, "in", reversalID); err != nil {
+		return "", apperrors.Internal("failed to link bakery order restock movements to COGS reversal journal")
+	}
 	return reversalID, nil
 }
 

@@ -3091,6 +3091,25 @@ func (r *Repository) ListInventoryReconciliationDetailRows(businessID, inventory
 				sm.total_cost,
 				sm.accounting_journal_entry_id,
 				sm.created_at,
+				-- Bill-only purchasing accounting (audit 2026-08-12 §GRNI): a receipt
+				-- never carries a journal; the supplier bill posts Inventory / Stock.
+				-- A receipt linked to a posted bill with a live journal is accounted.
+				EXISTS (
+					SELECT 1
+					FROM purchase_receipts pr
+					JOIN purchase_invoices pi ON pi.id = pr.purchase_invoice_id
+						AND pi.business_id = pr.business_id
+						AND pi.deleted_at IS NULL
+						AND pi.status = 'posted'
+					JOIN journal_entries bje ON bje.id = pi.journal_entry_id
+						AND bje.business_id = pi.business_id
+						AND bje.deleted_at IS NULL
+						AND bje.status = 'posted'
+					WHERE sm.reference_type = 'purchase_receipt'
+					  AND pr.id = sm.reference_id
+					  AND pr.business_id = sm.business_id
+					  AND pr.deleted_at IS NULL
+				) AS billed,
 				je.status AS journal_status,
 				EXISTS (
 					SELECT 1
@@ -3123,13 +3142,15 @@ func (r *Repository) ListInventoryReconciliationDetailRows(businessID, inventory
 					WHEN accounting_journal_entry_id IS NOT NULL
 					 AND journal_status IN ('posted', 'reversed')
 					 AND has_inventory_line
-					THEN signed_cost ELSE 0 END), 0) AS accounting_inventory_value,
+					THEN signed_cost
+					WHEN billed THEN signed_cost
+					ELSE 0 END), 0) AS accounting_inventory_value,
 				COUNT(*) FILTER (WHERE movement_type IN ('opening_stock','adjustment_in','adjustment_out','wastage','purchase_in','sale_out','production_in','production_out','purchase_return_out','purchase_bill_cancel_out','return_in') AND COALESCE(total_cost, 0) <= 0) AS missing_cost_count,
-				COUNT(*) FILTER (WHERE movement_type IN ('opening_stock','adjustment_in','adjustment_out','wastage','purchase_in','sale_out','production_in','production_out','purchase_return_out','purchase_bill_cancel_out','return_in') AND accounting_journal_entry_id IS NULL) AS missing_journal_count,
+				COUNT(*) FILTER (WHERE movement_type IN ('opening_stock','adjustment_in','adjustment_out','wastage','purchase_in','sale_out','production_in','production_out','purchase_return_out','purchase_bill_cancel_out','return_in') AND accounting_journal_entry_id IS NULL AND NOT billed) AS missing_journal_count,
 				COUNT(*) FILTER (WHERE accounting_journal_entry_id IS NOT NULL AND COALESCE(journal_status, '') NOT IN ('posted', 'reversed')) AS linked_unposted_count,
 				COUNT(*) FILTER (WHERE accounting_journal_entry_id IS NOT NULL AND journal_status IN ('posted', 'reversed') AND NOT has_inventory_line) AS linked_no_inventory_line_count,
-				COUNT(*) FILTER (WHERE movement_type = 'purchase_in' AND reference_type = 'purchase_receipt' AND accounting_journal_entry_id IS NULL) AS grn_only_count,
-				COALESCE(SUM(CASE WHEN movement_type = 'purchase_in' AND reference_type = 'purchase_receipt' AND accounting_journal_entry_id IS NULL THEN signed_cost ELSE 0 END), 0) AS grn_only_value,
+				COUNT(*) FILTER (WHERE movement_type = 'purchase_in' AND reference_type = 'purchase_receipt' AND accounting_journal_entry_id IS NULL AND NOT billed) AS grn_only_count,
+				COALESCE(SUM(CASE WHEN movement_type = 'purchase_in' AND reference_type = 'purchase_receipt' AND accounting_journal_entry_id IS NULL AND NOT billed THEN signed_cost ELSE 0 END), 0) AS grn_only_value,
 				COUNT(*) FILTER (WHERE movement_type = 'purchase_return_out' AND accounting_journal_entry_id IS NULL) AS purchase_return_missing_count,
 				COUNT(*) FILTER (WHERE movement_type = 'sale_out' AND reference_type = 'sale' AND accounting_journal_entry_id IS NULL) AS pos_cogs_missing_count,
 				COUNT(*) FILTER (WHERE movement_type IN ('production_in','production_out') AND accounting_journal_entry_id IS NULL) AS manufacturing_missing_count,
@@ -3294,6 +3315,23 @@ const unassignedInventoryJournalLinesSQL = `
 	    FROM stock_movements sm
 	    WHERE sm.business_id = jel.business_id
 	      AND sm.accounting_journal_entry_id = jel.journal_entry_id
+	  )
+	  -- A journal that has been reversed, or that reverses another, nets to
+	  -- zero against its pair and explains nothing about the balance.
+	  AND je.status <> 'reversed'
+	  AND je.reversed_entry_id IS NULL
+	  -- Bill-only purchasing accounting: the bill journal is the ledger side of
+	  -- its receipts and is deliberately not linked to their movements. It is
+	  -- assigned when the bill has at least one receipt.
+	  AND NOT EXISTS (
+	    SELECT 1
+	    FROM purchase_invoices pi
+	    JOIN purchase_receipts pr ON pr.purchase_invoice_id = pi.id
+	      AND pr.business_id = pi.business_id
+	      AND pr.deleted_at IS NULL
+	    WHERE pi.business_id = jel.business_id
+	      AND pi.deleted_at IS NULL
+	      AND (pi.journal_entry_id = je.id OR pi.reversal_journal_entry_id = je.id)
 	  )
 	ORDER BY je.entry_date DESC, je.entry_number DESC, jel.line_number ASC
 `
