@@ -216,6 +216,18 @@ type FailedStateProps = {
  * the user just did — it is something that went wrong and warrants interrupting.
  */
 export function FailedState({ detail, heading, noun, onRetry }: FailedStateProps): JSX.Element {
+  // Backend messages arrive as bare phrases ("supplier payment not found"),
+  // and the reassurance that follows ran straight on from them as one
+  // sentence. Capitalise and close the phrase before appending it.
+  const detailSentence = ((): ReactNode => {
+    if (typeof detail !== "string") {
+      return detail ?? "The request failed.";
+    }
+    const trimmed = detail.trim();
+    const sentence = /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+    return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+  })();
+
   return (
     <div
       className="flex flex-col items-center gap-3 rounded-lg border border-danger/30 bg-danger-tint px-6 py-10 text-center"
@@ -224,7 +236,7 @@ export function FailedState({ detail, heading, noun, onRetry }: FailedStateProps
       <h2 className="text-title text-danger-text">{heading ?? <>Couldn&rsquo;t load {noun}</>}</h2>
 
       <p className="text-body max-w-[54ch] text-danger-text">
-        {detail ?? "The request failed."} Nothing has changed and no data was lost.
+        {detailSentence} Nothing has changed and no data was lost.
       </p>
 
       {onRetry ? (

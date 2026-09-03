@@ -1,5 +1,6 @@
 "use client";
 
+import { SearchX } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
@@ -16,13 +17,14 @@ import {
   formatSupplierPaymentMoney,
   SupplierPaymentDetailsPanel,
 } from "@/components/purchasing/supplier-payment-details-panel";
+import { EmptyState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { usePermission } from "@/hooks/use-permission";
 import { useSupplierPayment } from "@/hooks/use-purchasing";
-import { getErrorMessage } from "@/lib/api/client";
+import { ApiError, getErrorMessage } from "@/lib/api/client";
 
 /**
  * The full page for one payment made, at /purchasing/payments/[id]. Read-only:
@@ -67,12 +69,29 @@ export function SupplierPaymentDetailsPageClient({
     return <PurchaseTableSkeleton />;
   }
 
+  // A missing record is not a failed request: retrying cannot help, and the
+  // red alert reads as an outage. It gets the neutral empty state and the one
+  // action that changes the situation, which is going back to the ledger.
+  const isNotFound = paymentQuery.error instanceof ApiError && paymentQuery.error.status === 404;
+
+  if (isNotFound) {
+    return (
+      <EmptyState
+        action={{
+          label: "Back to payments made",
+          onClick: () => router.push(ROUTES.purchasingPayments),
+        }}
+        description="This payment may have been deleted, or the link may belong to a different business."
+        icon={SearchX}
+        title="Payment not found"
+      />
+    );
+  }
+
   if (paymentQuery.error || !paymentQuery.data) {
     return (
       <PurchaseErrorState
-        description={
-          paymentQuery.error ? getErrorMessage(paymentQuery.error) : "Payment not found."
-        }
+        description={getErrorMessage(paymentQuery.error)}
         onRetry={() => {
           void paymentQuery.refetch();
         }}
