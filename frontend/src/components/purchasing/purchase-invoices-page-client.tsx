@@ -9,7 +9,9 @@ import { toast } from "sonner";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseEmptyState } from "@/components/purchasing/purchase-empty-state";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
+import { PurchaseInvoiceDetailsDrawer } from "@/components/purchasing/purchase-invoice-details-drawer";
 import { PurchaseInvoiceFormDialog } from "@/components/purchasing/purchase-invoice-form-dialog";
+import { PurchaseInvoicesCardGrid } from "@/components/purchasing/purchase-invoices-card-grid";
 import { PurchaseInvoicesTable } from "@/components/purchasing/purchase-invoices-table";
 import { PurchaseReceiveDialog } from "@/components/purchasing/purchase-receive-dialog";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
@@ -97,6 +99,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
     PERMISSIONS.purchasingInvoicesCancel,
     PERMISSIONS.purchasingReceiveStock,
   ]);
+  const canManagePayments = hasAnyPermission([PERMISSIONS.purchasingInvoicesEdit]);
   const canConvertToReceipt = hasAnyPermission([
     PERMISSIONS.purchasingReceiptsCreate,
     PERMISSIONS.purchasingReceiveStock,
@@ -112,6 +115,10 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [loadingInvoiceDetailId, setLoadingInvoiceDetailId] = useState<string | null>(null);
+  // The id, not the record: the list rows carry a summary and the drawer
+  // fetches the full bill itself.
+  const [detailsInvoiceId, setDetailsInvoiceId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [page, setPage] = useState(1);
   const invoicesQuery = usePurchaseInvoices(filters, canView && branchScope.hasBranchScope, page);
   const invoicesTotalPages = invoicesQuery.data?.pagination.totalPages ?? 1;
@@ -195,6 +202,11 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
     setFormOpen(true);
   };
 
+  const openDetails = (invoice: PurchaseInvoice): void => {
+    setDetailsInvoiceId(invoice.id);
+    setDetailsOpen(true);
+  };
+
   const handleCreate = async (payload: CreatePurchaseInvoicePayload): Promise<void> => {
     try {
       await createMutation.mutateAsync(payload);
@@ -235,7 +247,11 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
     }
   };
 
+  // A dialog on top of a sheet on top of the list is one layer too many, so
+  // the drawer closes before any of these open. Closing the dialog then
+  // lands back on the list.
   const handleEditInvoice = async (invoice: PurchaseInvoice): Promise<void> => {
+    setDetailsOpen(false);
     try {
       const invoiceDetail = await loadInvoiceDetail(invoice);
       setEditingInvoice(invoiceDetail);
@@ -246,6 +262,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
   };
 
   const handleOpenReceive = async (invoice: PurchaseInvoice): Promise<void> => {
+    setDetailsOpen(false);
     try {
       const invoiceDetail = await loadInvoiceDetail(invoice);
       setReceivingInvoice(invoiceDetail);
@@ -268,6 +285,12 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
+  };
+
+  const askAction = (action: NonNullable<PendingAction>): void => {
+    setDetailsOpen(false);
+    setCancelReason("");
+    setPendingAction(action);
   };
 
   const confirmAction = async (): Promise<void> => {
@@ -297,6 +320,30 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
   };
 
   const invoices = invoicesQuery.data?.items ?? [];
+  const listHandlers = {
+    canConvertToReceipt,
+    canManage,
+    canPost,
+    invoices,
+    loadingInvoiceId: loadingInvoiceDetailId,
+    onCancel: (invoice: PurchaseInvoice) => askAction({ invoice, type: "cancel" }),
+    onConvertToReceipt: (invoice: PurchaseInvoice) => void handleConvertToReceipt(invoice),
+    onEdit: (invoice: PurchaseInvoice) => void handleEditInvoice(invoice),
+    onPost: (invoice: PurchaseInvoice) => askAction({ invoice, type: "post" }),
+    onReceive: (invoice: PurchaseInvoice) => void handleOpenReceive(invoice),
+    onView: openDetails,
+  };
+  const pagination = invoicesQuery.data?.pagination ? (
+    <PaginationBar
+      isFetching={invoicesQuery.isFetching}
+      limit={invoicesQuery.data.pagination.limit}
+      noun={{ one: "bill", other: "bills" }}
+      onPageChange={setPage}
+      page={invoicesQuery.data.pagination.page}
+      total={invoicesQuery.data.pagination.total}
+      totalPages={invoicesQuery.data.pagination.totalPages}
+    />
+  ) : null;
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -317,6 +364,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
         allowAllBranches={branchScope.canAccessAllBranches}
         branches={branchOptions}
         filters={filters}
+        noun="bills"
         onFiltersChange={setFilters}
         paymentStatuses={paymentStatuses}
         resetBranchId={branchScope.defaultBranchId}
@@ -366,38 +414,31 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
         />
       ) : null}
 
+      {/* An eight-column ledger has no honest phone layout. Below md the list
+          is cards carrying the same fields; the table takes over from md up. */}
       {!invoicesQuery.isLoading && !invoicesQuery.error && invoices.length > 0 ? (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <PurchaseInvoicesTable
-              canConvertToReceipt={canConvertToReceipt}
-              canManage={canManage}
-              canPost={canPost}
-              invoices={invoices}
-              loadingInvoiceId={loadingInvoiceDetailId}
-              onCancel={(invoice) => {
-                setCancelReason("");
-                setPendingAction({ invoice, type: "cancel" });
-              }}
-              onConvertToReceipt={(invoice) => void handleConvertToReceipt(invoice)}
-              onEdit={(invoice) => void handleEditInvoice(invoice)}
-              onPost={(invoice) => setPendingAction({ invoice, type: "post" })}
-              onReceive={(invoice) => void handleOpenReceive(invoice)}
-            />
-            {invoicesQuery.data?.pagination ? (
-              <PaginationBar
-                isFetching={invoicesQuery.isFetching}
-                limit={invoicesQuery.data.pagination.limit}
-                noun={{ one: "bill", other: "bills" }}
-                onPageChange={setPage}
-                page={invoicesQuery.data.pagination.page}
-                total={invoicesQuery.data.pagination.total}
-                totalPages={invoicesQuery.data.pagination.totalPages}
-              />
-            ) : null}
-          </CardContent>
-        </Card>
+        <>
+          <div className="grid gap-4 md:hidden">
+            <PurchaseInvoicesCardGrid {...listHandlers} />
+            {pagination ? <Card className="overflow-hidden">{pagination}</Card> : null}
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <PurchaseInvoicesTable {...listHandlers} />
+              {pagination}
+            </CardContent>
+          </Card>
+        </>
       ) : null}
+
+      <PurchaseInvoiceDetailsDrawer
+        canManagePayments={canManagePayments}
+        canView={canView}
+        invoiceId={detailsInvoiceId}
+        onEdit={canManage ? (invoice) => void handleEditInvoice(invoice) : undefined}
+        onOpenChange={setDetailsOpen}
+        open={detailsOpen}
+      />
 
       <PurchaseInvoiceFormDialog
         accounts={[...(purchaseAccountsQuery.data ?? [])]}
@@ -444,7 +485,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {pendingAction?.type === "post" ? "Post Bill" : "Cancel Bill"}
+              {pendingAction?.type === "post" ? "Post bill" : "Cancel bill"}
             </DialogTitle>
             <DialogDescription>
               {pendingAction?.type === "post"
@@ -483,7 +524,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
               onClick={() => void confirmAction()}
               type="button"
             >
-              {pendingAction?.type === "post" ? "Post Bill" : "Cancel Bill"}
+              {pendingAction?.type === "post" ? "Post bill" : "Cancel bill"}
             </Button>
           </DialogFooter>
         </DialogContent>

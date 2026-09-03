@@ -96,7 +96,12 @@ export function PurchaseInvoicePaymentsSection({
         {!paymentsQuery.isLoading &&
         !paymentsQuery.error &&
         (paymentsQuery.data ?? []).length > 0 ? (
-          <PurchaseSupplierPaymentsTable payments={paymentsQuery.data ?? []} showSupplier={false} />
+          <div className="overflow-x-auto">
+            <PurchaseSupplierPaymentsTable
+              payments={paymentsQuery.data ?? []}
+              showSupplier={false}
+            />
+          </div>
         ) : null}
         {!paymentsQuery.isLoading &&
         !paymentsQuery.error &&

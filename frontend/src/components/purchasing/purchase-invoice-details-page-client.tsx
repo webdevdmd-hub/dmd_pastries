@@ -1,19 +1,21 @@
 "use client";
 
-import { AlertTriangle, ArrowUpRight, MoreHorizontal } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import type { JSX, ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { AppBadge } from "@/components/app/app-badge";
 import { usePublishBreadcrumbLabel } from "@/components/layout/breadcrumb-label";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
+import {
+  parsePurchaseInvoiceDetailTab,
+  type PurchaseInvoiceDetailTabKey,
+} from "@/components/purchasing/purchase-invoice-detail-tabs";
+import { PurchaseInvoiceDetailsPanel } from "@/components/purchasing/purchase-invoice-details-panel";
 import { PurchaseInvoiceFormDialog } from "@/components/purchasing/purchase-invoice-form-dialog";
-import { PurchaseInvoiceItemLines } from "@/components/purchasing/purchase-invoice-item-lines";
-import { PurchaseInvoicePaymentsSection } from "@/components/purchasing/purchase-invoice-payments-section";
 import { PurchaseInvoiceStatusBadge } from "@/components/purchasing/purchase-invoice-status-badge";
 import { PurchasePaymentStatusBadge } from "@/components/purchasing/purchase-payment-status-badge";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
@@ -34,13 +36,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
@@ -78,56 +73,8 @@ function formatDate(value: string | null): string {
   return new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(date);
 }
 
-function formatDateTime(value: string | null): string {
-  if (!value) return "Not recorded";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Not recorded";
-  return new Intl.DateTimeFormat("en-AE", { dateStyle: "medium", timeStyle: "short" }).format(date);
-}
-
 function today(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function receiveStatusMeta(status: PurchaseInvoice["receiveStatus"]): {
-  label: string;
-  tone: "muted" | "warning" | "success";
-} {
-  if (status === "received") return { label: "Received", tone: "success" };
-  if (status === "partially_received") return { label: "Partially received", tone: "warning" };
-  return { label: "Not received", tone: "muted" };
-}
-
-function SectionHeader({
-  action,
-  description,
-  title,
-}: {
-  action?: ReactNode;
-  description?: string;
-  title: string;
-}): JSX.Element {
-  return (
-    <div className="flex flex-col gap-3 border-b border-workspace-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h2 className="text-lg font-semibold text-brand-espresso">{title}</h2>
-        {description ? <p className="mt-1 text-sm text-workspace-muted">{description}</p> : null}
-      </div>
-      {action}
-    </div>
-  );
-}
-
-function InfoField({ label, value }: { label: string; value: ReactNode }): JSX.Element {
-  return (
-    <div className="min-w-0">
-      {/* Was `uppercase tracking-wide`, which this one helper turned into 25
-          violations of the DESIGN.md rule against uppercase-with-tracking
-          in-app. Sentence case reads faster and wraps better in a drawer. */}
-      <p className="text-meta font-medium text-workspace-muted">{label}</p>
-      <div className="mt-1 text-sm font-semibold text-brand-espresso">{value}</div>
-    </div>
-  );
 }
 
 type BillStanding = {
@@ -189,6 +136,8 @@ export function PurchaseInvoiceDetailsPageClient({
   invoiceId: string;
 }): JSX.Element {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.purchasingView, PERMISSIONS.inventoryView]);
   const canManage = hasAnyPermission([PERMISSIONS.purchasingInvoicesEdit]);
@@ -204,7 +153,6 @@ export function PurchaseInvoiceDetailsPageClient({
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [editOpen, setEditOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [receivedDate, setReceivedDate] = useState(today());
   const [conversionNotes, setConversionNotes] = useState("");
   const invoiceQuery = usePurchaseInvoice(invoiceId, canView);
@@ -234,6 +182,19 @@ export function PurchaseInvoiceDetailsPageClient({
   const cancelMutation = useCancelPurchaseInvoice();
   const updateMutation = useUpdatePurchaseInvoice();
 
+  const activeTab = parsePurchaseInvoiceDetailTab(searchParams.get("tab"));
+
+  const changeTab = (tab: PurchaseInvoiceDetailTabKey): void => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (tab === "items") {
+      next.delete("tab");
+    } else {
+      next.set("tab", tab);
+    }
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
   if (!canView) {
     return <AccessDeniedCard />;
   }
@@ -259,19 +220,7 @@ export function PurchaseInvoiceDetailsPageClient({
   const canCancelInvoice = canCancel && invoice.status === "posted";
   const canEditInvoice = canEdit && invoice.status !== "cancelled";
   const billTitle = invoice.supplierBillNumber ?? invoice.invoiceNumber;
-  const isOverdue = invoice.paymentStatus === "overdue";
-  const receiveStatus = receiveStatusMeta(invoice.receiveStatus);
   const standing = billStanding(invoice);
-  const billTotals = {
-    balance: invoice.balanceAmount,
-    billDiscount: invoice.billDiscountAmount,
-    legacyCharges: invoice.chargeAmount + invoice.chargeTaxAmount,
-    lineDiscounts: invoice.discountAmount,
-    paid: invoice.paidAmount,
-    subtotal: invoice.subtotalAmount,
-    tax: invoice.taxAmount,
-    total: invoice.totalAmount,
-  };
 
   const openConvertDialog = (): void => {
     setReceivedDate(today());
@@ -381,9 +330,6 @@ export function PurchaseInvoiceDetailsPageClient({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
-            <Button onClick={() => setDetailsOpen(true)} type="button" variant="outline">
-              Details &amp; notes
-            </Button>
             {canPostInvoice ? (
               <Button onClick={() => setPostOpen(true)} type="button">
                 Post Bill
@@ -434,161 +380,12 @@ export function PurchaseInvoiceDetailsPageClient({
         </div>
       </header>
 
-      {/* One column. The old grid was lg:grid-cols-[minmax(0,1fr)_22rem], and
-          lg: reads the viewport rather than this box: at a 1030px window main is
-          727px, so the fixed 22rem summary took 352px and the column holding the
-          items table got 287px. The summary was wider than what it summarised,
-          and the table hid 595px of itself. The money is now a footer on the
-          table it totals, so there is nothing to put beside it. */}
-      <div className="flex min-w-0 flex-col gap-6">
-        {invoice.status === "cancelled" ? (
-          <section className="rounded-md border border-danger/30 bg-danger-tint p-5">
-            <div className="flex items-start gap-3">
-              <AlertTriangle
-                aria-hidden="true"
-                className="mt-0.5 h-5 w-5 shrink-0 text-danger-text"
-              />
-              <div className="min-w-0 flex-1">
-                <h2 className="text-base font-semibold text-danger-text">
-                  This bill was cancelled
-                </h2>
-                <p className="mt-1 text-sm text-danger-text">
-                  Cancelling a posted bill reverses the supplier payable, VAT, and inventory impact
-                  where stock is still available.
-                </p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <p className="text-meta font-medium text-danger-text">Cancelled at</p>
-                    <p className="mt-1 text-sm font-semibold text-danger-text">
-                      {formatDateTime(invoice.cancelledAt)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-meta font-medium text-danger-text">Cancel reason</p>
-                    <p className="mt-1 text-sm font-semibold text-danger-text">
-                      {invoice.cancelReason ?? "Not recorded"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-meta font-medium text-danger-text">Reversal journal</p>
-                    {invoice.reversalJournalEntryId ? (
-                      <Link
-                        className="mt-1 inline-block text-sm font-semibold text-danger-text underline-offset-4 hover:underline"
-                        href={`${ROUTES.accountingJournalEntries}?search=${encodeURIComponent(
-                          invoice.reversalJournalEntryId,
-                        )}`}
-                      >
-                        View journal
-                      </Link>
-                    ) : (
-                      <p className="mt-1 text-sm font-semibold text-danger-text">Not recorded</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-meta font-medium text-danger-text">Cancelled receipt</p>
-                    {invoice.cancelledReceiptId ? (
-                      <Link
-                        className="mt-1 inline-block text-sm font-semibold text-danger-text underline-offset-4 hover:underline"
-                        href={`${ROUTES.purchasingReceipts}/${invoice.cancelledReceiptId}`}
-                      >
-                        View receipt
-                      </Link>
-                    ) : (
-                      <p className="mt-1 text-sm font-semibold text-danger-text">Not recorded</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
-          <SectionHeader
-            description={`${String(invoice.items.length)} line item(s) on this bill.`}
-            title="Bill items"
-          />
-          <PurchaseInvoiceItemLines items={invoice.items} totals={billTotals} />
-        </section>
-
-        {/* Paying is what you came to do on an unpaid bill, so it stays on the
-            page. Only reference material went into the drawer. */}
-        <PurchaseInvoicePaymentsSection canManage={canManage} invoice={invoice} />
-      </div>
-
-      <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-xl" side="right">
-          <SheetHeader>
-            <SheetTitle>Details &amp; notes</SheetTitle>
-            <SheetDescription>
-              {invoice.invoiceNumber} &middot; {invoice.supplierName}
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="mt-6 space-y-6">
-            <div className="grid gap-5 sm:grid-cols-2">
-              <InfoField label="Bill no" value={invoice.invoiceNumber} />
-              <InfoField
-                label="Invoice no (supplier)"
-                value={invoice.supplierBillNumber ?? "Not recorded"}
-              />
-              <InfoField label="Supplier" value={invoice.supplierName} />
-              <InfoField label="Branch" value={invoice.branchName} />
-              <InfoField label="Bill date" value={formatDate(invoice.invoiceDate)} />
-              <InfoField
-                label="Due date"
-                value={
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1.5",
-                      isOverdue ? "text-danger-text" : undefined,
-                    )}
-                  >
-                    {isOverdue ? (
-                      <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />
-                    ) : null}
-                    {formatDate(invoice.dueDate)}
-                  </span>
-                }
-              />
-              <InfoField
-                label="Purchase order"
-                value={
-                  invoice.purchaseOrderId ? (
-                    <Link
-                      className="inline-flex items-center gap-1 text-brand-espresso underline-offset-4 hover:underline"
-                      href={`${ROUTES.purchasingOrders}/${invoice.purchaseOrderId}`}
-                    >
-                      {invoice.purchaseOrderNumber ?? "View purchase order"}
-                      <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" />
-                    </Link>
-                  ) : (
-                    "Not linked to a purchase order"
-                  )
-                }
-              />
-              <InfoField
-                label="Goods receipt"
-                value={<AppBadge tone={receiveStatus.tone}>{receiveStatus.label}</AppBadge>}
-              />
-            </div>
-
-            <div className="border-t border-workspace-border pt-5">
-              <p className="text-meta font-medium text-workspace-muted">Notes</p>
-              <p className="mt-1 text-cell text-brand-espresso">
-                {invoice.notes ?? "No notes recorded."}
-              </p>
-            </div>
-
-            <p className="border-t border-workspace-border pt-5 text-meta text-workspace-muted">
-              Created by {invoice.createdByUserName} on {formatDateTime(invoice.createdAt)}
-              {invoice.updatedAt !== invoice.createdAt
-                ? ` · Last updated ${formatDateTime(invoice.updatedAt)}`
-                : ""}
-            </p>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <PurchaseInvoiceDetailsPanel
+        activeTab={activeTab}
+        canManagePayments={canManage}
+        invoice={invoice}
+        onTabChange={changeTab}
+      />
 
       <PurchaseInvoiceFormDialog
         accounts={[...(purchaseAccountsQuery.data ?? [])]}

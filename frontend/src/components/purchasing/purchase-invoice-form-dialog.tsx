@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { PurchasingItemLineEditor } from "@/components/purchasing/purchasing-item-line-editor";
 import { SupplierLookupSelect } from "@/components/purchasing/supplier-lookup-select";
+import { type FormTab, FormTabs } from "@/components/shared/form-tabs";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -54,6 +55,17 @@ export type PurchaseInvoiceFormInitialValues = {
   purchaseOrderNumber?: string | null;
   supplierId: string;
 };
+
+type BillFormTabKey = "details" | "items" | "notes";
+
+const FORM_TABPANEL_ID = "bill-form-tabpanel";
+
+/** Which tab a validation issue belongs to, from the field it names. */
+function tabForField(field: string | number | undefined): BillFormTabKey {
+  if (field === "items") return "items";
+  if (field === "notes") return "notes";
+  return "details";
+}
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -152,6 +164,7 @@ export function PurchaseInvoiceFormDialog({
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<PurchaseItemLineDraft[]>([emptyLine()]);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<BillFormTabKey>("details");
   // W3: "" = business default on create; edits carry the stored mode.
   const [taxMode, setTaxMode] = useState<"" | "inclusive" | "exclusive" | "no_tax">("");
   const { hasPermission } = usePermission();
@@ -216,11 +229,18 @@ export function PurchaseInvoiceFormDialog({
         : [emptyLine()],
     );
     setError(null);
+    // Every opening starts on Details, whichever tab the last one closed on.
+    setActiveTab("details");
   }, [branchScope.effectiveBranchId, initialValues, invoice, open]);
 
   const linkedPurchaseOrderLabel =
     purchaseOrderNumber || (purchaseOrderId ? "PO number unavailable" : "");
   const isPostedEdit = invoice?.status === "posted";
+  const formTabs: FormTab<BillFormTabKey>[] = [
+    { key: "details", label: "Details" },
+    { key: "items", label: "Items", badge: lines.length },
+    { key: "notes", label: "Notes" },
+  ];
 
   const submit = async (): Promise<void> => {
     const result = purchaseInvoiceSchema.safeParse({
@@ -237,7 +257,11 @@ export function PurchaseInvoiceFormDialog({
     });
 
     if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Please check the bill form.");
+      // A failed check switches to the tab that holds the problem before the
+      // banner explains it; a hidden error is otherwise a silent no-op.
+      const issue = result.error.issues[0];
+      setActiveTab(tabForField(issue?.path[0]));
+      setError(issue?.message ?? "Please check the bill form.");
       return;
     }
 
@@ -250,8 +274,8 @@ export function PurchaseInvoiceFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent className="flex max-h-[92vh] max-w-[min(96vw,1500px)] flex-col gap-3 overflow-hidden p-4">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90dvh] max-w-[min(96vw,1500px)] flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b border-border px-6 pb-4 pt-6">
           <DialogTitle>{invoice ? "Edit bill" : createTitle}</DialogTitle>
           <DialogDescription>
             {invoice
@@ -259,124 +283,145 @@ export function PurchaseInvoiceFormDialog({
               : createDescription}
           </DialogDescription>
         </DialogHeader>
-        {isPostedEdit ? (
-          <div className="rounded-lg border border-warning/30 bg-warning-tint px-3 py-2 text-sm text-warning-text">
-            Editing a posted bill will update payable/accounting records. Bills with payments,
-            vendor credits, or received stock cannot be edited.
-          </div>
-        ) : null}
-        {/* Every field carries a visible label. This dialog had none at all --
-            six controls identified by aria-label and placeholder only, and two
-            of them are adjacent type=date inputs that both render dd/mm/yyyy,
-            so nothing on screen said which was the bill date and which was the
-            due date. Create Purchase Order labels everything; so does this. */}
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <Field htmlFor="bill-branch" label="Branch" required>
-            <Select
-              value={branchId || "none"}
-              onValueChange={(value) => setBranchId(value === "none" ? "" : value)}
-            >
-              <SelectTrigger className="h-9 text-xs" id="bill-branch">
-                <SelectValue placeholder="Branch" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Select branch</SelectItem>
-                {selectableBranches.map((branch) => (
-                  <SelectItem key={branch.id} value={branch.id}>
-                    {branch.branchName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field htmlFor="bill-supplier" label="Supplier" required>
-            <SupplierLookupSelect
-              id="bill-supplier"
-              onValueChange={setSupplierId}
-              suppliers={suppliers}
-              value={supplierId}
-            />
-          </Field>
-          {purchaseOrderId ? (
-            <div className="flex h-9 items-center rounded-md border border-input bg-brand-latte/40 px-3 text-xs text-brand-espresso">
-              <span className="mr-2 text-brand-mocha">Linked PO</span>
-              <span className="font-semibold">{linkedPurchaseOrderLabel}</span>
+
+        {/* Tabs rather than one long scroll: one state holds every field, and
+            a tab only decides which section is visible. */}
+        <div className="border-b border-border px-6 py-3">
+          <FormTabs
+            active={activeTab}
+            aria-label="Bill form sections"
+            onTabChange={setActiveTab}
+            panelId={FORM_TABPANEL_ID}
+            tabs={formTabs}
+          />
+        </div>
+
+        <div
+          className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-6 py-5"
+          id={FORM_TABPANEL_ID}
+          role="tabpanel"
+          tabIndex={-1}
+        >
+          {isPostedEdit ? (
+            <div className="rounded-lg border border-warning/30 bg-warning-tint px-3 py-2 text-cell text-warning-text">
+              Editing a posted bill will update payable/accounting records. Bills with payments,
+              vendor credits, or received stock cannot be edited.
             </div>
           ) : null}
-          <Field htmlFor="bill-number" label="Bill number">
-            <Input
-              className="h-9 text-xs"
-              id="bill-number"
-              onChange={(event) => setInvoiceNumber(event.target.value)}
-              placeholder="Internal bill number"
-              value={invoiceNumber}
+          {/* Every field carries a visible label: two adjacent date inputs both
+            render dd/mm/yyyy, so nothing else says which is the bill date. */}
+          <div className={activeTab === "details" ? "grid gap-3 md:grid-cols-3" : "hidden"}>
+            <Field htmlFor="bill-branch" label="Branch" required>
+              <Select
+                value={branchId || "none"}
+                onValueChange={(value) => setBranchId(value === "none" ? "" : value)}
+              >
+                <SelectTrigger className="h-9 text-xs" id="bill-branch">
+                  <SelectValue placeholder="Branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Select branch</SelectItem>
+                  {selectableBranches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.branchName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field htmlFor="bill-supplier" label="Supplier" required>
+              <SupplierLookupSelect
+                id="bill-supplier"
+                onValueChange={setSupplierId}
+                suppliers={suppliers}
+                value={supplierId}
+              />
+            </Field>
+            {purchaseOrderId ? (
+              <div className="flex h-9 items-center rounded-md border border-input bg-brand-latte/40 px-3 text-xs text-brand-espresso">
+                <span className="mr-2 text-brand-mocha">Linked PO</span>
+                <span className="font-semibold">{linkedPurchaseOrderLabel}</span>
+              </div>
+            ) : null}
+            <Field htmlFor="bill-number" label="Bill number">
+              <Input
+                className="h-9 text-xs"
+                id="bill-number"
+                onChange={(event) => setInvoiceNumber(event.target.value)}
+                placeholder="Internal bill number"
+                value={invoiceNumber}
+              />
+            </Field>
+            <Field htmlFor="bill-date" label="Bill date" required>
+              <Input
+                className="h-9 text-xs"
+                id="bill-date"
+                onChange={(event) => setInvoiceDate(event.target.value)}
+                type="date"
+                value={invoiceDate}
+              />
+            </Field>
+            <Field htmlFor="bill-due-date" label="Due date">
+              <Input
+                className="h-9 text-xs"
+                id="bill-due-date"
+                onChange={(event) => setDueDate(event.target.value)}
+                type="date"
+                value={dueDate}
+              />
+            </Field>
+            <Field htmlFor="bill-vat-mode" label="VAT mode">
+              <Select
+                onValueChange={(value) =>
+                  setTaxMode(value === "default" ? "" : (value as typeof taxMode))
+                }
+                value={taxMode === "" ? "default" : taxMode}
+              >
+                <SelectTrigger className="h-9 text-xs" id="bill-vat-mode">
+                  <SelectValue placeholder="VAT mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">VAT: Business default</SelectItem>
+                  <SelectItem value="inclusive">VAT: Inclusive</SelectItem>
+                  <SelectItem value="exclusive">VAT: Exclusive</SelectItem>
+                  {canApplyNoTax ? <SelectItem value="no_tax">VAT: No tax</SelectItem> : null}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <div className={activeTab === "items" ? undefined : "hidden"}>
+            <PurchasingItemLineEditor
+              accounts={accounts}
+              allowBatchFields
+              compactLayout
+              extrasDefaultOpen
+              billDiscountAmount={billDiscountAmount}
+              legacyChargeAmount={invoice?.chargeAmount ?? 0}
+              legacyChargeTaxAmount={invoice?.chargeTaxAmount ?? 0}
+              lines={lines}
+              onBillDiscountAmountChange={setBillDiscountAmount}
+              onLinesChange={setLines}
+              paidAmount={invoice?.paidAmount ?? 0}
+              products={products}
+              showAccountRows
+              taxRates={taxRates}
+              units={units}
             />
-          </Field>
-          <Field htmlFor="bill-date" label="Bill date" required>
-            <Input
-              className="h-9 text-xs"
-              id="bill-date"
-              onChange={(event) => setInvoiceDate(event.target.value)}
-              type="date"
-              value={invoiceDate}
-            />
-          </Field>
-          <Field htmlFor="bill-due-date" label="Due date">
-            <Input
-              className="h-9 text-xs"
-              id="bill-due-date"
-              onChange={(event) => setDueDate(event.target.value)}
-              type="date"
-              value={dueDate}
-            />
-          </Field>
-          <Field htmlFor="bill-vat-mode" label="VAT mode">
-            <Select
-              onValueChange={(value) =>
-                setTaxMode(value === "default" ? "" : (value as typeof taxMode))
-              }
-              value={taxMode === "" ? "default" : taxMode}
-            >
-              <SelectTrigger className="h-9 text-xs" id="bill-vat-mode">
-                <SelectValue placeholder="VAT mode" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">VAT: Business default</SelectItem>
-                <SelectItem value="inclusive">VAT: Inclusive</SelectItem>
-                <SelectItem value="exclusive">VAT: Exclusive</SelectItem>
-                {canApplyNoTax ? <SelectItem value="no_tax">VAT: No tax</SelectItem> : null}
-              </SelectContent>
-            </Select>
-          </Field>
+          </div>
+          <div className={activeTab === "notes" ? undefined : "hidden"}>
+            <Field htmlFor="bill-notes" label="Notes">
+              <Textarea
+                className="min-h-40 text-cell"
+                id="bill-notes"
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Supplier reference, delivery notes, or anything to remember"
+                value={notes}
+              />
+            </Field>
+          </div>
+          {error ? <p className="text-cell font-medium text-danger-text">{error}</p> : null}
         </div>
-        <PurchasingItemLineEditor
-          accounts={accounts}
-          allowBatchFields
-          compactLayout
-          extrasDefaultOpen
-          billDiscountAmount={billDiscountAmount}
-          legacyChargeAmount={invoice?.chargeAmount ?? 0}
-          legacyChargeTaxAmount={invoice?.chargeTaxAmount ?? 0}
-          lines={lines}
-          onBillDiscountAmountChange={setBillDiscountAmount}
-          onLinesChange={setLines}
-          paidAmount={invoice?.paidAmount ?? 0}
-          products={products}
-          showAccountRows
-          taxRates={taxRates}
-          units={units}
-        />
-        <Field htmlFor="bill-notes" label="Notes">
-          <Textarea
-            className="min-h-[42px] text-xs"
-            id="bill-notes"
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Supplier reference, delivery notes, or anything to remember"
-            value={notes}
-          />
-        </Field>
-        {error ? <p className="text-sm font-semibold text-danger-text">{error}</p> : null}
-        <DialogFooter>
+        <DialogFooter className="border-t border-border px-6 py-4">
           <Button onClick={onClose} type="button" variant="outline">
             Cancel
           </Button>
