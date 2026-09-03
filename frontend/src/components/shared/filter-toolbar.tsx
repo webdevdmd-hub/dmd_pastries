@@ -92,7 +92,11 @@ export function FilterToolbar({
             ) : null}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-80 p-4">
+        <PopoverContent
+          align="start"
+          className="w-[calc(100vw-2rem)] p-4 sm:w-80"
+          collisionPadding={16}
+        >
           <div className="flex flex-col gap-3">
             <p className="text-sm font-semibold text-brand-espresso">{popoverTitle}</p>
             {children}
