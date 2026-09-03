@@ -29,19 +29,29 @@ export function RecipesSummaryCards({ recipes }: { recipes: Recipe[] }): JSX.Ele
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    // Four across from md, not from xl. The old xl threshold meant a laptop at
+    // any width under 1280px got two rows of two, which is most laptops: the
+    // four figures are one comparison and belong on one line.
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
       {cards.map((card) => {
         const Icon = card.icon;
 
         return (
-          <Card className="bg-card/80" key={card.label}>
-            <CardContent className="flex items-center justify-between p-6">
-              <div>
-                <p className="text-sm text-brand-mocha">{card.label}</p>
-                <p className="mt-3 text-3xl font-medium text-brand-espresso">{card.value}</p>
+          <Card key={card.label}>
+            {/* Padding and type step up with the viewport instead of staying at
+                the widest setting, so four cards fit a 768px row without the
+                figure colliding with its icon. */}
+            <CardContent className="flex items-center justify-between gap-3 p-4 xl:p-5">
+              <div className="min-w-0">
+                <p className="truncate text-meta text-foreground-muted">{card.label}</p>
+                <p className="mt-2 truncate text-2xl font-medium tabular-nums text-foreground xl:text-3xl">
+                  {card.value}
+                </p>
               </div>
-              <div className="rounded-2xl bg-brand-cappuccino/35 p-4 text-brand-mocha">
-                <Icon className="h-7 w-7" />
+              {/* The icon is decoration, and decoration is the first thing to
+                  go when the row is tight. */}
+              <div className="hidden shrink-0 rounded-xl bg-border/35 p-2.5 text-foreground-muted sm:block xl:p-3">
+                <Icon className="h-5 w-5 xl:h-6 xl:w-6" />
               </div>
             </CardContent>
           </Card>
