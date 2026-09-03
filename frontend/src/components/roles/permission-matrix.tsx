@@ -354,7 +354,7 @@ export function PermissionMatrix({
               <div className="flex items-center gap-3 px-4 py-3">
                 <Checkbox
                   aria-label={`Grant every ${group.title} permission`}
-                  checked={allGranted}
+                  checked={allGranted ? true : grantedInModule > 0 ? "indeterminate" : false}
                   disabled={matrixDisabled}
                   onCheckedChange={(checked) => toggleMany(ids, checked === true)}
                 />
