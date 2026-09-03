@@ -484,7 +484,7 @@ export function PermissionMatrix({
                                         <span className="block text-xs font-semibold text-brand-espresso">
                                           {permission.actionLabel}
                                         </span>
-                                        <span className="block text-[11px] leading-4 text-brand-mocha">
+                                        <span className="block font-mono text-meta leading-4 text-foreground-muted">
                                           {permission.permissionKey}
                                         </span>
                                       </span>
@@ -536,7 +536,7 @@ export function PermissionMatrix({
                                     <span className="block text-xs font-semibold text-brand-espresso">
                                       {permission.actionLabel}
                                     </span>
-                                    <span className="block text-[11px] leading-4 text-brand-mocha">
+                                    <span className="block font-mono text-meta leading-4 text-foreground-muted">
                                       {permission.permissionKey}
                                     </span>
                                   </span>

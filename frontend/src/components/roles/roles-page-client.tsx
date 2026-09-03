@@ -9,11 +9,19 @@ import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/roles/access-denied-card";
 import { PermissionMatrix } from "@/components/roles/permission-matrix";
+import { RoleDetailsDrawer } from "@/components/roles/role-details-drawer";
 import { RoleFormDialog } from "@/components/roles/role-form-dialog";
+import { RolesCardGrid } from "@/components/roles/roles-card-grid";
 import { RolesEmptyState } from "@/components/roles/roles-empty-state";
 import { RolesErrorState } from "@/components/roles/roles-error-state";
 import { RolesTable } from "@/components/roles/roles-table";
 import { RolesTableSkeleton } from "@/components/roles/roles-table-skeleton";
+import {
+  defaultRolesFilters,
+  type RolesFilters,
+  RolesToolbar,
+} from "@/components/roles/roles-toolbar";
+import { FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,6 +91,9 @@ export function RolesPageClient(): JSX.Element {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<RoleFormMode>("create");
   const [dialogRole, setDialogRole] = useState<Role | null>(null);
+  // The record, not the id: the list rows already carry a full role.
+  const [drawerRole, setDrawerRole] = useState<Role | null>(null);
+  const [rolesFilters, setRolesFilters] = useState<RolesFilters>(defaultRolesFilters);
   const [permissionDialog, setPermissionDialog] = useState<{
     mode: "view" | "manage";
     role: Role;
@@ -119,6 +130,29 @@ export function RolesPageClient(): JSX.Element {
     () => enrichRoles(rolesData ?? [], usersQuery.data),
     [rolesData, usersQuery.data],
   );
+  // The filtered view the table and cards render. The counts above stay on
+  // the unfiltered list, because they describe the workspace, not the search.
+  const visibleRoles = useMemo(() => {
+    const query = rolesFilters.search.trim().toLowerCase();
+
+    return roles.filter((role) => {
+      const matchesQuery =
+        query.length === 0 ||
+        role.roleName.toLowerCase().includes(query) ||
+        role.description.toLowerCase().includes(query);
+      const matchesStatus = rolesFilters.status === "all" || role.status === rolesFilters.status;
+      const matchesType =
+        rolesFilters.type === "all" ||
+        (rolesFilters.type === "system" ? role.isSystemDefault : !role.isSystemDefault);
+
+      return matchesQuery && matchesStatus && matchesType;
+    });
+  }, [roles, rolesFilters]);
+  const hasActiveRoleFilters =
+    rolesFilters.search.trim().length > 0 ||
+    rolesFilters.status !== "all" ||
+    rolesFilters.type !== "all";
+
   const selectedRole = useMemo(() => {
     if (!permissionDialog) {
       return null;
@@ -206,6 +240,28 @@ export function RolesPageClient(): JSX.Element {
 
   const openPermissionsDialog = (role: Role, mode: "view" | "manage"): void => {
     setPermissionDialog({ role, mode });
+  };
+
+  // A dialog on top of a sheet on top of the list is one layer too many, so
+  // the drawer closes before either dialog opens.
+  const editFromDrawer = (role: Role): void => {
+    setDrawerRole(null);
+    openEditDialog(role);
+  };
+
+  const managePermissionsFromDrawer = (role: Role): void => {
+    setDrawerRole(null);
+    openPermissionsDialog(role, "manage");
+  };
+
+  const listHandlers = {
+    canEdit: canEditRoles,
+    canManagePermissions: canUpdateRolePermissions,
+    canViewUserAssignments,
+    onEdit: editFromDrawer,
+    onManagePermissions: managePermissionsFromDrawer,
+    onView: setDrawerRole,
+    roles: visibleRoles,
   };
 
   const handleCreateRole = async (payload: CreateRolePayload): Promise<void> => {
@@ -315,7 +371,22 @@ export function RolesPageClient(): JSX.Element {
         </Card>
       </div>
 
-      {customRoleCount === 0 && !isLoading && !error ? (
+      {!isLoading && !error ? (
+        <RolesToolbar filters={rolesFilters} onFiltersChange={setRolesFilters} />
+      ) : null}
+
+      {/* This used to key off customRoleCount, so a workspace with system roles
+          and no custom ones showed "no roles yet" AND the populated table at
+          the same time. It is the visible list that can be empty. */}
+      {!isLoading && !error && visibleRoles.length === 0 && hasActiveRoleFilters ? (
+        <FilteredState
+          noun="roles"
+          onClearFilters={() => setRolesFilters(defaultRolesFilters)}
+          query={rolesFilters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!isLoading && !error && roles.length === 0 ? (
         <RolesEmptyState canCreate={canCreateRoles} onCreate={openCreateDialog} />
       ) : null}
 
@@ -330,33 +401,30 @@ export function RolesPageClient(): JSX.Element {
         />
       ) : null}
 
-      {!isLoading && !error ? (
-        <Card className="overflow-hidden">
-          <CardHeader>
-            <CardTitle>Roles workspace</CardTitle>
-            <CardDescription>
-              Review system and custom roles, then open permission details from each row action.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <RolesTable
-              canEdit={canEditRoles}
-              canManagePermissions={canUpdateRolePermissions}
-              canViewPermissions={canViewRolePermissions}
-              canViewUserAssignments={canViewUserAssignments}
-              onEdit={openEditDialog}
-              onManagePermissions={(role) => {
-                openPermissionsDialog(role, "manage");
-              }}
-              onViewPermissions={(role) => {
-                openPermissionsDialog(role, "view");
-              }}
-              roles={roles}
-              selectedRoleId={selectedRoleId}
-            />
-          </CardContent>
-        </Card>
+      {!isLoading && !error && visibleRoles.length > 0 ? (
+        <>
+          <div className="md:hidden">
+            <RolesCardGrid {...listHandlers} />
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <RolesTable {...listHandlers} />
+            </CardContent>
+          </Card>
+        </>
       ) : null}
+
+      <RoleDetailsDrawer
+        canEdit={canEditRoles}
+        canManagePermissions={canUpdateRolePermissions}
+        canViewPermissions={canViewRolePermissions}
+        canViewUserAssignments={canViewUserAssignments}
+        onEdit={editFromDrawer}
+        onManagePermissions={managePermissionsFromDrawer}
+        onOpenChange={(open) => (!open ? setDrawerRole(null) : undefined)}
+        open={drawerRole !== null}
+        role={drawerRole}
+      />
 
       <RoleFormDialog
         canManage={dialogMode === "create" ? canCreateRoles : canEditRoles}

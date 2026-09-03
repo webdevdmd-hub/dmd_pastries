@@ -2,6 +2,9 @@
 
 import type { JSX } from "react";
 
+import { type RoleActionHandlers, RoleActionsMenu } from "@/components/roles/role-actions-menu";
+import { formatRoleDate, roleTypeLabel } from "@/components/roles/role-details-drawer";
+import { RoleStatusBadge } from "@/components/roles/role-status-badge";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -13,104 +16,85 @@ import {
 } from "@/components/ui/table";
 import type { Role } from "@/types/role";
 
-import { RoleActionsMenu } from "./role-actions-menu";
-import { RoleStatusBadge } from "./role-status-badge";
-
-type RolesTableProps = {
-  canEdit: boolean;
-  canManagePermissions: boolean;
-  canViewPermissions: boolean;
+export type RolesListProps = RoleActionHandlers & {
   canViewUserAssignments: boolean;
-  onEdit: (role: Role) => void;
-  onManagePermissions: (role: Role) => void;
-  onViewPermissions: (role: Role) => void;
+  /** Opens the role's details; the whole row is the target. */
+  onView: (role: Role) => void;
   roles: Role[];
-  selectedRoleId: string | null;
 };
 
-function formatDate(value: string): string {
-  const parsed = new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return "Unavailable";
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-  }).format(parsed);
-}
-
+/**
+ * Seven columns became six.
+ *
+ * "Type" was a whole column repeating the System Default / Custom badge that
+ * already sat under the role name, so every row said the same thing twice.
+ * Created At went to the drawer.
+ */
 export function RolesTable({
-  canEdit,
-  canManagePermissions,
-  canViewPermissions,
   canViewUserAssignments,
-  onEdit,
-  onManagePermissions,
-  onViewPermissions,
+  onView,
   roles,
-  selectedRoleId,
-}: RolesTableProps): JSX.Element {
+  ...actions
+}: RolesListProps): JSX.Element {
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Role Name</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Assigned Users</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Created At</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {roles.map((role) => (
-            <TableRow
-              key={role.id}
-              className={selectedRoleId === role.id ? "bg-brand-latte/80" : undefined}
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Role</TableHead>
+          <TableHead>Description</TableHead>
+          <TableHead className="text-right">Assigned users</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Created</TableHead>
+          <TableHead>
+            <span className="sr-only">Actions</span>
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {roles.map((role) => (
+          // The row opens the drawer; the name is also a button so the keyboard
+          // has a focusable target for the same action.
+          <TableRow className="cursor-pointer" key={role.id} onClick={() => onView(role)}>
+            <TableCell className="min-w-52 whitespace-normal">
+              <button
+                className="grid gap-1.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onView(role);
+                }}
+                type="button"
+              >
+                <span className="font-medium">{role.roleName}</span>
+                <Badge className="w-fit" variant="outline">
+                  {roleTypeLabel(role)}
+                </Badge>
+              </button>
+            </TableCell>
+            <TableCell className="min-w-60 whitespace-normal text-foreground-muted">
+              {role.description || "No description provided."}
+            </TableCell>
+            <TableCell
+              className={
+                canViewUserAssignments
+                  ? "text-right tabular-nums"
+                  : "text-right text-foreground-muted"
+              }
             >
-              <TableCell className="whitespace-normal min-w-[220px]">
-                <div className="space-y-2">
-                  <div className="font-medium text-brand-espresso">{role.roleName}</div>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge
-                      className={
-                        role.isSystemDefault
-                          ? "border-brand-caramel/70 bg-brand-caramel/15 text-brand-mocha"
-                          : "border-brand-cappuccino bg-brand-cappuccino/45 text-brand-espresso"
-                      }
-                    >
-                      {role.isSystemDefault ? "System Default" : "Custom"}
-                    </Badge>
-                  </div>
-                </div>
-              </TableCell>
-              <TableCell className="whitespace-normal min-w-[240px] text-brand-mocha">
-                {role.description || "No description provided."}
-              </TableCell>
-              <TableCell>{role.isSystemDefault ? "System Default" : "Custom Role"}</TableCell>
-              <TableCell>{canViewUserAssignments ? role.usersCount : "Restricted"}</TableCell>
-              <TableCell>
-                <RoleStatusBadge status={role.status} />
-              </TableCell>
-              <TableCell>{formatDate(role.createdAt)}</TableCell>
-              <TableCell className="text-right">
-                <RoleActionsMenu
-                  canEdit={canEdit}
-                  canManagePermissions={canManagePermissions}
-                  canViewPermissions={canViewPermissions}
-                  onEdit={onEdit}
-                  onManagePermissions={onManagePermissions}
-                  onViewPermissions={onViewPermissions}
-                  role={role}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+              {canViewUserAssignments ? role.usersCount : "Restricted"}
+            </TableCell>
+            <TableCell>
+              <RoleStatusBadge status={role.status} />
+            </TableCell>
+            <TableCell className="tabular-nums text-foreground-muted">
+              {formatRoleDate(role.createdAt)}
+            </TableCell>
+            {/* The menu must not also open the drawer. */}
+            <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+              <RoleActionsMenu {...actions} role={role} />
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
