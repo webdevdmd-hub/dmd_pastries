@@ -24,7 +24,9 @@ export function BatchStatusBadge({ status }: { status: BatchStatus }): JSX.Eleme
 
   return (
     <Badge
-      className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase ${className}`}
+      // Was 11px, weight 700 and uppercase, all three of which DESIGN.md
+      // section 2 rules out. The labels are already sentence case.
+      className={`rounded-full px-3 py-1 text-meta font-medium ${className}`}
       variant="outline"
     >
       {labels[status]}
