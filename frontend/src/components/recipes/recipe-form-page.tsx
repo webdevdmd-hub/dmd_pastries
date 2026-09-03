@@ -630,11 +630,15 @@ export function RecipeFormPage({
       {isDialog ? (
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-5 sm:px-8">
           <div>
-            <h2 className="text-3xl font-semibold tracking-tight text-foreground">
-              Recipe Builder
+            {/* The dialog's accessible name already says which of the two this
+                is; the visible heading said "Recipe Builder" either way. */}
+            <h2 className="text-section font-medium text-foreground">
+              {isCreate ? "Recipe Builder" : (recipe?.recipeName ?? "Edit recipe")}
             </h2>
-            <p className="mt-1 text-sm text-foreground-muted">
-              Define how finished and semi-finished products are made.
+            <p className="mt-1 text-cell text-foreground-muted">
+              {isCreate
+                ? "Define how finished and semi-finished products are made."
+                : "Edit this recipe's details, BOM lines and instructions."}
             </p>
           </div>
           <Button aria-label="Close recipe builder" onClick={onClose} type="button" variant="ghost">
@@ -655,41 +659,55 @@ export function RecipeFormPage({
       )}
 
       <form
-        className={isDialog ? "min-h-0 flex-1 overflow-hidden" : "grid gap-6"}
+        className={isDialog ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "grid gap-6"}
         onSubmit={(event) => {
           void form.handleSubmit((values) => saveRecipe(values), showValidationToast)(event);
         }}
       >
+        {/* The strip sits outside the scrolling body. Inside it, scrolling the
+            ingredient list carried the tabs 261px off the top of their own
+            pane -- you could no longer see which section you were in, or
+            leave it, without scrolling back up. */}
+        <div
+          className={
+            isDialog ? "min-w-0 shrink-0 border-b border-border px-5 py-3 sm:px-8" : "min-w-0"
+          }
+        >
+          <FormTabs
+            active={activeTab}
+            aria-label="Recipe builder sections"
+            onTabChange={setActiveTab}
+            panelId={RECIPE_BUILDER_TABPANEL_ID}
+            tabs={[
+              { key: "details", label: "Details" },
+              { key: "ingredients", label: "Ingredients", badge: previewIngredientCount },
+              { key: "packaging", label: "Packaging", badge: previewPackagingCount },
+              { key: "instructions", label: "Instructions" },
+            ]}
+          />
+        </div>
+
+        {/* Below lg the two columns stack, and each keeping its own
+            overflow-y-auto made the dialog two ~350px scroll windows one
+            above the other. One scroller until the columns actually sit
+            side by side. */}
         <div
           className={
             isDialog
-              ? "grid h-full min-h-0 overflow-hidden lg:grid-cols-[minmax(0,1fr)_22rem]"
+              ? "grid min-h-0 flex-1 overflow-y-auto overscroll-contain lg:grid-cols-[minmax(0,1fr)_22rem] lg:overflow-hidden"
               : "grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]"
           }
         >
           <div
             className={
               isDialog
-                ? "flex min-h-0 min-w-0 flex-col gap-6 overflow-y-auto overscroll-contain px-5 py-6 sm:px-8"
+                ? "flex min-h-0 min-w-0 flex-col gap-6 px-5 py-6 sm:px-8 lg:overflow-y-auto lg:overscroll-contain"
                 : // A grid item defaults to min-width:auto, so without min-w-0
                   // this column grows to its widest child -- the four-tab strip --
                   // and drags the whole page into a horizontal scroll on a phone.
                   "flex min-w-0 flex-col gap-6"
             }
           >
-            <FormTabs
-              active={activeTab}
-              aria-label="Recipe builder sections"
-              onTabChange={setActiveTab}
-              panelId={RECIPE_BUILDER_TABPANEL_ID}
-              tabs={[
-                { key: "details", label: "Details" },
-                { key: "ingredients", label: "Ingredients", badge: previewIngredientCount },
-                { key: "packaging", label: "Packaging", badge: previewPackagingCount },
-                { key: "instructions", label: "Instructions" },
-              ]}
-            />
-
             {/* One panel region for all four sections: the strip aria-controls
                 this id, so it must not be the div that display:none hides. */}
             <div className="contents" id={RECIPE_BUILDER_TABPANEL_ID} role="tabpanel">
@@ -951,12 +969,15 @@ export function RecipeFormPage({
           <div
             className={
               isDialog
-                ? "min-h-0 overflow-y-auto overscroll-contain border-t border-border bg-muted px-5 py-5 lg:border-l lg:border-t-0"
+                ? "min-h-0 border-t border-border bg-muted px-5 py-5 lg:overflow-y-auto lg:overscroll-contain lg:border-l lg:border-t-0"
                 : "flex flex-col gap-5 xl:sticky xl:top-6 xl:self-start"
             }
           >
             <div className="flex flex-col gap-5">
-              {canSaveRecipe || canUpdateRecipeStatus ? (
+              {/* In the dialog the save buttons are a fixed footer, so this
+                  card would be a second copy of them 286px down a pane the
+                  operator had to discover. */}
+              {!isDialog && (canSaveRecipe || canUpdateRecipeStatus) ? (
                 <Card className="rounded-2xl border-workspace-border bg-card shadow-none">
                   <CardHeader>
                     <CardTitle className="text-2xl text-brand-espresso">Builder Actions</CardTitle>
@@ -981,6 +1002,15 @@ export function RecipeFormPage({
             </div>
           </div>
         </div>
+
+        {/* Save belongs to the dialog, not to a card inside one of its two
+            scrollers. It sat 286px down the sidebar, which meant scrolling a
+            secondary pane to find the button that ends the task. */}
+        {isDialog && (canSaveRecipe || canUpdateRecipeStatus) ? (
+          <div className="shrink-0 border-t border-border bg-card px-5 py-4 sm:px-8">
+            {recipeActionButtons}
+          </div>
+        ) : null}
 
         {!isDialog && (canSaveRecipe || canUpdateRecipeStatus) ? (
           <div className="rounded-3xl border border-brand-cappuccino bg-card/80 p-4 shadow-sm xl:hidden">
