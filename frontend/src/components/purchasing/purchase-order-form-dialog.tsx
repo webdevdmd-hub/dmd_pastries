@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { PurchaseOrderStatusBadge } from "@/components/purchasing/purchase-order-status-badge";
 import { PurchasingItemLineEditor } from "@/components/purchasing/purchasing-item-line-editor";
 import { SupplierLookupSelect } from "@/components/purchasing/supplier-lookup-select";
+import { type FormTab, FormTabs } from "@/components/shared/form-tabs";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -56,6 +57,17 @@ type FormError = {
   field: FormFieldName | null;
   message: string;
 };
+
+type PurchaseOrderFormTabKey = "details" | "items" | "notes";
+
+const FORM_TABPANEL_ID = "purchase-order-form-tabpanel";
+
+/** Which tab each field lives on, so a validation error can open the right one. */
+function tabForField(field: FormFieldName | null): PurchaseOrderFormTabKey {
+  if (field === "items") return "items";
+  if (field === "notes") return "notes";
+  return "details";
+}
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -288,6 +300,15 @@ export function PurchaseOrderFormDialog({
     useState<CreatePurchaseOrderRevisionPayload | null>(null);
   const [baseline, setBaseline] = useState("");
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [activeTab, setActiveTab] = useState<PurchaseOrderFormTabKey>("details");
+
+  // A validation problem switches to the tab that holds it before the
+  // banner explains it; a hidden error is otherwise a silent no-op.
+  useEffect(() => {
+    if (error) {
+      setActiveTab(tabForField(error.field));
+    }
+  }, [error]);
   const isPartialAdjustment = order?.status === "partially_received";
   const isCorrectionEdit = order?.status === "received";
   const hasAccountRows = lines.some(
@@ -364,6 +385,8 @@ export function PurchaseOrderFormDialog({
     setLineErrors({});
     setPendingRevisionPayload(null);
     setConfirmDiscard(false);
+    // Every opening starts on Details, whichever tab the last one closed on.
+    setActiveTab("details");
   }, [branchScope.effectiveBranchId, open, order]);
 
   const estimatedRevisedTotal = lines.reduce((sum, line) => {
@@ -519,6 +542,17 @@ export function PurchaseOrderFormDialog({
   const generalFieldError = error?.field === null ? error.message : undefined;
   const isReviewStep = Boolean(pendingRevisionPayload);
   const isOrderedEdit = !fieldsDisabled && order?.status === "ordered";
+  const errorTab =
+    error?.field !== undefined && error.field !== null ? tabForField(error.field) : null;
+  const formTabs: FormTab<PurchaseOrderFormTabKey>[] = [
+    { key: "details", label: "Details", badge: errorTab === "details" ? 1 : 0 },
+    {
+      key: "items",
+      label: "Items",
+      badge: errorTab === "items" ? Math.max(Object.keys(lineErrors).length, 1) : lines.length,
+    },
+    { key: "notes", label: "Notes", badge: errorTab === "notes" ? 1 : 0 },
+  ];
 
   const titleText = isPartialAdjustment
     ? "Adjust remaining purchase order"
@@ -593,7 +627,26 @@ export function PurchaseOrderFormDialog({
               {descriptionText}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
+          {/* Tabs rather than one long scroll: one state holds every field,
+              and a tab only decides which section is visible. The review
+              step replaces the whole panel, so the strip hides with it. */}
+          {!isReviewStep ? (
+            <div className="shrink-0 border-b border-workspace-border px-5 py-3">
+              <FormTabs
+                active={activeTab}
+                aria-label="Purchase order form sections"
+                onTabChange={setActiveTab}
+                panelId={FORM_TABPANEL_ID}
+                tabs={formTabs}
+              />
+            </div>
+          ) : null}
+          <div
+            className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-5 py-4"
+            id={FORM_TABPANEL_ID}
+            role="tabpanel"
+            tabIndex={-1}
+          >
             {isReviewStep ? (
               <FormSection
                 description="Confirm the recalculated totals before saving this correction as a new revision."
@@ -639,138 +692,144 @@ export function PurchaseOrderFormDialog({
                   </div>
                 ) : null}
 
-                <FormSection title="Order details">
-                  {/* Four fields, one row. At lg:grid-cols-3 the fourth wrapped
+                <div className={activeTab === "details" ? undefined : "hidden"}>
+                  <FormSection title="Order details">
+                    {/* Four fields, one row. At lg:grid-cols-3 the fourth wrapped
                       and cost 82px of section height to save 24px elsewhere. */}
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div>
-                      <Label htmlFor="po-branch">
-                        Branch
-                        <RequiredMark />
-                      </Label>
-                      <Select
-                        disabled={fieldsDisabled}
-                        value={branchId || "none"}
-                        onValueChange={(value) => setBranchId(value === "none" ? "" : value)}
-                      >
-                        <SelectTrigger className="mt-1.5 h-10" id="po-branch">
-                          <SelectValue placeholder="Select branch" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No branch selected</SelectItem>
-                          {selectableBranches.map((branch) => (
-                            <SelectItem key={branch.id} value={branch.id}>
-                              {branch.branchName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {lockReason ? <FieldHint>{lockReason}</FieldHint> : null}
-                      {selectableBranches.length === 0 ? (
-                        <FieldHint>
-                          No branches available for your access — contact an administrator.
-                        </FieldHint>
-                      ) : null}
-                      <FieldError message={branchFieldError} />
-                    </div>
-                    <div>
-                      <Label htmlFor="po-supplier">
-                        Supplier
-                        <RequiredMark />
-                      </Label>
-                      <div className="mt-1.5">
-                        <SupplierLookupSelect
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <div>
+                        <Label htmlFor="po-branch">
+                          Branch
+                          <RequiredMark />
+                        </Label>
+                        <Select
                           disabled={fieldsDisabled}
-                          id="po-supplier"
-                          onValueChange={setSupplierId}
-                          suppliers={suppliers}
-                          value={supplierId}
-                        />
+                          value={branchId || "none"}
+                          onValueChange={(value) => setBranchId(value === "none" ? "" : value)}
+                        >
+                          <SelectTrigger className="mt-1.5 h-10" id="po-branch">
+                            <SelectValue placeholder="Select branch" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No branch selected</SelectItem>
+                            {selectableBranches.map((branch) => (
+                              <SelectItem key={branch.id} value={branch.id}>
+                                {branch.branchName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {lockReason ? <FieldHint>{lockReason}</FieldHint> : null}
+                        {selectableBranches.length === 0 ? (
+                          <FieldHint>
+                            No branches available for your access — contact an administrator.
+                          </FieldHint>
+                        ) : null}
+                        <FieldError message={branchFieldError} />
                       </div>
-                      {lockReason ? <FieldHint>{lockReason}</FieldHint> : null}
-                      {suppliers.length === 0 ? (
-                        <FieldHint>No suppliers available — add a supplier first.</FieldHint>
-                      ) : null}
-                      <FieldError message={supplierFieldError} />
+                      <div>
+                        <Label htmlFor="po-supplier">
+                          Supplier
+                          <RequiredMark />
+                        </Label>
+                        <div className="mt-1.5">
+                          <SupplierLookupSelect
+                            disabled={fieldsDisabled}
+                            id="po-supplier"
+                            onValueChange={setSupplierId}
+                            suppliers={suppliers}
+                            value={supplierId}
+                          />
+                        </div>
+                        {lockReason ? <FieldHint>{lockReason}</FieldHint> : null}
+                        {suppliers.length === 0 ? (
+                          <FieldHint>No suppliers available — add a supplier first.</FieldHint>
+                        ) : null}
+                        <FieldError message={supplierFieldError} />
+                      </div>
+                      <div>
+                        <Label htmlFor="po-order-date">
+                          Order date
+                          <RequiredMark />
+                        </Label>
+                        <Input
+                          className="mt-1.5 h-10"
+                          disabled={fieldsDisabled}
+                          id="po-order-date"
+                          onChange={(event) => setOrderDate(event.target.value)}
+                          type="date"
+                          value={orderDate}
+                        />
+                        {lockReason ? <FieldHint>{lockReason}</FieldHint> : null}
+                        <FieldError message={orderDateFieldError} />
+                      </div>
+                      <div>
+                        <Label htmlFor="po-expected-delivery">Expected delivery date</Label>
+                        <Input
+                          className="mt-1.5 h-10"
+                          id="po-expected-delivery"
+                          onChange={(event) => setExpectedDeliveryDate(event.target.value)}
+                          type="date"
+                          value={expectedDeliveryDate}
+                        />
+                        <FieldError message={expectedDeliveryFieldError} />
+                      </div>
                     </div>
-                    <div>
-                      <Label htmlFor="po-order-date">
-                        Order date
-                        <RequiredMark />
-                      </Label>
-                      <Input
-                        className="mt-1.5 h-10"
-                        disabled={fieldsDisabled}
-                        id="po-order-date"
-                        onChange={(event) => setOrderDate(event.target.value)}
-                        type="date"
-                        value={orderDate}
-                      />
-                      {lockReason ? <FieldHint>{lockReason}</FieldHint> : null}
-                      <FieldError message={orderDateFieldError} />
-                    </div>
-                    <div>
-                      <Label htmlFor="po-expected-delivery">Expected delivery date</Label>
-                      <Input
-                        className="mt-1.5 h-10"
-                        id="po-expected-delivery"
-                        onChange={(event) => setExpectedDeliveryDate(event.target.value)}
-                        type="date"
-                        value={expectedDeliveryDate}
-                      />
-                      <FieldError message={expectedDeliveryFieldError} />
-                    </div>
-                  </div>
-                </FormSection>
+                  </FormSection>
+                </div>
 
-                <FormSection
-                  description={
-                    isPartialAdjustment
-                      ? "Only unreceived quantities can change. Received history stays locked at the line level."
-                      : isCorrectionEdit
-                        ? "Only quantities, rates, and tax on existing lines can change — lines can't be added or removed."
-                        : "Add product or account lines exactly as they should move through receiving and billing."
-                  }
-                  required
-                  title="Items"
-                >
-                  {itemsFieldError ? (
-                    <p className="mb-3 rounded-md border border-danger/30 bg-danger-tint px-3 py-2 text-sm font-medium text-danger-text">
-                      {itemsFieldError}
-                    </p>
-                  ) : null}
-                  <PurchasingItemLineEditor
-                    accounts={accounts}
-                    compactLayout
-                    disableAddRows={fieldsDisabled}
-                    lineErrors={lineErrors}
-                    lineLocks={lineLocks}
-                    lines={lines}
-                    onLinesChange={setLines}
-                    products={products}
-                    showAccountRows={showAccountRows}
-                    taxRates={taxRates}
-                    units={units}
-                  />
-                </FormSection>
+                <div className={activeTab === "items" ? undefined : "hidden"}>
+                  <FormSection
+                    description={
+                      isPartialAdjustment
+                        ? "Only unreceived quantities can change. Received history stays locked at the line level."
+                        : isCorrectionEdit
+                          ? "Only quantities, rates, and tax on existing lines can change — lines can't be added or removed."
+                          : "Add product or account lines exactly as they should move through receiving and billing."
+                    }
+                    required
+                    title="Items"
+                  >
+                    {itemsFieldError ? (
+                      <p className="mb-3 rounded-md border border-danger/30 bg-danger-tint px-3 py-2 text-sm font-medium text-danger-text">
+                        {itemsFieldError}
+                      </p>
+                    ) : null}
+                    <PurchasingItemLineEditor
+                      accounts={accounts}
+                      compactLayout
+                      disableAddRows={fieldsDisabled}
+                      lineErrors={lineErrors}
+                      lineLocks={lineLocks}
+                      lines={lines}
+                      onLinesChange={setLines}
+                      products={products}
+                      showAccountRows={showAccountRows}
+                      taxRates={taxRates}
+                      units={units}
+                    />
+                  </FormSection>
+                </div>
 
-                <FormSection title="Notes">
-                  <div>
+                <div className={activeTab === "notes" ? undefined : "hidden"}>
+                  <FormSection title="Notes">
                     <div>
-                      <Label className="sr-only" htmlFor="po-notes">
-                        Notes
-                      </Label>
-                      <Textarea
-                        className="mt-1.5 min-h-[42px]"
-                        id="po-notes"
-                        onChange={(event) => setNotes(event.target.value)}
-                        placeholder="Delivery instructions, supplier reference, or internal notes"
-                        value={notes}
-                      />
-                      <FieldError message={notesFieldError} />
+                      <div>
+                        <Label className="sr-only" htmlFor="po-notes">
+                          Notes
+                        </Label>
+                        <Textarea
+                          className="mt-1.5 min-h-[42px]"
+                          id="po-notes"
+                          onChange={(event) => setNotes(event.target.value)}
+                          placeholder="Delivery instructions, supplier reference, or internal notes"
+                          value={notes}
+                        />
+                        <FieldError message={notesFieldError} />
+                      </div>
                     </div>
-                  </div>
-                </FormSection>
+                  </FormSection>
+                </div>
               </>
             )}
           </div>

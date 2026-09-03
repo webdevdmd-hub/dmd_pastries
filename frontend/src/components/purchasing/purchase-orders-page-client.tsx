@@ -10,8 +10,10 @@ import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseEmptyState } from "@/components/purchasing/purchase-empty-state";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
 import { PurchaseInvoiceFormDialog } from "@/components/purchasing/purchase-invoice-form-dialog";
+import { PurchaseOrderDetailsDrawer } from "@/components/purchasing/purchase-order-details-drawer";
 import { PurchaseOrderFormDialog } from "@/components/purchasing/purchase-order-form-dialog";
 import { PurchaseOrderReceiveGoodsDialog } from "@/components/purchasing/purchase-order-receive-goods-dialog";
+import { PurchaseOrdersCardGrid } from "@/components/purchasing/purchase-orders-card-grid";
 import { PurchaseOrdersTable } from "@/components/purchasing/purchase-orders-table";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
 import { PurchasingToolbar } from "@/components/purchasing/purchasing-toolbar";
@@ -128,6 +130,10 @@ export function PurchaseOrdersPageClient(): JSX.Element {
   const [receivingOrderId, setReceivingOrderId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  // The id, not the record: the list rows carry a summary and the drawer
+  // fetches the full order itself.
+  const [detailsOrderId, setDetailsOrderId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   // Typing in search used to fire one request per keystroke: the raw filters
   // object fed the query key directly. Debounce only the search half; the
   // dropdowns and dates still apply instantly.
@@ -259,6 +265,33 @@ export function PurchaseOrdersPageClient(): JSX.Element {
     setFormOpen(true);
   };
 
+  const openDetails = (order: PurchaseOrder): void => {
+    setDetailsOrderId(order.id);
+    setDetailsOpen(true);
+  };
+
+  // A dialog on top of a sheet on top of the list is one layer too many, so
+  // the drawer closes before any of these open. Closing the dialog then
+  // lands back on the list.
+  const openEdit = (order: PurchaseOrder): void => {
+    setDetailsOpen(false);
+    setEditingOrder(order);
+    setEditingOrderId(order.id);
+    setFormOpen(true);
+  };
+  const openReceive = (order: PurchaseOrder): void => {
+    setDetailsOpen(false);
+    setReceivingOrderId(order.id);
+  };
+  const openConvert = (order: PurchaseOrder): void => {
+    setDetailsOpen(false);
+    setConvertingOrderId(order.id);
+  };
+  const askAction = (action: NonNullable<PendingAction>): void => {
+    setDetailsOpen(false);
+    setPendingAction(action);
+  };
+
   const handleCreate = async (payload: CreatePurchaseOrderPayload): Promise<void> => {
     try {
       await createOrderMutation.mutateAsync(payload);
@@ -371,6 +404,36 @@ export function PurchaseOrdersPageClient(): JSX.Element {
     : null;
   const purchaseAccounts = [...(purchaseAccountsQuery.data ?? [])];
 
+  const listHandlers = {
+    canCreate,
+    canDelete,
+    canEdit,
+    canConvertToBill,
+    canReceiveOrder,
+    canUpdateStatus,
+    onConvertToBill: openConvert,
+    onDelete: (order: PurchaseOrder) => askAction({ order, type: "delete" }),
+    onDuplicate: (order: PurchaseOrder) => void handleDuplicate(order),
+    onEdit: openEdit,
+    onReopen: (order: PurchaseOrder) => askAction({ order, type: "reopen" }),
+    onReceive: openReceive,
+    onStatusChange: (order: PurchaseOrder, status: PurchaseOrderStatus) =>
+      askAction({ order, status, type: "status" }),
+    onView: openDetails,
+    orders,
+  };
+  const paginationBar = pagination ? (
+    <PaginationBar
+      isFetching={ordersQuery.isFetching}
+      limit={pagination.limit}
+      noun={{ one: "purchase order", other: "purchase orders" }}
+      onPageChange={setPage}
+      page={pagination.page}
+      total={pagination.total}
+      totalPages={pagination.totalPages}
+    />
+  ) : null;
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
@@ -390,6 +453,7 @@ export function PurchaseOrdersPageClient(): JSX.Element {
         allowAllBranches={branchScope.canAccessAllBranches}
         branches={branchOptions}
         filters={filters}
+        noun="purchase orders"
         onFiltersChange={setFilters}
         resetBranchId={branchScope.defaultBranchId}
         statuses={orderStatuses}
@@ -433,45 +497,37 @@ export function PurchaseOrdersPageClient(): JSX.Element {
         />
       ) : null}
 
+      {/* An eight-column ledger has no honest phone layout. Below md the list
+          is cards carrying the same fields; the table takes over from md up. */}
       {!ordersQuery.isLoading && !ordersQuery.error && orders.length > 0 ? (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <PurchaseOrdersTable
-              canCreate={canCreate}
-              canDelete={canDelete}
-              canEdit={canEdit}
-              canConvertToBill={canConvertToBill}
-              canReceiveOrder={canReceiveOrder}
-              canUpdateStatus={canUpdateStatus}
-              onConvertToBill={(order) => setConvertingOrderId(order.id)}
-              onDelete={(order) => setPendingAction({ order, type: "delete" })}
-              onDuplicate={(order) => void handleDuplicate(order)}
-              onEdit={(order) => {
-                setEditingOrder(order);
-                setEditingOrderId(order.id);
-                setFormOpen(true);
-              }}
-              onReopen={(order) => setPendingAction({ order, type: "reopen" })}
-              onReceive={(order) => setReceivingOrderId(order.id)}
-              onStatusChange={(order, status) =>
-                setPendingAction({ order, status, type: "status" })
-              }
-              orders={orders}
-            />
-            {pagination ? (
-              <PaginationBar
-                isFetching={ordersQuery.isFetching}
-                limit={pagination.limit}
-                noun={{ one: "purchase order", other: "purchase orders" }}
-                onPageChange={setPage}
-                page={pagination.page}
-                total={pagination.total}
-                totalPages={pagination.totalPages}
-              />
-            ) : null}
-          </CardContent>
-        </Card>
+        <>
+          <div className="grid gap-4 md:hidden">
+            <PurchaseOrdersCardGrid {...listHandlers} />
+            {paginationBar ? <Card className="overflow-hidden">{paginationBar}</Card> : null}
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <PurchaseOrdersTable {...listHandlers} />
+              {paginationBar}
+            </CardContent>
+          </Card>
+        </>
       ) : null}
+
+      <PurchaseOrderDetailsDrawer
+        canEditOrder={(order) =>
+          canEdit &&
+          (order.status === "draft" ||
+            order.status === "ordered" ||
+            order.status === "partially_received" ||
+            order.status === "received")
+        }
+        canView={canView}
+        onEdit={openEdit}
+        onOpenChange={setDetailsOpen}
+        open={detailsOpen}
+        orderId={detailsOrderId}
+      />
 
       <PurchaseOrderFormDialog
         accounts={purchaseAccounts}

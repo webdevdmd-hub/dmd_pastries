@@ -2,20 +2,23 @@
 
 import { ArrowRight, MoreHorizontal, ReceiptText, Truck } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
-import { PurchaseDocumentChain } from "@/components/purchasing/purchase-document-chain";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
 import { PurchaseInvoiceFormDialog } from "@/components/purchasing/purchase-invoice-form-dialog";
+import {
+  parsePurchaseOrderDetailTab,
+  type PurchaseOrderDetailTabKey,
+} from "@/components/purchasing/purchase-order-detail-tabs";
+import { PurchaseOrderDetailsPanel } from "@/components/purchasing/purchase-order-details-panel";
 import { PurchaseOrderFormDialog } from "@/components/purchasing/purchase-order-form-dialog";
 import { PurchaseOrderReceiveGoodsDialog } from "@/components/purchasing/purchase-order-receive-goods-dialog";
 import { PurchaseOrderStatusBadge } from "@/components/purchasing/purchase-order-status-badge";
 import { PurchaseDetailSkeleton } from "@/components/purchasing/purchase-table-skeleton";
-import { PurchasingItemLines } from "@/components/purchasing/purchasing-item-lines";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,13 +34,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useAllChartAccounts } from "@/hooks/use-accounting";
@@ -157,6 +153,8 @@ const STANDING_TONE: Record<OrderStanding["tone"], string> = {
 
 export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string }): JSX.Element {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.purchasingView, PERMISSIONS.inventoryView]);
   const canConvert = hasAnyPermission([PERMISSIONS.purchasingInvoicesCreate]);
@@ -181,7 +179,6 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   const [pendingStatusAction, setPendingStatusAction] = useState<"issue" | "cancel" | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
-  const [timelineOpen, setTimelineOpen] = useState(false);
   const orderQuery = usePurchaseOrder(orderId, canView);
   const chainQuery = usePurchaseOrderDocumentChain(orderId, canView);
   const branchesQuery = usePurchasingBranches(canView);
@@ -210,6 +207,19 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   const receiveMutation = useReceivePurchaseOrder();
   const updateMutation = useUpdatePurchaseOrder();
   const statusMutation = useUpdatePurchaseOrderStatus();
+
+  const activeTab = parsePurchaseOrderDetailTab(searchParams.get("tab"));
+
+  const changeTab = (tab: PurchaseOrderDetailTabKey): void => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (tab === "items") {
+      next.delete("tab");
+    } else {
+      next.set("tab", tab);
+    }
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -513,15 +523,6 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
               </span>
             </>
           ) : null}
-          <Button
-            className="ml-auto"
-            onClick={() => setTimelineOpen(true)}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            Timeline &amp; documents
-          </Button>
         </div>
 
         {order.status === "partially_received" ? (
@@ -531,87 +532,12 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
         ) : null}
       </div>
 
-      <PurchasingItemLines
-        lines={order.items}
-        title="Purchase order items"
-        totals={{
-          discount: order.discountAmount,
-          subtotal: order.subtotalAmount,
-          tax: order.taxAmount,
-          total: order.totalAmount,
-        }}
+      <PurchaseOrderDetailsPanel
+        activeTab={activeTab}
+        canView={canView}
+        onTabChange={changeTab}
+        order={order}
       />
-
-      {/* Timeline, linked documents and notes are reference material: needed
-          when someone asks "what happened here", not on every visit. As a
-          drawer they cost one click instead of 2,111px of permanent scroll. */}
-      <Sheet onOpenChange={setTimelineOpen} open={timelineOpen}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-xl" side="right">
-          <SheetHeader>
-            <SheetTitle>Timeline &amp; documents</SheetTitle>
-            <SheetDescription>
-              {order.purchaseOrderNumber} &middot; {order.supplierName}
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="mt-6 space-y-6">
-            <div className="rounded-md bg-muted p-4">
-              <h3 className="text-meta font-medium text-foreground-muted">Document summary</h3>
-              <dl className="mt-3 space-y-2 text-sm">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-foreground-muted">Bill</dt>
-                  <dd className="font-medium">
-                    {activeBill?.supplierBillNumber ?? activeBill?.invoiceNumber ?? "Not created"}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-foreground-muted">Bill status</dt>
-                  <dd className="font-medium">{activeBill ? activeBill.status : "Pending"}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-foreground-muted">Payment status</dt>
-                  <dd className="font-medium">
-                    {activeBill ? activeBill.paymentStatus : "Pending"}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-foreground-muted">Not yet received</dt>
-                  <dd className="font-medium tabular-nums">
-                    {hasRemainingReceivableProducts(order)
-                      ? formatCurrency(unreceivedValue(order))
-                      : "Nothing outstanding"}
-                  </dd>
-                </div>
-                {/* Balance due is what the supplier is owed, which only a bill
-                    can establish. Falling back to the order total presented an
-                    un-billed PO as money owed. */}
-                <div className="flex justify-between gap-4 border-t border-border pt-2">
-                  <dt className="text-foreground-muted">Balance due</dt>
-                  <dd className="font-medium tabular-nums">
-                    {activeBill ? formatCurrency(activeBill.balanceAmount) : "No bill yet"}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-
-            <PurchaseDocumentChain
-              chain={chainQuery.data}
-              error={chainQuery.error}
-              isLoading={chainQuery.isLoading}
-              onRetry={() => {
-                void chainQuery.refetch();
-              }}
-            />
-
-            <div>
-              <h3 className="text-meta font-medium text-foreground-muted">Notes</h3>
-              <p className="mt-2 text-sm text-foreground-muted">
-                {order.notes ?? "No notes recorded."}
-              </p>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
 
       <Dialog
         open={pendingStatusAction !== null}

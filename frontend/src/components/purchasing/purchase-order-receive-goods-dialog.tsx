@@ -403,7 +403,7 @@ export function PurchaseOrderReceiveGoodsDialog({
       }}
       open={open}
     >
-      <DialogContent className="max-w-5xl">
+      <DialogContent className="max-h-[90dvh] max-w-5xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Receive goods</DialogTitle>
           <DialogDescription>

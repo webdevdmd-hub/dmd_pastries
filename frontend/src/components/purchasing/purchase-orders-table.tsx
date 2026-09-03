@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import type { JSX, MouseEvent as ReactMouseEvent } from "react";
+import type { JSX } from "react";
 
-import { PurchaseOrderActionsMenu } from "@/components/purchasing/purchase-order-actions-menu";
+import {
+  type PurchaseOrderActionHandlers,
+  PurchaseOrderActionsMenu,
+} from "@/components/purchasing/purchase-order-actions-menu";
 import { PurchaseOrderStatusBadge } from "@/components/purchasing/purchase-order-status-badge";
 import {
   Table,
@@ -14,39 +15,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ROUTES } from "@/constants/routes";
 import { formatDateOnly } from "@/lib/format/date";
-import type { PurchaseOrder, PurchaseOrderStatus } from "@/types/purchasing";
+import type { PurchaseOrder } from "@/types/purchasing";
 
-function formatCurrency(value: number): string {
+export type PurchaseOrdersListProps = PurchaseOrderActionHandlers & {
+  /** Opens the order's details; the whole row is the target. */
+  onView: (order: PurchaseOrder) => void;
+  orders: PurchaseOrder[];
+};
+
+export function formatPurchaseOrderCurrency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
-}
-
-function formatDate(value: string | null): string {
-  return formatDateOnly(value);
 }
 
 /**
  * Branch and who raised it are how you recognise a row once you have found it,
- * not how you find it -- nobody scans a column of "Main Branch (MAIN)" looking
- * for one order. They ride under the number they belong to, the same move the
- * movements ledger made when it went to eight columns.
+ * not how you find it. They ride under the number they belong to.
  */
-function orderSubline(order: PurchaseOrder): string {
+export function orderSubline(order: PurchaseOrder): string {
   return [order.branchName, order.createdByUserName].filter(Boolean).join(" · ");
-}
-
-/**
- * A click anywhere in the row opens the order, except where the row already
- * has something else to do: the number is a link, the last cell is a menu, and
- * a click that ends a text selection is a read, not a navigation.
- */
-function shouldOpenOrder(event: ReactMouseEvent<HTMLTableRowElement>): boolean {
-  if (event.target instanceof Element && event.target.closest("a,button,[role='menuitem']")) {
-    return false;
-  }
-
-  return (window.getSelection()?.toString().length ?? 0) === 0;
 }
 
 type NextStepPermissions = {
@@ -56,12 +43,10 @@ type NextStepPermissions = {
 };
 
 /**
- * The next step depends on who is reading it. This used to instruct every
- * viewer to "Mark as issued" or "Receive goods" regardless of their role, so a
- * view-only user was told to take an action the row's own menu denied them.
- * Without the permission, the cell reports the state instead.
+ * The next step depends on who is reading it. Without the permission, the
+ * cell reports the state instead of instructing an action the menu denies.
  */
-function nextStepForOrder(order: PurchaseOrder, permissions: NextStepPermissions): string {
+export function nextStepForOrder(order: PurchaseOrder, permissions: NextStepPermissions): string {
   if (order.status === "draft") {
     return permissions.canUpdateStatus ? "Mark as issued" : "Awaiting issue";
   }
@@ -84,111 +69,61 @@ function nextStepForOrder(order: PurchaseOrder, permissions: NextStepPermissions
 }
 
 export function PurchaseOrdersTable({
-  canCreate,
-  canDelete,
-  canEdit,
-  canConvertToBill,
-  canReceiveOrder,
-  canUpdateStatus,
-  onConvertToBill,
-  onDelete,
-  onDuplicate,
-  onEdit,
-  onReopen,
-  onReceive,
-  onStatusChange,
+  onView,
   orders,
-}: {
-  canCreate: boolean;
-  canDelete: boolean;
-  canEdit: boolean;
-  canConvertToBill: boolean;
-  canReceiveOrder: boolean;
-  canUpdateStatus: boolean;
-  onConvertToBill: (order: PurchaseOrder) => void;
-  onDelete: (order: PurchaseOrder) => void;
-  onDuplicate: (order: PurchaseOrder) => void;
-  onEdit: (order: PurchaseOrder) => void;
-  onReopen: (order: PurchaseOrder) => void;
-  onReceive: (order: PurchaseOrder) => void;
-  onStatusChange: (order: PurchaseOrder, status: PurchaseOrderStatus) => void;
-  orders: PurchaseOrder[];
-}): JSX.Element {
-  const router = useRouter();
-
+  ...actions
+}: PurchaseOrdersListProps): JSX.Element {
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>PO Number</TableHead>
+          <TableHead>PO number</TableHead>
           <TableHead>Supplier</TableHead>
-          <TableHead>Order Date</TableHead>
-          <TableHead>Expected Delivery</TableHead>
+          <TableHead>Order date</TableHead>
+          <TableHead>Expected delivery</TableHead>
           <TableHead>Status</TableHead>
           <TableHead className="text-right">Total</TableHead>
-          <TableHead>Next Step</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
+          <TableHead>Next step</TableHead>
+          <TableHead>
+            <span className="sr-only">Actions</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {orders.map((order) => (
-          <TableRow
-            className="cursor-pointer"
-            key={order.id}
-            onClick={(event) => {
-              if (!shouldOpenOrder(event)) return;
-              router.push(`${ROUTES.purchasingOrders}/${order.id}`);
-            }}
-          >
+          // The row opens the drawer; the number is also a button so the
+          // keyboard has a focusable target for the same action.
+          <TableRow className="cursor-pointer" key={order.id} onClick={() => onView(order)}>
             <TableCell>
-              <div>
-                <Link
-                  className="font-semibold text-brand-espresso"
-                  href={`${ROUTES.purchasingOrders}/${order.id}`}
-                >
-                  {order.purchaseOrderNumber}
-                </Link>
-                <p className="text-meta text-foreground-muted">{orderSubline(order)}</p>
-              </div>
+              <button
+                className="grid gap-0.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onView(order);
+                }}
+                type="button"
+              >
+                <span className="font-mono font-medium">{order.purchaseOrderNumber}</span>
+                <span className="text-meta text-foreground-muted">{orderSubline(order)}</span>
+              </button>
             </TableCell>
             <TableCell>{order.supplierName}</TableCell>
-            <TableCell className="tabular-nums">{formatDate(order.orderDate)}</TableCell>
-            <TableCell className="tabular-nums">{formatDate(order.expectedDeliveryDate)}</TableCell>
+            <TableCell className="tabular-nums">{formatDateOnly(order.orderDate)}</TableCell>
+            <TableCell className="tabular-nums">
+              {formatDateOnly(order.expectedDeliveryDate)}
+            </TableCell>
             <TableCell>
               <PurchaseOrderStatusBadge status={order.status} />
             </TableCell>
-            <TableCell className="text-right tabular-nums">
-              {formatCurrency(order.totalAmount)}
+            <TableCell className="text-right font-medium tabular-nums">
+              {formatPurchaseOrderCurrency(order.totalAmount)}
             </TableCell>
-            <TableCell>
-              <span className="text-meta text-foreground-muted">
-                {nextStepForOrder(order, {
-                  canConvertToBill,
-                  canReceiveOrder,
-                  canUpdateStatus,
-                })}
-              </span>
+            <TableCell className="text-foreground-muted">
+              {nextStepForOrder(order, actions)}
             </TableCell>
-            <TableCell className="text-right">
-              <PurchaseOrderActionsMenu
-                canCreate={canCreate}
-                canDelete={canDelete}
-                canEdit={canEdit}
-                canConvertToBill={canConvertToBill}
-                canReceiveOrder={canReceiveOrder}
-                canUpdateStatus={canUpdateStatus}
-                onConvertToBill={onConvertToBill}
-                onDelete={onDelete}
-                onDuplicate={onDuplicate}
-                onEdit={onEdit}
-                onReopen={onReopen}
-                onReceive={onReceive}
-                onStatusChange={onStatusChange}
-                onView={(selectedOrder) =>
-                  router.push(`${ROUTES.purchasingOrders}/${selectedOrder.id}`)
-                }
-                order={order}
-              />
+            {/* The menu must not also open the drawer. */}
+            <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+              <PurchaseOrderActionsMenu {...actions} order={order} />
             </TableCell>
           </TableRow>
         ))}
