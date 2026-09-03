@@ -10,7 +10,7 @@ import { SettingsEmptyState } from "@/components/settings/settings-empty-state";
 import { SettingsGrid } from "@/components/settings/settings-grid";
 import { SettingsSkeleton } from "@/components/settings/settings-skeleton";
 import { PageHeader } from "@/components/shared/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
 import { SETTINGS_SECTIONS } from "@/constants/settings";
 import { useAuth } from "@/hooks/use-auth";
@@ -102,6 +102,46 @@ export function SettingsPageClient(): JSX.Element {
   }
 
   const hasVisibleSections = systemSections.length > 0 || masterDataSections.length > 0;
+  const settingsOverview = settingsOverviewQuery.data;
+  const masterData = masterDataOverviewQuery.data;
+  const summaryCards = [
+    {
+      detail: `${settingsOverview?.defaultCurrency ?? "Currency"} · ${settingsOverview?.defaultTimezone ?? "Timezone"}`,
+      isLoading: settingsOverviewQuery.isLoading,
+      label: "Company profile",
+      value: settingsOverview?.companyProfileCompleted ? "Complete" : "Pending",
+    },
+    {
+      detail: "Configured locations",
+      isLoading: settingsOverviewQuery.isLoading,
+      label: "Branches",
+      value: String(settingsOverview?.branchCount ?? 0),
+    },
+    {
+      detail: "Active financial records",
+      isLoading: settingsOverviewQuery.isLoading,
+      label: "Tax & payments",
+      value: String(
+        (settingsOverview?.activeTaxRatesCount ?? 0) +
+          (settingsOverview?.activePaymentMethodsCount ?? 0),
+      ),
+    },
+    {
+      detail: "Seeded reference records",
+      isLoading: masterDataOverviewQuery.isLoading,
+      label: "Master data",
+      value: String(
+        masterData
+          ? masterData.unitsCount +
+              masterData.productCategoriesCount +
+              masterData.ingredientCategoriesCount +
+              masterData.packagingCategoriesCount +
+              masterData.orderStatusesCount +
+              masterData.paymentStatusesCount
+          : 0,
+      ),
+    },
+  ];
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-8">
@@ -110,73 +150,34 @@ export function SettingsPageClient(): JSX.Element {
         description="Configure your business, financial rules, master data, users, and operational preferences."
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm text-brand-mocha">Company Profile</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-kpi tabular-nums text-foreground">
-              {settingsOverviewQuery.data?.companyProfileCompleted ? "Complete" : "Pending"}
-            </p>
-            <p className="mt-1 text-sm text-brand-mocha">
-              {settingsOverviewQuery.data?.defaultCurrency ?? "Currency"} ·{" "}
-              {settingsOverviewQuery.data?.defaultTimezone ?? "Timezone"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm text-brand-mocha">Branches</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-kpi tabular-nums text-foreground">
-              {settingsOverviewQuery.data?.branchCount ?? 0}
-            </p>
-            <p className="mt-1 text-sm text-brand-mocha">Configured locations</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm text-brand-mocha">Tax & Payments</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-kpi tabular-nums text-foreground">
-              {(settingsOverviewQuery.data?.activeTaxRatesCount ?? 0) +
-                (settingsOverviewQuery.data?.activePaymentMethodsCount ?? 0)}
-            </p>
-            <p className="mt-1 text-sm text-brand-mocha">Active financial records</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm text-brand-mocha">Master Data</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-kpi tabular-nums text-foreground">
-              {masterDataOverviewQuery.data
-                ? masterDataOverviewQuery.data.unitsCount +
-                  masterDataOverviewQuery.data.productCategoriesCount +
-                  masterDataOverviewQuery.data.ingredientCategoriesCount +
-                  masterDataOverviewQuery.data.packagingCategoriesCount +
-                  masterDataOverviewQuery.data.orderStatusesCount +
-                  masterDataOverviewQuery.data.paymentStatusesCount
-                : 0}
-            </p>
-            <p className="mt-1 text-sm text-brand-mocha">Seeded reference records</p>
-          </CardContent>
-        </Card>
+      {/* Four across at every width. These are context for the sections below,
+          not the point of the page, so they read at cell size rather than
+          filling the screen above the thing you came here to open. */}
+      <div className="flex min-w-0 gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-4 sm:gap-4 sm:overflow-visible sm:pb-0">
+        {summaryCards.map((card) => (
+          <Card className="w-36 shrink-0 sm:w-auto sm:min-w-0" key={card.label}>
+            <CardContent className="p-4">
+              <p className="text-meta text-foreground-muted">{card.label}</p>
+              {/* A loading query asserted "Pending" and 0, which are answers,
+                  not the absence of one. */}
+              <p className="mt-1 text-section font-medium tabular-nums">
+                {card.isLoading ? "—" : card.value}
+              </p>
+              <p className="mt-0.5 break-words text-meta text-foreground-muted">{card.detail}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {!hasVisibleSections ? <SettingsEmptyState /> : null}
 
       {systemSections.length > 0 ? (
-        <section className="space-y-4" aria-labelledby="system-settings-heading">
-          <div className="space-y-2">
-            <h2 id="system-settings-heading" className="text-2xl font-semibold text-brand-espresso">
+        <section className="grid gap-4" aria-labelledby="system-settings-heading">
+          <div className="grid gap-1">
+            <h2 className="text-section font-medium" id="system-settings-heading">
               Business Settings
             </h2>
-            <p className="max-w-3xl text-sm leading-6 text-brand-mocha">
+            <p className="max-w-3xl text-cell text-foreground-muted">
               Core configuration for company identity, payments, receipts, notifications, and
               operational controls.
             </p>
@@ -190,15 +191,12 @@ export function SettingsPageClient(): JSX.Element {
       ) : null}
 
       {canViewMasterData && masterDataSections.length > 0 ? (
-        <section className="space-y-4" aria-labelledby="master-data-settings-heading">
-          <div className="space-y-2">
-            <h2
-              id="master-data-settings-heading"
-              className="text-2xl font-semibold text-brand-espresso"
-            >
+        <section className="grid gap-4" aria-labelledby="master-data-settings-heading">
+          <div className="grid gap-1">
+            <h2 className="text-section font-medium" id="master-data-settings-heading">
               Master Data
             </h2>
-            <p className="max-w-3xl text-sm leading-6 text-brand-mocha">
+            <p className="max-w-3xl text-cell text-foreground-muted">
               Manage reusable system data used across products, orders, inventory, POS billing, and
               reporting.
             </p>
