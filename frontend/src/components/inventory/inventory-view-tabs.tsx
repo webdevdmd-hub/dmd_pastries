@@ -193,7 +193,10 @@ export function InventoryViewTabs({
   return (
     <div
       aria-label="Inventory views"
-      className={SEGMENT_TRACK_CLASS}
+      // Six segments are 601px wide, so on a phone this strip alone pushed the
+      // whole module into a horizontal scroll. It scrolls inside itself now,
+      // the way every detail strip already does.
+      className={`${SEGMENT_TRACK_CLASS} max-w-full overflow-x-auto`}
       onKeyDown={handleKeyDown}
       ref={containerRef}
       role="tablist"
