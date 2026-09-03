@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { SupplierLookupSelect } from "@/components/purchasing/supplier-lookup-select";
+import { type FormTab, FormTabs } from "@/components/shared/form-tabs";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -39,6 +41,15 @@ import type {
   PurchasingUnitOption,
   ReceivePurchasePayload,
 } from "@/types/purchasing";
+
+type ReceiveFormTabKey = "source" | "items";
+
+const FORM_TABPANEL_ID = "receive-goods-form-tabpanel";
+
+/** Which tab a validation issue belongs to, from the field it names. */
+function tabForField(field: string | number | undefined): ReceiveFormTabKey {
+  return field === "items" ? "items" : "source";
+}
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -162,6 +173,7 @@ export function PurchaseReceiveDialog({
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<PurchaseItemLineDraft[]>([emptyLine()]);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ReceiveFormTabKey>("source");
   const sourceLocked = Boolean(order ?? invoice);
   const linkedPurchaseOrderLabel = order?.purchaseOrderNumber ?? invoice?.purchaseOrderNumber ?? "";
   const linkedPurchaseInvoiceLabel = invoice?.invoiceNumber ?? "";
@@ -226,6 +238,8 @@ export function PurchaseReceiveDialog({
       setLines([emptyLine()]);
     }
     setError(null);
+    // Every opening starts on Source, whichever tab the last one closed on.
+    setActiveTab("source");
   }, [branchScope.effectiveBranchId, invoice, open, order]);
 
   const submit = async (): Promise<void> => {
@@ -240,12 +254,21 @@ export function PurchaseReceiveDialog({
     });
 
     if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Please check the receive form.");
+      // A failed check switches to the tab that holds the problem before the
+      // banner explains it; a hidden error is otherwise a silent no-op.
+      const issue = result.error.issues[0];
+      setActiveTab(tabForField(issue?.path[0]));
+      setError(issue?.message ?? "Please check the receive form.");
       return;
     }
 
     await onReceive(result.data);
   };
+
+  const formTabs: FormTab<ReceiveFormTabKey>[] = [
+    { key: "source", label: "Source" },
+    { key: "items", label: "Items", badge: lines.length },
+  ];
 
   const renderItemCell = (line: PurchaseItemLineDraft): JSX.Element => {
     const selectedProduct = products.find((product) => product.id === line.productId) ?? null;
@@ -330,35 +353,69 @@ export function PurchaseReceiveDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-6 py-5">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Select
-              value={branchId || "none"}
-              onValueChange={(value) => setBranchId(value === "none" ? "" : value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Branch" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Select branch</SelectItem>
-                {selectableBranches.map((branch) => (
-                  <SelectItem key={branch.id} value={branch.id}>
-                    {branch.branchName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <SupplierLookupSelect
-              onValueChange={setSupplierId}
-              suppliers={suppliers}
-              value={supplierId}
-            />
-            <Input
-              aria-label="Received date"
-              onChange={(event) => setReceivedDate(event.target.value)}
-              type="date"
-              value={receivedDate}
-            />
+        {/* Two tabs on one state: where the stock came from, and what
+            physically arrived. Nothing typed on one is lost on the other. */}
+        <div className="shrink-0 border-b border-brand-cappuccino/70 px-6 py-3">
+          <FormTabs
+            active={activeTab}
+            aria-label="Receive goods sections"
+            onTabChange={setActiveTab}
+            panelId={FORM_TABPANEL_ID}
+            tabs={formTabs}
+          />
+        </div>
+
+        <div
+          className="min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-6 py-5"
+          id={FORM_TABPANEL_ID}
+          role="tabpanel"
+          tabIndex={-1}
+        >
+          {/* Every control carries a visible label: two of these render as
+              bare dropdowns, and the date input shows dd/mm/yyyy with nothing
+              on screen naming it. */}
+          <div
+            className={
+              activeTab === "source" ? "grid gap-4 md:grid-cols-2 xl:grid-cols-3" : "hidden"
+            }
+          >
+            <div className="grid gap-1.5">
+              <Label htmlFor="receive-branch">Branch</Label>
+              <Select
+                value={branchId || "none"}
+                onValueChange={(value) => setBranchId(value === "none" ? "" : value)}
+              >
+                <SelectTrigger id="receive-branch">
+                  <SelectValue placeholder="Branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Select branch</SelectItem>
+                  {selectableBranches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.branchName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="receive-supplier">Supplier</Label>
+              <SupplierLookupSelect
+                id="receive-supplier"
+                onValueChange={setSupplierId}
+                suppliers={suppliers}
+                value={supplierId}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="receive-date">Received date</Label>
+              <Input
+                id="receive-date"
+                onChange={(event) => setReceivedDate(event.target.value)}
+                type="date"
+                value={receivedDate}
+              />
+            </div>
             {purchaseOrderId ? (
               <div className="flex h-10 items-center rounded-md border border-input bg-brand-latte/40 px-3 text-sm text-brand-espresso">
                 <span className="mr-2 text-brand-mocha">Linked PO</span>
@@ -375,9 +432,24 @@ export function PurchaseReceiveDialog({
                 </span>
               </div>
             ) : null}
+            <div className="grid gap-1.5 md:col-span-2 xl:col-span-3">
+              <Label htmlFor="receive-notes">Notes</Label>
+              <Input
+                id="receive-notes"
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Delivery note reference, or anything to remember"
+                value={notes}
+              />
+            </div>
           </div>
 
-          <section className="rounded-xl border border-brand-cappuccino/70 bg-card shadow-sm">
+          <section
+            className={
+              activeTab === "items"
+                ? "rounded-xl border border-brand-cappuccino/70 bg-card shadow-sm"
+                : "hidden"
+            }
+          >
             <div className="border-b border-brand-cappuccino/70 px-4 py-3">
               <h3 className="text-sm font-semibold text-brand-espresso">Items to receive</h3>
               <p className="text-sm text-brand-mocha">
@@ -590,13 +662,7 @@ export function PurchaseReceiveDialog({
             ) : null}
           </section>
 
-          <Input
-            aria-label="Notes"
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Notes"
-            value={notes}
-          />
-          {error ? <p className="text-sm font-semibold text-danger-text">{error}</p> : null}
+          {error ? <p className="text-cell font-medium text-danger-text">{error}</p> : null}
         </div>
 
         <DialogFooter className="border-t border-brand-cappuccino/70 px-6 py-4">

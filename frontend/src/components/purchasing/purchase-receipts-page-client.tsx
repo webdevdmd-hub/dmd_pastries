@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseEmptyState } from "@/components/purchasing/purchase-empty-state";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
+import { PurchaseReceiptDetailsDrawer } from "@/components/purchasing/purchase-receipt-details-drawer";
+import { PurchaseReceiptsCardGrid } from "@/components/purchasing/purchase-receipts-card-grid";
 import { PurchaseReceiptsTable } from "@/components/purchasing/purchase-receipts-table";
 import { PurchaseReceiveDialog } from "@/components/purchasing/purchase-receive-dialog";
 import { PurchaseReturnDialog } from "@/components/purchasing/purchase-return-dialog";
@@ -88,6 +90,10 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [returnReceipt, setReturnReceipt] = useState<PurchaseReceipt | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  // The id, not the record: the list rows carry a summary and the drawer
+  // fetches the full receipt itself.
+  const [detailsReceiptId, setDetailsReceiptId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [page, setPage] = useState(1);
   const receiptsQuery = usePurchaseReceipts(filters, canView && branchScope.hasBranchScope, page);
   const receiptsTotalPages = receiptsQuery.data?.pagination.totalPages ?? 1;
@@ -161,6 +167,24 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
     }
   };
 
+  const openDetails = (receipt: PurchaseReceipt): void => {
+    setDetailsReceiptId(receipt.id);
+    setDetailsOpen(true);
+  };
+
+  // A dialog on top of a sheet on top of the list is one layer too many, so
+  // the drawer closes before any of these open. Confirming or cancelling
+  // then lands back on the list.
+  const askAction = (action: NonNullable<PendingAction>): void => {
+    setDetailsOpen(false);
+    setPendingAction(action);
+  };
+
+  const openReturn = (receipt: PurchaseReceipt): void => {
+    setDetailsOpen(false);
+    setReturnReceipt(receipt);
+  };
+
   const confirmAction = async (): Promise<void> => {
     if (!pendingAction) return;
 
@@ -179,6 +203,26 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
   };
 
   const receipts = receiptsQuery.data?.items ?? [];
+  const listHandlers = {
+    canManage,
+    canReturn,
+    onCancel: (receipt: PurchaseReceipt) => askAction({ receipt, type: "cancel" }),
+    onPost: (receipt: PurchaseReceipt) => askAction({ receipt, type: "post" }),
+    onReturn: openReturn,
+    onView: openDetails,
+    receipts,
+  };
+  const pagination = receiptsQuery.data?.pagination ? (
+    <PaginationBar
+      isFetching={receiptsQuery.isFetching}
+      limit={receiptsQuery.data.pagination.limit}
+      noun={{ one: "goods receipt", other: "goods receipts" }}
+      onPageChange={setPage}
+      page={receiptsQuery.data.pagination.page}
+      total={receiptsQuery.data.pagination.total}
+      totalPages={receiptsQuery.data.pagination.totalPages}
+    />
+  ) : null;
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -199,6 +243,7 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
         allowAllBranches={branchScope.canAccessAllBranches}
         branches={branchOptions}
         filters={filters}
+        noun="receive goods records"
         onFiltersChange={setFilters}
         resetBranchId={branchScope.defaultBranchId}
         statuses={receiptStatuses}
@@ -247,31 +292,33 @@ export function PurchaseReceiptsPageClient(): JSX.Element {
         />
       ) : null}
 
+      {/* An eight-column ledger has no honest phone layout. Below md the list
+          is cards carrying the same fields; the table takes over from md up. */}
       {!receiptsQuery.isLoading && !receiptsQuery.error && receipts.length > 0 ? (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <PurchaseReceiptsTable
-              canManage={canManage}
-              canReturn={canReturn}
-              onCancel={(receipt) => setPendingAction({ receipt, type: "cancel" })}
-              onPost={(receipt) => setPendingAction({ receipt, type: "post" })}
-              onReturn={(receipt) => setReturnReceipt(receipt)}
-              receipts={receipts}
-            />
-            {receiptsQuery.data?.pagination ? (
-              <PaginationBar
-                isFetching={receiptsQuery.isFetching}
-                limit={receiptsQuery.data.pagination.limit}
-                noun={{ one: "goods receipt", other: "goods receipts" }}
-                onPageChange={setPage}
-                page={receiptsQuery.data.pagination.page}
-                total={receiptsQuery.data.pagination.total}
-                totalPages={receiptsQuery.data.pagination.totalPages}
-              />
-            ) : null}
-          </CardContent>
-        </Card>
+        <>
+          <div className="grid gap-4 md:hidden">
+            <PurchaseReceiptsCardGrid {...listHandlers} />
+            {pagination ? <Card className="overflow-hidden">{pagination}</Card> : null}
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <PurchaseReceiptsTable {...listHandlers} />
+              {pagination}
+            </CardContent>
+          </Card>
+        </>
       ) : null}
+
+      <PurchaseReceiptDetailsDrawer
+        canPost={canManage}
+        canReturn={canReturn}
+        canView={canView}
+        onOpenChange={setDetailsOpen}
+        onPost={(receipt) => askAction({ receipt, type: "post" })}
+        onReturn={openReturn}
+        open={detailsOpen}
+        receiptId={detailsReceiptId}
+      />
 
       <PurchaseReceiveDialog
         branches={branchesQuery.data ?? []}

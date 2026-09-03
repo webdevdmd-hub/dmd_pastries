@@ -8,27 +8,35 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { PurchaseReceipt } from "@/types/purchasing";
 
+export type PurchaseReceiptActionHandlers = {
+  canManage: boolean;
+  canReturn: boolean;
+  onCancel: (receipt: PurchaseReceipt) => void;
+  onPost: (receipt: PurchaseReceipt) => void;
+  onReturn: (receipt: PurchaseReceipt) => void;
+};
+
+/**
+ * Actions only. Viewing is the row's own click, so "View details" no longer
+ * sits here; a reader with no write rights sees no menu at all.
+ */
 export function PurchaseReceiptActionsMenu({
   canManage,
   canReturn,
   onCancel,
   onPost,
   onReturn,
-  onView,
   receipt,
-}: {
-  canManage: boolean;
-  canReturn: boolean;
-  onCancel: (receipt: PurchaseReceipt) => void;
-  onPost: (receipt: PurchaseReceipt) => void;
-  onReturn: (receipt: PurchaseReceipt) => void;
-  onView: (receipt: PurchaseReceipt) => void;
-  receipt: PurchaseReceipt;
-}): JSX.Element {
+}: PurchaseReceiptActionHandlers & { receipt: PurchaseReceipt }): JSX.Element | null {
+  if (!canManage && !canReturn) {
+    return null;
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -42,7 +50,11 @@ export function PurchaseReceiptActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => onView(receipt)}>View details</DropdownMenuItem>
+        {canManage ? (
+          <DropdownMenuItem disabled={receipt.status !== "draft"} onSelect={() => onPost(receipt)}>
+            Post receipt
+          </DropdownMenuItem>
+        ) : null}
         {canReturn ? (
           <DropdownMenuItem
             disabled={receipt.status !== "posted"}
@@ -53,13 +65,9 @@ export function PurchaseReceiptActionsMenu({
         ) : null}
         {canManage ? (
           <>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
-              disabled={receipt.status !== "draft"}
-              onSelect={() => onPost(receipt)}
-            >
-              Post receipt
-            </DropdownMenuItem>
-            <DropdownMenuItem
+              className="text-danger-text"
               disabled={receipt.status === "cancelled"}
               onSelect={() => onCancel(receipt)}
             >

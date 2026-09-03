@@ -1,11 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 
 import { PurchaseReceiptAccountingBadge } from "@/components/purchasing/purchase-receipt-accounting-badge";
-import { PurchaseReceiptActionsMenu } from "@/components/purchasing/purchase-receipt-actions-menu";
+import {
+  type PurchaseReceiptActionHandlers,
+  PurchaseReceiptActionsMenu,
+} from "@/components/purchasing/purchase-receipt-actions-menu";
 import { PurchaseReceiptStatusBadge } from "@/components/purchasing/purchase-receipt-status-badge";
 import {
   Table,
@@ -15,25 +16,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ROUTES } from "@/constants/routes";
 import type { PurchaseReceipt } from "@/types/purchasing";
 
-function formatDate(value: string | null): string {
+export type PurchaseReceiptsListProps = PurchaseReceiptActionHandlers & {
+  /** Opens the receipt's details; the whole row is the target. */
+  onView: (receipt: PurchaseReceipt) => void;
+  receipts: PurchaseReceipt[];
+};
+
+export function formatPurchaseReceiptDay(value: string | null): string {
   return value
     ? new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(new Date(value))
     : "Not set";
 }
 
-function nextStepForReceipt(receipt: PurchaseReceipt): string {
+export function nextStepForReceipt(receipt: PurchaseReceipt): string {
   if (receipt.status === "draft") {
     return "Post receipt to update stock";
   }
 
   if (receipt.status === "posted") {
-    if (receipt.accountingStatus === "pending_bill_posting") {
-      return receipt.accountingStatusDetail;
-    }
-    if (receipt.accountingStatus === "pending_accounting_journal") {
+    if (
+      receipt.accountingStatus === "pending_bill_posting" ||
+      receipt.accountingStatus === "pending_accounting_journal"
+    ) {
       return receipt.accountingStatusDetail;
     }
     return "Return items if needed";
@@ -42,101 +48,77 @@ function nextStepForReceipt(receipt: PurchaseReceipt): string {
   return "No action";
 }
 
-function linkedPurchaseOrderLabel(receipt: PurchaseReceipt): string {
-  return (
-    receipt.purchaseOrderNumber ??
-    (receipt.purchaseOrderId ? "PO number unavailable" : "Not linked")
-  );
-}
+/** The documents this receipt came from, on one line. */
+export function receiptLinkedDocuments(receipt: PurchaseReceipt): string {
+  const parts = [
+    receipt.purchaseOrderNumber ?? (receipt.purchaseOrderId ? "PO unavailable" : null),
+    receipt.purchaseInvoiceNumber ?? (receipt.purchaseInvoiceId ? "Bill unavailable" : null),
+  ].filter((part): part is string => part !== null);
 
-function linkedPurchaseInvoiceLabel(receipt: PurchaseReceipt): string {
-  return (
-    receipt.purchaseInvoiceNumber ??
-    (receipt.purchaseInvoiceId ? "Bill number unavailable" : "Not linked")
-  );
+  return parts.length > 0 ? parts.join(" · ") : "Not linked";
 }
 
 export function PurchaseReceiptsTable({
-  canManage,
-  canReturn,
-  onCancel,
-  onPost,
-  onReturn,
+  onView,
   receipts,
-}: {
-  canManage: boolean;
-  canReturn: boolean;
-  onCancel: (receipt: PurchaseReceipt) => void;
-  onPost: (receipt: PurchaseReceipt) => void;
-  onReturn: (receipt: PurchaseReceipt) => void;
-  receipts: PurchaseReceipt[];
-}): JSX.Element {
-  const router = useRouter();
-
+  ...actions
+}: PurchaseReceiptsListProps): JSX.Element {
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Receipt Number</TableHead>
+          <TableHead>Receipt</TableHead>
           <TableHead>Supplier</TableHead>
-          <TableHead>Branch</TableHead>
-          <TableHead>Received Date</TableHead>
-          <TableHead>Linked PO</TableHead>
-          <TableHead>Linked Invoice</TableHead>
+          <TableHead>Received</TableHead>
+          <TableHead>Linked documents</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead>Accounting</TableHead>
-          <TableHead>Received By</TableHead>
-          <TableHead>Next Step</TableHead>
-          <TableHead>Actions</TableHead>
+          <TableHead>Received by</TableHead>
+          <TableHead>Next step</TableHead>
+          <TableHead>
+            <span className="sr-only">Actions</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {receipts.map((receipt) => (
-          <TableRow key={receipt.id}>
+          // The row opens the drawer; the number is also a button so the
+          // keyboard has a focusable target for the same action.
+          <TableRow className="cursor-pointer" key={receipt.id} onClick={() => onView(receipt)}>
             <TableCell>
-              <Link
-                className="font-semibold text-brand-espresso"
-                href={`${ROUTES.purchasingReceipts}/${receipt.id}`}
+              <button
+                className="grid gap-0.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onView(receipt);
+                }}
+                type="button"
               >
-                {receipt.receiptNumber}
-              </Link>
+                <span className="font-mono font-medium">{receipt.receiptNumber}</span>
+                {/* Branch is how you recognise a receipt you have found, not
+                    how you find one. It rides under the number. */}
+                <span className="text-meta text-foreground-muted">{receipt.branchName}</span>
+              </button>
             </TableCell>
             <TableCell>{receipt.supplierName}</TableCell>
-            <TableCell>{receipt.branchName}</TableCell>
-            <TableCell>{formatDate(receipt.receivedDate)}</TableCell>
-            <TableCell>{linkedPurchaseOrderLabel(receipt)}</TableCell>
-            <TableCell>{linkedPurchaseInvoiceLabel(receipt)}</TableCell>
-            <TableCell>
-              <PurchaseReceiptStatusBadge status={receipt.status} />
+            <TableCell className="tabular-nums">
+              {formatPurchaseReceiptDay(receipt.receivedDate)}
             </TableCell>
+            <TableCell className="font-mono">{receiptLinkedDocuments(receipt)}</TableCell>
             <TableCell>
-              <div className="space-y-1">
+              {/* Two badges, one column. Posting state and accounting state are
+                  independent, and the second is why a storekeeper is here. */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <PurchaseReceiptStatusBadge status={receipt.status} />
                 <PurchaseReceiptAccountingBadge receipt={receipt} />
-                {receipt.accountingStatus === "pending_bill_posting" ? (
-                  <p className="max-w-56 text-xs text-brand-mocha">
-                    {receipt.accountingStatusDetail}
-                  </p>
-                ) : null}
               </div>
             </TableCell>
             <TableCell>{receipt.receivedByUserName}</TableCell>
-            <TableCell>
-              <span className="text-sm font-medium text-brand-mocha">
-                {nextStepForReceipt(receipt)}
-              </span>
+            <TableCell className="min-w-56 whitespace-normal text-foreground-muted">
+              {nextStepForReceipt(receipt)}
             </TableCell>
-            <TableCell>
-              <PurchaseReceiptActionsMenu
-                canManage={canManage}
-                canReturn={canReturn}
-                onCancel={onCancel}
-                onPost={onPost}
-                onReturn={onReturn}
-                onView={(selectedReceipt) =>
-                  router.push(`${ROUTES.purchasingReceipts}/${selectedReceipt.id}`)
-                }
-                receipt={receipt}
-              />
+            {/* The menu must not also open the drawer. */}
+            <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+              <PurchaseReceiptActionsMenu {...actions} receipt={receipt} />
             </TableCell>
           </TableRow>
         ))}
