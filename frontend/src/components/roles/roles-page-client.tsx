@@ -446,8 +446,8 @@ export function RolesPageClient(): JSX.Element {
           }
         }}
       >
-        <DialogContent className="flex max-h-[90vh] max-w-6xl flex-col overflow-hidden p-0">
-          <DialogHeader className="border-b border-brand-cappuccino px-6 pb-4 pt-6">
+        <DialogContent className="flex max-h-[90vh] min-w-0 max-w-3xl flex-col overflow-hidden p-0">
+          <DialogHeader className="shrink-0 border-b border-border px-6 pb-4 pt-6">
             <DialogTitle>
               {permissionDialog?.mode === "manage" ? "Manage permissions" : "View permissions"}
             </DialogTitle>
@@ -457,7 +457,7 @@ export function RolesPageClient(): JSX.Element {
                 : "Role permissions across POS modules."}
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-hidden px-6 py-5">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-6 py-5">
             <PermissionMatrix
               canManage={canUpdateRolePermissions && permissionDialog?.mode === "manage"}
               errorMessage={permissionMatrixErrorMessage}

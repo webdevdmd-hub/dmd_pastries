@@ -1,12 +1,13 @@
 "use client";
 
-import { Save, ShieldCheck } from "lucide-react";
+import { ChevronDown, Search, ShieldCheck } from "lucide-react";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils/cn";
 import type {
@@ -15,7 +16,7 @@ import type {
   PermissionModuleName,
   RolePermission,
 } from "@/types/permission";
-import { PERMISSION_MODULE_META, PERMISSION_MODULES } from "@/types/permission";
+import { PERMISSION_MODULE_META } from "@/types/permission";
 import type { Role } from "@/types/role";
 
 type PermissionMatrixProps = {
@@ -32,30 +33,13 @@ type PermissionMatrixProps = {
   showSave?: boolean;
 };
 
-type MatrixColumn = "view" | "create" | "edit" | "delete" | "status" | "manage" | "advanced";
-
-type MatrixCellPermission = PermissionDefinition & {
-  actionLabel: string;
-  column: MatrixColumn;
-};
-
-type PermissionModuleGroup = {
+type ModuleGroup = {
   moduleName: PermissionModuleName;
-  permissions: MatrixCellPermission[];
+  permissions: (PermissionDefinition & { actionLabel: string })[];
+  title: string;
 };
 
-const matrixColumns: {
-  column: Exclude<MatrixColumn, "advanced">;
-  label: string;
-}[] = [
-  { column: "view", label: "View" },
-  { column: "create", label: "Create" },
-  { column: "edit", label: "Edit" },
-  { column: "delete", label: "Delete" },
-  { column: "status", label: "Status" },
-  { column: "manage", label: "Manage" },
-];
-const permissionRequiredMessage = "Please select at least one permission.";
+const permissionRequiredMessage = "Select at least one permission before saving.";
 
 function buildInitialSelection(rolePermissions: RolePermission[] | undefined): Set<string> {
   return new Set(
@@ -85,117 +69,10 @@ function getModuleTitle(moduleName: PermissionModuleName): string {
   return formatLabel(moduleName);
 }
 
+/** "users.activity.view" -> "Activity View". The module prefix is the heading. */
 function getPermissionAction(permissionKey: Permission): string {
   const [, ...actionParts] = permissionKey.split(".");
   return actionParts.length > 0 ? actionParts.join(".") : permissionKey;
-}
-
-function getPermissionColumn(permissionKey: Permission): MatrixColumn {
-  const action = getPermissionAction(permissionKey);
-
-  if (action === "view" || action.endsWith(".view") || action === "lookup") {
-    return "view";
-  }
-
-  if (
-    action === "create" ||
-    action.includes(".create") ||
-    action === "add" ||
-    action === "invite" ||
-    action === "quick_create" ||
-    action === "opening_stock" ||
-    action === "manual_create"
-  ) {
-    return "create";
-  }
-
-  if (
-    action === "edit" ||
-    action.includes(".edit") ||
-    action.endsWith(".update") ||
-    action === "adjust"
-  ) {
-    return "edit";
-  }
-
-  if (
-    action === "delete" ||
-    action.includes(".delete") ||
-    action === "void" ||
-    action === "reverse" ||
-    action === "cancel_held_sale"
-  ) {
-    return "delete";
-  }
-
-  if (action === "status.update" || action.includes(".status.update")) {
-    return "status";
-  }
-
-  if (
-    action === "manage" ||
-    action.endsWith(".manage") ||
-    action === "sell" ||
-    action === "checkout" ||
-    action === "reconcile"
-  ) {
-    return "manage";
-  }
-
-  return "advanced";
-}
-
-function compareModuleNames(left: string, right: string): number {
-  const leftIndex = PERMISSION_MODULES.findIndex((moduleName) => moduleName === left);
-  const rightIndex = PERMISSION_MODULES.findIndex((moduleName) => moduleName === right);
-
-  if (leftIndex !== -1 && rightIndex !== -1) {
-    return leftIndex - rightIndex;
-  }
-
-  if (leftIndex !== -1) {
-    return -1;
-  }
-
-  if (rightIndex !== -1) {
-    return 1;
-  }
-
-  return left.localeCompare(right);
-}
-
-function togglePermission(
-  current: Set<string>,
-  permissionId: string,
-  checked: boolean,
-): Set<string> {
-  const next = new Set(current);
-
-  if (checked) {
-    next.add(permissionId);
-  } else {
-    next.delete(permissionId);
-  }
-
-  return next;
-}
-
-function toggleManyPermissions(
-  current: Set<string>,
-  permissions: PermissionDefinition[],
-  checked: boolean,
-): Set<string> {
-  const next = new Set(current);
-
-  permissions.forEach((permission) => {
-    if (checked) {
-      next.add(permission.id);
-    } else {
-      next.delete(permission.id);
-    }
-  });
-
-  return next;
 }
 
 export function PermissionMatrix({
@@ -212,6 +89,8 @@ export function PermissionMatrix({
   showSave = true,
 }: PermissionMatrixProps): JSX.Element {
   const [selectedPermissionIds, setSelectedPermissionIds] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const adminRole = isAdminRole(role);
 
   useEffect(() => {
@@ -230,14 +109,15 @@ export function PermissionMatrix({
 
     return buildInitialSelection(rolePermissions);
   }, [adminRole, permissions, rolePermissions]);
+
   const changedPermissionIds = useMemo(() => {
     const changed = new Set<string>();
-    const allPermissionIds = new Set<string>([
+    const everyId = new Set<string>([
       ...Array.from(selectedPermissionIds),
       ...Array.from(initialSelection),
     ]);
 
-    allPermissionIds.forEach((permissionId) => {
+    everyId.forEach((permissionId) => {
       if (selectedPermissionIds.has(permissionId) !== initialSelection.has(permissionId)) {
         changed.add(permissionId);
       }
@@ -246,44 +126,107 @@ export function PermissionMatrix({
     return changed;
   }, [initialSelection, selectedPermissionIds]);
 
-  const groupedPermissions = useMemo<PermissionModuleGroup[]>(() => {
-    const moduleNames = Array.from(
-      new Set(permissions.map((permission) => permission.moduleName)),
-    ).sort(compareModuleNames);
+  const groups = useMemo<ModuleGroup[]>(() => {
+    const byModule = new Map<PermissionModuleName, ModuleGroup>();
 
-    return moduleNames.map((moduleName) => ({
-      moduleName,
-      permissions: permissions
-        .filter((permission) => permission.moduleName === moduleName)
-        .map((permission) => ({
-          ...permission,
-          actionLabel: formatLabel(getPermissionAction(permission.permissionKey)),
-          column: getPermissionColumn(permission.permissionKey),
-        })),
-    }));
+    permissions.forEach((permission) => {
+      const existing = byModule.get(permission.moduleName);
+      const entry = {
+        ...permission,
+        actionLabel: formatLabel(getPermissionAction(permission.permissionKey)),
+      };
+
+      if (existing) {
+        existing.permissions.push(entry);
+        return;
+      }
+
+      byModule.set(permission.moduleName, {
+        moduleName: permission.moduleName,
+        permissions: [entry],
+        title: getModuleTitle(permission.moduleName),
+      });
+    });
+
+    return Array.from(byModule.values())
+      .map((group) => ({
+        ...group,
+        permissions: [...group.permissions].sort((a, b) =>
+          a.actionLabel.localeCompare(b.actionLabel),
+        ),
+      }))
+      .sort((a, b) => a.title.localeCompare(b.title));
   }, [permissions]);
 
+  // Searching narrows to matching permissions and shows the modules holding
+  // them open, so a search never leaves you looking at collapsed rows.
+  const query = search.trim().toLowerCase();
+  const visibleGroups = useMemo(() => {
+    if (query.length === 0) {
+      return groups;
+    }
+
+    return groups
+      .map((group) => ({
+        ...group,
+        permissions: group.permissions.filter(
+          (permission) =>
+            permission.actionLabel.toLowerCase().includes(query) ||
+            permission.permissionKey.toLowerCase().includes(query) ||
+            group.title.toLowerCase().includes(query),
+        ),
+      }))
+      .filter((group) => group.permissions.length > 0);
+  }, [groups, query]);
+
+  const totalCount = permissions.length;
+  const selectedCount = selectedPermissionIds.size;
   const hasChanges = changedPermissionIds.size > 0;
-  const hasSelectedPermissions = selectedPermissionIds.size > 0;
-  const saveDisabled =
-    !canManage ||
-    !role ||
-    !hasChanges ||
-    isSaving ||
-    !hasSelectedPermissions ||
-    saveDisabledReason !== null;
+  const matrixDisabled = !showSave || !canManage || adminRole || saveDisabledReason !== null;
+
+  const toggleOne = (permissionId: string, checked: boolean): void => {
+    setSelectedPermissionIds((current) => {
+      const next = new Set(current);
+      if (checked) {
+        next.add(permissionId);
+      } else {
+        next.delete(permissionId);
+      }
+      return next;
+    });
+  };
+
+  const toggleMany = (ids: string[], checked: boolean): void => {
+    setSelectedPermissionIds((current) => {
+      const next = new Set(current);
+      ids.forEach((id) => (checked ? next.add(id) : next.delete(id)));
+      return next;
+    });
+  };
+
+  const toggleExpanded = (moduleName: string): void => {
+    setExpandedModules((current) => {
+      const next = new Set(current);
+      if (next.has(moduleName)) {
+        next.delete(moduleName);
+      } else {
+        next.add(moduleName);
+      }
+      return next;
+    });
+  };
 
   if (!role) {
     return (
       <Card>
-        <CardContent className="flex min-h-[320px] items-center justify-center p-8 text-center">
-          <div className="space-y-3">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-cappuccino/30 text-brand-caramel">
+        <CardContent className="flex min-h-64 items-center justify-center p-8 text-center">
+          <div className="grid gap-3">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-foreground-muted">
               <ShieldCheck className="h-6 w-6" />
             </div>
-            <h2 className="text-xl font-semibold text-brand-espresso">Select a role</h2>
-            <p className="max-w-lg text-sm leading-6 text-brand-mocha">
-              Choose a role from the table to inspect and manage its permission matrix.
+            <p className="text-section font-medium">Select a role</p>
+            <p className="max-w-md text-cell text-foreground-muted">
+              Choose a role to review what it can do.
             </p>
           </div>
         </CardContent>
@@ -293,34 +236,24 @@ export function PermissionMatrix({
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader className="space-y-3">
-          <Skeleton className="h-7 w-48 rounded-full" />
-          <Skeleton className="h-4 w-72 rounded-full" />
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <Skeleton className="h-36 w-full rounded-[1.5rem]" />
-          <Skeleton className="h-36 w-full rounded-[1.5rem]" />
-          <Skeleton className="h-36 w-full rounded-[1.5rem]" />
-        </CardContent>
-      </Card>
+      <div className="grid gap-3">
+        <Skeleton className="h-10 w-full rounded-lg" />
+        <Skeleton className="h-14 w-full rounded-lg" />
+        <Skeleton className="h-14 w-full rounded-lg" />
+        <Skeleton className="h-14 w-full rounded-lg" />
+      </div>
     );
   }
 
   if (errorMessage) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl text-brand-espresso">Permission matrix</CardTitle>
-          <CardDescription>Unable to load the selected role permissions.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-4 text-sm leading-6 text-brand-mocha">
-            {errorMessage}
-          </div>
+        <CardContent className="grid gap-4 p-6">
+          <p className="text-cell font-medium">Permissions could not be loaded.</p>
+          <p className="text-cell text-foreground-muted">{errorMessage}</p>
           {onRetry ? (
-            <Button onClick={onRetry} type="button" variant="outline">
-              Retry permission request
+            <Button className="w-fit" onClick={onRetry} type="button" variant="outline">
+              Try again
             </Button>
           ) : null}
         </CardContent>
@@ -328,251 +261,190 @@ export function PermissionMatrix({
     );
   }
 
-  const matrixDisabled = !showSave || !canManage || adminRole || saveDisabledReason !== null;
-  const footerStatusMessage = !hasSelectedPermissions
-    ? permissionRequiredMessage
-    : hasChanges
-      ? "Unsaved permission changes are ready to save."
-      : "No unsaved changes.";
+  const footerStatusMessage =
+    selectedCount === 0
+      ? permissionRequiredMessage
+      : hasChanges
+        ? `${String(changedPermissionIds.size)} unsaved ${changedPermissionIds.size === 1 ? "change" : "changes"}.`
+        : "No unsaved changes.";
 
   return (
-    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <CardHeader className="space-y-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
-            <CardTitle className="text-2xl text-brand-espresso">
-              Permission matrix for {role.roleName}
-            </CardTitle>
-            {/* Read-only viewers cannot toggle anything, and telling them to
-                was the copy describing a control they do not have. */}
-            <CardDescription>
-              {canManage
-                ? "Toggle module permissions and save them back through the backend role update flow."
-                : `What  can do across POS modules. Open Manage permissions to change it.`}
-            </CardDescription>
-          </div>
-          <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 px-4 py-3 text-sm text-brand-mocha">
-            <span className="font-semibold text-brand-espresso">{selectedPermissionIds.size}</span>{" "}
-            of {permissions.length} permissions selected
-          </div>
-        </div>
-        {adminRole ? (
-          <div className="rounded-2xl border border-brand-cappuccino bg-brand-cappuccino/25 p-4 text-sm leading-6 text-brand-mocha">
-            Admin is protected by the backend and must always keep every available permission.
-            Permission removal is disabled for this role.
-          </div>
-        ) : role.isSystemDefault ? (
-          <div className="rounded-2xl border border-brand-cappuccino bg-brand-cappuccino/25 p-4 text-sm leading-6 text-brand-mocha">
-            This is a predefined role. Its name is locked, but its permissions can be adjusted.
-          </div>
-        ) : null}
-        {!hasSelectedPermissions ? (
-          <div className="rounded-2xl border border-warning/20 bg-warning-tint p-4 text-sm leading-6 text-warning-text">
-            {permissionRequiredMessage}
-          </div>
-        ) : null}
-        {saveDisabledReason ? (
-          <div className="rounded-2xl border border-warning/20 bg-warning-tint p-4 text-sm leading-6 text-warning-text">
-            {saveDisabledReason}
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      {/* One line of state, not three stacked banners. The count is the thing
+          you check; everything else earns its place only when it applies. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-cell text-foreground-muted">
+          <span className="font-medium tabular-nums text-foreground">{selectedCount}</span> of{" "}
+          <span className="tabular-nums">{totalCount}</span> permissions granted
+        </p>
+        {!matrixDisabled ? (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() =>
+                toggleMany(
+                  permissions.map((permission) => permission.id),
+                  true,
+                )
+              }
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Grant all
+            </Button>
+            <Button
+              onClick={() =>
+                toggleMany(
+                  permissions.map((permission) => permission.id),
+                  false,
+                )
+              }
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Clear all
+            </Button>
           </div>
         ) : null}
-        {hasChanges ? (
-          <div className="rounded-2xl border border-brand-caramel/40 bg-brand-caramel/10 p-4 text-sm leading-6 text-brand-mocha">
-            You have unsaved permission changes for this role.
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-4 text-sm leading-6 text-brand-mocha">
-            No unsaved permission changes.
-          </div>
-        )}
-      </CardHeader>
-      <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-        <div className="overflow-hidden rounded-[1.5rem] border border-brand-cappuccino bg-card/80">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-brand-cappuccino bg-brand-latte/80 text-brand-espresso">
-                  <th className="w-[260px] px-4 py-4 font-semibold">Module</th>
-                  {matrixColumns.map((column) => (
-                    <th
-                      className="min-w-[120px] border-l border-brand-cappuccino/70 px-4 py-4 font-semibold"
-                      key={column.column}
-                    >
-                      {column.label}
-                    </th>
-                  ))}
-                  <th className="min-w-[260px] border-l border-brand-cappuccino/70 px-4 py-4 font-semibold">
-                    Advanced
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {groupedPermissions.map((group) => {
-                  const selectedCount = group.permissions.filter((permission) =>
-                    selectedPermissionIds.has(permission.id),
-                  ).length;
-                  const allSelected = selectedCount === group.permissions.length;
-                  const someSelected = selectedCount > 0 && !allSelected;
+      </div>
 
-                  return (
-                    <tr
-                      className="border-b border-brand-cappuccino/70 last:border-b-0"
-                      key={group.moduleName}
-                    >
-                      <td className="align-top px-4 py-4">
-                        <label className="flex cursor-pointer items-start gap-3">
-                          <Checkbox
-                            checked={allSelected ? true : someSelected ? "indeterminate" : false}
-                            disabled={matrixDisabled}
-                            onCheckedChange={(checked) => {
-                              setSelectedPermissionIds((current) =>
-                                toggleManyPermissions(current, group.permissions, checked === true),
-                              );
-                            }}
-                          />
-                          <span className="space-y-1">
-                            <span className="block font-semibold text-brand-espresso">
-                              {getModuleTitle(group.moduleName)}
-                            </span>
-                            <span className="block text-xs font-medium text-brand-mocha">
-                              {selectedCount}/{group.permissions.length} selected
-                            </span>
+      {adminRole ? (
+        <p className="rounded-lg border border-border bg-muted px-4 py-3 text-cell text-foreground-muted">
+          Admin always keeps every permission, so this role cannot be edited.
+        </p>
+      ) : null}
+
+      {saveDisabledReason ? (
+        <p className="rounded-lg border border-warning/30 bg-warning-tint px-4 py-3 text-cell">
+          {saveDisabledReason}
+        </p>
+      ) : null}
+
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
+        <Input
+          aria-label="Search permissions"
+          className="pl-9"
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search a module or permission..."
+          value={search}
+        />
+      </div>
+
+      {/* One row per module instead of a 7-column grid of 170 checkboxes.
+          Collapsed, the whole role fits on a screen; you open only the module
+          you came to change. */}
+      <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto">
+        {visibleGroups.length === 0 ? (
+          <p className="rounded-lg border border-border bg-card px-4 py-6 text-center text-cell text-foreground-muted">
+            No permission matches “{search.trim()}”.
+          </p>
+        ) : null}
+
+        {visibleGroups.map((group) => {
+          const ids = group.permissions.map((permission) => permission.id);
+          const grantedInModule = ids.filter((id) => selectedPermissionIds.has(id)).length;
+          const changedInModule = ids.filter((id) => changedPermissionIds.has(id)).length;
+          const allGranted = grantedInModule === ids.length;
+          const isOpen = expandedModules.has(group.moduleName) || query.length > 0;
+
+          return (
+            <div className="rounded-lg border border-border bg-card" key={group.moduleName}>
+              <div className="flex items-center gap-3 px-4 py-3">
+                <Checkbox
+                  aria-label={`Grant every ${group.title} permission`}
+                  checked={allGranted}
+                  disabled={matrixDisabled}
+                  onCheckedChange={(checked) => toggleMany(ids, checked === true)}
+                />
+                <button
+                  aria-expanded={isOpen}
+                  className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  onClick={() => toggleExpanded(group.moduleName)}
+                  type="button"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">{group.title}</span>
+                    <span className="block text-meta text-foreground-muted">
+                      <span className="tabular-nums">
+                        {grantedInModule} of {ids.length}
+                      </span>
+                      {changedInModule > 0 ? (
+                        <span className="text-warning-text">
+                          {" "}
+                          · <span className="tabular-nums">{changedInModule}</span> changed
+                        </span>
+                      ) : null}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 text-foreground-muted transition-transform duration-fast ease-out",
+                      isOpen ? "rotate-180" : "",
+                    )}
+                  />
+                </button>
+              </div>
+
+              {isOpen ? (
+                <div className="grid gap-1 border-t border-border px-2 py-2 sm:grid-cols-2">
+                  {group.permissions.map((permission) => {
+                    const checked = selectedPermissionIds.has(permission.id);
+                    const changed = changedPermissionIds.has(permission.id);
+
+                    return (
+                      <label
+                        className={cn(
+                          "flex items-start gap-2.5 rounded-md p-2 transition-colors duration-fast ease-out",
+                          matrixDisabled ? "" : "cursor-pointer hover:bg-muted",
+                          changed ? "bg-warning-tint" : "",
+                        )}
+                        key={permission.id}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          className="mt-0.5"
+                          disabled={matrixDisabled}
+                          onCheckedChange={(next) => toggleOne(permission.id, next === true)}
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-cell">{permission.actionLabel}</span>
+                          {/* The raw key is the thing an operator never needs
+                              and an admin occasionally does, so it stays but
+                              recedes. */}
+                          <span className="block truncate font-mono text-meta text-foreground-muted">
+                            {permission.permissionKey}
                           </span>
-                        </label>
-                      </td>
-                      {matrixColumns.map((column) => {
-                        const cellPermissions = group.permissions.filter(
-                          (permission) => permission.column === column.column,
-                        );
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
 
-                        return (
-                          <td
-                            className="border-l border-brand-cappuccino/70 align-top px-4 py-4"
-                            key={column.column}
-                          >
-                            <div className="grid gap-2">
-                              {cellPermissions.length === 0 ? (
-                                <span className="text-foreground-muted">-</span>
-                              ) : (
-                                cellPermissions.map((permission) => {
-                                  const checked = selectedPermissionIds.has(permission.id);
-                                  const changed = changedPermissionIds.has(permission.id);
-
-                                  return (
-                                    <label
-                                      className={cn(
-                                        "flex cursor-pointer items-start gap-2 rounded-xl p-2 transition-colors",
-                                        checked ? "bg-brand-caramel/10" : "bg-transparent",
-                                        changed ? "ring-1 ring-brand-caramel/50" : undefined,
-                                        matrixDisabled
-                                          ? "cursor-not-allowed opacity-70"
-                                          : "hover:bg-brand-latte",
-                                      )}
-                                      key={permission.id}
-                                      title={permission.permissionKey}
-                                    >
-                                      <Checkbox
-                                        checked={checked}
-                                        disabled={matrixDisabled}
-                                        onCheckedChange={(nextValue) => {
-                                          setSelectedPermissionIds((current) =>
-                                            togglePermission(
-                                              current,
-                                              permission.id,
-                                              nextValue === true,
-                                            ),
-                                          );
-                                        }}
-                                      />
-                                      <span className="space-y-0.5">
-                                        <span className="block text-xs font-semibold text-brand-espresso">
-                                          {permission.actionLabel}
-                                        </span>
-                                        <span className="block font-mono text-meta leading-4 text-foreground-muted">
-                                          {permission.permissionKey}
-                                        </span>
-                                      </span>
-                                    </label>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </td>
-                        );
-                      })}
-                      <td className="border-l border-brand-cappuccino/70 align-top px-4 py-4">
-                        <div className="grid gap-2">
-                          {group.permissions
-                            .filter((permission) => permission.column === "advanced")
-                            .map((permission) => {
-                              const checked = selectedPermissionIds.has(permission.id);
-                              const changed = changedPermissionIds.has(permission.id);
-
-                              return (
-                                <label
-                                  className={cn(
-                                    "flex cursor-pointer items-start gap-2 rounded-xl border p-2 transition-colors",
-                                    checked
-                                      ? "border-brand-caramel/60 bg-brand-caramel/10"
-                                      : "border-brand-cappuccino/70 bg-brand-latte/50",
-                                    changed ? "ring-1 ring-brand-caramel/50" : undefined,
-                                    matrixDisabled
-                                      ? "cursor-not-allowed opacity-70"
-                                      : "hover:border-brand-mocha/60",
-                                  )}
-                                  key={permission.id}
-                                  title={permission.description}
-                                >
-                                  <Checkbox
-                                    checked={checked}
-                                    disabled={matrixDisabled}
-                                    onCheckedChange={(nextValue) => {
-                                      setSelectedPermissionIds((current) =>
-                                        togglePermission(
-                                          current,
-                                          permission.id,
-                                          nextValue === true,
-                                        ),
-                                      );
-                                    }}
-                                  />
-                                  <span className="space-y-0.5">
-                                    <span className="block text-xs font-semibold text-brand-espresso">
-                                      {permission.actionLabel}
-                                    </span>
-                                    <span className="block font-mono text-meta leading-4 text-foreground-muted">
-                                      {permission.permissionKey}
-                                    </span>
-                                  </span>
-                                </label>
-                              );
-                            })}
-                          {group.permissions.every(
-                            (permission) => permission.column !== "advanced",
-                          ) ? (
-                            <span className="text-foreground-muted">-</span>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {!canManage && showSave ? (
-          <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-4 text-sm leading-6 text-brand-mocha">
-            Your role can view this matrix but cannot save changes because
-            `roles.permissions.update` is missing.
-          </div>
-        ) : null}
-      </CardContent>
       {showSave ? (
-        <div className="flex items-center justify-between gap-3 border-t border-brand-cappuccino bg-card/95 px-6 py-4 backdrop-blur">
-          <div className="text-sm text-brand-mocha">{footerStatusMessage}</div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+          <p
+            className={cn(
+              "text-cell",
+              selectedCount === 0 ? "text-danger-text" : "text-foreground-muted",
+            )}
+          >
+            {footerStatusMessage}
+          </p>
           <Button
-            disabled={saveDisabled}
+            disabled={
+              !canManage ||
+              !hasChanges ||
+              isSaving ||
+              selectedCount === 0 ||
+              saveDisabledReason !== null
+            }
             onClick={() => {
               const payload = permissions.map<RolePermission>((permission) => ({
                 roleId: role.id,
@@ -582,12 +454,12 @@ export function PermissionMatrix({
 
               void onSave(payload);
             }}
+            type="button"
           >
-            <Save className="h-4 w-4" />
             {isSaving ? "Saving..." : "Save permissions"}
           </Button>
         </div>
       ) : null}
-    </Card>
+    </div>
   );
 }
