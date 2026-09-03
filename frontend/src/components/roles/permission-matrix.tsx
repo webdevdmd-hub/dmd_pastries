@@ -343,8 +343,12 @@ export function PermissionMatrix({
             <CardTitle className="text-2xl text-brand-espresso">
               Permission matrix for {role.roleName}
             </CardTitle>
+            {/* Read-only viewers cannot toggle anything, and telling them to
+                was the copy describing a control they do not have. */}
             <CardDescription>
-              Toggle module permissions and save them back through the backend role update flow.
+              {canManage
+                ? "Toggle module permissions and save them back through the backend role update flow."
+                : `What  can do across POS modules. Open Manage permissions to change it.`}
             </CardDescription>
           </div>
           <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 px-4 py-3 text-sm text-brand-mocha">
