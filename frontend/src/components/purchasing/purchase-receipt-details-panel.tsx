@@ -142,10 +142,7 @@ export function PurchaseReceiptDetailsPanel({
 
             <div className="rounded-lg bg-muted p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-meta text-foreground-muted">Accounting status</p>
-                  <p className="mt-0.5 text-cell font-medium">{receipt.accountingStatusLabel}</p>
-                </div>
+                <p className="text-meta text-foreground-muted">Accounting status</p>
                 <PurchaseReceiptAccountingBadge receipt={receipt} />
               </div>
               <p className="mt-2 text-cell text-foreground-muted">
