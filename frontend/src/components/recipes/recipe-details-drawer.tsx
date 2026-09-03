@@ -1,7 +1,6 @@
 "use client";
 
-import { ArrowUpRight } from "lucide-react";
-import Link from "next/link";
+import { Pencil } from "lucide-react";
 import type { JSX, ReactNode } from "react";
 import { useState } from "react";
 
@@ -16,7 +15,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { ROUTES } from "@/constants/routes";
 import { useRecipeIngredients, useRecipePackaging, useRecipeVersions } from "@/hooks/use-recipes";
 import type { Recipe } from "@/types/recipes";
 
@@ -74,14 +72,23 @@ function ListState({
  * check a yield or a cost had to load the whole editor. It now opens on a row
  * click, and it carries the BOM lines rather than six cost figures and a link.
  *
+ * Editing opens the builder as a dialog over this list rather than navigating
+ * to /recipes/[id], so closing it returns the operator to the row they came
+ * from. The route still resolves for anyone arriving by URL.
+ *
  * Tab state is in memory and the tabs are buttons, not links: /recipes/[id] is
  * the editor, so there is no read-only URL to hand out for a tab.
  */
 export function RecipeDetailsDrawer({
+  canManage,
+  onEdit,
   onOpenChange,
   open,
   recipe,
 }: {
+  canManage: boolean;
+  /** Closes the drawer and opens the host's builder dialog. */
+  onEdit: (recipe: Recipe) => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   recipe: Recipe | null;
@@ -117,14 +124,16 @@ export function RecipeDetailsDrawer({
                   {recipe.isActive ? "Active BOM" : "Not active"}
                 </Badge>
               </div>
-              <div className="mt-3">
-                <Button asChild size="sm" type="button" variant="outline">
-                  <Link href={`${ROUTES.recipes}/${recipe.id}`}>
-                    <ArrowUpRight className="h-4 w-4" />
-                    Open in builder
-                  </Link>
-                </Button>
-              </div>
+              {canManage ? (
+                <div className="mt-3">
+                  {/* The builder opens over the list, so closing it returns
+                      the operator to the row they came from. */}
+                  <Button onClick={() => onEdit(recipe)} size="sm" type="button" variant="outline">
+                    <Pencil className="h-4 w-4" />
+                    Edit in builder
+                  </Button>
+                </div>
+              ) : null}
             </SheetHeader>
 
             <FormTabs

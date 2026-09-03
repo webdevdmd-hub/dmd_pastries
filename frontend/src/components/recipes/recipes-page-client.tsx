@@ -68,6 +68,8 @@ export function RecipesPageClient(): JSX.Element {
   const [filters, setFilters] = useState<RecipeFilters>(defaultFilters);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  // The recipe the builder dialog is editing, or null when it is creating.
+  const [editRecipe, setEditRecipe] = useState<Recipe | null>(null);
   const [drawerRecipe, setDrawerRecipe] = useState<Recipe | null>(null);
   const [versionRecipe, setVersionRecipe] = useState<Recipe | null>(null);
   const recipesQuery = useRecipes(filters, canView);
@@ -115,10 +117,23 @@ export function RecipesPageClient(): JSX.Element {
     }
   };
 
+  const builderOpen = createOpen || editRecipe !== null;
+
+  const closeBuilder = (): void => {
+    setCreateOpen(false);
+    setEditRecipe(null);
+  };
+
   // A dialog on top of a sheet on top of the list is one layer too many, so
-  // the drawer closes before either confirmation opens.
+  // the drawer closes before the builder or either confirmation opens.
+  const openBuilder = (recipe: Recipe): void => {
+    setDrawerRecipe(null);
+    setEditRecipe(recipe);
+  };
+
   const listHandlers = {
     canManage,
+    onEdit: openBuilder,
     onCreateVersion: (recipe: Recipe) => {
       setDrawerRecipe(null);
       setVersionRecipe(recipe);
@@ -208,6 +223,8 @@ export function RecipesPageClient(): JSX.Element {
       ) : null}
 
       <RecipeDetailsDrawer
+        canManage={canManage}
+        onEdit={openBuilder}
         onOpenChange={(open) => {
           if (!open) {
             setDrawerRecipe(null);
@@ -223,25 +240,34 @@ export function RecipesPageClient(): JSX.Element {
         recipeId={versionRecipe?.id ?? null}
       />
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      {/* One builder dialog for both intentions. Creating already opened the
+          form this way; editing navigated to /recipes/[id] instead, so the two
+          routes to the same form behaved differently and editing cost the
+          operator their place in the list. The route still resolves for anyone
+          arriving by URL. */}
+      <Dialog open={builderOpen} onOpenChange={(open) => (!open ? closeBuilder() : undefined)}>
         <DialogContent
           className="flex h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-7xl gap-0 overflow-hidden border-0 bg-transparent p-0 shadow-none sm:h-[calc(100dvh-3rem)] sm:max-h-[calc(100dvh-3rem)] sm:w-[calc(100vw-3rem)]"
           showCloseButton={false}
         >
           <DialogHeader className="sr-only">
-            <DialogTitle>Recipe Builder</DialogTitle>
+            <DialogTitle>{editRecipe ? "Edit recipe" : "Recipe Builder"}</DialogTitle>
             <DialogDescription>
               Define how finished and semi-finished products are made.
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 flex-1">
+            {/* Keyed by record: the builder holds a whole form state, so
+                switching from one recipe to another must remount it rather
+                than leave the previous recipe's drafts in place. */}
             <RecipeFormPage
-              onClose={() => setCreateOpen(false)}
+              key={editRecipe?.id ?? "new"}
+              onClose={closeBuilder}
               onSaved={() => {
                 void recipesQuery.refetch();
               }}
               presentation="dialog"
-              recipeId={null}
+              recipeId={editRecipe?.id ?? null}
             />
           </div>
         </DialogContent>

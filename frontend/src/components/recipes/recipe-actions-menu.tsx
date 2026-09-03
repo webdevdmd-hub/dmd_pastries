@@ -1,7 +1,6 @@
 "use client";
 
 import { MoreHorizontal } from "lucide-react";
-import Link from "next/link";
 import type { JSX } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -12,25 +11,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ROUTES } from "@/constants/routes";
 import type { Recipe, RecipeStatus } from "@/types/recipes";
 
 export type RecipeActionHandlers = {
   canManage: boolean;
   onCreateVersion: (recipe: Recipe) => void;
   onDelete: (recipe: Recipe) => void;
+  /** Opens the builder over the list. Not a navigation. */
+  onEdit: (recipe: Recipe) => void;
   onStatusChange: (recipe: Recipe, status: RecipeStatus, isActive?: boolean) => void;
 };
 
 /**
  * Actions only. "View / Edit" is gone: the row opens the drawer, and the
- * drawer header links to the builder, so one menu item no longer stands for
+ * drawer header opens the builder, so one menu item no longer stands for
  * two different intentions. A reader with no manage rights sees no menu.
  */
 export function RecipeActionsMenu({
   canManage,
   onCreateVersion,
   onDelete,
+  onEdit,
   onStatusChange,
   recipe,
 }: RecipeActionHandlers & { recipe: Recipe }): JSX.Element | null {
@@ -51,9 +52,7 @@ export function RecipeActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem asChild>
-          <Link href={`${ROUTES.recipes}/${recipe.id}`}>Edit in builder</Link>
-        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => onEdit(recipe)}>Edit in builder</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           disabled={recipe.isActive}
