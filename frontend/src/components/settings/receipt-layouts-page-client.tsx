@@ -1,24 +1,27 @@
 "use client";
 
-import {
-  CheckCircle2,
-  Eye,
-  FileText,
-  MoreHorizontal,
-  Plus,
-  ReceiptText,
-  ShieldAlert,
-  Star,
-  Trash2,
-} from "lucide-react";
+import { Plus, ReceiptText, ShieldAlert } from "lucide-react";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { EmptyState } from "@/components/shared/collection-state";
+import { useConfirm } from "@/components/app/confirm-provider";
+import { ReceiptLayoutDetailsDrawer } from "@/components/settings/receipt-layout-details-drawer";
+import {
+  receiptFieldOptions,
+  receiptTypeLabels,
+} from "@/components/settings/receipt-layout-shared";
+import { ReceiptLayoutsCardGrid } from "@/components/settings/receipt-layouts-card-grid";
+import { ReceiptLayoutsTable } from "@/components/settings/receipt-layouts-table";
+import {
+  defaultReceiptLayoutFilters,
+  type ReceiptLayoutFilters,
+  ReceiptLayoutsToolbar,
+} from "@/components/settings/receipt-layouts-toolbar";
+import { EmptyState, FilteredState } from "@/components/shared/collection-state";
+import { FormTabs } from "@/components/shared/form-tabs";
 import { PageHeader } from "@/components/shared/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,12 +33,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -45,14 +42,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useBranches } from "@/hooks/use-branches";
 import { usePermission } from "@/hooks/use-permission";
@@ -94,47 +83,6 @@ const defaultLayoutConfig: ReceiptLayoutConfig = {
   termsText: "",
 };
 
-const receiptTypeLabels: Record<ReceiptLayoutType, string> = {
-  "58mm": "58mm thermal",
-  "80mm": "80mm thermal",
-  a4: "A4 invoice",
-  custom: "Custom size",
-};
-
-const configOptions: {
-  key: keyof Pick<
-    ReceiptLayoutConfig,
-    | "showAddress"
-    | "showBranchName"
-    | "showBusinessName"
-    | "showCashier"
-    | "showCustomer"
-    | "showDiscount"
-    | "showLogo"
-    | "showPaymentMethod"
-    | "showPhone"
-    | "showQrCode"
-    | "showTax"
-    | "showTaxNumber"
-    | "showUnitPrice"
-  >;
-  label: string;
-}[] = [
-  { key: "showLogo", label: "Logo" },
-  { key: "showBusinessName", label: "Business name" },
-  { key: "showBranchName", label: "Branch name" },
-  { key: "showAddress", label: "Address" },
-  { key: "showPhone", label: "Phone" },
-  { key: "showTaxNumber", label: "Tax/VAT number" },
-  { key: "showCashier", label: "Cashier name" },
-  { key: "showCustomer", label: "Customer details" },
-  { key: "showUnitPrice", label: "Unit price" },
-  { key: "showDiscount", label: "Discount" },
-  { key: "showTax", label: "Tax" },
-  { key: "showPaymentMethod", label: "Payment method" },
-  { key: "showQrCode", label: "QR code / barcode" },
-];
-
 function blankFormState(): ReceiptLayoutSchema {
   return {
     branchId: null,
@@ -159,29 +107,6 @@ function toFormState(layout: ReceiptLayout): ReceiptLayoutSchema {
     receiptType: layout.receiptType,
     status: layout.status,
   };
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en-AE", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
-}
-
-function ReceiptLayoutStatusBadge({ layout }: { layout: ReceiptLayout }): JSX.Element {
-  if (layout.isDefault) {
-    return (
-      <Badge className="gap-1" variant="secondary">
-        <Star className="h-3 w-3" />
-        Default
-      </Badge>
-    );
-  }
-
-  return (
-    <Badge variant={layout.status === "active" ? "secondary" : "default"}>{layout.status}</Badge>
-  );
 }
 
 function ReceiptMockPreview({ layout }: { layout: ReceiptLayoutSchema }): JSX.Element {
@@ -280,6 +205,10 @@ type ReceiptLayoutDialogProps = {
   onSubmit: (values: ReceiptLayoutSchema) => Promise<void>;
 };
 
+type ReceiptFormTabKey = "layout" | "fields" | "style";
+
+const RECEIPT_FORM_TABPANEL_ID = "receipt-layout-form-tabpanel";
+
 function ReceiptLayoutDialog({
   layout,
   open,
@@ -295,6 +224,10 @@ function ReceiptLayoutDialog({
   const [formState, setFormState] = useState<ReceiptLayoutSchema>(
     layout ? toFormState(layout) : blankFormState(),
   );
+  const [activeTab, setActiveTab] = useState<ReceiptFormTabKey>("layout");
+  const shownFieldCount = receiptFieldOptions.filter(
+    (option) => formState.layoutConfig[option.key],
+  ).length;
 
   useEffect(() => {
     if (open) {
@@ -336,232 +269,260 @@ function ReceiptLayoutDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="layoutName">Layout name</Label>
-              <Input
-                id="layoutName"
-                onChange={(event) =>
-                  setFormState((current) => ({ ...current, layoutName: event.target.value }))
-                }
-                value={formState.layoutName}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="receipt-layouts-receipt-type">Receipt type</Label>
-              <Select
-                onValueChange={(value) =>
-                  setFormState((current) => ({
-                    ...current,
-                    receiptType: value as ReceiptLayoutType,
-                  }))
-                }
-                value={formState.receiptType}
-              >
-                <SelectTrigger id="receipt-layouts-receipt-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(receiptTypeLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="receipt-layouts-branch-scope">Branch scope</Label>
-              <Select
-                onValueChange={(value) =>
-                  setFormState((current) => ({
-                    ...current,
-                    branchId: value === businessWideBranchValue ? null : value,
-                    isDefault:
-                      layout === null ? value === businessWideBranchValue : current.isDefault,
-                  }))
-                }
-                value={formState.branchId ?? businessWideBranchValue}
-              >
-                <SelectTrigger id="receipt-layouts-branch-scope">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={businessWideBranchValue}>Business-wide default</SelectItem>
-                  {activeBranches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="receipt-layouts-status">Status</Label>
-              <Select
-                onValueChange={(value) =>
-                  setFormState((current) => ({
-                    ...current,
-                    isDefault: value === "inactive" ? false : current.isDefault,
-                    status: value === "inactive" ? "inactive" : "active",
-                  }))
-                }
-                value={formState.status}
-              >
-                <SelectTrigger id="receipt-layouts-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="printerType">Printer type</Label>
-              <Input
-                id="printerType"
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    printerType: event.target.value.trim() || null,
-                  }))
-                }
-                placeholder="Thermal, Epson, Sunmi..."
-                value={formState.printerType ?? ""}
-              />
-            </div>
-            <label className="flex items-center gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-3 text-sm font-medium text-brand-espresso">
-              <Checkbox
-                checked={formState.isDefault}
-                disabled={formState.status === "inactive"}
-                onCheckedChange={(checked) => {
-                  setFormState((current) => ({
-                    ...current,
-                    isDefault: checked === true,
-                  }));
-                }}
-              />
-              Set as default for this scope
-            </label>
-            <div className="grid gap-2">
-              <Label htmlFor="counterId">Counter ID</Label>
-              <Input
-                id="counterId"
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    counterId: event.target.value.trim() || null,
-                  }))
-                }
-                placeholder="Counter 1"
-                value={formState.counterId ?? ""}
-              />
+        {/* Three tabs on one form state. Twelve fields, thirteen toggles and
+            five style controls in one column meant the style settings sat
+            below the fold of the toggles, which sat below the fold of the
+            scope fields. The live preview stays beside all three. */}
+        <div className="min-w-0 pb-4">
+          <FormTabs
+            active={activeTab}
+            aria-label="Receipt layout sections"
+            onTabChange={setActiveTab}
+            panelId={RECEIPT_FORM_TABPANEL_ID}
+            tabs={[
+              { key: "layout", label: "Layout" },
+              { key: "fields", label: "Fields", badge: shownFieldCount },
+              { key: "style", label: "Style" },
+            ]}
+          />
+        </div>
+
+        <div
+          className="grid min-w-0 gap-6 lg:grid-cols-[1fr_22rem]"
+          id={RECEIPT_FORM_TABPANEL_ID}
+          role="tabpanel"
+        >
+          <div className="grid min-w-0 gap-4 md:grid-cols-2">
+            <div className={activeTab === "layout" ? "contents" : "hidden"}>
+              <div className="grid gap-2">
+                <Label htmlFor="layoutName">Layout name</Label>
+                <Input
+                  id="layoutName"
+                  onChange={(event) =>
+                    setFormState((current) => ({ ...current, layoutName: event.target.value }))
+                  }
+                  value={formState.layoutName}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="receipt-layouts-receipt-type">Receipt type</Label>
+                <Select
+                  onValueChange={(value) =>
+                    setFormState((current) => ({
+                      ...current,
+                      receiptType: value as ReceiptLayoutType,
+                    }))
+                  }
+                  value={formState.receiptType}
+                >
+                  <SelectTrigger id="receipt-layouts-receipt-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(receiptTypeLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="receipt-layouts-branch-scope">Branch scope</Label>
+                <Select
+                  onValueChange={(value) =>
+                    setFormState((current) => ({
+                      ...current,
+                      branchId: value === businessWideBranchValue ? null : value,
+                      isDefault:
+                        layout === null ? value === businessWideBranchValue : current.isDefault,
+                    }))
+                  }
+                  value={formState.branchId ?? businessWideBranchValue}
+                >
+                  <SelectTrigger id="receipt-layouts-branch-scope">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={businessWideBranchValue}>Business-wide default</SelectItem>
+                    {activeBranches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="receipt-layouts-status">Status</Label>
+                <Select
+                  onValueChange={(value) =>
+                    setFormState((current) => ({
+                      ...current,
+                      isDefault: value === "inactive" ? false : current.isDefault,
+                      status: value === "inactive" ? "inactive" : "active",
+                    }))
+                  }
+                  value={formState.status}
+                >
+                  <SelectTrigger id="receipt-layouts-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="printerType">Printer type</Label>
+                <Input
+                  id="printerType"
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      printerType: event.target.value.trim() || null,
+                    }))
+                  }
+                  placeholder="Thermal, Epson, Sunmi..."
+                  value={formState.printerType ?? ""}
+                />
+              </div>
+              <label className="flex items-center gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-3 text-sm font-medium text-brand-espresso">
+                <Checkbox
+                  checked={formState.isDefault}
+                  disabled={formState.status === "inactive"}
+                  onCheckedChange={(checked) => {
+                    setFormState((current) => ({
+                      ...current,
+                      isDefault: checked === true,
+                    }));
+                  }}
+                />
+                Set as default for this scope
+              </label>
+              <div className="grid gap-2">
+                <Label htmlFor="counterId">Counter ID</Label>
+                <Input
+                  id="counterId"
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      counterId: event.target.value.trim() || null,
+                    }))
+                  }
+                  placeholder="Counter 1"
+                  value={formState.counterId ?? ""}
+                />
+              </div>
             </div>
 
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-lg">Visible receipt fields</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {configOptions.map((option) => (
-                  <label
-                    className="flex items-center gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-3 text-sm font-medium text-brand-espresso"
-                    key={option.key}
-                  >
-                    <Checkbox
-                      checked={formState.layoutConfig[option.key]}
-                      onCheckedChange={(checked) => {
-                        updateConfig(option.key, checked === true);
-                      }}
-                    />
-                    {option.label}
-                  </label>
-                ))}
-              </CardContent>
-            </Card>
+            <div className={activeTab === "fields" ? "contents" : "hidden"}>
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">Visible receipt fields</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {receiptFieldOptions.map((option) => (
+                    <label
+                      className="flex items-center gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-3 text-sm font-medium text-brand-espresso"
+                      key={option.key}
+                    >
+                      <Checkbox
+                        checked={formState.layoutConfig[option.key]}
+                        onCheckedChange={(checked) => {
+                          updateConfig(option.key, checked === true);
+                        }}
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="receipt-layouts-font-size">Font size</Label>
-              <Select
-                onValueChange={(value) =>
-                  updateConfig(
-                    "fontSize",
-                    value === "small" || value === "large" ? value : "medium",
-                  )
-                }
-                value={formState.layoutConfig.fontSize}
-              >
-                <SelectTrigger id="receipt-layouts-font-size">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="small">Small</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="large">Large</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="receipt-layouts-alignment">Alignment</Label>
-              <Select
-                onValueChange={(value) =>
-                  updateConfig("alignment", value === "left" ? "left" : "center")
-                }
-                value={formState.layoutConfig.alignment}
-              >
-                <SelectTrigger id="receipt-layouts-alignment">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="center">Center</SelectItem>
-                  <SelectItem value="left">Left</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="receipt-layouts-spacing">Spacing</Label>
-              <Select
-                onValueChange={(value) =>
-                  updateConfig(
-                    "spacing",
-                    value === "compact" || value === "relaxed" ? value : "normal",
-                  )
-                }
-                value={formState.layoutConfig.spacing}
-              >
-                <SelectTrigger id="receipt-layouts-spacing">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="compact">Compact</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="relaxed">Relaxed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2 md:col-span-2">
-              <Label htmlFor="footerMessage">Footer message</Label>
-              <Input
-                id="footerMessage"
-                onChange={(event) => updateConfig("footerMessage", event.target.value)}
-                value={formState.layoutConfig.footerMessage}
-              />
-            </div>
-            <div className="grid gap-2 md:col-span-2">
-              <Label htmlFor="termsText">Terms and conditions</Label>
-              <textarea
-                className="min-h-24 rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel"
-                id="termsText"
-                onChange={(event) => updateConfig("termsText", event.target.value)}
-                value={formState.layoutConfig.termsText}
-              />
+            <div className={activeTab === "style" ? "contents" : "hidden"}>
+              <div className="grid gap-2">
+                <Label htmlFor="receipt-layouts-font-size">Font size</Label>
+                <Select
+                  onValueChange={(value) =>
+                    updateConfig(
+                      "fontSize",
+                      value === "small" || value === "large" ? value : "medium",
+                    )
+                  }
+                  value={formState.layoutConfig.fontSize}
+                >
+                  <SelectTrigger id="receipt-layouts-font-size">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="small">Small</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="large">Large</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="receipt-layouts-alignment">Alignment</Label>
+                <Select
+                  onValueChange={(value) =>
+                    updateConfig("alignment", value === "left" ? "left" : "center")
+                  }
+                  value={formState.layoutConfig.alignment}
+                >
+                  <SelectTrigger id="receipt-layouts-alignment">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="center">Center</SelectItem>
+                    <SelectItem value="left">Left</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="receipt-layouts-spacing">Spacing</Label>
+                <Select
+                  onValueChange={(value) =>
+                    updateConfig(
+                      "spacing",
+                      value === "compact" || value === "relaxed" ? value : "normal",
+                    )
+                  }
+                  value={formState.layoutConfig.spacing}
+                >
+                  <SelectTrigger id="receipt-layouts-spacing">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="compact">Compact</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="relaxed">Relaxed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2 md:col-span-2">
+                <Label htmlFor="footerMessage">Footer message</Label>
+                <Input
+                  id="footerMessage"
+                  onChange={(event) => updateConfig("footerMessage", event.target.value)}
+                  value={formState.layoutConfig.footerMessage}
+                />
+              </div>
+              <div className="grid gap-2 md:col-span-2">
+                <Label htmlFor="termsText">Terms and conditions</Label>
+                <textarea
+                  className="min-h-24 rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm text-brand-espresso focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel"
+                  id="termsText"
+                  onChange={(event) => updateConfig("termsText", event.target.value)}
+                  value={formState.layoutConfig.termsText}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <p className="text-xs text-brand-mocha">Live preview</p>
+          <div className="grid min-w-0 gap-3">
+            <p className="text-meta text-foreground-muted">Live preview</p>
             <ReceiptMockPreview layout={formState} />
           </div>
         </div>
@@ -633,6 +594,9 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [previewLayout, setPreviewLayout] = useState<ReceiptLayout | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [drawerLayout, setDrawerLayout] = useState<ReceiptLayout | null>(null);
+  const [filters, setFilters] = useState<ReceiptLayoutFilters>(defaultReceiptLayoutFilters);
+  const confirm = useConfirm();
 
   const layouts = layoutsQuery.data ?? [];
   const submitting = createMutation.isPending || updateMutation.isPending;
@@ -655,6 +619,7 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
   };
 
   const handlePreview = async (layout: ReceiptLayout): Promise<void> => {
+    setDrawerLayout(null);
     setPreviewLayout(layout);
     try {
       await previewMutation.mutateAsync(layout.id);
@@ -662,6 +627,87 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
+  };
+
+  const openEdit = (layout: ReceiptLayout): void => {
+    setDrawerLayout(null);
+    setEditingLayout(layout);
+    setDialogOpen(true);
+  };
+
+  const handleSetDefault = async (layout: ReceiptLayout): Promise<void> => {
+    setDrawerLayout(null);
+
+    try {
+      await defaultMutation.mutateAsync(layout.id);
+      toast.success("Default receipt layout updated.");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  const handleDelete = async (layout: ReceiptLayout): Promise<void> => {
+    setDrawerLayout(null);
+
+    // There was no confirmation at all: one click on a menu item deleted the
+    // template every printed receipt for that scope is produced from.
+    const confirmed = await confirm({
+      cancelLabel: "Keep layout",
+      confirmLabel: "Delete layout",
+      consequence: `This permanently deletes ${layout.layoutName}. It cannot be undone.`,
+      detail: layout.isDefault
+        ? "It is the default for its scope, so receipts there fall back to the business-wide layout."
+        : "Receipts using it fall back to the default layout for their scope.",
+      title: "Delete this receipt layout?",
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteMutation.mutateAsync(layout.id);
+      toast.success("Receipt layout deleted.");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  const query = filters.search.trim().toLowerCase();
+  const visibleLayouts = layouts.filter((layout) => {
+    const matchesQuery =
+      query.length === 0 ||
+      layout.layoutName.toLowerCase().includes(query) ||
+      (layout.printerType ?? "").toLowerCase().includes(query) ||
+      (layout.counterId ?? "").toLowerCase().includes(query);
+    const matchesStatus = filters.status === "all" || layout.status === filters.status;
+    const matchesType = filters.receiptType === "all" || layout.receiptType === filters.receiptType;
+    const matchesScope =
+      filters.scope === "all" ||
+      (filters.scope === "business" ? layout.branchId === null : layout.branchId !== null);
+
+    return matchesQuery && matchesStatus && matchesType && matchesScope;
+  });
+  const hasActiveFilters =
+    query.length > 0 ||
+    filters.status !== "all" ||
+    filters.receiptType !== "all" ||
+    filters.scope !== "all";
+
+  const listHandlers = {
+    canManage,
+    layouts: visibleLayouts,
+    onDelete: (layout: ReceiptLayout) => {
+      void handleDelete(layout);
+    },
+    onEdit: openEdit,
+    onPreview: (layout: ReceiptLayout) => {
+      void handlePreview(layout);
+    },
+    onSetDefault: (layout: ReceiptLayout) => {
+      void handleSetDefault(layout);
+    },
+    onView: setDrawerLayout,
   };
 
   if (!canView) {
@@ -695,28 +741,26 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
         title="Receipt Layouts"
       />
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="p-5">
-            <ReceiptText className="h-5 w-5 text-brand-caramel" />
-            <p className="mt-3 text-xs text-brand-mocha">Layouts</p>
-            <p className="text-kpi tabular-nums text-foreground">{layouts.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <Star className="h-5 w-5 text-brand-caramel" />
-            <p className="mt-3 text-xs text-brand-mocha">Defaults</p>
-            <p className="text-kpi tabular-nums text-foreground">
-              {layouts.filter((layout) => layout.isDefault).length}
+      {/* Two counts, not three. The third card was a KPI whose value was the
+          hardcoded string "58 / 80 / A4" -- a static list of supported sizes
+          dressed as a measured figure. */}
+      <div className="flex min-w-0 gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:pb-0">
+        <Card className="w-36 shrink-0 sm:w-auto sm:min-w-0">
+          <CardContent className="p-4">
+            <p className="text-meta text-foreground-muted">Layouts</p>
+            <p className="mt-1 text-section font-medium tabular-nums">
+              {layoutsQuery.isLoading ? "—" : layouts.length}
             </p>
+            <p className="mt-0.5 text-meta text-foreground-muted">Configured templates</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-5">
-            <FileText className="h-5 w-5 text-brand-caramel" />
-            <p className="mt-3 text-xs text-brand-mocha">Supported</p>
-            <p className="text-kpi tabular-nums text-foreground">58 / 80 / A4</p>
+        <Card className="w-36 shrink-0 sm:w-auto sm:min-w-0">
+          <CardContent className="p-4">
+            <p className="text-meta text-foreground-muted">Defaults set</p>
+            <p className="mt-1 text-section font-medium tabular-nums">
+              {layoutsQuery.isLoading ? "—" : layouts.filter((layout) => layout.isDefault).length}
+            </p>
+            <p className="mt-0.5 text-meta text-foreground-muted">One per scope</p>
           </CardContent>
         </Card>
       </div>
@@ -739,114 +783,54 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
 
       {!layoutsQuery.isLoading && !layoutsQuery.error && layouts.length === 0 ? (
         <EmptyState
-          description="A layout decides what a printed receipt looks like — 80mm thermal, 58mm counter, A4 invoice, or a custom format."
+          description="A layout decides what a printed receipt looks like â 80mm thermal, 58mm counter, A4 invoice, or a custom format."
           icon={ReceiptText}
           title="No receipt layouts yet"
         />
       ) : null}
 
       {!layoutsQuery.isLoading && !layoutsQuery.error && layouts.length > 0 ? (
-        <Card>
-          <CardContent className="overflow-x-auto p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Layout</TableHead>
-                  <TableHead>Scope</TableHead>
-                  <TableHead>Receipt Type</TableHead>
-                  <TableHead>Printer / Counter</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {layouts.map((layout) => (
-                  <TableRow key={layout.id}>
-                    <TableCell>
-                      <div className="font-semibold text-brand-espresso">{layout.layoutName}</div>
-                      {layout.isDefault ? (
-                        <p className="flex items-center gap-1 text-xs text-brand-mocha">
-                          <CheckCircle2 className="h-3 w-3" />
-                          Default for this scope
-                        </p>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>{layout.branchName ?? "Business-wide"}</TableCell>
-                    <TableCell>{receiptTypeLabels[layout.receiptType]}</TableCell>
-                    <TableCell>
-                      <div>{layout.printerType ?? "Any printer"}</div>
-                      <p className="text-xs text-brand-mocha">
-                        {layout.counterId ?? "Any counter"}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      <ReceiptLayoutStatusBadge layout={layout} />
-                    </TableCell>
-                    <TableCell>{formatDate(layout.updatedAt)}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            aria-label={`Open actions for ${layout.layoutName}`}
-                            size="icon"
-                            type="button"
-                            variant="ghost"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => void handlePreview(layout)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Preview
-                          </DropdownMenuItem>
-                          {canManage ? (
-                            <>
-                              <DropdownMenuItem
-                                onSelect={() => {
-                                  setEditingLayout(layout);
-                                  setDialogOpen(true);
-                                }}
-                              >
-                                Edit layout
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                disabled={layout.isDefault || defaultMutation.isPending}
-                                onSelect={() => {
-                                  defaultMutation
-                                    .mutateAsync(layout.id)
-                                    .then(() => toast.success("Default receipt layout updated."))
-                                    .catch((error: unknown) => toast.error(getErrorMessage(error)));
-                                }}
-                              >
-                                Set as default
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-danger-text"
-                                disabled={deleteMutation.isPending}
-                                onSelect={() => {
-                                  deleteMutation
-                                    .mutateAsync(layout.id)
-                                    .then(() => toast.success("Receipt layout deleted."))
-                                    .catch((error: unknown) => toast.error(getErrorMessage(error)));
-                                }}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </>
-                          ) : null}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <ReceiptLayoutsToolbar filters={filters} onFiltersChange={setFilters} />
       ) : null}
+
+      {!layoutsQuery.isLoading &&
+      !layoutsQuery.error &&
+      layouts.length > 0 &&
+      visibleLayouts.length === 0 &&
+      hasActiveFilters ? (
+        <FilteredState
+          noun="receipt layouts"
+          onClearFilters={() => setFilters(defaultReceiptLayoutFilters)}
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {visibleLayouts.length > 0 ? (
+        <>
+          <div className="md:hidden">
+            <ReceiptLayoutsCardGrid {...listHandlers} />
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <ReceiptLayoutsTable {...listHandlers} />
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
+
+      <ReceiptLayoutDetailsDrawer
+        canManage={canManage}
+        layout={drawerLayout}
+        onEdit={openEdit}
+        onOpenChange={(open) => (!open ? setDrawerLayout(null) : undefined)}
+        onPreview={(target) => {
+          void handlePreview(target);
+        }}
+        onSetDefault={(target) => {
+          void handleSetDefault(target);
+        }}
+        open={drawerLayout !== null}
+      />
 
       <ReceiptLayoutDialog
         layout={editingLayout}
