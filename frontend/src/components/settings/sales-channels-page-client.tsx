@@ -1,17 +1,24 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LoaderCircle, MoreHorizontal, Plus, RadioTower, Star, Trash2 } from "lucide-react";
+import { LoaderCircle, Plus, RadioTower } from "lucide-react";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-import { EmptyState } from "@/components/shared/collection-state";
-import { CollectionStateRow } from "@/components/shared/collection-state-row";
+import { useConfirm } from "@/components/app/confirm-provider";
+import { SalesChannelDetailsDrawer } from "@/components/settings/sales-channel-details-drawer";
+import { SalesChannelsCardGrid } from "@/components/settings/sales-channels-card-grid";
+import { SalesChannelsTable } from "@/components/settings/sales-channels-table";
+import {
+  defaultSalesChannelFilters,
+  type SalesChannelFilters,
+  SalesChannelsToolbar,
+} from "@/components/settings/sales-channels-toolbar";
+import { EmptyState, FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,12 +30,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Form,
   FormControl,
@@ -45,14 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PERMISSIONS } from "@/constants/permissions";
 import { usePermission } from "@/hooks/use-permission";
 import {
@@ -79,10 +73,6 @@ const defaultValues: SalesChannelValues = {
   requiresExternalOrderNumber: false,
   status: "active",
 };
-
-function statusBadge(status: SalesChannel["status"]): JSX.Element {
-  return <Badge variant={status === "active" ? "secondary" : "default"}>{status}</Badge>;
-}
 
 function toFormValues(channel: SalesChannel | null): SalesChannelValues {
   if (!channel) return defaultValues;
@@ -320,8 +310,11 @@ export function SalesChannelsPageClient(): JSX.Element {
     PERMISSIONS.settingsCompanyUpdate,
     PERMISSIONS.settingsPaymentMethodsManage,
   ]);
+  const confirm = useConfirm();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<SalesChannel | null>(null);
+  const [drawerChannel, setDrawerChannel] = useState<SalesChannel | null>(null);
+  const [filters, setFilters] = useState<SalesChannelFilters>(defaultSalesChannelFilters);
   const salesChannelsQuery = useSalesChannels(canView);
   const paymentMethodsQuery = usePaymentMethods(canView);
   const createMutation = useCreateSalesChannel();
@@ -346,7 +339,10 @@ export function SalesChannelsPageClient(): JSX.Element {
     setDialogOpen(true);
   };
 
+  // A dialog on top of a sheet on top of the list is one layer too many, so
+  // the drawer closes before the form opens.
   const openEdit = (channel: SalesChannel): void => {
+    setDrawerChannel(null);
     setSelectedChannel(channel);
     setDialogOpen(true);
   };
@@ -385,12 +381,64 @@ export function SalesChannelsPageClient(): JSX.Element {
   };
 
   const handleDelete = async (channel: SalesChannel) => {
+    setDrawerChannel(null);
+
+    // There was no confirmation at all: one click on a menu item deleted the
+    // channel that every historical order is attributed to.
+    const confirmed = await confirm({
+      cancelLabel: "Keep channel",
+      confirmLabel: "Delete channel",
+      consequence: `This permanently deletes . It cannot be undone.`,
+      detail:
+        "Orders already recorded against it keep their channel name, but no new order can use it.",
+      title: "Delete this sales channel?",
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
     try {
       await deleteMutation.mutateAsync(channel.id);
       toast.success("Sales channel deleted.");
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
+  };
+
+  const allChannels = salesChannelsQuery.data ?? [];
+  const channelTypes = Array.from(
+    new Set(allChannels.map((channel) => channel.channelType).filter(Boolean)),
+  ).sort();
+  const query = filters.search.trim().toLowerCase();
+  const visibleChannels = allChannels.filter((channel) => {
+    const matchesQuery =
+      query.length === 0 ||
+      channel.channelName.toLowerCase().includes(query) ||
+      channel.channelType.toLowerCase().includes(query);
+    const matchesStatus = filters.status === "all" || channel.status === filters.status;
+    const matchesType = filters.type === "all" || channel.channelType === filters.type;
+
+    return matchesQuery && matchesStatus && matchesType;
+  });
+  const hasActiveFilters = query.length > 0 || filters.status !== "all" || filters.type !== "all";
+
+  const listHandlers = {
+    canManage,
+    channels: visibleChannels,
+    onDelete: (channel: SalesChannel) => {
+      void handleDelete(channel);
+    },
+    onEdit: openEdit,
+    onSetDefault: (channel: SalesChannel) => {
+      setDrawerChannel(null);
+      void handleDefault(channel);
+    },
+    onStatusChange: (channel: SalesChannel, status: SalesChannel["status"]) => {
+      setDrawerChannel(null);
+      void handleStatus(channel, status);
+    },
+    onView: setDrawerChannel,
   };
 
   if (!canView) {
@@ -426,121 +474,62 @@ export function SalesChannelsPageClient(): JSX.Element {
         </Alert>
       ) : null}
 
-      <Card className="overflow-hidden">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Channel</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Commission</TableHead>
-                <TableHead>External ID</TableHead>
-                <TableHead>Default payment</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {salesChannelsQuery.isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-12 text-center text-brand-mocha">
-                    Loading sales channels...
-                  </TableCell>
-                </TableRow>
-              ) : null}
-              {(salesChannelsQuery.data ?? []).map((channel) => (
-                <TableRow key={channel.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-brand-espresso">{channel.channelName}</span>
-                      {channel.isDefault ? (
-                        <Badge className="gap-1">
-                          <Star className="h-3 w-3" />
-                          Default
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>{channel.channelType}</TableCell>
-                  <TableCell>{(channel.commissionRate ?? 0).toFixed(2)}%</TableCell>
-                  <TableCell>
-                    {channel.requiresExternalOrderNumber ? "Required" : "Not required"}
-                  </TableCell>
-                  <TableCell>{channel.defaultPaymentMethodName || "-"}</TableCell>
-                  <TableCell>{statusBadge(channel.status)}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button size="icon" variant="ghost">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem disabled={!canManage} onSelect={() => openEdit(channel)}>
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={
-                            !canManage || channel.isDefault || channel.status === "inactive"
-                          }
-                          onSelect={() => {
-                            void handleDefault(channel);
-                          }}
-                        >
-                          Set as default
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={!canManage || channel.status === "active"}
-                          onSelect={() => {
-                            void handleStatus(channel, "active");
-                          }}
-                        >
-                          Mark active
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={!canManage || channel.status === "inactive"}
-                          onSelect={() => {
-                            void handleStatus(channel, "inactive");
-                          }}
-                        >
-                          Mark inactive
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-danger-text focus:text-danger-text"
-                          disabled={!canManage || channel.isDefault}
-                          onSelect={() => {
-                            void handleDelete(channel);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!salesChannelsQuery.isLoading && (salesChannelsQuery.data ?? []).length === 0 ? (
-                <CollectionStateRow colSpan={7}>
-                  <EmptyState
-                    description="A channel records where an order came from — walk-in, WhatsApp, Talabat — so sales can be reported by source."
-                    icon={RadioTower}
-                    title="No sales channels yet"
-                  />
-                </CollectionStateRow>
-              ) : null}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <SalesChannelsToolbar
+        channelTypes={channelTypes}
+        filters={filters}
+        onFiltersChange={setFilters}
+      />
 
-      <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4 text-sm text-brand-mocha">
-        <p className="text-sm font-medium leading-none text-brand-espresso">Quick distinction</p>
-        <p className="mt-1">
-          Sales Channel is where the order came from. Payment Method is how the customer paid.
-          Payment Account is where that money is held for accounting.
-        </p>
-      </div>
+      {salesChannelsQuery.isLoading ? (
+        <div className="grid gap-2">
+          <Skeleton className="h-16 w-full rounded-lg" />
+          <Skeleton className="h-16 w-full rounded-lg" />
+          <Skeleton className="h-16 w-full rounded-lg" />
+        </div>
+      ) : null}
+
+      {/* A filter that matched nothing and a register with no channels need
+          opposite remedies. DESIGN.md 8. */}
+      {!salesChannelsQuery.isLoading && visibleChannels.length === 0 && hasActiveFilters ? (
+        <FilteredState
+          noun="sales channels"
+          onClearFilters={() => setFilters(defaultSalesChannelFilters)}
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      {!salesChannelsQuery.isLoading && allChannels.length === 0 ? (
+        <EmptyState
+          description="A channel records where an order came from -- walk-in, WhatsApp, Talabat -- so sales can be reported by source."
+          icon={RadioTower}
+          title="No sales channels yet"
+        />
+      ) : null}
+
+      {visibleChannels.length > 0 ? (
+        <>
+          <div className="md:hidden">
+            <SalesChannelsCardGrid {...listHandlers} />
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <SalesChannelsTable {...listHandlers} />
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
+
+      <SalesChannelDetailsDrawer
+        canManage={canManage}
+        channel={drawerChannel}
+        onEdit={openEdit}
+        onOpenChange={(open) => (!open ? setDrawerChannel(null) : undefined)}
+        onSetDefault={(channel) => {
+          setDrawerChannel(null);
+          void handleDefault(channel);
+        }}
+        open={drawerChannel !== null}
+      />
 
       <SalesChannelDialog
         channel={selectedChannel}
