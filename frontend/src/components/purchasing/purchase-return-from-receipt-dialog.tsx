@@ -6,6 +6,7 @@ import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { type FormTab, FormTabs } from "@/components/shared/form-tabs";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -34,6 +35,10 @@ import type {
   PurchasingSupplierOption,
   ReturnablePurchaseReceiptItem,
 } from "@/types/purchasing";
+
+type VendorCreditFormTabKey = "source" | "items";
+
+const FORM_TABPANEL_ID = "vendor-credit-form-tabpanel";
 
 type ReturnLineState = {
   purchaseReceiptItemId: string;
@@ -101,6 +106,7 @@ export function PurchaseReturnFromReceiptDialog({
   const [returnDate, setReturnDate] = useState(todayInputValue());
   const [supplierReferenceNumber, setSupplierReferenceNumber] = useState("");
   const [lines, setLines] = useState<ReturnLineState[]>([]);
+  const [activeTab, setActiveTab] = useState<VendorCreditFormTabKey>("source");
   const receiptsQuery = usePurchaseReceipts(
     {
       branchId: selectedBranchId,
@@ -192,6 +198,8 @@ export function PurchaseReturnFromReceiptDialog({
       setReturnDate(todayInputValue());
       setSupplierReferenceNumber("");
       setLines([]);
+      // Every opening starts on Source, whichever tab the last one closed on.
+      setActiveTab("source");
     }
   }, [defaultBranchId, open]);
 
@@ -237,6 +245,10 @@ export function PurchaseReturnFromReceiptDialog({
     return item ? total + estimatedLineCredit(item, line.quantity) : total;
   }, 0);
   const estimatedCredit = roundMoney(selectedTotal);
+  const formTabs: FormTab<VendorCreditFormTabKey>[] = [
+    { key: "source", label: "Source" },
+    { key: "items", label: "Items", badge: selectedLines.length },
+  ];
 
   const updateLine = (itemId: string, patch: Partial<ReturnLineState>): void => {
     setLines((currentLines) =>
@@ -254,18 +266,23 @@ export function PurchaseReturnFromReceiptDialog({
   };
 
   const handleSubmit = async (): Promise<void> => {
+    // A failed check switches to the tab that holds the problem before the
+    // toast explains it.
     if (!selectedReceipt) {
+      setActiveTab("source");
       toast.error("Select a posted receipt before creating a vendor credit.");
       return;
     }
 
     const trimmedReason = reason.trim();
     if (!trimmedReason) {
+      setActiveTab("source");
       toast.error("Return reason is required.");
       return;
     }
 
     if (selectedLines.length === 0) {
+      setActiveTab("items");
       toast.error("Select at least one return item.");
       return;
     }
@@ -306,230 +323,257 @@ export function PurchaseReturnFromReceiptDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90dvh] max-w-6xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b border-border px-6 pb-4 pt-6">
           <DialogTitle>Create vendor credit</DialogTitle>
           <DialogDescription>
             Select a posted receive-goods record, then return supplier stock against that receipt.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="purchase-return-from-receipt-dialo-branch">Branch</Label>
-            <SearchableCombobox
-              id="purchase-return-from-receipt-dialo-branch"
-              emptyMessage="No branches found."
-              onValueChange={setSelectedBranchId}
-              options={branchOptions}
-              placeholder="Select branch"
-              searchPlaceholder="Search branch..."
-              value={selectedBranchId}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="purchase-return-from-receipt-dialo-supplier">Supplier *</Label>
-            <SearchableCombobox
-              id="purchase-return-from-receipt-dialo-supplier"
-              emptyMessage="No suppliers found."
-              onValueChange={setSelectedSupplierId}
-              options={supplierOptions}
-              placeholder="Select supplier"
-              searchPlaceholder="Search supplier..."
-              value={selectedSupplierId}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="purchase-return-from-receipt-dialo-posted-receipt">
-              Posted receipt *
-            </Label>
-            <SearchableCombobox
-              id="purchase-return-from-receipt-dialo-posted-receipt"
-              disabled={selectedSupplierId === ""}
-              emptyMessage="No posted receipt with returnable items found."
-              errorMessage={receiptsQuery.error ? getErrorMessage(receiptsQuery.error) : null}
-              isLoading={receiptsQuery.isFetching}
-              onRetry={() => {
-                void receiptsQuery.refetch();
-              }}
-              onValueChange={setSelectedReceiptId}
-              options={receiptOptions}
-              placeholder="Select receipt"
-              searchPlaceholder="Search receipt, PO, bill..."
-              value={selectedReceiptId}
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-[1fr_1fr_16rem]">
-          <div className="space-y-2">
-            <Label htmlFor="vendor-credit-date">Return date</Label>
-            <Input
-              id="vendor-credit-date"
-              onChange={(event) => setReturnDate(event.target.value)}
-              type="date"
-              value={returnDate}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="vendor-credit-supplier-reference">Supplier reference</Label>
-            <Input
-              id="vendor-credit-supplier-reference"
-              onChange={(event) => setSupplierReferenceNumber(event.target.value)}
-              placeholder="Optional credit note ref"
-              value={supplierReferenceNumber}
-            />
-          </div>
-          <div className="rounded-lg border border-brand-cappuccino bg-brand-latte/60 p-4">
-            <p className="text-xs text-brand-mocha">Estimated credit</p>
-            <p className="mt-2 text-2xl font-semibold text-brand-espresso">
-              {formatCurrency(estimatedCredit)}
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="vendor-credit-reason">Return reason *</Label>
-          <Textarea
-            id="vendor-credit-reason"
-            onChange={(event) => setReason(event.target.value)}
-            placeholder="Damaged items, expired on delivery, supplier quality issue..."
-            value={reason}
+        {/* Two tabs on one state: where the credit comes from, and which
+            lines come back. Nothing typed on one is lost on the other. */}
+        <div className="border-b border-border px-6 py-3">
+          <FormTabs
+            active={activeTab}
+            aria-label="Vendor credit sections"
+            onTabChange={setActiveTab}
+            panelId={FORM_TABPANEL_ID}
+            tabs={formTabs}
           />
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-brand-cappuccino">
-          <div className="border-b border-brand-cappuccino bg-brand-cream px-4 py-3 text-sm font-medium text-brand-mocha">
-            {selectedReceiptId !== "" && selectedLines.length === 0
-              ? "Please select at least one return line to create the Vendor Credit."
-              : `${selectedLineCountText} return line${selectedLines.length === 1 ? "" : "s"} selected.`}
-          </div>
-          <div className="grid grid-cols-[7rem_1.6fr_0.8fr_0.8fr_1fr_1.2fr] gap-3 bg-brand-latte px-4 py-3 text-xs font-semibold text-brand-mocha">
-            <span>Select</span>
-            <span>Item</span>
-            <span>Returnable</span>
-            <span>Quantity</span>
-            <span>Location</span>
-            <span>Line reason</span>
-          </div>
-
-          {selectedSupplierId === "" ? (
-            <div className="p-8 text-center text-sm text-brand-mocha">
-              Select a supplier to view posted receipts.
-            </div>
-          ) : null}
-
-          {selectedSupplierId !== "" && selectedReceiptId === "" && !receiptsQuery.isFetching ? (
-            <div className="p-8 text-center text-sm text-brand-mocha">
-              Select a posted receipt to view returnable items.
-            </div>
-          ) : null}
-
-          {returnableItemsQuery.isLoading ? (
-            <div className="flex items-center justify-center gap-2 p-8 text-sm text-brand-mocha">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading returnable items...
-            </div>
-          ) : null}
-
-          {returnableItemsQuery.error ? (
-            <div className="p-6 text-sm text-danger-text">
-              {getErrorMessage(returnableItemsQuery.error)}
-            </div>
-          ) : null}
-
-          {!returnableItemsQuery.isLoading &&
-          selectedReceiptId !== "" &&
-          !returnableItemsQuery.error &&
-          (returnableItemsQuery.data ?? []).length === 0 ? (
-            <div className="p-8 text-center text-sm text-brand-mocha">
-              No posted receipt with returnable items found.
-            </div>
-          ) : null}
-
-          {(returnableItemsQuery.data ?? []).map((item) => {
-            const line = lines.find(
-              (currentLine) => currentLine.purchaseReceiptItemId === item.purchaseReceiptItemId,
-            );
-            if (!line) {
-              return null;
-            }
-
-            const disabled = item.returnableQuantity <= 0;
-            const lineCredit = line.selected ? estimatedLineCredit(item, line.quantity) : 0;
-
-            return (
-              <div
-                className="grid grid-cols-[7rem_1.6fr_0.8fr_0.8fr_1fr_1.2fr] items-center gap-3 border-t border-brand-cappuccino px-4 py-3"
-                key={item.purchaseReceiptItemId}
-              >
-                <label className="flex items-center gap-2 text-sm font-medium text-brand-espresso">
-                  <Checkbox
-                    checked={line.selected}
-                    disabled={disabled}
-                    onCheckedChange={(checked) =>
-                      setLineSelected(
-                        item.purchaseReceiptItemId,
-                        checked === true,
-                        item.returnableQuantity,
-                      )
-                    }
-                  />
-                  <span>{line.selected ? "Selected" : "Select"}</span>
-                </label>
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-brand-espresso">
-                    {item.itemNameSnapshot}
-                  </p>
-                  <p className="text-xs text-brand-mocha">
-                    {item.itemType} - {item.unitCost ? formatCurrency(item.unitCost) : "No cost"}
-                  </p>
-                  {line.selected ? (
-                    <p className="text-xs font-medium text-brand-espresso">
-                      Credit {formatCurrency(lineCredit)}
-                    </p>
-                  ) : null}
-                </div>
-                <p className="text-sm text-brand-mocha">
-                  {item.returnableQuantity} {item.unitSymbol}
-                </p>
-                <Input
-                  disabled={disabled || !line.selected}
-                  max={item.returnableQuantity}
-                  min={0}
-                  onChange={(event) =>
-                    updateLine(item.purchaseReceiptItemId, {
-                      quantity: Number(event.target.value),
-                    })
-                  }
-                  type="number"
-                  value={line.quantity}
-                />
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5"
+          id={FORM_TABPANEL_ID}
+          role="tabpanel"
+          tabIndex={-1}
+        >
+          <div className={activeTab === "source" ? "grid gap-4" : "hidden"}>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="purchase-return-from-receipt-dialo-branch">Branch</Label>
                 <SearchableCombobox
-                  disabled={disabled || !line.selected}
-                  emptyMessage="No active stock locations found."
-                  onValueChange={(value) =>
-                    updateLine(item.purchaseReceiptItemId, { stockLocationId: value })
-                  }
-                  options={stockLocationOptions}
-                  placeholder="Default location"
-                  searchPlaceholder="Search location..."
-                  value={line.stockLocationId}
-                />
-                <Input
-                  disabled={disabled || !line.selected}
-                  onChange={(event) =>
-                    updateLine(item.purchaseReceiptItemId, { reason: event.target.value })
-                  }
-                  placeholder="Optional"
-                  value={line.reason}
+                  id="purchase-return-from-receipt-dialo-branch"
+                  emptyMessage="No branches found."
+                  onValueChange={setSelectedBranchId}
+                  options={branchOptions}
+                  placeholder="Select branch"
+                  searchPlaceholder="Search branch..."
+                  value={selectedBranchId}
                 />
               </div>
-            );
-          })}
+              <div className="space-y-2">
+                <Label htmlFor="purchase-return-from-receipt-dialo-supplier">Supplier *</Label>
+                <SearchableCombobox
+                  id="purchase-return-from-receipt-dialo-supplier"
+                  emptyMessage="No suppliers found."
+                  onValueChange={setSelectedSupplierId}
+                  options={supplierOptions}
+                  placeholder="Select supplier"
+                  searchPlaceholder="Search supplier..."
+                  value={selectedSupplierId}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="purchase-return-from-receipt-dialo-posted-receipt">
+                  Posted receipt *
+                </Label>
+                <SearchableCombobox
+                  id="purchase-return-from-receipt-dialo-posted-receipt"
+                  disabled={selectedSupplierId === ""}
+                  emptyMessage="No posted receipt with returnable items found."
+                  errorMessage={receiptsQuery.error ? getErrorMessage(receiptsQuery.error) : null}
+                  isLoading={receiptsQuery.isFetching}
+                  onRetry={() => {
+                    void receiptsQuery.refetch();
+                  }}
+                  onValueChange={setSelectedReceiptId}
+                  options={receiptOptions}
+                  placeholder="Select receipt"
+                  searchPlaceholder="Search receipt, PO, bill..."
+                  value={selectedReceiptId}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-[1fr_1fr_16rem]">
+              <div className="space-y-2">
+                <Label htmlFor="vendor-credit-date">Return date</Label>
+                <Input
+                  id="vendor-credit-date"
+                  onChange={(event) => setReturnDate(event.target.value)}
+                  type="date"
+                  value={returnDate}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vendor-credit-supplier-reference">Supplier reference</Label>
+                <Input
+                  id="vendor-credit-supplier-reference"
+                  onChange={(event) => setSupplierReferenceNumber(event.target.value)}
+                  placeholder="Optional credit note ref"
+                  value={supplierReferenceNumber}
+                />
+              </div>
+              <div className="rounded-lg border border-brand-cappuccino bg-brand-latte/60 p-4">
+                <p className="text-xs text-brand-mocha">Estimated credit</p>
+                <p className="mt-2 text-2xl font-semibold text-brand-espresso">
+                  {formatCurrency(estimatedCredit)}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="vendor-credit-reason">Return reason *</Label>
+              <Textarea
+                id="vendor-credit-reason"
+                onChange={(event) => setReason(event.target.value)}
+                placeholder="Damaged items, expired on delivery, supplier quality issue..."
+                value={reason}
+              />
+            </div>
+          </div>
+
+          <div
+            className={
+              activeTab === "items"
+                ? "overflow-hidden rounded-lg border border-brand-cappuccino"
+                : "hidden"
+            }
+          >
+            <div className="border-b border-brand-cappuccino bg-brand-cream px-4 py-3 text-sm font-medium text-brand-mocha">
+              {selectedReceiptId !== "" && selectedLines.length === 0
+                ? "Please select at least one return line to create the Vendor Credit."
+                : `${selectedLineCountText} return line${selectedLines.length === 1 ? "" : "s"} selected.`}
+            </div>
+            <div className="hidden gap-3 bg-brand-latte px-4 py-3 text-meta text-brand-mocha md:grid md:grid-cols-[7rem_1.6fr_0.8fr_0.8fr_1fr_1.2fr]">
+              <span>Select</span>
+              <span>Item</span>
+              <span>Returnable</span>
+              <span>Quantity</span>
+              <span>Location</span>
+              <span>Line reason</span>
+            </div>
+
+            {selectedSupplierId === "" ? (
+              <div className="p-8 text-center text-sm text-brand-mocha">
+                Select a supplier to view posted receipts.
+              </div>
+            ) : null}
+
+            {selectedSupplierId !== "" && selectedReceiptId === "" && !receiptsQuery.isFetching ? (
+              <div className="p-8 text-center text-sm text-brand-mocha">
+                Select a posted receipt to view returnable items.
+              </div>
+            ) : null}
+
+            {returnableItemsQuery.isLoading ? (
+              <div className="flex items-center justify-center gap-2 p-8 text-sm text-brand-mocha">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading returnable items...
+              </div>
+            ) : null}
+
+            {returnableItemsQuery.error ? (
+              <div className="p-6 text-sm text-danger-text">
+                {getErrorMessage(returnableItemsQuery.error)}
+              </div>
+            ) : null}
+
+            {!returnableItemsQuery.isLoading &&
+            selectedReceiptId !== "" &&
+            !returnableItemsQuery.error &&
+            (returnableItemsQuery.data ?? []).length === 0 ? (
+              <div className="p-8 text-center text-sm text-brand-mocha">
+                No posted receipt with returnable items found.
+              </div>
+            ) : null}
+
+            {(returnableItemsQuery.data ?? []).map((item) => {
+              const line = lines.find(
+                (currentLine) => currentLine.purchaseReceiptItemId === item.purchaseReceiptItemId,
+              );
+              if (!line) {
+                return null;
+              }
+
+              const disabled = item.returnableQuantity <= 0;
+              const lineCredit = line.selected ? estimatedLineCredit(item, line.quantity) : 0;
+
+              return (
+                <div
+                  className="grid gap-3 border-t border-brand-cappuccino px-4 py-3 md:grid-cols-[7rem_1.6fr_0.8fr_0.8fr_1fr_1.2fr] md:items-center"
+                  key={item.purchaseReceiptItemId}
+                >
+                  <label className="flex items-center gap-2 text-sm font-medium text-brand-espresso">
+                    <Checkbox
+                      checked={line.selected}
+                      disabled={disabled}
+                      onCheckedChange={(checked) =>
+                        setLineSelected(
+                          item.purchaseReceiptItemId,
+                          checked === true,
+                          item.returnableQuantity,
+                        )
+                      }
+                    />
+                    <span>{line.selected ? "Selected" : "Select"}</span>
+                  </label>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-brand-espresso">
+                      {item.itemNameSnapshot}
+                    </p>
+                    <p className="text-xs text-brand-mocha">
+                      {item.itemType} - {item.unitCost ? formatCurrency(item.unitCost) : "No cost"}
+                    </p>
+                    {line.selected ? (
+                      <p className="text-xs font-medium text-brand-espresso">
+                        Credit {formatCurrency(lineCredit)}
+                      </p>
+                    ) : null}
+                  </div>
+                  <p className="text-sm text-brand-mocha">
+                    {item.returnableQuantity} {item.unitSymbol}
+                  </p>
+                  <Input
+                    disabled={disabled || !line.selected}
+                    max={item.returnableQuantity}
+                    min={0}
+                    onChange={(event) =>
+                      updateLine(item.purchaseReceiptItemId, {
+                        quantity: Number(event.target.value),
+                      })
+                    }
+                    type="number"
+                    value={line.quantity}
+                  />
+                  <SearchableCombobox
+                    disabled={disabled || !line.selected}
+                    emptyMessage="No active stock locations found."
+                    onValueChange={(value) =>
+                      updateLine(item.purchaseReceiptItemId, { stockLocationId: value })
+                    }
+                    options={stockLocationOptions}
+                    placeholder="Default location"
+                    searchPlaceholder="Search location..."
+                    value={line.stockLocationId}
+                  />
+                  <Input
+                    disabled={disabled || !line.selected}
+                    onChange={(event) =>
+                      updateLine(item.purchaseReceiptItemId, { reason: event.target.value })
+                    }
+                    placeholder="Optional"
+                    value={line.reason}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="border-t border-border px-6 py-4">
           <Button onClick={onClose} type="button" variant="outline">
             Cancel
           </Button>

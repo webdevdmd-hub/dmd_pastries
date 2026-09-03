@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { Button } from "@/components/ui/button";
+import { FilterField, FilterToolbar } from "@/components/shared/filter-toolbar";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -11,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils/cn";
 import type {
   PurchasingBranchOption,
   PurchasingFilters,
@@ -27,12 +26,23 @@ type PurchasingToolbarProps = {
   suppliers: PurchasingSupplierOption[];
   branches: PurchasingBranchOption[];
   resetBranchId: string;
+  /** Names the list in the popover heading, e.g. "vendor credits". */
+  noun?: string;
 };
 
+/**
+ * The toolbar every purchasing list shares: orders, bills, receipts and
+ * vendor credits. Search stays visible; supplier, branch, status, payment
+ * status and the date range live in the Filters popover, the same idiom as
+ * the other modules. Branch is scope, not a filter: it always carries a
+ * value, so it never counts toward the badge and Reset returns it to the
+ * user's own branch rather than clearing it.
+ */
 export function PurchasingToolbar({
   allowAllBranches = true,
   branches,
   filters,
+  noun = "records",
   onFiltersChange,
   paymentStatuses,
   resetBranchId,
@@ -43,126 +53,132 @@ export function PurchasingToolbar({
     onFiltersChange({ ...filters, ...patch });
   };
 
-  // Six or seven controls used to snap onto one grid row the moment the
-  // VIEWPORT hit lg. The viewport is not the width this toolbar gets: with the
-  // sidebar open, a 1030px window leaves main 742px, so each control was
-  // allotted 91px and the date-to input rendered 25px wide -- a date field you
-  // cannot read or type into. Wrapping on the toolbar's own width needs no
-  // breakpoint to be guessed right: each control asks for a readable basis,
-  // takes a share of what is left, and drops to the next row when there is no
-  // room.
-  //
-  // The sizing sits on each control rather than on the parent as [&>*]:flex-1.
-  // That arbitrary variant compiles to a two-class selector, which outranks a
-  // plain .flex-none on a child, so Reset could not opt out of stretching and
-  // rendered 629px wide.
-  const control = "min-w-0 flex-1 basis-36";
+  const hiddenFilterCount =
+    (filters.supplierId !== "all" ? 1 : 0) +
+    (filters.status !== "all" ? 1 : 0) +
+    (paymentStatuses && (filters.paymentStatus ?? "all") !== "all" ? 1 : 0) +
+    (filters.dateFrom.length > 0 ? 1 : 0) +
+    (filters.dateTo.length > 0 ? 1 : 0);
+  const hasAnyFilter = hiddenFilterCount > 0 || filters.search.trim().length > 0;
+
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-md border border-brand-cappuccino/60 bg-card p-4">
-      <Input
-        aria-label="Search purchasing records"
-        className={cn(control, "basis-48")}
-        onChange={(event) => updateFilter({ search: event.target.value })}
-        placeholder="Search number, supplier..."
-        value={filters.search}
-      />
-      <Select
-        value={filters.supplierId}
-        onValueChange={(supplierId) => updateFilter({ supplierId })}
-      >
-        <SelectTrigger className={control}>
-          <SelectValue placeholder="Supplier" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All suppliers</SelectItem>
-          {suppliers.map((supplier) => (
-            <SelectItem key={supplier.id} value={supplier.id}>
-              {supplier.supplierName}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select value={filters.branchId} onValueChange={(branchId) => updateFilter({ branchId })}>
-        <SelectTrigger className={control}>
-          <SelectValue placeholder="Branch" />
-        </SelectTrigger>
-        <SelectContent>
-          {allowAllBranches ? <SelectItem value="all">All branches</SelectItem> : null}
-          {branches.map((branch) => (
-            <SelectItem key={branch.id} value={branch.id}>
-              {branch.branchName}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select value={filters.status} onValueChange={(status) => updateFilter({ status })}>
-        <SelectTrigger className={control}>
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All statuses</SelectItem>
-          {statuses.map((status) => (
-            <SelectItem key={status.value} value={status.value}>
-              {status.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {paymentStatuses ? (
+    <FilterToolbar
+      hasAnyFilter={hasAnyFilter}
+      hiddenFilterCount={hiddenFilterCount}
+      hideDensityBelowMd
+      onReset={() => {
+        const resetFilters: PurchasingFilters = {
+          branchId: resetBranchId,
+          dateFrom: "",
+          dateTo: "",
+          search: "",
+          status: "all",
+          supplierId: "all",
+        };
+
+        if (paymentStatuses) {
+          resetFilters.paymentStatus = "all";
+        }
+
+        onFiltersChange(resetFilters);
+      }}
+      onSearchChange={(search) => updateFilter({ search })}
+      popoverTitle={`Filter ${noun}`}
+      searchAriaLabel="Search purchasing records"
+      searchPlaceholder="Search number, supplier..."
+      searchValue={filters.search}
+    >
+      <FilterField htmlFor="purchasingFilterSupplier" label="Supplier">
         <Select
-          value={filters.paymentStatus ?? "all"}
-          onValueChange={(paymentStatus) => updateFilter({ paymentStatus })}
+          onValueChange={(supplierId) => updateFilter({ supplierId })}
+          value={filters.supplierId}
         >
-          <SelectTrigger className={control}>
-            <SelectValue placeholder="Payment" />
+          <SelectTrigger id="purchasingFilterSupplier">
+            <SelectValue placeholder="Supplier" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All payments</SelectItem>
-            {paymentStatuses.map((status) => (
-              <SelectItem key={status.value} value={status.value}>
-                {status.label}
+            <SelectItem value="all">All suppliers</SelectItem>
+            {suppliers.map((supplier) => (
+              <SelectItem key={supplier.id} value={supplier.id}>
+                {supplier.supplierName}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-      ) : null}
-      <Input
-        aria-label="Date from"
-        className={cn(control, "min-w-36")}
-        onChange={(event) => updateFilter({ dateFrom: event.target.value })}
-        type="date"
-        value={filters.dateFrom}
-      />
-      <Input
-        aria-label="Date to"
-        className={cn(control, "min-w-36")}
-        onChange={(event) => updateFilter({ dateTo: event.target.value })}
-        type="date"
-        value={filters.dateTo}
-      />
-      <Button
-        onClick={() => {
-          const resetFilters: PurchasingFilters = {
-            branchId: resetBranchId,
-            dateFrom: "",
-            dateTo: "",
-            search: "",
-            status: "all",
-            supplierId: "all",
-          };
+      </FilterField>
 
-          if (paymentStatuses) {
-            resetFilters.paymentStatus = "all";
-          }
+      <FilterField htmlFor="purchasingFilterBranch" label="Branch">
+        <Select onValueChange={(branchId) => updateFilter({ branchId })} value={filters.branchId}>
+          <SelectTrigger id="purchasingFilterBranch">
+            <SelectValue placeholder="Branch" />
+          </SelectTrigger>
+          <SelectContent>
+            {allowAllBranches ? <SelectItem value="all">All branches</SelectItem> : null}
+            {branches.map((branch) => (
+              <SelectItem key={branch.id} value={branch.id}>
+                {branch.branchName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FilterField>
 
-          onFiltersChange(resetFilters);
-        }}
-        className="flex-none"
-        type="button"
-        variant="outline"
-      >
-        Reset
-      </Button>
-    </div>
+      <div className={paymentStatuses ? "grid grid-cols-2 gap-3" : "grid gap-3"}>
+        <FilterField htmlFor="purchasingFilterStatus" label="Status">
+          <Select onValueChange={(status) => updateFilter({ status })} value={filters.status}>
+            <SelectTrigger id="purchasingFilterStatus">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {statuses.map((status) => (
+                <SelectItem key={status.value} value={status.value}>
+                  {status.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+        {paymentStatuses ? (
+          <FilterField htmlFor="purchasingFilterPayment" label="Payment">
+            <Select
+              onValueChange={(paymentStatus) => updateFilter({ paymentStatus })}
+              value={filters.paymentStatus ?? "all"}
+            >
+              <SelectTrigger id="purchasingFilterPayment">
+                <SelectValue placeholder="Payment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All payments</SelectItem>
+                {paymentStatuses.map((status) => (
+                  <SelectItem key={status.value} value={status.value}>
+                    {status.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+        ) : null}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <FilterField htmlFor="purchasingFilterDateFrom" label="From">
+          <Input
+            id="purchasingFilterDateFrom"
+            onChange={(event) => updateFilter({ dateFrom: event.target.value })}
+            type="date"
+            value={filters.dateFrom}
+          />
+        </FilterField>
+        <FilterField htmlFor="purchasingFilterDateTo" label="To">
+          <Input
+            id="purchasingFilterDateTo"
+            onChange={(event) => updateFilter({ dateTo: event.target.value })}
+            type="date"
+            value={filters.dateTo}
+          />
+        </FilterField>
+      </div>
+    </FilterToolbar>
   );
 }

@@ -8,7 +8,9 @@ import { toast } from "sonner";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseEmptyState } from "@/components/purchasing/purchase-empty-state";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
+import { PurchaseReturnDetailsDrawer } from "@/components/purchasing/purchase-return-details-drawer";
 import { PurchaseReturnFromReceiptDialog } from "@/components/purchasing/purchase-return-from-receipt-dialog";
+import { PurchaseReturnsCardGrid } from "@/components/purchasing/purchase-returns-card-grid";
 import { PurchaseReturnsTable } from "@/components/purchasing/purchase-returns-table";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
 import { PurchasingToolbar } from "@/components/purchasing/purchasing-toolbar";
@@ -88,6 +90,10 @@ export function PurchaseReturnsPageClient(): JSX.Element {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [reversalReturn, setReversalReturn] = useState<PurchaseReturn | null>(null);
+  // The id, not the record: the drawer fetches the note itself so its journal
+  // and reversal links are current.
+  const [detailsReturnId, setDetailsReturnId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [page, setPage] = useState(1);
   const returnsQuery = usePurchaseReturns(filters, canView && branchScope.hasBranchScope, page);
   const purchaseReturnsTotalPages = returnsQuery.data?.pagination.totalPages ?? 1;
@@ -179,13 +185,55 @@ export function PurchaseReturnsPageClient(): JSX.Element {
     }
   };
 
+  const openDetails = (purchaseReturn: PurchaseReturn): void => {
+    setDetailsReturnId(purchaseReturn.id);
+    setDetailsOpen(true);
+  };
+
+  // A confirm dialog on top of a sheet on top of the list is one layer too
+  // many, so the drawer closes before any of these open. Confirming or
+  // cancelling then lands back on the list.
+  const askPost = (purchaseReturn: PurchaseReturn): void => {
+    setDetailsOpen(false);
+    setPendingAction({ purchaseReturn, type: "post" });
+  };
+  const askCancel = (purchaseReturn: PurchaseReturn): void => {
+    setDetailsOpen(false);
+    setPendingAction({ purchaseReturn, type: "cancel" });
+  };
+  const askReverse = (purchaseReturn: PurchaseReturn): void => {
+    setDetailsOpen(false);
+    setReversalReturn(purchaseReturn);
+  };
+
   const purchaseReturns = returnsQuery.data?.items ?? [];
+  const listHandlers = {
+    canCancel,
+    canPost,
+    canReverse,
+    onCancel: askCancel,
+    onPost: askPost,
+    onReverse: askReverse,
+    onView: openDetails,
+    returns: purchaseReturns,
+  };
+  const pagination = returnsQuery.data?.pagination ? (
+    <PaginationBar
+      isFetching={returnsQuery.isFetching}
+      limit={returnsQuery.data.pagination.limit}
+      noun={{ one: "vendor credit", other: "vendor credits" }}
+      onPageChange={setPage}
+      page={returnsQuery.data.pagination.page}
+      total={returnsQuery.data.pagination.total}
+      totalPages={returnsQuery.data.pagination.totalPages}
+    />
+  ) : null;
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
         title="Vendor Credits"
-        description="Review returned supplier stock, open vendor credits, and posted credit history."
+        description="Review returned supplier stock, open vendor credits, and posted credit history. Credits are created from posted receive-goods records so stock and bill links stay correct."
         actions={
           canCreate ? (
             <Button onClick={() => setCreateDialogOpen(true)} type="button">
@@ -196,17 +244,11 @@ export function PurchaseReturnsPageClient(): JSX.Element {
         }
       />
 
-      <Card>
-        <CardContent className="p-4 text-sm text-brand-mocha">
-          Vendor credits are created from posted receive-goods records so stock and bill links stay
-          correct.
-        </CardContent>
-      </Card>
-
       <PurchasingToolbar
         allowAllBranches={branchScope.canAccessAllBranches}
         branches={branchOptions}
         filters={filters}
+        noun="vendor credits"
         onFiltersChange={setFilters}
         resetBranchId={branchScope.defaultBranchId}
         statuses={returnStatuses}
@@ -256,32 +298,35 @@ export function PurchaseReturnsPageClient(): JSX.Element {
         />
       ) : null}
 
+      {/* A ten-column ledger has no honest phone layout. Below md the list is
+          cards carrying the same fields; the table takes over from md up. */}
       {!returnsQuery.isLoading && !returnsQuery.error && purchaseReturns.length > 0 ? (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <PurchaseReturnsTable
-              canCancel={canCancel}
-              canPost={canPost}
-              canReverse={canReverse}
-              onCancel={(purchaseReturn) => setPendingAction({ purchaseReturn, type: "cancel" })}
-              onPost={(purchaseReturn) => setPendingAction({ purchaseReturn, type: "post" })}
-              onReverse={setReversalReturn}
-              returns={purchaseReturns}
-            />
-            {returnsQuery.data?.pagination ? (
-              <PaginationBar
-                isFetching={returnsQuery.isFetching}
-                limit={returnsQuery.data.pagination.limit}
-                noun={{ one: "vendor credit", other: "vendor credits" }}
-                onPageChange={setPage}
-                page={returnsQuery.data.pagination.page}
-                total={returnsQuery.data.pagination.total}
-                totalPages={returnsQuery.data.pagination.totalPages}
-              />
-            ) : null}
-          </CardContent>
-        </Card>
+        <>
+          <div className="grid gap-4 md:hidden">
+            <PurchaseReturnsCardGrid {...listHandlers} />
+            {pagination ? <Card className="overflow-hidden">{pagination}</Card> : null}
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <PurchaseReturnsTable {...listHandlers} />
+              {pagination}
+            </CardContent>
+          </Card>
+        </>
       ) : null}
+
+      <PurchaseReturnDetailsDrawer
+        canCancel={canCancel}
+        canPost={canPost}
+        canReverse={canReverse}
+        canView={canView}
+        onCancel={askCancel}
+        onOpenChange={setDetailsOpen}
+        onPost={askPost}
+        onReverse={askReverse}
+        open={detailsOpen}
+        purchaseReturnId={detailsReturnId}
+      />
 
       <Dialog
         open={pendingAction !== null}
@@ -294,7 +339,7 @@ export function PurchaseReturnsPageClient(): JSX.Element {
             </DialogTitle>
             <DialogDescription>
               {pendingAction?.type === "post"
-                ? "Posting finalizes the vendor credit, creates purchase return stock movement, and posts accounting."
+                ? `Posting ${pendingAction.purchaseReturn.returnNumber} is final. It creates the purchase return stock movement and posts accounting.`
                 : "Only draft vendor credits can be cancelled."}
             </DialogDescription>
           </DialogHeader>

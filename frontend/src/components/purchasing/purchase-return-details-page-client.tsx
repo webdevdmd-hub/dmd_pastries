@@ -1,17 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
+import {
+  parsePurchaseReturnDetailTab,
+  type PurchaseReturnDetailTabKey,
+} from "@/components/purchasing/purchase-return-detail-tabs";
+import {
+  formatPurchaseReturnMoney,
+  PurchaseReturnDetailsPanel,
+} from "@/components/purchasing/purchase-return-details-panel";
 import { PurchaseReturnStatusBadge } from "@/components/purchasing/purchase-return-status-badge";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
 import { ReturnReversalDialog } from "@/components/shared/return-reversal-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -20,14 +28,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { usePermission } from "@/hooks/use-permission";
@@ -38,16 +38,6 @@ import {
   useReversePurchaseReturn,
 } from "@/hooks/use-purchasing";
 import { getErrorMessage } from "@/lib/api/client";
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
-}
-
-function formatDate(value: string | null): string {
-  return value
-    ? new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(new Date(value))
-    : "Not set";
-}
 
 type PendingAction = "post" | "cancel" | null;
 
@@ -70,12 +60,28 @@ export function PurchaseReturnDetailsPageClient({
     PERMISSIONS.purchasingReturnsReverse,
     PERMISSIONS.purchasingReturnsManage,
   ]);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [reverseDialogOpen, setReverseDialogOpen] = useState(false);
   const returnQuery = usePurchaseReturn(purchaseReturnId, canView);
   const postMutation = usePostPurchaseReturn();
   const cancelMutation = useCancelPurchaseReturn();
   const reverseMutation = useReversePurchaseReturn();
+
+  const activeTab = parsePurchaseReturnDetailTab(searchParams.get("tab"));
+
+  const changeTab = (tab: PurchaseReturnDetailTabKey): void => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (tab === "overview") {
+      next.delete("tab");
+    } else {
+      next.set("tab", tab);
+    }
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -89,7 +95,7 @@ export function PurchaseReturnDetailsPageClient({
     return (
       <PurchaseErrorState
         description={
-          returnQuery.error ? getErrorMessage(returnQuery.error) : "Purchase return not found."
+          returnQuery.error ? getErrorMessage(returnQuery.error) : "Vendor credit not found."
         }
         onRetry={() => {
           void returnQuery.refetch();
@@ -101,9 +107,6 @@ export function PurchaseReturnDetailsPageClient({
   const purchaseReturn = returnQuery.data;
   const isDraft = purchaseReturn.status === "draft";
   const isPosted = purchaseReturn.status === "posted";
-  const journalSearchValue = purchaseReturn.journalEntryNumber ?? purchaseReturn.journalEntryId;
-  const reversalJournalSearchValue =
-    purchaseReturn.reversalJournalEntryNumber ?? purchaseReturn.reversalJournalEntryId;
 
   const confirmAction = async (): Promise<void> => {
     if (!pendingAction) return;
@@ -139,245 +142,49 @@ export function PurchaseReturnDetailsPageClient({
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <div>
-        <Link
-          className="text-sm font-semibold text-brand-mocha hover:text-brand-espresso"
-          href={ROUTES.purchasingReturns}
-        >
-          Back to Purchase Returns
-        </Link>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <h1 className="text-4xl font-semibold text-brand-espresso">
-            {purchaseReturn.returnNumber}
-          </h1>
-          <PurchaseReturnStatusBadge status={purchaseReturn.status} />
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <Link
+            className="inline-flex items-center gap-1.5 text-cell text-foreground-muted transition-colors hover:text-foreground"
+            href={ROUTES.purchasingReturns}
+          >
+            Back to vendor credits
+          </Link>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <h1 className="font-mono text-page">{purchaseReturn.returnNumber}</h1>
+            <PurchaseReturnStatusBadge status={purchaseReturn.status} />
+          </div>
+          <p className="mt-1 text-meta text-foreground-muted">
+            {purchaseReturn.supplierName} · {purchaseReturn.branchName}
+          </p>
+          <p className="mt-2 text-kpi tabular-nums">
+            {formatPurchaseReturnMoney(purchaseReturn.returnTotal)}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
           {canPost && isDraft ? (
             <Button onClick={() => setPendingAction("post")} type="button">
-              Post Vendor Credit
+              Post vendor credit
             </Button>
           ) : null}
           {canCancel && isDraft ? (
             <Button onClick={() => setPendingAction("cancel")} type="button" variant="outline">
-              Cancel Draft
+              Cancel draft
             </Button>
           ) : null}
           {canReverse && isPosted ? (
             <Button onClick={() => setReverseDialogOpen(true)} type="button" variant="outline">
-              Reverse Vendor Credit
+              Reverse vendor credit
             </Button>
           ) : null}
         </div>
-        <p className="mt-2 text-sm text-brand-mocha">
-          {purchaseReturn.supplierName} - {purchaseReturn.branchName}
-        </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Return total</p>
-            <p className="text-2xl font-semibold text-brand-espresso">
-              {formatCurrency(purchaseReturn.returnTotal)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Applied credit</p>
-            <p className="text-2xl font-semibold text-brand-espresso">
-              {formatCurrency(purchaseReturn.appliedCreditAmount)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">{isDraft ? "Draft credit" : "Open credit"}</p>
-            <p className="text-2xl font-semibold text-brand-espresso">
-              {formatCurrency(
-                isDraft ? purchaseReturn.returnTotal : purchaseReturn.openCreditAmount,
-              )}
-            </p>
-            {isDraft ? (
-              <p className="mt-1 text-xs text-brand-mocha">
-                Open credit is AED 0.00 until this Vendor Credit is posted.
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Return date</p>
-            <p className="text-lg font-semibold text-brand-espresso">
-              {formatDate(purchaseReturn.returnDate)}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Linked receipt</p>
-            <Link
-              className="text-lg font-semibold text-brand-espresso hover:text-brand-mocha"
-              href={`${ROUTES.purchasingReceipts}/${purchaseReturn.purchaseReceiptId}`}
-            >
-              {purchaseReturn.purchaseReceiptNumber}
-            </Link>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Linked invoice</p>
-            {purchaseReturn.purchaseInvoiceId ? (
-              <Link
-                className="text-lg font-semibold text-brand-espresso hover:text-brand-mocha"
-                href={`${ROUTES.purchasingInvoices}/${purchaseReturn.purchaseInvoiceId}`}
-              >
-                {purchaseReturn.purchaseInvoiceNumber ?? "Bill number unavailable"}
-              </Link>
-            ) : (
-              <p className="text-lg font-semibold text-brand-espresso">Not linked</p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-brand-mocha">Journal reference</p>
-            {journalSearchValue ? (
-              <Link
-                className="text-lg font-semibold text-brand-espresso hover:text-brand-mocha"
-                href={`${ROUTES.accountingJournalEntries}?search=${journalSearchValue}`}
-              >
-                {purchaseReturn.journalEntryNumber ?? "View journal"}
-              </Link>
-            ) : isPosted ? (
-              <div className="space-y-1">
-                <p className="text-lg font-semibold text-danger-text">Journal missing</p>
-                <p className="text-xs text-danger-text">
-                  Posted without linked journal. Run purchase-return journal backfill.
-                </p>
-              </div>
-            ) : (
-              <p className="text-lg font-semibold text-brand-espresso">Not posted yet</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {purchaseReturn.status === "reversed" ||
-      purchaseReturn.reversalReturnNumber ||
-      purchaseReturn.originalReturnNumber ? (
-        <Card className="border-info/30 bg-info-tint/60">
-          <CardHeader>
-            <CardTitle>Reversal details</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-3">
-            <div>
-              <p className="text-sm text-brand-mocha">Original note</p>
-              <p className="font-semibold text-brand-espresso">
-                {purchaseReturn.originalReturnNumber ?? purchaseReturn.returnNumber}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-brand-mocha">Reversal note</p>
-              {purchaseReturn.reversalReturnId ? (
-                <Link
-                  className="font-semibold text-brand-espresso hover:text-brand-mocha"
-                  href={`${ROUTES.purchasingReturns}/${purchaseReturn.reversalReturnId}`}
-                >
-                  {purchaseReturn.reversalReturnNumber ?? purchaseReturn.reversalReturnId}
-                </Link>
-              ) : (
-                <p className="font-semibold text-brand-espresso">
-                  {purchaseReturn.reversalReturnNumber ?? "Not linked"}
-                </p>
-              )}
-            </div>
-            <div>
-              <p className="text-sm text-brand-mocha">Reversed by</p>
-              <p className="font-semibold text-brand-espresso">
-                {purchaseReturn.reversedByUserName ?? "System"}
-              </p>
-              <p className="text-xs text-brand-mocha">{formatDate(purchaseReturn.reversedAt)}</p>
-            </div>
-            <div className="md:col-span-2">
-              <p className="text-sm text-brand-mocha">Reason</p>
-              <p className="font-semibold text-brand-espresso">
-                {purchaseReturn.reversalReason ?? "No reversal reason returned."}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-brand-mocha">Reversal journal</p>
-              {reversalJournalSearchValue ? (
-                <Link
-                  className="font-semibold text-brand-espresso hover:text-brand-mocha"
-                  href={`${ROUTES.accountingJournalEntries}?search=${reversalJournalSearchValue}`}
-                >
-                  {purchaseReturn.reversalJournalEntryNumber ?? "View reversal journal"}
-                </Link>
-              ) : (
-                <p className="font-semibold text-brand-espresso">Not linked</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Returned items</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Reason</TableHead>
-                <TableHead>Line total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {purchaseReturn.items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-semibold text-brand-espresso">
-                    {item.itemNameSnapshot}
-                  </TableCell>
-                  <TableCell>{item.itemType}</TableCell>
-                  <TableCell>
-                    {item.quantity} {item.unitSymbol}
-                  </TableCell>
-                  <TableCell>{item.stockLocationName ?? "Default location"}</TableCell>
-                  <TableCell className="min-w-64 whitespace-normal">
-                    {item.reason ?? purchaseReturn.reason ?? "Not set"}
-                  </TableCell>
-                  <TableCell>{formatCurrency(item.lineTotal)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-card/85">
-        <CardHeader>
-          <CardTitle>Return reason</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-brand-mocha">{purchaseReturn.reason ?? "No reason added."}</p>
-          {purchaseReturn.supplierReferenceNumber ? (
-            <p className="mt-3 text-sm text-brand-mocha">
-              Supplier reference:{" "}
-              <span className="font-semibold text-brand-espresso">
-                {purchaseReturn.supplierReferenceNumber}
-              </span>
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
+      <PurchaseReturnDetailsPanel
+        activeTab={activeTab}
+        onTabChange={changeTab}
+        purchaseReturn={purchaseReturn}
+      />
 
       <Dialog
         open={pendingAction !== null}

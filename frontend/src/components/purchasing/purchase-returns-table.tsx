@@ -23,17 +23,29 @@ import {
 import { ROUTES } from "@/constants/routes";
 import type { PurchaseReturn } from "@/types/purchasing";
 
-function formatCurrency(value: number): string {
+export type PurchaseReturnsListProps = {
+  canCancel: boolean;
+  canPost: boolean;
+  canReverse: boolean;
+  onCancel: (purchaseReturn: PurchaseReturn) => void;
+  onPost: (purchaseReturn: PurchaseReturn) => void;
+  onReverse: (purchaseReturn: PurchaseReturn) => void;
+  /** Opens the note's details; the whole row is the target. */
+  onView: (purchaseReturn: PurchaseReturn) => void;
+  returns: PurchaseReturn[];
+};
+
+export function formatPurchaseReturnCurrency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
 }
 
-function formatDate(value: string | null): string {
+export function formatPurchaseReturnDay(value: string | null): string {
   return value
     ? new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(new Date(value))
     : "Not set";
 }
 
-function nextStepForReturn(purchaseReturn: PurchaseReturn): string {
+export function nextStepForReturn(purchaseReturn: PurchaseReturn): string {
   if (purchaseReturn.status === "draft") {
     return "Review and post vendor credit";
   }
@@ -49,21 +61,82 @@ function nextStepForReturn(purchaseReturn: PurchaseReturn): string {
   return "No action";
 }
 
-function creditDisplayForReturn(purchaseReturn: PurchaseReturn): {
+export function creditDisplayForReturn(purchaseReturn: PurchaseReturn): {
   helper: string | null;
   value: string;
 } {
   if (purchaseReturn.status === "draft") {
     return {
       helper: "Open after posting",
-      value: `Draft ${formatCurrency(purchaseReturn.returnTotal)}`,
+      value: `Draft ${formatPurchaseReturnCurrency(purchaseReturn.returnTotal)}`,
     };
   }
 
   return {
     helper: null,
-    value: formatCurrency(purchaseReturn.openCreditAmount),
+    value: formatPurchaseReturnCurrency(purchaseReturn.openCreditAmount),
   };
+}
+
+/**
+ * Actions only. Viewing is the row's own click, so "View details" no longer
+ * sits here; a reader with no rights sees no menu at all.
+ */
+export function PurchaseReturnActionsMenu({
+  canCancel,
+  canPost,
+  canReverse,
+  onCancel,
+  onPost,
+  onReverse,
+  purchaseReturn,
+}: Omit<PurchaseReturnsListProps, "onView" | "returns"> & {
+  purchaseReturn: PurchaseReturn;
+}): JSX.Element | null {
+  if (!canPost && !canCancel && !canReverse) {
+    return null;
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label={`Open actions for ${purchaseReturn.returnNumber}`}
+          size="icon"
+          type="button"
+          variant="ghost"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {canPost ? (
+          <DropdownMenuItem
+            disabled={purchaseReturn.status !== "draft"}
+            onSelect={() => onPost(purchaseReturn)}
+          >
+            Post vendor credit
+          </DropdownMenuItem>
+        ) : null}
+        {canCancel ? (
+          <DropdownMenuItem
+            disabled={purchaseReturn.status !== "draft"}
+            onSelect={() => onCancel(purchaseReturn)}
+          >
+            Cancel draft
+          </DropdownMenuItem>
+        ) : null}
+        {canReverse ? (
+          <DropdownMenuItem
+            disabled={purchaseReturn.status !== "posted"}
+            onSelect={() => onReverse(purchaseReturn)}
+          >
+            Reverse vendor credit
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 export function PurchaseReturnsTable({
@@ -73,30 +146,25 @@ export function PurchaseReturnsTable({
   onCancel,
   onPost,
   onReverse,
+  onView,
   returns,
-}: {
-  canCancel: boolean;
-  canPost: boolean;
-  canReverse: boolean;
-  onCancel: (purchaseReturn: PurchaseReturn) => void;
-  onPost: (purchaseReturn: PurchaseReturn) => void;
-  onReverse: (purchaseReturn: PurchaseReturn) => void;
-  returns: PurchaseReturn[];
-}): JSX.Element {
+}: PurchaseReturnsListProps): JSX.Element {
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="whitespace-nowrap">Vendor Credit</TableHead>
-          <TableHead className="whitespace-nowrap">Supplier</TableHead>
-          <TableHead className="whitespace-nowrap">Receipt</TableHead>
-          <TableHead className="whitespace-nowrap">Invoice</TableHead>
-          <TableHead className="whitespace-nowrap">Return Date</TableHead>
-          <TableHead className="whitespace-nowrap">Total</TableHead>
-          <TableHead className="whitespace-nowrap">Open Credit</TableHead>
-          <TableHead className="whitespace-nowrap">Status</TableHead>
-          <TableHead className="whitespace-nowrap">Next Step</TableHead>
-          <TableHead className="whitespace-nowrap">Actions</TableHead>
+          <TableHead>Vendor credit</TableHead>
+          <TableHead>Supplier</TableHead>
+          <TableHead>Receipt</TableHead>
+          <TableHead>Bill</TableHead>
+          <TableHead>Return date</TableHead>
+          <TableHead className="text-right">Total</TableHead>
+          <TableHead className="text-right">Open credit</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Next step</TableHead>
+          <TableHead>
+            <span className="sr-only">Actions</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -104,91 +172,69 @@ export function PurchaseReturnsTable({
           const creditDisplay = creditDisplayForReturn(purchaseReturn);
 
           return (
-            <TableRow key={purchaseReturn.id}>
-              <TableCell className="whitespace-nowrap">
-                <Link
-                  className="font-semibold text-brand-espresso"
-                  href={`${ROUTES.purchasingReturns}/${purchaseReturn.id}`}
+            // The row opens the drawer; the number is also a button so the
+            // keyboard has a focusable target for the same action.
+            <TableRow
+              className="cursor-pointer"
+              key={purchaseReturn.id}
+              onClick={() => onView(purchaseReturn)}
+            >
+              <TableCell>
+                <button
+                  className="rounded-sm font-mono font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onView(purchaseReturn);
+                  }}
+                  type="button"
                 >
                   {purchaseReturn.returnNumber}
-                </Link>
+                </button>
               </TableCell>
-              <TableCell className="whitespace-nowrap">{purchaseReturn.supplierName}</TableCell>
-              <TableCell className="whitespace-nowrap">
+              <TableCell>{purchaseReturn.supplierName}</TableCell>
+              {/* Cross-links stay links; they must not open the drawer. */}
+              <TableCell onClick={(event) => event.stopPropagation()}>
                 <Link
-                  className="text-brand-mocha hover:text-brand-espresso"
+                  className="font-mono text-foreground-muted hover:text-foreground"
                   href={`${ROUTES.purchasingReceipts}/${purchaseReturn.purchaseReceiptId}`}
                 >
                   {purchaseReturn.purchaseReceiptNumber}
                 </Link>
               </TableCell>
-              <TableCell className="whitespace-nowrap">
-                {purchaseReturn.purchaseInvoiceNumber}
+              <TableCell className="font-mono">
+                {purchaseReturn.purchaseInvoiceNumber ?? "—"}
               </TableCell>
-              <TableCell className="whitespace-nowrap">
-                {formatDate(purchaseReturn.returnDate)}
+              <TableCell className="tabular-nums">
+                {formatPurchaseReturnDay(purchaseReturn.returnDate)}
               </TableCell>
-              <TableCell className="whitespace-nowrap">
-                {formatCurrency(purchaseReturn.returnTotal)}
+              <TableCell className="text-right tabular-nums">
+                {formatPurchaseReturnCurrency(purchaseReturn.returnTotal)}
               </TableCell>
-              <TableCell className="whitespace-nowrap">
-                <div className="font-medium text-brand-espresso">{creditDisplay.value}</div>
-                {creditDisplay.helper ? (
-                  <div className="text-xs text-brand-mocha">{creditDisplay.helper}</div>
-                ) : null}
-              </TableCell>
-              <TableCell className="whitespace-nowrap">
-                <PurchaseReturnStatusBadge status={purchaseReturn.status} />
-              </TableCell>
-              <TableCell className="whitespace-normal min-w-56">
-                <span className="text-sm font-medium text-brand-mocha">
-                  {nextStepForReturn(purchaseReturn)}
+              <TableCell className="text-right">
+                <span className="grid gap-0.5">
+                  <span className="font-medium tabular-nums">{creditDisplay.value}</span>
+                  {creditDisplay.helper ? (
+                    <span className="text-meta text-foreground-muted">{creditDisplay.helper}</span>
+                  ) : null}
                 </span>
               </TableCell>
-              <TableCell className="whitespace-nowrap">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      aria-label={`Open actions for ${purchaseReturn.returnNumber}`}
-                      size="icon"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link href={`${ROUTES.purchasingReturns}/${purchaseReturn.id}`}>
-                        View details
-                      </Link>
-                    </DropdownMenuItem>
-                    {canPost ? (
-                      <DropdownMenuItem
-                        disabled={purchaseReturn.status !== "draft"}
-                        onSelect={() => onPost(purchaseReturn)}
-                      >
-                        Post vendor credit
-                      </DropdownMenuItem>
-                    ) : null}
-                    {canCancel ? (
-                      <DropdownMenuItem
-                        disabled={purchaseReturn.status !== "draft"}
-                        onSelect={() => onCancel(purchaseReturn)}
-                      >
-                        Cancel draft
-                      </DropdownMenuItem>
-                    ) : null}
-                    {canReverse ? (
-                      <DropdownMenuItem
-                        disabled={purchaseReturn.status !== "posted"}
-                        onSelect={() => onReverse(purchaseReturn)}
-                      >
-                        Reverse vendor credit
-                      </DropdownMenuItem>
-                    ) : null}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              <TableCell>
+                <PurchaseReturnStatusBadge status={purchaseReturn.status} />
+              </TableCell>
+              <TableCell className="min-w-56 whitespace-normal text-foreground-muted">
+                {nextStepForReturn(purchaseReturn)}
+              </TableCell>
+              {/* The menu must not also open the drawer. */}
+              <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+                <PurchaseReturnActionsMenu
+                  canCancel={canCancel}
+                  canPost={canPost}
+                  canReverse={canReverse}
+                  onCancel={onCancel}
+                  onPost={onPost}
+                  onReverse={onReverse}
+                  purchaseReturn={purchaseReturn}
+                />
               </TableCell>
             </TableRow>
           );
