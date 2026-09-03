@@ -2,9 +2,8 @@
 
 import type { JSX } from "react";
 
-import { Button } from "@/components/ui/button";
+import { FilterField, FilterToolbar } from "@/components/shared/filter-toolbar";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -20,6 +19,22 @@ type RecipesToolbarProps = {
   products: RecipeProductOption[];
 };
 
+const resetFilters: RecipeFilters = {
+  active: "all",
+  productId: "all",
+  search: "",
+  status: "all",
+};
+
+/** Search is visible in the toolbar, so it does not count toward the badge. */
+function countHiddenFilters(filters: RecipeFilters): number {
+  let count = 0;
+  if (filters.productId !== "all") count += 1;
+  if (filters.status !== "all") count += 1;
+  if (filters.active !== "all") count += 1;
+  return count;
+}
+
 export function RecipesToolbar({
   filters,
   onFiltersChange,
@@ -29,58 +44,63 @@ export function RecipesToolbar({
     onFiltersChange({ ...filters, ...patch });
   };
 
+  const hiddenFilterCount = countHiddenFilters(filters);
+
   return (
-    <div className="grid gap-3 rounded-3xl border border-brand-cappuccino bg-card/75 p-4 shadow-soft xl:grid-cols-[1.4fr_1fr_1fr_auto_auto]">
-      <Input
-        aria-label="Search recipes"
-        onChange={(event) => update({ search: event.target.value })}
-        placeholder="Search recipe, code, product..."
-        value={filters.search}
-      />
-      <Select onValueChange={(productId) => update({ productId })} value={filters.productId}>
-        <SelectTrigger aria-label="Filter by product">
-          <SelectValue placeholder="Product" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All products</SelectItem>
-          {products.map((product) => (
-            <SelectItem key={product.id} value={product.id}>
-              {product.productName}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select
-        onValueChange={(status) => update({ status: status as RecipeFilters["status"] })}
-        value={filters.status}
-      >
-        <SelectTrigger aria-label="Filter by status">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All statuses</SelectItem>
-          <SelectItem value="draft">Draft</SelectItem>
-          <SelectItem value="active">Active</SelectItem>
-          <SelectItem value="inactive">Inactive</SelectItem>
-          <SelectItem value="archived">Archived</SelectItem>
-        </SelectContent>
-      </Select>
-      <label className="flex items-center gap-2 rounded-xl border border-brand-cappuccino bg-brand-latte px-3 py-2 text-sm font-medium text-brand-espresso">
+    <FilterToolbar
+      hasAnyFilter={hiddenFilterCount > 0 || filters.search.trim().length > 0}
+      hiddenFilterCount={hiddenFilterCount}
+      hideDensityBelowMd
+      onReset={() => onFiltersChange(resetFilters)}
+      onSearchChange={(search) => update({ search })}
+      popoverTitle="Filter recipes"
+      searchAriaLabel="Search recipes"
+      searchPlaceholder="Search recipe, code, product..."
+      searchValue={filters.search}
+    >
+      <FilterField htmlFor="recipeFilterProduct" label="Product">
+        <Select onValueChange={(productId) => update({ productId })} value={filters.productId}>
+          <SelectTrigger id="recipeFilterProduct">
+            <SelectValue placeholder="Product" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All products</SelectItem>
+            {products.map((product) => (
+              <SelectItem key={product.id} value={product.id}>
+                {product.productName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FilterField>
+
+      <FilterField htmlFor="recipeFilterStatus" label="Status">
+        <Select
+          onValueChange={(status) => update({ status: status as RecipeFilters["status"] })}
+          value={filters.status}
+        >
+          <SelectTrigger id="recipeFilterStatus">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterField>
+
+      {/* Status and "active BOM" are different questions: a recipe can be
+          status-active and still not be the BOM manufacturing uses. */}
+      <label className="flex items-center gap-2.5 border-t border-border pt-3 text-cell font-medium">
         <Checkbox
           checked={filters.active === "true"}
           onCheckedChange={(checked) => update({ active: checked === true ? "true" : "all" })}
         />
-        Active only
+        Active BOM only
       </label>
-      <Button
-        onClick={() =>
-          onFiltersChange({ active: "all", productId: "all", search: "", status: "all" })
-        }
-        type="button"
-        variant="outline"
-      >
-        Reset
-      </Button>
-    </div>
+    </FilterToolbar>
   );
 }

@@ -9,6 +9,7 @@ import { AccessDeniedCard } from "@/components/recipes/access-denied-card";
 import { RecipeDetailsDrawer } from "@/components/recipes/recipe-details-drawer";
 import { RecipeFormPage } from "@/components/recipes/recipe-form-page";
 import { RecipeVersionDialog } from "@/components/recipes/recipe-version-dialog";
+import { RecipesCardGrid } from "@/components/recipes/recipes-card-grid";
 import { RecipesEmptyState } from "@/components/recipes/recipes-empty-state";
 import { RecipesErrorState } from "@/components/recipes/recipes-error-state";
 import { RecipesSummaryCards } from "@/components/recipes/recipes-summary-cards";
@@ -114,6 +115,26 @@ export function RecipesPageClient(): JSX.Element {
     }
   };
 
+  // A dialog on top of a sheet on top of the list is one layer too many, so
+  // the drawer closes before either confirmation opens.
+  const listHandlers = {
+    canManage,
+    onCreateVersion: (recipe: Recipe) => {
+      setDrawerRecipe(null);
+      setVersionRecipe(recipe);
+    },
+    onDelete: (recipe: Recipe) => {
+      setDrawerRecipe(null);
+      setPendingAction({ recipe, type: "delete" });
+    },
+    onStatusChange: (recipe: Recipe, status: RecipeStatus, isActive?: boolean) => {
+      setDrawerRecipe(null);
+      setPendingAction({ isActive, recipe, status, type: "status" });
+    },
+    onView: setDrawerRecipe,
+    recipes,
+  };
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
@@ -174,19 +195,16 @@ export function RecipesPageClient(): JSX.Element {
       ) : null}
 
       {!recipesQuery.isLoading && !recipesQuery.error && recipes.length > 0 ? (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <RecipesTable
-              canManage={canManage}
-              onCreateVersion={setVersionRecipe}
-              onDelete={(recipe) => setPendingAction({ recipe, type: "delete" })}
-              onStatusChange={(recipe, status, isActive) =>
-                setPendingAction({ isActive, recipe, status, type: "status" })
-              }
-              recipes={recipes}
-            />
-          </CardContent>
-        </Card>
+        <>
+          <div className="md:hidden">
+            <RecipesCardGrid {...listHandlers} />
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <RecipesTable {...listHandlers} />
+            </CardContent>
+          </Card>
+        </>
       ) : null}
 
       <RecipeDetailsDrawer

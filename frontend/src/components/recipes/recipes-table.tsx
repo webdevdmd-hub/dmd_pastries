@@ -1,10 +1,16 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 
-import { RecipeActionsMenu } from "@/components/recipes/recipe-actions-menu";
+import {
+  type RecipeActionHandlers,
+  RecipeActionsMenu,
+} from "@/components/recipes/recipe-actions-menu";
+import {
+  formatRecipeDate,
+  formatRecipeMoney,
+  recipeOutputLabel,
+} from "@/components/recipes/recipe-details-drawer";
 import { RecipeStatusBadge } from "@/components/recipes/recipe-status-badge";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,97 +21,79 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ROUTES } from "@/constants/routes";
-import type { Recipe, RecipeStatus } from "@/types/recipes";
+import type { Recipe } from "@/types/recipes";
 
-type RecipesTableProps = {
-  canManage: boolean;
-  onCreateVersion: (recipe: Recipe) => void;
-  onDelete: (recipe: Recipe) => void;
-  onStatusChange: (recipe: Recipe, status: RecipeStatus, isActive?: boolean) => void;
+export type RecipesListProps = RecipeActionHandlers & {
+  /** Opens the recipe's details; the whole row is the target. */
+  onView: (recipe: Recipe) => void;
   recipes: Recipe[];
 };
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
-}
-
-function formatDate(value: string): string {
-  return value
-    ? new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(new Date(value))
-    : "Not recorded";
-}
-
-function recipeOutputLabel(recipe: Recipe): string {
-  return recipe.productVariantName
-    ? `${recipe.productName} - ${recipe.productVariantName}`
-    : recipe.productName;
-}
-
-export function RecipesTable({
-  canManage,
-  onCreateVersion,
-  onDelete,
-  onStatusChange,
-  recipes,
-}: RecipesTableProps): JSX.Element {
-  const router = useRouter();
-
+/**
+ * Eight columns became seven.
+ *
+ * Status and Active were two columns carrying two badges about the same thing,
+ * so they share one cell. The "Output: parent product stock" line under every
+ * product name went to the drawer, where it is a labelled field rather than a
+ * sentence repeated down a column.
+ */
+export function RecipesTable({ onView, recipes, ...actions }: RecipesListProps): JSX.Element {
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Recipe</TableHead>
           <TableHead>Product</TableHead>
-          <TableHead>Yield</TableHead>
-          <TableHead>Cost per Unit</TableHead>
+          <TableHead className="text-right">Yield</TableHead>
+          <TableHead className="text-right">Cost per unit</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead>Active</TableHead>
-          <TableHead>Updated At</TableHead>
-          <TableHead>Actions</TableHead>
+          <TableHead>Updated</TableHead>
+          <TableHead>
+            <span className="sr-only">Actions</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {recipes.map((recipe) => (
-          <TableRow className={recipe.status === "archived" ? "opacity-65" : ""} key={recipe.id}>
+          // The row opens the drawer; the name is also a button so the keyboard
+          // has a focusable target for the same action.
+          <TableRow
+            className={`cursor-pointer ${recipe.status === "archived" ? "opacity-65" : ""}`}
+            key={recipe.id}
+            onClick={() => onView(recipe)}
+          >
             <TableCell>
-              <Link className="grid gap-1" href={`${ROUTES.recipes}/${recipe.id}`}>
-                <span className="font-semibold text-brand-espresso">{recipe.recipeName}</span>
-                <span className="text-xs text-brand-mocha">
+              <button
+                className="grid gap-0.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onView(recipe);
+                }}
+                type="button"
+              >
+                <span className="font-medium">{recipe.recipeName}</span>
+                <span className="font-mono text-meta text-foreground-muted">
                   {recipe.recipeCode} · v{recipe.versionNumber}
                 </span>
-              </Link>
+              </button>
             </TableCell>
-            <TableCell>
-              <div className="grid gap-1">
-                <span>{recipeOutputLabel(recipe)}</span>
-                <span className="text-xs text-brand-mocha">
-                  Output: {recipe.productVariantName ? "Variant stock" : "Parent product stock"}
-                </span>
-              </div>
-            </TableCell>
-            <TableCell>
+            <TableCell>{recipeOutputLabel(recipe)}</TableCell>
+            <TableCell className="text-right tabular-nums">
               {recipe.batchYieldQuantity} {recipe.batchYieldUnitName}
             </TableCell>
-            <TableCell>{formatCurrency(recipe.costPerYieldUnit)}</TableCell>
-            <TableCell>
-              <RecipeStatusBadge status={recipe.status} />
+            <TableCell className="text-right font-medium tabular-nums">
+              {formatRecipeMoney(recipe.costPerYieldUnit)}
             </TableCell>
             <TableCell>
-              <Badge variant={recipe.isActive ? "default" : "outline"}>
-                {recipe.isActive ? "Active BOM" : "Not active"}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <RecipeStatusBadge status={recipe.status} />
+                {recipe.isActive ? <Badge>Active BOM</Badge> : null}
+              </div>
             </TableCell>
-            <TableCell>{formatDate(recipe.updatedAt)}</TableCell>
-            <TableCell>
-              <RecipeActionsMenu
-                canManage={canManage}
-                onCreateVersion={onCreateVersion}
-                onDelete={onDelete}
-                onStatusChange={onStatusChange}
-                onView={(selectedRecipe) => router.push(`${ROUTES.recipes}/${selectedRecipe.id}`)}
-                recipe={recipe}
-              />
+            <TableCell className="tabular-nums">{formatRecipeDate(recipe.updatedAt)}</TableCell>
+            {/* The menu must not also open the drawer. */}
+            <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+              <RecipeActionsMenu {...actions} recipe={recipe} />
             </TableCell>
           </TableRow>
         ))}
