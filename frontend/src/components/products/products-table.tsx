@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clock3, PackageSearch, X } from "lucide-react";
+import { Check, PackageSearch, X } from "lucide-react";
 import type { JSX } from "react";
 
 import { ProductActionsMenu } from "@/components/products/product-actions-menu";
@@ -24,7 +24,7 @@ export type ProductInventorySummary = {
   unitSymbol: string;
 };
 
-type ProductsTableProps = {
+export type ProductsListProps = {
   canManage: boolean;
   inventoryAvailable: boolean;
   inventoryByProduct: ReadonlyMap<string, ProductInventorySummary>;
@@ -32,11 +32,12 @@ type ProductsTableProps = {
   onEdit: (product: Product) => void;
   onManageVariants: (product: Product) => void;
   onStatusChange: (product: Product, status: ProductStatus) => void;
+  /** Opens the product's details; the whole row is the target. */
   onView: (product: Product) => void;
   products: Product[];
 };
 
-function initials(value: string): string {
+export function productInitials(value: string): string {
   return value
     .split(" ")
     .filter(Boolean)
@@ -45,7 +46,7 @@ function initials(value: string): string {
     .join("");
 }
 
-function formatCurrency(value: number): string {
+export function formatProductCurrency(value: number): string {
   return new Intl.NumberFormat("en-AE", {
     currency: "AED",
     maximumFractionDigits: 2,
@@ -65,11 +66,11 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
-function latestPurchasePrice(product: Product): number | null {
+export function latestPurchasePrice(product: Product): number | null {
   return product.lastPurchaseCost ?? product.costPrice;
 }
 
-function QuantityValue({
+export function QuantityValue({
   inventoryAvailable,
   product,
   summary,
@@ -79,25 +80,25 @@ function QuantityValue({
   summary: ProductInventorySummary | undefined;
 }): JSX.Element {
   if (!product.isStockTracked) {
-    return <span className="text-xs text-workspace-muted">Not tracked</span>;
+    return <span className="text-meta text-foreground-muted">Not tracked</span>;
   }
   if (!inventoryAvailable) {
-    return <span className="text-workspace-muted">-</span>;
+    return <span className="text-foreground-muted">—</span>;
   }
 
   return (
-    <div>
-      <p className="font-semibold text-brand-espresso">
+    <span className="grid gap-0.5">
+      <span className="font-medium tabular-nums">
         {formatQuantity(summary?.currentQuantity ?? 0)} {summary?.unitSymbol ?? product.unitName}
-      </p>
-      <p className="mt-0.5 text-xs text-workspace-muted">
+      </span>
+      <span className="text-meta tabular-nums text-foreground-muted">
         {formatQuantity(summary?.availableQuantity ?? 0)} available
-      </p>
-    </div>
+      </span>
+    </span>
   );
 }
 
-function Availability({ product }: { product: Product }): JSX.Element {
+export function ProductAvailability({ product }: { product: Product }): JSX.Element {
   const items = [
     { active: product.isPurchasable, label: "Purchase" },
     { active: product.isSellable, label: "Sell" },
@@ -108,7 +109,7 @@ function Availability({ product }: { product: Product }): JSX.Element {
     <div className="flex flex-wrap gap-1">
       {items.map((item) => (
         <span
-          className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[0.68rem] font-medium ${
+          className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium ${
             item.active
               ? "border-money/30 bg-money-tint text-money-text"
               : "border-border bg-muted text-foreground-muted"
@@ -133,189 +134,111 @@ export function ProductsTable({
   onStatusChange,
   onView,
   products,
-}: ProductsTableProps): JSX.Element {
+}: ProductsListProps): JSX.Element {
   return (
-    <div>
-      <div className="grid gap-2 p-3 md:hidden">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Product</TableHead>
+          <TableHead className="text-right">Current quantity</TableHead>
+          <TableHead className="text-right">Latest purchase</TableHead>
+          <TableHead className="text-right">Sale price</TableHead>
+          <TableHead>Availability</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Updated</TableHead>
+          <TableHead>
+            <span className="sr-only">Actions</span>
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {products.map((product) => {
           const inventory = inventoryByProduct.get(product.id);
           const purchasePrice = latestPurchasePrice(product);
 
           return (
-            <article
-              className="rounded-2xl border border-brand-cappuccino bg-card p-4"
-              key={product.id}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
+            // The row opens the drawer; the name is also a button so the
+            // keyboard has a focusable target for the same action.
+            <TableRow className="cursor-pointer" key={product.id} onClick={() => onView(product)}>
+              <TableCell>
+                <button
+                  className="flex items-center gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onView(product);
+                  }}
+                  type="button"
+                >
                   <Avatar className="h-10 w-10">
                     <AvatarImage
                       alt={product.productName}
                       src={getProductImagePreviewUrl(product.imageFileId) ?? product.imageUrl ?? ""}
                     />
                     <AvatarFallback className="bg-brand-cappuccino text-brand-espresso">
-                      {initials(product.productName)}
+                      {productInitials(product.productName)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-brand-espresso">
-                      {product.productName}
-                    </p>
-                    <p className="truncate text-xs text-workspace-muted">
-                      {product.productCode} / {product.categoryName}
-                    </p>
-                  </div>
-                </div>
+                  <span className="grid gap-0.5">
+                    <span className="font-medium">{product.productName}</span>
+                    <span className="text-meta text-foreground-muted">
+                      <span className="font-mono">{product.productCode}</span> ·{" "}
+                      {product.categoryName} · {product.unitName}
+                    </span>
+                    {product.variants.length > 0 ? (
+                      <span className="inline-flex items-center gap-1 text-meta tabular-nums text-foreground-muted">
+                        <PackageSearch className="h-3.5 w-3.5" />
+                        {product.variants.length} variants
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              </TableCell>
+              <TableCell className="text-right">
+                <QuantityValue
+                  inventoryAvailable={inventoryAvailable}
+                  product={product}
+                  summary={inventory}
+                />
+              </TableCell>
+              <TableCell className="text-right">
+                <span className="grid gap-0.5">
+                  <span className="font-medium tabular-nums">
+                    {purchasePrice === null ? "—" : formatProductCurrency(purchasePrice)}
+                  </span>
+                  <span className="text-meta tabular-nums text-foreground-muted">
+                    {product.lastPurchaseDate
+                      ? formatDate(product.lastPurchaseDate)
+                      : "No receipt yet"}
+                  </span>
+                </span>
+              </TableCell>
+              <TableCell className="text-right font-medium tabular-nums">
+                {formatProductCurrency(product.salePrice)}
+              </TableCell>
+              <TableCell>
+                <ProductAvailability product={product} />
+              </TableCell>
+              <TableCell>
+                <ProductStatusBadge status={product.status} />
+              </TableCell>
+              <TableCell className="tabular-nums text-foreground-muted">
+                {formatDate(product.updatedAt)}
+              </TableCell>
+              {/* The menu must not also open the drawer. */}
+              <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                 <ProductActionsMenu
                   canManage={canManage}
                   onDelete={onDelete}
                   onEdit={onEdit}
                   onManageVariants={onManageVariants}
                   onStatusChange={onStatusChange}
-                  onView={onView}
                   product={product}
                 />
-              </div>
-
-              <div className="mt-4 grid grid-cols-3 gap-3 border-y border-brand-cappuccino/70 py-3 text-sm">
-                <div>
-                  <p className="text-[0.68rem] font-semibold uppercase text-workspace-muted">
-                    Current qty
-                  </p>
-                  <div className="mt-1">
-                    <QuantityValue
-                      inventoryAvailable={inventoryAvailable}
-                      product={product}
-                      summary={inventory}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-[0.68rem] font-semibold uppercase text-workspace-muted">
-                    Latest purchase
-                  </p>
-                  <p className="mt-1 font-semibold text-brand-espresso">
-                    {purchasePrice === null ? "-" : formatCurrency(purchasePrice)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[0.68rem] font-semibold uppercase text-workspace-muted">
-                    Sale price
-                  </p>
-                  <p className="mt-1 font-semibold text-brand-espresso">
-                    {formatCurrency(product.salePrice)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <Availability product={product} />
-                <ProductStatusBadge status={product.status} />
-              </div>
-            </article>
+              </TableCell>
+            </TableRow>
           );
         })}
-      </div>
-
-      <div className="hidden overflow-x-auto md:block">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="min-w-[260px]">Product</TableHead>
-              <TableHead className="min-w-[150px]">Current quantity</TableHead>
-              <TableHead className="min-w-[145px]">Latest purchase</TableHead>
-              <TableHead>Sale price</TableHead>
-              <TableHead>Availability</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Updated</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {products.map((product) => {
-              const inventory = inventoryByProduct.get(product.id);
-              const purchasePrice = latestPurchasePrice(product);
-
-              return (
-                <TableRow className="align-middle" key={product.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage
-                          alt={product.productName}
-                          src={
-                            getProductImagePreviewUrl(product.imageFileId) ?? product.imageUrl ?? ""
-                          }
-                        />
-                        <AvatarFallback className="bg-brand-cappuccino text-brand-espresso">
-                          {initials(product.productName)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-brand-espresso">
-                          {product.productName}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs text-workspace-muted">
-                          {product.productCode} / {product.categoryName} / {product.unitName}
-                        </p>
-                        {product.variants.length > 0 ? (
-                          <p className="mt-1 inline-flex items-center gap-1 text-xs text-workspace-muted">
-                            <PackageSearch className="h-3.5 w-3.5" />
-                            {product.variants.length} variants
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <QuantityValue
-                      inventoryAvailable={inventoryAvailable}
-                      product={product}
-                      summary={inventory}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <p className="font-semibold text-brand-espresso">
-                      {purchasePrice === null ? "-" : formatCurrency(purchasePrice)}
-                    </p>
-                    <p className="mt-0.5 text-xs text-workspace-muted">
-                      {product.lastPurchaseDate
-                        ? formatDate(product.lastPurchaseDate)
-                        : "No receipt yet"}
-                    </p>
-                  </TableCell>
-                  <TableCell className="font-semibold text-brand-espresso">
-                    {formatCurrency(product.salePrice)}
-                  </TableCell>
-                  <TableCell>
-                    <Availability product={product} />
-                  </TableCell>
-                  <TableCell>
-                    <ProductStatusBadge status={product.status} />
-                  </TableCell>
-                  <TableCell>
-                    <span className="inline-flex items-center gap-1 text-sm text-workspace-muted">
-                      <Clock3 className="h-3.5 w-3.5" />
-                      {formatDate(product.updatedAt)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <ProductActionsMenu
-                      canManage={canManage}
-                      onDelete={onDelete}
-                      onEdit={onEdit}
-                      onManageVariants={onManageVariants}
-                      onStatusChange={onStatusChange}
-                      onView={onView}
-                      product={product}
-                    />
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
+      </TableBody>
+    </Table>
   );
 }

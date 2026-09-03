@@ -15,9 +15,14 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ProductsAccessDeniedCard } from "@/components/products/access-denied-card";
+import {
+  DEFAULT_PRODUCT_DETAIL_TAB,
+  type ProductDetailTabKey,
+} from "@/components/products/product-detail-tabs";
 import { ProductDetailsDrawer } from "@/components/products/product-details-drawer";
 import { ProductFormDialog } from "@/components/products/product-form-dialog";
 import { ProductVariantFormDialog } from "@/components/products/product-variant-form-dialog";
+import { ProductsCardGrid } from "@/components/products/products-card-grid";
 import { ProductsTable } from "@/components/products/products-table";
 import { ProductsTableSkeleton } from "@/components/products/products-table-skeleton";
 import { ProductsToolbar } from "@/components/products/products-toolbar";
@@ -173,6 +178,7 @@ export function ProductsPageClient(): JSX.Element {
   const [filters, setFilters] = useState<ProductListFilters>(searchParamFilters);
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsTab, setDetailsTab] = useState<ProductDetailTabKey>(DEFAULT_PRODUCT_DETAIL_TAB);
   const [variantOpen, setVariantOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
@@ -316,6 +322,26 @@ export function ProductsPageClient(): JSX.Element {
     return <ProductsAccessDeniedCard />;
   }
 
+  const openCreate = (): void => {
+    setSelectedProduct(null);
+    setFormOpen(true);
+  };
+
+  const openDetails = (product: Product, tab: ProductDetailTabKey = "overview"): void => {
+    setSelectedProduct(product);
+    setDetailsTab(tab);
+    setDetailsOpen(true);
+  };
+
+  const openEdit = (product: Product): void => {
+    // The drawer may be open underneath; a form on top of a sheet on top of
+    // the list is one layer too many, so the drawer closes first. Closing or
+    // saving the form then lands back on the list.
+    setDetailsOpen(false);
+    setSelectedProduct(product);
+    setFormOpen(true);
+  };
+
   const submitProductCreate = async (payload: CreateProductPayload): Promise<void> => {
     try {
       await createProductMutation.mutateAsync(payload);
@@ -405,18 +431,25 @@ export function ProductsPageClient(): JSX.Element {
     }
   };
 
+  const listHandlers = {
+    canManage: canManageProducts,
+    inventoryAvailable: canViewInventory && inventoryQuery.isSuccess,
+    inventoryByProduct,
+    onDelete: (product: Product) => setConfirmState({ action: "delete", product }),
+    onEdit: openEdit,
+    onManageVariants: (product: Product) => openDetails(product, "variants"),
+    onStatusChange: (product: Product, status: ProductStatus) =>
+      setConfirmState({ action: "status", nextStatus: status, product }),
+    onView: (product: Product) => openDetails(product),
+    products: list,
+  };
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
         actions={
           canCreateProducts ? (
-            <Button
-              onClick={() => {
-                setSelectedProduct(null);
-                setFormOpen(true);
-              }}
-              type="button"
-            >
+            <Button onClick={openCreate} type="button">
               <PlusCircle className="h-4 w-4" />
               Add Product
             </Button>
@@ -426,7 +459,9 @@ export function ProductsPageClient(): JSX.Element {
         title="Products"
       />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {/* Two across on a phone, four from xl: four stacked cards filled a
+          screen before the first product was visible. */}
+      <section className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
         {[
           { icon: PackageCheck, label: "Catalog records", value: stats.total },
           { icon: Eye, label: "Active products", value: stats.active },
@@ -436,7 +471,7 @@ export function ProductsPageClient(): JSX.Element {
             value:
               canViewInventory && inventoryQuery.isSuccess
                 ? formatQuantity(stats.currentQuantity)
-                : "-",
+                : "—",
           },
           {
             icon: CircleDollarSign,
@@ -445,12 +480,12 @@ export function ProductsPageClient(): JSX.Element {
           },
         ].map((item) => (
           <Card className="bg-card/80" key={item.label}>
-            <CardContent className="flex items-center justify-between p-6">
-              <div>
-                <p className="text-sm text-brand-mocha">{item.label}</p>
+            <CardContent className="flex items-center justify-between gap-2 p-4 md:p-6">
+              <div className="min-w-0">
+                <p className="text-cell leading-tight text-brand-mocha">{item.label}</p>
                 <p className="mt-2 text-kpi tabular-nums text-foreground">{item.value}</p>
               </div>
-              <div className="rounded-2xl bg-brand-cappuccino/35 p-3 text-brand-mocha">
+              <div className="hidden shrink-0 rounded-2xl bg-brand-cappuccino/35 p-3 text-brand-mocha sm:block">
                 <item.icon className="h-6 w-6" />
               </div>
             </CardContent>
@@ -463,8 +498,8 @@ export function ProductsPageClient(): JSX.Element {
           <CardContent className="p-0">
             <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-semibold text-brand-espresso">Price suggestions</p>
-                <p className="text-xs text-brand-mocha">
+                <p className="text-cell font-medium text-brand-espresso">Price suggestions</p>
+                <p className="text-meta text-brand-mocha">
                   Review cost changes for active sellable POS products before updating prices.
                 </p>
               </div>
@@ -500,30 +535,31 @@ export function ProductsPageClient(): JSX.Element {
                       }}
                     />
                     <div>
-                      <p className="font-semibold text-brand-espresso">
+                      <p className="font-medium text-brand-espresso">
                         {suggestion.productName}
                         {suggestion.variantName ? ` / ${suggestion.variantName}` : ""}
                       </p>
-                      <p className="text-xs text-brand-mocha">
+                      <p className="text-meta text-brand-mocha">
                         {suggestion.sourceNumber ?? suggestion.sourceType} /{" "}
                         {suggestion.pricingType} {suggestion.pricingPercent}%
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-brand-mocha">Cost</p>
-                      <p className="font-medium text-brand-espresso">
+                      <p className="text-meta text-brand-mocha">Cost</p>
+                      <p className="font-medium tabular-nums text-brand-espresso">
                         {formatMoney(suggestion.currentCost)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-brand-mocha">Current POS price</p>
-                      <p className="font-medium text-brand-espresso">
+                      <p className="text-meta text-brand-mocha">Current POS price</p>
+                      <p className="font-medium tabular-nums text-brand-espresso">
                         {formatMoney(suggestion.currentSalePrice)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-brand-mocha">Suggested price</p>
+                      <p className="text-meta text-brand-mocha">Suggested price</p>
                       <Input
+                        className="tabular-nums"
                         inputMode="decimal"
                         onChange={(event) =>
                           setSuggestionPrices((current) => ({
@@ -582,11 +618,8 @@ export function ProductsPageClient(): JSX.Element {
           }}
         />
       ) : null}
-      {/* Empty and filtered were one branch: `list.length === 0` rendered the empty
-          state whether the catalogue was genuinely empty or a search had simply
-          excluded everything. Those need opposite actions - "Add product" is wrong
-          when 214 products exist and the user typed "sourd" - so they are now
-          separate. DESIGN.md 8. */}
+      {/* Empty and filtered need opposite actions: "Add product" is wrong when
+          214 products exist and the user typed "sourd". DESIGN.md 8. */}
       {!productsQuery.isLoading && !productsQuery.error && list.length === 0 && hasActiveFilters ? (
         <FilteredState
           noun="products"
@@ -602,82 +635,58 @@ export function ProductsPageClient(): JSX.Element {
       list.length === 0 &&
       !hasActiveFilters ? (
         <EmptyState
-          action={
-            canCreateProducts
-              ? {
-                  label: "Add product",
-                  onClick: () => {
-                    setSelectedProduct(null);
-                    setFormOpen(true);
-                  },
-                }
-              : undefined
-          }
+          action={canCreateProducts ? { label: "Add product", onClick: openCreate } : undefined}
           description="Products are what the counter sells and what stock is counted against. Add one to give it a price, a category and POS visibility."
           icon={PackagePlus}
           title="No products yet"
         />
       ) : null}
-      {!productsQuery.isLoading && !productsQuery.error && list.length > 0 ? (
-        <Card className="overflow-hidden bg-card/80">
-          <CardContent className="p-0">
-            <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-brand-espresso">Product catalog</p>
-                <p className="text-xs text-brand-mocha">
-                  Showing {list.length} of {productsQuery.data?.total ?? list.length} records
-                </p>
-              </div>
-              <p className="text-xs text-brand-mocha">
-                Page {filters.page} of {totalPages}
-              </p>
-            </div>
-            <ProductsTable
-              canManage={canManageProducts}
-              inventoryAvailable={canViewInventory && inventoryQuery.isSuccess}
-              inventoryByProduct={inventoryByProduct}
-              onDelete={(product) => setConfirmState({ action: "delete", product })}
-              onEdit={(product) => {
-                setSelectedProduct(product);
-                setFormOpen(true);
-              }}
-              onManageVariants={(product) => {
-                setSelectedProduct(product);
-                setDetailsOpen(true);
-              }}
-              onStatusChange={(product, status) =>
-                setConfirmState({ action: "status", nextStatus: status, product })
-              }
-              onView={(product) => {
-                setSelectedProduct(product);
-                setDetailsOpen(true);
-              }}
-              products={list}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
 
-      <div className="flex flex-col gap-3 rounded-3xl border border-brand-cappuccino bg-card/75 p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
-        <Button
-          disabled={filters.page <= 1}
-          onClick={() => setFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
-          variant="outline"
-        >
-          Previous
-        </Button>
-        <p className="text-center text-sm text-brand-mocha">
-          Page <span className="font-semibold text-brand-espresso">{filters.page}</span> of{" "}
-          <span className="font-semibold text-brand-espresso">{totalPages}</span>
-        </p>
-        <Button
-          disabled={(productsQuery.data?.items.length ?? 0) < filters.limit}
-          onClick={() => setFilters((prev) => ({ ...prev, page: prev.page + 1 }))}
-          variant="outline"
-        >
-          Next
-        </Button>
-      </div>
+      {/* An eight-column catalogue has no honest phone layout. Below md the
+          list is cards carrying the same fields; the table takes over from md
+          up, with the same paging strip under both. */}
+      {!productsQuery.isLoading && !productsQuery.error && list.length > 0 ? (
+        <>
+          <div className="md:hidden">
+            <ProductsCardGrid {...listHandlers} />
+          </div>
+          <Card className="hidden overflow-hidden bg-card/80 md:block">
+            <CardContent className="p-0">
+              <ProductsTable {...listHandlers} />
+            </CardContent>
+          </Card>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted px-4 py-2.5">
+            <p className="text-meta tabular-nums text-foreground-muted">
+              Showing {list.length} of {productsQuery.data?.total ?? list.length} products
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                disabled={filters.page <= 1}
+                onClick={() =>
+                  setFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))
+                }
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                Previous
+              </Button>
+              <span className="text-meta tabular-nums text-foreground-muted">
+                Page {filters.page} of {totalPages}
+              </span>
+              <Button
+                disabled={(productsQuery.data?.items.length ?? 0) < filters.limit}
+                onClick={() => setFilters((prev) => ({ ...prev, page: prev.page + 1 }))}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </>
+      ) : null}
 
       <ProductFormDialog
         onClose={() => {
@@ -694,6 +703,7 @@ export function ProductsPageClient(): JSX.Element {
 
       <ProductDetailsDrawer
         canManage={canManageProducts}
+        initialTab={detailsTab}
         onAddVariant={() => {
           setSelectedVariant(null);
           setVariantOpen(true);
@@ -707,6 +717,7 @@ export function ProductsPageClient(): JSX.Element {
             .then(() => toast.success("Variant deleted."))
             .catch((error: unknown) => toast.error(getErrorMessage(error)));
         }}
+        onEdit={openEdit}
         onEditVariant={(variant) => {
           setSelectedVariant(variant);
           setVariantOpen(true);
@@ -742,7 +753,7 @@ export function ProductsPageClient(): JSX.Element {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={() => setConfirmState(null)} variant="outline">
+            <Button onClick={() => setConfirmState(null)} type="button" variant="outline">
               Cancel
             </Button>
             <Button
@@ -782,6 +793,7 @@ export function ProductsPageClient(): JSX.Element {
                     .catch((error: unknown) => toast.error(getErrorMessage(error)));
                 }
               }}
+              type="button"
             >
               {confirmState?.action === "delete" ? "Delete" : "Confirm"}
             </Button>
@@ -791,7 +803,7 @@ export function ProductsPageClient(): JSX.Element {
 
       {referenceDataQuery.error ? (
         <Card className="border-warning/30 bg-warning-tint/80">
-          <CardContent className="p-4 text-sm text-warning-text">
+          <CardContent className="p-4 text-cell text-warning-text">
             <div className="inline-flex items-center gap-2">
               <Box className="h-4 w-4" />
               Unable to load categories/units/tax rates. Product form options may be limited.

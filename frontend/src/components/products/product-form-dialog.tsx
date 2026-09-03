@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { type FormTab, FormTabs } from "@/components/shared/form-tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -99,6 +100,8 @@ const PRODUCT_FORM_STEP_FIELDS: readonly (readonly (keyof ProductSchema)[])[] = 
 ];
 
 const LAST_PRODUCT_FORM_STEP = PRODUCT_FORM_STEPS.length - 1;
+
+const PRODUCT_FORM_TABPANEL_ID = "product-form-tabpanel";
 
 function stepForField(field: keyof ProductSchema): number {
   const index = PRODUCT_FORM_STEP_FIELDS.findIndex((fields) => fields.includes(field));
@@ -214,20 +217,21 @@ export function ProductFormDialog({
     setSelectedImage(null);
   }, [defaultItemStructure, defaultProductType, form, product]);
 
-  // Always start the wizard on the first step whenever the dialog is opened.
+  // Every opening starts on Identity, whichever tab the last one closed on.
   useEffect(() => {
     if (open) {
       setStep(0);
     }
   }, [open]);
 
-  const goToNextStep = async (): Promise<void> => {
-    const stepFields = PRODUCT_FORM_STEP_FIELDS[step] ?? [];
-    const isStepValid = await form.trigger([...stepFields]);
-    if (isStepValid) {
-      setStep((current) => Math.min(current + 1, LAST_PRODUCT_FORM_STEP));
-    }
-  };
+  // Each tab badges the fields with errors it holds, so a problem on a tab
+  // the user is not looking at is not a silent no-op.
+  const errorFields = Object.keys(form.formState.errors) as (keyof ProductSchema)[];
+  const tabs: FormTab<string>[] = PRODUCT_FORM_STEPS.map((formStep, index) => ({
+    key: String(index),
+    label: formStep.label,
+    badge: errorFields.filter((field) => stepForField(field) === index).length,
+  }));
 
   useEffect(() => {
     const categoryId = form.getValues("categoryId");
@@ -417,57 +421,15 @@ export function ProductFormDialog({
 
   return (
     <Dialog onOpenChange={(nextOpen) => !nextOpen && onClose()} open={open}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90dvh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b border-border px-6 pb-4 pt-6">
           <DialogTitle>{product ? "Edit product" : "Add product"}</DialogTitle>
           <DialogDescription>
             Set the catalog identity, pricing, POS visibility, and stock behavior for this item.
           </DialogDescription>
         </DialogHeader>
-        <nav aria-label="Product form steps" className="flex items-stretch gap-2">
-          {PRODUCT_FORM_STEPS.map((formStep, index) => {
-            const isActive = index === step;
-            const isComplete = index < step;
-
-            return (
-              <button
-                aria-current={isActive ? "step" : undefined}
-                className={cn(
-                  "flex flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
-                  isActive
-                    ? "border-brand-caramel bg-brand-latte"
-                    : "border-brand-cappuccino/60 hover:bg-brand-latte/50",
-                )}
-                key={formStep.label}
-                onClick={() => setStep(index)}
-                type="button"
-              >
-                <span
-                  className={cn(
-                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                    isActive
-                      ? "bg-brand-caramel text-primary-foreground"
-                      : isComplete
-                        ? "bg-brand-mocha text-primary-foreground"
-                        : "bg-brand-cappuccino/60 text-brand-espresso",
-                  )}
-                >
-                  {index + 1}
-                </span>
-                <span className="hidden min-w-0 sm:block">
-                  <span className="block truncate text-sm font-semibold text-brand-espresso">
-                    {formStep.label}
-                  </span>
-                  <span className="block truncate text-xs text-brand-mocha">
-                    {formStep.description}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </nav>
         <form
-          className="flex flex-col gap-4"
+          className="flex min-h-0 flex-1 flex-col"
           onSubmit={(event) => {
             void form.handleSubmit(
               (values) => {
@@ -479,423 +441,428 @@ export function ProductFormDialog({
             )(event);
           }}
         >
-          <Card className={cn(step === 0 ? undefined : "hidden")}>
-            <CardContent className="p-4">
-              <div className="mb-4">
-                <h3 className="font-semibold text-brand-espresso">Catalog identity</h3>
-                <p className="text-sm text-brand-mocha">
-                  Use clear names and category mapping so billing staff can find products quickly.
-                </p>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="productName">Product name</Label>
-                  <Input id="productName" {...form.register("productName")} />
-                  <FieldError message={form.formState.errors.productName?.message} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="product-form-product-type">Product type</Label>
-                  <Select
-                    onValueChange={(value) =>
-                      handleProductTypeChange(value as ProductSchema["productType"])
-                    }
-                    value={form.watch("productType")}
-                  >
-                    <SelectTrigger id="product-form-product-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PRODUCT_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {PRODUCT_TYPE_LABELS[type]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="product-form-item-structure">Item structure</Label>
-                  <Select
-                    onValueChange={(value) =>
-                      form.setValue("itemStructure", value as ProductSchema["itemStructure"])
-                    }
-                    value={form.watch("itemStructure")}
-                  >
-                    <SelectTrigger id="product-form-item-structure">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ITEM_STRUCTURES.map((itemStructure) => (
-                        <SelectItem key={itemStructure} value={itemStructure}>
-                          {ITEM_STRUCTURE_LABELS[itemStructure]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {watchedItemStructure === "recipe_based" ? (
-                    <p className="text-xs text-brand-mocha">
-                      This product should be linked to a recipe in a later step.
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="product-form-category">Category</Label>
-                  <Select
-                    disabled={compatibleCategories.length === 0}
-                    onValueChange={handleCategoryChange}
-                    value={selectedCategoryId}
-                  >
-                    <SelectTrigger id="product-form-category">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {compatibleCategories.length === 0 ? (
-                        <SelectItem disabled value="__no_categories">
-                          No compatible categories
-                        </SelectItem>
-                      ) : null}
-                      {compatibleCategories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.categoryName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-brand-mocha">
-                    {compatibleCategories.length === 0
-                      ? "No compatible categories are available for this product type."
-                      : "Categories are filtered by the selected product type."}
+          {/* Tabs rather than a wizard: one form instance holds every field,
+              and a tab only decides which section is visible, so nothing typed
+              elsewhere is lost and Save is always in reach. */}
+          <div className="border-b border-border px-6 py-3">
+            <FormTabs
+              active={String(step)}
+              aria-label="Product form sections"
+              onTabChange={(key) => setStep(Number(key))}
+              panelId={PRODUCT_FORM_TABPANEL_ID}
+              tabs={tabs}
+            />
+          </div>
+
+          {/* The sections stay mounted and hide, so their inputs keep their
+              registration. Only this panel scrolls. */}
+          <div
+            className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-6 py-5"
+            id={PRODUCT_FORM_TABPANEL_ID}
+            role="tabpanel"
+            tabIndex={-1}
+          >
+            <Card className={cn(step === 0 ? undefined : "hidden")}>
+              <CardContent className="p-4">
+                <div className="mb-4">
+                  <h3 className="font-semibold text-brand-espresso">Catalog identity</h3>
+                  <p className="text-sm text-brand-mocha">
+                    Use clear names and category mapping so billing staff can find products quickly.
                   </p>
-                  <FieldError message={form.formState.errors.categoryId?.message} />
                 </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="product-form-unit">Unit</Label>
-                  <Controller
-                    control={form.control}
-                    name="unitId"
-                    render={({ field }) => (
-                      <Select
-                        onValueChange={(value) => {
-                          form.setValue(field.name, value, {
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="productName">Product name</Label>
+                    <Input id="productName" {...form.register("productName")} />
+                    <FieldError message={form.formState.errors.productName?.message} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="product-form-product-type">Product type</Label>
+                    <Select
+                      onValueChange={(value) =>
+                        handleProductTypeChange(value as ProductSchema["productType"])
+                      }
+                      value={form.watch("productType")}
+                    >
+                      <SelectTrigger id="product-form-product-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PRODUCT_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {PRODUCT_TYPE_LABELS[type]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="product-form-item-structure">Item structure</Label>
+                    <Select
+                      onValueChange={(value) =>
+                        form.setValue("itemStructure", value as ProductSchema["itemStructure"])
+                      }
+                      value={form.watch("itemStructure")}
+                    >
+                      <SelectTrigger id="product-form-item-structure">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ITEM_STRUCTURES.map((itemStructure) => (
+                          <SelectItem key={itemStructure} value={itemStructure}>
+                            {ITEM_STRUCTURE_LABELS[itemStructure]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {watchedItemStructure === "recipe_based" ? (
+                      <p className="text-xs text-brand-mocha">
+                        This product should be linked to a recipe in a later step.
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="product-form-category">Category</Label>
+                    <Select
+                      disabled={compatibleCategories.length === 0}
+                      onValueChange={handleCategoryChange}
+                      value={selectedCategoryId}
+                    >
+                      <SelectTrigger id="product-form-category">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {compatibleCategories.length === 0 ? (
+                          <SelectItem disabled value="__no_categories">
+                            No compatible categories
+                          </SelectItem>
+                        ) : null}
+                        {compatibleCategories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.categoryName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-brand-mocha">
+                      {compatibleCategories.length === 0
+                        ? "No compatible categories are available for this product type."
+                        : "Categories are filtered by the selected product type."}
+                    </p>
+                    <FieldError message={form.formState.errors.categoryId?.message} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="product-form-unit">Unit</Label>
+                    <Controller
+                      control={form.control}
+                      name="unitId"
+                      render={({ field }) => (
+                        <Select
+                          onValueChange={(value) => {
+                            form.setValue(field.name, value, {
+                              shouldDirty: true,
+                              shouldTouch: true,
+                              shouldValidate: true,
+                            });
+                            form.clearErrors(field.name);
+                          }}
+                          value={field.value}
+                        >
+                          <SelectTrigger id="product-form-unit">
+                            <SelectValue placeholder="Select unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {referenceData.units.map((unit) => (
+                              <SelectItem key={unit.id} value={unit.id}>
+                                {unit.unitName} ({unit.symbol})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    <FieldError message={form.formState.errors.unitId?.message} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className={cn(step === 1 ? undefined : "hidden")}>
+              <CardContent className="p-4">
+                <div className="mb-4">
+                  <h3 className="font-semibold text-brand-espresso">Pricing and tax</h3>
+                  <p className="text-sm text-brand-mocha">
+                    Prices are used by POS and receipt generation. Cost price is optional.
+                  </p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="salePrice">Sale price</Label>
+                    <Input id="salePrice" type="number" {...form.register("salePrice")} />
+                    <FieldError message={form.formState.errors.salePrice?.message} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="costPrice">Cost price</Label>
+                    <Input id="costPrice" type="number" {...form.register("costPrice")} />
+                    <FieldError message={form.formState.errors.costPrice?.message} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="product-form-cost-update-policy">Cost update policy</Label>
+                    <Select
+                      onValueChange={(value) =>
+                        form.setValue(
+                          "costUpdatePolicy",
+                          value as ProductSchema["costUpdatePolicy"],
+                        )
+                      }
+                      value={form.watch("costUpdatePolicy")}
+                    >
+                      <SelectTrigger id="product-form-cost-update-policy">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(COST_UPDATE_POLICY_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="product-form-pricing-type">Pricing type</Label>
+                    <Select
+                      onValueChange={(value) =>
+                        form.setValue("pricingType", value as ProductSchema["pricingType"])
+                      }
+                      value={form.watch("pricingType")}
+                    >
+                      <SelectTrigger id="product-form-pricing-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(PRICING_TYPE_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="pricingPercent">Pricing percent</Label>
+                    <Input id="pricingPercent" type="number" {...form.register("pricingPercent")} />
+                    <FieldError message={form.formState.errors.pricingPercent?.message} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="minimumSalePrice">Minimum sale price</Label>
+                    <Input
+                      id="minimumSalePrice"
+                      type="number"
+                      {...form.register("minimumSalePrice")}
+                    />
+                    <FieldError message={form.formState.errors.minimumSalePrice?.message} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="product-form-tax-rate">Tax rate</Label>
+                    <Select
+                      onValueChange={(value) =>
+                        form.setValue("taxRateId", value === "__none" ? "" : value)
+                      }
+                      value={watchedTaxRateId.trim() ? watchedTaxRateId : "__none"}
+                    >
+                      <SelectTrigger id="product-form-tax-rate">
+                        <SelectValue placeholder="Optional tax rate" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none">No tax rate</SelectItem>
+                        {referenceData.taxRates.filter(isSelectableTaxRate).map((taxRate) => (
+                          <SelectItem key={taxRate.id} value={taxRate.id}>
+                            {taxRate.taxName} ({taxRate.ratePercentage}%)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 rounded-2xl border border-brand-cappuccino/70 bg-card/70 p-3 md:grid-cols-[1fr_1fr_auto] md:items-center">
+                  <div>
+                    <p className="text-xs font-semibold text-brand-mocha">
+                      Suggested selling price
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-brand-espresso">
+                      AED {liveSuggestedPrice.toFixed(2)}
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 rounded-xl bg-brand-latte/60 p-2 text-sm text-brand-espresso">
+                    <Checkbox
+                      checked={form.watch("autoPriceUpdateEnabled")}
+                      onCheckedChange={(checked) =>
+                        form.setValue("autoPriceUpdateEnabled", checked === true)
+                      }
+                    />
+                    Auto-update POS price
+                  </label>
+                  <label className="flex items-center gap-2 rounded-xl bg-brand-latte/60 p-2 text-sm text-brand-espresso">
+                    <Checkbox
+                      checked={form.watch("salePriceLocked")}
+                      onCheckedChange={(checked) =>
+                        form.setValue("salePriceLocked", checked === true)
+                      }
+                    />
+                    Lock sale price
+                  </label>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className={cn(step === 2 ? undefined : "hidden")}>
+              <CardContent className="p-4">
+                <div className="mb-4">
+                  <h3 className="font-semibold text-brand-espresso">Operational behavior</h3>
+                  <p className="text-sm text-brand-mocha">
+                    Control whether this item appears in POS and how inventory should track it.
+                  </p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-[1fr_1.2fr]">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="preparationTimeMinutes">Preparation time (minutes)</Label>
+                    <Input
+                      id="preparationTimeMinutes"
+                      type="number"
+                      {...form.register("preparationTimeMinutes")}
+                    />
+                    <FieldError message={form.formState.errors.preparationTimeMinutes?.message} />
+                  </div>
+                  <div className="grid gap-2 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/40 p-3 sm:grid-cols-2">
+                    <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
+                      <Checkbox
+                        checked={watchedIsSellable}
+                        onCheckedChange={(checked) => handleSellableChange(checked === true)}
+                      />
+                      Sellable
+                    </label>
+                    <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
+                      <Checkbox
+                        checked={watchedIsSellable && form.watch("isPosVisible")}
+                        disabled={!watchedIsSellable}
+                        onCheckedChange={(checked) =>
+                          form.setValue("isPosVisible", checked === true, {
                             shouldDirty: true,
                             shouldTouch: true,
                             shouldValidate: true,
-                          });
-                          form.clearErrors(field.name);
-                        }}
-                        value={field.value}
-                      >
-                        <SelectTrigger id="product-form-unit">
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {referenceData.units.map((unit) => (
-                            <SelectItem key={unit.id} value={unit.id}>
-                              {unit.unitName} ({unit.symbol})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <FieldError message={form.formState.errors.unitId?.message} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={cn(step === 1 ? undefined : "hidden")}>
-            <CardContent className="p-4">
-              <div className="mb-4">
-                <h3 className="font-semibold text-brand-espresso">Pricing and tax</h3>
-                <p className="text-sm text-brand-mocha">
-                  Prices are used by POS and receipt generation. Cost price is optional.
-                </p>
-              </div>
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="salePrice">Sale price</Label>
-                  <Input id="salePrice" type="number" {...form.register("salePrice")} />
-                  <FieldError message={form.formState.errors.salePrice?.message} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="costPrice">Cost price</Label>
-                  <Input id="costPrice" type="number" {...form.register("costPrice")} />
-                  <FieldError message={form.formState.errors.costPrice?.message} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="product-form-cost-update-policy">Cost update policy</Label>
-                  <Select
-                    onValueChange={(value) =>
-                      form.setValue("costUpdatePolicy", value as ProductSchema["costUpdatePolicy"])
-                    }
-                    value={form.watch("costUpdatePolicy")}
-                  >
-                    <SelectTrigger id="product-form-cost-update-policy">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(COST_UPDATE_POLICY_LABELS).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="product-form-pricing-type">Pricing type</Label>
-                  <Select
-                    onValueChange={(value) =>
-                      form.setValue("pricingType", value as ProductSchema["pricingType"])
-                    }
-                    value={form.watch("pricingType")}
-                  >
-                    <SelectTrigger id="product-form-pricing-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(PRICING_TYPE_LABELS).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="pricingPercent">Pricing percent</Label>
-                  <Input id="pricingPercent" type="number" {...form.register("pricingPercent")} />
-                  <FieldError message={form.formState.errors.pricingPercent?.message} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="minimumSalePrice">Minimum sale price</Label>
-                  <Input
-                    id="minimumSalePrice"
-                    type="number"
-                    {...form.register("minimumSalePrice")}
-                  />
-                  <FieldError message={form.formState.errors.minimumSalePrice?.message} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="product-form-tax-rate">Tax rate</Label>
-                  <Select
-                    onValueChange={(value) =>
-                      form.setValue("taxRateId", value === "__none" ? "" : value)
-                    }
-                    value={watchedTaxRateId.trim() ? watchedTaxRateId : "__none"}
-                  >
-                    <SelectTrigger id="product-form-tax-rate">
-                      <SelectValue placeholder="Optional tax rate" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none">No tax rate</SelectItem>
-                      {referenceData.taxRates.filter(isSelectableTaxRate).map((taxRate) => (
-                        <SelectItem key={taxRate.id} value={taxRate.id}>
-                          {taxRate.taxName} ({taxRate.ratePercentage}%)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="mt-4 grid gap-3 rounded-2xl border border-brand-cappuccino/70 bg-card/70 p-3 md:grid-cols-[1fr_1fr_auto] md:items-center">
-                <div>
-                  <p className="text-xs font-semibold text-brand-mocha">Suggested selling price</p>
-                  <p className="mt-1 text-lg font-semibold text-brand-espresso">
-                    AED {liveSuggestedPrice.toFixed(2)}
-                  </p>
-                </div>
-                <label className="flex items-center gap-2 rounded-xl bg-brand-latte/60 p-2 text-sm text-brand-espresso">
-                  <Checkbox
-                    checked={form.watch("autoPriceUpdateEnabled")}
-                    onCheckedChange={(checked) =>
-                      form.setValue("autoPriceUpdateEnabled", checked === true)
-                    }
-                  />
-                  Auto-update POS price
-                </label>
-                <label className="flex items-center gap-2 rounded-xl bg-brand-latte/60 p-2 text-sm text-brand-espresso">
-                  <Checkbox
-                    checked={form.watch("salePriceLocked")}
-                    onCheckedChange={(checked) =>
-                      form.setValue("salePriceLocked", checked === true)
-                    }
-                  />
-                  Lock sale price
-                </label>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={cn(step === 2 ? undefined : "hidden")}>
-            <CardContent className="p-4">
-              <div className="mb-4">
-                <h3 className="font-semibold text-brand-espresso">Operational behavior</h3>
-                <p className="text-sm text-brand-mocha">
-                  Control whether this item appears in POS and how inventory should track it.
-                </p>
-              </div>
-              <div className="grid gap-4 md:grid-cols-[1fr_1.2fr]">
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="preparationTimeMinutes">Preparation time (minutes)</Label>
-                  <Input
-                    id="preparationTimeMinutes"
-                    type="number"
-                    {...form.register("preparationTimeMinutes")}
-                  />
-                  <FieldError message={form.formState.errors.preparationTimeMinutes?.message} />
-                </div>
-                <div className="grid gap-2 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/40 p-3 sm:grid-cols-2">
-                  <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
-                    <Checkbox
-                      checked={watchedIsSellable}
-                      onCheckedChange={(checked) => handleSellableChange(checked === true)}
-                    />
-                    Sellable
-                  </label>
-                  <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
-                    <Checkbox
-                      checked={watchedIsSellable && form.watch("isPosVisible")}
-                      disabled={!watchedIsSellable}
-                      onCheckedChange={(checked) =>
-                        form.setValue("isPosVisible", checked === true, {
-                          shouldDirty: true,
-                          shouldTouch: true,
-                          shouldValidate: true,
-                        })
-                      }
-                    />
-                    POS visible
-                  </label>
-                  <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
-                    <Checkbox
-                      checked={form.watch("isPurchasable")}
-                      onCheckedChange={(checked) =>
-                        form.setValue("isPurchasable", checked === true, {
-                          shouldDirty: true,
-                          shouldTouch: true,
-                          shouldValidate: true,
-                        })
-                      }
-                    />
-                    Purchasable
-                  </label>
-                  <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
-                    <Checkbox
-                      checked={form.watch("isStockTracked")}
-                      onCheckedChange={(checked) =>
-                        form.setValue("isStockTracked", checked === true)
-                      }
-                    />
-                    Stock tracked
-                  </label>
-                  <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
-                    <Checkbox
-                      checked={form.watch("isExpiryTracked")}
-                      onCheckedChange={(checked) =>
-                        form.setValue("isExpiryTracked", checked === true)
-                      }
-                    />
-                    Expiry tracked
-                  </label>
-                  <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
-                    <Checkbox
-                      checked={form.watch("isCustomOrderAvailable")}
-                      onCheckedChange={(checked) =>
-                        form.setValue("isCustomOrderAvailable", checked === true)
-                      }
-                    />
-                    Custom order available
-                  </label>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={cn(step === 3 ? undefined : "hidden")}>
-            <CardContent className="p-4">
-              <div className="mb-4">
-                <h3 className="font-semibold text-brand-espresso">Identifiers and media</h3>
-                <p className="text-sm text-brand-mocha">
-                  SKU, barcode, and image make catalog search and POS selection faster.
-                </p>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="sku">SKU</Label>
-                  <Input id="sku" {...form.register("sku")} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="barcode">Barcode</Label>
-                  <Input id="barcode" {...form.register("barcode")} />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="productImage">Product image</Label>
-                  <div className="flex flex-col gap-3 rounded-lg border border-brand-cappuccino bg-brand-latte/50 p-3 sm:flex-row sm:items-center">
-                    {previewUrl ? (
-                      <img
-                        alt="Selected product"
-                        className="h-20 w-20 rounded-md object-cover"
-                        src={previewUrl}
+                          })
+                        }
                       />
-                    ) : (
-                      <div className="flex h-20 w-20 items-center justify-center rounded-md bg-brand-cappuccino/50 text-xs text-brand-mocha">
-                        No image
-                      </div>
-                    )}
-                    <Input
-                      accept="image/jpeg,image/png,image/webp"
-                      id="productImage"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0] ?? null;
-                        setSelectedImage(file);
-                      }}
-                      type="file"
-                    />
+                      POS visible
+                    </label>
+                    <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
+                      <Checkbox
+                        checked={form.watch("isPurchasable")}
+                        onCheckedChange={(checked) =>
+                          form.setValue("isPurchasable", checked === true, {
+                            shouldDirty: true,
+                            shouldTouch: true,
+                            shouldValidate: true,
+                          })
+                        }
+                      />
+                      Purchasable
+                    </label>
+                    <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
+                      <Checkbox
+                        checked={form.watch("isStockTracked")}
+                        onCheckedChange={(checked) =>
+                          form.setValue("isStockTracked", checked === true)
+                        }
+                      />
+                      Stock tracked
+                    </label>
+                    <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
+                      <Checkbox
+                        checked={form.watch("isExpiryTracked")}
+                        onCheckedChange={(checked) =>
+                          form.setValue("isExpiryTracked", checked === true)
+                        }
+                      />
+                      Expiry tracked
+                    </label>
+                    <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
+                      <Checkbox
+                        checked={form.watch("isCustomOrderAvailable")}
+                        onCheckedChange={(checked) =>
+                          form.setValue("isCustomOrderAvailable", checked === true)
+                        }
+                      />
+                      Custom order available
+                    </label>
                   </div>
                 </div>
-                <div className="flex flex-col gap-1 md:col-span-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Input id="description" {...form.register("description")} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <DialogFooter className="sticky bottom-0 -mx-2 flex-row items-center justify-between gap-2 rounded-2xl border border-brand-cappuccino/70 bg-card/95 p-3 backdrop-blur">
-            <div className="flex items-center gap-2">
-              <Button onClick={onClose} type="button" variant="outline">
-                Cancel
-              </Button>
-              {step > 0 ? (
-                <Button
-                  onClick={() => setStep((current) => Math.max(0, current - 1))}
-                  type="button"
-                  variant="outline"
-                >
-                  Back
-                </Button>
-              ) : null}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="hidden text-xs text-brand-mocha sm:inline">
-                Step {step + 1} of {PRODUCT_FORM_STEPS.length}
-              </span>
-              {step < LAST_PRODUCT_FORM_STEP ? (
-                <Button onClick={() => void goToNextStep()} type="button">
-                  Next
-                </Button>
-              ) : (
-                <Button disabled={submitting || isUploadingImage} type="submit">
-                  {submitting || isUploadingImage
-                    ? "Saving..."
-                    : product
-                      ? "Save changes"
-                      : "Create product"}
-                </Button>
-              )}
-            </div>
+            <Card className={cn(step === 3 ? undefined : "hidden")}>
+              <CardContent className="p-4">
+                <div className="mb-4">
+                  <h3 className="font-semibold text-brand-espresso">Identifiers and media</h3>
+                  <p className="text-sm text-brand-mocha">
+                    SKU, barcode, and image make catalog search and POS selection faster.
+                  </p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="sku">SKU</Label>
+                    <Input id="sku" {...form.register("sku")} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="barcode">Barcode</Label>
+                    <Input id="barcode" {...form.register("barcode")} />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="productImage">Product image</Label>
+                    <div className="flex flex-col gap-3 rounded-lg border border-brand-cappuccino bg-brand-latte/50 p-3 sm:flex-row sm:items-center">
+                      {previewUrl ? (
+                        <img
+                          alt="Selected product"
+                          className="h-20 w-20 rounded-md object-cover"
+                          src={previewUrl}
+                        />
+                      ) : (
+                        <div className="flex h-20 w-20 items-center justify-center rounded-md bg-brand-cappuccino/50 text-xs text-brand-mocha">
+                          No image
+                        </div>
+                      )}
+                      <Input
+                        accept="image/jpeg,image/png,image/webp"
+                        id="productImage"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null;
+                          setSelectedImage(file);
+                        }}
+                        type="file"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1 md:col-span-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Input id="description" {...form.register("description")} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <DialogFooter className="border-t border-border px-6 py-4">
+            <Button onClick={onClose} type="button" variant="outline">
+              Cancel
+            </Button>
+            <Button disabled={submitting || isUploadingImage} type="submit">
+              {submitting || isUploadingImage
+                ? "Saving..."
+                : product
+                  ? "Save changes"
+                  : "Create product"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

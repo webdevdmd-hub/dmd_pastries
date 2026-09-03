@@ -1,12 +1,14 @@
 "use client";
 
-import { Barcode, Clock3, DollarSign, Package, ReceiptText, Store } from "lucide-react";
+import { ExternalLink, Pencil } from "lucide-react";
+import Link from "next/link";
 import type { JSX } from "react";
+import { useState } from "react";
 
-import { ProductVariantsSection } from "@/components/products/product-variants-section";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import type { ProductDetailTabKey } from "@/components/products/product-detail-tabs";
+import { ProductDetailsPanel } from "@/components/products/product-details-panel";
+import { ProductStatusBadge } from "@/components/products/product-status-badge";
+import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -14,183 +16,136 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
-import { getProductPosVisibilityLabel } from "@/lib/selectors/eligibility";
-import {
-  ITEM_STRUCTURE_LABELS,
-  type Product,
-  PRODUCT_TYPE_LABELS,
-  type ProductVariant,
-} from "@/types/product";
+import { ROUTES } from "@/constants/routes";
+import type { Product, ProductVariant } from "@/types/product";
 
 type ProductDetailsDrawerProps = {
   canManage: boolean;
+  /** The tab the sheet opens on; "Manage variants" lands on Variants. */
+  initialTab: ProductDetailTabKey;
   onAddVariant: () => void;
   onDeleteVariant: (variant: ProductVariant) => void;
+  /** Opens the edit form in the host's own modal flow. */
+  onEdit?: ((product: Product) => void) | undefined;
   onEditVariant: (variant: ProductVariant) => void;
-  open: boolean;
   onOpenChange: (open: boolean) => void;
+  open: boolean;
   product: Product | null;
   variants: ProductVariant[];
 };
 
-function formatMoney(value: number | null): string {
-  if (value === null) return "-";
-
-  return new Intl.NumberFormat("en-AE", {
-    currency: "AED",
-    maximumFractionDigits: 2,
-    style: "currency",
-  }).format(value);
-}
-
-function formatPreparationTime(value: number | null): string {
-  return value === null ? "- min" : `${String(value)} min`;
-}
-
-function DetailMetric({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Barcode;
-  label: string;
-  value: string;
-}): JSX.Element {
-  return (
-    <div className="rounded-2xl border border-brand-cappuccino/70 bg-card/80 p-3">
-      <div className="flex items-center gap-2 text-xs font-semibold text-brand-mocha">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </div>
-      <p className="mt-2 break-words text-sm font-semibold text-brand-espresso">{value}</p>
-    </div>
-  );
-}
-
+/**
+ * One product's details in a sheet over the catalogue. The product record is
+ * already on the row, so the sheet needs no fetch of its own; the variants
+ * come from the host, which refreshes them as they are edited. The tab is
+ * plain state here; the header offers the full page for anyone who wants a
+ * URL to share.
+ */
 export function ProductDetailsDrawer({
   canManage,
+  initialTab,
   onAddVariant,
   onDeleteVariant,
+  onEdit,
   onEditVariant,
-  open,
   onOpenChange,
+  open,
   product,
   variants,
 }: ProductDetailsDrawerProps): JSX.Element {
+  // Radix requires a title in every dialog. The body renders the product's
+  // name; the empty state names the sheet invisibly.
+  const fallbackTitle = (
+    <SheetHeader className="sr-only">
+      <SheetTitle>Product details</SheetTitle>
+      <SheetDescription>Details of the selected product.</SheetDescription>
+    </SheetHeader>
+  );
+
   return (
     <Sheet onOpenChange={onOpenChange} open={open}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-3xl">
         {product ? (
-          <div className="flex flex-col gap-5">
-            <SheetHeader>
-              <SheetTitle className="pr-8 text-2xl">{product.productName}</SheetTitle>
-              <SheetDescription>
-                {product.productCode} · {product.categoryName} · {product.unitName}
-              </SheetDescription>
-            </SheetHeader>
-
-            {(getProductImagePreviewUrl(product.imageFileId) ?? product.imageUrl) ? (
-              <img
-                alt={product.productName}
-                className="h-48 w-full rounded-lg object-cover"
-                src={getProductImagePreviewUrl(product.imageFileId) ?? product.imageUrl ?? ""}
-              />
-            ) : null}
-
-            <div className="grid grid-cols-2 gap-3">
-              <DetailMetric
-                icon={DollarSign}
-                label="Sale price"
-                value={formatMoney(product.salePrice)}
-              />
-              <DetailMetric
-                icon={ReceiptText}
-                label="Cost price"
-                value={formatMoney(product.costPrice)}
-              />
-              <DetailMetric
-                icon={Barcode}
-                label="SKU / Barcode"
-                value={`${product.sku ?? "-"} / ${product.barcode ?? "-"}`}
-              />
-              <DetailMetric
-                icon={Clock3}
-                label="Prep time"
-                value={formatPreparationTime(product.preparationTimeMinutes)}
-              />
-            </div>
-            <Separator />
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">Sellable: {product.isSellable ? "Yes" : "No"}</Badge>
-              <Badge variant="outline">POS: {getProductPosVisibilityLabel(product)}</Badge>
-              <Badge variant="outline">Purchasable: {product.isPurchasable ? "Yes" : "No"}</Badge>
-              <Badge variant="outline">
-                Stock: {product.isStockTracked ? "Tracked" : "Not tracked"}
-              </Badge>
-              <Badge variant="outline">
-                Expiry: {product.isExpiryTracked ? "Tracked" : "Not tracked"}
-              </Badge>
-              <Badge variant="outline">
-                Custom orders: {product.isCustomOrderAvailable ? "Enabled" : "Disabled"}
-              </Badge>
-              <Badge variant="outline">Status: {product.status}</Badge>
-            </div>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-latte text-brand-mocha">
-                    <Package className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <p className="font-semibold text-brand-espresso">Catalog notes</p>
-                    <p className="mt-1 text-sm leading-6 text-brand-mocha">
-                      {product.description ?? "No product description has been added."}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="grid gap-3 p-4 text-sm sm:grid-cols-2">
-                <DetailMetric
-                  icon={Store}
-                  label="Product type"
-                  value={PRODUCT_TYPE_LABELS[product.productType]}
-                />
-                <DetailMetric
-                  icon={Package}
-                  label="Item structure"
-                  value={ITEM_STRUCTURE_LABELS[product.itemStructure]}
-                />
-                <DetailMetric
-                  icon={ReceiptText}
-                  label="Tax rate"
-                  value={product.taxRateName ?? "-"}
-                />
-                <DetailMetric
-                  icon={Clock3}
-                  label="Created"
-                  value={new Date(product.createdAt).toLocaleString()}
-                />
-                <DetailMetric
-                  icon={Clock3}
-                  label="Updated"
-                  value={new Date(product.updatedAt).toLocaleString()}
-                />
-              </CardContent>
-            </Card>
-            <ProductVariantsSection
-              canManage={canManage}
-              onAdd={onAddVariant}
-              onDelete={onDeleteVariant}
-              onEdit={onEditVariant}
-              product={product}
-              variants={variants}
-            />
-          </div>
-        ) : null}
+          // Keyed by product and opening tab so switching products, or
+          // re-opening on Variants from the kebab, resets the strip.
+          <ProductDetailsDrawerBody
+            canManage={canManage}
+            initialTab={initialTab}
+            key={`${product.id}:${initialTab}`}
+            onAddVariant={onAddVariant}
+            onDeleteVariant={onDeleteVariant}
+            onEdit={onEdit}
+            onEditVariant={onEditVariant}
+            product={product}
+            variants={variants}
+          />
+        ) : (
+          fallbackTitle
+        )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+function ProductDetailsDrawerBody({
+  canManage,
+  initialTab,
+  onAddVariant,
+  onDeleteVariant,
+  onEdit,
+  onEditVariant,
+  product,
+  variants,
+}: {
+  canManage: boolean;
+  initialTab: ProductDetailTabKey;
+  onAddVariant: () => void;
+  onDeleteVariant: (variant: ProductVariant) => void;
+  onEdit: ((product: Product) => void) | undefined;
+  onEditVariant: (variant: ProductVariant) => void;
+  product: Product;
+  variants: ProductVariant[];
+}): JSX.Element {
+  const [activeTab, setActiveTab] = useState<ProductDetailTabKey>(initialTab);
+  const detailHref = `${ROUTES.products}/${product.id}`;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <SheetHeader>
+        <div className="flex flex-wrap items-center gap-3 pr-8">
+          <SheetTitle className="text-page">{product.productName}</SheetTitle>
+          <ProductStatusBadge status={product.status} />
+        </div>
+        <SheetDescription>
+          <span className="font-mono">{product.productCode}</span> · {product.categoryName} ·{" "}
+          {product.unitName}
+        </SheetDescription>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button asChild size="sm" variant="outline">
+            <Link href={detailHref}>
+              <ExternalLink className="h-4 w-4" />
+              Open full page
+            </Link>
+          </Button>
+          {canManage && onEdit ? (
+            <Button onClick={() => onEdit(product)} size="sm" type="button" variant="outline">
+              <Pencil className="h-4 w-4" />
+              Edit product
+            </Button>
+          ) : null}
+        </div>
+      </SheetHeader>
+
+      <ProductDetailsPanel
+        activeTab={activeTab}
+        canManage={canManage}
+        onAddVariant={onAddVariant}
+        onDeleteVariant={onDeleteVariant}
+        onEditVariant={onEditVariant}
+        onTabChange={setActiveTab}
+        product={product}
+        variants={variants}
+      />
+    </div>
   );
 }
