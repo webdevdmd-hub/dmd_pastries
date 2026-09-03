@@ -51,6 +51,7 @@ export function ExpensesToolbar({
     <FilterToolbar
       hasAnyFilter={hasAnyFilter}
       hiddenFilterCount={hiddenFilterCount}
+      hideDensityBelowMd
       onReset={onReset}
       onSearchChange={(search) => onFiltersChange({ search })}
       popoverTitle="Filter expenses"
