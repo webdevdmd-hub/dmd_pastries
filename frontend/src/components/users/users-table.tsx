@@ -1,3 +1,5 @@
+"use client";
+
 import type { JSX } from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -10,166 +12,104 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { UserActionsMenu } from "@/components/users/user-actions-menu";
+import { type UserActionHandlers, UserActionsMenu } from "@/components/users/user-actions-menu";
+import { formatUserRelativeDate, userInitials } from "@/components/users/user-details-drawer";
 import { UserStatusBadge } from "@/components/users/user-status-badge";
 import { cn } from "@/lib/utils/cn";
-import type { User, UserStatus } from "@/types/user";
+import type { User } from "@/types/user";
 
-type UsersTableProps = {
+export type UsersListProps = UserActionHandlers & {
   branchNameById: ReadonlyMap<string, string>;
-  canDelete: boolean;
-  canEdit: boolean;
-  currentUserId: string | null;
-  onChangeStatus: (user: User, status: UserStatus) => void;
-  onDelete: (user: User) => void;
-  onEdit: (user: User) => void;
+  /** Opens the user's details; the whole row is the target. */
   onView: (user: User) => void;
   users: User[];
 };
 
-function initials(fullName: string): string {
-  return fullName
-    .split(" ")
-    .map((segment) => segment[0] ?? "")
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-function formatDate(value: string | null): string {
-  if (!value) {
-    return "Never";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown";
-  }
-
-  return date.toLocaleDateString("en-GB", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function formatRelativeDate(value: string | null): string {
-  if (!value) {
-    return "Never";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown";
-  }
-
-  const differenceInMs = date.getTime() - Date.now();
-  const differenceInDays = Math.round(differenceInMs / (1000 * 60 * 60 * 24));
-
-  if (Math.abs(differenceInDays) >= 1) {
-    return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(differenceInDays, "day");
-  }
-
-  const differenceInHours = Math.round(differenceInMs / (1000 * 60 * 60));
-
-  if (Math.abs(differenceInHours) >= 1) {
-    return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(differenceInHours, "hour");
-  }
-
-  const differenceInMinutes = Math.round(differenceInMs / (1000 * 60));
-
-  if (Math.abs(differenceInMinutes) >= 1) {
-    return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(
-      differenceInMinutes,
-      "minute",
-    );
-  }
-
-  return "Just now";
-}
-
+/**
+ * Ten columns became six.
+ *
+ * The old table carried a `min-w-[1100px]`, so it scrolled sideways on every
+ * laptop and the last thing you could read was the row you wanted. Role moved
+ * under the name where it already appeared, phone and email share the contact
+ * column, and "Email verified", "Created at" and the id fragment went to the
+ * drawer.
+ */
 export function UsersTable({
   branchNameById,
-  canDelete,
-  canEdit,
-  currentUserId,
-  onChangeStatus,
-  onDelete,
-  onEdit,
   onView,
   users,
-}: UsersTableProps): JSX.Element {
+  ...actions
+}: UsersListProps): JSX.Element {
   return (
-    <Table className="min-w-[1100px]">
+    <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Staff member</TableHead>
-          <TableHead>Email</TableHead>
-          <TableHead>Phone</TableHead>
+          <TableHead>Contact</TableHead>
           <TableHead>Branch</TableHead>
-          <TableHead>Role</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead>Email Verified</TableHead>
-          <TableHead>Last Login</TableHead>
-          <TableHead>Created At</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
+          <TableHead>Last login</TableHead>
+          <TableHead>
+            <span className="sr-only">Actions</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {users.map((user) => (
+          // The row opens the drawer; the name is also a button so the keyboard
+          // has a focusable target for the same action.
           <TableRow
             className={cn(
+              "cursor-pointer",
               user.branchId === null ? "bg-warning-tint/60 hover:bg-warning-tint" : undefined,
             )}
             key={user.id}
+            onClick={() => onView(user)}
           >
             <TableCell>
-              <div className="flex items-center gap-3">
-                <Avatar className="h-11 w-11">
-                  <AvatarFallback>{initials(user.fullName)}</AvatarFallback>
+              <button
+                className="flex items-center gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onView(user);
+                }}
+                type="button"
+              >
+                <Avatar className="h-9 w-9 shrink-0">
+                  <AvatarFallback>{userInitials(user.fullName)}</AvatarFallback>
                 </Avatar>
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-brand-espresso">{user.fullName}</p>
-                  <p className="truncate text-xs text-brand-mocha">
-                    {user.roleName} - {user.id.slice(0, 8)}
-                  </p>
-                </div>
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="truncate font-medium">{user.fullName}</span>
+                  <span className="truncate text-meta text-foreground-muted">{user.roleName}</span>
+                </span>
+              </button>
+            </TableCell>
+            <TableCell>
+              <div className="grid gap-0.5">
+                <span>{user.email}</span>
+                <span className="text-meta tabular-nums text-foreground-muted">
+                  {user.phone || "No phone"}
+                </span>
               </div>
             </TableCell>
-            <TableCell>{user.email}</TableCell>
-            <TableCell>{user.phone}</TableCell>
             <TableCell>
               {user.branchId ? (
                 (branchNameById.get(user.branchId) ?? "Assigned branch")
               ) : (
-                <div className="flex flex-col gap-1">
-                  <Badge className="w-fit border-warning/30 bg-warning-tint text-warning-text">
-                    Needs branch setup
-                  </Badge>
-                  <span className="text-xs text-brand-mocha">No branch assigned</span>
-                </div>
+                <Badge className="w-fit border-warning/30 bg-warning-tint text-warning-text">
+                  Needs branch setup
+                </Badge>
               )}
             </TableCell>
-            <TableCell>{user.roleName}</TableCell>
             <TableCell>
               <UserStatusBadge status={user.status} />
             </TableCell>
-            <TableCell>{user.emailVerified ? "Verified" : "Pending"}</TableCell>
-            <TableCell>{formatRelativeDate(user.lastLoginAt)}</TableCell>
-            <TableCell>{formatDate(user.createdAt)}</TableCell>
-            <TableCell className="text-right">
-              <UserActionsMenu
-                canDelete={canDelete}
-                canEdit={canEdit}
-                currentUserId={currentUserId}
-                onChangeStatus={onChangeStatus}
-                onDelete={onDelete}
-                onEdit={onEdit}
-                onView={onView}
-                user={user}
-              />
+            <TableCell className="tabular-nums text-foreground-muted">
+              {formatUserRelativeDate(user.lastLoginAt)}
+            </TableCell>
+            {/* The menu must not also open the drawer. */}
+            <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+              <UserActionsMenu {...actions} user={user} />
             </TableCell>
           </TableRow>
         ))}

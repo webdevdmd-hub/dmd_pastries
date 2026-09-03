@@ -13,30 +13,36 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { User, UserStatus } from "@/types/user";
 
-type UserActionsMenuProps = {
-  currentUserId: string | null;
+export type UserActionHandlers = {
   canDelete: boolean;
   canEdit: boolean;
+  currentUserId: string | null;
   onChangeStatus: (user: User, status: UserStatus) => void;
   onDelete: (user: User) => void;
   onEdit: (user: User) => void;
-  onView: (user: User) => void;
-  user: User;
 };
 
+/**
+ * Actions only. "View details" is gone -- it called the same function as
+ * "Edit user" and opened the same editor, so the menu offered one action
+ * twice under two names. Reading a user is now the row's own click.
+ */
 export function UserActionsMenu({
-  currentUserId,
   canDelete,
   canEdit,
+  currentUserId,
   onChangeStatus,
   onDelete,
   onEdit,
-  onView,
   user,
-}: UserActionsMenuProps): JSX.Element {
+}: UserActionHandlers & { user: User }): JSX.Element | null {
   const isCurrentUser = currentUserId === user.id;
   const canManageStatus = canEdit && !isCurrentUser;
   const canDeleteUser = canDelete && !isCurrentUser;
+
+  if (!canEdit && !canDeleteUser) {
+    return null;
+  }
 
   return (
     <DropdownMenu>
@@ -46,41 +52,40 @@ export function UserActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => onView(user)}>View details</DropdownMenuItem>
         {canEdit ? (
-          <DropdownMenuItem onClick={() => onEdit(user)}>Edit user</DropdownMenuItem>
-        ) : null}
-        {canManageStatus ? <DropdownMenuSeparator /> : null}
-        {canManageStatus ? (
-          <DropdownMenuItem
-            disabled={user.status === "active"}
-            onClick={() => onChangeStatus(user, "active")}
-          >
-            Activate user
-          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onEdit(user)}>Edit user</DropdownMenuItem>
         ) : null}
         {canManageStatus ? (
-          <DropdownMenuItem
-            disabled={user.status === "inactive"}
-            onClick={() => onChangeStatus(user, "inactive")}
-          >
-            Deactivate user
-          </DropdownMenuItem>
-        ) : null}
-        {canManageStatus ? (
-          <DropdownMenuItem
-            disabled={user.status === "suspended"}
-            onClick={() => onChangeStatus(user, "suspended")}
-          >
-            Suspend user
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={user.status === "active"}
+              onSelect={() => onChangeStatus(user, "active")}
+            >
+              Activate user
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={user.status === "inactive"}
+              onSelect={() => onChangeStatus(user, "inactive")}
+            >
+              Deactivate user
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={user.status === "suspended"}
+              onSelect={() => onChangeStatus(user, "suspended")}
+            >
+              Suspend user
+            </DropdownMenuItem>
+          </>
         ) : null}
         {canDeleteUser ? (
           <>
             <DropdownMenuSeparator />
+            {/* text-danger-text, not text-destructive: the latter is not a
+                token in this design system and rendered as inherited colour. */}
             <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onClick={() => onDelete(user)}
+              className="text-danger-text focus:text-danger-text"
+              onSelect={() => onDelete(user)}
             >
               Delete user
             </DropdownMenuItem>

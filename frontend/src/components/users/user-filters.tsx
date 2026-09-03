@@ -1,9 +1,8 @@
 "use client";
 
-import { Search } from "lucide-react";
 import type { JSX } from "react";
 
-import { Input } from "@/components/ui/input";
+import { FilterField, FilterToolbar } from "@/components/shared/filter-toolbar";
 import {
   Select,
   SelectContent,
@@ -12,21 +11,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Branch } from "@/types/branch";
-import type { UserFilters } from "@/types/user";
+import type { UserFilters as UserFiltersValue } from "@/types/user";
 
 type UserFiltersProps = {
   allowAllBranches?: boolean;
   branchOptions: Branch[];
-  filters: UserFilters;
-  onFiltersChange: (nextFilters: UserFilters) => void;
-  showUnassignedBranch?: boolean;
+  filters: UserFiltersValue;
+  onFiltersChange: (nextFilters: UserFiltersValue) => void;
+  onReset: () => void;
   showBranchFilter: boolean;
+  showUnassignedBranch?: boolean;
 };
 
 export const allBranchesFilterValue = "__all_branches__";
 export const unassignedBranchFilterValue = "__unassigned_branch__";
 
-function isFilterStatus(value: string): value is UserFilters["status"] {
+function isFilterStatus(value: string): value is UserFiltersValue["status"] {
   return (
     value === "all" ||
     value === "active" ||
@@ -36,94 +36,101 @@ function isFilterStatus(value: string): value is UserFilters["status"] {
   );
 }
 
+/**
+ * Search stays visible; status and branch move into the popover.
+ *
+ * Branch is a real filter here rather than scope -- an admin looking at staff
+ * can legitimately ask "who has no branch yet" -- so unlike the operational
+ * lists it counts toward the badge.
+ */
+function countHiddenFilters(filters: UserFiltersValue, showBranchFilter: boolean): number {
+  let count = 0;
+  if (filters.status !== "all") count += 1;
+  if (showBranchFilter && (filters.branchId ?? allBranchesFilterValue) !== allBranchesFilterValue) {
+    count += 1;
+  }
+  return count;
+}
+
 export function UserFilters({
   allowAllBranches = true,
   branchOptions,
   filters,
   onFiltersChange,
-  showUnassignedBranch = true,
+  onReset,
   showBranchFilter,
+  showUnassignedBranch = true,
 }: UserFiltersProps): JSX.Element {
   const selectedBranchValue = filters.branchId ?? allBranchesFilterValue;
   const isKnownSpecialBranchValue =
     selectedBranchValue === allBranchesFilterValue ||
     selectedBranchValue === unassignedBranchFilterValue;
   const selectedBranchOption = branchOptions.find((branch) => branch.id === selectedBranchValue);
+  const hiddenFilterCount = countHiddenFilters(filters, showBranchFilter);
 
   return (
-    <div className="flex flex-col gap-3 md:flex-row">
-      <div className="relative flex-1">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mocha" />
-        <Input
-          aria-label="Search staff users"
-          className="pl-9"
-          placeholder="Search by name, email, phone, or role"
-          value={filters.search}
-          onChange={(event) => {
-            onFiltersChange({
-              ...filters,
-              search: event.target.value,
-            });
-          }}
-        />
-      </div>
-
-      <Select
-        value={filters.status}
-        onValueChange={(value) => {
-          if (!isFilterStatus(value)) {
-            return;
-          }
-
-          onFiltersChange({
-            ...filters,
-            status: value,
-          });
-        }}
-      >
-        <SelectTrigger aria-label="Filter users by status" className="md:max-w-56">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All</SelectItem>
-          <SelectItem value="active">Active</SelectItem>
-          <SelectItem value="inactive">Inactive</SelectItem>
-          <SelectItem value="invited">Invited</SelectItem>
-          <SelectItem value="suspended">Suspended</SelectItem>
-        </SelectContent>
-      </Select>
-
-      {showBranchFilter ? (
+    <FilterToolbar
+      hasAnyFilter={hiddenFilterCount > 0 || filters.search.trim().length > 0}
+      hiddenFilterCount={hiddenFilterCount}
+      hideDensityBelowMd
+      onReset={onReset}
+      onSearchChange={(search) => onFiltersChange({ ...filters, search })}
+      popoverTitle="Filter staff users"
+      searchAriaLabel="Search staff users"
+      searchPlaceholder="Search by name, email, phone, or role"
+      searchValue={filters.search}
+    >
+      <FilterField htmlFor="userFilterStatus" label="Status">
         <Select
-          value={selectedBranchValue}
           onValueChange={(value) => {
-            onFiltersChange({
-              ...filters,
-              branchId: value,
-            });
+            if (!isFilterStatus(value)) {
+              return;
+            }
+            onFiltersChange({ ...filters, status: value });
           }}
+          value={filters.status}
         >
-          <SelectTrigger aria-label="Filter users by branch" className="md:max-w-64">
-            <SelectValue placeholder="Branch" />
+          <SelectTrigger id="userFilterStatus">
+            <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            {allowAllBranches ? (
-              <SelectItem value={allBranchesFilterValue}>All branches</SelectItem>
-            ) : null}
-            {showUnassignedBranch ? (
-              <SelectItem value={unassignedBranchFilterValue}>No branch assigned</SelectItem>
-            ) : null}
-            {!isKnownSpecialBranchValue && !selectedBranchOption ? (
-              <SelectItem value={selectedBranchValue}>Selected branch</SelectItem>
-            ) : null}
-            {branchOptions.map((branch) => (
-              <SelectItem key={branch.id} value={branch.id}>
-                {branch.name} ({branch.code})
-              </SelectItem>
-            ))}
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
+            <SelectItem value="invited">Invited</SelectItem>
+            <SelectItem value="suspended">Suspended</SelectItem>
           </SelectContent>
         </Select>
+      </FilterField>
+
+      {showBranchFilter ? (
+        <FilterField htmlFor="userFilterBranch" label="Branch">
+          <Select
+            onValueChange={(branchId) => onFiltersChange({ ...filters, branchId })}
+            value={selectedBranchValue}
+          >
+            <SelectTrigger id="userFilterBranch">
+              <SelectValue placeholder="Branch" />
+            </SelectTrigger>
+            <SelectContent>
+              {allowAllBranches ? (
+                <SelectItem value={allBranchesFilterValue}>All branches</SelectItem>
+              ) : null}
+              {showUnassignedBranch ? (
+                <SelectItem value={unassignedBranchFilterValue}>No branch assigned</SelectItem>
+              ) : null}
+              {!isKnownSpecialBranchValue && !selectedBranchOption ? (
+                <SelectItem value={selectedBranchValue}>Selected branch</SelectItem>
+              ) : null}
+              {branchOptions.map((branch) => (
+                <SelectItem key={branch.id} value={branch.id}>
+                  {branch.name} ({branch.code})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
       ) : null}
-    </div>
+    </FilterToolbar>
   );
 }

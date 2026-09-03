@@ -20,12 +20,14 @@ import {
 } from "@/components/ui/dialog";
 import { InviteUserDialog } from "@/components/users/invite-user-dialog";
 import { PendingInvitationsPanel } from "@/components/users/pending-invitations-panel";
+import { UserDetailsDrawer } from "@/components/users/user-details-drawer";
 import {
   allBranchesFilterValue,
   unassignedBranchFilterValue,
   UserFilters,
 } from "@/components/users/user-filters";
 import { UserFormDialog } from "@/components/users/user-form-dialog";
+import { UsersCardGrid } from "@/components/users/users-card-grid";
 import { UsersEmptyState } from "@/components/users/users-empty-state";
 import { UsersErrorState } from "@/components/users/users-error-state";
 import { UsersTable } from "@/components/users/users-table";
@@ -142,6 +144,8 @@ export function UsersPageClient(): JSX.Element {
     user: User;
   } | null>(null);
   const [deleteDialogUser, setDeleteDialogUser] = useState<User | null>(null);
+  // The record, not the id: the list rows already carry a full user.
+  const [drawerUser, setDrawerUser] = useState<User | null>(null);
   const { data, error, isLoading, refetch } = useUsers(filters);
   const createUserMutation = useCreateUser();
   const updateUserMutation = useUpdateUser();
@@ -287,11 +291,16 @@ export function UsersPageClient(): JSX.Element {
     setDialogOpen(true);
   };
 
-  const viewUserDetails = (targetUser: User): void => {
-    setDialogMode("edit");
-    setSelectedUser(targetUser);
-    setCreateFormError(null);
-    setDialogOpen(true);
+  // A dialog on top of a sheet on top of the list is one layer too many, so
+  // the drawer closes before the form or either confirmation opens.
+  const editFromDrawer = (targetUser: User): void => {
+    setDrawerUser(null);
+    openEditDialog(targetUser);
+  };
+
+  const deleteFromDrawer = (targetUser: User): void => {
+    setDrawerUser(null);
+    requestDeleteUser(targetUser);
   };
 
   const closeDialog = (): void => {
@@ -450,6 +459,21 @@ export function UsersPageClient(): JSX.Element {
     setDeleteDialogUser(targetUser);
   };
 
+  const listHandlers = {
+    branchNameById,
+    canDelete: canDeleteUsers,
+    canEdit: canEditUsers,
+    currentUserId: user?.id ?? null,
+    onChangeStatus: (targetUser: User, status: UserStatus) => {
+      setDrawerUser(null);
+      requestStatusChange(targetUser, status);
+    },
+    onDelete: deleteFromDrawer,
+    onEdit: editFromDrawer,
+    onView: setDrawerUser,
+    users,
+  };
+
   const confirmStatusChange = async (): Promise<void> => {
     if (!statusDialogState) {
       return;
@@ -542,6 +566,7 @@ export function UsersPageClient(): JSX.Element {
         branchOptions={staffBranchFilterOptions}
         filters={filters}
         onFiltersChange={setFilters}
+        onReset={() => setFilters(defaultFilters)}
         showUnassignedBranch={branchScope.canAccessAllBranches}
         showBranchFilter={canUseStaffBranchFilter}
       />
@@ -595,22 +620,29 @@ export function UsersPageClient(): JSX.Element {
       ) : null}
 
       {!isLoading && !error && users.length > 0 ? (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <UsersTable
-              branchNameById={branchNameById}
-              canDelete={canDeleteUsers}
-              canEdit={canEditUsers}
-              currentUserId={user?.id ?? null}
-              onChangeStatus={requestStatusChange}
-              onDelete={requestDeleteUser}
-              onEdit={openEditDialog}
-              onView={viewUserDetails}
-              users={users}
-            />
-          </CardContent>
-        </Card>
+        <>
+          <div className="md:hidden">
+            <UsersCardGrid {...listHandlers} />
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <UsersTable {...listHandlers} />
+            </CardContent>
+          </Card>
+        </>
       ) : null}
+
+      <UserDetailsDrawer
+        branchNameById={branchNameById}
+        canDelete={canDeleteUsers}
+        canEdit={canEditUsers}
+        currentUserId={user?.id ?? null}
+        onDelete={deleteFromDrawer}
+        onEdit={editFromDrawer}
+        onOpenChange={(open) => (!open ? setDrawerUser(null) : undefined)}
+        open={drawerUser !== null}
+        user={drawerUser}
+      />
 
       <PendingInvitationsPanel
         canManage={canEditUsers}
