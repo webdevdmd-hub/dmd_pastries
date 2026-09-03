@@ -694,14 +694,18 @@ export function RecipeFormPage({
         <div
           className={
             isDialog
-              ? "grid min-h-0 flex-1 overflow-y-auto overscroll-contain lg:grid-cols-[minmax(0,1fr)_22rem] lg:overflow-hidden"
+              ? // Below lg this must be a flex column, not a one-column grid: a grid
+                // with a definite height shares that height between its rows, so the
+                // details pane was squeezed to 298px while holding 589px of form
+                // and the cost panel painted over the spill.
+                "flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:overflow-hidden"
               : "grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]"
           }
         >
           <div
             className={
               isDialog
-                ? "flex min-h-0 min-w-0 flex-col gap-6 px-5 py-6 sm:px-8 lg:overflow-y-auto lg:overscroll-contain"
+                ? "flex min-w-0 shrink-0 flex-col gap-6 px-5 py-6 sm:px-8 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain"
                 : // A grid item defaults to min-width:auto, so without min-w-0
                   // this column grows to its widest child -- the four-tab strip --
                   // and drags the whole page into a horizontal scroll on a phone.
@@ -969,7 +973,7 @@ export function RecipeFormPage({
           <div
             className={
               isDialog
-                ? "min-h-0 border-t border-border bg-muted px-5 py-5 lg:overflow-y-auto lg:overscroll-contain lg:border-l lg:border-t-0"
+                ? "min-w-0 shrink-0 border-t border-border bg-muted px-5 py-5 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:border-l lg:border-t-0"
                 : "flex flex-col gap-5 xl:sticky xl:top-6 xl:self-start"
             }
           >
