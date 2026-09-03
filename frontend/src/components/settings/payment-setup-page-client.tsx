@@ -2,13 +2,13 @@
 
 import { AlertTriangle, CheckCircle2, CreditCard, Landmark, Link2, Store } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { JSX } from "react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
-import { PaymentAccountsPageClient } from "@/components/accounting/settlement-pages";
-import { SettingsDataPageClient } from "@/components/settings/settings-data-page-client";
+import { PaymentAccountsPanel } from "@/components/accounting/payment-accounts-panel";
+import { PaymentMethodsPanel } from "@/components/settings/payment-methods-panel";
+import { type FormTab, FormTabs } from "@/components/shared/form-tabs";
 import { PageHeader } from "@/components/shared/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -46,11 +46,13 @@ type PaymentSetupPageClientProps = {
   initialTab: PaymentSetupTab;
 };
 
-const tabs: { label: string; value: PaymentSetupTab }[] = [
-  { label: "Overview", value: "overview" },
-  { label: "Methods", value: "methods" },
-  { label: "Accounts", value: "accounts" },
-  { label: "Branch setup", value: "branches" },
+const PAYMENT_SETUP_TABPANEL_ID = "payment-setup-tabpanel";
+
+const tabs: FormTab<PaymentSetupTab>[] = [
+  { key: "overview", label: "Overview" },
+  { key: "methods", label: "Methods" },
+  { key: "accounts", label: "Accounts" },
+  { key: "branches", label: "Branch setup" },
 ];
 
 const overviewAccountFilters: PaymentAccountsFilters = {
@@ -124,7 +126,7 @@ function readinessAction(issue: AccountingBackfillReadinessIssue): {
     return { href: ROUTES.accountingAccountMappings, label: "Open Account Mappings" };
   }
   if (issue.code.startsWith("payment_account")) {
-    return { href: ROUTES.accountingPaymentAccounts, label: "Open Payment Accounts" };
+    return { href: `${ROUTES.settingsPaymentSetup}?tab=accounts`, label: "Open Payment Accounts" };
   }
   return { href: `${ROUTES.settingsPaymentSetup}?tab=methods`, label: "Open Payment Methods" };
 }
@@ -151,13 +153,15 @@ function OverviewCard({
 
   return (
     <Card className={toneClass}>
-      <CardContent className="flex items-start justify-between gap-4 p-5">
-        <div>
-          <p className="text-xs font-semibold text-current/70">{label}</p>
-          <p className="mt-3 text-3xl font-semibold">{value}</p>
-          <p className="mt-2 text-sm text-current/70">{detail}</p>
+      <CardContent className="flex items-start justify-between gap-2 p-4 md:p-5">
+        <div className="min-w-0">
+          <p className="text-cell leading-tight text-current/70">{label}</p>
+          <p className="mt-2 text-kpi tabular-nums">{value}</p>
+          <p className="mt-2 text-meta text-current/70">{detail}</p>
         </div>
-        <div className="rounded-full border border-current/15 bg-card/60 p-3">{icon}</div>
+        <div className="hidden shrink-0 rounded-full border border-current/15 bg-card/60 p-3 sm:block">
+          {icon}
+        </div>
       </CardContent>
     </Card>
   );
@@ -221,31 +225,32 @@ function PaymentSetupOverview({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {/* Two across on a phone, four from xl. */}
+      <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
         <OverviewCard
           detail="Active ways customers can pay."
           icon={<CreditCard className="h-5 w-5" />}
           label="Payment methods"
-          value={canViewMethods ? String(activeMethods.length) : "-"}
+          value={canViewMethods ? String(activeMethods.length) : "—"}
         />
         <OverviewCard
           detail="Active places where money is recorded."
           icon={<Landmark className="h-5 w-5" />}
           label="Payment accounts"
-          value={canViewAccounts ? String(activeAccounts.length) : "-"}
+          value={canViewAccounts ? String(activeAccounts.length) : "—"}
         />
         <OverviewCard
           detail="Checkout-visible methods missing a usable linked account."
           icon={<AlertTriangle className="h-5 w-5" />}
           label="Setup warnings"
           tone={setupIssueCount > 0 ? "warning" : "success"}
-          value={canViewAccounts ? String(setupIssueCount) : "-"}
+          value={canViewAccounts ? String(setupIssueCount) : "—"}
         />
         <OverviewCard
           detail="Business-wide and branch-specific account records."
           icon={<Store className="h-5 w-5" />}
           label="Branch coverage"
-          value={canViewAccounts ? String(accounts.length) : "-"}
+          value={canViewAccounts ? String(accounts.length) : "—"}
         />
       </div>
 
@@ -291,29 +296,28 @@ function PaymentSetupOverview({
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-title">
             <Link2 className="h-5 w-5" />
             How payment setup works
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-workspace-border p-4">
-            <p className="font-semibold text-brand-espresso">1. Payment method</p>
-            <p className="mt-2 text-sm text-brand-mocha">
-              This is what the user selects at checkout, such as Cash, Card, Talabat, or Bank
-              Transfer.
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-lg bg-muted p-4">
+            <p className="text-cell font-medium">1. Payment method</p>
+            <p className="mt-1 text-cell text-foreground-muted">
+              What the user selects at checkout, such as Cash, Card, Talabat, or Bank Transfer.
             </p>
           </div>
-          <div className="rounded-2xl border border-workspace-border p-4">
-            <p className="font-semibold text-brand-espresso">2. Linked payment account</p>
-            <p className="mt-2 text-sm text-brand-mocha">
-              This is where the money is held and reconciled, such as Cash Box, Card Clearing, or
-              Talabat Settlement.
+          <div className="rounded-lg bg-muted p-4">
+            <p className="text-cell font-medium">2. Linked payment account</p>
+            <p className="mt-1 text-cell text-foreground-muted">
+              Where the money is held and reconciled, such as Cash Box, Card Clearing, or Talabat
+              Settlement.
             </p>
           </div>
-          <div className="rounded-2xl border border-workspace-border p-4">
-            <p className="font-semibold text-brand-espresso">3. Accounting ledger</p>
-            <p className="mt-2 text-sm text-brand-mocha">
+          <div className="rounded-lg bg-muted p-4">
+            <p className="text-cell font-medium">3. Accounting ledger</p>
+            <p className="mt-1 text-cell text-foreground-muted">
               Payment accounts connect to asset ledgers so reports, journals, and reconciliation
               stay accurate.
             </p>
@@ -332,47 +336,51 @@ function PaymentSetupOverview({
         <Card className="border-danger/30">
           <CardHeader>
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <CardTitle className="text-danger-text">Accounting setup issues</CardTitle>
-              {canManageAccounts && blockingPaymentCoverageIssues.length > 0 ? (
-                <Button
-                  disabled={isSeedingPaymentAccounts}
-                  onClick={onSeedPaymentAccounts}
-                  type="button"
-                >
-                  {isSeedingPaymentAccounts
-                    ? "Setting up accounts..."
-                    : "Set up default payment accounts"}
-                </Button>
-              ) : null}
-              {canManageAccounts && blockingAccountMappingIssues.length > 0 ? (
-                <Button
-                  disabled={isSeedingAccountMappings}
-                  onClick={onSeedAccountMappings}
-                  type="button"
-                >
-                  {isSeedingAccountMappings
-                    ? "Setting up mappings..."
-                    : "Set up default account mappings"}
-                </Button>
-              ) : null}
+              <CardTitle className="text-title text-danger-text">Accounting setup issues</CardTitle>
+              <div className="flex flex-wrap gap-2">
+                {canManageAccounts && blockingPaymentCoverageIssues.length > 0 ? (
+                  <Button
+                    disabled={isSeedingPaymentAccounts}
+                    onClick={onSeedPaymentAccounts}
+                    type="button"
+                  >
+                    {isSeedingPaymentAccounts
+                      ? "Setting up accounts..."
+                      : "Set up default payment accounts"}
+                  </Button>
+                ) : null}
+                {canManageAccounts && blockingAccountMappingIssues.length > 0 ? (
+                  <Button
+                    disabled={isSeedingAccountMappings}
+                    onClick={onSeedAccountMappings}
+                    type="button"
+                  >
+                    {isSeedingAccountMappings
+                      ? "Setting up mappings..."
+                      : "Set up default account mappings"}
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="grid gap-3">
             {blockingSetupIssues.map((issue) => {
               const action = readinessAction(issue);
               const details = formatIssueDetails(issue);
 
               return (
                 <div
-                  className="rounded-2xl border border-danger/30 bg-danger-tint p-4 text-sm text-danger-text"
+                  className="rounded-lg border border-danger/30 bg-danger-tint p-4 text-cell text-danger-text"
                   key={`${issue.code}-${issue.message}-${details}`}
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <p className="font-semibold">{issue.message}</p>
-                      {details ? <p className="mt-1 text-xs text-danger-text">{details}</p> : null}
+                    <div className="min-w-0">
+                      <p className="font-medium">{issue.message}</p>
+                      {details ? (
+                        <p className="mt-1 break-words text-meta text-danger-text">{details}</p>
+                      ) : null}
                     </div>
-                    <Button asChild size="sm" variant="outline">
+                    <Button asChild className="shrink-0" size="sm" variant="outline">
                       <Link href={action.href}>{action.label}</Link>
                     </Button>
                   </div>
@@ -418,17 +426,19 @@ function BranchMappingView({
         <AccessNotice title="Accounting access is required to verify linked accounts" />
       ) : null}
       {canViewAccounts && branchPaymentIssues.length > 0 ? (
-        <Card className="border-danger/30">
+        <Card className="overflow-hidden border-danger/30">
           <CardHeader>
-            <CardTitle className="text-danger-text">Branch checkout mapping issues</CardTitle>
+            <CardTitle className="text-title text-danger-text">
+              Branch checkout mapping issues
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Payment Method</TableHead>
+                  <TableHead>Payment method</TableHead>
                   <TableHead>Branch</TableHead>
-                  <TableHead>Effective Account</TableHead>
+                  <TableHead>Effective account</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead>Issue</TableHead>
                 </TableRow>
@@ -448,27 +458,31 @@ function BranchMappingView({
                       )}-${accountName}`}
                     >
                       <TableCell>
-                        <div className="font-medium text-brand-espresso">{methodName}</div>
-                        <div className="text-xs text-brand-mocha">
-                          {issueDetail(issue, "method_type")}
-                        </div>
+                        <span className="grid gap-0.5">
+                          <span className="font-medium">{methodName}</span>
+                          <span className="text-meta text-foreground-muted">
+                            {issueDetail(issue, "method_type")}
+                          </span>
+                        </span>
                       </TableCell>
                       <TableCell>{branchName}</TableCell>
                       <TableCell>
                         {accountName ? (
-                          <>
-                            <div>{accountName}</div>
-                            <div className="text-xs text-brand-mocha">
+                          <span className="grid gap-0.5">
+                            <span>{accountName}</span>
+                            <span className="text-meta text-foreground-muted">
                               {issueDetail(issue, "chart_account_code")}{" "}
                               {issueDetail(issue, "chart_account_name")}
-                            </div>
-                          </>
+                            </span>
+                          </span>
                         ) : (
                           <span className="text-danger-text">No effective account</span>
                         )}
                       </TableCell>
-                      <TableCell>{source ? formatStatus(source) : "-"}</TableCell>
-                      <TableCell className="text-danger-text">{issue.message}</TableCell>
+                      <TableCell>{source ? formatStatus(source) : "—"}</TableCell>
+                      <TableCell className="min-w-64 whitespace-normal text-danger-text">
+                        {issue.message}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -499,8 +513,13 @@ function BranchMappingView({
   );
 }
 
+/**
+ * The four surfaces of payment setup under one route. The tab is state, and
+ * the URL is mirrored with replaceState rather than a router navigation: a
+ * search-param navigation remounts the page segment, which would close any
+ * drawer or dialog open inside a tab.
+ */
 export function PaymentSetupPageClient({ initialTab }: PaymentSetupPageClientProps): JSX.Element {
-  const router = useRouter();
   const { hasAnyPermission } = usePermission();
   const [activeTab, setActiveTab] = useState<PaymentSetupTab>(initialTab);
   const canViewMethods = hasAnyPermission([
@@ -513,19 +532,27 @@ export function PaymentSetupPageClient({ initialTab }: PaymentSetupPageClientPro
   ]);
   const canManageAccounts = hasAnyPermission([PERMISSIONS.accountingAccountsManage]);
   const canViewAny = canViewMethods || canViewAccounts;
-  const methodsQuery = usePaymentMethods(canViewMethods);
-  const accountsQuery = usePaymentAccounts(overviewAccountFilters, canViewAccounts);
-  const setupReadinessQuery = useAccountingSetupReadiness(canViewAccounts);
+  // The overview's own queries: only the Overview and Branch tabs read them.
+  const overviewActive = activeTab === "overview" || activeTab === "branches";
+  const methodsQuery = usePaymentMethods(canViewMethods && overviewActive);
+  const accountsQuery = usePaymentAccounts(
+    overviewAccountFilters,
+    canViewAccounts && overviewActive,
+  );
+  const setupReadinessQuery = useAccountingSetupReadiness(canViewAccounts && overviewActive);
   const seedPaymentAccountsMutation = useSeedDefaultPaymentAccounts();
   const seedAccountMappingsMutation = useSeedDefaultAccountMappings();
 
   const methods = methodsQuery.data ?? [];
   const accounts = accountsQuery.data?.items ?? [];
-  const visibleTabs = useMemo(() => tabs, []);
 
   const selectTab = (tab: PaymentSetupTab): void => {
     setActiveTab(tab);
-    router.replace(`${ROUTES.settingsPaymentSetup}?tab=${tab}`, { scroll: false });
+    const url =
+      tab === "overview"
+        ? ROUTES.settingsPaymentSetup
+        : `${ROUTES.settingsPaymentSetup}?tab=${tab}`;
+    window.history.replaceState(window.history.state, "", url);
   };
 
   const handleSeedPaymentAccounts = async (): Promise<void> => {
@@ -582,68 +609,64 @@ export function PaymentSetupPageClient({ initialTab }: PaymentSetupPageClientPro
         description="Choose how customers pay, then link where that money is recorded."
       />
 
-      <div className="flex flex-wrap gap-2 rounded-2xl border border-workspace-border bg-workspace-panel p-2">
-        {visibleTabs.map((tab) => (
-          <Button
-            aria-current={activeTab === tab.value ? "page" : undefined}
-            key={tab.value}
-            onClick={() => selectTab(tab.value)}
-            size="sm"
-            variant={activeTab === tab.value ? "default" : "ghost"}
-          >
-            {tab.label}
-          </Button>
-        ))}
+      <FormTabs
+        active={activeTab}
+        aria-label="Payment setup sections"
+        onTabChange={selectTab}
+        panelId={PAYMENT_SETUP_TABPANEL_ID}
+        tabs={tabs}
+      />
+
+      <div id={PAYMENT_SETUP_TABPANEL_ID} role="tabpanel" tabIndex={-1}>
+        {activeTab === "overview" ? (
+          <PaymentSetupOverview
+            accounts={accounts}
+            accountsError={accountsQuery.error}
+            canViewAccounts={canViewAccounts}
+            canViewMethods={canViewMethods}
+            canManageAccounts={canManageAccounts}
+            isSetupReadinessLoading={setupReadinessQuery.isLoading}
+            isSeedingPaymentAccounts={seedPaymentAccountsMutation.isPending}
+            isSeedingAccountMappings={seedAccountMappingsMutation.isPending}
+            methods={methods}
+            methodsError={methodsQuery.error}
+            onSeedPaymentAccounts={() => {
+              void handleSeedPaymentAccounts();
+            }}
+            onSeedAccountMappings={() => {
+              void handleSeedAccountMappings();
+            }}
+            seedPaymentAccountsError={seedPaymentAccountsMutation.error}
+            seedAccountMappingsError={seedAccountMappingsMutation.error}
+            setupReadiness={setupReadinessQuery.data}
+            setupReadinessError={setupReadinessQuery.error}
+          />
+        ) : null}
+
+        {activeTab === "methods" ? (
+          canViewMethods ? (
+            <PaymentMethodsPanel />
+          ) : (
+            <AccessNotice title="Payment method access is required" />
+          )
+        ) : null}
+
+        {activeTab === "accounts" ? (
+          canViewAccounts ? (
+            <PaymentAccountsPanel />
+          ) : (
+            <AccessNotice title="Accounting access is required" />
+          )
+        ) : null}
+
+        {activeTab === "branches" ? (
+          <BranchMappingView
+            canViewAccounts={canViewAccounts}
+            canViewMethods={canViewMethods}
+            setupReadiness={setupReadinessQuery.data}
+          />
+        ) : null}
       </div>
-
-      {activeTab === "overview" ? (
-        <PaymentSetupOverview
-          accounts={accounts}
-          accountsError={accountsQuery.error}
-          canViewAccounts={canViewAccounts}
-          canViewMethods={canViewMethods}
-          canManageAccounts={canManageAccounts}
-          isSetupReadinessLoading={setupReadinessQuery.isLoading}
-          isSeedingPaymentAccounts={seedPaymentAccountsMutation.isPending}
-          isSeedingAccountMappings={seedAccountMappingsMutation.isPending}
-          methods={methods}
-          methodsError={methodsQuery.error}
-          onSeedPaymentAccounts={() => {
-            void handleSeedPaymentAccounts();
-          }}
-          onSeedAccountMappings={() => {
-            void handleSeedAccountMappings();
-          }}
-          seedPaymentAccountsError={seedPaymentAccountsMutation.error}
-          seedAccountMappingsError={seedAccountMappingsMutation.error}
-          setupReadiness={setupReadinessQuery.data}
-          setupReadinessError={setupReadinessQuery.error}
-        />
-      ) : null}
-
-      {activeTab === "methods" ? (
-        canViewMethods ? (
-          <SettingsDataPageClient embedded kind="payment-methods" />
-        ) : (
-          <AccessNotice title="Payment method access is required" />
-        )
-      ) : null}
-
-      {activeTab === "accounts" ? (
-        canViewAccounts ? (
-          <PaymentAccountsPageClient embedded />
-        ) : (
-          <AccessNotice title="Accounting access is required" />
-        )
-      ) : null}
-
-      {activeTab === "branches" ? (
-        <BranchMappingView
-          canViewAccounts={canViewAccounts}
-          canViewMethods={canViewMethods}
-          setupReadiness={setupReadinessQuery.data}
-        />
-      ) : null}
     </div>
   );
 }
