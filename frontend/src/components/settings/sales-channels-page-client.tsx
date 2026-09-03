@@ -388,7 +388,7 @@ export function SalesChannelsPageClient(): JSX.Element {
     const confirmed = await confirm({
       cancelLabel: "Keep channel",
       confirmLabel: "Delete channel",
-      consequence: `This permanently deletes . It cannot be undone.`,
+      consequence: `This permanently deletes ${channel.channelName}. It cannot be undone.`,
       detail:
         "Orders already recorded against it keep their channel name, but no new order can use it.",
       title: "Delete this sales channel?",
