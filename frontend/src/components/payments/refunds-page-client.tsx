@@ -8,6 +8,7 @@ import { PaymentsEmptyState } from "@/components/payments/payments-empty-state";
 import { PaymentsErrorState } from "@/components/payments/payments-error-state";
 import { PaymentsTableSkeleton } from "@/components/payments/payments-table-skeleton";
 import { PaymentsToolbar } from "@/components/payments/payments-toolbar";
+import { RefundsCardGrid } from "@/components/payments/refunds-card-grid";
 import { RefundsTable } from "@/components/payments/refunds-table";
 import { FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
@@ -47,6 +48,8 @@ export function RefundsPageClient(): JSX.Element {
     );
   }
 
+  const refunds = refundsQuery.data ?? [];
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
@@ -78,7 +81,7 @@ export function RefundsPageClient(): JSX.Element {
 
       {!refundsQuery.isLoading &&
       !refundsQuery.error &&
-      (refundsQuery.data ?? []).length === 0 &&
+      refunds.length === 0 &&
       hasActiveFilters ? (
         <FilteredState
           noun="refunds"
@@ -89,7 +92,7 @@ export function RefundsPageClient(): JSX.Element {
 
       {!refundsQuery.isLoading &&
       !refundsQuery.error &&
-      (refundsQuery.data ?? []).length === 0 &&
+      refunds.length === 0 &&
       !hasActiveFilters ? (
         <PaymentsEmptyState
           title="No refunds yet"
@@ -97,12 +100,18 @@ export function RefundsPageClient(): JSX.Element {
         />
       ) : null}
 
-      {!refundsQuery.isLoading && !refundsQuery.error && (refundsQuery.data ?? []).length > 0 ? (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <RefundsTable refunds={refundsQuery.data ?? []} />
-          </CardContent>
-        </Card>
+      {/* Cards below md, the table from md up. */}
+      {!refundsQuery.isLoading && !refundsQuery.error && refunds.length > 0 ? (
+        <>
+          <div className="md:hidden">
+            <RefundsCardGrid refunds={refunds} />
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <RefundsTable refunds={refunds} />
+            </CardContent>
+          </Card>
+        </>
       ) : null}
     </div>
   );

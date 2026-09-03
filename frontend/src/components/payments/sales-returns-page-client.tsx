@@ -5,19 +5,17 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { TableDensityToggle } from "@/components/density/table-density";
 import { AccessDeniedCard } from "@/components/payments/access-denied-card";
 import { PaymentsErrorState } from "@/components/payments/payments-error-state";
 import { PaymentsTableSkeleton } from "@/components/payments/payments-table-skeleton";
+import { SalesReturnsCardGrid } from "@/components/payments/sales-returns-card-grid";
 import { SalesReturnsTable } from "@/components/payments/sales-returns-table";
 import { EmptyState, FilteredState } from "@/components/shared/collection-state";
-import { FilterBar } from "@/components/shared/filter-bar";
+import { FilterField, FilterToolbar } from "@/components/shared/filter-toolbar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReturnReversalDialog } from "@/components/shared/return-reversal-dialog";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -107,6 +105,20 @@ export function SalesReturnsPageClient(): JSX.Element {
     }
   };
 
+  const returns = returnsQuery.data ?? [];
+  const listHandlers = {
+    canManage,
+    canReverse,
+    isCancelling: cancelMutation.isPending,
+    isPosting: postMutation.isPending,
+    isReversing: reverseMutation.isPending,
+    onCancel: (salesReturn: SalesReturn) => void handleCancel(salesReturn),
+    onPost: (salesReturn: SalesReturn) => void handlePost(salesReturn),
+    onReverse: setReversalReturn,
+    returns,
+  };
+  const hiddenFilterCount = filters.status !== defaultFilters.status ? 1 : 0;
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
@@ -114,45 +126,37 @@ export function SalesReturnsPageClient(): JSX.Element {
         description="Review POS item-level returns, refund handling, and posted credit notes."
       />
 
-      <FilterBar>
-        <Input
-          onChange={(event) =>
-            setFilters((currentFilters) => ({
-              ...currentFilters,
-              search: event.target.value,
-            }))
-          }
-          aria-label="Search returns by return, sale, or customer"
-          className="min-w-52 flex-1"
-          placeholder="Search return, sale, customer..."
-          value={filters.search}
-        />
-        <Select
-          onValueChange={(value) =>
-            setFilters((currentFilters) => ({
-              ...currentFilters,
-              status: value as SalesReturnStatus | "all",
-            }))
-          }
-          value={filters.status}
-        >
-          <SelectTrigger aria-label="Return status" className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="posted">Posted</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-            <SelectItem value="reversed">Reversed</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button onClick={() => setFilters(defaultFilters)} type="button" variant="outline">
-          <RotateCcw className="h-4 w-4" />
-          Reset
-        </Button>
-        <TableDensityToggle className="ml-auto" />
-      </FilterBar>
+      <FilterToolbar
+        hasAnyFilter={hasActiveFilters}
+        hiddenFilterCount={hiddenFilterCount}
+        hideDensityBelowMd
+        onReset={() => setFilters(defaultFilters)}
+        onSearchChange={(search) => setFilters((current) => ({ ...current, search }))}
+        popoverTitle="Filter credit notes"
+        searchAriaLabel="Search returns by return, sale, or customer"
+        searchPlaceholder="Search return, sale, customer..."
+        searchValue={filters.search}
+      >
+        <FilterField htmlFor="returnsFilterStatus" label="Status">
+          <Select
+            onValueChange={(value) =>
+              setFilters((current) => ({ ...current, status: value as SalesReturnStatus | "all" }))
+            }
+            value={filters.status}
+          >
+            <SelectTrigger id="returnsFilterStatus">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="posted">Posted</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="reversed">Reversed</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+      </FilterToolbar>
 
       {returnsQuery.isLoading ? <PaymentsTableSkeleton /> : null}
 
@@ -164,12 +168,10 @@ export function SalesReturnsPageClient(): JSX.Element {
         />
       ) : null}
 
-      {/* Filtered and empty are different situations with opposite remedies.
-          Offering nothing but "create one from a POS sale" is wrong when credit
-          notes exist and the user simply typed a status that excludes them. */}
+      {/* Filtered and empty are different situations with opposite remedies. */}
       {!returnsQuery.isLoading &&
       !returnsQuery.error &&
-      (returnsQuery.data ?? []).length === 0 &&
+      returns.length === 0 &&
       hasActiveFilters ? (
         <FilteredState
           noun="credit notes"
@@ -180,7 +182,7 @@ export function SalesReturnsPageClient(): JSX.Element {
 
       {!returnsQuery.isLoading &&
       !returnsQuery.error &&
-      (returnsQuery.data ?? []).length === 0 &&
+      returns.length === 0 &&
       !hasActiveFilters ? (
         <EmptyState
           description="Create item returns from POS sale details inside Payments."
@@ -189,23 +191,20 @@ export function SalesReturnsPageClient(): JSX.Element {
         />
       ) : null}
 
-      {!returnsQuery.isLoading && !returnsQuery.error && (returnsQuery.data ?? []).length > 0 ? (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <SalesReturnsTable
-              canManage={canManage}
-              canReverse={canReverse}
-              isCancelling={cancelMutation.isPending}
-              isPosting={postMutation.isPending}
-              isReversing={reverseMutation.isPending}
-              onCancel={(salesReturn) => void handleCancel(salesReturn)}
-              onPost={(salesReturn) => void handlePost(salesReturn)}
-              onReverse={setReversalReturn}
-              returns={returnsQuery.data ?? []}
-            />
-          </CardContent>
-        </Card>
+      {/* Cards below md, the table from md up. */}
+      {!returnsQuery.isLoading && !returnsQuery.error && returns.length > 0 ? (
+        <>
+          <div className="md:hidden">
+            <SalesReturnsCardGrid {...listHandlers} />
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <SalesReturnsTable {...listHandlers} />
+            </CardContent>
+          </Card>
+        </>
       ) : null}
+
       <ReturnReversalDialog
         description="Reversing a posted credit note creates a controlled correction while keeping the original audit trail."
         isSubmitting={reverseMutation.isPending}

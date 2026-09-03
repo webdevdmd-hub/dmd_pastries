@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ReceiptText, RotateCcw } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -10,14 +11,20 @@ import { toast } from "sonner";
 import { AccessDeniedCard } from "@/components/payments/access-denied-card";
 import { PaymentMethodBadge } from "@/components/payments/payment-method-badge";
 import { PaymentStatusBadge } from "@/components/payments/payment-status-badge";
+import { parseSaleDetailTab, type SaleDetailTabKey } from "@/components/payments/sale-detail-tabs";
+import {
+  SALE_DETAIL_TABPANEL_ID,
+  SaleDetailViewTabs,
+} from "@/components/payments/sale-detail-view-tabs";
 import { SalesReturnDialog } from "@/components/payments/sales-return-dialog";
+import { SalesReturnsCardGrid } from "@/components/payments/sales-returns-card-grid";
 import { SalesReturnsTable } from "@/components/payments/sales-returns-table";
 import { POSReceiptDialog } from "@/components/pos/pos-receipt-dialog";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReturnReversalDialog } from "@/components/shared/return-reversal-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -79,9 +86,25 @@ function selectReceiptLayout(
   );
 }
 
+/** A loading, error or empty line inside a table card. */
+function PanelNote({ children, tone }: { children: string; tone?: "danger" }): JSX.Element {
+  return (
+    <p
+      className={
+        tone === "danger" ? "p-6 text-cell text-danger-text" : "p-6 text-cell text-foreground-muted"
+      }
+    >
+      {children}
+    </p>
+  );
+}
+
 export function SaleDetailPageClient({ saleId }: SaleDetailPageClientProps): JSX.Element {
   const branchScope = useBranchScope();
   const { hasAnyPermission } = usePermission();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const canView = hasAnyPermission([PERMISSIONS.paymentsView, PERMISSIONS.posView]);
   const canReturn = hasAnyPermission([PERMISSIONS.paymentsRefund, PERMISSIONS.posRefund]);
   const canReverse = hasAnyPermission([
@@ -113,11 +136,24 @@ export function SaleDetailPageClient({ saleId }: SaleDetailPageClientProps): JSX
   const receipt = receiptQuery.data ?? null;
   const receiptLayout = selectReceiptLayout(
     receiptLayoutsQuery.data ?? [],
-    receipt?.saleId ? branchScope.effectiveBranchId : branchScope.effectiveBranchId,
+    branchScope.effectiveBranchId,
   );
   const hasReturnableItems = (returnableItemsQuery.data ?? []).some(
     (item) => item.returnableQuantity > 0,
   );
+
+  const activeTab = parseSaleDetailTab(searchParams.get("tab"));
+
+  const changeTab = (tab: SaleDetailTabKey): void => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (tab === "items") {
+      next.delete("tab");
+    } else {
+      next.set("tab", tab);
+    }
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   if (!canView) {
     return (
@@ -166,6 +202,21 @@ export function SaleDetailPageClient({ saleId }: SaleDetailPageClientProps): JSX
     }
   };
 
+  const salePayments = paymentsQuery.data ?? [];
+  const returnableItems = returnableItemsQuery.data ?? [];
+  const saleReturns = saleReturnsQuery.data ?? [];
+  const returnHandlers = {
+    canManage: canReturn,
+    canReverse,
+    isCancelling: cancelMutation.isPending,
+    isPosting: postMutation.isPending,
+    isReversing: reverseMutation.isPending,
+    onCancel: (salesReturn: SalesReturn) => void handleCancelReturn(salesReturn),
+    onPost: (salesReturn: SalesReturn) => void handlePostReturn(salesReturn),
+    onReverse: setReversalReturn,
+    returns: saleReturns,
+  };
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
@@ -204,7 +255,7 @@ export function SaleDetailPageClient({ saleId }: SaleDetailPageClientProps): JSX
 
       {receiptQuery.isLoading ? (
         <Card>
-          <CardContent className="p-8 text-sm text-brand-mocha">
+          <CardContent className="p-8 text-cell text-foreground-muted">
             Loading sale details...
           </CardContent>
         </Card>
@@ -219,188 +270,204 @@ export function SaleDetailPageClient({ saleId }: SaleDetailPageClientProps): JSX
       ) : null}
 
       {receipt ? (
-        <>
-          {/* One strip, not four tiles. Balance due leads because it is the
-              only figure here anyone acts on; the rest are context. */}
-          <div className="flex flex-wrap items-center gap-x-7 gap-y-2 rounded bg-muted px-4 py-3">
-            <div className="flex items-baseline gap-2.5">
-              <span className="text-meta text-foreground-muted">Balance due</span>
-              <span className="text-kpi tabular-nums">{formatMoney(receipt.balanceDue)}</span>
-            </div>
-            <span aria-hidden="true" className="hidden h-5 w-px bg-border sm:block" />
-            <div className="flex items-baseline gap-2">
-              <span className="text-meta text-foreground-muted">Total</span>
-              <span className="text-cell font-medium tabular-nums">
-                {formatMoney(receipt.total)}
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-meta text-foreground-muted">Paid</span>
-              <span className="text-cell font-medium tabular-nums">
-                {formatMoney(receipt.paidAmount)}
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-meta text-foreground-muted">Sold at</span>
-              <span className="text-cell font-medium tabular-nums">
-                {formatDateTime(receipt.soldAt)}
-              </span>
-            </div>
+        // One strip, not four tiles. Balance due leads because it is the
+        // only figure here anyone acts on; the rest are context.
+        <div className="flex flex-wrap items-center gap-x-7 gap-y-2 rounded bg-muted px-4 py-3">
+          <div className="flex items-baseline gap-2.5">
+            <span className="text-meta text-foreground-muted">Balance due</span>
+            <span className="text-kpi tabular-nums">{formatMoney(receipt.balanceDue)}</span>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Sale items</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Unit Price</TableHead>
-                    <TableHead className="text-right">Line Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {receipt.items.map((item, index) => (
-                    <TableRow key={`${item.name}-${String(index)}`}>
-                      <TableCell className="font-semibold text-brand-espresso">
-                        {item.name}
-                      </TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell>{formatMoney(item.unitPrice)}</TableCell>
-                      <TableCell className="text-right font-bold">
-                        {formatMoney(item.lineTotal)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </>
+          <span aria-hidden="true" className="hidden h-5 w-px bg-border sm:block" />
+          <div className="flex items-baseline gap-2">
+            <span className="text-meta text-foreground-muted">Total</span>
+            <span className="text-cell font-medium tabular-nums">{formatMoney(receipt.total)}</span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-meta text-foreground-muted">Paid</span>
+            <span className="text-cell font-medium tabular-nums">
+              {formatMoney(receipt.paidAmount)}
+            </span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-meta text-foreground-muted">Sold at</span>
+            <span className="text-cell font-medium tabular-nums">
+              {formatDateTime(receipt.soldAt)}
+            </span>
+          </div>
+        </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Payments</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {paymentsQuery.isLoading ? (
-              <div className="p-6 text-sm text-brand-mocha">Loading payments...</div>
-            ) : null}
-            {paymentsQuery.error ? (
-              <div className="p-6 text-sm text-danger-text">
-                {getErrorMessage(paymentsQuery.error)}
-              </div>
-            ) : null}
-            {!paymentsQuery.isLoading && !paymentsQuery.error ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Method</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Paid At</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(paymentsQuery.data ?? []).map((payment) => (
-                    <TableRow key={payment.id}>
-                      <TableCell>
-                        <PaymentMethodBadge methodName={payment.paymentMethodNameSnapshot} />
-                      </TableCell>
-                      <TableCell className="font-bold">{formatMoney(payment.amount)}</TableCell>
-                      <TableCell>
-                        <PaymentStatusBadge status={payment.paymentStatus} />
-                      </TableCell>
-                      <TableCell>{formatDateTime(payment.paidAt)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : null}
-          </CardContent>
-        </Card>
+      <SaleDetailViewTabs
+        active={activeTab}
+        creditNotesCount={saleReturnsQuery.data?.length}
+        onTabChange={changeTab}
+        paymentsCount={paymentsQuery.data?.length}
+        saleId={saleId}
+      />
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Returnable items</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {returnableItemsQuery.isLoading ? (
-              <div className="p-6 text-sm text-brand-mocha">Loading returnable items...</div>
-            ) : null}
-            {returnableItemsQuery.error ? (
-              <div className="p-6 text-sm text-danger-text">
-                {getErrorMessage(returnableItemsQuery.error)}
-              </div>
-            ) : null}
-            {!returnableItemsQuery.isLoading && !returnableItemsQuery.error ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Sold</TableHead>
-                    <TableHead>Returned</TableHead>
-                    <TableHead>Available</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(returnableItemsQuery.data ?? []).map((item) => (
-                    <TableRow key={item.saleItemId}>
-                      <TableCell className="font-semibold text-brand-espresso">
-                        {item.itemName}
-                      </TableCell>
-                      <TableCell>{item.soldQuantity}</TableCell>
-                      <TableCell>{item.returnedQuantity}</TableCell>
-                      <TableCell>{item.returnableQuantity}</TableCell>
+      {/* One panel element that swaps, which is what `aria-controls` on every
+          tab points at. Tables scroll inside their card on a phone rather
+          than forcing the page wide. */}
+      <div id={SALE_DETAIL_TABPANEL_ID} role="tabpanel" tabIndex={-1}>
+        {activeTab === "items" ? (
+          <Card className="overflow-hidden">
+            <CardContent className="overflow-x-auto p-0">
+              {receipt ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead className="text-right">Quantity</TableHead>
+                      <TableHead className="text-right">Unit price</TableHead>
+                      <TableHead className="text-right">Line total</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {receipt.items.map((item, index) => (
+                      <TableRow key={`${item.name}-${String(index)}`}>
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell className="text-right tabular-nums">{item.quantity}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatMoney(item.unitPrice)}
+                        </TableCell>
+                        <TableCell className="text-right font-medium tabular-nums">
+                          {formatMoney(item.lineTotal)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <PanelNote>Sale items appear once the receipt has loaded.</PanelNote>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {activeTab === "payments" ? (
+          <Card className="overflow-hidden">
+            <CardContent className="overflow-x-auto p-0">
+              {paymentsQuery.isLoading ? <PanelNote>Loading payments...</PanelNote> : null}
+              {paymentsQuery.error ? (
+                <PanelNote tone="danger">{getErrorMessage(paymentsQuery.error)}</PanelNote>
+              ) : null}
+              {!paymentsQuery.isLoading && !paymentsQuery.error && salePayments.length === 0 ? (
+                <PanelNote>No payments recorded against this sale.</PanelNote>
+              ) : null}
+              {!paymentsQuery.isLoading && !paymentsQuery.error && salePayments.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Method</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Paid at</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {salePayments.map((payment) => (
+                      <TableRow key={payment.id}>
+                        <TableCell>
+                          <PaymentMethodBadge methodName={payment.paymentMethodNameSnapshot} />
+                        </TableCell>
+                        <TableCell className="text-right font-medium tabular-nums">
+                          {formatMoney(payment.amount)}
+                        </TableCell>
+                        <TableCell>
+                          <PaymentStatusBadge status={payment.paymentStatus} />
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          {formatDateTime(payment.paidAt)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {activeTab === "returnable" ? (
+          <Card className="overflow-hidden">
+            <CardContent className="overflow-x-auto p-0">
+              {returnableItemsQuery.isLoading ? (
+                <PanelNote>Loading returnable items...</PanelNote>
+              ) : null}
+              {returnableItemsQuery.error ? (
+                <PanelNote tone="danger">{getErrorMessage(returnableItemsQuery.error)}</PanelNote>
+              ) : null}
+              {!returnableItemsQuery.isLoading &&
+              !returnableItemsQuery.error &&
+              returnableItems.length === 0 ? (
+                <PanelNote>Nothing on this sale can be returned.</PanelNote>
+              ) : null}
+              {!returnableItemsQuery.isLoading &&
+              !returnableItemsQuery.error &&
+              returnableItems.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead className="text-right">Sold</TableHead>
+                      <TableHead className="text-right">Returned</TableHead>
+                      <TableHead className="text-right">Available</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {returnableItems.map((item) => (
+                      <TableRow key={item.saleItemId}>
+                        <TableCell className="font-medium">{item.itemName}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {item.soldQuantity}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {item.returnedQuantity}
+                        </TableCell>
+                        <TableCell className="text-right font-medium tabular-nums">
+                          {item.returnableQuantity}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {activeTab === "credit-notes" ? (
+          <>
+            {saleReturnsQuery.isLoading ? (
+              <Card>
+                <PanelNote>Loading credit notes...</PanelNote>
+              </Card>
             ) : null}
-          </CardContent>
-        </Card>
+            {saleReturnsQuery.error ? (
+              <Card>
+                <PanelNote tone="danger">{getErrorMessage(saleReturnsQuery.error)}</PanelNote>
+              </Card>
+            ) : null}
+            {!saleReturnsQuery.isLoading && !saleReturnsQuery.error && saleReturns.length === 0 ? (
+              <Card>
+                <PanelNote>No credit notes for this sale yet.</PanelNote>
+              </Card>
+            ) : null}
+            {!saleReturnsQuery.isLoading && !saleReturnsQuery.error && saleReturns.length > 0 ? (
+              <>
+                <div className="md:hidden">
+                  <SalesReturnsCardGrid {...returnHandlers} />
+                </div>
+                <Card className="hidden overflow-hidden md:block">
+                  <CardContent className="p-0">
+                    <SalesReturnsTable {...returnHandlers} />
+                  </CardContent>
+                </Card>
+              </>
+            ) : null}
+          </>
+        ) : null}
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Returns / Credit Notes</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {saleReturnsQuery.isLoading ? (
-            <div className="p-6 text-sm text-brand-mocha">Loading credit notes...</div>
-          ) : null}
-          {saleReturnsQuery.error ? (
-            <div className="p-6 text-sm text-danger-text">
-              {getErrorMessage(saleReturnsQuery.error)}
-            </div>
-          ) : null}
-          {!saleReturnsQuery.isLoading &&
-          !saleReturnsQuery.error &&
-          (saleReturnsQuery.data ?? []).length === 0 ? (
-            <div className="p-6 text-sm text-brand-mocha">No credit notes for this sale yet.</div>
-          ) : null}
-          {!saleReturnsQuery.isLoading &&
-          !saleReturnsQuery.error &&
-          (saleReturnsQuery.data ?? []).length > 0 ? (
-            <SalesReturnsTable
-              canManage={canReturn}
-              canReverse={canReverse}
-              isCancelling={cancelMutation.isPending}
-              isPosting={postMutation.isPending}
-              isReversing={reverseMutation.isPending}
-              onCancel={(salesReturn) => void handleCancelReturn(salesReturn)}
-              onPost={(salesReturn) => void handlePostReturn(salesReturn)}
-              onReverse={setReversalReturn}
-              returns={saleReturnsQuery.data ?? []}
-            />
-          ) : null}
-        </CardContent>
-      </Card>
 
       <POSReceiptDialog
         layout={receiptLayout}

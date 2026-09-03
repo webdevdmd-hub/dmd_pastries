@@ -5,15 +5,15 @@ import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { TableDensityToggle } from "@/components/density/table-density";
 import { AccessDeniedCard } from "@/components/payments/access-denied-card";
 import { PaymentsEmptyState } from "@/components/payments/payments-empty-state";
 import { PaymentsErrorState } from "@/components/payments/payments-error-state";
 import { PaymentsTableSkeleton } from "@/components/payments/payments-table-skeleton";
+import { ReconciliationCardGrid } from "@/components/payments/reconciliation-card-grid";
 import { ReconciliationFormDialog } from "@/components/payments/reconciliation-form-dialog";
 import { ReconciliationTable } from "@/components/payments/reconciliation-table";
 import { FilteredState } from "@/components/shared/collection-state";
-import { FilterBar } from "@/components/shared/filter-bar";
+import { FilterField, FilterToolbar } from "@/components/shared/filter-toolbar";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -64,12 +64,17 @@ export function ReconciliationPageClient(): JSX.Element {
   const createMutation = useCreateReconciliation();
   const isPermissionDenied =
     reconciliationsQuery.error instanceof ApiError && reconciliationsQuery.error.status === 403;
-  // Branch is scope rather than a filter here too — it defaults to the user's
-  // own branch, so counting it would mark every empty ledger as "filtered".
+  // Branch is scope rather than a filter here too: it defaults to the user's
+  // own branch, so counting it would mark every empty ledger as "filtered"
+  // and leave the badge permanently at 1.
   const hasActiveFilters =
     filters.paymentMethodId !== defaultFilters.paymentMethodId ||
     filters.dateFrom.length > 0 ||
     filters.dateTo.length > 0;
+  const hiddenFilterCount =
+    (filters.paymentMethodId !== defaultFilters.paymentMethodId ? 1 : 0) +
+    (filters.dateFrom.length > 0 ? 1 : 0) +
+    (filters.dateTo.length > 0 ? 1 : 0);
   const branchOptions = useMemo(
     () =>
       (branchesQuery.data ?? []).filter(
@@ -108,6 +113,10 @@ export function ReconciliationPageClient(): JSX.Element {
     }
   };
 
+  const resetFilters = (): void =>
+    setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId });
+  const reconciliations = reconciliationsQuery.data ?? [];
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
@@ -123,76 +132,84 @@ export function ReconciliationPageClient(): JSX.Element {
         }
       />
 
-      <FilterBar>
-        <Select
-          onValueChange={(value) => setFilters((current) => ({ ...current, branchId: value }))}
-          value={filters.branchId}
-        >
-          <SelectTrigger aria-label="Branch" className="w-48">
-            <SelectValue placeholder="Branch" />
-          </SelectTrigger>
-          <SelectContent>
-            {branchScope.canAccessAllBranches ? (
-              <SelectItem value="all">All branches</SelectItem>
-            ) : null}
-            {branchOptions.map((branch) => (
-              <SelectItem key={branch.id} value={branch.id}>
-                {branch.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          onValueChange={(value) =>
-            setFilters((current) => ({ ...current, paymentMethodId: value }))
-          }
-          value={filters.paymentMethodId}
-        >
-          <SelectTrigger aria-label="Payment method" className="w-48">
-            <SelectValue placeholder="Payment method" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All methods</SelectItem>
-            {(methodsQuery.data ?? []).map((method) => (
-              <SelectItem key={method.id} value={method.id}>
-                {method.methodName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input
-          aria-label="Date from"
-          className="w-40"
-          onChange={(event) =>
-            setFilters((current) => ({ ...current, dateFrom: event.target.value }))
-          }
-          type="date"
-          value={filters.dateFrom}
-        />
-        <Input
-          aria-label="Date to"
-          className="w-40"
-          onChange={(event) =>
-            setFilters((current) => ({ ...current, dateTo: event.target.value }))
-          }
-          type="date"
-          value={filters.dateTo}
-        />
-        <Button
-          onClick={() => setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })}
-          type="button"
-          variant="outline"
-        >
-          Reset
-        </Button>
-        <TableDensityToggle className="ml-auto" />
-      </FilterBar>
+      {/* No search: the endpoint cannot search. Branch sits first in the
+          popover because it scopes everything below it. */}
+      <FilterToolbar
+        hasAnyFilter={hasActiveFilters}
+        hiddenFilterCount={hiddenFilterCount}
+        hideDensityBelowMd
+        onReset={resetFilters}
+        popoverTitle="Filter reconciliations"
+      >
+        <FilterField htmlFor="reconciliationFilterBranch" label="Branch">
+          <Select
+            onValueChange={(value) => setFilters((current) => ({ ...current, branchId: value }))}
+            value={filters.branchId}
+          >
+            <SelectTrigger id="reconciliationFilterBranch">
+              <SelectValue placeholder="Branch" />
+            </SelectTrigger>
+            <SelectContent>
+              {branchScope.canAccessAllBranches ? (
+                <SelectItem value="all">All branches</SelectItem>
+              ) : null}
+              {branchOptions.map((branch) => (
+                <SelectItem key={branch.id} value={branch.id}>
+                  {branch.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+        <FilterField htmlFor="reconciliationFilterMethod" label="Payment method">
+          <Select
+            onValueChange={(value) =>
+              setFilters((current) => ({ ...current, paymentMethodId: value }))
+            }
+            value={filters.paymentMethodId}
+          >
+            <SelectTrigger id="reconciliationFilterMethod">
+              <SelectValue placeholder="Payment method" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All methods</SelectItem>
+              {(methodsQuery.data ?? []).map((method) => (
+                <SelectItem key={method.id} value={method.id}>
+                  {method.methodName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+        <div className="grid grid-cols-2 gap-3">
+          <FilterField htmlFor="reconciliationFilterDateFrom" label="From">
+            <Input
+              id="reconciliationFilterDateFrom"
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, dateFrom: event.target.value }))
+              }
+              type="date"
+              value={filters.dateFrom}
+            />
+          </FilterField>
+          <FilterField htmlFor="reconciliationFilterDateTo" label="To">
+            <Input
+              id="reconciliationFilterDateTo"
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, dateTo: event.target.value }))
+              }
+              type="date"
+              value={filters.dateTo}
+            />
+          </FilterField>
+        </div>
+      </FilterToolbar>
 
       {lastCreated ? (
-        <div className="rounded-3xl border border-brand-cappuccino bg-card/80 p-4 text-sm text-brand-mocha">
-          Reconciliation created for {lastCreated.reconciliationDate}. Backend calculated the
-          expected amount and difference; the table below has been refreshed with the saved result.
-        </div>
+        <p className="rounded-lg bg-muted px-4 py-3 text-cell text-foreground-muted">
+          Reconciliation created for {lastCreated.reconciliationDate}. The backend calculated the
+          expected amount and difference; the list below shows the saved result.
+        </p>
       ) : null}
 
       {reconciliationsQuery.isLoading ? <PaymentsTableSkeleton /> : null}
@@ -212,19 +229,14 @@ export function ReconciliationPageClient(): JSX.Element {
 
       {!reconciliationsQuery.isLoading &&
       !reconciliationsQuery.error &&
-      (reconciliationsQuery.data ?? []).length === 0 &&
+      reconciliations.length === 0 &&
       hasActiveFilters ? (
-        <FilteredState
-          noun="reconciliations"
-          onClearFilters={() =>
-            setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })
-          }
-        />
+        <FilteredState noun="reconciliations" onClearFilters={resetFilters} />
       ) : null}
 
       {!reconciliationsQuery.isLoading &&
       !reconciliationsQuery.error &&
-      (reconciliationsQuery.data ?? []).length === 0 &&
+      reconciliations.length === 0 &&
       !hasActiveFilters ? (
         <PaymentsEmptyState
           title="No reconciliations yet"
@@ -232,14 +244,20 @@ export function ReconciliationPageClient(): JSX.Element {
         />
       ) : null}
 
+      {/* Cards below md, the table from md up. */}
       {!reconciliationsQuery.isLoading &&
       !reconciliationsQuery.error &&
-      (reconciliationsQuery.data ?? []).length > 0 ? (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <ReconciliationTable reconciliations={reconciliationsQuery.data ?? []} />
-          </CardContent>
-        </Card>
+      reconciliations.length > 0 ? (
+        <>
+          <div className="md:hidden">
+            <ReconciliationCardGrid reconciliations={reconciliations} />
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <ReconciliationTable reconciliations={reconciliations} />
+            </CardContent>
+          </Card>
+        </>
       ) : null}
 
       <ReconciliationFormDialog

@@ -6,13 +6,13 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { SalesReturnStatusBadge } from "@/components/payments/sales-return-status-badge";
+import { type FormTab, FormTabs } from "@/components/shared/form-tabs";
 import {
   SearchableCombobox,
   type SearchableComboboxOption,
 } from "@/components/shared/searchable-combobox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -57,6 +57,10 @@ type SalesReturnDialogProps = {
   stockLocations: StockLocation[];
 };
 
+type SalesReturnTabKey = "items" | "refund";
+
+const FORM_TABPANEL_ID = "sales-return-form-tabpanel";
+
 function formatMoney(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
 }
@@ -69,6 +73,12 @@ function selectedQuantity(lines: SalesReturnDraftFormItem[], saleItemId: string)
   return lines.find((line) => line.saleItemId === saleItemId)?.quantity ?? 0;
 }
 
+/**
+ * Create a sales return in two tabs: which items come back, and how the
+ * customer is compensated. Both tabs read the same state, so nothing typed
+ * on one is lost on the other. A validation failure switches to the tab
+ * that holds the problem before the toast explains it.
+ */
 export function SalesReturnDialog({
   onOpenChange,
   onPosted,
@@ -81,6 +91,7 @@ export function SalesReturnDialog({
   const returnableItemsQuery = useReturnableSaleItems(saleId, open && saleId !== null);
   const createMutation = useCreateSalesReturn();
   const postMutation = usePostSalesReturn();
+  const [activeTab, setActiveTab] = useState<SalesReturnTabKey>("items");
   const [returnDate, setReturnDate] = useState(todayDate);
   const [reason, setReason] = useState("");
   const [refundMode, setRefundMode] = useState<RefundMode>("refund");
@@ -119,9 +130,11 @@ export function SalesReturnDialog({
     selectedLines,
   );
   const requiresStockLocation = selectedLines.some((line) => line.restockAction === "restock");
+  const returnableItems = returnableItemsQuery.data ?? [];
 
   useEffect(() => {
     if (!open) {
+      setActiveTab("items");
       setReturnDate(todayDate());
       setReason("");
       setRefundMode("refund");
@@ -159,32 +172,43 @@ export function SalesReturnDialog({
     );
   };
 
-  const validate = (): string | null => {
+  /** The first problem, and the tab it lives on. */
+  const validate = (): { message: string; tab: SalesReturnTabKey } | null => {
     if (!saleId) {
-      return "Sale ID is missing.";
-    }
-
-    if (!reason.trim()) {
-      return "Return reason is required.";
+      return { message: "Sale ID is missing.", tab: "items" };
     }
 
     if (selectedLines.length === 0) {
-      return "Select at least one returned item.";
+      return { message: "Select at least one returned item.", tab: "items" };
     }
 
     const invalidLine = selectedLines.find((line) => {
-      const item = (returnableItemsQuery.data ?? []).find(
+      const item = returnableItems.find(
         (returnableItem) => returnableItem.saleItemId === line.saleItemId,
       );
       return !item || line.quantity > item.returnableQuantity;
     });
 
     if (invalidLine) {
-      return "Returned quantity cannot exceed remaining returnable quantity.";
+      return {
+        message: "Returned quantity cannot exceed remaining returnable quantity.",
+        tab: "items",
+      };
+    }
+
+    if (
+      requiresStockLocation &&
+      selectedLines.some((line) => line.restockAction === "restock" && !line.stockLocationId)
+    ) {
+      return { message: "Select a stock location for restocked items.", tab: "items" };
+    }
+
+    if (!reason.trim()) {
+      return { message: "Return reason is required.", tab: "refund" };
     }
 
     if (refundMode === "refund" && !refundPaymentMethodId) {
-      return "Select a refund payment method.";
+      return { message: "Select a refund payment method.", tab: "refund" };
     }
 
     if (
@@ -192,14 +216,10 @@ export function SalesReturnDialog({
       selectedPaymentMethod?.requiresReference &&
       !refundReferenceNumber.trim()
     ) {
-      return "Reference number is required for this refund payment method.";
-    }
-
-    if (
-      requiresStockLocation &&
-      selectedLines.some((line) => line.restockAction === "restock" && !line.stockLocationId)
-    ) {
-      return "Select a stock location for restocked items.";
+      return {
+        message: "Reference number is required for this refund payment method.",
+        tab: "refund",
+      };
     }
 
     return null;
@@ -208,7 +228,8 @@ export function SalesReturnDialog({
   const handleCreateDraft = async (): Promise<void> => {
     const validationError = validate();
     if (validationError) {
-      toast.error(validationError);
+      setActiveTab(validationError.tab);
+      toast.error(validationError.message);
       return;
     }
 
@@ -257,10 +278,18 @@ export function SalesReturnDialog({
     }
   };
 
+  const tabs: FormTab<SalesReturnTabKey>[] = [
+    { key: "items", label: "Items", badge: selectedLines.length },
+    { key: "refund", label: "Refund" },
+  ];
+  const estimateLabel =
+    refundMode === "store_credit" ? "Estimated store credit" : "Estimated refund";
+  const hasItems = returnableItems.length > 0;
+
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90dvh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b border-border px-6 pb-4 pt-6">
           <DialogTitle>Create sales return / credit note</DialogTitle>
           <DialogDescription>
             Return item quantities from {saleNumber ?? "this POS sale"} and optionally create a
@@ -269,39 +298,48 @@ export function SalesReturnDialog({
         </DialogHeader>
 
         {draftReturn ? (
-          <div className="space-y-5">
-            <Alert className="border-money/30 bg-money-tint text-money-text">
-              <CheckCircle2 className="h-4 w-4" />
-              <AlertTitle>Draft credit note ready</AlertTitle>
-              <AlertDescription>
-                Review {draftReturn.returnNumber}, then post it to finalize stock/refund handling.
-              </AlertDescription>
-            </Alert>
+          <>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+              <div className="grid gap-5">
+                <Alert className="border-money/30 bg-money-tint text-money-text">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <AlertTitle>Draft credit note ready</AlertTitle>
+                  <AlertDescription>
+                    Review {draftReturn.returnNumber}, then post it to finalize stock and refund
+                    handling.
+                  </AlertDescription>
+                </Alert>
 
-            <div className="grid gap-3 md:grid-cols-4">
-              <div className="rounded-2xl border border-brand-cappuccino bg-card p-4">
-                <p className="text-xs font-bold text-brand-mocha">Credit note</p>
-                <p className="mt-1 font-bold text-brand-espresso">{draftReturn.returnNumber}</p>
-              </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-card p-4">
-                <p className="text-xs font-bold text-brand-mocha">Refund amount</p>
-                <p className="mt-1 font-bold text-brand-espresso">
-                  {formatMoney(draftReturn.refundAmount)}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-card p-4">
-                <p className="text-xs font-bold text-brand-mocha">Items</p>
-                <p className="mt-1 font-bold text-brand-espresso">{draftReturn.items.length}</p>
-              </div>
-              <div className="rounded-2xl border border-brand-cappuccino bg-card p-4">
-                <p className="text-xs font-bold text-brand-mocha">Status</p>
-                <div className="mt-1">
-                  <SalesReturnStatusBadge status={draftReturn.status} />
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <div className="min-w-0 rounded-lg bg-muted p-3">
+                    <p className="text-meta text-foreground-muted">Credit note</p>
+                    <p className="mt-1 break-words font-mono text-cell font-medium">
+                      {draftReturn.returnNumber}
+                    </p>
+                  </div>
+                  <div className="min-w-0 rounded-lg bg-muted p-3">
+                    <p className="text-meta text-foreground-muted">Refund amount</p>
+                    <p className="mt-1 break-words text-cell font-medium tabular-nums">
+                      {formatMoney(draftReturn.refundAmount)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-muted p-3">
+                    <p className="text-meta text-foreground-muted">Items</p>
+                    <p className="mt-1 text-cell font-medium tabular-nums">
+                      {draftReturn.items.length}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-muted p-3">
+                    <p className="text-meta text-foreground-muted">Status</p>
+                    <div className="mt-1">
+                      <SalesReturnStatusBadge status={draftReturn.status} />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="border-t border-border px-6 py-4">
               <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
                 Close
               </Button>
@@ -314,78 +352,249 @@ export function SalesReturnDialog({
                 Post credit note
               </Button>
             </DialogFooter>
-          </div>
+          </>
         ) : (
-          <div className="space-y-6">
-            {returnableItemsQuery.isLoading ? (
-              <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-brand-mocha">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading returnable items...
+          <>
+            {hasItems ? (
+              <div className="border-b border-border px-6 py-3">
+                <FormTabs
+                  active={activeTab}
+                  aria-label="Sales return sections"
+                  onTabChange={setActiveTab}
+                  panelId={FORM_TABPANEL_ID}
+                  tabs={tabs}
+                />
               </div>
             ) : null}
 
-            {returnableItemsQuery.error ? (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Unable to load returnable items</AlertTitle>
-                <AlertDescription>{getErrorMessage(returnableItemsQuery.error)}</AlertDescription>
-              </Alert>
-            ) : null}
+            {/* One panel element that swaps. It is the only part that scrolls,
+                so the tab strip and the footer stay in reach on a phone. */}
+            <div
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5"
+              id={FORM_TABPANEL_ID}
+              role="tabpanel"
+              tabIndex={-1}
+            >
+              {returnableItemsQuery.isLoading ? (
+                <div className="flex min-h-48 items-center justify-center gap-2 text-cell text-foreground-muted">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading returnable items...
+                </div>
+              ) : null}
 
-            {!returnableItemsQuery.isLoading &&
-            !returnableItemsQuery.error &&
-            (returnableItemsQuery.data ?? []).length === 0 ? (
-              <div className="rounded-3xl border border-brand-cappuccino bg-brand-latte/40 p-8 text-center">
-                <p className="font-semibold text-brand-espresso">Nothing left to return</p>
-                <p className="mt-1 text-sm text-brand-mocha">
-                  This sale may already be fully returned or not eligible for item returns.
-                </p>
-              </div>
-            ) : null}
+              {returnableItemsQuery.error ? (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Unable to load returnable items</AlertTitle>
+                  <AlertDescription>{getErrorMessage(returnableItemsQuery.error)}</AlertDescription>
+                </Alert>
+              ) : null}
 
-            {(returnableItemsQuery.data ?? []).length > 0 ? (
-              <>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="return-date">Return date</Label>
-                    <Input
-                      id="return-date"
-                      onChange={(event) => setReturnDate(event.target.value)}
-                      type="date"
-                      value={returnDate}
+              {!returnableItemsQuery.isLoading && !returnableItemsQuery.error && !hasItems ? (
+                <div className="rounded-lg border border-dashed border-border p-8 text-center">
+                  <p className="font-medium">Nothing left to return</p>
+                  <p className="mt-1 text-cell text-foreground-muted">
+                    This sale may already be fully returned or not eligible for item returns.
+                  </p>
+                </div>
+              ) : null}
+
+              {hasItems && activeTab === "items" ? (
+                <div className="grid gap-4">
+                  {/* Rows stack on a phone and become a four-column grid from md. */}
+                  <div className="overflow-hidden rounded-lg border border-border">
+                    <div className="hidden gap-3 border-b border-border bg-muted px-4 py-2 text-meta text-foreground-muted md:grid md:grid-cols-[minmax(0,1fr)_6rem_9rem_13rem]">
+                      <span>Item</span>
+                      <span>Quantity</span>
+                      <span>Action</span>
+                      <span>Location / reason</span>
+                    </div>
+                    <div className="divide-y divide-border">
+                      {returnableItems.map((item) => {
+                        const line = lines.find(
+                          (candidate) => candidate.saleItemId === item.saleItemId,
+                        );
+                        const quantity = selectedQuantity(lines, item.saleItemId);
+
+                        return (
+                          <div
+                            className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_6rem_9rem_13rem]"
+                            key={item.saleItemId}
+                          >
+                            <div className="min-w-0">
+                              <p className="font-medium">{item.itemName}</p>
+                              <p className="mt-1 text-meta tabular-nums text-foreground-muted">
+                                Sold {item.soldQuantity} · Returned {item.returnedQuantity} ·
+                                Available {item.returnableQuantity}
+                              </p>
+                              <p className="mt-0.5 text-meta tabular-nums text-foreground-muted">
+                                Unit {formatMoney(item.unitPrice)}
+                              </p>
+                            </div>
+                            <Input
+                              aria-label={`Quantity to return for ${item.itemName}`}
+                              className="tabular-nums"
+                              min={0}
+                              max={item.returnableQuantity}
+                              onChange={(event) =>
+                                updateLine(item.saleItemId, (currentLine) => ({
+                                  ...currentLine,
+                                  quantity: Math.min(
+                                    Number(event.target.value || 0),
+                                    item.returnableQuantity,
+                                  ),
+                                }))
+                              }
+                              type="number"
+                              value={quantity}
+                            />
+                            <Select
+                              disabled={quantity <= 0}
+                              onValueChange={(value: RestockAction) =>
+                                updateLine(item.saleItemId, (currentLine) => ({
+                                  ...currentLine,
+                                  restockAction: value,
+                                  stockLocationId:
+                                    value === "discard" ? "" : currentLine.stockLocationId,
+                                }))
+                              }
+                              value={line?.restockAction ?? "discard"}
+                            >
+                              <SelectTrigger aria-label={`Stock action for ${item.itemName}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="discard">Discard</SelectItem>
+                                <SelectItem value="restock">Restock</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="grid gap-2">
+                              {line?.restockAction === "restock" ? (
+                                <SearchableCombobox
+                                  disabled={quantity <= 0}
+                                  emptyMessage="No active stock locations found."
+                                  onValueChange={(value) =>
+                                    updateLine(item.saleItemId, (currentLine) => ({
+                                      ...currentLine,
+                                      stockLocationId: value,
+                                    }))
+                                  }
+                                  options={stockLocationOptions}
+                                  placeholder="Select location"
+                                  searchPlaceholder="Search location..."
+                                  value={line.stockLocationId}
+                                />
+                              ) : null}
+                              <Input
+                                aria-label={`Line reason for ${item.itemName}`}
+                                disabled={quantity <= 0}
+                                onChange={(event) =>
+                                  updateLine(item.saleItemId, (currentLine) => ({
+                                    ...currentLine,
+                                    reason: event.target.value,
+                                  }))
+                                }
+                                placeholder="Line reason"
+                                value={line?.reason ?? ""}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <p className="text-cell text-foreground-muted">
+                    <span className="font-medium tabular-nums text-foreground">
+                      {selectedLines.length} item line{selectedLines.length === 1 ? "" : "s"}
+                    </span>{" "}
+                    selected. Posting the credit note finalizes refund and stock actions.
+                  </p>
+                </div>
+              ) : null}
+
+              {hasItems && activeTab === "refund" ? (
+                <div className="grid gap-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="return-date">Return date</Label>
+                      <Input
+                        id="return-date"
+                        onChange={(event) => setReturnDate(event.target.value)}
+                        type="date"
+                        value={returnDate}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="refund-mode">Refund mode</Label>
+                      <Select
+                        onValueChange={(value: RefundMode) => setRefundMode(value)}
+                        value={refundMode}
+                      >
+                        <SelectTrigger id="refund-mode">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="refund">Refund customer</SelectItem>
+                          <SelectItem value="store_credit">Store credit</SelectItem>
+                          <SelectItem value="none">No compensation</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {refundMode === "refund" ? (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="sales-return-refund-payment-method">
+                          Refund payment method
+                        </Label>
+                        <SearchableCombobox
+                          id="sales-return-refund-payment-method"
+                          emptyMessage="No active POS refund methods with payment accounts found."
+                          onValueChange={setRefundPaymentMethodId}
+                          options={paymentMethodOptions}
+                          placeholder="Select refund method"
+                          searchPlaceholder="Search method..."
+                          value={refundPaymentMethodId}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="refund-reference">
+                          Reference number
+                          {selectedPaymentMethod?.requiresReference ? " *" : ""}
+                        </Label>
+                        <Input
+                          id="refund-reference"
+                          onChange={(event) => setRefundReferenceNumber(event.target.value)}
+                          placeholder="Optional refund reference"
+                          value={refundReferenceNumber}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="return-reason">Return reason</Label>
+                    <Textarea
+                      id="return-reason"
+                      onChange={(event) => setReason(event.target.value)}
+                      placeholder="Why is this item being returned?"
+                      value={reason}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="refund-mode">Refund mode</Label>
-                    <Select
-                      onValueChange={(value: RefundMode) => setRefundMode(value)}
-                      value={refundMode}
-                    >
-                      <SelectTrigger id="refund-mode">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="refund">Refund customer</SelectItem>
-                        <SelectItem value="store_credit">Store credit</SelectItem>
-                        <SelectItem value="none">No compensation</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-4">
-                    <p className="text-xs font-bold text-brand-mocha">
-                      {refundMode === "store_credit"
-                        ? "Estimated store credit"
-                        : "Estimated refund"}
-                    </p>
-                    <p className="mt-1 text-2xl font-medium text-brand-espresso">
+
+                  <div className="rounded-lg bg-muted p-4">
+                    <p className="text-meta text-foreground-muted">{estimateLabel}</p>
+                    <p className="mt-1 text-title tabular-nums">
                       {formatMoney(
                         refundMode !== "none" ? estimatedRefundPreview.finalRefundAmount : 0,
                       )}
                     </p>
-                    <div className="mt-3 space-y-1 text-sm text-brand-mocha">
+                    <div className="mt-3 grid gap-1 text-cell text-foreground-muted">
                       <div className="flex items-center justify-between gap-3">
                         <span>Item refund amount</span>
-                        <span className="font-semibold text-brand-espresso">
+                        <span className="font-medium tabular-nums text-foreground">
                           {formatMoney(
                             refundMode !== "none" ? estimatedRefundPreview.itemRefundAmount : 0,
                           )}
@@ -393,7 +602,7 @@ export function SalesReturnDialog({
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span>Refundable VAT</span>
-                        <span className="font-semibold text-brand-espresso">
+                        <span className="font-medium tabular-nums text-foreground">
                           {formatMoney(
                             refundMode !== "none" ? estimatedRefundPreview.refundableVat : 0,
                           )}
@@ -402,180 +611,29 @@ export function SalesReturnDialog({
                     </div>
                   </div>
                 </div>
+              ) : null}
+            </div>
 
-                {refundMode === "refund" ? (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="sales-return-refund-payment-method">
-                        Refund payment method
-                      </Label>
-                      <SearchableCombobox
-                        id="sales-return-refund-payment-method"
-                        emptyMessage="No active POS refund methods with payment accounts found."
-                        onValueChange={setRefundPaymentMethodId}
-                        options={paymentMethodOptions}
-                        placeholder="Select refund method"
-                        searchPlaceholder="Search method..."
-                        value={refundPaymentMethodId}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="refund-reference">
-                        Reference number
-                        {selectedPaymentMethod?.requiresReference ? " *" : ""}
-                      </Label>
-                      <Input
-                        id="refund-reference"
-                        onChange={(event) => setRefundReferenceNumber(event.target.value)}
-                        placeholder="Optional refund reference"
-                        value={refundReferenceNumber}
-                      />
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="space-y-2">
-                  <Label htmlFor="return-reason">Return reason</Label>
-                  <Textarea
-                    id="return-reason"
-                    onChange={(event) => setReason(event.target.value)}
-                    placeholder="Why is this item being returned?"
-                    value={reason}
-                  />
-                </div>
-
-                <div className="overflow-hidden rounded-3xl border border-brand-cappuccino bg-card">
-                  <div className="grid grid-cols-[minmax(0,1fr)_120px_180px_220px] gap-3 border-b border-brand-cappuccino bg-brand-cream/60 px-4 py-3 text-xs font-bold text-brand-mocha">
-                    <span>Item</span>
-                    <span>Quantity</span>
-                    <span>Action</span>
-                    <span>Location / reason</span>
-                  </div>
-                  <div className="divide-y divide-brand-cappuccino/70">
-                    {(returnableItemsQuery.data ?? []).map((item) => {
-                      const line = lines.find(
-                        (candidate) => candidate.saleItemId === item.saleItemId,
-                      );
-                      const quantity = selectedQuantity(lines, item.saleItemId);
-
-                      return (
-                        <div
-                          className="grid grid-cols-[minmax(0,1fr)_120px_180px_220px] gap-3 px-4 py-3"
-                          key={item.saleItemId}
-                        >
-                          <div className="min-w-0">
-                            <p className="font-semibold text-brand-espresso">{item.itemName}</p>
-                            <p className="mt-1 text-xs text-brand-mocha">
-                              Sold {item.soldQuantity} / Returned {item.returnedQuantity} /
-                              Available {item.returnableQuantity}
-                            </p>
-                            <p className="mt-1 text-xs text-brand-mocha">
-                              Unit {formatMoney(item.unitPrice)}
-                            </p>
-                          </div>
-                          <Input
-                            min={0}
-                            max={item.returnableQuantity}
-                            onChange={(event) =>
-                              updateLine(item.saleItemId, (currentLine) => ({
-                                ...currentLine,
-                                quantity: Math.min(
-                                  Number(event.target.value || 0),
-                                  item.returnableQuantity,
-                                ),
-                              }))
-                            }
-                            type="number"
-                            value={quantity}
-                          />
-                          <Select
-                            disabled={quantity <= 0}
-                            onValueChange={(value: RestockAction) =>
-                              updateLine(item.saleItemId, (currentLine) => ({
-                                ...currentLine,
-                                restockAction: value,
-                                stockLocationId:
-                                  value === "discard" ? "" : currentLine.stockLocationId,
-                              }))
-                            }
-                            value={line?.restockAction ?? "discard"}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="discard">Discard</SelectItem>
-                              <SelectItem value="restock">Restock</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <div className="space-y-2">
-                            {line?.restockAction === "restock" ? (
-                              <SearchableCombobox
-                                disabled={quantity <= 0}
-                                emptyMessage="No active stock locations found."
-                                onValueChange={(value) =>
-                                  updateLine(item.saleItemId, (currentLine) => ({
-                                    ...currentLine,
-                                    stockLocationId: value,
-                                  }))
-                                }
-                                options={stockLocationOptions}
-                                placeholder="Select location"
-                                searchPlaceholder="Search location..."
-                                value={line.stockLocationId}
-                              />
-                            ) : null}
-                            <Input
-                              disabled={quantity <= 0}
-                              onChange={(event) =>
-                                updateLine(item.saleItemId, (currentLine) => ({
-                                  ...currentLine,
-                                  reason: event.target.value,
-                                }))
-                              }
-                              placeholder="Line reason"
-                              value={line?.reason ?? ""}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/40 p-4">
-                  <Checkbox checked={selectedLines.length > 0} disabled />
-                  <div>
-                    <p className="text-sm font-semibold text-brand-espresso">
-                      {selectedLines.length} item line{selectedLines.length === 1 ? "" : "s"}{" "}
-                      selected
-                    </p>
-                    <p className="text-sm text-brand-mocha">
-                      Posting the credit note finalizes refund and stock actions.
-                    </p>
-                  </div>
-                </div>
-
-                <DialogFooter>
-                  <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
-                    Cancel
-                  </Button>
-                  <Button
-                    disabled={createMutation.isPending}
-                    onClick={() => void handleCreateDraft()}
-                    type="button"
-                  >
-                    {createMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RotateCcw className="h-4 w-4" />
-                    )}
-                    Create draft return
-                  </Button>
-                </DialogFooter>
-              </>
-            ) : null}
-          </div>
+            <DialogFooter className="border-t border-border px-6 py-4">
+              <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
+                Cancel
+              </Button>
+              {hasItems ? (
+                <Button
+                  disabled={createMutation.isPending}
+                  onClick={() => void handleCreateDraft()}
+                  type="button"
+                >
+                  {createMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-4 w-4" />
+                  )}
+                  Create draft return
+                </Button>
+              ) : null}
+            </DialogFooter>
+          </>
         )}
       </DialogContent>
     </Dialog>

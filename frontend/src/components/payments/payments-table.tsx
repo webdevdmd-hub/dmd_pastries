@@ -1,9 +1,10 @@
-import { Eye, FileSearch, ReceiptText, Undo2 } from "lucide-react";
+"use client";
+
 import type { JSX } from "react";
 
+import { PaymentActionsMenu } from "@/components/payments/payment-actions-menu";
 import { PaymentMethodBadge } from "@/components/payments/payment-method-badge";
 import { PaymentStatusBadge } from "@/components/payments/payment-status-badge";
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -15,57 +16,27 @@ import {
 import { orderPaymentTypeLabel } from "@/lib/orders/payment-stage";
 import type { SalePayment } from "@/types/payment";
 
-type PaymentsTableProps = {
+export type PaymentsListProps = {
   canRefund: boolean;
   isReceiptLoading: boolean;
   onCreateReturn: (payment: SalePayment) => void;
+  /** Opens the payment's details; the whole row is the target. */
   onView: (payment: SalePayment) => void;
   onViewReceipt: (payment: SalePayment) => void;
   onViewSaleDetails: (payment: SalePayment) => void;
   payments: SalePayment[];
 };
 
-function formatMoney(value: number): string {
+export function formatPaymentMoney(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
 }
 
-function formatDate(value: string): string {
+export function formatPaymentDate(value: string | null): string {
   return value ? new Date(value).toLocaleString("en-AE") : "Not recorded";
 }
 
-function isRefundable(payment: SalePayment): boolean {
-  return (
-    payment.sourceType === "pos_sale" &&
-    (payment.paymentStatus === "completed" || payment.paymentStatus === "partially_refunded")
-  );
-}
-
-function refundDisabledReason(payment: SalePayment): string | null {
-  if (payment.sourceType !== "pos_sale") {
-    return "Refund actions are currently available for POS sale payments only.";
-  }
-
-  if (payment.paymentStatus === "refunded") {
-    return "This payment is already fully refunded.";
-  }
-
-  if (payment.paymentStatus === "failed") {
-    return "Failed payments cannot be refunded.";
-  }
-
-  if (payment.paymentStatus === "pending") {
-    return "Pending payments cannot be refunded until completed.";
-  }
-
-  return null;
-}
-
-function sourceLabel(payment: SalePayment): string {
+export function paymentSourceLabel(payment: SalePayment): string {
   return payment.sourceType === "bakery_order" ? "Bakery Order" : "POS Sale";
-}
-
-function paymentTypeLabel(payment: SalePayment): string {
-  return orderPaymentTypeLabel(payment.paymentType);
 }
 
 export function PaymentsTable({
@@ -76,105 +47,72 @@ export function PaymentsTable({
   onViewReceipt,
   onViewSaleDetails,
   payments,
-}: PaymentsTableProps): JSX.Element {
+}: PaymentsListProps): JSX.Element {
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="whitespace-nowrap">Source</TableHead>
-          <TableHead className="whitespace-nowrap">Customer</TableHead>
-          <TableHead className="whitespace-nowrap">Payment Method</TableHead>
-          <TableHead className="whitespace-nowrap">Type</TableHead>
-          <TableHead className="whitespace-nowrap text-right">Amount</TableHead>
-          <TableHead className="whitespace-nowrap">Status</TableHead>
-          <TableHead className="whitespace-nowrap">Reference</TableHead>
-          <TableHead className="whitespace-nowrap">Cashier</TableHead>
-          <TableHead className="whitespace-nowrap">Paid At</TableHead>
-          <TableHead className="whitespace-nowrap text-right">Actions</TableHead>
+          <TableHead>Source</TableHead>
+          <TableHead>Customer</TableHead>
+          <TableHead>Payment method</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead className="text-right">Amount</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Reference</TableHead>
+          <TableHead>Cashier</TableHead>
+          <TableHead>Paid at</TableHead>
+          <TableHead>
+            <span className="sr-only">Actions</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {payments.map((payment) => (
-          <TableRow key={payment.id}>
-            {/* The sale number is an identifier: mono, and it must not wrap.
-                Left to wrap it took two lines and pushed every row to 75px,
-                overriding the density system entirely. */}
-            <TableCell className="whitespace-nowrap">
-              <span className="block font-mono font-medium">{payment.sourceNumber}</span>
-              <span className="text-meta text-foreground-muted">{sourceLabel(payment)}</span>
+          // The row opens the drawer; the sale number is also a button so the
+          // keyboard has a focusable target for the same action.
+          <TableRow className="cursor-pointer" key={payment.id} onClick={() => onView(payment)}>
+            <TableCell>
+              <button
+                className="grid gap-0.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onView(payment);
+                }}
+                type="button"
+              >
+                {/* The sale number is an identifier: mono, and it must not wrap. */}
+                <span className="font-mono font-medium">{payment.sourceNumber}</span>
+                <span className="text-meta text-foreground-muted">
+                  {paymentSourceLabel(payment)}
+                </span>
+              </button>
             </TableCell>
-            <TableCell className="whitespace-nowrap">
-              {payment.customerName ?? "Walk-in customer"}
-            </TableCell>
-            <TableCell className="whitespace-nowrap">
+            <TableCell>{payment.customerName ?? "Walk-in customer"}</TableCell>
+            <TableCell>
               <PaymentMethodBadge methodName={payment.paymentMethodNameSnapshot} />
             </TableCell>
-            <TableCell className="whitespace-nowrap capitalize">
-              {paymentTypeLabel(payment)}
+            <TableCell className="capitalize">
+              {orderPaymentTypeLabel(payment.paymentType)}
             </TableCell>
-            <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
-              {formatMoney(payment.amount)}
-            </TableCell>
-            <TableCell className="whitespace-nowrap">
-              <PaymentStatusBadge status={payment.paymentStatus} />
-            </TableCell>
-            <TableCell className="whitespace-nowrap font-mono">
-              {payment.referenceNumber ?? "No reference"}
-            </TableCell>
-            <TableCell className="whitespace-nowrap">{payment.paidByUserName}</TableCell>
-            <TableCell className="whitespace-nowrap tabular-nums">
-              {formatDate(payment.paidAt)}
+            <TableCell className="text-right font-medium tabular-nums">
+              {formatPaymentMoney(payment.amount)}
             </TableCell>
             <TableCell>
-              <div className="flex justify-end gap-2">
-                <Button
-                  aria-label={`View ${payment.sourceNumber}`}
-                  onClick={() => onView(payment)}
-                  size="icon"
-                  type="button"
-                  variant="ghost"
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
-                {payment.sourceType === "pos_sale" && payment.sourceId ? (
-                  <>
-                    <Button
-                      aria-label={`View sale details for ${payment.sourceNumber}`}
-                      onClick={() => onViewSaleDetails(payment)}
-                      size="icon"
-                      title="View sale details"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <FileSearch className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      aria-label={`View receipt for ${payment.sourceNumber}`}
-                      disabled={isReceiptLoading}
-                      onClick={() => onViewReceipt(payment)}
-                      size="icon"
-                      title="View receipt"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <ReceiptText className="h-4 w-4" />
-                    </Button>
-                  </>
-                ) : null}
-                {canRefund ? (
-                  <Button
-                    aria-label={`Return items for ${payment.sourceNumber}`}
-                    disabled={!isRefundable(payment)}
-                    onClick={() => onCreateReturn(payment)}
-                    size="icon"
-                    title={refundDisabledReason(payment) ?? "Return items / credit note"}
-                    type="button"
-                    variant="ghost"
-                  >
-                    <Undo2 className="h-4 w-4" />
-                  </Button>
-                ) : null}
-              </div>
+              <PaymentStatusBadge status={payment.paymentStatus} />
+            </TableCell>
+            <TableCell className="font-mono">{payment.referenceNumber ?? "No reference"}</TableCell>
+            <TableCell>{payment.paidByUserName}</TableCell>
+            <TableCell className="tabular-nums">{formatPaymentDate(payment.paidAt)}</TableCell>
+            {/* The menu must not also open the drawer. */}
+            <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+              <PaymentActionsMenu
+                canRefund={canRefund}
+                isReceiptLoading={isReceiptLoading}
+                onCreateReturn={onCreateReturn}
+                onViewReceipt={onViewReceipt}
+                onViewSaleDetails={onViewSaleDetails}
+                payment={payment}
+              />
             </TableCell>
           </TableRow>
         ))}

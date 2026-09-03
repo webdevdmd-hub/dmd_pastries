@@ -10,6 +10,7 @@ import { AccessDeniedCard } from "@/components/payments/access-denied-card";
 import { AddPaymentDialog } from "@/components/payments/add-payment-dialog";
 import { PaymentDetailsDrawer } from "@/components/payments/payment-details-drawer";
 import { PaymentRefundDialog } from "@/components/payments/payment-refund-dialog";
+import { PaymentsCardGrid } from "@/components/payments/payments-card-grid";
 import { PaymentsEmptyState } from "@/components/payments/payments-empty-state";
 import { PaymentsErrorState } from "@/components/payments/payments-error-state";
 import { PaymentsTable } from "@/components/payments/payments-table";
@@ -107,7 +108,10 @@ export function PaymentsPageClient(): JSX.Element {
     branchId: branchScope.defaultBranchId,
   });
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  // The drawer keeps its payment while it animates closed, so open state is
+  // separate from the selected record.
   const [selectedPayment, setSelectedPayment] = useState<SalePayment | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [refundPayment, setRefundPayment] = useState<SalePayment | null>(null);
   const [returnPayment, setReturnPayment] = useState<SalePayment | null>(null);
   const [receipt, setReceipt] = useState<SaleReceipt | null>(null);
@@ -195,6 +199,24 @@ export function PaymentsPageClient(): JSX.Element {
     return <NoBranchScopeCard />;
   }
 
+  const openDetails = (payment: SalePayment): void => {
+    setSelectedPayment(payment);
+    setDetailsOpen(true);
+  };
+
+  // A dialog on top of a sheet on top of the list is one layer too many, so
+  // the drawer closes before any modal opens. Closing the modal then lands
+  // back on the list.
+  const openReturn = (payment: SalePayment): void => {
+    setDetailsOpen(false);
+    setReturnPayment(payment);
+  };
+
+  const openRefund = (payment: SalePayment): void => {
+    setDetailsOpen(false);
+    setRefundPayment(payment);
+  };
+
   const handleAddPayment = async (saleId: string, payload: AddPaymentPayload): Promise<void> => {
     try {
       await addPaymentMutation.mutateAsync({ saleId, payload });
@@ -222,6 +244,7 @@ export function PaymentsPageClient(): JSX.Element {
 
     try {
       const saleReceipt = await saleReceiptMutation.mutateAsync(payment.sourceId);
+      setDetailsOpen(false);
       setReceiptBranchId(payment.branchId || branchScope.effectiveBranchId);
       setReceipt(saleReceipt);
     } catch (error) {
@@ -235,6 +258,19 @@ export function PaymentsPageClient(): JSX.Element {
     }
 
     router.push(`/payments/sales/${payment.sourceId}`);
+  };
+
+  const payments = paymentsQuery.data ?? [];
+  const listHandlers = {
+    canRefund,
+    isReceiptLoading: saleReceiptMutation.isPending,
+    onCreateReturn: openReturn,
+    onView: openDetails,
+    onViewReceipt: (payment: SalePayment) => {
+      void handleViewReceipt(payment);
+    },
+    onViewSaleDetails: handleViewSaleDetails,
+    payments,
   };
 
   return (
@@ -287,7 +323,7 @@ export function PaymentsPageClient(): JSX.Element {
           took no money today, which may be flatly untrue. */}
       {!paymentsQuery.isLoading &&
       !paymentsQuery.error &&
-      (paymentsQuery.data ?? []).length === 0 &&
+      payments.length === 0 &&
       hasActiveFilters ? (
         <FilteredState
           noun="payments"
@@ -298,44 +334,36 @@ export function PaymentsPageClient(): JSX.Element {
 
       {!paymentsQuery.isLoading &&
       !paymentsQuery.error &&
-      (paymentsQuery.data ?? []).length === 0 &&
+      payments.length === 0 &&
       !hasActiveFilters ? (
         <PaymentsEmptyState />
       ) : null}
 
-      {!paymentsQuery.isLoading && !paymentsQuery.error && (paymentsQuery.data ?? []).length > 0 ? (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <PaymentsTable
-              canRefund={canRefund}
-              isReceiptLoading={saleReceiptMutation.isPending}
-              onCreateReturn={setReturnPayment}
-              onView={setSelectedPayment}
-              onViewReceipt={(payment) => {
-                void handleViewReceipt(payment);
-              }}
-              onViewSaleDetails={handleViewSaleDetails}
-              payments={paymentsQuery.data ?? []}
-            />
-          </CardContent>
-        </Card>
+      {/* A ten-column ledger has no honest phone layout. Below md the list is
+          cards carrying the same fields; the table takes over from md up. */}
+      {!paymentsQuery.isLoading && !paymentsQuery.error && payments.length > 0 ? (
+        <>
+          <div className="md:hidden">
+            <PaymentsCardGrid {...listHandlers} />
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <PaymentsTable {...listHandlers} />
+            </CardContent>
+          </Card>
+        </>
       ) : null}
 
       <PaymentDetailsDrawer
         canRefund={canRefund}
         isReceiptLoading={saleReceiptMutation.isPending}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedPayment(null);
-          }
-        }}
-        onRefund={setRefundPayment}
-        onCreateReturn={setReturnPayment}
+        onOpenChange={setDetailsOpen}
+        onRefund={openRefund}
+        onCreateReturn={openReturn}
         onViewReceipt={(payment) => {
           void handleViewReceipt(payment);
         }}
-        onViewSaleDetails={handleViewSaleDetails}
-        open={selectedPayment !== null}
+        open={detailsOpen}
         payment={selectedPayment}
         refunds={(refundsQuery.data ?? []).filter(
           (refund) => refund.salePaymentId === selectedPayment?.id,
