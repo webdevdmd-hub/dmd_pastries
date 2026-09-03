@@ -53,15 +53,33 @@ export function auditRecordLabel(actionLabel: string, recordLabel: string): stri
     return null;
   }
 
-  const normalise = (value: string): string =>
+  const words = (value: string): string[] =>
     value
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, " ")
-      .trim();
-  const action = normalise(actionLabel);
-  const candidate = normalise(record);
+      .trim()
+      .split(" ")
+      .filter(Boolean);
 
-  if (candidate.includes(action) || action.includes(candidate)) {
+  const actionWords = words(actionLabel);
+  const recordWords = words(record);
+
+  if (actionWords.length === 0 || recordWords.length === 0) {
+    return record;
+  }
+
+  // Word sets, not substrings: "Purchasing document chain viewed" restates
+  // "viewed purchasing document chain" with the verb moved to the end, which
+  // no substring test catches.
+  const actionSet = new Set(actionWords);
+  if (recordWords.every((word) => actionSet.has(word))) {
+    return null;
+  }
+
+  // And a record that merely ends with the action's verb -- "Accounting report
+  // viewed" under "viewed accounting ledger details" -- is the same sentence
+  // told twice, even when the nouns differ.
+  if (recordWords.at(-1) === actionWords[0]) {
     return null;
   }
 
