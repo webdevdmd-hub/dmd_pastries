@@ -3,7 +3,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Copy,
-  Database,
   ListChecks,
   LoaderCircle,
   MoreHorizontal,
@@ -20,13 +19,30 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { useConfirm } from "@/components/app/confirm-provider";
+import { MasterDataCardGrid } from "@/components/master-data/master-data-card-grid";
+import {
+  type MasterDataDetail,
+  matchesMasterDataQuery,
+  orderStatusDetail,
+  paymentStatusDetail,
+  productCategoryDetail,
+  simpleCategoryDetail,
+  unitDetail,
+} from "@/components/master-data/master-data-detail";
+import { MasterDataDetailsDrawer } from "@/components/master-data/master-data-details-drawer";
+import {
+  defaultMasterDataFilters,
+  type MasterDataFilters,
+  MasterDataToolbar,
+} from "@/components/master-data/master-data-toolbar";
 import { EmptyState } from "@/components/shared/collection-state";
+import { FilteredState } from "@/components/shared/collection-state";
 import { CollectionStateRow } from "@/components/shared/collection-state-row";
 import { PageHeader } from "@/components/shared/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -988,12 +1004,14 @@ function UnitsTable({
   onDeactivate,
   onEdit,
   onStatusChange,
+  onView,
   units,
 }: {
   canManage: boolean;
   onDeactivate: (unit: Unit) => void;
   onEdit: (unit: Unit) => void;
   onStatusChange: (unit: Unit, status: RecordStatus) => void;
+  onView: (unit: Unit) => void;
   units: Unit[];
 }): JSX.Element {
   return (
@@ -1021,7 +1039,7 @@ function UnitsTable({
           </CollectionStateRow>
         ) : null}
         {units.map((unit) => (
-          <TableRow key={unit.id}>
+          <TableRow className="cursor-pointer" key={unit.id} onClick={() => onView(unit)}>
             <TableCell className="font-medium">{unit.unitName}</TableCell>
             <TableCell>{unit.symbol}</TableCell>
             <TableCell>{unit.unitCategory.name}</TableCell>
@@ -1031,7 +1049,7 @@ function UnitsTable({
             <TableCell>
               <StatusBadge status={unit.status} />
             </TableCell>
-            <TableCell className="text-right">
+            <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -1084,12 +1102,14 @@ function ProductCategoriesTable({
   onDeactivate,
   onEdit,
   onStatusChange,
+  onView,
 }: {
   canManage: boolean;
   categories: ProductCategory[];
   onDeactivate: (category: ProductCategory) => void;
   onEdit: (category: ProductCategory) => void;
   onStatusChange: (category: ProductCategory, status: RecordStatus) => void;
+  onView: (category: ProductCategory) => void;
 }): JSX.Element {
   return (
     <Table>
@@ -1118,7 +1138,7 @@ function ProductCategoriesTable({
           const Icon = getProductCategoryIconForMetadata(category);
 
           return (
-            <TableRow key={category.id}>
+            <TableRow className="cursor-pointer" key={category.id} onClick={() => onView(category)}>
               <TableCell className="font-medium">
                 <div className="flex items-center gap-3">
                   <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-latte text-brand-mocha">
@@ -1146,7 +1166,7 @@ function ProductCategoriesTable({
               <TableCell>
                 <StatusBadge status={category.status} />
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -1198,6 +1218,7 @@ function SimpleCategoriesTable({
   onDeactivate,
   onEdit,
   onStatusChange,
+  onView,
 }: {
   canManage?: boolean;
   categories: SimpleCategory[];
@@ -1208,6 +1229,7 @@ function SimpleCategoriesTable({
   onDeactivate?: (category: SimpleCategory) => void;
   onEdit?: (category: SimpleCategory) => void;
   onStatusChange?: (category: SimpleCategory, status: RecordStatus) => void;
+  onView: (category: SimpleCategory) => void;
 }): JSX.Element {
   const showActions =
     onEdit !== undefined && onDeactivate !== undefined && onStatusChange !== undefined;
@@ -1233,14 +1255,14 @@ function SimpleCategoriesTable({
           </CollectionStateRow>
         ) : null}
         {categories.map((category) => (
-          <TableRow key={category.id}>
+          <TableRow className="cursor-pointer" key={category.id} onClick={() => onView(category)}>
             <TableCell className="font-medium">{category.categoryName}</TableCell>
             <TableCell className="min-w-64 whitespace-normal">{category.description}</TableCell>
             <TableCell>
               <StatusBadge status={category.status} />
             </TableCell>
             {showActions ? (
-              <TableCell className="text-right">
+              <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -1476,11 +1498,13 @@ function OrderStatusesTable({
   canManage,
   onEdit,
   onStatusChange,
+  onView,
   statuses,
 }: {
   canManage: boolean;
   onEdit: (status: OrderStatus) => void;
   onStatusChange: (status: OrderStatus, recordStatus: RecordStatus) => void;
+  onView: (status: OrderStatus) => void;
   statuses: OrderStatus[];
 }): JSX.Element {
   return (
@@ -1507,7 +1531,7 @@ function OrderStatusesTable({
           </CollectionStateRow>
         ) : null}
         {statuses.map((status) => (
-          <TableRow key={status.id}>
+          <TableRow className="cursor-pointer" key={status.id} onClick={() => onView(status)}>
             <TableCell className="font-medium">{status.statusName}</TableCell>
             <TableCell>{status.statusKey}</TableCell>
             <TableCell>{status.sortOrder}</TableCell>
@@ -1516,7 +1540,7 @@ function OrderStatusesTable({
             <TableCell>
               <StatusBadge status={status.status} />
             </TableCell>
-            <TableCell className="text-right">
+            <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -1695,11 +1719,13 @@ function PaymentStatusesTable({
   canManage,
   onEdit,
   onStatusChange,
+  onView,
   statuses,
 }: {
   canManage: boolean;
   onEdit: (status: PaymentStatus) => void;
   onStatusChange: (status: PaymentStatus, recordStatus: RecordStatus) => void;
+  onView: (status: PaymentStatus) => void;
   statuses: PaymentStatus[];
 }): JSX.Element {
   return (
@@ -1725,7 +1751,7 @@ function PaymentStatusesTable({
           </CollectionStateRow>
         ) : null}
         {statuses.map((status) => (
-          <TableRow key={status.id}>
+          <TableRow className="cursor-pointer" key={status.id} onClick={() => onView(status)}>
             <TableCell className="font-medium">{status.statusName}</TableCell>
             <TableCell>{status.statusKey}</TableCell>
             <TableCell>
@@ -1742,7 +1768,7 @@ function PaymentStatusesTable({
             <TableCell>
               <StatusBadge status={status.status} />
             </TableCell>
-            <TableCell className="text-right">
+            <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -1908,6 +1934,8 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
   const [simpleDialogOpen, setSimpleDialogOpen] = useState(false);
   const [selectedSimpleCategory, setSelectedSimpleCategory] = useState<SimpleCategory | null>(null);
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [filters, setFilters] = useState<MasterDataFilters>(defaultMasterDataFilters);
+  const [drawerDetail, setDrawerDetail] = useState<MasterDataDetail | null>(null);
   const [copySourceBranchId, setCopySourceBranchId] = useState("");
   const branchesQuery = useBranches(Boolean(copyableCollection && canManage));
   const activeCopySourceBranches = useMemo(
@@ -2411,6 +2439,83 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
     }
   };
 
+  const statusAllowed = (status: RecordStatus): boolean =>
+    filters.status === "all" || filters.status === status;
+  const query = filters.search.trim().toLowerCase();
+  const keep = (detail: MasterDataDetail): boolean =>
+    statusAllowed(detail.status) && matchesMasterDataQuery(detail, query);
+
+  // Each collection maps onto the shared descriptor, so the search, the cards
+  // and the drawer are written once rather than five times.
+  const filteredUnits = (unitsQuery.data ?? []).filter((unit) => keep(unitDetail(unit)));
+  const filteredProductCategories = (productCategoriesQuery.data ?? []).filter((category) =>
+    keep(productCategoryDetail(category)),
+  );
+  const filteredIngredientCategories = (ingredientCategoriesQuery.data ?? []).filter((category) =>
+    keep(simpleCategoryDetail(category)),
+  );
+  const filteredPackagingCategories = (packagingCategoriesQuery.data ?? []).filter((category) =>
+    keep(simpleCategoryDetail(category)),
+  );
+  const filteredOrderStatuses = (orderStatusesQuery.data ?? []).filter((status) =>
+    keep(orderStatusDetail(status)),
+  );
+  const filteredPaymentStatuses = (paymentStatusesQuery.data ?? []).filter((status) =>
+    keep(paymentStatusDetail(status)),
+  );
+
+  const activeDetails: MasterDataDetail[] =
+    collection === "units"
+      ? filteredUnits.map(unitDetail)
+      : collection === "product-categories"
+        ? filteredProductCategories.map(productCategoryDetail)
+        : collection === "ingredient-categories"
+          ? filteredIngredientCategories.map(simpleCategoryDetail)
+          : collection === "packaging-categories"
+            ? filteredPackagingCategories.map(simpleCategoryDetail)
+            : collection === "order-statuses"
+              ? filteredOrderStatuses.map(orderStatusDetail)
+              : filteredPaymentStatuses.map(paymentStatusDetail);
+
+  // The drawer holds a descriptor, so one component serves every collection.
+  const editFromDrawer = (): void => {
+    const detail = drawerDetail;
+    setDrawerDetail(null);
+
+    if (!detail) return;
+
+    if (collection === "units") {
+      const unit = unitsQuery.data?.find((item) => item.id === detail.id);
+      if (unit) openEditUnitDialog(unit);
+      return;
+    }
+
+    if (collection === "product-categories") {
+      const category = productCategoriesQuery.data?.find((item) => item.id === detail.id);
+      if (category) openEditProductCategoryDialog(category);
+      return;
+    }
+
+    if (collection === "ingredient-categories" || collection === "packaging-categories") {
+      const source =
+        collection === "ingredient-categories"
+          ? ingredientCategoriesQuery.data
+          : packagingCategoriesQuery.data;
+      const category = source?.find((item) => item.id === detail.id);
+      if (category) openEditSimpleCategoryDialog(category);
+      return;
+    }
+
+    if (collection === "order-statuses") {
+      const status = orderStatusesQuery.data?.find((item) => item.id === detail.id);
+      if (status) openEditOrderStatusDialog(status);
+      return;
+    }
+
+    const status = paymentStatusesQuery.data?.find((item) => item.id === detail.id);
+    if (status) openEditPaymentStatusDialog(status);
+  };
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
@@ -2505,26 +2610,50 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
           onSubmit={handleCopyCategories}
         />
       ) : null}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-brand-espresso">
-            <Database className="h-5 w-5" />
-            Seeded business reference data
-          </CardTitle>
-        </CardHeader>
-      </Card>
+      {/* A card that held only a title and did nothing is gone. The page
+          heading already says what this screen is. */}
+      <MasterDataToolbar
+        filters={filters}
+        noun={titles[collection].toLowerCase()}
+        onFiltersChange={setFilters}
+      />
+
+      {/* Five tables of up to seven columns, none of which survives 375px.
+          Below md the active collection renders as cards instead. */}
+      {!activeQuery.isLoading && !activeQuery.error && activeDetails.length > 0 ? (
+        <div className="md:hidden">
+          <MasterDataCardGrid details={activeDetails} onView={setDrawerDetail} />
+        </div>
+      ) : null}
+
+      {!activeQuery.isLoading && !activeQuery.error && activeDetails.length === 0 ? (
+        <FilteredState
+          noun={titles[collection].toLowerCase()}
+          onClearFilters={() => setFilters(defaultMasterDataFilters)}
+          query={filters.search.trim() || undefined}
+        />
+      ) : null}
+
+      <MasterDataDetailsDrawer
+        canManage={canManage}
+        detail={drawerDetail}
+        onEdit={editFromDrawer}
+        onOpenChange={(open) => (!open ? setDrawerDetail(null) : undefined)}
+        open={drawerDetail !== null}
+      />
       {activeQuery.isLoading ? <LoadingCard /> : null}
       {activeQuery.error ? <ErrorCard>{getErrorMessage(activeQuery.error)}</ErrorCard> : null}
       {collection === "units" && unitsQuery.data ? (
-        <Card className="overflow-hidden">
+        <Card className="hidden overflow-hidden md:block">
           <CardContent className="p-0">
             <UnitsTable
               canManage={canManage}
-              units={unitsQuery.data}
+              units={filteredUnits}
               onDeactivate={(unit) => {
                 void handleUnitDeactivate(unit);
               }}
               onEdit={openEditUnitDialog}
+              onView={(unit) => setDrawerDetail(unitDetail(unit))}
               onStatusChange={(unit, status) => {
                 void handleUnitStatusChange(unit, status);
               }}
@@ -2544,15 +2673,16 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
         />
       ) : null}
       {collection === "product-categories" && productCategoriesQuery.data ? (
-        <Card className="overflow-hidden">
+        <Card className="hidden overflow-hidden md:block">
           <CardContent className="p-0">
             <ProductCategoriesTable
               canManage={canManage}
-              categories={productCategoriesQuery.data}
+              categories={filteredProductCategories}
               onDeactivate={(category) => {
                 void handleProductCategoryDeactivate(category);
               }}
               onEdit={openEditProductCategoryDialog}
+              onView={(category) => setDrawerDetail(productCategoryDetail(category))}
               onStatusChange={(category, status) => {
                 void handleProductCategoryStatusChange(category, status);
               }}
@@ -2570,16 +2700,17 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
         />
       ) : null}
       {collection === "ingredient-categories" && ingredientCategoriesQuery.data ? (
-        <Card className="overflow-hidden">
+        <Card className="hidden overflow-hidden md:block">
           <CardContent className="p-0">
             <SimpleCategoriesTable
               canManage={canManage}
-              categories={ingredientCategoriesQuery.data}
+              categories={filteredIngredientCategories}
               noun="ingredient categories"
               onDeactivate={(category) => {
                 void handleSimpleCategoryDeactivate(category);
               }}
               onEdit={openEditSimpleCategoryDialog}
+              onView={(category) => setDrawerDetail(simpleCategoryDetail(category))}
               onStatusChange={(category, status) => {
                 void handleSimpleCategoryStatusChange(category, status);
               }}
@@ -2588,16 +2719,17 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
         </Card>
       ) : null}
       {collection === "packaging-categories" && packagingCategoriesQuery.data ? (
-        <Card className="overflow-hidden">
+        <Card className="hidden overflow-hidden md:block">
           <CardContent className="p-0">
             <SimpleCategoriesTable
               canManage={canManage}
-              categories={packagingCategoriesQuery.data}
+              categories={filteredPackagingCategories}
               noun="packaging categories"
               onDeactivate={(category) => {
                 void handleSimpleCategoryDeactivate(category);
               }}
               onEdit={openEditSimpleCategoryDialog}
+              onView={(category) => setDrawerDetail(simpleCategoryDetail(category))}
               onStatusChange={(category, status) => {
                 void handleSimpleCategoryStatusChange(category, status);
               }}
@@ -2620,12 +2752,13 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
         />
       ) : null}
       {collection === "order-statuses" && orderStatusesQuery.data ? (
-        <Card className="overflow-hidden">
+        <Card className="hidden overflow-hidden md:block">
           <CardContent className="p-0">
             <OrderStatusesTable
               canManage={canManage}
-              statuses={orderStatusesQuery.data}
+              statuses={filteredOrderStatuses}
               onEdit={openEditOrderStatusDialog}
+              onView={(status) => setDrawerDetail(orderStatusDetail(status))}
               onStatusChange={(status, recordStatus) => {
                 void handleOrderStatusStatusChange(status, recordStatus);
               }}
@@ -2643,12 +2776,13 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
         />
       ) : null}
       {collection === "payment-statuses" && paymentStatusesQuery.data ? (
-        <Card className="overflow-hidden">
+        <Card className="hidden overflow-hidden md:block">
           <CardContent className="p-0">
             <PaymentStatusesTable
               canManage={canManage}
-              statuses={paymentStatusesQuery.data}
+              statuses={filteredPaymentStatuses}
               onEdit={openEditPaymentStatusDialog}
+              onView={(status) => setDrawerDetail(paymentStatusDetail(status))}
               onStatusChange={(status, recordStatus) => {
                 void handlePaymentStatusStatusChange(status, recordStatus);
               }}
