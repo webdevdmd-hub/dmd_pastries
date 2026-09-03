@@ -38,6 +38,36 @@ export function formatAuditValue(value: ActivityMetadataValue): string {
   return String(value);
 }
 
+/**
+ * The record a log line names, or nothing.
+ *
+ * The backend sometimes sets recordLabel to a restatement of the action
+ * ("Purchasing document chain viewed" for the action "viewed purchasing
+ * document chain") and sometimes to the literal string "Unknown". Printing
+ * either turns the sentence into a stutter.
+ */
+export function auditRecordLabel(actionLabel: string, recordLabel: string): string | null {
+  const record = recordLabel.trim();
+
+  if (record.length === 0 || record.toLowerCase() === "unknown") {
+    return null;
+  }
+
+  const normalise = (value: string): string =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  const action = normalise(actionLabel);
+  const candidate = normalise(record);
+
+  if (candidate.includes(action) || action.includes(candidate)) {
+    return null;
+  }
+
+  return record;
+}
+
 export function formatAuditTime(value: string, timeZone: string): string {
   const date = new Date(value);
 
@@ -45,9 +75,14 @@ export function formatAuditTime(value: string, timeZone: string): string {
     return "Unknown time";
   }
 
-  return new Intl.DateTimeFormat("en-AE", { hour: "2-digit", minute: "2-digit", timeZone }).format(
-    date,
-  );
+  // 24-hour, so every row is five characters wide and the column stays one
+  // line. "03:57 PM" wrapped.
+  return new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    timeZone,
+  }).format(date);
 }
 
 export function auditDayKey(value: string, timeZone: string): string {
@@ -112,6 +147,7 @@ export function AuditLogEntry({
     log.userAgent.length > 0;
   const target =
     log.targetUserName && log.targetUserName !== log.actorUserName ? log.targetUserName : null;
+  const record = auditRecordLabel(log.actionLabel, log.recordLabel);
 
   return (
     <li className="bg-card">
@@ -121,7 +157,7 @@ export function AuditLogEntry({
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
-        <span className="w-12 shrink-0 pt-0.5 text-meta tabular-nums text-foreground-muted">
+        <span className="w-10 shrink-0 pt-0.5 text-meta tabular-nums text-foreground-muted">
           {formatAuditTime(log.createdAt, timezone)}
         </span>
         <span className="min-w-0 flex-1">
@@ -130,10 +166,10 @@ export function AuditLogEntry({
           <span className="block text-cell">
             <span className="font-medium">{log.actorUserName || "System"}</span>{" "}
             {log.actionLabel.toLowerCase()}
-            {log.recordLabel ? (
+            {record ? (
               <>
                 {" "}
-                <span className="font-medium">{log.recordLabel}</span>
+                <span className="font-medium">{record}</span>
               </>
             ) : null}
             {target ? <> for {target}</> : null}
