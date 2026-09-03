@@ -1,9 +1,16 @@
 "use client";
 
+import { ArrowUpRight, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import type { JSX } from "react";
+import { useState } from "react";
 
-import { AccountingJournalLink } from "@/components/shared/accounting-reference-links";
+import {
+  DEFAULT_MOVEMENT_DETAIL_TAB,
+  MOVEMENT_DETAIL_BASE_PATH,
+  type MovementDetailTabKey,
+} from "@/components/stock-movements/movement-detail-tabs";
+import { MovementDetailsPanel } from "@/components/stock-movements/movement-details-panel";
 import { MovementDirectionBadge } from "@/components/stock-movements/movement-direction-badge";
 import { MovementTypeBadge } from "@/components/stock-movements/movement-type-badge";
 import { Button } from "@/components/ui/button";
@@ -14,170 +21,86 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  sourceModuleLabel,
-  sourceReferenceLabel,
-  stockMovementDescription,
-} from "@/lib/inventory/stock-movement-display";
 import type { StockMovement } from "@/types/stock-movements";
 
 type MovementDetailsDrawerProps = {
+  /** Whether the viewer may reverse this row. The host owns the eligibility
+   *  rules; this only decides whether the button is offered. */
+  canReverse: boolean;
   movement: StockMovement | null;
   onOpenChange: (open: boolean) => void;
+  /** Closes the drawer and opens the host's reversal dialog. */
+  onReverse: (movement: StockMovement) => void;
   open: boolean;
 };
 
-function formatDate(value: string): string {
-  return value ? new Date(value).toLocaleString("en-AE") : "Not recorded";
-}
-
-function formatQuantity(value: number, unit: string): string {
-  return `${new Intl.NumberFormat("en-AE", { maximumFractionDigits: 3 }).format(value)} ${unit}`;
-}
-
-function formatMoney(value: number): string {
-  return new Intl.NumberFormat("en-AE", {
-    currency: "AED",
-    style: "currency",
-  }).format(value);
-}
-
-function formatItemType(value: StockMovement["itemType"]): string {
-  if (value === "product_variant") return "Variant";
-  if (value === "product") return "Product";
-  if (value === "ingredient") return "Ingredient";
-  return "Packaging";
-}
-
-function DetailRow({ label, value }: { label: string; value: string }): JSX.Element {
-  return (
-    <div className="rounded-2xl border border-border bg-card/70 p-3">
-      <p className="text-xs text-foreground-muted">{label}</p>
-      <p className="mt-1 font-semibold text-foreground">{value}</p>
-    </div>
-  );
-}
-
-function locationName(value: string | null): string {
-  return value && value.trim().length > 0 ? value : "Unknown location";
-}
-
+/**
+ * A ledger row, over the ledger.
+ *
+ * The tab state is in memory, not in the URL: a `router.replace` here would
+ * remount the page segment about a second later and Radix would dismiss the
+ * sheet. The full page is the URL-addressable copy, and its link is in the
+ * header.
+ */
 export function MovementDetailsDrawer({
+  canReverse,
   movement,
   onOpenChange,
+  onReverse,
   open,
 }: MovementDetailsDrawerProps): JSX.Element {
+  const [activeTab, setActiveTab] = useState<MovementDetailTabKey>(DEFAULT_MOVEMENT_DETAIL_TAB);
+
   return (
     <Sheet onOpenChange={onOpenChange} open={open}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-2xl" side="right">
-        <SheetHeader>
-          <SheetTitle>{movement?.itemName ?? "Stock movement"}</SheetTitle>
-          <SheetDescription>Complete stock ledger entry and reversal context.</SheetDescription>
-        </SheetHeader>
         {movement ? (
-          <div className="mt-6 space-y-5">
-            <div className="flex flex-wrap gap-2">
-              <MovementTypeBadge type={movement.movementType} />
-              <MovementDirectionBadge direction={movement.movementDirection} />
-            </div>
-            <div className="rounded-2xl border border-border bg-card/70 p-4">
-              <p className="text-xs text-foreground-muted">What happened</p>
-              <p className="mt-2 font-semibold text-foreground">
-                {stockMovementDescription(movement)}
-              </p>
-              <p className="mt-1 text-sm text-foreground-muted">
-                {sourceModuleLabel(movement)} - {sourceReferenceLabel(movement)}
-              </p>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <DetailRow label="Movement ID" value={movement.id} />
-              <DetailRow label="Branch" value={movement.branchName} />
-              <DetailRow label="Item type" value={formatItemType(movement.itemType)} />
-              <DetailRow
-                label="Quantity"
-                value={formatQuantity(movement.quantity, movement.unitSymbol)}
-              />
-              <DetailRow
-                label="Before"
-                value={formatQuantity(movement.beforeQuantity, movement.unitSymbol)}
-              />
-              <DetailRow
-                label="After"
-                value={formatQuantity(movement.afterQuantity, movement.unitSymbol)}
-              />
-              <DetailRow label="Reference type" value={movement.referenceType ?? "Manual"} />
-              <DetailRow label="Reference number" value={movement.referenceNumber ?? "None"} />
-              {movement.movementType === "transfer" ? (
-                <>
-                  <DetailRow
-                    label="From location"
-                    value={locationName(movement.fromStockLocationName)}
-                  />
-                  <DetailRow
-                    label="To location"
-                    value={locationName(movement.toStockLocationName)}
-                  />
-                  <DetailRow label="Transfer number" value={movement.referenceNumber ?? "None"} />
-                </>
-              ) : null}
-              <DetailRow
-                label="Total cost"
-                value={movement.totalCost > 0 ? formatMoney(movement.totalCost) : "Not costed"}
-              />
-              <DetailRow
-                label="Unit cost"
-                value={
-                  movement.unitCostSnapshot > 0
-                    ? formatMoney(movement.unitCostSnapshot)
-                    : "Not costed"
-                }
-              />
-              <DetailRow label="Valuation" value={movement.valuationMethod ?? "Not available"} />
-              <DetailRow label="Created by" value={movement.createdByUserName} />
-              <DetailRow label="Created at" value={formatDate(movement.createdAt)} />
-            </div>
-            {movement.accountingJournalEntryId ? (
-              <div className="rounded-2xl border border-border bg-card/70 p-4">
-                <p className="text-xs text-foreground-muted">Accounting journal</p>
-                <p className="mt-2 text-sm text-foreground">
-                  This movement was posted to accounting journal {movement.accountingJournalEntryId}
-                  .
-                </p>
-                <div className="mt-3">
-                  <AccountingJournalLink id={movement.accountingJournalEntryId} />
-                </div>
+          // Keyed by movement: opening a different row resets the tab rather
+          // than landing on Costing because that is where the last one was left.
+          <div className="grid min-w-0 gap-6" key={movement.id}>
+            <SheetHeader className="space-y-0 p-0">
+              <SheetTitle className="text-section">{movement.itemName}</SheetTitle>
+              <SheetDescription className="sr-only">
+                Stock ledger entry, costing and audit trail.
+              </SheetDescription>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <MovementTypeBadge type={movement.movementType} />
+                <MovementDirectionBadge direction={movement.movementDirection} />
               </div>
-            ) : null}
-            <div className="rounded-2xl border border-border bg-card/70 p-4">
-              <p className="text-xs text-foreground-muted">Reason</p>
-              <p className="mt-2 text-sm text-foreground">
-                {movement.reason ?? stockMovementDescription(movement)}
-              </p>
-              {movement.notes ? (
-                <>
-                  <p className="mt-4 text-xs text-foreground-muted">Notes</p>
-                  <p className="mt-2 text-sm text-foreground">{movement.notes}</p>
-                </>
-              ) : null}
-            </div>
-            {movement.reversedMovementId ? (
-              <div className="rounded-2xl border border-warning/30 bg-warning-tint p-4">
-                <p className="font-medium text-foreground">Reversal information</p>
-                <p className="mt-1 text-sm text-foreground-muted">
-                  Related movement: {movement.reversedMovementId}
-                </p>
-                <Button asChild className="mt-3" size="sm" type="button" variant="outline">
-                  <Link href={`/inventory/movements/${movement.reversedMovementId}`}>
-                    Open related movement
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button asChild size="sm" type="button" variant="outline">
+                  <Link href={`${MOVEMENT_DETAIL_BASE_PATH}/${movement.id}`}>
+                    <ArrowUpRight className="h-4 w-4" />
+                    Open full page
                   </Link>
                 </Button>
+                {canReverse ? (
+                  <Button
+                    onClick={() => onReverse(movement)}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Reverse movement
+                  </Button>
+                ) : null}
               </div>
-            ) : null}
-            <Button asChild type="button" variant="outline">
-              <Link href={`/inventory/audit/${movement.inventoryItemId}`}>Audit this item</Link>
-            </Button>
+            </SheetHeader>
+
+            <MovementDetailsPanel
+              activeTab={activeTab}
+              movement={movement}
+              onTabChange={setActiveTab}
+            />
           </div>
-        ) : null}
+        ) : (
+          // Radix requires a title on every open sheet, including this one.
+          <SheetHeader>
+            <SheetTitle className="sr-only">Stock movement</SheetTitle>
+            <SheetDescription>No movement selected.</SheetDescription>
+          </SheetHeader>
+        )}
       </SheetContent>
     </Sheet>
   );

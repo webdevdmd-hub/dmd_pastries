@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, MoreHorizontal, RotateCcw } from "lucide-react";
+import { MoreHorizontal, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import type { JSX } from "react";
 
@@ -18,10 +18,9 @@ type MovementActionsMenuProps = {
   canReverse: boolean;
   movement: StockMovement;
   onReverse: (movement: StockMovement) => void;
-  onView: (movement: StockMovement) => void;
 };
 
-function canAttemptReverse(movement: StockMovement): boolean {
+export function canAttemptReverse(movement: StockMovement): boolean {
   return (
     !movement.isReversal &&
     movement.movementType !== "reversal" &&
@@ -31,11 +30,18 @@ function canAttemptReverse(movement: StockMovement): boolean {
   );
 }
 
+/**
+ * Actions and one sideways link.
+ *
+ * "View details" and "Open full page" are gone: the row itself opens the
+ * drawer, and the drawer header carries the full-page link. What is left is
+ * the item's whole ledger, which is a different record from this row, and the
+ * reversal.
+ */
 export function MovementActionsMenu({
   canReverse,
   movement,
   onReverse,
-  onView,
 }: MovementActionsMenuProps): JSX.Element {
   const reverseAllowed = canReverse && canAttemptReverse(movement);
 
@@ -52,13 +58,6 @@ export function MovementActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => onView(movement)}>
-          <Eye className="mr-2 h-4 w-4" />
-          View details
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href={`/inventory/movements/${movement.id}`}>Open full page</Link>
-        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href={`/inventory/audit/${movement.inventoryItemId}`}>Audit item ledger</Link>
         </DropdownMenuItem>

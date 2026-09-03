@@ -13,18 +13,27 @@ import {
 import { stockMovementDescription } from "@/lib/inventory/stock-movement-display";
 import type { StockMovement } from "@/types/stock-movements";
 
-type MovementsTableProps = {
+export type MovementsListProps = {
   canReverse: boolean;
   movements: StockMovement[];
   onReverse: (movement: StockMovement) => void;
   onView: (movement: StockMovement) => void;
 };
 
-function formatDate(value: string): string {
+export function formatMovementDateTime(value: string): string {
   return value ? new Date(value).toLocaleString("en-AE") : "Not recorded";
 }
 
-function formatQuantity(value: number): string {
+/** Day and time without the seconds, for the phone cards. */
+export function formatMovementDay(value: string): string {
+  return value
+    ? new Intl.DateTimeFormat("en-AE", { dateStyle: "medium", timeStyle: "short" }).format(
+        new Date(value),
+      )
+    : "Not recorded";
+}
+
+export function formatMovementQuantity(value: number): string {
   return new Intl.NumberFormat("en-AE", { maximumFractionDigits: 3 }).format(value);
 }
 
@@ -57,7 +66,7 @@ function TransferDetails({ movement }: { movement: StockMovement }): JSX.Element
       <p>From: {locationName(movement.fromStockLocationName)}</p>
       <p>To: {locationName(movement.toStockLocationName)}</p>
       <p>
-        {formatQuantity(movement.quantity)} {movement.unitSymbol}
+        {formatMovementQuantity(movement.quantity)} {movement.unitSymbol}
       </p>
     </div>
   );
@@ -87,7 +96,7 @@ export function MovementsTable({
   movements,
   onReverse,
   onView,
-}: MovementsTableProps): JSX.Element {
+}: MovementsListProps): JSX.Element {
   return (
     <Table>
       <TableHeader>
@@ -104,28 +113,49 @@ export function MovementsTable({
       </TableHeader>
       <TableBody>
         {movements.map((movement) => (
-          <TableRow className={rowClassName(movement)} key={movement.id}>
-            <TableCell className="tabular-nums">{formatDate(movement.createdAt)}</TableCell>
+          // The row opens the drawer. The tinting stays: it is how a reversal
+          // is spotted while scanning, and it survives the added cursor.
+          <TableRow
+            className={`cursor-pointer ${rowClassName(movement) ?? ""}`}
+            key={movement.id}
+            onClick={() => onView(movement)}
+          >
+            <TableCell className="tabular-nums">
+              {formatMovementDateTime(movement.createdAt)}
+            </TableCell>
             {/* Name only. The line under it used to be the first eight
                 characters of inventoryItemId, which sits exactly where an item
                 code goes and reads like one -- `5279d113` is entirely plausible
                 as a SKU. StockMovement carries no itemCode, so there was
                 nothing true to put there; the full id is in the drawer as
                 "Movement ID" for anyone who needs to trace a row. */}
-            <TableCell className="font-medium">{movement.itemName}</TableCell>
+            <TableCell className="font-medium">
+              {/* Also a button, so the keyboard has a focusable target for the
+                  same action the row click performs. */}
+              <button
+                className="rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onView(movement);
+                }}
+                type="button"
+              >
+                {movement.itemName}
+              </button>
+            </TableCell>
             <TableCell>
               <MovementTypeBadge type={movement.movementType} />
               <TransferDetails movement={movement} />
             </TableCell>
             <TableCell className="text-right font-medium tabular-nums">
-              {formatQuantity(movement.quantity)}
+              {formatMovementQuantity(movement.quantity)}
               <span className="ml-1 text-foreground-muted">{movement.unitSymbol}</span>
             </TableCell>
             <TableCell className="text-right tabular-nums text-foreground-muted">
-              {formatQuantity(movement.beforeQuantity)}
+              {formatMovementQuantity(movement.beforeQuantity)}
               <span className="mx-1">&rarr;</span>
               <span className="font-medium text-foreground">
-                {formatQuantity(movement.afterQuantity)}
+                {formatMovementQuantity(movement.afterQuantity)}
               </span>
             </TableCell>
             <TableCell className="text-right tabular-nums">
@@ -136,12 +166,12 @@ export function MovementsTable({
                 {stockMovementDescription(movement)}
               </p>
             </TableCell>
-            <TableCell className="text-right">
+            {/* The menu must not also open the drawer. */}
+            <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
               <MovementActionsMenu
                 canReverse={canReverse}
                 movement={movement}
                 onReverse={onReverse}
-                onView={onView}
               />
             </TableCell>
           </TableRow>

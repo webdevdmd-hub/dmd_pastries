@@ -9,7 +9,9 @@ import { FilteredState } from "@/components/shared/collection-state";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { AccessDeniedCard } from "@/components/stock-movements/access-denied-card";
 import { ManualMovementDialog } from "@/components/stock-movements/manual-movement-dialog";
+import { canAttemptReverse } from "@/components/stock-movements/movement-actions-menu";
 import { MovementDetailsDrawer } from "@/components/stock-movements/movement-details-drawer";
+import { MovementsCardGrid } from "@/components/stock-movements/movements-card-grid";
 import { MovementsEmptyState } from "@/components/stock-movements/movements-empty-state";
 import { MovementsErrorState } from "@/components/stock-movements/movements-error-state";
 import { MovementsSummaryCards } from "@/components/stock-movements/movements-summary-cards";
@@ -196,6 +198,21 @@ export function MovementsPanel({ itemId, onClearItemScope }: MovementsPanelProps
     onClearItemScope();
   };
 
+  // A dialog on top of a sheet on top of the ledger is one layer too many, so
+  // the drawer closes before the reversal dialog opens. Confirming or
+  // cancelling then lands back on the ledger.
+  const openReversal = (movement: StockMovement): void => {
+    setSelectedMovement(null);
+    setReversalMovement(movement);
+  };
+
+  const listHandlers = {
+    canReverse: canManage,
+    movements,
+    onReverse: openReversal,
+    onView: setSelectedMovement,
+  };
+
   return (
     <>
       {canManage ? (
@@ -283,24 +300,28 @@ export function MovementsPanel({ itemId, onClearItemScope }: MovementsPanelProps
         <MovementsEmptyState />
       ) : null}
 
+      {/* Eight columns of numbers do not survive 375px. Below md the ledger is
+          cards carrying the same fields; the table takes over from md up. */}
       {!activeMovementsQuery.isLoading && !activeMovementsQuery.error && movements.length > 0 ? (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <MovementsTable
-              canReverse={canManage}
-              movements={movements}
-              onReverse={setReversalMovement}
-              onView={setSelectedMovement}
-            />
-          </CardContent>
-        </Card>
+        <>
+          <div className="md:hidden">
+            <MovementsCardGrid {...listHandlers} />
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <MovementsTable {...listHandlers} />
+            </CardContent>
+          </Card>
+        </>
       ) : null}
 
       <MovementDetailsDrawer
+        canReverse={canManage && selectedMovement !== null && canAttemptReverse(selectedMovement)}
         movement={selectedMovement}
         onOpenChange={(open) => {
           if (!open) setSelectedMovement(null);
         }}
+        onReverse={openReversal}
         open={selectedMovement !== null}
       />
 

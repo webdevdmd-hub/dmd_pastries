@@ -56,6 +56,9 @@ export function ManualMovementDialog({
     },
   });
   const movementType = form.watch("movementType");
+  // The schema rejects an empty reason and a zero quantity, and nothing here
+  // ever displayed the message: submitting a blank form simply did nothing.
+  const errors = form.formState.errors;
 
   useEffect(() => {
     if (open) {
@@ -113,6 +116,9 @@ export function ManualMovementDialog({
                 ))}
               </SelectContent>
             </Select>
+            {errors.inventoryItemId ? (
+              <p className="text-meta text-danger-text">{errors.inventoryItemId.message}</p>
+            ) : null}
           </div>
           <div className="space-y-1">
             <Label htmlFor="manual-movement-movement-type">Movement type</Label>
@@ -142,10 +148,16 @@ export function ManualMovementDialog({
               type="number"
               {...form.register("quantity")}
             />
+            {errors.quantity ? (
+              <p className="text-meta text-danger-text">{errors.quantity.message}</p>
+            ) : null}
           </div>
           <div className="space-y-1">
             <Label htmlFor="manualReason">Reason</Label>
             <Input id="manualReason" {...form.register("reason")} />
+            {errors.reason ? (
+              <p className="text-meta text-danger-text">{errors.reason.message}</p>
+            ) : null}
           </div>
           <div className="space-y-1">
             <Label htmlFor="manualNotes">Notes</Label>
