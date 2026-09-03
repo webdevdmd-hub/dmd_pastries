@@ -687,259 +687,261 @@ export function RecipeFormPage({
               ]}
             />
 
-            <div
-              className={activeTab === "details" ? "contents" : "hidden"}
-              id={RECIPE_BUILDER_TABPANEL_ID}
-              role="tabpanel"
-            >
-              <Card className="rounded-2xl border-workspace-border bg-card shadow-none">
-                <CardContent className="grid gap-4 lg:grid-cols-2">
-                  <div className="grid gap-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <Label htmlFor="recipe-form-page-product">Product</Label>
-                      {canCreateProduct ? (
-                        <Button
-                          disabled={!canEditRecipeForm || productReferenceDataQuery.isLoading}
-                          onClick={() => setProductDialogOpen(true)}
-                          size="sm"
-                          type="button"
-                          variant="outline"
-                        >
-                          <PackagePlus className="h-4 w-4" />
-                          Create Product
-                        </Button>
-                      ) : null}
-                    </div>
-                    <SearchableCombobox
-                      id="recipe-form-page-product"
-                      disabled={!canEditRecipeForm}
-                      emptyMessage="No matching products found."
-                      onValueChange={handleProductChange}
-                      options={productOptions}
-                      placeholder="Select product"
-                      searchPlaceholder="Search product, variant, SKU..."
-                      value={selectedProductId}
-                    />
-                    {fieldError("productId") ? (
-                      <span className="text-sm text-danger-text">{fieldError("productId")}</span>
-                    ) : null}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="recipe-form-page-recipe-output">Recipe output</Label>
-                    <Select
-                      disabled={!canEditRecipeForm || selectedProductId.length === 0}
-                      onValueChange={(value) => {
-                        const nextMode = value as CreateRecipeFormValues["outputVariantMode"];
-                        form.setValue("outputVariantMode", nextMode);
-                        form.setValue("productVariantId", "");
-                        form.setValue("newProductVariantName", "");
-                        form.setValue("newProductVariantSku", null);
-                        form.setValue("newProductVariantSalePrice", null);
-                      }}
-                      value={outputVariantMode}
-                    >
-                      <SelectTrigger id="recipe-form-page-recipe-output">
-                        <SelectValue placeholder="Select output stock target" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="parent">
-                          Parent product stock
-                          {selectedProduct ? ` (${selectedProduct.productName})` : ""}
-                        </SelectItem>
-                        <SelectItem
-                          value="existing"
-                          disabled={selectedProductVariants.length === 0}
-                        >
-                          Existing product variant
-                        </SelectItem>
-                        <SelectItem value="new">Create new product variant</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {outputVariantMode === "existing" ? (
+            {/* One panel region for all four sections: the strip aria-controls
+                this id, so it must not be the div that display:none hides. */}
+            <div className="contents" id={RECIPE_BUILDER_TABPANEL_ID} role="tabpanel">
+              <div className={activeTab === "details" ? "contents" : "hidden"}>
+                <Card className="rounded-2xl border-workspace-border bg-card shadow-none">
+                  <CardContent className="grid gap-4 lg:grid-cols-2">
                     <div className="grid gap-2">
-                      <Label htmlFor="recipe-form-page-product-variant">Product variant</Label>
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="recipe-form-page-product">Product</Label>
+                        {canCreateProduct ? (
+                          <Button
+                            disabled={!canEditRecipeForm || productReferenceDataQuery.isLoading}
+                            onClick={() => setProductDialogOpen(true)}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                          >
+                            <PackagePlus className="h-4 w-4" />
+                            Create Product
+                          </Button>
+                        ) : null}
+                      </div>
                       <SearchableCombobox
-                        id="recipe-form-page-product-variant"
+                        id="recipe-form-page-product"
                         disabled={!canEditRecipeForm}
-                        emptyMessage="No matching variants found."
-                        onValueChange={(value) => form.setValue("productVariantId", value)}
-                        options={variantOptions}
-                        placeholder="Select variant"
-                        searchPlaceholder="Search variant, SKU..."
-                        value={selectedVariantId}
+                        emptyMessage="No matching products found."
+                        onValueChange={handleProductChange}
+                        options={productOptions}
+                        placeholder="Select product"
+                        searchPlaceholder="Search product, variant, SKU..."
+                        value={selectedProductId}
                       />
-                      {fieldError("productVariantId") ? (
-                        <span className="text-sm text-danger-text">
-                          {fieldError("productVariantId")}
-                        </span>
+                      {fieldError("productId") ? (
+                        <span className="text-sm text-danger-text">{fieldError("productId")}</span>
                       ) : null}
                     </div>
-                  ) : null}
-                  {outputVariantMode === "new" ? (
-                    <div className="grid gap-4 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/50 p-4 lg:col-span-2 lg:grid-cols-3">
-                      <div className="grid gap-2">
-                        <Label htmlFor="new-variant-name">New variant name</Label>
-                        <Input
-                          disabled={!canEditRecipeForm}
-                          id="new-variant-name"
-                          placeholder="Small / Large / Mocktail"
-                          {...form.register("newProductVariantName")}
-                        />
-                        {fieldError("newProductVariantName") ? (
-                          <span className="text-sm text-danger-text">
-                            {fieldError("newProductVariantName")}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="new-variant-sku">Variant SKU</Label>
-                        <Input
-                          disabled={!canEditRecipeForm}
-                          id="new-variant-sku"
-                          placeholder="Optional"
-                          {...form.register("newProductVariantSku")}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="new-variant-price">Variant sale price</Label>
-                        <Input
-                          disabled={!canEditRecipeForm}
-                          id="new-variant-price"
-                          min="0"
-                          step="0.01"
-                          type="number"
-                          {...form.register("newProductVariantSalePrice")}
-                        />
-                        {fieldError("newProductVariantSalePrice") ? (
-                          <span className="text-sm text-danger-text">
-                            {fieldError("newProductVariantSalePrice")}
-                          </span>
-                        ) : null}
-                      </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="recipe-form-page-recipe-output">Recipe output</Label>
+                      <Select
+                        disabled={!canEditRecipeForm || selectedProductId.length === 0}
+                        onValueChange={(value) => {
+                          const nextMode = value as CreateRecipeFormValues["outputVariantMode"];
+                          form.setValue("outputVariantMode", nextMode);
+                          form.setValue("productVariantId", "");
+                          form.setValue("newProductVariantName", "");
+                          form.setValue("newProductVariantSku", null);
+                          form.setValue("newProductVariantSalePrice", null);
+                        }}
+                        value={outputVariantMode}
+                      >
+                        <SelectTrigger id="recipe-form-page-recipe-output">
+                          <SelectValue placeholder="Select output stock target" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="parent">
+                            Parent product stock
+                            {selectedProduct ? ` (${selectedProduct.productName})` : ""}
+                          </SelectItem>
+                          <SelectItem
+                            value="existing"
+                            disabled={selectedProductVariants.length === 0}
+                          >
+                            Existing product variant
+                          </SelectItem>
+                          <SelectItem value="new">Create new product variant</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  ) : null}
-                  <div className="grid gap-2">
-                    <Label htmlFor="recipe-name">Recipe name</Label>
-                    <Input
-                      disabled={!canEditRecipeForm}
-                      id="recipe-name"
-                      {...form.register("recipeName")}
-                    />
-                    {fieldError("recipeName") ? (
-                      <span className="text-sm text-danger-text">{fieldError("recipeName")}</span>
+                    {outputVariantMode === "existing" ? (
+                      <div className="grid gap-2">
+                        <Label htmlFor="recipe-form-page-product-variant">Product variant</Label>
+                        <SearchableCombobox
+                          id="recipe-form-page-product-variant"
+                          disabled={!canEditRecipeForm}
+                          emptyMessage="No matching variants found."
+                          onValueChange={(value) => form.setValue("productVariantId", value)}
+                          options={variantOptions}
+                          placeholder="Select variant"
+                          searchPlaceholder="Search variant, SKU..."
+                          value={selectedVariantId}
+                        />
+                        {fieldError("productVariantId") ? (
+                          <span className="text-sm text-danger-text">
+                            {fieldError("productVariantId")}
+                          </span>
+                        ) : null}
+                      </div>
                     ) : null}
-                  </div>
-                  <div className="grid gap-2 lg:col-span-2">
-                    <Label htmlFor="recipe-description">Description</Label>
+                    {outputVariantMode === "new" ? (
+                      <div className="grid gap-4 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/50 p-4 lg:col-span-2 lg:grid-cols-3">
+                        <div className="grid gap-2">
+                          <Label htmlFor="new-variant-name">New variant name</Label>
+                          <Input
+                            disabled={!canEditRecipeForm}
+                            id="new-variant-name"
+                            placeholder="Small / Large / Mocktail"
+                            {...form.register("newProductVariantName")}
+                          />
+                          {fieldError("newProductVariantName") ? (
+                            <span className="text-sm text-danger-text">
+                              {fieldError("newProductVariantName")}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="new-variant-sku">Variant SKU</Label>
+                          <Input
+                            disabled={!canEditRecipeForm}
+                            id="new-variant-sku"
+                            placeholder="Optional"
+                            {...form.register("newProductVariantSku")}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="new-variant-price">Variant sale price</Label>
+                          <Input
+                            disabled={!canEditRecipeForm}
+                            id="new-variant-price"
+                            min="0"
+                            step="0.01"
+                            type="number"
+                            {...form.register("newProductVariantSalePrice")}
+                          />
+                          {fieldError("newProductVariantSalePrice") ? (
+                            <span className="text-sm text-danger-text">
+                              {fieldError("newProductVariantSalePrice")}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                    <div className="grid gap-2">
+                      <Label htmlFor="recipe-name">Recipe name</Label>
+                      <Input
+                        disabled={!canEditRecipeForm}
+                        id="recipe-name"
+                        {...form.register("recipeName")}
+                      />
+                      {fieldError("recipeName") ? (
+                        <span className="text-sm text-danger-text">{fieldError("recipeName")}</span>
+                      ) : null}
+                    </div>
+                    <div className="grid gap-2 lg:col-span-2">
+                      <Label htmlFor="recipe-description">Description</Label>
+                      <Textarea
+                        className="min-h-20"
+                        disabled={!canEditRecipeForm}
+                        id="recipe-description"
+                        {...form.register("description")}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl border-workspace-border bg-card shadow-none">
+                  <CardHeader>
+                    <CardTitle className="text-2xl text-brand-espresso">
+                      This Recipe Makes
+                    </CardTitle>
+                    <p className="text-sm text-brand-mocha">
+                      Tell the system how much finished output this recipe produces. It is used to
+                      calculate cost per unit.
+                    </p>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 md:grid-cols-3">
+                    <div className="grid gap-2">
+                      <Label htmlFor="yield-quantity">Yield quantity</Label>
+                      <Input
+                        disabled={!canEditRecipeForm}
+                        id="yield-quantity"
+                        min="0.01"
+                        step="0.01"
+                        type="number"
+                        {...form.register("batchYieldQuantity", {
+                          setValueAs: numberFieldValue,
+                        })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="recipe-form-page-yield-unit">Yield unit</Label>
+                      <SearchableCombobox
+                        id="recipe-form-page-yield-unit"
+                        disabled={!canEditRecipeForm}
+                        emptyMessage="No matching units found."
+                        onValueChange={(value) => form.setValue("batchYieldUnitId", value)}
+                        options={unitOptions}
+                        placeholder="Select unit"
+                        searchPlaceholder="Search unit..."
+                        value={batchYieldUnitId}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="prep-time">Preparation minutes</Label>
+                      <Input
+                        disabled={!canEditRecipeForm}
+                        id="prep-time"
+                        min="0"
+                        step="1"
+                        type="number"
+                        {...form.register("preparationTimeMinutes", {
+                          setValueAs: numberFieldValue,
+                        })}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className={activeTab === "ingredients" ? "contents" : "hidden"}>
+                <RecipeIngredientsSection
+                  canManage={canManageRecipeIngredients}
+                  componentProducts={ingredientComponentProducts}
+                  draftLines={draftIngredients}
+                  onDraftLinesChange={setDraftIngredients}
+                  onPreviewDraftChange={setIngredientPreviewDraft}
+                  parentProductId={selectedProductId}
+                  recipeId={recipeId}
+                  units={data.units}
+                />
+              </div>
+
+              <div className={activeTab === "packaging" ? "contents" : "hidden"}>
+                <RecipePackagingSection
+                  canManage={canManageRecipePackaging}
+                  componentProducts={packagingComponentProducts}
+                  draftLines={draftPackaging}
+                  onDraftLinesChange={setDraftPackaging}
+                  onPreviewDraftChange={setPackagingPreviewDraft}
+                  parentProductId={selectedProductId}
+                  recipeId={recipeId}
+                  units={data.units}
+                />
+              </div>
+
+              <div className={activeTab === "instructions" ? "contents" : "hidden"}>
+                <Card className="rounded-2xl border-workspace-border bg-card shadow-none">
+                  <CardHeader>
+                    <CardTitle
+                      className="text-2xl text-brand-espresso"
+                      id="recipe-instructions-heading"
+                    >
+                      Production Instructions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
                     <Textarea
-                      className="min-h-20"
+                      aria-labelledby="recipe-instructions-heading"
+                      className="min-h-44"
                       disabled={!canEditRecipeForm}
-                      id="recipe-description"
-                      {...form.register("description")}
+                      placeholder={"1. Mix ingredients…\n2. Rest or proof…\n3. Bake or finish…"}
+                      {...form.register("instructions")}
                     />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-2xl border-workspace-border bg-card shadow-none">
-                <CardHeader>
-                  <CardTitle className="text-2xl text-brand-espresso">This Recipe Makes</CardTitle>
-                  <p className="text-sm text-brand-mocha">
-                    Tell the system how much finished output this recipe produces. It is used to
-                    calculate cost per unit.
-                  </p>
-                </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-3">
-                  <div className="grid gap-2">
-                    <Label htmlFor="yield-quantity">Yield quantity</Label>
-                    <Input
-                      disabled={!canEditRecipeForm}
-                      id="yield-quantity"
-                      min="0.01"
-                      step="0.01"
-                      type="number"
-                      {...form.register("batchYieldQuantity", {
-                        setValueAs: numberFieldValue,
-                      })}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="recipe-form-page-yield-unit">Yield unit</Label>
-                    <SearchableCombobox
-                      id="recipe-form-page-yield-unit"
-                      disabled={!canEditRecipeForm}
-                      emptyMessage="No matching units found."
-                      onValueChange={(value) => form.setValue("batchYieldUnitId", value)}
-                      options={unitOptions}
-                      placeholder="Select unit"
-                      searchPlaceholder="Search unit..."
-                      value={batchYieldUnitId}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="prep-time">Preparation minutes</Label>
-                    <Input
-                      disabled={!canEditRecipeForm}
-                      id="prep-time"
-                      min="0"
-                      step="1"
-                      type="number"
-                      {...form.register("preparationTimeMinutes", {
-                        setValueAs: numberFieldValue,
-                      })}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className={activeTab === "ingredients" ? "contents" : "hidden"}>
-              <RecipeIngredientsSection
-                canManage={canManageRecipeIngredients}
-                componentProducts={ingredientComponentProducts}
-                draftLines={draftIngredients}
-                onDraftLinesChange={setDraftIngredients}
-                onPreviewDraftChange={setIngredientPreviewDraft}
-                parentProductId={selectedProductId}
-                recipeId={recipeId}
-                units={data.units}
-              />
-            </div>
-
-            <div className={activeTab === "packaging" ? "contents" : "hidden"}>
-              <RecipePackagingSection
-                canManage={canManageRecipePackaging}
-                componentProducts={packagingComponentProducts}
-                draftLines={draftPackaging}
-                onDraftLinesChange={setDraftPackaging}
-                onPreviewDraftChange={setPackagingPreviewDraft}
-                parentProductId={selectedProductId}
-                recipeId={recipeId}
-                units={data.units}
-              />
-            </div>
-
-            <div className={activeTab === "instructions" ? "contents" : "hidden"}>
-              <Card className="rounded-2xl border-workspace-border bg-card shadow-none">
-                <CardHeader>
-                  <CardTitle
-                    className="text-2xl text-brand-espresso"
-                    id="recipe-instructions-heading"
-                  >
-                    Production Instructions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Textarea
-                    aria-labelledby="recipe-instructions-heading"
-                    className="min-h-44"
-                    disabled={!canEditRecipeForm}
-                    placeholder={"1. Mix ingredients…\n2. Rest or proof…\n3. Bake or finish…"}
-                    {...form.register("instructions")}
-                  />
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
 
