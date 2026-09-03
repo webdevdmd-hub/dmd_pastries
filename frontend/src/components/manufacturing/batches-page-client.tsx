@@ -1,15 +1,18 @@
 "use client";
 
-import { BarChart3, Factory, Search, SlidersHorizontal } from "lucide-react";
+import { BarChart3, Factory } from "lucide-react";
 import Link from "next/link";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/manufacturing/access-denied-card";
+import { BatchDetailsDrawer } from "@/components/manufacturing/batch-details-drawer";
 import { BatchFormDialog } from "@/components/manufacturing/batch-form-dialog";
 import { BatchWastageDialog } from "@/components/manufacturing/batch-wastage-dialog";
+import { BatchesCardGrid } from "@/components/manufacturing/batches-card-grid";
 import { BatchesTable } from "@/components/manufacturing/batches-table";
+import { BatchesToolbar } from "@/components/manufacturing/batches-toolbar";
 import { ManufacturingEmptyState } from "@/components/manufacturing/manufacturing-empty-state";
 import { ManufacturingErrorState } from "@/components/manufacturing/manufacturing-error-state";
 import { ManufacturingTableSkeleton } from "@/components/manufacturing/manufacturing-table-skeleton";
@@ -25,14 +28,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useBranchScope } from "@/hooks/use-branch-scope";
@@ -94,6 +89,9 @@ export function BatchesPageClient(): JSX.Element {
   const [wastageBatch, setWastageBatch] = useState<ProductionBatch | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [producingBatchId, setProducingBatchId] = useState<string | null>(null);
+  // The record, not the id: the list rows already carry a full batch, so the
+  // drawer only fetches its four component lists.
+  const [drawerBatch, setDrawerBatch] = useState<ProductionBatch | null>(null);
   const batchesQuery = useBatches(filters, canView && branchScope.hasBranchScope);
   const productsQuery = useManufacturingProducts(canView);
   const branchesQuery = useManufacturingBranches(canView);
@@ -146,9 +144,22 @@ export function BatchesPageClient(): JSX.Element {
     setFormOpen(true);
   };
 
+  // A dialog on top of a sheet on top of the list is one layer too many, so
+  // the drawer closes before any of these open.
   const openEdit = (batch: ProductionBatch): void => {
+    setDrawerBatch(null);
     setEditingBatch(batch);
     setFormOpen(true);
+  };
+
+  const askDelete = (batch: ProductionBatch): void => {
+    setDrawerBatch(null);
+    setDeleteBatchTarget(batch);
+  };
+
+  const openWastage = (batch: ProductionBatch): void => {
+    setDrawerBatch(null);
+    setWastageBatch(batch);
   };
 
   const updateFilter = (patch: Partial<BatchFilters>): void => {
@@ -249,6 +260,22 @@ export function BatchesPageClient(): JSX.Element {
   };
 
   const batches = batchesQuery.data ?? [];
+
+  const listHandlers = {
+    batches,
+    canDelete,
+    canEdit,
+    canProduce,
+    canRecordWastage,
+    onDelete: askDelete,
+    onEdit: openEdit,
+    onProduce: (batch: ProductionBatch) => {
+      void handleProducePlannedFromRow(batch);
+    },
+    onView: setDrawerBatch,
+    onWastage: openWastage,
+    producingBatchId,
+  };
   const batchMetrics = {
     completed: batches.filter((batch) => batch.status === "completed").length,
     inProgress: batches.filter(
@@ -328,93 +355,15 @@ export function BatchesPageClient(): JSX.Element {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-5">
-        <div className="grid gap-4 lg:grid-cols-[1.5fr_repeat(5,minmax(0,1fr))]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
-            <Input
-              aria-label="Search batches"
-              className="pl-10"
-              onChange={(event) => updateFilter({ search: event.target.value })}
-              placeholder="Batch ID or product..."
-              value={filters.search}
-            />
-          </div>
-          <Select
-            value={filters.productId}
-            onValueChange={(productId) => updateFilter({ productId })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Product" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All products</SelectItem>
-              {(productsQuery.data ?? []).map((product) => (
-                <SelectItem key={product.id} value={product.id}>
-                  {product.productName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filters.branchId} onValueChange={(branchId) => updateFilter({ branchId })}>
-            <SelectTrigger>
-              <SelectValue placeholder="Branch" />
-            </SelectTrigger>
-            <SelectContent>
-              {branchScope.canAccessAllBranches ? (
-                <SelectItem value="all">All branches</SelectItem>
-              ) : null}
-              {branchOptions.map((branch) => (
-                <SelectItem key={branch.id} value={branch.id}>
-                  {branch.branchName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.status}
-            onValueChange={(status) => updateFilter({ status: status as BatchFilters["status"] })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="draft">Draft planned</SelectItem>
-              <SelectItem value="planned">Planned</SelectItem>
-              <SelectItem value="in_progress">In progress</SelectItem>
-              <SelectItem value="partially_completed">Partially completed</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-          <Input
-            aria-label="Date from"
-            onChange={(event) => updateFilter({ dateFrom: event.target.value })}
-            type="date"
-            value={filters.dateFrom}
-          />
-          <Input
-            aria-label="Date to"
-            onChange={(event) => updateFilter({ dateTo: event.target.value })}
-            type="date"
-            value={filters.dateTo}
-          />
-        </div>
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <Button className="border-border" type="button" variant="ghost">
-            <SlidersHorizontal className="h-4 w-4" />
-            Filter options
-          </Button>
-          <Button
-            onClick={() => setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })}
-            type="button"
-            variant="outline"
-          >
-            Reset
-          </Button>
-        </div>
-      </div>
+      <BatchesToolbar
+        allowAllBranches={branchScope.canAccessAllBranches}
+        branches={branchOptions}
+        filters={filters}
+        onFiltersChange={updateFilter}
+        onReset={() => setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })}
+        products={productsQuery.data ?? []}
+        resetBranchId={branchScope.defaultBranchId}
+      />
 
       {batchesQuery.isLoading ? <ManufacturingTableSkeleton /> : null}
 
@@ -461,25 +410,32 @@ export function BatchesPageClient(): JSX.Element {
       ) : null}
 
       {!batchesQuery.isLoading && !batchesQuery.error && batches.length > 0 ? (
-        <Card className="overflow-hidden rounded-2xl border-border bg-card shadow-none">
-          <CardContent className="p-0">
-            <BatchesTable
-              batches={batches}
-              canDelete={canDelete}
-              canEdit={canEdit}
-              canProduce={canProduce}
-              canRecordWastage={canRecordWastage}
-              onDelete={setDeleteBatchTarget}
-              onEdit={openEdit}
-              onProduce={(batch) => {
-                void handleProducePlannedFromRow(batch);
-              }}
-              onWastage={setWastageBatch}
-              producingBatchId={producingBatchId}
-            />
-          </CardContent>
-        </Card>
+        <>
+          <div className="md:hidden">
+            <BatchesCardGrid {...listHandlers} />
+          </div>
+          <Card className="hidden overflow-hidden rounded-2xl border-border bg-card shadow-none md:block">
+            <CardContent className="p-0">
+              <BatchesTable {...listHandlers} />
+            </CardContent>
+          </Card>
+        </>
       ) : null}
+
+      <BatchDetailsDrawer
+        batch={drawerBatch}
+        canDelete={canDelete}
+        canProduce={canProduce}
+        canRecordWastage={canRecordWastage}
+        isProducing={producingBatchId === drawerBatch?.id}
+        onDelete={askDelete}
+        onOpenChange={(open) => (!open ? setDrawerBatch(null) : undefined)}
+        onProduce={(batch) => {
+          void handleProducePlannedFromRow(batch);
+        }}
+        onWastage={openWastage}
+        open={drawerBatch !== null}
+      />
 
       <BatchFormDialog
         batch={editingBatch}

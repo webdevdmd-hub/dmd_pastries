@@ -13,34 +13,47 @@ import {
 import { canProduceBatch, isBatchPlannedStatus } from "@/lib/manufacturing/batch-status";
 import type { ProductionBatch } from "@/types/manufacturing";
 
+export type BatchActionHandlers = {
+  canDelete: boolean;
+  canEdit: boolean;
+  canProduce: boolean;
+  canRecordWastage: boolean;
+  onDelete: (batch: ProductionBatch) => void;
+  onEdit: (batch: ProductionBatch) => void;
+  onProduce: (batch: ProductionBatch) => void;
+  onWastage: (batch: ProductionBatch) => void;
+  producingBatchId?: string | null;
+};
+
+/**
+ * Actions only. "View details" is gone: the row opens the drawer, and the
+ * drawer header carries the full-page link. A batch whose status leaves no
+ * action available renders no menu rather than an empty one.
+ */
 export function BatchActionsMenu({
   batch,
   canDelete,
   canEdit,
   canProduce,
   canRecordWastage,
-  isProducing = false,
   onDelete,
   onEdit,
   onProduce,
-  onView,
   onWastage,
-}: {
-  batch: ProductionBatch;
-  canDelete: boolean;
-  canEdit: boolean;
-  canProduce: boolean;
-  canRecordWastage: boolean;
-  isProducing?: boolean;
-  onDelete: (batch: ProductionBatch) => void;
-  onEdit: (batch: ProductionBatch) => void;
-  onProduce: (batch: ProductionBatch) => void;
-  onView: (batch: ProductionBatch) => void;
-  onWastage: (batch: ProductionBatch) => void;
-}): JSX.Element {
+  producingBatchId = null,
+}: BatchActionHandlers & { batch: ProductionBatch }): JSX.Element | null {
   const isPlanned = isBatchPlannedStatus(batch.status);
-  const isProduceEligible = canProduceBatch(batch);
-  const canAddWastage = canRecordWastage && !isPlanned && batch.status !== "cancelled";
+  const isProducing = producingBatchId === batch.id;
+  const showEdit = canEdit && isPlanned;
+  const showProduce = canProduce && canProduceBatch(batch);
+  const showDelete = canDelete && isPlanned;
+  const showWastage = canRecordWastage && !isPlanned && batch.status !== "cancelled";
+
+  // A completed batch that the viewer cannot waste against has nothing here,
+  // and an empty dropdown is worse than no dropdown.
+  if (!showEdit && !showProduce && !showDelete && !showWastage) {
+    return null;
+  }
 
   return (
     <DropdownMenu>
@@ -55,27 +68,26 @@ export function BatchActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => onView(batch)}>View details</DropdownMenuItem>
-        {canEdit && isPlanned ? (
+        {showEdit ? (
           <DropdownMenuItem onSelect={() => onEdit(batch)}>
             <Edit className="h-4 w-4" />
             Edit planned
           </DropdownMenuItem>
         ) : null}
-        {canProduce && isProduceEligible ? (
+        {showProduce ? (
           <DropdownMenuItem disabled={isProducing} onSelect={() => onProduce(batch)}>
             <Play className="h-4 w-4" />
             {isProducing ? "Producing..." : "Produce planned"}
           </DropdownMenuItem>
         ) : null}
-        {canDelete && isPlanned ? (
+        {showWastage ? (
+          <DropdownMenuItem onSelect={() => onWastage(batch)}>Record wastage</DropdownMenuItem>
+        ) : null}
+        {showDelete ? (
           <DropdownMenuItem className="text-danger-text" onSelect={() => onDelete(batch)}>
             <Trash2 className="h-4 w-4" />
             Delete planned
           </DropdownMenuItem>
-        ) : null}
-        {canAddWastage ? (
-          <DropdownMenuItem onSelect={() => onWastage(batch)}>Record wastage</DropdownMenuItem>
         ) : null}
       </DropdownMenuContent>
     </DropdownMenu>

@@ -4,6 +4,7 @@ import type { JSX } from "react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { FormTabs } from "@/components/shared/form-tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -151,6 +152,10 @@ function PreviewLinesTable({
   );
 }
 
+type BatchFormTabKey = "production" | "components";
+
+const BATCH_FORM_TABPANEL_ID = "batch-form-tabpanel";
+
 export function BatchFormDialog({
   batch,
   branches,
@@ -183,6 +188,7 @@ export function BatchFormDialog({
   const [plannedQuantity, setPlannedQuantity] = useState(1);
   const [productionDate, setProductionDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
+  const [activeTab, setActiveTab] = useState<BatchFormTabKey>("production");
   const [feedback, setFeedback] = useState<ProductionFeedback | null>(null);
   const [isCheckingPreview, setIsCheckingPreview] = useState(false);
   const productionActionInFlightRef = useRef(false);
@@ -208,6 +214,8 @@ export function BatchFormDialog({
     );
     setNotes(batch?.notes ?? "");
     setFeedback(null);
+    // Every opening starts on Production, whichever tab the last one closed on.
+    setActiveTab("production");
   }, [batch, branchScope.effectiveBranchId, open]);
 
   const clearFeedback = (): void => {
@@ -507,8 +515,27 @@ export function BatchFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
-          <div className="grid gap-5 md:grid-cols-2">
+        {/* Two tabs on one form state: what to produce, and what producing it
+            will consume. Nothing typed on one is lost on the other. */}
+        <div className="min-w-0 shrink-0 border-b border-border px-8 py-3">
+          <FormTabs
+            active={activeTab}
+            aria-label="Production form sections"
+            onTabChange={setActiveTab}
+            panelId={BATCH_FORM_TABPANEL_ID}
+            tabs={[
+              { key: "production", label: "Production" },
+              { key: "components", label: "Components" },
+            ]}
+          />
+        </div>
+
+        <div
+          className="min-h-0 min-w-0 flex-1 overflow-y-auto px-8 py-6"
+          id={BATCH_FORM_TABPANEL_ID}
+          role="tabpanel"
+        >
+          <div className={activeTab === "production" ? "grid gap-5 md:grid-cols-2" : "hidden"}>
             <div className="space-y-2">
               <label htmlFor="batch-form-branch" className="text-sm font-medium text-foreground">
                 Branch
@@ -635,9 +662,11 @@ export function BatchFormDialog({
                 </Select>
               )}
             </div>
+          </div>
 
+          <div className={activeTab === "components" ? "grid gap-5" : "hidden"}>
             {shouldShowPreviewPanel ? (
-              <div className="rounded-2xl border border-border bg-muted p-5 text-sm text-foreground-muted md:col-span-2">
+              <div className="rounded-2xl border border-border bg-muted p-5 text-sm text-foreground-muted">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="font-semibold text-foreground">Recipe Details</p>
@@ -779,8 +808,15 @@ export function BatchFormDialog({
                   </div>
                 ) : null}
               </div>
-            ) : null}
+            ) : (
+              <p className="text-cell text-foreground-muted">
+                Choose an output product and an active recipe on the Production tab to see what this
+                batch will consume.
+              </p>
+            )}
+          </div>
 
+          <div className={activeTab === "production" ? "grid gap-5 md:grid-cols-2" : "hidden"}>
             <div className="space-y-2">
               <label htmlFor="batch-form-quantity" className="text-sm font-medium text-foreground">
                 {batch ? "Quantity to produce now" : "Quantity to produce"}

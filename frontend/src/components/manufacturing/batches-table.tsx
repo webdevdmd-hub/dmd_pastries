@@ -1,12 +1,17 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 
-import { BatchActionsMenu } from "@/components/manufacturing/batch-actions-menu";
+import {
+  type BatchActionHandlers,
+  BatchActionsMenu,
+} from "@/components/manufacturing/batch-actions-menu";
+import {
+  batchOutputLabel,
+  formatBatchDateTime,
+  formatBatchQuantity,
+} from "@/components/manufacturing/batch-details-panel";
 import { BatchStatusBadge } from "@/components/manufacturing/batch-status-badge";
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -15,152 +20,100 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ROUTES } from "@/constants/routes";
-import { canProduceBatch } from "@/lib/manufacturing/batch-status";
 import { formatRecipeVersionLabel } from "@/lib/manufacturing/recipe-version-display";
 import type { ProductionBatch } from "@/types/manufacturing";
 
-function formatDateTime(value: string | null): string {
-  return value
-    ? new Intl.DateTimeFormat("en-AE", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(new Date(value))
-    : "Not set";
-}
-
-function batchOutputLabel(batch: ProductionBatch): string {
-  return batch.productVariantName
-    ? `${batch.productName} - ${batch.productVariantName}`
-    : batch.productName;
-}
-
-function formatQuantity(value: number, unit: string): string {
-  return `${new Intl.NumberFormat("en-AE", { maximumFractionDigits: 2 }).format(value)} ${unit}`;
-}
-
-export function BatchesTable({
-  batches,
-  canDelete,
-  canEdit,
-  canProduce,
-  canRecordWastage,
-  producingBatchId = null,
-  onDelete,
-  onEdit,
-  onProduce,
-  onWastage,
-}: {
+export type BatchesListProps = BatchActionHandlers & {
   batches: ProductionBatch[];
-  canDelete: boolean;
-  canEdit: boolean;
-  canProduce: boolean;
-  canRecordWastage: boolean;
-  producingBatchId?: string | null;
-  onDelete: (batch: ProductionBatch) => void;
-  onEdit: (batch: ProductionBatch) => void;
-  onProduce: (batch: ProductionBatch) => void;
-  onWastage: (batch: ProductionBatch) => void;
-}): JSX.Element {
-  const router = useRouter();
+  /** Opens the batch's details; the whole row is the target. */
+  onView: (batch: ProductionBatch) => void;
+};
 
+export function batchProgressPercent(batch: ProductionBatch): number {
+  return batch.plannedQuantity > 0
+    ? Math.min((batch.producedQuantity / batch.plannedQuantity) * 100, 100)
+    : 0;
+}
+
+/**
+ * Eight columns became six.
+ *
+ * Planned and Produced were two number columns describing one quantity, so
+ * they share a cell reading `12 / 20 pcs` above the progress bar that was
+ * already there. The "Output: parent product stock" line under every product
+ * name went to the drawer, where it is a labelled field rather than a sentence
+ * repeated down a column. The inline "Produce planned" button left the row too:
+ * it posts stock and accounting in one transaction, which is not something to
+ * put one stray click away in a dense list.
+ */
+export function BatchesTable({ batches, onView, ...actions }: BatchesListProps): JSX.Element {
   return (
     <Table>
       <TableHeader className="bg-muted">
         <TableRow className="border-border hover:bg-muted">
-          <TableHead>Production Number</TableHead>
-          <TableHead>Output Product</TableHead>
+          <TableHead>Production</TableHead>
+          <TableHead>Output product</TableHead>
           <TableHead>Recipe</TableHead>
-          <TableHead>Planned</TableHead>
-          <TableHead>Produced</TableHead>
+          <TableHead>Progress</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead>Start Time</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
+          <TableHead>Start time</TableHead>
+          <TableHead>
+            <span className="sr-only">Actions</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {batches.map((batch) => {
-          const progress =
-            batch.plannedQuantity > 0
-              ? Math.min((batch.producedQuantity / batch.plannedQuantity) * 100, 100)
-              : 0;
-
-          return (
-            <TableRow className="border-border hover:bg-muted" key={batch.id}>
-              <TableCell>
-                <Link
-                  className="font-mono text-sm font-semibold text-foreground underline-offset-4 hover:underline"
-                  href={`${ROUTES.manufacturingBatches}/${batch.id}`}
-                >
-                  {batch.batchNumber}
-                </Link>
-              </TableCell>
-              <TableCell>
-                <div className="grid gap-1">
-                  <span className="font-semibold text-foreground">{batchOutputLabel(batch)}</span>
-                  <span className="text-xs text-foreground-muted">
-                    Output: {batch.productVariantName ? "Variant stock" : "Parent product stock"}
-                  </span>
-                </div>
-              </TableCell>
-              <TableCell className="text-foreground-muted">
-                {batch.recipeName} · {formatRecipeVersionLabel(batch.recipeVersionNumber)}
-              </TableCell>
-              <TableCell className="font-mono text-foreground">
-                {formatQuantity(batch.plannedQuantity, batch.batchUnitName)}
-              </TableCell>
-              <TableCell className="whitespace-normal min-w-44">
-                <div className="space-y-2">
-                  <span className="font-mono text-foreground">
-                    {formatQuantity(batch.producedQuantity, batch.batchUnitName)}
-                  </span>
-                  <div className="h-1.5 rounded-full bg-muted">
-                    <div
-                      className="h-1.5 rounded-full bg-primary"
-                      style={{ width: `${progress.toFixed(0)}%` }}
-                    />
-                  </div>
-                </div>
-              </TableCell>
-              <TableCell>
-                <BatchStatusBadge status={batch.status} />
-              </TableCell>
-              <TableCell className="text-sm text-foreground-muted">
-                {formatDateTime(batch.startTime)}
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-2">
-                  {canProduce && canProduceBatch(batch) ? (
-                    <Button
-                      className="h-8 border-border px-3 text-xs"
-                      disabled={producingBatchId === batch.id}
-                      onClick={() => onProduce(batch)}
-                      type="button"
-                      variant="outline"
-                    >
-                      {producingBatchId === batch.id ? "Producing..." : "Produce planned"}
-                    </Button>
-                  ) : null}
-                  <BatchActionsMenu
-                    batch={batch}
-                    canDelete={canDelete}
-                    canEdit={canEdit}
-                    canProduce={canProduce}
-                    canRecordWastage={canRecordWastage}
-                    isProducing={producingBatchId === batch.id}
-                    onDelete={onDelete}
-                    onEdit={onEdit}
-                    onProduce={onProduce}
-                    onView={(selectedBatch) =>
-                      router.push(`${ROUTES.manufacturingBatches}/${selectedBatch.id}`)
-                    }
-                    onWastage={onWastage}
+        {batches.map((batch) => (
+          // The row opens the drawer; the number is also a button so the
+          // keyboard has a focusable target for the same action.
+          <TableRow
+            className="cursor-pointer border-border hover:bg-muted"
+            key={batch.id}
+            onClick={() => onView(batch)}
+          >
+            <TableCell>
+              <button
+                className="grid gap-0.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onView(batch);
+                }}
+                type="button"
+              >
+                <span className="font-mono font-medium">{batch.batchNumber}</span>
+                <span className="text-meta text-foreground-muted">{batch.branchName}</span>
+              </button>
+            </TableCell>
+            <TableCell>{batchOutputLabel(batch)}</TableCell>
+            <TableCell className="text-foreground-muted">
+              {batch.recipeName} · {formatRecipeVersionLabel(batch.recipeVersionNumber)}
+            </TableCell>
+            <TableCell className="min-w-44 whitespace-normal">
+              <div className="space-y-2">
+                <span className="text-cell tabular-nums">
+                  {formatBatchQuantity(batch.producedQuantity, "")}/{" "}
+                  {formatBatchQuantity(batch.plannedQuantity, batch.batchUnitName)}
+                </span>
+                <div className="h-1.5 rounded-full bg-muted">
+                  <div
+                    className="h-1.5 rounded-full bg-primary"
+                    style={{ width: `${batchProgressPercent(batch).toFixed(0)}%` }}
                   />
                 </div>
-              </TableCell>
-            </TableRow>
-          );
-        })}
+              </div>
+            </TableCell>
+            <TableCell>
+              <BatchStatusBadge status={batch.status} />
+            </TableCell>
+            <TableCell className="tabular-nums text-foreground-muted">
+              {formatBatchDateTime(batch.startTime)}
+            </TableCell>
+            {/* The menu must not also open the drawer. */}
+            <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+              <BatchActionsMenu {...actions} batch={batch} />
+            </TableCell>
+          </TableRow>
+        ))}
       </TableBody>
     </Table>
   );

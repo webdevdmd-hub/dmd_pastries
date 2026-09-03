@@ -1,21 +1,23 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/manufacturing/access-denied-card";
+import {
+  type BatchDetailTabKey,
+  parseBatchDetailTab,
+} from "@/components/manufacturing/batch-detail-tabs";
+import { BatchDetailsPanel } from "@/components/manufacturing/batch-details-panel";
 import { BatchHeader } from "@/components/manufacturing/batch-header";
-import { BatchIngredientsSection } from "@/components/manufacturing/batch-ingredients-section";
-import { BatchOutputSection } from "@/components/manufacturing/batch-output-section";
-import { BatchPackagingSection } from "@/components/manufacturing/batch-packaging-section";
-import { BatchProgressCard } from "@/components/manufacturing/batch-progress-card";
-import { BatchTimeline } from "@/components/manufacturing/batch-timeline";
 import { BatchWastageDialog } from "@/components/manufacturing/batch-wastage-dialog";
-import { BatchWastageSection } from "@/components/manufacturing/batch-wastage-section";
 import { ManufacturingErrorState } from "@/components/manufacturing/manufacturing-error-state";
 import { ManufacturingTableSkeleton } from "@/components/manufacturing/manufacturing-table-skeleton";
 import { PERMISSIONS } from "@/constants/permissions";
+import { ROUTES } from "@/constants/routes";
 import {
   useAddBatchWastage,
   useBatch,
@@ -38,6 +40,9 @@ export function BatchDetailsPageClient({ batchId }: { batchId: string }): JSX.El
   const canView = hasAnyPermission([PERMISSIONS.manufacturingView, PERMISSIONS.inventoryView]);
   const canProduce = hasAnyPermission([PERMISSIONS.manufacturingBatchesProduce]);
   const canRecordWastage = hasAnyPermission([PERMISSIONS.manufacturingBatchesWastage]);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const batchQuery = useBatch(batchId, canView);
   const ingredientsQuery = useBatchIngredients(batchId, canView);
   const packagingQuery = useBatchPackaging(batchId, canView);
@@ -46,6 +51,19 @@ export function BatchDetailsPageClient({ batchId }: { batchId: string }): JSX.El
   const inventoryQuery = useManufacturingInventory(canView && canRecordWastage);
   const addWastageMutation = useAddBatchWastage();
   const produceBatchMutation = useProduceBatch();
+
+  const activeTab = parseBatchDetailTab(searchParams.get("tab"));
+
+  const changeTab = (tab: BatchDetailTabKey): void => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (tab === "overview") {
+      next.delete("tab");
+    } else {
+      next.set("tab", tab);
+    }
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   if (!canView) {
     return <AccessDeniedCard />;
@@ -101,6 +119,13 @@ export function BatchDetailsPageClient({ batchId }: { batchId: string }): JSX.El
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
+      <Link
+        className="inline-flex w-fit items-center gap-1.5 text-cell text-foreground-muted transition-colors hover:text-foreground"
+        href={ROUTES.manufacturingBatches}
+      >
+        Back to production
+      </Link>
+
       <BatchHeader
         batch={batch}
         canProduce={canProduce}
@@ -112,19 +137,15 @@ export function BatchDetailsPageClient({ batchId }: { batchId: string }): JSX.El
         onRecordWastage={() => setWastageOpen(true)}
       />
 
-      <BatchProgressCard batch={batch} />
-
-      <div className="grid gap-6 xl:grid-cols-[1fr_0.48fr]">
-        <div className="space-y-6">
-          <BatchIngredientsSection ingredients={ingredientsQuery.data ?? []} />
-          <BatchPackagingSection packaging={packagingQuery.data ?? []} />
-          <BatchOutputSection outputs={outputsQuery.data ?? []} />
-        </div>
-        <div className="space-y-6">
-          <BatchWastageSection wastage={wastageQuery.data ?? []} />
-          <BatchTimeline batch={batch} />
-        </div>
-      </div>
+      <BatchDetailsPanel
+        activeTab={activeTab}
+        batch={batch}
+        ingredients={ingredientsQuery.data ?? []}
+        onTabChange={changeTab}
+        outputs={outputsQuery.data ?? []}
+        packaging={packagingQuery.data ?? []}
+        wastage={wastageQuery.data ?? []}
+      />
 
       <BatchWastageDialog
         inventory={inventoryQuery.data ?? []}
