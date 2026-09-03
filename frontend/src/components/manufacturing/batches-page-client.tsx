@@ -335,22 +335,30 @@ export function BatchesPageClient(): JSX.Element {
         </div>
       </section>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+      {/* Six across at every width. These six are one comparison -- how much
+          was planned against how much came out, and what was lost on the way --
+          and two rows of three broke that reading in half on every laptop
+          under 1280px. To survive a 52px column the figure leads and the label
+          wraps beneath it; the unit word only appears once there is room. */}
+      <div className="grid min-w-0 grid-cols-6 gap-1.5 sm:gap-3 xl:gap-4">
         {metricCards.map((metric) => (
-          <section className="rounded-2xl border border-border bg-card p-5" key={metric.label}>
-            <p className="text-xs font-bold text-foreground-muted">{metric.label}</p>
-            <div className="mt-4 flex items-end gap-2">
-              <p
-                className={
-                  metric.tone === "danger"
-                    ? "text-kpi tabular-nums text-danger-text"
-                    : "text-kpi tabular-nums text-foreground"
-                }
-              >
-                {metric.value}
-              </p>
-              <p className="pb-1 text-sm text-foreground-muted">{metric.meta}</p>
-            </div>
+          <section
+            className="min-w-0 rounded-lg border border-border bg-card p-2 sm:rounded-2xl sm:p-4 xl:p-5"
+            key={metric.label}
+          >
+            <p
+              className={
+                metric.tone === "danger"
+                  ? "truncate text-section tabular-nums text-danger-text xl:text-kpi"
+                  : "truncate text-section tabular-nums text-foreground xl:text-kpi"
+              }
+            >
+              {metric.value}
+            </p>
+            <p className="mt-1 break-words text-meta font-medium text-foreground-muted">
+              {metric.label}
+            </p>
+            <p className="hidden text-meta text-foreground-muted lg:block">{metric.meta}</p>
           </section>
         ))}
       </div>
