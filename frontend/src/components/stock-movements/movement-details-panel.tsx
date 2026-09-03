@@ -42,6 +42,19 @@ export function movementItemTypeLabel(value: StockMovement["itemType"]): string 
   return "Packaging";
 }
 
+/**
+ * Backend enums reach these two fields as free-form strings -- `weighted_average`,
+ * `bakery_order_cancelled` -- and were printed raw. There is no label map to
+ * key off, so sentence-case the token rather than show a database value.
+ */
+export function humaniseMovementToken(value: string | null, fallback: string): string {
+  if (value === null || value.trim().length === 0) {
+    return fallback;
+  }
+  const words = value.trim().replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export function movementLocationName(value: string | null): string {
   return value && value.trim().length > 0 ? value : "Unknown location";
 }
@@ -186,7 +199,10 @@ export function MovementDetailsPanel({
                   movement.totalCost > 0 ? formatMovementMoney(movement.totalCost) : "Not costed"
                 }
               />
-              <InfoField label="Valuation method" value={movement.valuationMethod ?? "Not set"} />
+              <InfoField
+                label="Valuation method"
+                value={humaniseMovementToken(movement.valuationMethod, "Not set")}
+              />
             </div>
 
             {/* An uncosted movement is not a bug to hide. Saying so beats two
@@ -232,7 +248,10 @@ export function MovementDetailsPanel({
 
             <div className="grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2">
               <InfoField label="Movement ID" mono value={movement.id} />
-              <InfoField label="Reference type" value={movement.referenceType ?? "Manual"} />
+              <InfoField
+                label="Reference type"
+                value={humaniseMovementToken(movement.referenceType, "Manual")}
+              />
               <InfoField label="Reference number" mono value={movement.referenceNumber ?? "None"} />
               <InfoField label="Created by" value={movement.createdByUserName} />
               <InfoField
