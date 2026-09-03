@@ -56,19 +56,23 @@ export function RolesTable({
           // has a focusable target for the same action.
           <TableRow className="cursor-pointer" key={role.id} onClick={() => onView(role)}>
             <TableCell className="min-w-52 whitespace-normal">
-              <button
-                className="grid gap-1.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onView(role);
-                }}
-                type="button"
-              >
-                <span className="font-medium">{role.roleName}</span>
+              {/* The badge sits beside the button, not inside it: Badge renders
+                  a div, which a button may not contain. */}
+              <div className="grid gap-1.5">
+                <button
+                  className="w-fit rounded-sm text-left font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onView(role);
+                  }}
+                  type="button"
+                >
+                  {role.roleName}
+                </button>
                 <Badge className="w-fit" variant="outline">
                   {roleTypeLabel(role)}
                 </Badge>
-              </button>
+              </div>
             </TableCell>
             <TableCell className="min-w-60 whitespace-normal text-foreground-muted">
               {role.description || "No description provided."}
