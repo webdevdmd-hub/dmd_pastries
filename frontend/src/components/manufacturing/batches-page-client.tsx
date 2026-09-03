@@ -340,10 +340,10 @@ export function BatchesPageClient(): JSX.Element {
           and two rows of three broke that reading in half on every laptop
           under 1280px. To survive a 52px column the figure leads and the label
           wraps beneath it; the unit word only appears once there is room. */}
-      <div className="grid min-w-0 grid-cols-6 gap-1.5 sm:gap-3 xl:gap-4">
+      <div className="flex min-w-0 gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-6 sm:gap-3 sm:overflow-visible sm:pb-0 xl:gap-4">
         {metricCards.map((metric) => (
           <section
-            className="min-w-0 rounded-lg border border-border bg-card p-2 sm:rounded-2xl sm:p-4 xl:p-5"
+            className="w-28 shrink-0 rounded-lg border border-border bg-card p-3 sm:w-auto sm:min-w-0 sm:rounded-2xl sm:p-4 xl:p-5"
             key={metric.label}
           >
             <p
@@ -355,9 +355,7 @@ export function BatchesPageClient(): JSX.Element {
             >
               {metric.value}
             </p>
-            <p className="mt-1 break-words text-meta font-medium text-foreground-muted">
-              {metric.label}
-            </p>
+            <p className="mt-1 text-meta font-medium text-foreground-muted">{metric.label}</p>
             <p className="hidden text-meta text-foreground-muted lg:block">{metric.meta}</p>
           </section>
         ))}
