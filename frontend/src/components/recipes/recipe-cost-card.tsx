@@ -63,33 +63,33 @@ export function RecipeCostCard({
       <CardContent className="grid gap-3 text-sm text-brand-mocha">
         <div className="flex justify-between">
           <span>Ingredient lines</span>
-          <strong className="text-brand-espresso">{draftIngredientCount}</strong>
+          <strong className="tabular-nums text-brand-espresso">{draftIngredientCount}</strong>
         </div>
         <div className="flex justify-between">
           <span>Packaging lines</span>
-          <strong className="text-brand-espresso">{draftPackagingCount}</strong>
+          <strong className="tabular-nums text-brand-espresso">{draftPackagingCount}</strong>
         </div>
         <div className="flex justify-between">
           <span>Ingredients</span>
-          <strong className="text-brand-espresso">
+          <strong className="tabular-nums text-brand-espresso">
             {formatCurrency(livePreview?.estimatedIngredientCost ?? 0)}
           </strong>
         </div>
         <div className="flex justify-between">
           <span>Packaging</span>
-          <strong className="text-brand-espresso">
+          <strong className="tabular-nums text-brand-espresso">
             {formatCurrency(livePreview?.estimatedPackagingCost ?? 0)}
           </strong>
         </div>
         <div className="flex justify-between border-t border-brand-cappuccino pt-3">
           <span>Total</span>
-          <strong className="text-brand-espresso">
+          <strong className="tabular-nums text-brand-espresso">
             {formatCurrency(livePreview?.estimatedTotalCost ?? 0)}
           </strong>
         </div>
         <div className="flex justify-between">
           <span>Cost per yield unit</span>
-          <strong className="text-brand-espresso">
+          <strong className="tabular-nums text-brand-espresso">
             {formatCurrency(livePreview?.costPerYieldUnit ?? 0)}
           </strong>
         </div>
@@ -120,13 +120,13 @@ export function RecipeCostCard({
             <p className="font-semibold text-brand-espresso">Saved backend cost</p>
             <div className="flex justify-between">
               <span>Total</span>
-              <strong className="text-brand-espresso">
+              <strong className="tabular-nums text-brand-espresso">
                 {formatCurrency(cost?.estimatedTotalCost ?? 0)}
               </strong>
             </div>
             <div className="flex justify-between">
               <span>Cost per yield unit</span>
-              <strong className="text-brand-espresso">
+              <strong className="tabular-nums text-brand-espresso">
                 {formatCurrency(cost?.costPerYieldUnit ?? 0)}
               </strong>
             </div>

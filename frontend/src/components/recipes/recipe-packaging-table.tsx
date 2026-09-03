@@ -61,11 +61,11 @@ export function RecipePackagingTable({
                 {line.componentVariantName ? ` · ${line.componentVariantName}` : ""}
               </p>
             </TableCell>
-            <TableCell>
+            <TableCell className="tabular-nums">
               {line.quantityRequired} {line.unitSymbol}
             </TableCell>
-            <TableCell>{formatCurrency(line.unitCostSnapshot)}</TableCell>
-            <TableCell>{formatCurrency(line.totalCost)}</TableCell>
+            <TableCell className="tabular-nums">{formatCurrency(line.unitCostSnapshot)}</TableCell>
+            <TableCell className="tabular-nums">{formatCurrency(line.totalCost)}</TableCell>
             <TableCell>
               <Badge variant="outline">{line.isOptional ? "Optional" : "Required"}</Badge>
             </TableCell>

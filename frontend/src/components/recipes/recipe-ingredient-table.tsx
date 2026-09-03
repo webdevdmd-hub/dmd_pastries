@@ -61,12 +61,12 @@ export function RecipeIngredientTable({
               </p>
               {line.notes ? <p className="text-xs text-brand-mocha">{line.notes}</p> : null}
             </TableCell>
-            <TableCell>
+            <TableCell className="tabular-nums">
               {line.quantityRequired} {line.unitSymbol}
             </TableCell>
-            <TableCell>{formatCurrency(line.unitCostSnapshot)}</TableCell>
-            <TableCell>{formatCurrency(line.totalCost)}</TableCell>
-            <TableCell>{line.wastagePercentage}%</TableCell>
+            <TableCell className="tabular-nums">{formatCurrency(line.unitCostSnapshot)}</TableCell>
+            <TableCell className="tabular-nums">{formatCurrency(line.totalCost)}</TableCell>
+            <TableCell className="tabular-nums">{line.wastagePercentage}%</TableCell>
             <TableCell>
               {canManage ? (
                 <div className="flex gap-2">

@@ -28,11 +28,11 @@ export function RecipeYieldCard({ preview }: { preview: RecipeYieldPreview }): J
       <CardContent className="grid gap-3 text-sm text-brand-mocha">
         <div className="flex justify-between">
           <span>Batch yield</span>
-          <strong className="text-brand-espresso">{batchYield}</strong>
+          <strong className="tabular-nums text-brand-espresso">{batchYield}</strong>
         </div>
         <div className="flex justify-between">
           <span>Preparation time</span>
-          <strong className="text-brand-espresso">
+          <strong className="tabular-nums text-brand-espresso">
             {formattedPreparationTime(preview.preparationTimeMinutes)}
           </strong>
         </div>
