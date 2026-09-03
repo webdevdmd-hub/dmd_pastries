@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { SupplierLookupSelect } from "@/components/purchasing/supplier-lookup-select";
+import { type FormTab, FormTabs } from "@/components/shared/form-tabs";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -65,6 +66,10 @@ type SupplierPaymentAllocationDialogProps = {
   selectedSupplierId: string;
   suppliers: PurchasingSupplierOption[];
 };
+
+type SupplierPaymentFormTabKey = "payment" | "bills";
+
+const FORM_TABPANEL_ID = "supplier-payment-form-tabpanel";
 
 function todayInputValue(): string {
   return new Date().toISOString().slice(0, 10);
@@ -126,6 +131,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [validatingBalances, setValidatingBalances] = useState(false);
+  const [activeTab, setActiveTab] = useState<SupplierPaymentFormTabKey>("payment");
 
   const selectedMethod = methods.find((method) => method.id === paymentMethodId) ?? null;
   const hasPaymentMethods = methods.length > 0;
@@ -147,6 +153,11 @@ export function PurchaseSupplierPaymentAllocationDialog({
     (entry) => entry.amount > roundMoney(entry.invoice.balanceAmount),
   );
   const overAllocated = allocatedAmount > amountValue;
+  const billsWithAllocation = allocationEntries.filter((entry) => entry.amount > 0).length;
+  const formTabs: FormTab<SupplierPaymentFormTabKey>[] = [
+    { key: "payment", label: "Payment" },
+    { key: "bills", label: "Bills", badge: billsWithAllocation },
+  ];
 
   useEffect(() => {
     if (!open) return;
@@ -170,6 +181,8 @@ export function PurchaseSupplierPaymentAllocationDialog({
     );
     setSubmitError(null);
     setRowErrors({});
+    // Every opening starts on Payment, whichever tab the last one closed on.
+    setActiveTab("payment");
   }, [initialPayment, open]);
 
   useEffect(() => {
@@ -366,8 +379,8 @@ export function PurchaseSupplierPaymentAllocationDialog({
       }}
       open={open}
     >
-      <DialogContent className="flex max-h-[92vh] max-w-[1200px] flex-col overflow-hidden p-0 sm:w-[92vw]">
-        <DialogHeader className="border-b border-brand-cappuccino/70 px-6 py-5">
+      <DialogContent className="flex max-h-[90dvh] max-w-[1200px] flex-col gap-0 overflow-hidden p-0 sm:w-[92vw]">
+        <DialogHeader className="border-b border-border px-6 pb-4 pt-6">
           <DialogTitle>
             {isEditing ? "Edit Supplier Payment" : "Record Supplier Payment"}
           </DialogTitle>
@@ -378,8 +391,25 @@ export function PurchaseSupplierPaymentAllocationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          <div className="grid gap-4 lg:grid-cols-3">
+        {/* Two tabs on one state: the payment itself, and the bills it
+            settles. Nothing typed on one is lost on the other. */}
+        <div className="border-b border-border px-6 py-3">
+          <FormTabs
+            active={activeTab}
+            aria-label="Supplier payment sections"
+            onTabChange={setActiveTab}
+            panelId={FORM_TABPANEL_ID}
+            tabs={formTabs}
+          />
+        </div>
+
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5"
+          id={FORM_TABPANEL_ID}
+          role="tabpanel"
+          tabIndex={-1}
+        >
+          <div className={activeTab === "payment" ? "grid gap-4 lg:grid-cols-3" : "hidden"}>
             <div className="grid gap-2">
               <Label htmlFor="purchase-supplier-payment-allocati-branch">Branch *</Label>
               <Select
@@ -513,7 +543,21 @@ export function PurchaseSupplierPaymentAllocationDialog({
             </div>
           </div>
 
-          <div className="mt-5 rounded-xl border border-brand-cappuccino/70">
+          <div className={activeTab === "payment" ? "mt-5 grid gap-2" : "hidden"}>
+            <Label htmlFor="supplierPaymentNotes">Notes</Label>
+            <Textarea
+              id="supplierPaymentNotes"
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Optional internal supplier payment note"
+              value={notes}
+            />
+          </div>
+
+          <div
+            className={
+              activeTab === "bills" ? "rounded-xl border border-brand-cappuccino/70" : "hidden"
+            }
+          >
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-cappuccino/70 px-4 py-3">
               <div>
                 <h3 className="font-semibold text-brand-espresso">Bills for selected supplier</h3>
@@ -693,17 +737,9 @@ export function PurchaseSupplierPaymentAllocationDialog({
             ) : null}
           </div>
 
-          <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_360px]">
-            <div className="grid gap-2">
-              <Label htmlFor="supplierPaymentNotes">Notes</Label>
-              <Textarea
-                id="supplierPaymentNotes"
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Optional internal supplier payment note"
-                value={notes}
-              />
-            </div>
-
+          {/* The running total shows on both tabs: the amount is typed on one
+              and spent on the other. */}
+          <div className="mt-5">
             <div className="rounded-xl border border-brand-cappuccino bg-brand-latte/40 p-4">
               <div className="grid gap-3 text-sm">
                 <div className="flex justify-between gap-4">
