@@ -135,7 +135,7 @@ export function PurchasingItemLines({
   const labelSpan = tracksReceiving ? 6 : 4;
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <CardTitle>{title}</CardTitle>
         {tracksReceiving ? (
@@ -144,7 +144,9 @@ export function PurchasingItemLines({
           </span>
         ) : null}
       </CardHeader>
-      <CardContent className="p-0">
+      {/* The table scrolls inside the card on a phone rather than pushing its
+          host, a drawer or a page, wider than the screen. */}
+      <CardContent className="overflow-x-auto p-0">
         <Table>
           <TableHeader>
             <TableRow>
