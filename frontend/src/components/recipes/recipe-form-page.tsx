@@ -664,14 +664,17 @@ export function RecipeFormPage({
           className={
             isDialog
               ? "grid h-full min-h-0 overflow-hidden lg:grid-cols-[minmax(0,1fr)_22rem]"
-              : "grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]"
+              : "grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]"
           }
         >
           <div
             className={
               isDialog
-                ? "flex min-h-0 flex-col gap-6 overflow-y-auto overscroll-contain px-5 py-6 sm:px-8"
-                : "flex flex-col gap-6"
+                ? "flex min-h-0 min-w-0 flex-col gap-6 overflow-y-auto overscroll-contain px-5 py-6 sm:px-8"
+                : // A grid item defaults to min-width:auto, so without min-w-0
+                  // this column grows to its widest child -- the four-tab strip --
+                  // and drags the whole page into a horizontal scroll on a phone.
+                  "flex min-w-0 flex-col gap-6"
             }
           >
             <FormTabs
