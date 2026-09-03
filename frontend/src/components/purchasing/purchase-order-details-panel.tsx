@@ -53,7 +53,7 @@ export function PurchaseOrderDetailsPanel({
   );
 
   return (
-    <div className="grid gap-6">
+    <div className="grid min-w-0 gap-6">
       <PurchaseOrderDetailViewTabs
         active={activeTab}
         itemsCount={order.items.length}
@@ -61,7 +61,7 @@ export function PurchaseOrderDetailsPanel({
         orderId={order.id}
       />
 
-      <div id={PURCHASE_ORDER_DETAIL_TABPANEL_ID} role="tabpanel" tabIndex={-1}>
+      <div className="min-w-0" id={PURCHASE_ORDER_DETAIL_TABPANEL_ID} role="tabpanel" tabIndex={-1}>
         {activeTab === "items" ? (
           <PurchasingItemLines
             lines={order.items}

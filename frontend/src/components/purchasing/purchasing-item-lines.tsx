@@ -135,7 +135,7 @@ export function PurchasingItemLines({
   const labelSpan = tracksReceiving ? 6 : 4;
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="min-w-0 max-w-full overflow-hidden">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <CardTitle>{title}</CardTitle>
         {tracksReceiving ? (
