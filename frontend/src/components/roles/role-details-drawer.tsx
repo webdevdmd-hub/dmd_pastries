@@ -48,9 +48,9 @@ function InfoField({
   return (
     <div className="min-w-0">
       <p className="text-meta text-foreground-muted">{label}</p>
-      <p className={`mt-0.5 break-words text-cell font-medium ${numeric ? "tabular-nums" : ""}`}>
+      <div className={`mt-0.5 break-words text-cell font-medium ${numeric ? "tabular-nums" : ""}`}>
         {value}
-      </p>
+      </div>
     </div>
   );
 }

@@ -25,20 +25,25 @@ export function RolesCardGrid({
           onClick={() => onView(role)}
         >
           <div className="flex items-start justify-between gap-3 border-b border-workspace-border px-4 py-3">
-            <button
-              className="grid min-w-0 gap-1.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              onClick={(event) => {
-                event.stopPropagation();
-                onView(role);
-              }}
-              type="button"
-            >
-              <span className="truncate font-medium">{role.roleName}</span>
-              <span className="flex flex-wrap items-center gap-1.5">
+            {/* The badges sit beside the button, not inside it: Badge renders a
+                div, and a div inside a button (or a span) is invalid HTML and
+                trips React hydration. */}
+            <div className="grid min-w-0 gap-1.5">
+              <button
+                className="truncate rounded-sm text-left font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onView(role);
+                }}
+                type="button"
+              >
+                {role.roleName}
+              </button>
+              <div className="flex flex-wrap items-center gap-1.5">
                 <RoleStatusBadge status={role.status} />
                 <Badge variant="outline">{roleTypeLabel(role)}</Badge>
-              </span>
-            </button>
+              </div>
+            </div>
             <div onClick={(event) => event.stopPropagation()}>
               <RoleActionsMenu {...actions} role={role} />
             </div>

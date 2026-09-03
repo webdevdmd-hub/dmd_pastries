@@ -89,7 +89,7 @@ function InfoField({
   return (
     <div className="min-w-0">
       <p className="text-meta text-foreground-muted">{label}</p>
-      <p
+      <div
         className={[
           "mt-0.5 break-words text-cell font-medium",
           mono ? "font-mono" : "",
@@ -99,7 +99,7 @@ function InfoField({
           .join(" ")}
       >
         {value}
-      </p>
+      </div>
     </div>
   );
 }
