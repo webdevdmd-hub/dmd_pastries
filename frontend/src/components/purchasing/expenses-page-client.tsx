@@ -1,22 +1,26 @@
 "use client";
 
-import { Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
-import Link from "next/link";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
+import { ExpenseDetailsDrawer } from "@/components/purchasing/expense-details-drawer";
+import { ExpensesCardGrid } from "@/components/purchasing/expenses-card-grid";
+import { ExpensesTable } from "@/components/purchasing/expenses-table";
+import { ExpensesToolbar } from "@/components/purchasing/expenses-toolbar";
 import { PurchaseEmptyState } from "@/components/purchasing/purchase-empty-state";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
 import { PurchaseTableSkeleton } from "@/components/purchasing/purchase-table-skeleton";
 import { FilteredState } from "@/components/shared/collection-state";
+import { FormTabs } from "@/components/shared/form-tabs";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
+import { PaginationBar } from "@/components/shared/pagination-bar";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,31 +32,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useChartAccounts, usePaymentAccounts } from "@/hooks/use-accounting";
@@ -147,16 +128,6 @@ function formFromExpense(expense: Expense | null, defaultBranchId: string): Expe
     referenceNumber: expense.referenceNumber ?? "",
     supplierId: expense.supplierId ?? "",
   };
-}
-
-function money(value: number): string {
-  return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
-}
-
-function formatDate(value: string): string {
-  return value
-    ? new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(new Date(value))
-    : "-";
 }
 
 function textOrNull(value: string): string | null {
@@ -263,13 +234,27 @@ function buildPayload(state: ExpenseFormState): CreateExpensePayload {
   };
 }
 
-function ExpenseStatusBadge({ status }: { status: Expense["status"] }): JSX.Element {
-  return (
-    <Badge variant={status === "posted" ? "default" : "secondary"}>
-      {status === "posted" ? "Posted" : "Voided"}
-    </Badge>
-  );
-}
+type ExpenseFormTabKey = "expense" | "attribution" | "receipt";
+
+const EXPENSE_FORM_TABPANEL_ID = "expense-form-tabpanel";
+
+/**
+ * Which tab holds a given control. Validation reports field ids, so a failed
+ * submit can switch to the tab holding the first offender rather than focusing
+ * something the operator cannot see.
+ */
+const EXPENSE_FIELD_TABS: Record<string, ExpenseFormTabKey> = {
+  amount: "expense",
+  expenseDate: "expense",
+  "expenses-branch": "expense",
+  "expenses-expense-account": "expense",
+  "expenses-paid-through": "expense",
+  "expenses-customer": "attribution",
+  "expenses-vendor": "attribution",
+  referenceNumber: "attribution",
+  notes: "receipt",
+  receiptFile: "receipt",
+};
 
 function ExpenseFormDialog({
   accountErrorMessage,
@@ -304,6 +289,12 @@ function ExpenseFormDialog({
 }): JSX.Element {
   const [formState, setFormState] = useState<ExpenseFormState>(emptyForm(defaultBranchId));
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ExpenseFormTabKey>("expense");
+  const [tabErrorCounts, setTabErrorCounts] = useState<Record<ExpenseFormTabKey, number>>({
+    attribution: 0,
+    expense: 0,
+    receipt: 0,
+  });
   const [customerSearch, setCustomerSearch] = useState("");
   const [knownCustomers, setKnownCustomers] = useState<Customer[]>([]);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -327,6 +318,8 @@ function ExpenseFormDialog({
     if (open) {
       setFormState(formFromExpense(expense, defaultBranchId));
       setError(null);
+      setActiveTab("expense");
+      setTabErrorCounts({ attribution: 0, expense: 0, receipt: 0 });
       setCustomerSearch("");
       setReceiptFile(null);
       setKnownCustomers(
@@ -458,14 +451,33 @@ function ExpenseFormDialog({
 
     if (validationErrors.length > 0) {
       setError(validationErrors.map((item) => item.message).join(" "));
-      // Take the operator to the first field that needs them rather than
-      // leaving them to find it from a message at the foot of the form.
-      document.getElementById(validationErrors[0]?.fieldId ?? "")?.focus();
+
+      // Badge each tab with how many of its fields are failing, so a problem
+      // on a tab the operator is not looking at is still visible.
+      const counts: Record<ExpenseFormTabKey, number> = {
+        attribution: 0,
+        expense: 0,
+        receipt: 0,
+      };
+      validationErrors.forEach((item) => {
+        const tab = EXPENSE_FIELD_TABS[item.fieldId] ?? "expense";
+        counts[tab] += 1;
+      });
+      setTabErrorCounts(counts);
+
+      // Switch to the tab holding the first offender before focusing it:
+      // focusing a field on a hidden tab moves the caret nowhere visible.
+      const firstFieldId = validationErrors[0]?.fieldId ?? "";
+      const firstTab = EXPENSE_FIELD_TABS[firstFieldId] ?? "expense";
+      setActiveTab(firstTab);
+      // The field only exists in the DOM once its tab is showing, so focus
+      // waits for the render that switching the tab causes.
+      window.setTimeout(() => document.getElementById(firstFieldId)?.focus(), 0);
       return;
     }
 
     setError(null);
-    setError(null);
+    setTabErrorCounts({ attribution: 0, expense: 0, receipt: 0 });
 
     if (receiptFile) {
       try {
@@ -497,14 +509,31 @@ function ExpenseFormDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Three tabs on one form state, so nothing typed on one is lost on
+            another. What was spent leads; who it is attributed to and the
+            paperwork follow. */}
+        <FormTabs
+          active={activeTab}
+          aria-label="Expense form sections"
+          onTabChange={setActiveTab}
+          panelId={EXPENSE_FORM_TABPANEL_ID}
+          tabs={[
+            { key: "expense", label: "Expense", badge: tabErrorCounts.expense },
+            { key: "attribution", label: "Attribution", badge: tabErrorCounts.attribution },
+            { key: "receipt", label: "Receipt", badge: tabErrorCounts.receipt },
+          ]}
+        />
+
         <form
           className="grid gap-4"
+          id={EXPENSE_FORM_TABPANEL_ID}
           onSubmit={(event) => {
             event.preventDefault();
             void submitForm();
           }}
+          role="tabpanel"
         >
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className={activeTab === "expense" ? "grid gap-4 md:grid-cols-2" : "hidden"}>
             <div className="grid gap-2">
               <Label htmlFor="expenses-branch">Branch</Label>
               <SearchableCombobox
@@ -575,6 +604,23 @@ function ExpenseFormDialog({
                 </p>
               ) : null}
             </div>
+            {/* Amount belongs beside the accounts it moves between, not four
+                fields below them next to the reference number. */}
+            <div className="grid gap-2">
+              <Label htmlFor="amount">Amount</Label>
+              <Input
+                id="amount"
+                min="0"
+                onChange={(event) => updateForm({ amount: event.target.value })}
+                placeholder="0.00"
+                step="0.01"
+                type="number"
+                value={formState.amount}
+              />
+            </div>
+          </div>
+
+          <div className={activeTab === "attribution" ? "grid gap-4 md:grid-cols-2" : "hidden"}>
             <div className="grid gap-2">
               <Label htmlFor="expenses-vendor">Vendor</Label>
               <SearchableCombobox
@@ -603,18 +649,6 @@ function ExpenseFormDialog({
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="amount">Amount</Label>
-              <Input
-                id="amount"
-                min="0"
-                onChange={(event) => updateForm({ amount: event.target.value })}
-                placeholder="0.00"
-                step="0.01"
-                type="number"
-                value={formState.amount}
-              />
-            </div>
-            <div className="grid gap-2">
               <Label htmlFor="referenceNumber">Reference number</Label>
               <Input
                 id="referenceNumber"
@@ -623,20 +657,7 @@ function ExpenseFormDialog({
                 value={formState.referenceNumber}
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="receiptFile">Receipt upload</Label>
-              <Input
-                id="receiptFile"
-                onChange={(event) => setReceiptFile(event.target.files?.[0] ?? null)}
-                type="file"
-              />
-              {formState.receiptFileId && !receiptFile ? (
-                <p className="text-xs text-brand-mocha">
-                  Current receipt file: {formState.receiptFileId}
-                </p>
-              ) : null}
-            </div>
-            <label className="flex items-center gap-3 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/30 px-4 py-3">
+            <label className="flex items-center gap-3 rounded-2xl border border-brand-cappuccino/70 bg-brand-latte/30 px-4 py-3 md:col-span-2">
               <Checkbox
                 checked={formState.isBillable}
                 onCheckedChange={(checked) => updateForm({ isBillable: checked === true })}
@@ -649,18 +670,34 @@ function ExpenseFormDialog({
               </span>
             </label>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Input
-              id="notes"
-              onChange={(event) => updateForm({ notes: event.target.value })}
-              placeholder="Internal expense notes"
-              value={formState.notes}
-            />
+
+          <div className={activeTab === "receipt" ? "grid gap-4" : "hidden"}>
+            <div className="grid gap-2">
+              <Label htmlFor="receiptFile">Receipt upload</Label>
+              <Input
+                id="receiptFile"
+                onChange={(event) => setReceiptFile(event.target.files?.[0] ?? null)}
+                type="file"
+              />
+              {formState.receiptFileId && !receiptFile ? (
+                <p className="text-meta text-foreground-muted">
+                  Current receipt file: {formState.receiptFileId}
+                </p>
+              ) : null}
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Input
+                id="notes"
+                onChange={(event) => updateForm({ notes: event.target.value })}
+                placeholder="Internal expense notes"
+                value={formState.notes}
+              />
+            </div>
           </div>
 
           {error ? (
-            <p className="text-sm font-medium text-danger-text" role="alert">
+            <p className="text-cell font-medium text-danger-text" role="alert">
               {error}
             </p>
           ) : null}
@@ -711,6 +748,9 @@ export function ExpensesPageClient({
   const [formOpen, setFormOpen] = useState(initialCreateOpen);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null);
+  // The record, not the id: the register rows already carry a full Expense,
+  // so the drawer needs no fetch of its own.
+  const [detailsExpense, setDetailsExpense] = useState<Expense | null>(null);
   const expensesQuery = useExpenses(filters, canView && branchScope.hasBranchScope);
   const expenseAccountsQuery = useChartAccounts(
     {
@@ -844,6 +884,40 @@ export function ExpensesPageClient({
     setFormOpen(true);
   };
 
+  // A dialog on top of a sheet on top of the register is one layer too many,
+  // so the drawer closes before either of these opens.
+  const openEdit = (expense: Expense): void => {
+    setDetailsExpense(null);
+    setEditingExpense(expense);
+    setFormOpen(true);
+  };
+
+  const askDelete = (expense: Expense): void => {
+    setDetailsExpense(null);
+    setDeleteTarget(expense);
+  };
+
+  const listHandlers = {
+    canDelete,
+    canEdit,
+    expenses,
+    onDelete: askDelete,
+    onEdit: openEdit,
+    onView: setDetailsExpense,
+  };
+
+  const pagination = (
+    <PaginationBar
+      isFetching={expensesQuery.isFetching}
+      limit={filters.limit}
+      noun={{ one: "expense", other: "expenses" }}
+      onPageChange={(page) => updateFilters({ page }, false)}
+      page={filters.page}
+      total={totalExpenses}
+      totalPages={totalPages}
+    />
+  );
+
   const handleCreate = async (payload: CreateExpensePayload): Promise<void> => {
     try {
       await createMutation.mutateAsync(payload);
@@ -895,73 +969,14 @@ export function ExpensesPageClient({
         title="Expenses"
       />
 
-      <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-card/80 p-4 lg:grid-cols-[1.5fr_repeat(5,minmax(0,1fr))]">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mocha" />
-          <Input
-            aria-label="Search expenses"
-            className="pl-9"
-            onChange={(event) => updateFilters({ search: event.target.value })}
-            placeholder="Search expense, reference, vendor..."
-            value={filters.search}
-          />
-        </div>
-        <Select
-          onValueChange={(status: ExpensesFilters["status"]) => updateFilters({ status })}
-          value={filters.status}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="posted">Posted</SelectItem>
-            <SelectItem value="voided">Voided</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          onValueChange={(branchId) => updateFilters({ branchId })}
-          value={filters.branchId || "all"}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Branch" />
-          </SelectTrigger>
-          <SelectContent>
-            {branchScope.canAccessAllBranches ? (
-              <SelectItem value="all">All branches</SelectItem>
-            ) : null}
-            {branchOptions.map((branch) => (
-              <SelectItem key={branch.id} value={branch.id}>
-                {branch.branchName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input
-          aria-label="Date from"
-          onChange={(event) => updateFilters({ dateFrom: event.target.value })}
-          type="date"
-          value={filters.dateFrom}
-        />
-        <Input
-          aria-label="Date to"
-          onChange={(event) => updateFilters({ dateTo: event.target.value })}
-          type="date"
-          value={filters.dateTo}
-        />
-        <Button
-          onClick={() =>
-            setFilters({
-              ...defaultFilters,
-              branchId: branchScope.defaultBranchId,
-            })
-          }
-          type="button"
-          variant="outline"
-        >
-          Reset
-        </Button>
-      </div>
+      <ExpensesToolbar
+        allowAllBranches={branchScope.canAccessAllBranches}
+        branches={branchOptions}
+        filters={filters}
+        onFiltersChange={updateFilters}
+        onReset={() => setFilters({ ...defaultFilters, branchId: branchScope.defaultBranchId })}
+        resetBranchId={branchScope.defaultBranchId}
+      />
 
       {expensesQuery.isLoading ? <PurchaseTableSkeleton /> : null}
 
@@ -1009,152 +1024,29 @@ export function ExpensesPageClient({
       ) : null}
 
       {!expensesQuery.isLoading && !expensesQuery.error && expenses.length > 0 ? (
-        <Card className="overflow-hidden border-brand-cappuccino/70 bg-card/85">
-          <CardContent className="overflow-hidden p-0">
-            <div className="flex flex-col gap-2 border-b border-brand-cappuccino/70 bg-card/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-brand-espresso">Expense register</p>
-                <p className="text-xs text-brand-mocha">
-                  Showing {expenses.length} of {totalExpenses} expenses
-                </p>
-              </div>
-              <p className="text-xs text-brand-mocha">
-                Page {filters.page} of {totalPages}
-              </p>
-            </div>
-            <div className="overflow-x-auto bg-card/75">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Expense</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Branch</TableHead>
-                    <TableHead>Account</TableHead>
-                    <TableHead>Paid Through</TableHead>
-                    <TableHead>Vendor/Customer</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {expenses.map((expense) => (
-                    <TableRow key={expense.id}>
-                      <TableCell>
-                        <Link
-                          className="font-bold text-brand-espresso"
-                          href={`${ROUTES.expenses}/${expense.id}`}
-                        >
-                          {expense.expenseNumber}
-                        </Link>
-                        <span className="block max-w-52 truncate text-xs text-brand-mocha">
-                          {expense.referenceNumber ?? expense.notes ?? "No reference"}
-                        </span>
-                      </TableCell>
-                      <TableCell>{formatDate(expense.expenseDate)}</TableCell>
-                      <TableCell>{expense.branchName}</TableCell>
-                      <TableCell>{expense.expenseAccountName}</TableCell>
-                      <TableCell>{expense.paidThroughAccountName}</TableCell>
-                      <TableCell>
-                        {expense.supplierName ?? expense.customerName ?? (
-                          <span className="text-brand-mocha">Not tagged</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <ExpenseStatusBadge status={expense.status} />
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {money(expense.amount)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="icon" type="button" variant="ghost">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-52">
-                            <DropdownMenuLabel>Expense actions</DropdownMenuLabel>
-                            <DropdownMenuItem asChild>
-                              <Link href={`${ROUTES.expenses}/${expense.id}`}>
-                                <Eye className="h-4 w-4" />
-                                View details
-                              </Link>
-                            </DropdownMenuItem>
-                            {canEdit ? (
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setEditingExpense(expense);
-                                  setFormOpen(true);
-                                }}
-                              >
-                                <Pencil className="h-4 w-4" />
-                                Edit expense
-                              </DropdownMenuItem>
-                            ) : null}
-                            {canDelete ? (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-danger-text focus:text-danger-text"
-                                  onClick={() => setDeleteTarget(expense)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  Delete permanently
-                                </DropdownMenuItem>
-                              </>
-                            ) : null}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="flex flex-col gap-3 border-t border-brand-cappuccino/70 bg-card/80 px-4 py-3 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-brand-mocha">Rows per page</span>
-                <Select
-                  onValueChange={(value) => updateFilters({ limit: Number(value) })}
-                  value={String(filters.limit)}
-                >
-                  <SelectTrigger className="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between gap-3 md:justify-end">
-                <Button
-                  disabled={filters.page <= 1 || expensesQuery.isFetching}
-                  onClick={() => updateFilters({ page: Math.max(1, filters.page - 1) }, false)}
-                  type="button"
-                  variant="outline"
-                >
-                  Previous
-                </Button>
-                <span className="min-w-28 text-center text-sm text-brand-mocha">
-                  {filters.page} / {totalPages}
-                </span>
-                <Button
-                  disabled={filters.page >= totalPages || expensesQuery.isFetching}
-                  onClick={() => updateFilters({ page: filters.page + 1 }, false)}
-                  type="button"
-                  variant="outline"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <>
+          <div className="grid gap-4 md:hidden">
+            <ExpensesCardGrid {...listHandlers} />
+            <Card className="overflow-hidden">{pagination}</Card>
+          </div>
+          <Card className="hidden overflow-hidden md:block">
+            <CardContent className="p-0">
+              <ExpensesTable {...listHandlers} />
+              {pagination}
+            </CardContent>
+          </Card>
+        </>
       ) : null}
+
+      <ExpenseDetailsDrawer
+        canDelete={canDelete}
+        canEdit={canEdit}
+        expense={detailsExpense}
+        onDelete={askDelete}
+        onEdit={openEdit}
+        onOpenChange={(open) => (!open ? setDetailsExpense(null) : undefined)}
+        open={detailsExpense !== null}
+      />
 
       <ExpenseFormDialog
         accountErrorMessage={accountErrorMessage}
