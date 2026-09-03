@@ -623,7 +623,7 @@ export function RecipeFormPage({
     <div
       className={
         isDialog
-          ? "mx-auto flex h-full min-h-0 max-h-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+          ? "mx-auto flex h-full min-h-0 min-w-0 max-h-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
           : "mx-auto flex max-w-7xl flex-col gap-6"
       }
     >
@@ -659,7 +659,7 @@ export function RecipeFormPage({
       )}
 
       <form
-        className={isDialog ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "grid gap-6"}
+        className={isDialog ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : "grid gap-6"}
         onSubmit={(event) => {
           void form.handleSubmit((values) => saveRecipe(values), showValidationToast)(event);
         }}
@@ -1007,7 +1007,7 @@ export function RecipeFormPage({
             scrollers. It sat 286px down the sidebar, which meant scrolling a
             secondary pane to find the button that ends the task. */}
         {isDialog && (canSaveRecipe || canUpdateRecipeStatus) ? (
-          <div className="shrink-0 border-t border-border bg-card px-5 py-4 sm:px-8">
+          <div className="min-w-0 shrink-0 border-t border-border bg-card px-5 py-4 sm:px-8">
             {recipeActionButtons}
           </div>
         ) : null}

@@ -256,7 +256,7 @@ export function RecipesPageClient(): JSX.Element {
               Define how finished and semi-finished products are made.
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 flex-1">
+          <div className="min-h-0 min-w-0 flex-1">
             {/* Keyed by record: the builder holds a whole form state, so
                 switching from one recipe to another must remount it rather
                 than leave the previous recipe's drafts in place. */}
