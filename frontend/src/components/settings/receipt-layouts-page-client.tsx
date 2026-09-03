@@ -783,7 +783,7 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
 
       {!layoutsQuery.isLoading && !layoutsQuery.error && layouts.length === 0 ? (
         <EmptyState
-          description="A layout decides what a printed receipt looks like â 80mm thermal, 58mm counter, A4 invoice, or a custom format."
+          description="A layout decides what a printed receipt looks like: 80mm thermal, 58mm counter, A4 invoice, or a custom format."
           icon={ReceiptText}
           title="No receipt layouts yet"
         />
