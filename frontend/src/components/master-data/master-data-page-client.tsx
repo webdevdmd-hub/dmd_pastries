@@ -2643,7 +2643,7 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
       />
       {activeQuery.isLoading ? <LoadingCard /> : null}
       {activeQuery.error ? <ErrorCard>{getErrorMessage(activeQuery.error)}</ErrorCard> : null}
-      {collection === "units" && unitsQuery.data ? (
+      {collection === "units" && unitsQuery.data && activeDetails.length > 0 ? (
         <Card className="hidden overflow-hidden md:block">
           <CardContent className="p-0">
             <UnitsTable
@@ -2672,7 +2672,9 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
           onSubmit={handleUnitSubmit}
         />
       ) : null}
-      {collection === "product-categories" && productCategoriesQuery.data ? (
+      {collection === "product-categories" &&
+      productCategoriesQuery.data &&
+      activeDetails.length > 0 ? (
         <Card className="hidden overflow-hidden md:block">
           <CardContent className="p-0">
             <ProductCategoriesTable
@@ -2699,7 +2701,9 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
           onSubmit={handleProductCategorySubmit}
         />
       ) : null}
-      {collection === "ingredient-categories" && ingredientCategoriesQuery.data ? (
+      {collection === "ingredient-categories" &&
+      ingredientCategoriesQuery.data &&
+      activeDetails.length > 0 ? (
         <Card className="hidden overflow-hidden md:block">
           <CardContent className="p-0">
             <SimpleCategoriesTable
@@ -2718,7 +2722,9 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
           </CardContent>
         </Card>
       ) : null}
-      {collection === "packaging-categories" && packagingCategoriesQuery.data ? (
+      {collection === "packaging-categories" &&
+      packagingCategoriesQuery.data &&
+      activeDetails.length > 0 ? (
         <Card className="hidden overflow-hidden md:block">
           <CardContent className="p-0">
             <SimpleCategoriesTable
@@ -2751,7 +2757,7 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
           onSubmit={handleSimpleCategorySubmit}
         />
       ) : null}
-      {collection === "order-statuses" && orderStatusesQuery.data ? (
+      {collection === "order-statuses" && orderStatusesQuery.data && activeDetails.length > 0 ? (
         <Card className="hidden overflow-hidden md:block">
           <CardContent className="p-0">
             <OrderStatusesTable
@@ -2775,7 +2781,9 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
           onSubmit={handleOrderStatusSubmit}
         />
       ) : null}
-      {collection === "payment-statuses" && paymentStatusesQuery.data ? (
+      {collection === "payment-statuses" &&
+      paymentStatusesQuery.data &&
+      activeDetails.length > 0 ? (
         <Card className="hidden overflow-hidden md:block">
           <CardContent className="p-0">
             <PaymentStatusesTable
