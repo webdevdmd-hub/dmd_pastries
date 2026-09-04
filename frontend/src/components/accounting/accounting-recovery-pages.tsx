@@ -656,7 +656,9 @@ export function AccountMappingsPageClient(): JSX.Element {
       {updateMappings.isError ? <ErrorNotice message={updateMappings.error.message} /> : null}
 
       <Card className="overflow-hidden border-workspace-panel-border bg-workspace-panel shadow-sm">
-        <div className="grid gap-4 border-b bg-muted/40 px-4 py-3 text-xs font-semibold text-muted-foreground md:grid-cols-[minmax(0,1.25fr)_minmax(0,2fr)_minmax(0,1fr)_8rem]">
+        {/* A column header strip means nothing once the columns stack, so it
+            only exists where the grid does. */}
+        <div className="hidden gap-4 border-b bg-muted/40 px-4 py-3 text-meta font-medium text-muted-foreground md:grid md:grid-cols-[minmax(0,1.25fr)_minmax(0,2fr)_minmax(0,1fr)_8rem]">
           <span>Mapping</span>
           <span>Chart account</span>
           <span>Type / group</span>
