@@ -27,12 +27,21 @@ export function ReportKpiCard({
   changePercentage,
   icon: Icon,
   label,
+  tone = "default",
   trend,
   value,
 }: {
   changePercentage?: number;
-  icon: LucideIcon;
+  /** Optional: a reconciliation figure reads better without one. */
+  icon?: LucideIcon | undefined;
   label: string;
+  /**
+   * "danger" for a figure whose non-zero value is the problem -- an unreconciled
+   * difference, a mismatch count. Semantic, not decorative: a zero difference
+   * stays neutral, so colour here means "look at this" rather than "this is a
+   * money figure".
+   */
+  tone?: "danger" | "default" | undefined;
   trend?: ReportTrend;
   value: string;
 }): JSX.Element {
@@ -41,7 +50,11 @@ export function ReportKpiCard({
       <CardContent className="flex items-start justify-between gap-3 p-4">
         <div className="min-w-0">
           <p className="text-meta whitespace-nowrap leading-tight text-foreground-muted">{label}</p>
-          <p className="text-title mt-1.5 whitespace-nowrap font-mono tabular-nums text-foreground lg:text-kpi">
+          <p
+            className={`text-title mt-1.5 whitespace-nowrap font-mono tabular-nums lg:text-kpi ${
+              tone === "danger" ? "text-danger-text" : "text-foreground"
+            }`}
+          >
             {value}
           </p>
           {changePercentage !== undefined ? (
@@ -52,9 +65,11 @@ export function ReportKpiCard({
         </div>
         {/* The first thing to go when the row is tight: it names nothing the
             label does not already say. */}
-        <span className="hidden shrink-0 rounded-lg bg-muted p-2.5 text-foreground-muted lg:inline-flex">
-          <Icon className="h-5 w-5" />
-        </span>
+        {Icon ? (
+          <span className="hidden shrink-0 rounded-lg bg-muted p-2.5 text-foreground-muted lg:inline-flex">
+            <Icon className="h-5 w-5" />
+          </span>
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -19,6 +19,8 @@ import {
   defaultInventoryReportDraft,
   parseInventoryReportDraft,
 } from "@/components/reports/inventory/inventory-report-page-utils";
+import { ReportKpiCard } from "@/components/reports/report-kpi-card";
+import { ReportKpiRow } from "@/components/reports/report-kpi-row";
 import { ReportSectionHeader } from "@/components/reports/report-section-header";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Button } from "@/components/ui/button";
@@ -58,35 +60,6 @@ function reconciliationFilters(filters: InventoryReportFilters, page = 1): Inven
     sortBy: "difference_amount",
     sortOrder: "desc",
   };
-}
-
-function SummaryTile({
-  label,
-  tone = "default",
-  value,
-}: {
-  label: string;
-  tone?: "default" | "danger";
-  value: string;
-}): JSX.Element {
-  return (
-    // min-w-0 so a long AED figure wraps inside a half-width phone tile instead
-    // of stretching the grid past the screen.
-    <Card className="min-w-0 bg-card/85 shadow-soft">
-      <CardContent className="p-4 md:p-5">
-        <p className="text-cell leading-tight text-brand-mocha">{label}</p>
-        <p
-          className={
-            tone === "danger"
-              ? "mt-2 break-words text-kpi tabular-nums text-danger-text"
-              : "mt-2 break-words text-kpi tabular-nums text-brand-espresso"
-          }
-        >
-          {value}
-        </p>
-      </CardContent>
-    </Card>
-  );
 }
 
 export function InventoryAccountingReconciliationPageClient(): JSX.Element {
@@ -150,37 +123,39 @@ export function InventoryAccountingReconciliationPageClient(): JSX.Element {
         onChange={setDraft}
         onReset={resetFilters}
       />
-      <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-5">
-        <SummaryTile
+      {/* Seven figures, one strip. The counts used to sit in a separate
+          two-across grid below the money, which read as a different kind of
+          fact when they answer the same question: does the ledger agree with
+          the stock? */}
+      <ReportKpiRow count={7}>
+        <ReportKpiCard
           label="Operational value"
           value={formatMoney(report?.totalOperationalValue ?? 0)}
         />
-        <SummaryTile
+        <ReportKpiCard
           label="Stock ledger value"
           value={formatMoney(report?.totalInventoryLedgerValue ?? 0)}
         />
-        <SummaryTile
+        <ReportKpiCard
           label="Linked accounting value"
           value={formatMoney(report?.totalAccountingInventoryValue ?? 0)}
         />
-        <SummaryTile
+        <ReportKpiCard
           label="Inventory / Stock GL"
           value={formatMoney(report?.generalLedgerInventoryBalance ?? 0)}
         />
-        <SummaryTile
+        <ReportKpiCard
           label="Unassigned GL difference"
           tone={Math.abs(report?.unassignedAccountingDifference ?? 0) > 0.01 ? "danger" : "default"}
           value={formatMoney(report?.unassignedAccountingDifference ?? 0)}
         />
-      </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <SummaryTile label="Matched rows" value={String(report?.matchedCount ?? 0)} />
-        <SummaryTile
+        <ReportKpiCard label="Matched rows" value={String(report?.matchedCount ?? 0)} />
+        <ReportKpiCard
           label="Mismatch rows"
           tone={(report?.mismatchCount ?? 0) > 0 ? "danger" : "default"}
           value={String(report?.mismatchCount ?? 0)}
         />
-      </div>
+      </ReportKpiRow>
       {unassignedLines.length > 0 ? (
         <Card className="border-danger/30 bg-card/85 shadow-soft">
           <CardContent className="space-y-4 p-5">
