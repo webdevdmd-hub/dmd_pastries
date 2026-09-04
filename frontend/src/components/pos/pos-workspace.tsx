@@ -485,12 +485,6 @@ export function POSWorkspace(): JSX.Element {
 
   const isCheckoutProcessing = checkoutMutation.isPending || verifyCheckoutMutation.isPending;
 
-  const resetCheckoutReference = (): void => {
-    if (!isCheckoutProcessing) {
-      checkoutReferenceRef.current = null;
-    }
-  };
-
   const referenceCategories = useMemo(
     () => referenceDataQuery.data?.productCategories ?? [],
     [referenceDataQuery.data?.productCategories],
@@ -672,27 +666,6 @@ export function POSWorkspace(): JSX.Element {
       onChargesChange={(charges) => {
         clearCheckoutFeedback();
         cart.setCharges(charges);
-      }}
-      onClear={() => {
-        void (async () => {
-          const confirmed = await confirm({
-            cancelLabel: "Keep sale",
-            confirmLabel: "Discard sale",
-            consequence: describeCartDiscard(cart.items.length, cart.totals.total),
-            detail: "Nothing is posted to the ledger — the sale was never completed.",
-            title: "Discard this sale?",
-          });
-
-          if (!confirmed) {
-            return;
-          }
-
-          clearCheckoutFeedback();
-          resetCheckoutReference();
-          setAutoSelectedPaymentMethodId(null);
-          setPaymentAutoSelectionSuppressedChannelId(null);
-          cart.clearCart();
-        })();
       }}
       onQuantityChange={(cartItemId, quantity) => {
         clearCheckoutFeedback();

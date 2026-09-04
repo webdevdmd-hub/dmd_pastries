@@ -1,4 +1,4 @@
-import { ArrowRight, RotateCcw } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { JSX } from "react";
 
 import { useConnectivity } from "@/components/connectivity/connectivity-provider";
@@ -16,7 +16,6 @@ type POSCartPanelProps = {
   items: CartItem[];
   onChargesChange: (charges: DocumentChargeDraft[]) => void;
   onCheckout: () => void;
-  onClear: () => void;
   onQuantityChange: (cartItemId: string, quantity: number) => void;
   onRemoveItem: (cartItemId: string) => void;
   totals: CartTotals;
@@ -45,7 +44,6 @@ export function POSCartPanel({
   items,
   onChargesChange,
   onCheckout,
-  onClear,
   onQuantityChange,
   onRemoveItem,
   totals,
@@ -144,17 +142,6 @@ export function POSCartPanel({
             </>
           )}
           <ArrowRight className="ml-3 h-5 w-5" />
-        </Button>
-
-        <Button
-          className="text-body min-h-tap w-full rounded border-border bg-card font-medium text-danger-text shadow-none hover:border-danger hover:bg-danger-tint"
-          disabled={items.length === 0}
-          onClick={onClear}
-          type="button"
-          variant="outline"
-        >
-          <RotateCcw className="mr-2 h-4 w-4" />
-          Clear cart
         </Button>
       </div>
     </aside>
