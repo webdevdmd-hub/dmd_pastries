@@ -7,7 +7,26 @@ type AdminDashboardResponse struct {
 	Manufacturing AdminManufacturingWidget `json:"manufacturing"`
 	Financial     AdminFinancialWidget     `json:"financial"`
 	Customers     AdminCustomersWidget     `json:"customers"`
-	LoadWarnings  []DashboardLoadWarning   `json:"load_warnings,omitempty"`
+	// Nil when the comparison could not be computed. The client renders no
+	// delta rather than a zero one -- "unchanged" and "unknown" are different
+	// answers and a KPI must not confuse them.
+	Previous     *AdminPreviousPeriod   `json:"previous,omitempty"`
+	LoadWarnings []DashboardLoadWarning `json:"load_warnings,omitempty"`
+}
+
+// AdminPreviousPeriod carries the same figures as the current window, measured
+// over the window of equal length immediately before it.
+//
+// Only period-scoped figures appear here. OutstandingBalance is deliberately
+// absent: it is a point-in-time ledger balance, not something accumulated over
+// a window, so "the previous period's outstanding balance" has no meaning.
+type AdminPreviousPeriod struct {
+	Sales             float64 `json:"sales"`
+	SalesCount        int64   `json:"sales_count"`
+	AverageOrderValue float64 `json:"average_order_value"`
+	Collected         float64 `json:"collected"`
+	DateFrom          string  `json:"date_from"`
+	DateTo            string  `json:"date_to"`
 }
 
 type DashboardLoadWarning struct {

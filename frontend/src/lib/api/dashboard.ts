@@ -1,6 +1,7 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
   AdminDashboard,
+  AdminDashboardPrevious,
   CashierDashboard,
   DashboardActivity,
   DashboardAlert,
@@ -192,7 +193,25 @@ function parseAdminDashboard(value: unknown): AdminDashboard {
       salesCountToday: numberField(sales, "sales_count_today"),
       todaySales: numberField(sales, "today_sales"),
     },
+    previous: parseAdminPrevious(value),
     loadWarnings: parseDashboardLoadWarnings(value),
+  };
+}
+
+function parseAdminPrevious(value: unknown): AdminDashboardPrevious | null {
+  if (!isObject(value) || !isObject(value.previous)) {
+    return null;
+  }
+
+  const previous = value.previous;
+
+  return {
+    averageOrderValue: numberField(previous, "average_order_value"),
+    collected: numberField(previous, "collected"),
+    dateFrom: stringField(previous, "date_from"),
+    dateTo: stringField(previous, "date_to"),
+    sales: numberField(previous, "sales"),
+    salesCount: numberField(previous, "sales_count"),
   };
 }
 

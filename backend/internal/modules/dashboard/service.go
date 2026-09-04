@@ -51,6 +51,28 @@ func (s *Service) AdminDashboard(currentUser *utils.AuthContext, values url.Valu
 	if err != nil {
 		return nil, adminDashboardLoadError("admin_widgets", "admin_widgets_failed", filter, err)
 	}
+	// A failed comparison must not fail the dashboard: the current figures are
+	// the point of the screen and the delta is a garnish on them. A nil
+	// Previous makes the client render no delta at all.
+	if previousFilter := filter.PreviousPeriod(); previousFilter != nil {
+		if previousSummary, previousErr := s.reports.DashboardSummary(previousFilter); previousErr == nil {
+			result.Previous = &AdminPreviousPeriod{
+				AverageOrderValue: previousSummary.Sales.AverageOrderValue,
+				Collected:         previousSummary.Payments.CollectedAmount,
+				DateFrom:          previousFilter.DateFrom.Format("2006-01-02"),
+				DateTo:            previousFilter.DateTo.Format("2006-01-02"),
+				Sales:             previousSummary.Sales.TotalSales,
+				SalesCount:        previousSummary.Sales.SalesCount,
+			}
+		} else {
+			result.LoadWarnings = append(result.LoadWarnings, DashboardLoadWarning{
+				Message: "Previous-period comparison could not be loaded.",
+				Reason:  "previous_period_failed",
+				Segment: "previous_period",
+			})
+		}
+	}
+
 	_ = s.writeAudit(currentUser, "dashboard.admin_viewed", "admin", scope, ipAddress, userAgent)
 	return result, nil
 }

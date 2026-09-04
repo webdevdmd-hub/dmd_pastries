@@ -51,6 +51,33 @@ type ReportBaseFilter struct {
 // The dashboard's "monthly" figures were reading the same window as "today",
 // because the month bounds were simply copied from the request window. Widening
 // here keeps the month in the user's timezone rather than the server's.
+// PreviousPeriod returns a copy of the filter covering the window of the same
+// length immediately before this one.
+//
+// Same convention the sales report summary already uses (see
+// Repository.SalesReportSummary): shift the range back by its own duration, so a
+// 7-day window compares against the 7 days before it and a single day compares
+// against the day before. The end of the previous window is the start of this
+// one, so no row is counted in both.
+func (f *ResolvedFilter) PreviousPeriod() *ResolvedFilter {
+	if f == nil {
+		return nil
+	}
+
+	period := f.EndUTC.Sub(f.StartUTC)
+	if period <= 0 {
+		return nil
+	}
+
+	shifted := *f
+	shifted.EndUTC = f.StartUTC
+	shifted.StartUTC = f.StartUTC.Add(-period)
+	shifted.DateTo = f.DateFrom
+	shifted.DateFrom = f.DateFrom.Add(-period)
+
+	return &shifted
+}
+
 func (f *ResolvedFilter) MonthToDate() *ResolvedFilter {
 	if f == nil {
 		return nil

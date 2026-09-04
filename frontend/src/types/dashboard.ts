@@ -71,7 +71,25 @@ export type AdminDashboard = {
     salesCountToday: number;
     todaySales: number;
   };
+  /**
+   * The same figures over the window of equal length immediately before this
+   * one. Absent when the backend could not compute the comparison, in which
+   * case no delta is shown at all.
+   *
+   * Outstanding balance has no entry here on purpose: it is a point-in-time
+   * ledger balance, not a figure accumulated over a window.
+   */
+  previous: AdminDashboardPrevious | null;
   loadWarnings: DashboardLoadWarning[];
+};
+
+export type AdminDashboardPrevious = {
+  averageOrderValue: number;
+  collected: number;
+  dateFrom: string;
+  dateTo: string;
+  sales: number;
+  salesCount: number;
 };
 
 export type CashierDashboard = {

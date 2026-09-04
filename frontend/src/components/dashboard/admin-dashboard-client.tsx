@@ -56,7 +56,7 @@ import {
 import { reportBaseFiltersSchema } from "@/lib/validators/reports.schema";
 import type { DashboardActivity, DashboardAlert, DashboardLoadWarning } from "@/types/dashboard";
 import type { ManufacturingReportFilters } from "@/types/manufacturing-reports";
-import type { ReportChartData, ReportFilters } from "@/types/reports";
+import type { ReportFilters } from "@/types/reports";
 
 const actions = [
   { href: ROUTES.pos, icon: ReceiptText, label: "Open POS" },
@@ -351,33 +351,23 @@ function ActivityTable({
 }
 
 /**
- * A period-over-period delta for the sales KPI, computed from the sales chart's
- * own buckets.
+ * A delta against the previous window, or nothing.
  *
- * The dashboard API returns current-period figures only, so this is the one
- * card on the screen with a real comparison behind it. Returns undefined rather
- * than 0% when there is no previous bucket, or when the previous bucket was
- * zero and a percentage change is undefined rather than infinite.
+ * Returns undefined when the backend sent no comparison, and when the previous
+ * value was zero -- a percentage change from zero is undefined, not infinite,
+ * and not 100%. A KPI that cannot be compared shows no badge rather than a
+ * number that looks measured.
  */
-function salesDeltaFromChart(
-  chart: ReportChartData | undefined,
-  granularityLabel: string,
+function periodDelta(
+  current: number,
+  previous: number | undefined,
+  comparedTo: string,
 ): KpiDelta | undefined {
-  const data = chart?.datasets[0]?.data;
-  if (!data || data.length < 2) {
+  if (previous === undefined || previous === 0) {
     return undefined;
   }
 
-  const latest = data[data.length - 1];
-  const previous = data[data.length - 2];
-  if (latest === undefined || previous === undefined || previous === 0) {
-    return undefined;
-  }
-
-  return {
-    comparedTo: `vs previous ${granularityLabel}`,
-    percentage: ((latest - previous) / previous) * 100,
-  };
+  return { comparedTo, percentage: ((current - previous) / previous) * 100 };
 }
 
 export function AdminDashboardClient(): JSX.Element {
@@ -470,35 +460,39 @@ export function AdminDashboardClient(): JSX.Element {
     { label: "Expiring", value: dashboard?.inventory.expiringItems ?? 0 },
     { label: "Out of stock", value: dashboard?.inventory.outOfStock ?? 0 },
   ];
-  // The bucket the chart is grouped by, so the delta says what it compares.
-  const granularityLabel =
-    appliedFilters.groupBy === "month"
-      ? "month"
-      : appliedFilters.groupBy === "week"
-        ? "week"
-        : "day";
+  // Named from the window the backend actually measured, so the badge says what
+  // it compared against rather than implying a bucket the API never used.
+  const previous = dashboard?.previous ?? null;
+  const comparedTo = previous ? `vs ${previous.dateFrom} to ${previous.dateTo}` : "";
   const decisionMetrics = [
     {
       caption: "Selected period",
-      delta: salesDeltaFromChart(salesChartQuery.data, granularityLabel),
+      delta: periodDelta(dashboard?.sales.todaySales ?? 0, previous?.sales, comparedTo),
       icon: CircleDollarSign,
       label: "Sales",
       value: formatCurrency(dashboard?.sales.todaySales ?? 0),
     },
     {
       caption: "Payments received",
+      delta: periodDelta(dashboard?.financial.collectedToday ?? 0, previous?.collected, comparedTo),
       icon: CreditCard,
       label: "Collections",
       value: formatCurrency(dashboard?.financial.collectedToday ?? 0),
     },
     {
       caption: "Completed sales",
+      delta: periodDelta(dashboard?.sales.salesCountToday ?? 0, previous?.salesCount, comparedTo),
       icon: ReceiptText,
       label: "Sales count",
       value: formatNumber(dashboard?.sales.salesCountToday ?? 0),
     },
     {
       caption: "Per completed sale",
+      delta: periodDelta(
+        dashboard?.sales.averageOrderValue ?? 0,
+        previous?.averageOrderValue,
+        comparedTo,
+      ),
       icon: BarChart3,
       label: "Average order",
       value: formatCurrency(dashboard?.sales.averageOrderValue ?? 0),
