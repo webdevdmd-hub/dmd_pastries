@@ -147,7 +147,11 @@ function groupTrialBalanceItems(items: readonly TrialBalanceItem[]): TrialBalanc
 }
 
 function AmountCell({ value }: { value: number }): JSX.Element {
-  return <td className="w-40 px-6 py-3 text-right tabular-nums text-info-text">{money(value)}</td>;
+  return (
+    <td className="w-28 px-3 py-3 sm:w-40 sm:px-6 text-right tabular-nums text-info-text">
+      {money(value)}
+    </td>
+  );
 }
 
 export function TrialBalancePageClient(): JSX.Element {
@@ -288,7 +292,7 @@ export function TrialBalancePageClient(): JSX.Element {
             </div>
 
             <div className="overflow-x-auto px-4 py-10">
-              <div className="mx-auto min-w-[48rem] max-w-5xl">
+              <div className="mx-auto max-w-5xl md:min-w-[48rem]">
                 <div className="mb-8 text-center">
                   <p className="text-sm font-medium text-foreground-muted">Accrual basis</p>
                   <h2 className="mt-2 text-2xl font-bold text-foreground">Trial Balance</h2>
@@ -321,17 +325,17 @@ export function TrialBalancePageClient(): JSX.Element {
 
                 <table className="w-full border-collapse text-sm">
                   <thead>
-                    <tr className="border-y border-border bg-muted text-xs uppercase tracking-wide text-foreground-muted">
-                      <th className="px-6 py-3 text-left font-bold">Account</th>
-                      <th className="px-6 py-3 text-right font-bold">Net Debit</th>
-                      <th className="px-6 py-3 text-right font-bold">Net Credit</th>
+                    <tr className="border-y border-border bg-muted text-meta text-foreground-muted">
+                      <th className="px-3 py-3 sm:px-6 text-left font-bold">Account</th>
+                      <th className="px-3 py-3 sm:px-6 text-right font-bold">Net Debit</th>
+                      <th className="px-3 py-3 sm:px-6 text-right font-bold">Net Credit</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sections.map((section) => (
                       <Fragment key={section.type}>
                         <tr className="border-b border-border">
-                          <td className="px-6 py-3 text-base font-bold text-foreground">
+                          <td className="px-3 py-3 sm:px-6 text-base font-bold text-foreground">
                             {section.label}
                           </td>
                           <td />

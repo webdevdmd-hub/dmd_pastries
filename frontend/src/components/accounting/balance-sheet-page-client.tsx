@@ -139,7 +139,7 @@ function AmountCell({ strong = false, value }: { strong?: boolean; value: number
   return (
     <td
       className={cn(
-        "w-52 px-6 py-3 text-right tabular-nums",
+        "w-28 px-3 py-3 sm:w-52 sm:px-6 text-right tabular-nums",
         strong ? "font-bold text-foreground" : "font-medium text-info-text",
       )}
     >
@@ -160,7 +160,7 @@ function BalanceSheetRows({
   return (
     <>
       <tr className="border-b border-border">
-        <td className="px-6 py-3 text-base font-bold text-foreground">{title}</td>
+        <td className="px-3 py-3 sm:px-6 text-base font-bold text-foreground">{title}</td>
         <td />
       </tr>
       {groups.map((group) => (
@@ -183,7 +183,7 @@ function BalanceSheetRows({
                 >
                   {getBalanceSheetItemLabel(item)}
                   {item.isCalculated ? (
-                    <Badge className="text-[0.65rem]" variant="secondary">
+                    <Badge className="text-meta" variant="secondary">
                       Calculated
                     </Badge>
                   ) : null}
@@ -199,7 +199,7 @@ function BalanceSheetRows({
         </Fragment>
       ))}
       <tr className="border-b border-border bg-muted/60">
-        <td className="px-6 py-3 font-bold text-foreground">Total for {title}</td>
+        <td className="px-3 py-3 sm:px-6 font-bold text-foreground">Total for {title}</td>
         <AmountCell strong value={section.total} />
       </tr>
     </>
@@ -335,7 +335,7 @@ export function BalanceSheetPageClient(): JSX.Element {
             </div>
 
             <div className="overflow-x-auto px-4 py-10">
-              <div className="mx-auto min-w-[42rem] max-w-4xl">
+              <div className="mx-auto max-w-4xl md:min-w-[42rem]">
                 <div className="mb-8 text-center">
                   <p className="text-sm font-medium text-foreground-muted">Accrual basis</p>
                   <h2 className="mt-2 text-2xl font-bold text-foreground">Balance Sheet</h2>
@@ -373,9 +373,9 @@ export function BalanceSheetPageClient(): JSX.Element {
 
                 <table className="w-full border-collapse text-sm">
                   <thead>
-                    <tr className="border-y border-border bg-muted text-xs uppercase tracking-wide text-foreground-muted">
-                      <th className="px-6 py-3 text-left font-bold">Account</th>
-                      <th className="px-6 py-3 text-right font-bold">Total</th>
+                    <tr className="border-y border-border bg-muted text-meta text-foreground-muted">
+                      <th className="px-3 py-3 sm:px-6 text-left font-bold">Account</th>
+                      <th className="px-3 py-3 sm:px-6 text-right font-bold">Total</th>
                     </tr>
                   </thead>
                   <tbody>

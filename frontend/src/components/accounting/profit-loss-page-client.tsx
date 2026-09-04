@@ -77,7 +77,7 @@ function StatementAmount({
   return (
     <td
       className={cn(
-        "w-44 px-6 py-3 text-right tabular-nums",
+        "w-28 px-3 py-3 sm:w-44 sm:px-6 text-right tabular-nums",
         strong ? "font-bold text-foreground" : "font-medium text-info-text",
       )}
     >
@@ -124,7 +124,7 @@ function SectionRows({
   return (
     <>
       <tr className="border-b border-border">
-        <td className="px-6 py-3 text-base font-bold text-foreground">{title}</td>
+        <td className="px-3 py-3 sm:px-6 text-base font-bold text-foreground">{title}</td>
         <td />
       </tr>
       {groups.map((group) => (
@@ -160,7 +160,7 @@ function SectionRows({
         </Fragment>
       ))}
       <tr className="border-b border-border">
-        <td className="px-6 py-3 font-bold text-foreground">Total for {title}</td>
+        <td className="px-3 py-3 sm:px-6 font-bold text-foreground">Total for {title}</td>
         <StatementAmount strong value={section.total} />
       </tr>
     </>
@@ -289,7 +289,7 @@ export function ProfitLossPageClient(): JSX.Element {
             </div>
 
             <div className="overflow-x-auto px-4 py-10">
-              <div className="mx-auto min-w-[42rem] max-w-4xl">
+              <div className="mx-auto max-w-4xl md:min-w-[42rem]">
                 <div className="mb-8 text-center">
                   <p className="text-sm font-medium text-foreground-muted">Accrual basis</p>
                   <h2 className="mt-2 text-2xl font-bold text-foreground">Profit and Loss</h2>
@@ -300,29 +300,35 @@ export function ProfitLossPageClient(): JSX.Element {
 
                 <table className="w-full border-collapse text-sm">
                   <thead>
-                    <tr className="border-y border-border bg-muted text-xs uppercase tracking-wide text-foreground-muted">
-                      <th className="px-6 py-3 text-left font-bold">Account</th>
-                      <th className="px-6 py-3 text-right font-bold">Total</th>
+                    <tr className="border-y border-border bg-muted text-meta text-foreground-muted">
+                      <th className="px-3 py-3 sm:px-6 text-left font-bold">Account</th>
+                      <th className="px-3 py-3 sm:px-6 text-right font-bold">Total</th>
                     </tr>
                   </thead>
                   <tbody>
                     <SectionRows section={profitLoss.income} title="Operating Income" />
                     <SectionRows section={profitLoss.cogs} title="Cost of Goods Sold" />
                     <tr className="border-b border-border bg-muted/60">
-                      <td className="px-6 py-3 font-bold text-foreground">Gross Profit</td>
+                      <td className="px-3 py-3 sm:px-6 font-bold text-foreground">Gross Profit</td>
                       <StatementAmount strong value={profitLoss.grossProfit} />
                     </tr>
                     <SectionRows section={profitLoss.operatingExpenses} title="Operating Expense" />
                     <tr className="border-b border-border">
-                      <td className="px-6 py-3 font-bold text-foreground">Operating Profit</td>
+                      <td className="px-3 py-3 sm:px-6 font-bold text-foreground">
+                        Operating Profit
+                      </td>
                       <StatementAmount strong value={profitLoss.netProfit} />
                     </tr>
                     <tr className="border-b border-border">
-                      <td className="px-6 py-3 font-bold text-foreground">Non Operating Income</td>
+                      <td className="px-3 py-3 sm:px-6 font-bold text-foreground">
+                        Non Operating Income
+                      </td>
                       <StatementAmount strong value={0} />
                     </tr>
                     <tr className="border-b border-border">
-                      <td className="px-6 py-3 font-bold text-foreground">Non Operating Expense</td>
+                      <td className="px-3 py-3 sm:px-6 font-bold text-foreground">
+                        Non Operating Expense
+                      </td>
                       <StatementAmount strong value={0} />
                     </tr>
                     <tr className="border-t border-border text-base">
