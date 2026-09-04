@@ -459,9 +459,11 @@ export function ProductsPageClient(): JSX.Element {
         title="Products"
       />
 
-      {/* Two across on a phone, four from xl: four stacked cards filled a
-          screen before the first product was visible. */}
-      <section className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+      {/* One row at every width. Below sm the row scrolls sideways rather than
+          wrapping to a second line: these four are context for the table below,
+          not the reason anyone opened the page, so they get one band of height
+          instead of half a phone screen. */}
+      <section className="scrollbar-hidden flex min-w-0 gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-4 sm:gap-4 sm:overflow-visible sm:pb-0">
         {[
           { icon: PackageCheck, label: "Catalog records", value: stats.total },
           { icon: Eye, label: "Active products", value: stats.active },
@@ -479,14 +481,18 @@ export function ProductsPageClient(): JSX.Element {
             value: priceSuggestionsQuery.data?.total ?? 0,
           },
         ].map((item) => (
-          <Card className="bg-card/80" key={item.label}>
-            <CardContent className="flex items-center justify-between gap-2 p-4 md:p-6">
+          <Card className="w-40 shrink-0 sm:w-auto sm:min-w-0" key={item.label}>
+            <CardContent className="flex items-center justify-between gap-2 p-4 lg:p-5">
               <div className="min-w-0">
-                <p className="text-cell leading-tight text-brand-mocha">{item.label}</p>
-                <p className="mt-2 text-kpi tabular-nums text-foreground">{item.value}</p>
+                <p className="text-meta leading-tight text-foreground-muted">{item.label}</p>
+                <p className="mt-1.5 break-words text-section font-medium tabular-nums text-foreground lg:text-kpi">
+                  {item.value}
+                </p>
               </div>
-              <div className="hidden shrink-0 rounded-2xl bg-brand-cappuccino/35 p-3 text-brand-mocha sm:block">
-                <item.icon className="h-6 w-6" />
+              {/* The icon is the first thing to go when the row is tight: it
+                  labels nothing the text does not already say. */}
+              <div className="hidden shrink-0 rounded-lg bg-muted p-2.5 text-foreground-muted lg:block">
+                <item.icon className="h-5 w-5" />
               </div>
             </CardContent>
           </Card>
