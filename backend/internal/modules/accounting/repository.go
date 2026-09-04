@@ -445,10 +445,19 @@ func (r *Repository) FindByID(businessID, id string) (*ChartAccount, error) {
 	return &account, err
 }
 
+// FindAccountForReport reads one account as the ledger reports project it.
+//
+// Take, not First: First appends ORDER BY the destination's primary key, and
+// the destination is a projection DTO with no primary key, so GORM fell back to
+// its first column -- account_id, which is this query's SELECT alias and not a
+// column on chart_of_accounts. Postgres rejected it, and because the failure
+// was not ErrRecordNotFound the General Ledger returned 500 for every
+// single-account run. The id = ? predicate already selects at most one row, so
+// there is nothing for an ORDER BY to decide.
 func (r *Repository) FindAccountForReport(businessID, id string) (*GeneralLedgerAccountResponse, error) {
 	var account GeneralLedgerAccountResponse
 	err := r.accountForReportQuery(businessID, id).
-		First(&account).Error
+		Take(&account).Error
 	return &account, err
 }
 
