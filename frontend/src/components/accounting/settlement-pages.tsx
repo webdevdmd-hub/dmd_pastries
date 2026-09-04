@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccountingAccessDeniedCard } from "@/components/accounting/accounting-access-denied-card";
+import { type ReportColumn, ReportDataTable } from "@/components/reports/report-data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
@@ -76,6 +77,7 @@ import {
   platformSettlementSchema,
 } from "@/lib/validators/accounting.schema";
 import {
+  type AccountTransfer,
   type AccountTransferPayload,
   type AccountTransfersFilters,
   type ChartAccount,
@@ -84,6 +86,7 @@ import {
   type PaymentAccountPayload,
   type PaymentAccountsFilters,
   type PaymentAccountType,
+  type PlatformSettlement,
   type PlatformSettlementDeductionPayload,
   type PlatformSettlementPayload,
   type PlatformSettlementsFilters,
@@ -919,6 +922,41 @@ function AccountTransferDialog({
   );
 }
 
+const transferColumns: ReportColumn<AccountTransfer>[] = [
+  {
+    cell: (transfer) => transfer.transferNumber,
+    header: "Transfer",
+    key: "transfer",
+    primary: true,
+  },
+  {
+    cell: (transfer) => transfer.referenceNumber || "-",
+    header: "Reference",
+    key: "reference",
+    secondary: true,
+  },
+  {
+    align: "right",
+    cell: (transfer) => <span className="tabular-nums">{formatDate(transfer.transferDate)}</span>,
+    header: "Date",
+    key: "date",
+  },
+  { cell: (transfer) => transfer.fromPaymentAccountName, header: "From", key: "from" },
+  { cell: (transfer) => transfer.toPaymentAccountName, header: "To", key: "to" },
+  {
+    align: "right",
+    cell: (transfer) => <span className="font-medium tabular-nums">{money(transfer.amount)}</span>,
+    header: "Amount",
+    key: "amount",
+  },
+  {
+    align: "right",
+    cell: (transfer) => <JournalLink id={transfer.journalEntryId} />,
+    header: "Journal",
+    key: "journal",
+  },
+];
+
 export function AccountTransfersPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.accountingView]);
@@ -926,6 +964,7 @@ export function AccountTransfersPageClient(): JSX.Element {
   const [filters] = useState<AccountTransfersFilters>(defaultTransferFilters);
   const [dialogOpen, setDialogOpen] = useState(false);
   const transfersQuery = useAccountTransfers(filters, canView);
+  const transfers = transfersQuery.data?.items ?? [];
   const paymentAccountsQuery = usePaymentAccounts(defaultPaymentAccountFilters, canView);
   const branchesQuery = useBranches(canView);
   const createMutation = useCreateAccountTransfer();
@@ -964,52 +1003,20 @@ export function AccountTransfersPageClient(): JSX.Element {
       ) : null}
       <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Transfer</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>From</TableHead>
-                <TableHead>To</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Journal</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {transfersQuery.isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-12 text-center text-brand-mocha">
-                    Loading transfers...
-                  </TableCell>
-                </TableRow>
-              ) : null}
-              {(transfersQuery.data?.items ?? []).map((transfer) => (
-                <TableRow key={transfer.id}>
-                  <TableCell>
-                    <div className="font-medium text-brand-espresso">{transfer.transferNumber}</div>
-                    <div className="text-xs text-brand-mocha">
-                      {transfer.referenceNumber || "-"}
-                    </div>
-                  </TableCell>
-                  <TableCell>{formatDate(transfer.transferDate)}</TableCell>
-                  <TableCell>{transfer.fromPaymentAccountName}</TableCell>
-                  <TableCell>{transfer.toPaymentAccountName}</TableCell>
-                  <TableCell>{money(transfer.amount)}</TableCell>
-                  <TableCell>
-                    <JournalLink id={transfer.journalEntryId} />
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!transfersQuery.isLoading && (transfersQuery.data?.items ?? []).length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-12 text-center text-brand-mocha">
-                    <ArrowLeftRight className="mx-auto h-8 w-8" />
-                    <p className="mt-3 font-medium text-brand-espresso">No transfers found.</p>
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
+          {transfersQuery.isLoading ? (
+            <p className="py-12 text-center text-brand-mocha">Loading transfers...</p>
+          ) : transfers.length === 0 ? (
+            <div className="py-12 text-center text-brand-mocha">
+              <ArrowLeftRight className="mx-auto h-8 w-8" />
+              <p className="mt-3 font-medium text-brand-espresso">No transfers found.</p>
+            </div>
+          ) : (
+            <ReportDataTable
+              columns={transferColumns}
+              rowKey={(transfer) => transfer.id}
+              rows={transfers}
+            />
+          )}
         </CardContent>
       </Card>
       <AccountTransferDialog
@@ -1286,6 +1293,65 @@ function PlatformSettlementDialog({
   );
 }
 
+const settlementColumns: ReportColumn<PlatformSettlement>[] = [
+  {
+    cell: (settlement) => settlement.settlementNumber,
+    header: "Settlement",
+    key: "settlement",
+    primary: true,
+  },
+  {
+    cell: (settlement) => settlement.referenceNumber || "-",
+    header: "Reference",
+    key: "reference",
+    secondary: true,
+  },
+  {
+    align: "right",
+    cell: (settlement) => (
+      <span className="tabular-nums">{formatDate(settlement.settlementDate)}</span>
+    ),
+    header: "Date",
+    key: "date",
+  },
+  {
+    cell: (settlement) => settlement.platformPaymentAccountName,
+    header: "Platform",
+    key: "platform",
+  },
+  {
+    cell: (settlement) => settlement.depositPaymentAccountName,
+    header: "Deposit",
+    key: "deposit",
+  },
+  {
+    align: "right",
+    cell: (settlement) => <span className="tabular-nums">{money(settlement.grossAmount)}</span>,
+    header: "Gross",
+    key: "gross",
+  },
+  {
+    align: "right",
+    cell: (settlement) => <span className="tabular-nums">{money(settlement.deductionsTotal)}</span>,
+    header: "Deductions",
+    key: "deductions",
+  },
+  {
+    align: "right",
+    cell: (settlement) => (
+      <span className="font-medium tabular-nums">{money(settlement.netReceivedAmount)}</span>
+    ),
+    header: "Net",
+    key: "net",
+  },
+  {
+    align: "right",
+    cell: (settlement) => <JournalLink id={settlement.journalEntryId} />,
+    header: "Journal",
+    key: "journal",
+  },
+];
+
 export function PlatformSettlementsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.accountingView]);
@@ -1293,6 +1359,7 @@ export function PlatformSettlementsPageClient(): JSX.Element {
   const [filters] = useState<PlatformSettlementsFilters>(defaultSettlementFilters);
   const [dialogOpen, setDialogOpen] = useState(false);
   const settlementsQuery = usePlatformSettlements(filters, canView);
+  const settlements = settlementsQuery.data?.items ?? [];
   const paymentAccountsQuery = usePaymentAccounts(defaultPaymentAccountFilters, canView);
   const branchesQuery = useBranches(canView);
   const expenseAccountsQuery = useChartAccounts(
@@ -1345,60 +1412,20 @@ export function PlatformSettlementsPageClient(): JSX.Element {
       ) : null}
       <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Settlement</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Platform</TableHead>
-                <TableHead>Deposit</TableHead>
-                <TableHead>Gross</TableHead>
-                <TableHead>Deductions</TableHead>
-                <TableHead>Net</TableHead>
-                <TableHead>Journal</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {settlementsQuery.isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-12 text-center text-brand-mocha">
-                    Loading settlements...
-                  </TableCell>
-                </TableRow>
-              ) : null}
-              {(settlementsQuery.data?.items ?? []).map((settlement) => (
-                <TableRow key={settlement.id}>
-                  <TableCell>
-                    <div className="font-medium text-brand-espresso">
-                      {settlement.settlementNumber}
-                    </div>
-                    <div className="text-xs text-brand-mocha">
-                      {settlement.referenceNumber || "-"}
-                    </div>
-                  </TableCell>
-                  <TableCell>{formatDate(settlement.settlementDate)}</TableCell>
-                  <TableCell>{settlement.platformPaymentAccountName}</TableCell>
-                  <TableCell>{settlement.depositPaymentAccountName}</TableCell>
-                  <TableCell>{money(settlement.grossAmount)}</TableCell>
-                  <TableCell>{money(settlement.deductionsTotal)}</TableCell>
-                  <TableCell>{money(settlement.netReceivedAmount)}</TableCell>
-                  <TableCell>
-                    <JournalLink id={settlement.journalEntryId} />
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!settlementsQuery.isLoading && (settlementsQuery.data?.items ?? []).length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-12 text-center text-brand-mocha">
-                    <ReceiptText className="mx-auto h-8 w-8" />
-                    <p className="mt-3 font-medium text-brand-espresso">
-                      No platform settlements found.
-                    </p>
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
+          {settlementsQuery.isLoading ? (
+            <p className="py-12 text-center text-brand-mocha">Loading settlements...</p>
+          ) : settlements.length === 0 ? (
+            <div className="py-12 text-center text-brand-mocha">
+              <ReceiptText className="mx-auto h-8 w-8" />
+              <p className="mt-3 font-medium text-brand-espresso">No platform settlements found.</p>
+            </div>
+          ) : (
+            <ReportDataTable
+              columns={settlementColumns}
+              rowKey={(settlement) => settlement.id}
+              rows={settlements}
+            />
+          )}
         </CardContent>
       </Card>
       <PlatformSettlementDialog
