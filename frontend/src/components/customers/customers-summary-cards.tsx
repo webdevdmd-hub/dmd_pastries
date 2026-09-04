@@ -38,22 +38,24 @@ export function CustomersSummaryCards({ customers }: { customers: Customer[] }):
   ];
 
   return (
-    // Two across on a phone, four from xl: four stacked cards filled a screen
-    // before the first customer was visible.
-    <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+    // One row at every width; below sm it scrolls sideways rather than
+    // wrapping to a second line.
+    <div className="scrollbar-hidden flex min-w-0 gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-4 sm:gap-4 sm:overflow-visible sm:pb-0">
       {items.map((item) => {
         const Icon = item.icon;
 
         return (
-          <Card className="bg-card/80" key={item.label}>
-            <CardContent className="flex items-center justify-between gap-2 p-4 md:p-6">
+          <Card className="w-40 shrink-0 sm:w-auto sm:min-w-0" key={item.label}>
+            <CardContent className="flex items-center justify-between gap-2 p-4 lg:p-5">
               <div className="min-w-0">
-                <p className="text-cell leading-tight text-brand-mocha">{item.label}</p>
-                <p className="mt-2 text-kpi tabular-nums text-foreground">{item.value}</p>
+                <p className="text-meta leading-tight text-foreground-muted">{item.label}</p>
+                <p className="mt-1.5 break-words text-section font-medium tabular-nums text-foreground lg:text-kpi">
+                  {item.value}
+                </p>
               </div>
-              <div className="hidden shrink-0 rounded-2xl bg-brand-cappuccino/35 p-3 text-brand-mocha sm:block">
-                <Icon className="h-6 w-6" />
-              </div>
+              <span className="hidden shrink-0 rounded-lg bg-muted p-2.5 text-foreground-muted lg:inline-flex">
+                <Icon className="h-5 w-5" />
+              </span>
             </CardContent>
           </Card>
         );
