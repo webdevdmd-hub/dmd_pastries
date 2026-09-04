@@ -1,37 +1,34 @@
 import type { JSX } from "react";
 
+import { type ReportColumn, ReportDataTable } from "@/components/reports/report-data-table";
 import { formatCurrency, formatNumber } from "@/components/reports/sales/sales-report-format";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { OrderStatusRow } from "@/types/bakery-orders-reports";
 
+const columns: ReportColumn<OrderStatusRow>[] = [
+  {
+    cell: (row) => (
+      <span className="capitalize">{row.orderStatus.replaceAll("_", " ") || "-"}</span>
+    ),
+    header: "Status",
+    key: "status",
+    primary: true,
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatNumber(row.ordersCount)}</span>,
+    header: "Orders",
+    key: "orders",
+  },
+  {
+    align: "right",
+    cell: (row) => (
+      <span className="font-medium tabular-nums">{formatCurrency(row.totalOrderValue)}</span>
+    ),
+    header: "Total value",
+    key: "value",
+  },
+];
+
 export function OrderStatusTable({ rows }: { rows: OrderStatusRow[] }): JSX.Element {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Status</TableHead>
-          <TableHead>Orders Count</TableHead>
-          <TableHead>Total Value</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <TableRow key={row.orderStatus}>
-            <TableCell className="font-semibold capitalize">
-              {row.orderStatus.replaceAll("_", " ") || "-"}
-            </TableCell>
-            <TableCell>{formatNumber(row.ordersCount)}</TableCell>
-            <TableCell>{formatCurrency(row.totalOrderValue)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
+  return <ReportDataTable columns={columns} rowKey={(row) => row.orderStatus} rows={rows} />;
 }

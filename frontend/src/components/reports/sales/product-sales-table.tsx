@@ -1,45 +1,63 @@
 import type { JSX } from "react";
 
+import { type ReportColumn, ReportDataTable } from "@/components/reports/report-data-table";
 import { formatCurrency, formatNumber } from "@/components/reports/sales/sales-report-format";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { ProductSalesRow } from "@/types/sales-reports";
+
+const columns: ReportColumn<ProductSalesRow>[] = [
+  {
+    cell: (row) => row.productName || "Unnamed product",
+    header: "Product",
+    key: "product",
+    primary: true,
+  },
+  {
+    cell: (row) => row.sku || "-",
+    header: "SKU",
+    key: "sku",
+    secondary: true,
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatNumber(row.quantitySold)}</span>,
+    header: "Quantity sold",
+    key: "quantity",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatCurrency(row.grossSales)}</span>,
+    header: "Gross sales",
+    key: "gross",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatCurrency(row.discountTotal)}</span>,
+    header: "Discount",
+    key: "discount",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatCurrency(row.taxTotal)}</span>,
+    header: "Tax",
+    key: "tax",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="font-medium tabular-nums">{formatCurrency(row.netSales)}</span>,
+    header: "Net sales",
+    key: "net",
+  },
+];
 
 export function ProductSalesTable({ rows }: { rows: ProductSalesRow[] }): JSX.Element {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-brand-cappuccino bg-card/85">
-      <Table>
-        <TableHeader className="sticky top-0 bg-brand-latte">
-          <TableRow>
-            <TableHead>Product</TableHead>
-            <TableHead>SKU</TableHead>
-            <TableHead>Quantity Sold</TableHead>
-            <TableHead>Gross Sales</TableHead>
-            <TableHead>Discount</TableHead>
-            <TableHead>Tax</TableHead>
-            <TableHead>Net Sales</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.productId || row.productName}>
-              <TableCell>{row.productName || "Unnamed product"}</TableCell>
-              <TableCell>{row.sku || "-"}</TableCell>
-              <TableCell>{formatNumber(row.quantitySold)}</TableCell>
-              <TableCell>{formatCurrency(row.grossSales)}</TableCell>
-              <TableCell>{formatCurrency(row.discountTotal)}</TableCell>
-              <TableCell>{formatCurrency(row.taxTotal)}</TableCell>
-              <TableCell>{formatCurrency(row.netSales)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <ReportDataTable
+      columns={columns}
+      // Sales reports keep their framed, sticky-headed table on a desktop.
+      frameClassName="overflow-x-auto rounded-2xl border border-brand-cappuccino bg-card/85"
+      headerClassName="sticky top-0 bg-brand-latte"
+      rowKey={(row) => row.productId || row.productName}
+      rows={rows}
+    />
   );
 }

@@ -1,15 +1,8 @@
 import type { JSX } from "react";
 
+import { type ReportColumn, ReportDataTable } from "@/components/reports/report-data-table";
 import { formatCurrency, formatDate } from "@/components/reports/sales/sales-report-format";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { PaymentsReportRow } from "@/types/financial-reports";
 
 function statusBadge(status: string): JSX.Element {
@@ -19,6 +12,7 @@ function statusBadge(status: string): JSX.Element {
   if (status === "pending" || status === "partial") {
     return <Badge className="border-warning/30 bg-warning-tint text-warning-text">{status}</Badge>;
   }
+
   return (
     <Badge className="border-danger/30 bg-danger-tint text-danger-text">
       {status || "unknown"}
@@ -26,37 +20,65 @@ function statusBadge(status: string): JSX.Element {
   );
 }
 
+const columns: ReportColumn<PaymentsReportRow>[] = [
+  {
+    cell: (row) => row.sourceNumber || "-",
+    header: "Source number",
+    key: "source",
+    primary: true,
+  },
+  {
+    cell: (row) => row.branchName || "-",
+    header: "Branch",
+    key: "branch",
+    secondary: true,
+  },
+  {
+    cell: (row) => row.sourceType || "-",
+    header: "Source type",
+    key: "source-type",
+  },
+  {
+    cell: (row) => row.paymentMethodName || row.paymentMethodType || "-",
+    header: "Payment method",
+    key: "method",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="font-medium tabular-nums">{formatCurrency(row.amount)}</span>,
+    header: "Amount",
+    key: "amount",
+  },
+  {
+    cell: (row) => statusBadge(row.status),
+    header: "Status",
+    key: "status",
+    unlabelledOnCard: true,
+  },
+  {
+    cell: (row) => row.referenceNumber || "-",
+    header: "Reference",
+    key: "reference",
+  },
+  {
+    cell: (row) => row.paidByUserName || "-",
+    header: "Paid by",
+    key: "paid-by",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatDate(row.paidAt)}</span>,
+    header: "Paid at",
+    key: "paid-at",
+  },
+];
+
 export function PaymentsReportTable({ rows }: { rows: PaymentsReportRow[] }): JSX.Element {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Source Number</TableHead>
-          <TableHead>Source Type</TableHead>
-          <TableHead>Branch</TableHead>
-          <TableHead>Payment Method</TableHead>
-          <TableHead>Amount</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Reference</TableHead>
-          <TableHead>Paid By</TableHead>
-          <TableHead>Paid At</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <TableRow key={row.paymentId || `${row.sourceNumber}-${row.paidAt}`}>
-            <TableCell className="font-semibold">{row.sourceNumber || "-"}</TableCell>
-            <TableCell>{row.sourceType || "-"}</TableCell>
-            <TableCell>{row.branchName || "-"}</TableCell>
-            <TableCell>{row.paymentMethodName || row.paymentMethodType || "-"}</TableCell>
-            <TableCell>{formatCurrency(row.amount)}</TableCell>
-            <TableCell>{statusBadge(row.status)}</TableCell>
-            <TableCell>{row.referenceNumber || "-"}</TableCell>
-            <TableCell>{row.paidByUserName || "-"}</TableCell>
-            <TableCell>{formatDate(row.paidAt)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <ReportDataTable
+      columns={columns}
+      rowKey={(row) => row.paymentId || `${row.sourceNumber}-${row.paidAt}`}
+      rows={rows}
+    />
   );
 }

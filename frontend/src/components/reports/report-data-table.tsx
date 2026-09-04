@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils/cn";
 
 export type ReportColumn<Row> = {
   align?: "right" | undefined;
@@ -42,10 +43,15 @@ export type ReportColumn<Row> = {
  */
 export function ReportDataTable<Row>({
   columns,
+  frameClassName,
+  headerClassName,
   rowKey,
   rows,
 }: {
   columns: ReportColumn<Row>[];
+  /** Framing for the desktop table only; the cards below md have their own. */
+  frameClassName?: string | undefined;
+  headerClassName?: string | undefined;
   rowKey: (row: Row, index: number) => string;
   rows: Row[];
 }): JSX.Element {
@@ -55,9 +61,9 @@ export function ReportDataTable<Row>({
 
   return (
     <>
-      <div className="hidden md:block">
+      <div className={cn("hidden md:block", frameClassName)}>
         <Table>
-          <TableHeader>
+          <TableHeader className={headerClassName}>
             <TableRow>
               {columns.map((column) => (
                 <TableHead

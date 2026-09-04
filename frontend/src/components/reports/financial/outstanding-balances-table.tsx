@@ -1,15 +1,8 @@
 import type { JSX } from "react";
 
+import { type ReportColumn, ReportDataTable } from "@/components/reports/report-data-table";
 import { formatCurrency, formatDate } from "@/components/reports/sales/sales-report-format";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { OutstandingBalanceRow } from "@/types/financial-reports";
 
 function paymentBadge(status: string): JSX.Element {
@@ -19,44 +12,81 @@ function paymentBadge(status: string): JSX.Element {
   if (status === "partial") {
     return <Badge className="border-warning/30 bg-warning-tint text-warning-text">Partial</Badge>;
   }
+
   return (
     <Badge className="border-danger/30 bg-danger-tint text-danger-text">{status || "Unpaid"}</Badge>
   );
 }
 
+const columns: ReportColumn<OutstandingBalanceRow>[] = [
+  {
+    cell: (row) => row.sourceNumber || "-",
+    header: "Source number",
+    key: "source",
+    primary: true,
+  },
+  {
+    cell: (row) => row.customerName || "-",
+    header: "Customer",
+    key: "customer",
+    secondary: true,
+  },
+  {
+    cell: (row) => row.sourceType || "-",
+    header: "Source type",
+    key: "source-type",
+  },
+  {
+    cell: (row) => row.branchName || "-",
+    header: "Branch",
+    key: "branch",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatCurrency(row.totalAmount)}</span>,
+    header: "Total",
+    key: "total",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatCurrency(row.paidAmount)}</span>,
+    header: "Paid",
+    key: "paid",
+  },
+  {
+    align: "right",
+    cell: (row) => (
+      <span
+        className={
+          row.balanceAmount > 0 ? "font-medium tabular-nums text-danger-text" : "tabular-nums"
+        }
+      >
+        {formatCurrency(row.balanceAmount)}
+      </span>
+    ),
+    header: "Balance",
+    key: "balance",
+  },
+  {
+    cell: (row) => paymentBadge(row.paymentStatus),
+    header: "Status",
+    key: "status",
+    unlabelledOnCard: true,
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatDate(row.dueDate)}</span>,
+    header: "Due date",
+    key: "due",
+  },
+];
+
 export function OutstandingBalancesTable({ rows }: { rows: OutstandingBalanceRow[] }): JSX.Element {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Source Number</TableHead>
-          <TableHead>Source Type</TableHead>
-          <TableHead>Customer</TableHead>
-          <TableHead>Branch</TableHead>
-          <TableHead>Total</TableHead>
-          <TableHead>Paid</TableHead>
-          <TableHead>Balance</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Due Date</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <TableRow key={`${row.sourceType}-${row.sourceNumber}`}>
-            <TableCell className="font-semibold">{row.sourceNumber || "-"}</TableCell>
-            <TableCell>{row.sourceType || "-"}</TableCell>
-            <TableCell>{row.customerName || "-"}</TableCell>
-            <TableCell>{row.branchName || "-"}</TableCell>
-            <TableCell>{formatCurrency(row.totalAmount)}</TableCell>
-            <TableCell>{formatCurrency(row.paidAmount)}</TableCell>
-            <TableCell className={row.balanceAmount > 0 ? "font-semibold text-danger-text" : ""}>
-              {formatCurrency(row.balanceAmount)}
-            </TableCell>
-            <TableCell>{paymentBadge(row.paymentStatus)}</TableCell>
-            <TableCell>{formatDate(row.dueDate)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <ReportDataTable
+      columns={columns}
+      rowKey={(row) => `${row.sourceType}-${row.sourceNumber}`}
+      rows={rows}
+    />
   );
 }

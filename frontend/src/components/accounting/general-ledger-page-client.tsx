@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 
 import { AccountingAccessDeniedCard } from "@/components/accounting/accounting-access-denied-card";
 import { ChartAccountTypeBadge } from "@/components/accounting/chart-account-badges";
+import { type ReportColumn, ReportDataTable } from "@/components/reports/report-data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import {
   SearchableSelect,
@@ -23,14 +24,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { PERMISSIONS } from "@/constants/permissions";
 import {
   useAllChartAccounts,
@@ -40,7 +33,7 @@ import {
 import { useBranches } from "@/hooks/use-branches";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
-import type { GeneralLedgerFilters } from "@/types/accounting";
+import type { GeneralLedgerFilters, GeneralLedgerItem } from "@/types/accounting";
 
 const allValue = "all";
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -74,6 +67,69 @@ function money(value: number): string {
     currency: "AED",
     style: "currency",
   }).format(value);
+}
+
+/**
+ * A factory rather than a constant: the running-balance column only exists
+ * when the report was run for a single account, which the response decides.
+ */
+function ledgerColumns(showRunningBalance: boolean): ReportColumn<GeneralLedgerItem>[] {
+  return [
+    { cell: (item) => item.entryNumber, header: "Entry", key: "entry", primary: true },
+    {
+      cell: (item) => item.referenceNumber || item.narration || item.lineDescription,
+      header: "Reference",
+      key: "reference",
+      secondary: true,
+    },
+    {
+      align: "right",
+      cell: (item) => <span className="tabular-nums">{item.entryDate}</span>,
+      header: "Date",
+      key: "date",
+    },
+    {
+      cell: (item) => (
+        <div>
+          <span className="block font-medium text-brand-espresso">
+            {item.accountCode} - {item.accountName}
+          </span>
+          <ChartAccountTypeBadge accountType={item.accountType} />
+        </div>
+      ),
+      header: "Account",
+      key: "account",
+    },
+    {
+      cell: (item) => item.branchName || "Business-level",
+      header: "Branch",
+      key: "branch",
+    },
+    {
+      align: "right",
+      cell: (item) => <span className="tabular-nums">{money(item.debitAmount)}</span>,
+      header: "Debit",
+      key: "debit",
+    },
+    {
+      align: "right",
+      cell: (item) => <span className="tabular-nums">{money(item.creditAmount)}</span>,
+      header: "Credit",
+      key: "credit",
+    },
+    ...(showRunningBalance
+      ? [
+          {
+            align: "right" as const,
+            cell: (item: GeneralLedgerItem) => (
+              <span className="font-medium tabular-nums">{money(item.runningBalance ?? 0)}</span>
+            ),
+            header: "Running",
+            key: "running",
+          },
+        ]
+      : []),
+  ];
 }
 
 function updateFilters(
@@ -401,52 +457,12 @@ export function GeneralLedgerPageClient(): JSX.Element {
                     Page {currentPage} of {totalPages}
                   </p>
                 </div>
-                <div className="overflow-x-auto bg-card/75 [&>div]:rounded-none">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Entry</TableHead>
-                        <TableHead>Account</TableHead>
-                        <TableHead>Branch</TableHead>
-                        <TableHead className="text-right">Debit</TableHead>
-                        <TableHead className="text-right">Credit</TableHead>
-                        {showRunningBalance ? (
-                          <TableHead className="text-right">Running</TableHead>
-                        ) : null}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {ledger.items.map((item) => (
-                        <TableRow key={`${item.entryId}-${item.accountId}-${item.lineDescription}`}>
-                          <TableCell>{item.entryDate}</TableCell>
-                          <TableCell>
-                            <span className="block font-bold text-brand-espresso">
-                              {item.entryNumber}
-                            </span>
-                            <span className="block max-w-xs truncate text-xs text-brand-mocha">
-                              {item.referenceNumber || item.narration || item.lineDescription}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="block font-semibold text-brand-espresso">
-                              {item.accountCode} - {item.accountName}
-                            </span>
-                            <ChartAccountTypeBadge accountType={item.accountType} />
-                          </TableCell>
-                          <TableCell>{item.branchName || "Business-level"}</TableCell>
-                          <TableCell className="text-right">{money(item.debitAmount)}</TableCell>
-                          <TableCell className="text-right">{money(item.creditAmount)}</TableCell>
-                          {showRunningBalance ? (
-                            <TableCell className="text-right font-semibold">
-                              {money(item.runningBalance ?? 0)}
-                            </TableCell>
-                          ) : null}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                <ReportDataTable
+                  columns={ledgerColumns(showRunningBalance)}
+                  frameClassName="overflow-x-auto bg-card/75 [&>div]:rounded-none"
+                  rowKey={(item) => `${item.entryId}-${item.accountId}-${item.lineDescription}`}
+                  rows={ledger.items}
+                />
                 <div className="flex flex-col gap-3 border-t border-brand-cappuccino/70 bg-card/80 px-4 py-3 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-brand-mocha">Rows per page</span>

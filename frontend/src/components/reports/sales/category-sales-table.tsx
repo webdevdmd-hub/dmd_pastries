@@ -1,41 +1,51 @@
 import type { JSX } from "react";
 
+import { type ReportColumn, ReportDataTable } from "@/components/reports/report-data-table";
 import { formatCurrency, formatNumber } from "@/components/reports/sales/sales-report-format";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { CategorySalesRow } from "@/types/sales-reports";
+
+const columns: ReportColumn<CategorySalesRow>[] = [
+  {
+    cell: (row) => row.categoryName || "Uncategorized",
+    header: "Category",
+    key: "category",
+    primary: true,
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatNumber(row.quantitySold)}</span>,
+    header: "Quantity sold",
+    key: "quantity",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatNumber(row.salesCount)}</span>,
+    header: "Sales count",
+    key: "sales-count",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatCurrency(row.grossSales)}</span>,
+    header: "Gross sales",
+    key: "gross",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="font-medium tabular-nums">{formatCurrency(row.netSales)}</span>,
+    header: "Net sales",
+    key: "net",
+  },
+];
 
 export function CategorySalesTable({ rows }: { rows: CategorySalesRow[] }): JSX.Element {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-brand-cappuccino bg-card/85">
-      <Table>
-        <TableHeader className="sticky top-0 bg-brand-latte">
-          <TableRow>
-            <TableHead>Category</TableHead>
-            <TableHead>Quantity Sold</TableHead>
-            <TableHead>Sales Count</TableHead>
-            <TableHead>Gross Sales</TableHead>
-            <TableHead>Net Sales</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.categoryId || row.categoryName}>
-              <TableCell>{row.categoryName || "Uncategorized"}</TableCell>
-              <TableCell>{formatNumber(row.quantitySold)}</TableCell>
-              <TableCell>{formatNumber(row.salesCount)}</TableCell>
-              <TableCell>{formatCurrency(row.grossSales)}</TableCell>
-              <TableCell>{formatCurrency(row.netSales)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <ReportDataTable
+      columns={columns}
+      // Sales reports keep their framed, sticky-headed table on a desktop.
+      frameClassName="overflow-x-auto rounded-2xl border border-brand-cappuccino bg-card/85"
+      headerClassName="sticky top-0 bg-brand-latte"
+      rowKey={(row) => row.categoryId || row.categoryName}
+      rows={rows}
+    />
   );
 }

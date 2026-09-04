@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { POSReceiptDialog } from "@/components/pos/pos-receipt-dialog";
 import { AccessDeniedCard } from "@/components/reports/access-denied-card";
 import { ReportBranchSelect } from "@/components/reports/report-branch-select";
+import { type ReportColumn, ReportDataTable } from "@/components/reports/report-data-table";
 import { ReportDateRangePicker } from "@/components/reports/report-date-range-picker";
 import {
   compactSummary,
@@ -32,14 +33,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { PERMISSIONS } from "@/constants/permissions";
 import { resolveReportPresetRange } from "@/constants/report-presets";
 import { useBranchScope } from "@/hooks/use-branch-scope";
@@ -138,62 +131,94 @@ function ReceiptsTable({
   onViewReceipt: (row: ReceiptRecordRow) => void;
   rows: ReceiptRecordRow[];
 }): JSX.Element {
+  // Built here rather than at module scope: the action column closes over the
+  // host's loading flag and view handler.
+  const columns: ReportColumn<ReceiptRecordRow>[] = [
+    { cell: (row) => row.saleNumber || "-", header: "Sale / Bill", key: "sale", primary: true },
+    {
+      cell: (row) => `Receipt: ${row.receiptStatus || "not viewed"}`,
+      header: "Receipt",
+      key: "receipt",
+      secondary: true,
+    },
+    {
+      cell: (row) => row.customerName || "Walk-in Customer",
+      header: "Customer",
+      key: "customer",
+    },
+    { cell: (row) => row.branchName || "-", header: "Branch", key: "branch" },
+    { cell: (row) => row.cashierName || "-", header: "Cashier", key: "cashier" },
+    {
+      align: "right",
+      cell: (row) => <span className="tabular-nums">{formatCurrency(row.totalAmount)}</span>,
+      header: "Total",
+      key: "total",
+    },
+    {
+      align: "right",
+      cell: (row) => (
+        <span className="font-medium tabular-nums">{formatCurrency(row.paidAmount)}</span>
+      ),
+      header: "Paid",
+      key: "paid",
+    },
+    {
+      cell: (row) => statusBadge(row.paymentStatus),
+      header: "Payment",
+      key: "payment",
+      unlabelledOnCard: true,
+    },
+    {
+      cell: (row) => statusBadge(row.saleStatus),
+      header: "Sale status",
+      key: "sale-status",
+      unlabelledOnCard: true,
+    },
+    {
+      align: "right",
+      cell: (row) => <span className="tabular-nums">{formatDate(row.soldAt)}</span>,
+      header: "Sold at",
+      key: "sold-at",
+    },
+    {
+      align: "right",
+      cell: (row) => (
+        <div>
+          <div className="tabular-nums">{row.viewCount}</div>
+          {row.lastViewedAt ? (
+            <div className="text-meta text-brand-mocha">Last: {formatDate(row.lastViewedAt)}</div>
+          ) : null}
+        </div>
+      ),
+      header: "Views",
+      key: "views",
+    },
+    {
+      align: "right",
+      cell: (row) => (
+        <Button
+          disabled={isReceiptLoading || !row.saleId}
+          onClick={() => onViewReceipt(row)}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          <Eye className="mr-2 h-4 w-4" />
+          View receipt
+        </Button>
+      ),
+      header: "Action",
+      key: "action",
+      unlabelledOnCard: true,
+    },
+  ];
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Sale / Bill</TableHead>
-          <TableHead>Customer</TableHead>
-          <TableHead>Branch</TableHead>
-          <TableHead>Cashier</TableHead>
-          <TableHead>Total</TableHead>
-          <TableHead>Paid</TableHead>
-          <TableHead>Payment</TableHead>
-          <TableHead>Sale Status</TableHead>
-          <TableHead>Sold At</TableHead>
-          <TableHead>Views</TableHead>
-          <TableHead className="text-right">Action</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <TableRow key={row.saleId || `${row.saleNumber}-${row.soldAt}`}>
-            <TableCell>
-              <div className="font-semibold text-brand-espresso">{row.saleNumber || "-"}</div>
-              <div className="text-xs text-brand-mocha">
-                Receipt: {row.receiptStatus || "not viewed"}
-              </div>
-            </TableCell>
-            <TableCell>{row.customerName || "Walk-in Customer"}</TableCell>
-            <TableCell>{row.branchName || "-"}</TableCell>
-            <TableCell>{row.cashierName || "-"}</TableCell>
-            <TableCell>{formatCurrency(row.totalAmount)}</TableCell>
-            <TableCell>{formatCurrency(row.paidAmount)}</TableCell>
-            <TableCell>{statusBadge(row.paymentStatus)}</TableCell>
-            <TableCell>{statusBadge(row.saleStatus)}</TableCell>
-            <TableCell>{formatDate(row.soldAt)}</TableCell>
-            <TableCell>
-              <div>{row.viewCount}</div>
-              {row.lastViewedAt ? (
-                <div className="text-xs text-brand-mocha">Last: {formatDate(row.lastViewedAt)}</div>
-              ) : null}
-            </TableCell>
-            <TableCell className="text-right">
-              <Button
-                disabled={isReceiptLoading || !row.saleId}
-                size="sm"
-                type="button"
-                variant="outline"
-                onClick={() => onViewReceipt(row)}
-              >
-                <Eye className="mr-2 h-4 w-4" />
-                View receipt
-              </Button>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <ReportDataTable
+      columns={columns}
+      rowKey={(row) => row.saleId || `${row.saleNumber}-${row.soldAt}`}
+      rows={rows}
+    />
   );
 }
 

@@ -1,45 +1,63 @@
 import type { JSX } from "react";
 
+import { type ReportColumn, ReportDataTable } from "@/components/reports/report-data-table";
 import { formatCurrency, formatNumber } from "@/components/reports/sales/sales-report-format";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { CashierSalesRow } from "@/types/sales-reports";
+
+const columns: ReportColumn<CashierSalesRow>[] = [
+  {
+    cell: (row) => row.cashierName || "Unknown cashier",
+    header: "Cashier",
+    key: "cashier",
+    primary: true,
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatNumber(row.salesCount)}</span>,
+    header: "Sales count",
+    key: "sales-count",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatNumber(row.itemsSold)}</span>,
+    header: "Items sold",
+    key: "items-sold",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatCurrency(row.grossSales)}</span>,
+    header: "Gross sales",
+    key: "gross",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="font-medium tabular-nums">{formatCurrency(row.netSales)}</span>,
+    header: "Net sales",
+    key: "net",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatNumber(row.refundCount)}</span>,
+    header: "Refunds",
+    key: "refunds",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatNumber(row.voidCount)}</span>,
+    header: "Voids",
+    key: "voids",
+  },
+];
 
 export function CashierSalesTable({ rows }: { rows: CashierSalesRow[] }): JSX.Element {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-brand-cappuccino bg-card/85">
-      <Table>
-        <TableHeader className="sticky top-0 bg-brand-latte">
-          <TableRow>
-            <TableHead>Cashier</TableHead>
-            <TableHead>Sales Count</TableHead>
-            <TableHead>Items Sold</TableHead>
-            <TableHead>Gross Sales</TableHead>
-            <TableHead>Net Sales</TableHead>
-            <TableHead>Refund Count</TableHead>
-            <TableHead>Void Count</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.cashierUserId || row.cashierName}>
-              <TableCell>{row.cashierName || "Unknown cashier"}</TableCell>
-              <TableCell>{formatNumber(row.salesCount)}</TableCell>
-              <TableCell>{formatNumber(row.itemsSold)}</TableCell>
-              <TableCell>{formatCurrency(row.grossSales)}</TableCell>
-              <TableCell>{formatCurrency(row.netSales)}</TableCell>
-              <TableCell>{formatNumber(row.refundCount)}</TableCell>
-              <TableCell>{formatNumber(row.voidCount)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <ReportDataTable
+      columns={columns}
+      // Sales reports keep their framed, sticky-headed table on a desktop.
+      frameClassName="overflow-x-auto rounded-2xl border border-brand-cappuccino bg-card/85"
+      headerClassName="sticky top-0 bg-brand-latte"
+      rowKey={(row) => row.cashierUserId || row.cashierName}
+      rows={rows}
+    />
   );
 }

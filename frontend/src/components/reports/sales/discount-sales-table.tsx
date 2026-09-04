@@ -1,43 +1,58 @@
 import type { JSX } from "react";
 
+import { type ReportColumn, ReportDataTable } from "@/components/reports/report-data-table";
 import { formatCurrency, formatDate } from "@/components/reports/sales/sales-report-format";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { DiscountReportItem } from "@/types/sales-reports";
+
+const columns: ReportColumn<DiscountReportItem>[] = [
+  {
+    cell: (row) => row.saleNumber || "-",
+    header: "Sale number",
+    key: "sale",
+    primary: true,
+  },
+  {
+    cell: (row) => row.cashierName || "-",
+    header: "Cashier",
+    key: "cashier",
+    secondary: true,
+  },
+  {
+    cell: (row) => row.discountType || "-",
+    header: "Discount type",
+    key: "discount-type",
+  },
+  {
+    align: "right",
+    cell: (row) => (
+      <span className="font-medium tabular-nums">{formatCurrency(row.discountAmount)}</span>
+    ),
+    header: "Discount",
+    key: "discount",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatCurrency(row.saleTotal)}</span>,
+    header: "Sale total",
+    key: "sale-total",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatDate(row.soldAt)}</span>,
+    header: "Sold at",
+    key: "sold-at",
+  },
+];
 
 export function DiscountSalesTable({ rows }: { rows: DiscountReportItem[] }): JSX.Element {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-brand-cappuccino bg-card/85">
-      <Table>
-        <TableHeader className="sticky top-0 bg-brand-latte">
-          <TableRow>
-            <TableHead>Sale Number</TableHead>
-            <TableHead>Cashier</TableHead>
-            <TableHead>Discount Type</TableHead>
-            <TableHead>Discount Amount</TableHead>
-            <TableHead>Sale Total</TableHead>
-            <TableHead>Sold At</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={`${row.saleNumber}-${row.soldAt}`}>
-              <TableCell>{row.saleNumber || "-"}</TableCell>
-              <TableCell>{row.cashierName || "-"}</TableCell>
-              <TableCell>{row.discountType || "-"}</TableCell>
-              <TableCell>{formatCurrency(row.discountAmount)}</TableCell>
-              <TableCell>{formatCurrency(row.saleTotal)}</TableCell>
-              <TableCell>{formatDate(row.soldAt)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <ReportDataTable
+      columns={columns}
+      // Sales reports keep their framed, sticky-headed table on a desktop.
+      frameClassName="overflow-x-auto rounded-2xl border border-brand-cappuccino bg-card/85"
+      headerClassName="sticky top-0 bg-brand-latte"
+      rowKey={(row) => `${row.saleNumber}-${row.soldAt}`}
+      rows={rows}
+    />
   );
 }
