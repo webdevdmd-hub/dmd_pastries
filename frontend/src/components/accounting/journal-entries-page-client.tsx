@@ -78,6 +78,7 @@ import {
   useUpdateJournalEntry,
 } from "@/hooks/use-accounting";
 import { useBranches } from "@/hooks/use-branches";
+import { useIsDesktop } from "@/hooks/use-media-query";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 import { isLedgerAllowedForContext } from "@/lib/selectors/eligibility";
@@ -927,6 +928,9 @@ export function JournalEntriesPageClient(): JSX.Element {
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  // See the chart of accounts: the overlay mounts even when the content is
+  // hidden by a class, so the breakpoint has to gate the open prop.
+  const isDesktop = useIsDesktop();
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const entriesQuery = useJournalEntries(filters, canView);
   const accountingSettingsQuery = useAccountingSettings(canView);
@@ -1360,8 +1364,8 @@ export function JournalEntriesPageClient(): JSX.Element {
       </Card>
 
       {/* Below lg the detail has no column, so it opens over the list. */}
-      <Sheet onOpenChange={setDetailOpen} open={detailOpen && selectedEntry !== null}>
-        <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-xl lg:hidden" side="right">
+      <Sheet onOpenChange={setDetailOpen} open={detailOpen && !isDesktop && selectedEntry !== null}>
+        <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-xl" side="right">
           <SheetHeader className="sr-only">
             <SheetTitle>{selectedEntry?.entryNumber ?? "Journal entry"}</SheetTitle>
             <SheetDescription>Journal entry lines, totals and actions.</SheetDescription>

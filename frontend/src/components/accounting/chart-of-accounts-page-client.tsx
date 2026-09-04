@@ -62,6 +62,7 @@ import {
   useUpdateChartAccountStatus,
 } from "@/hooks/use-accounting";
 import { useBranchScope } from "@/hooks/use-branch-scope";
+import { useIsDesktop } from "@/hooks/use-media-query";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 import type {
@@ -127,6 +128,9 @@ export function ChartOfAccountsPageClient(): JSX.Element {
   // Below lg the detail has no column to live in, so tapping a row opens it
   // over the list instead of parking it under a full page of accounts.
   const [detailOpen, setDetailOpen] = useState(false);
+  // Not a CSS class: hiding only the sheet content still mounts the overlay,
+  // which dimmed and blurred the desktop page behind nothing.
+  const isDesktop = useIsDesktop();
   const accountsQuery = useChartAccounts(filters, canView && Boolean(filters.branchId));
   const seedMutation = useSeedDefaultChartAccounts();
   const createMutation = useCreateChartAccount();
@@ -571,8 +575,11 @@ export function ChartOfAccountsPageClient(): JSX.Element {
       </div>
 
       {/* The same panel as the desktop column, over the list. */}
-      <Sheet onOpenChange={setDetailOpen} open={detailOpen && displayAccount !== null}>
-        <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-xl lg:hidden" side="right">
+      <Sheet
+        onOpenChange={setDetailOpen}
+        open={detailOpen && !isDesktop && displayAccount !== null}
+      >
+        <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-xl" side="right">
           {displayAccount ? (
             <>
               <SheetHeader className="space-y-0 border-b border-brand-cappuccino/60 bg-brand-latte/20 px-4 py-5">
