@@ -25,6 +25,8 @@ import { DashboardChartCard } from "@/components/dashboard/dashboard-chart-card"
 import { DashboardDonutChart } from "@/components/dashboard/dashboard-donut-chart";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { DashboardErrorState } from "@/components/dashboard/dashboard-error-state";
+import type { KpiDelta } from "@/components/dashboard/dashboard-kpi-card";
+import { DashboardKpiGrid } from "@/components/dashboard/dashboard-kpi-grid";
 import { DashboardRiskChart } from "@/components/dashboard/dashboard-risk-chart";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { DashboardTrendChart } from "@/components/dashboard/dashboard-trend-chart";
@@ -54,7 +56,7 @@ import {
 import { reportBaseFiltersSchema } from "@/lib/validators/reports.schema";
 import type { DashboardActivity, DashboardAlert, DashboardLoadWarning } from "@/types/dashboard";
 import type { ManufacturingReportFilters } from "@/types/manufacturing-reports";
-import type { ReportFilters } from "@/types/reports";
+import type { ReportChartData, ReportFilters } from "@/types/reports";
 
 const actions = [
   { href: ROUTES.pos, icon: ReceiptText, label: "Open POS" },
@@ -348,6 +350,36 @@ function ActivityTable({
   );
 }
 
+/**
+ * A period-over-period delta for the sales KPI, computed from the sales chart's
+ * own buckets.
+ *
+ * The dashboard API returns current-period figures only, so this is the one
+ * card on the screen with a real comparison behind it. Returns undefined rather
+ * than 0% when there is no previous bucket, or when the previous bucket was
+ * zero and a percentage change is undefined rather than infinite.
+ */
+function salesDeltaFromChart(
+  chart: ReportChartData | undefined,
+  granularityLabel: string,
+): KpiDelta | undefined {
+  const data = chart?.datasets[0]?.data;
+  if (!data || data.length < 2) {
+    return undefined;
+  }
+
+  const latest = data[data.length - 1];
+  const previous = data[data.length - 2];
+  if (latest === undefined || previous === undefined || previous === 0) {
+    return undefined;
+  }
+
+  return {
+    comparedTo: `vs previous ${granularityLabel}`,
+    percentage: ((latest - previous) / previous) * 100,
+  };
+}
+
 export function AdminDashboardClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
@@ -438,33 +470,41 @@ export function AdminDashboardClient(): JSX.Element {
     { label: "Expiring", value: dashboard?.inventory.expiringItems ?? 0 },
     { label: "Out of stock", value: dashboard?.inventory.outOfStock ?? 0 },
   ];
+  // The bucket the chart is grouped by, so the delta says what it compares.
+  const granularityLabel =
+    appliedFilters.groupBy === "month"
+      ? "month"
+      : appliedFilters.groupBy === "week"
+        ? "week"
+        : "day";
   const decisionMetrics = [
     {
-      detail: "Selected period",
+      caption: "Selected period",
+      delta: salesDeltaFromChart(salesChartQuery.data, granularityLabel),
       icon: CircleDollarSign,
       label: "Sales",
       value: formatCurrency(dashboard?.sales.todaySales ?? 0),
     },
     {
-      detail: "Payments received",
+      caption: "Payments received",
       icon: CreditCard,
       label: "Collections",
       value: formatCurrency(dashboard?.financial.collectedToday ?? 0),
     },
     {
-      detail: "Completed sales",
+      caption: "Completed sales",
       icon: ReceiptText,
       label: "Sales count",
       value: formatNumber(dashboard?.sales.salesCountToday ?? 0),
     },
     {
-      detail: "Per completed sale",
+      caption: "Per completed sale",
       icon: BarChart3,
       label: "Average order",
       value: formatCurrency(dashboard?.sales.averageOrderValue ?? 0),
     },
     {
-      detail: "Open customer balance",
+      caption: "Open customer balance",
       icon: AlertCircle,
       label: "Outstanding",
       value: formatCurrency(dashboard?.financial.outstandingBalance ?? 0),
@@ -548,28 +588,7 @@ export function AdminDashboardClient(): JSX.Element {
 
           <GettingStartedChecklist hasFirstSale={dashboard.sales.salesCountToday > 0} />
 
-          <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
-            <div className="grid sm:grid-cols-2 xl:grid-cols-5">
-              {decisionMetrics.map((metric) => {
-                const Icon = metric.icon;
-                return (
-                  <div
-                    className="border-b border-workspace-border p-5 sm:border-r xl:border-b-0 last:border-b-0 xl:last:border-r-0"
-                    key={metric.label}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs font-semibold uppercase text-workspace-muted">
-                        {metric.label}
-                      </p>
-                      <Icon className="h-4 w-4 text-foreground-muted" aria-hidden="true" />
-                    </div>
-                    <p className="mt-4 text-kpi tabular-nums text-foreground">{metric.value}</p>
-                    <p className="mt-1 text-xs text-workspace-muted">{metric.detail}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+          <DashboardKpiGrid items={decisionMetrics} />
 
           <section className="flex flex-wrap items-center gap-2 border-y border-workspace-border py-3">
             <span className="mr-2 text-xs font-semibold uppercase text-workspace-muted">
