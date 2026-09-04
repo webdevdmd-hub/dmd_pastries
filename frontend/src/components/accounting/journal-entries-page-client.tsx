@@ -7,7 +7,6 @@ import {
   Pencil,
   Plus,
   RotateCcw,
-  Search,
   Send,
   Trash2,
 } from "lucide-react";
@@ -18,6 +17,8 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccountingAccessDeniedCard } from "@/components/accounting/accounting-access-denied-card";
+import { FilterField, FilterToolbar } from "@/components/shared/filter-toolbar";
+import { type FormTab, FormTabs } from "@/components/shared/form-tabs";
 import { PageHeader } from "@/components/shared/page-header";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
@@ -47,6 +48,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -105,6 +113,12 @@ const journalOriginLabels: Record<JournalEntriesFilters["journalOrigin"], string
   manual: "Manual Journals",
   system: "System Generated",
 };
+
+const journalOriginTabs = [
+  { key: "all", label: "All" },
+  { key: "manual", label: "Manual" },
+  { key: "system", label: "System" },
+] as const satisfies readonly FormTab<JournalEntriesFilters["journalOrigin"]>[];
 
 const journalOriginDescriptions: Record<JournalEntriesFilters["journalOrigin"], string> = {
   all: "Manual and backend-posted accounting journals.",
@@ -912,6 +926,7 @@ export function JournalEntriesPageClient(): JSX.Element {
   const [formMode, setFormMode] = useState<JournalFormMode>("create");
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const entriesQuery = useJournalEntries(filters, canView);
   const accountingSettingsQuery = useAccountingSettings(canView);
@@ -950,6 +965,34 @@ export function JournalEntriesPageClient(): JSX.Element {
   const selectedEntry = detailEntryQuery.data ?? selectedSummaryEntry;
   const formEntry = formMode === "edit" ? (formEntryQuery.data ?? null) : null;
   const isManualView = filters.journalOrigin === "manual";
+  // Origin lives in the visible tab strip and branch is scope, so neither
+  // counts toward the badge.
+  const hiddenFilterCount =
+    (filters.status === "all" ? 0 : 1) + (filters.dateFrom ? 1 : 0) + (filters.dateTo ? 1 : 0);
+  const hasAnyFilter =
+    hiddenFilterCount > 0 || filters.search.length > 0 || filters.branchId.length > 0;
+  const detailPanelProps = {
+    canManage,
+    entry: selectedEntry,
+    isLoading: selectedEntryId !== null && detailEntryQuery.isLoading,
+    lockedThrough,
+    onDelete: (entry: JournalEntry) => {
+      setDetailOpen(false);
+      setPendingAction({ entry, type: "delete" });
+    },
+    onEdit: (entry: JournalEntry) => {
+      setDetailOpen(false);
+      openEditForm(entry);
+    },
+    onPost: (entry: JournalEntry) => {
+      setDetailOpen(false);
+      setPendingAction({ entry, type: "post" });
+    },
+    onReverse: (entry: JournalEntry) => {
+      setDetailOpen(false);
+      setPendingAction({ entry, type: "reverse" });
+    },
+  };
   const journalViewLabel = journalOriginLabels[filters.journalOrigin];
   const journalViewDescription = journalOriginDescriptions[filters.journalOrigin];
 
@@ -1065,8 +1108,8 @@ export function JournalEntriesPageClient(): JSX.Element {
 
       <Card className="overflow-hidden rounded-3xl border-brand-cappuccino/70 bg-card shadow-sm">
         <CardContent className="p-0">
-          <div className="grid min-h-[720px] lg:grid-cols-[420px_minmax(0,1fr)]">
-            <aside className="flex min-h-[720px] flex-col border-b border-brand-cappuccino/70 bg-card lg:border-b-0 lg:border-r">
+          <div className="grid lg:min-h-[720px] lg:grid-cols-[420px_minmax(0,1fr)]">
+            <aside className="flex min-w-0 flex-col border-b border-brand-cappuccino/70 bg-card lg:min-h-[720px] lg:border-b-0 lg:border-r">
               <div className="flex items-center justify-between gap-3 border-b border-brand-cappuccino/70 px-4 py-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1109,111 +1152,86 @@ export function JournalEntriesPageClient(): JSX.Element {
                 </div>
               </div>
 
-              <div className="grid gap-3 border-b border-brand-cappuccino/70 bg-brand-latte/25 p-4">
-                <div className="grid grid-cols-3 rounded-2xl border border-brand-cappuccino/70 bg-card p-1">
-                  <Button
-                    className="rounded-xl"
-                    onClick={() =>
-                      updateFilters({
-                        journalOrigin: "all",
-                        sourceType: "",
-                      })
-                    }
-                    type="button"
-                    variant={filters.journalOrigin === "all" ? "default" : "ghost"}
-                  >
-                    All
-                  </Button>
-                  <Button
-                    className="rounded-xl"
-                    onClick={() =>
-                      updateFilters({
-                        journalOrigin: "manual",
-                        sourceType: "",
-                      })
-                    }
-                    type="button"
-                    variant={isManualView ? "default" : "ghost"}
-                  >
-                    Manual
-                  </Button>
-                  <Button
-                    className="rounded-xl"
-                    onClick={() =>
-                      updateFilters({
-                        journalOrigin: "system",
-                        sourceType: "",
-                      })
-                    }
-                    type="button"
-                    variant={filters.journalOrigin === "system" ? "default" : "ghost"}
-                  >
-                    System Generated
-                  </Button>
-                </div>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mocha" />
-                  <Input
-                    aria-label="Search journal entries"
-                    className="pl-9"
-                    onChange={(event) => updateFilters({ search: event.target.value })}
-                    placeholder="Search journal, reference, notes..."
-                    value={filters.search}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Select
-                    onValueChange={(status: JournalEntriesFilters["status"]) =>
-                      updateFilters({ status })
-                    }
-                    value={filters.status}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All statuses</SelectItem>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="posted">Posted</SelectItem>
-                      <SelectItem value="reversed">Reversed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <div className="flex items-center rounded-2xl border border-brand-cappuccino/70 bg-card px-3 text-xs font-semibold text-brand-mocha">
-                    {journalViewLabel}
-                  </div>
-                </div>
-                <Select
-                  onValueChange={(branchId) =>
-                    updateFilters({ branchId: branchId === "all" ? "" : branchId })
-                  }
-                  value={filters.branchId || "all"}
+              <div className="grid min-w-0 gap-3 border-b border-brand-cappuccino/70 bg-brand-latte/25 p-4">
+                {/* Origin stays visible: it is which journals you are looking
+                    at, not a filter on one list. */}
+                <FormTabs
+                  active={filters.journalOrigin}
+                  aria-label="Journal origin"
+                  onTabChange={(journalOrigin) => updateFilters({ journalOrigin, sourceType: "" })}
+                  panelId="journal-entries-list"
+                  tabs={journalOriginTabs}
+                />
+
+                <FilterToolbar
+                  hasAnyFilter={hasAnyFilter}
+                  hiddenFilterCount={hiddenFilterCount}
+                  hideDensityBelowMd
+                  onReset={() => setFilters(defaultFilters)}
+                  onSearchChange={(search) => updateFilters({ search })}
+                  popoverTitle="Filter journals"
+                  searchAriaLabel="Search journal entries"
+                  searchPlaceholder="Search journal, reference..."
+                  searchValue={filters.search}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All branches</SelectItem>
-                    {activeBranches.map((branch) => (
-                      <SelectItem key={branch.id} value={branch.id}>
-                        {branch.name} ({branch.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    aria-label="Date from"
-                    onChange={(event) => updateFilters({ dateFrom: event.target.value })}
-                    type="date"
-                    value={filters.dateFrom}
-                  />
-                  <Input
-                    aria-label="Date to"
-                    onChange={(event) => updateFilters({ dateTo: event.target.value })}
-                    type="date"
-                    value={filters.dateTo}
-                  />
-                </div>
+                  <FilterField htmlFor="journal-status-filter" label="Status">
+                    <Select
+                      onValueChange={(status: JournalEntriesFilters["status"]) =>
+                        updateFilters({ status })
+                      }
+                      value={filters.status}
+                    >
+                      <SelectTrigger id="journal-status-filter">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="posted">Posted</SelectItem>
+                        <SelectItem value="reversed">Reversed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FilterField>
+
+                  <FilterField htmlFor="journal-branch-filter" label="Branch">
+                    <Select
+                      onValueChange={(branchId) =>
+                        updateFilters({ branchId: branchId === "all" ? "" : branchId })
+                      }
+                      value={filters.branchId || "all"}
+                    >
+                      <SelectTrigger id="journal-branch-filter">
+                        <SelectValue placeholder="Branch" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All branches</SelectItem>
+                        {activeBranches.map((branch) => (
+                          <SelectItem key={branch.id} value={branch.id}>
+                            {branch.name} ({branch.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FilterField>
+
+                  <FilterField htmlFor="journal-date-from" label="Date from">
+                    <Input
+                      id="journal-date-from"
+                      onChange={(event) => updateFilters({ dateFrom: event.target.value })}
+                      type="date"
+                      value={filters.dateFrom}
+                    />
+                  </FilterField>
+
+                  <FilterField htmlFor="journal-date-to" label="Date to">
+                    <Input
+                      id="journal-date-to"
+                      onChange={(event) => updateFilters({ dateTo: event.target.value })}
+                      type="date"
+                      value={filters.dateTo}
+                    />
+                  </FilterField>
+                </FilterToolbar>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto">
@@ -1269,7 +1287,10 @@ export function JournalEntriesPageClient(): JSX.Element {
                               ? "bg-brand-latte/75 shadow-[inset_4px_0_0_var(--money-solid)]"
                               : "bg-card hover:bg-brand-latte/30"
                           }`}
-                          onClick={() => setSelectedEntryId(entry.id)}
+                          onClick={() => {
+                            setSelectedEntryId(entry.id);
+                            setDetailOpen(true);
+                          }}
                           type="button"
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -1331,19 +1352,23 @@ export function JournalEntriesPageClient(): JSX.Element {
               </div>
             </aside>
 
-            <JournalEntryDetailsPanel
-              canManage={canManage}
-              entry={selectedEntry}
-              isLoading={selectedEntryId !== null && detailEntryQuery.isLoading}
-              lockedThrough={lockedThrough}
-              onDelete={(entry) => setPendingAction({ entry, type: "delete" })}
-              onEdit={openEditForm}
-              onPost={(entry) => setPendingAction({ entry, type: "post" })}
-              onReverse={(entry) => setPendingAction({ entry, type: "reverse" })}
-            />
+            <div className="hidden min-w-0 lg:block">
+              <JournalEntryDetailsPanel {...detailPanelProps} />
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Below lg the detail has no column, so it opens over the list. */}
+      <Sheet onOpenChange={setDetailOpen} open={detailOpen && selectedEntry !== null}>
+        <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-xl lg:hidden" side="right">
+          <SheetHeader className="sr-only">
+            <SheetTitle>{selectedEntry?.entryNumber ?? "Journal entry"}</SheetTitle>
+            <SheetDescription>Journal entry lines, totals and actions.</SheetDescription>
+          </SheetHeader>
+          <JournalEntryDetailsPanel {...detailPanelProps} />
+        </SheetContent>
+      </Sheet>
 
       <JournalEntryFormDialog
         accounts={accountsQuery.data?.items ?? []}
