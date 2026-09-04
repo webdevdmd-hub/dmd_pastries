@@ -80,75 +80,76 @@ export function POSCartPanel({
         </div>
       </div>
 
-      <div className="shrink-0 space-y-3 rounded-lg border border-border bg-card p-4">
-        {items.length > 0 ? (
+      {/* The summary only exists once there is something to summarise. An
+          empty cart used to hold 306px of AED 0.00 and a dead button above the
+          fold, which is the space the product list wants. */}
+      {items.length === 0 ? null : (
+        <div className="shrink-0 space-y-3 rounded-lg border border-border bg-card p-4 duration-fast animate-in fade-in-0 slide-in-from-bottom-2">
           <POSChargesControl
             charges={charges}
             className="border-b border-border pb-3"
             onChange={onChargesChange}
           />
-        ) : null}
 
-        <div className="space-y-2">
-          <div className="text-body flex justify-between">
-            <span className="text-foreground-muted">Subtotal</span>
-            <span className="font-mono font-medium tabular-nums text-foreground">
-              {formatMoney(totals.subtotal)}
-            </span>
-          </div>
-          <div className="text-body flex justify-between">
-            <span className="text-foreground-muted">Tax</span>
-            <span className="font-mono font-medium tabular-nums text-foreground">
-              {formatMoney(totals.taxAmount + totals.chargeTaxAmount)}
-            </span>
-          </div>
-          {totals.chargeAmount > 0 ? (
+          <div className="space-y-2">
             <div className="text-body flex justify-between">
-              <span className="text-foreground-muted">Charges</span>
+              <span className="text-foreground-muted">Subtotal</span>
               <span className="font-mono font-medium tabular-nums text-foreground">
-                {formatMoney(totals.chargeAmount)}
+                {formatMoney(totals.subtotal)}
               </span>
             </div>
-          ) : null}
+            <div className="text-body flex justify-between">
+              <span className="text-foreground-muted">Tax</span>
+              <span className="font-mono font-medium tabular-nums text-foreground">
+                {formatMoney(totals.taxAmount + totals.chargeTaxAmount)}
+              </span>
+            </div>
+            {totals.chargeAmount > 0 ? (
+              <div className="text-body flex justify-between">
+                <span className="text-foreground-muted">Charges</span>
+                <span className="font-mono font-medium tabular-nums text-foreground">
+                  {formatMoney(totals.chargeAmount)}
+                </span>
+              </div>
+            ) : null}
 
-          {/* The total is the one thing on this screen a cashier reads from a
+            {/* The total is the one thing on this screen a cashier reads from a
               metre away, so it gets the size rather than the weight: 32px mono
               at -0.045em tracking, weight 500 (DESIGN.md section 2). */}
-          <div className="flex items-baseline justify-between gap-3 border-t border-border pt-3">
-            <span className="text-body font-medium text-foreground">Total</span>
-            <span className="text-total font-mono tabular-nums text-foreground">
-              {formatMoney(totals.total)}
-            </span>
+            <div className="flex items-baseline justify-between gap-3 border-t border-border pt-3">
+              <span className="text-body font-medium text-foreground">Total</span>
+              <span className="text-total font-mono tabular-nums text-foreground">
+                {formatMoney(totals.total)}
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* The commit action: the one saturated thing on the screen, because it
+          {/* The commit action: the one saturated thing on the screen, because it
             is the one control that moves money (DESIGN.md sections 3.2 and 6).
             The label carries the amount so a cashier confirms the figure on the
             button, not just the word. */}
-        <Button
-          className="text-body h-14 w-full rounded bg-money font-medium text-primary-foreground shadow-none hover:bg-money-hover disabled:bg-muted disabled:text-foreground-disabled"
-          disabled={!canSell || items.length === 0 || isCheckingOut || isOffline}
-          onClick={onCheckout}
-          type="button"
-        >
-          {isCheckingOut ? (
-            "Processing..."
-          ) : !canSell ? (
-            "Sell permission required"
-          ) : isOffline ? (
-            "Charging unavailable while offline"
-          ) : items.length === 0 ? (
-            "Create order"
-          ) : (
-            <>
-              Create order{" "}
-              <span className="font-mono tabular-nums">{formatMoney(totals.total)}</span>
-            </>
-          )}
-          <ArrowRight className="ml-3 h-5 w-5" />
-        </Button>
-      </div>
+          <Button
+            className="text-body h-14 w-full rounded bg-money font-medium text-primary-foreground shadow-none hover:bg-money-hover disabled:bg-muted disabled:text-foreground-disabled"
+            disabled={!canSell || isCheckingOut || isOffline}
+            onClick={onCheckout}
+            type="button"
+          >
+            {isCheckingOut ? (
+              "Processing..."
+            ) : !canSell ? (
+              "Sell permission required"
+            ) : isOffline ? (
+              "Charging unavailable while offline"
+            ) : (
+              <>
+                Create order{" "}
+                <span className="font-mono tabular-nums">{formatMoney(totals.total)}</span>
+              </>
+            )}
+            <ArrowRight className="ml-3 h-5 w-5" />
+          </Button>
+        </div>
+      )}
     </aside>
   );
 }
