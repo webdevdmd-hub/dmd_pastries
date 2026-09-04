@@ -77,7 +77,7 @@ function StatementAmount({
   return (
     <td
       className={cn(
-        "w-24 px-3 py-3 sm:w-44 sm:px-6 text-right tabular-nums",
+        "w-20 px-2 py-3 sm:w-44 sm:px-6 text-right tabular-nums",
         strong ? "font-bold text-foreground" : "font-medium text-info-text",
       )}
     >
@@ -290,7 +290,7 @@ export function ProfitLossPageClient(): JSX.Element {
               </Badge>
             </div>
 
-            <div className="overflow-x-auto px-4 py-10">
+            <div className="overflow-x-auto px-0 py-6 sm:px-4 sm:py-10">
               <div className="mx-auto max-w-4xl md:min-w-[42rem]">
                 <div className="mb-8 text-center">
                   <p className="text-sm font-medium text-foreground-muted">Accrual basis</p>

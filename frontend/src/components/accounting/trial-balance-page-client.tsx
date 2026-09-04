@@ -148,7 +148,7 @@ function groupTrialBalanceItems(items: readonly TrialBalanceItem[]): TrialBalanc
 
 function AmountCell({ value }: { value: number }): JSX.Element {
   return (
-    <td className="w-24 px-3 py-3 sm:w-40 sm:px-6 text-right tabular-nums text-info-text">
+    <td className="w-20 px-2 py-3 sm:w-40 sm:px-6 text-right tabular-nums text-info-text">
       {money(value)}
     </td>
   );
@@ -291,7 +291,7 @@ export function TrialBalancePageClient(): JSX.Element {
               </span>
             </div>
 
-            <div className="overflow-x-auto px-4 py-10">
+            <div className="overflow-x-auto px-0 py-6 sm:px-4 sm:py-10">
               <div className="mx-auto max-w-5xl md:min-w-[48rem]">
                 <div className="mb-8 text-center">
                   <p className="text-sm font-medium text-foreground-muted">Accrual basis</p>
