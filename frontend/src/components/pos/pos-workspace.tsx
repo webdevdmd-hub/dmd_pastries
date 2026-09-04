@@ -6,12 +6,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useConfirm } from "@/components/app/confirm-provider";
-import { POSBarcodeInput } from "@/components/pos/pos-barcode-input";
 import { POSCartPanel } from "@/components/pos/pos-cart-panel";
-import { POSCategorySidebar } from "@/components/pos/pos-category-sidebar";
+import { POSCategoryTiles } from "@/components/pos/pos-category-tiles";
 import { POSCheckoutDialog } from "@/components/pos/pos-checkout-dialog";
 import { POSCreateOrderDialog } from "@/components/pos/pos-create-order-dialog";
-import { POSHoldSaleDialog } from "@/components/pos/pos-hold-sale-dialog";
 import { POSProductGrid } from "@/components/pos/pos-product-grid";
 import { POSProductSearch } from "@/components/pos/pos-product-search";
 import { POSReceiptDialog } from "@/components/pos/pos-receipt-dialog";
@@ -40,24 +38,15 @@ import { useCustomerCredits } from "@/hooks/use-customer-credits";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePermission } from "@/hooks/use-permission";
 import { usePOSCart } from "@/hooks/use-pos-cart";
-import {
-  useCancelHeldSale,
-  useHeldSales,
-  useHoldSale,
-  usePOSCheckout,
-  useResumeHeldSale,
-  useVerifyPOSCheckout,
-} from "@/hooks/use-pos-checkout";
+import { usePOSCheckout, useVerifyPOSCheckout } from "@/hooks/use-pos-checkout";
 import {
   usePOSPaymentMethods,
   usePOSProducts,
   usePOSReferenceData,
 } from "@/hooks/use-pos-products";
 import { getErrorMessage } from "@/lib/api/client";
-import { lookupPOSProduct } from "@/lib/api/pos";
 import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
 import { type CheckoutFeedback, resolveCheckoutBlocker } from "@/lib/pos/checkout-feedback";
-import { getProductCategoryIconForMetadata } from "@/lib/product-category-icons";
 import { createUuid } from "@/lib/uuid";
 import { checkoutSchema } from "@/lib/validators/pos.schema";
 import type { ProductCategory } from "@/types/master-data";
@@ -173,11 +162,9 @@ export function POSWorkspace(): JSX.Element {
   const confirm = useConfirm();
   const canSell = hasPermission(PERMISSIONS.posSell);
   const canCreateBakeryOrder = hasAnyPermission([PERMISSIONS.ordersCreate, PERMISSIONS.posSell]);
-  const barcodeInputRef = useRef<HTMLInputElement | null>(null);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [createOrderOpen, setCreateOrderOpen] = useState(false);
-  const [holdOpen, setHoldOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receipt, setReceipt] = useState<SaleReceipt | null>(null);
   const [search, setSearch] = useState("");
@@ -231,10 +218,6 @@ export function POSWorkspace(): JSX.Element {
   );
   const checkoutMutation = usePOSCheckout();
   const verifyCheckoutMutation = useVerifyPOSCheckout();
-  const heldSalesQuery = useHeldSales(holdOpen);
-  const holdSaleMutation = useHoldSale();
-  const resumeHeldSaleMutation = useResumeHeldSale();
-  const cancelHeldSaleMutation = useCancelHeldSale();
   const cart = usePOSCart();
   const cartPayments = cart.payments;
   const cartTotal = cart.totals.total;
@@ -260,10 +243,6 @@ export function POSWorkspace(): JSX.Element {
     (branchScope.effectiveBranchId ? "Active branch" : "No branch assigned");
 
   useEffect(() => {
-    barcodeInputRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
     setShowPrices(window.localStorage.getItem(POS_SHOW_PRICES_STORAGE_KEY) === "true");
     setPricePreferenceLoaded(true);
   }, []);
@@ -286,7 +265,6 @@ export function POSWorkspace(): JSX.Element {
       if (event.key === "/" && !isTyping) {
         event.preventDefault();
         setSearch("");
-        barcodeInputRef.current?.focus();
       }
 
       if (event.key === "F2") {
@@ -366,7 +344,6 @@ export function POSWorkspace(): JSX.Element {
 
     cart.addProduct(variant ? { product, variant } : { product });
     toast.success(`${displayName} added to cart`);
-    barcodeInputRef.current?.focus();
   };
 
   const openVariantChooser = (product: POSProduct): void => {
@@ -374,21 +351,6 @@ export function POSWorkspace(): JSX.Element {
       return;
     }
     setVariantProduct(product);
-  };
-
-  const handleLookup = async (query: string): Promise<void> => {
-    try {
-      const product = await lookupPOSProduct({ query });
-
-      if (!product) {
-        toast.error("Product not found");
-        return;
-      }
-
-      addProduct(product);
-    } catch (error) {
-      toast.error(getErrorMessage(error));
-    }
   };
 
   const showCheckoutFeedback = (feedback: CheckoutFeedback): void => {
@@ -442,7 +404,6 @@ export function POSWorkspace(): JSX.Element {
     } else {
       toast.success("Sale completed");
     }
-    barcodeInputRef.current?.focus();
   };
 
   const submitCheckout = async (): Promise<void> => {
@@ -527,117 +488,6 @@ export function POSWorkspace(): JSX.Element {
   const resetCheckoutReference = (): void => {
     if (!isCheckoutProcessing) {
       checkoutReferenceRef.current = null;
-    }
-  };
-
-  const holdCurrentSale = async (notes: string | null): Promise<void> => {
-    if (!branchId) {
-      toast.error(
-        "No active branch is selected. Switch to an active branch before holding a sale.",
-      );
-      return;
-    }
-
-    if (cart.items.length === 0) {
-      toast.error("Add items before holding a sale.");
-      return;
-    }
-
-    try {
-      await holdSaleMutation.mutateAsync({
-        branchId,
-        customerId,
-        items: cart.items,
-        saleDiscountType: cart.saleDiscountType,
-        saleDiscountValue: cart.saleDiscountValue,
-        charges: cart.charges,
-        totals: cart.totals,
-        notes,
-      });
-      resetCheckoutReference();
-      setAutoSelectedPaymentMethodId(null);
-      setPaymentAutoSelectionSuppressedChannelId(null);
-      cart.clearCart();
-      setCustomerId(null);
-      toast.success("Sale held successfully.");
-      void heldSalesQuery.refetch();
-    } catch (error) {
-      toast.error(getErrorMessage(error));
-    }
-  };
-
-  const resumeHeldSale = async (heldSaleId: string): Promise<void> => {
-    if (cart.items.length > 0) {
-      const confirmed = await confirm({
-        cancelLabel: "Keep current sale",
-        confirmLabel: "Replace sale",
-        consequence: describeCartDiscard(cart.items.length, cart.totals.total),
-        detail: "The held sale you picked will be loaded in its place.",
-        title: "Replace the current sale?",
-      });
-
-      if (!confirmed) {
-        return;
-      }
-    }
-
-    try {
-      const resumed = await resumeHeldSaleMutation.mutateAsync(heldSaleId);
-      // Held sales stored before tax inclusivity was tracked don't carry the flag,
-      // so recover it from the loaded product catalog.
-      const restoredItems = resumed.items.map((item) => {
-        const product = categorySourceProducts.find((entry) => entry.id === item.productId);
-        return product ? { ...item, taxRateIsInclusive: product.taxRateIsInclusive } : item;
-      });
-      cart.restoreHeldSaleCart(
-        restoredItems,
-        resumed.saleDiscountType,
-        resumed.saleDiscountValue,
-        resumed.charges,
-      );
-      setAutoSelectedPaymentMethodId(null);
-      setPaymentAutoSelectionSuppressedChannelId(null);
-      setCustomerId(resumed.customerId);
-      setHoldOpen(false);
-      toast.success("Held sale resumed.");
-      barcodeInputRef.current?.focus();
-    } catch (error) {
-      toast.error(getErrorMessage(error));
-    }
-  };
-
-  const cancelHeldSale = async (heldSaleId: string): Promise<void> => {
-    // Name the specific held sale. "Cancel this held sale?" was ambiguous in a
-    // list of them — the cashier had already clicked a row, but the prompt gave
-    // no way to check they had clicked the row they meant.
-    const heldSale = (heldSalesQuery.data ?? []).find((entry) => entry.id === heldSaleId) ?? null;
-    const items = heldSale
-      ? heldSale.itemCount === 1
-        ? "1 item"
-        : `${String(heldSale.itemCount)} items`
-      : null;
-
-    const confirmed = await confirm({
-      cancelLabel: "Keep it held",
-      confirmLabel: "Cancel held sale",
-      consequence: heldSale
-        ? `This cancels held sale ${heldSale.holdNumber}${
-            heldSale.customerName ? ` for ${heldSale.customerName}` : ""
-          } — ${String(items)} totalling ${formatMoney(heldSale.total)}. It cannot be undone.`
-        : "This cancels the held sale. It cannot be undone.",
-      detail: "Nothing is posted to the ledger — the sale was never completed.",
-      title: "Cancel this held sale?",
-    });
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await cancelHeldSaleMutation.mutateAsync(heldSaleId);
-      toast.success("Held sale cancelled.");
-    } catch (error) {
-      toast.error(getErrorMessage(error));
     }
   };
 
@@ -817,8 +667,6 @@ export function POSWorkspace(): JSX.Element {
     <POSCartPanel
       canSell={canSell}
       charges={cart.charges}
-      customerId={customerId}
-      externalOrderNumber={externalOrderNumber}
       isCheckingOut={isCheckoutProcessing}
       items={cart.items}
       onCheckout={() => handleCheckoutOpenChange(true)}
@@ -847,25 +695,6 @@ export function POSWorkspace(): JSX.Element {
           cart.clearCart();
         })();
       }}
-      onCustomerChange={(value) => {
-        clearCheckoutFeedback();
-        setCustomerId(value);
-      }}
-      onExternalOrderNumberChange={(value) => {
-        clearCheckoutFeedback();
-        setExternalOrderNumber(value);
-      }}
-      onTaxModeChange={(mode) => {
-        clearCheckoutFeedback();
-        cart.setTaxMode(mode);
-      }}
-      canApplyNoTax={hasPermission(PERMISSIONS.salesNoTaxApply)}
-      taxMode={cart.taxMode}
-      onHoldSale={() => setHoldOpen(true)}
-      onLineDiscountChange={(cartItemId, discountType, discountValue) => {
-        clearCheckoutFeedback();
-        cart.applyLineDiscount(cartItemId, discountType, discountValue);
-      }}
       onQuantityChange={(cartItemId, quantity) => {
         clearCheckoutFeedback();
         const maxQuantity = stockByCartItemId.get(cartItemId);
@@ -882,13 +711,6 @@ export function POSWorkspace(): JSX.Element {
         clearCheckoutFeedback();
         cart.removeItem(cartItemId);
       }}
-      onSalesChannelChange={(value) => {
-        clearCheckoutFeedback();
-        setPaymentAutoSelectionSuppressedChannelId(null);
-        setSalesChannelId(value);
-      }}
-      salesChannelId={salesChannelId}
-      salesChannels={salesChannels}
       taxRates={chargeTaxRates}
       totals={cart.totals}
     />
@@ -912,8 +734,9 @@ export function POSWorkspace(): JSX.Element {
         ) : (
           <>
             <div className="hidden min-h-0 lg:block">
-              <POSCategorySidebar
+              <POSCategoryTiles
                 categories={categories}
+                layout="column"
                 onSelect={setCategoryId}
                 selectedCategoryId={categoryId}
               />
@@ -930,12 +753,6 @@ export function POSWorkspace(): JSX.Element {
                   inline with the fields taking the slack. */}
               <div className="sticky top-0 z-10 grid gap-2 border-b border-border bg-card px-3 py-2.5 md:grid-cols-2 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
                 <POSProductSearch onChange={setSearch} value={search} />
-                <POSBarcodeInput
-                  inputRef={barcodeInputRef}
-                  onLookup={(query) => {
-                    void handleLookup(query);
-                  }}
-                />
                 <Button
                   className="text-meta min-h-tap w-full justify-center whitespace-nowrap rounded border-border bg-card px-3 font-medium text-foreground shadow-none hover:bg-muted"
                   disabled={!canCreateBakeryOrder}
@@ -954,31 +771,13 @@ export function POSWorkspace(): JSX.Element {
                   Show prices
                 </label>
               </div>
-              <div className="flex gap-2 overflow-x-auto border-b border-border bg-card px-3 py-2 lg:hidden">
-                <Button
-                  className="rounded-md border-border"
-                  onClick={() => setCategoryId("all")}
-                  type="button"
-                  variant={categoryId === "all" ? "default" : "outline"}
-                >
-                  All
-                </Button>
-                {categories.map((category) => {
-                  const Icon = getProductCategoryIconForMetadata(category);
-
-                  return (
-                    <Button
-                      className="rounded-md border-border"
-                      key={category.id}
-                      onClick={() => setCategoryId(category.id)}
-                      type="button"
-                      variant={categoryId === category.id ? "default" : "outline"}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {category.categoryName}
-                    </Button>
-                  );
-                })}
+              <div className="lg:hidden">
+                <POSCategoryTiles
+                  categories={categories}
+                  layout="row"
+                  onSelect={setCategoryId}
+                  selectedCategoryId={categoryId}
+                />
               </div>
               <div className="px-4 py-4">
                 <POSProductGrid
@@ -1163,33 +962,10 @@ export function POSWorkspace(): JSX.Element {
         onNewSale={() => {
           setReceiptOpen(false);
           setReceipt(null);
-          barcodeInputRef.current?.focus();
         }}
         onOpenChange={setReceiptOpen}
         open={receiptOpen}
         receipt={receipt}
-      />
-      <POSHoldSaleDialog
-        canHoldCurrentSale={cart.items.length > 0}
-        heldSales={heldSalesQuery.data ?? []}
-        isCancelling={cancelHeldSaleMutation.isPending}
-        isHolding={holdSaleMutation.isPending}
-        isLoading={heldSalesQuery.isLoading}
-        isResuming={resumeHeldSaleMutation.isPending}
-        onCancelHeldSale={(heldSaleId) => {
-          void cancelHeldSale(heldSaleId);
-        }}
-        onHoldCurrentSale={(notes) => {
-          void holdCurrentSale(notes);
-        }}
-        onOpenChange={setHoldOpen}
-        onResumeHeldSale={(heldSaleId) => {
-          void resumeHeldSale(heldSaleId);
-        }}
-        onRetry={() => {
-          void heldSalesQuery.refetch();
-        }}
-        open={holdOpen}
       />
     </div>
   );
