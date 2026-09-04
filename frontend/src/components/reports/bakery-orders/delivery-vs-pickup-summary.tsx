@@ -2,6 +2,7 @@ import { CakeSlice, Truck } from "lucide-react";
 import type { JSX } from "react";
 
 import { ReportKpiCard } from "@/components/reports/report-kpi-card";
+import { ReportKpiRow } from "@/components/reports/report-kpi-row";
 import { formatCurrency, formatNumber } from "@/components/reports/sales/sales-report-format";
 import type { DeliveryVsPickupReport } from "@/types/bakery-orders-reports";
 
@@ -11,7 +12,7 @@ export function DeliveryVsPickupSummary({
   report: DeliveryVsPickupReport | undefined;
 }): JSX.Element {
   return (
-    <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+    <ReportKpiRow columns={4}>
       <ReportKpiCard
         icon={CakeSlice}
         label="Pickup Count"
@@ -32,6 +33,6 @@ export function DeliveryVsPickupSummary({
         label="Delivery Value"
         value={formatCurrency(report?.deliveryOrders.totalValue ?? 0)}
       />
-    </div>
+    </ReportKpiRow>
   );
 }

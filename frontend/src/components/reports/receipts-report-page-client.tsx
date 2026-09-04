@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, ReceiptText, Search } from "lucide-react";
+import { Eye, ReceiptText, Search, WalletCards } from "lucide-react";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -18,13 +18,15 @@ import {
   describeReportPeriod,
   ReportFilterPopover,
 } from "@/components/reports/report-filter-popover";
+import { ReportKpiCard } from "@/components/reports/report-kpi-card";
+import { ReportKpiRow } from "@/components/reports/report-kpi-row";
 import { ReportPageHeader } from "@/components/reports/report-page-header";
 import { ReportPresetSelector } from "@/components/reports/report-preset-selector";
 import { formatCurrency, formatDate } from "@/components/reports/sales/sales-report-format";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -415,34 +417,16 @@ export function ReceiptsReportPageClient(): JSX.Element {
         </>
       </ReportFilterPopover>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="bg-card/85 shadow-soft">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-brand-mocha">Receipts in view</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-end gap-2">
-            <ReceiptText className="mb-1 h-5 w-5 text-brand-caramel" />
-            <span className="text-3xl font-medium text-brand-espresso">{rows.length}</span>
-          </CardContent>
-        </Card>
-        <Card className="bg-card/85 shadow-soft">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-brand-mocha">Total billed</CardTitle>
-          </CardHeader>
-          <CardContent className="text-3xl font-medium text-brand-espresso">
-            {formatCurrency(totalAmount)}
-          </CardContent>
-        </Card>
-        <Card className="bg-card/85 shadow-soft">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-brand-mocha">Viewed receipts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-medium text-brand-espresso">{viewedCount}</div>
-            <p className="text-sm text-brand-mocha">Paid total: {formatCurrency(paidAmount)}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <ReportKpiRow columns={4}>
+        <ReportKpiCard icon={ReceiptText} label="Receipts in view" value={String(rows.length)} />
+        <ReportKpiCard
+          icon={ReceiptText}
+          label="Total billed"
+          value={formatCurrency(totalAmount)}
+        />
+        <ReportKpiCard icon={Eye} label="Viewed receipts" value={String(viewedCount)} />
+        <ReportKpiCard icon={WalletCards} label="Paid total" value={formatCurrency(paidAmount)} />
+      </ReportKpiRow>
 
       {receiptsQuery.error ? (
         <Card className="border-danger/30 bg-danger-tint text-danger-text">

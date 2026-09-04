@@ -9,12 +9,13 @@ import {
 import type { JSX } from "react";
 
 import { ReportKpiCard } from "@/components/reports/report-kpi-card";
+import { ReportKpiRow } from "@/components/reports/report-kpi-row";
 import { formatCurrency, formatNumber } from "@/components/reports/sales/sales-report-format";
 import type { SalesSummary } from "@/types/sales-reports";
 
 export function SalesSummaryCards({ summary }: { summary: SalesSummary | undefined }): JSX.Element {
   return (
-    <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+    <ReportKpiRow columns={4}>
       <ReportKpiCard
         icon={ReceiptText}
         label="Gross Sales"
@@ -61,6 +62,6 @@ export function SalesSummaryCards({ summary }: { summary: SalesSummary | undefin
         label="Refund Total"
         value={formatCurrency(summary?.refundTotal ?? 0)}
       />
-    </div>
+    </ReportKpiRow>
   );
 }

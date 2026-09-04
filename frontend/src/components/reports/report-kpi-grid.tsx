@@ -9,6 +9,7 @@ import {
 import type { JSX } from "react";
 
 import { ReportKpiCard } from "@/components/reports/report-kpi-card";
+import { ReportKpiRow } from "@/components/reports/report-kpi-row";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ReportsDashboardSummary } from "@/types/reports";
 
@@ -33,16 +34,16 @@ export function ReportKpiGrid({
 }): JSX.Element {
   if (isLoading && !summary) {
     return (
-      <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-5">
+      <ReportKpiRow columns={10}>
         {Array.from({ length: 10 }).map((_, index) => (
           <Skeleton className="h-32 rounded-2xl" key={index} />
         ))}
-      </div>
+      </ReportKpiRow>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-5">
+    <ReportKpiRow columns={10}>
       <ReportKpiCard
         icon={ReceiptText}
         label="Total Sales"
@@ -93,6 +94,6 @@ export function ReportKpiGrid({
         label="Ready Orders"
         value={number(summary?.orders.readyOrders ?? 0)}
       />
-    </div>
+    </ReportKpiRow>
   );
 }

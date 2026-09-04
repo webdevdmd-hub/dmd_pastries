@@ -2,6 +2,7 @@ import { Banknote, CreditCard, Landmark, ReceiptText, RotateCcw, WalletCards } f
 import type { JSX } from "react";
 
 import { ReportKpiCard } from "@/components/reports/report-kpi-card";
+import { ReportKpiRow } from "@/components/reports/report-kpi-row";
 import { formatCurrency, formatNumber } from "@/components/reports/sales/sales-report-format";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -57,7 +58,7 @@ export function FinancialSummaryCards({
         </p>
       ) : null}
       {shouldShowCards ? (
-        <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+        <ReportKpiRow columns={4}>
           <ReportKpiCard
             icon={ReceiptText}
             label="Gross Sales"
@@ -108,7 +109,7 @@ export function FinancialSummaryCards({
             label="Refunds"
             value={formatNumber(summary?.refundCount ?? 0)}
           />
-        </div>
+        </ReportKpiRow>
       ) : null}
     </div>
   );

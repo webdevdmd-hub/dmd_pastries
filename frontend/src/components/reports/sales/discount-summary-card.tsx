@@ -2,6 +2,7 @@ import { BadgePercent, ReceiptText } from "lucide-react";
 import type { JSX } from "react";
 
 import { ReportKpiCard } from "@/components/reports/report-kpi-card";
+import { ReportKpiRow } from "@/components/reports/report-kpi-row";
 import {
   formatCurrency,
   formatNumber,
@@ -15,7 +16,7 @@ export function DiscountSummaryCard({
   report: DiscountReport | undefined;
 }): JSX.Element {
   return (
-    <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-5">
+    <ReportKpiRow columns={5}>
       <ReportKpiCard
         icon={BadgePercent}
         label="Total Discount"
@@ -41,6 +42,6 @@ export function DiscountSummaryCard({
         label="Discount % Gross"
         value={formatPercent(report?.discountPercentageOfGrossSales ?? 0)}
       />
-    </div>
+    </ReportKpiRow>
   );
 }

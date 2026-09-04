@@ -2,6 +2,7 @@ import { CircleDollarSign, Factory, PackageCheck, PackageX, Scale, Trash2 } from
 import type { JSX } from "react";
 
 import { ReportKpiCard } from "@/components/reports/report-kpi-card";
+import { ReportKpiRow } from "@/components/reports/report-kpi-row";
 import {
   formatCurrency,
   formatNumber,
@@ -15,7 +16,7 @@ export function ManufacturingSummaryCards({
   summary: ManufacturingSummary | undefined;
 }): JSX.Element {
   return (
-    <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+    <ReportKpiRow columns={4}>
       <ReportKpiCard
         icon={Factory}
         label="Total Batches"
@@ -56,6 +57,6 @@ export function ManufacturingSummaryCards({
         label="Production Cost"
         value={formatCurrency(summary?.estimatedProductionCost ?? 0)}
       />
-    </div>
+    </ReportKpiRow>
   );
 }
