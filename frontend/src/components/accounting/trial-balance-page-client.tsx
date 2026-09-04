@@ -327,8 +327,10 @@ export function TrialBalancePageClient(): JSX.Element {
                   <thead>
                     <tr className="border-y border-border bg-muted text-meta text-foreground-muted">
                       <th className="px-3 py-3 sm:px-6 text-left font-bold">Account</th>
-                      <th className="px-3 py-3 sm:px-6 text-right font-bold">Net Debit</th>
-                      <th className="px-3 py-3 sm:px-6 text-right font-bold">Net Credit</th>
+                      <th className="w-20 px-2 py-3 text-right font-bold sm:w-40 sm:px-6">Debit</th>
+                      <th className="w-20 px-2 py-3 text-right font-bold sm:w-40 sm:px-6">
+                        Credit
+                      </th>
                     </tr>
                   </thead>
                   <tbody>

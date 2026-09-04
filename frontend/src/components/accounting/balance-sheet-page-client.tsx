@@ -377,7 +377,7 @@ export function BalanceSheetPageClient(): JSX.Element {
                   <thead>
                     <tr className="border-y border-border bg-muted text-meta text-foreground-muted">
                       <th className="px-3 py-3 sm:px-6 text-left font-bold">Account</th>
-                      <th className="px-3 py-3 sm:px-6 text-right font-bold">Total</th>
+                      <th className="w-20 px-2 py-3 text-right font-bold sm:w-52 sm:px-6">Total</th>
                     </tr>
                   </thead>
                   <tbody>
