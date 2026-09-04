@@ -20,21 +20,21 @@ export function DesktopSidebar(): JSX.Element {
     <aside
       className={cn(
         "sticky top-0 hidden h-screen shrink-0 border-r transition-[width,background-color,border-color,color] duration-300 lg:flex lg:flex-col",
-        "border-workspace-border bg-muted text-brand-espresso shadow-none",
+        "border-border bg-muted text-foreground shadow-none",
         collapsed ? "w-[4.75rem]" : "w-[18rem]",
       )}
     >
       <div
         className={cn(
           "flex min-h-20 items-center gap-3 border-b px-4",
-          "border-workspace-border bg-workspace-panel",
+          "border-border bg-workspace-panel",
           collapsed ? "justify-center" : "justify-between",
         )}
       >
         {!collapsed ? (
           <div className="min-w-0">
             <p
-              className="truncate text-xl font-semibold tracking-tight text-brand-espresso"
+              className="truncate text-xl font-semibold tracking-tight text-foreground"
               title={workspaceName}
             >
               {workspaceName}
@@ -45,8 +45,8 @@ export function DesktopSidebar(): JSX.Element {
         <Button
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className={cn(
-            "h-10 w-10 rounded-2xl",
-            "border-workspace-border bg-workspace-panel text-brand-espresso shadow-none hover:bg-muted",
+            "h-10 w-10 rounded-lg",
+            "border-border bg-workspace-panel text-foreground shadow-none hover:bg-muted",
           )}
           size="icon"
           type="button"
@@ -68,8 +68,8 @@ export function DesktopSidebar(): JSX.Element {
       </TooltipProvider>
 
       {!collapsed ? (
-        <div className="mx-3 mb-4 rounded-2xl border border-workspace-border bg-workspace-panel p-3 text-xs text-workspace-sidebar-muted">
-          <p className="font-medium text-brand-espresso">Protected workspace</p>
+        <div className="mx-3 mb-4 rounded-lg border border-border bg-workspace-panel p-3 text-xs text-workspace-sidebar-muted">
+          <p className="font-medium text-foreground">Protected workspace</p>
           <p className="mt-1.5 leading-5">Branch-aware modules grouped by operating workflow.</p>
         </div>
       ) : null}

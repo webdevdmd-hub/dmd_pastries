@@ -25,7 +25,7 @@ export function MobileSidebar(): JSX.Element {
       <SheetTrigger asChild>
         <Button
           aria-label="Open navigation"
-          className="border-workspace-border bg-workspace-panel text-brand-espresso shadow-none hover:bg-brand-latte/70"
+          className="border-border bg-workspace-panel text-foreground shadow-none hover:bg-muted/70"
           size="icon"
           variant="outline"
         >
@@ -34,18 +34,18 @@ export function MobileSidebar(): JSX.Element {
         </Button>
       </SheetTrigger>
       <SheetContent
-        className="flex w-[20rem] flex-col border-workspace-border bg-muted p-4 text-brand-espresso sm:w-[22rem]"
+        className="flex w-[20rem] flex-col border-border bg-muted p-4 text-foreground sm:w-[22rem]"
         side="left"
       >
         <SheetHeader>
-          <SheetTitle className="truncate text-left text-xl font-semibold leading-none text-brand-espresso">
+          <SheetTitle className="truncate text-left text-xl font-semibold leading-none text-foreground">
             {workspaceName}
           </SheetTitle>
-          <SheetDescription className="text-left text-xs text-workspace-muted">
+          <SheetDescription className="text-left text-xs text-foreground-muted">
             Operations OS
           </SheetDescription>
         </SheetHeader>
-        <div className="mt-5 w-fit rounded-full border border-workspace-border bg-workspace-panel px-3 py-1 text-xs font-semibold text-brand-espresso">
+        <div className="mt-5 w-fit rounded-full border border-border bg-workspace-panel px-3 py-1 text-xs font-semibold text-foreground">
           Operations shell
         </div>
 
@@ -55,8 +55,8 @@ export function MobileSidebar(): JSX.Element {
           </TooltipProvider>
         </nav>
 
-        <div className="rounded-2xl border border-workspace-border bg-workspace-panel p-3 text-xs text-workspace-muted">
-          <p className="font-medium text-brand-espresso">Protected workspace</p>
+        <div className="rounded-lg border border-border bg-workspace-panel p-3 text-xs text-foreground-muted">
+          <p className="font-medium text-foreground">Protected workspace</p>
           <p className="mt-1.5 leading-5">Modules stay grouped by operating workflow.</p>
         </div>
       </SheetContent>

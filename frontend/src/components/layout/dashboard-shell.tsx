@@ -15,7 +15,7 @@ export function DashboardShell({ children }: DashboardShellProps): JSX.Element {
 
   return (
     <BreadcrumbLabelProvider>
-      <div className="min-h-screen bg-workspace-canvas text-brand-espresso">
+      <div className="min-h-screen bg-workspace-canvas text-foreground">
         <div className="flex min-h-screen">
           <DesktopSidebar />
           <div className="flex min-h-screen min-w-0 flex-1 flex-col">
