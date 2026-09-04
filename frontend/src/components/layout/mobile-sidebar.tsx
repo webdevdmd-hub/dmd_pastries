@@ -45,10 +45,6 @@ export function MobileSidebar(): JSX.Element {
             Operations OS
           </SheetDescription>
         </SheetHeader>
-        <div className="mt-5 w-fit rounded-full border border-border bg-workspace-panel px-3 py-1 text-xs font-semibold text-foreground">
-          Operations shell
-        </div>
-
         <nav aria-label="Primary" className="mt-6 flex min-h-0 flex-1">
           <TooltipProvider delayDuration={150}>
             <AppNavigationList theme="pos" />
