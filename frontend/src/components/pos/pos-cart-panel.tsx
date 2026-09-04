@@ -3,12 +3,11 @@ import type { JSX } from "react";
 
 import { useConnectivity } from "@/components/connectivity/connectivity-provider";
 import { POSCartItem } from "@/components/pos/pos-cart-item";
+import { POSChargesControl } from "@/components/pos/pos-charges-control";
 import { POSEmptyCartState } from "@/components/pos/pos-empty-cart-state";
-import { DocumentChargesEditor } from "@/components/shared/document-charges-editor";
 import { Button } from "@/components/ui/button";
 import type { DocumentChargeDraft } from "@/types/document-charges";
 import type { CartItem, CartTotals } from "@/types/pos";
-import type { TaxRate } from "@/types/settings";
 
 type POSCartPanelProps = {
   canSell: boolean;
@@ -20,7 +19,6 @@ type POSCartPanelProps = {
   onClear: () => void;
   onQuantityChange: (cartItemId: string, quantity: number) => void;
   onRemoveItem: (cartItemId: string) => void;
-  taxRates: TaxRate[];
   totals: CartTotals;
 };
 
@@ -50,7 +48,6 @@ export function POSCartPanel({
   onClear,
   onQuantityChange,
   onRemoveItem,
-  taxRates,
   totals,
 }: POSCartPanelProps): JSX.Element {
   const { isOffline } = useConnectivity();
@@ -82,12 +79,10 @@ export function POSCartPanel({
 
       <div className="shrink-0 space-y-3 border-t border-border bg-card p-4">
         {items.length > 0 ? (
-          <DocumentChargesEditor
+          <POSChargesControl
             charges={charges}
             className="border-b border-border pb-3"
-            compact
             onChange={onChargesChange}
-            taxRates={taxRates}
           />
         ) : null}
 

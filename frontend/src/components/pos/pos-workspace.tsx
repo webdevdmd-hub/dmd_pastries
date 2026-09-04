@@ -496,7 +496,6 @@ export function POSWorkspace(): JSX.Element {
     [referenceDataQuery.data?.productCategories],
   );
   const paymentMethods = useMemo(() => paymentMethodsQuery.data ?? [], [paymentMethodsQuery.data]);
-  const chargeTaxRates = referenceDataQuery.data?.taxRates ?? [];
   const salesChannels = useMemo(
     () =>
       (referenceDataQuery.data?.salesChannels ?? []).filter(
@@ -711,7 +710,6 @@ export function POSWorkspace(): JSX.Element {
         clearCheckoutFeedback();
         cart.removeItem(cartItemId);
       }}
-      taxRates={chargeTaxRates}
       totals={cart.totals}
     />
   );
@@ -947,7 +945,6 @@ export function POSWorkspace(): JSX.Element {
         payments={cart.payments}
         saleDiscountType={cart.saleDiscountType}
         saleDiscountValue={cart.saleDiscountValue}
-        taxRates={chargeTaxRates}
         totals={cart.totals}
       />
       <POSCreateOrderDialog

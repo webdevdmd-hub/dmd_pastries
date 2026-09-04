@@ -3,9 +3,9 @@
 import type { JSX } from "react";
 import { useEffect, useRef } from "react";
 
+import { POSChargesControl } from "@/components/pos/pos-charges-control";
 import { POSDiscountControl } from "@/components/pos/pos-discount-control";
 import { POSPaymentPanel } from "@/components/pos/pos-payment-panel";
-import { DocumentChargesEditor } from "@/components/shared/document-charges-editor";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,7 +18,7 @@ import {
 import type { CheckoutFeedback } from "@/lib/pos/checkout-feedback";
 import type { DocumentChargeDraft } from "@/types/document-charges";
 import type { CartDiscountType, CartTotals, PaymentInput } from "@/types/pos";
-import type { PaymentMethod, TaxRate } from "@/types/settings";
+import type { PaymentMethod } from "@/types/settings";
 
 type POSCheckoutDialogProps = {
   charges: DocumentChargeDraft[];
@@ -44,7 +44,6 @@ type POSCheckoutDialogProps = {
   payments: PaymentInput[];
   saleDiscountType: CartDiscountType | null;
   saleDiscountValue: number | null;
-  taxRates: TaxRate[];
   totals: CartTotals;
 };
 
@@ -110,7 +109,6 @@ export function POSCheckoutDialog({
   payments,
   saleDiscountType,
   saleDiscountValue,
-  taxRates,
   totals,
 }: POSCheckoutDialogProps): JSX.Element {
   const cannotConfirm = isSubmitting || paymentMethodsLoading;
@@ -147,12 +145,7 @@ export function POSCheckoutDialog({
           </div>
 
           <div className="rounded-lg border border-border bg-muted p-4">
-            <DocumentChargesEditor
-              charges={charges}
-              compact
-              onChange={onChargesChange}
-              taxRates={taxRates}
-            />
+            <POSChargesControl charges={charges} onChange={onChargesChange} />
           </div>
 
           <POSPaymentPanel
