@@ -669,7 +669,7 @@ export function AccountMappingsPageClient(): JSX.Element {
 
           return (
             <div
-              className="grid items-center gap-4 border-b px-4 py-4 last:border-b-0 md:grid-cols-[minmax(0,1.25fr)_minmax(0,2fr)_minmax(0,1fr)_8rem]"
+              className="grid min-w-0 items-center gap-4 border-b px-4 py-4 last:border-b-0 [&>*]:min-w-0 md:grid-cols-[minmax(0,1.25fr)_minmax(0,2fr)_minmax(0,1fr)_8rem]"
               key={mapping.mappingKey}
             >
               <div>
