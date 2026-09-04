@@ -52,30 +52,35 @@ export function POSCartPanel({
   const itemCountLabel = items.length === 1 ? "1 item" : `${String(items.length)} items`;
 
   return (
-    <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-card text-foreground">
-      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3.5">
-        <p className="text-section font-medium text-foreground">Your cart</p>
-        <p className="text-meta font-mono tabular-nums text-foreground-muted">{itemCountLabel}</p>
+    // Two panels, not one: what is being bought and what it comes to are
+    // separate questions, and the summary is the half a cashier reads aloud.
+    // The cart scrolls; the summary never leaves the bottom of the screen.
+    <aside className="flex h-full min-h-0 flex-col gap-3 overflow-hidden bg-canvas p-3 text-foreground">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3.5">
+          <p className="text-section font-medium text-foreground">Your cart</p>
+          <p className="text-meta font-mono tabular-nums text-foreground-muted">{itemCountLabel}</p>
+        </div>
+
+        <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
+          {items.length === 0 ? (
+            <POSEmptyCartState />
+          ) : (
+            <div className="divide-y divide-border">
+              {items.map((item) => (
+                <POSCartItem
+                  item={item}
+                  key={item.cartItemId}
+                  onQuantityChange={onQuantityChange}
+                  onRemove={onRemoveItem}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
-        {items.length === 0 ? (
-          <POSEmptyCartState />
-        ) : (
-          <div className="divide-y divide-border">
-            {items.map((item) => (
-              <POSCartItem
-                item={item}
-                key={item.cartItemId}
-                onQuantityChange={onQuantityChange}
-                onRemove={onRemoveItem}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="shrink-0 space-y-3 border-t border-border bg-card p-4">
+      <div className="shrink-0 space-y-3 rounded-lg border border-border bg-card p-4">
         {items.length > 0 ? (
           <POSChargesControl
             charges={charges}
