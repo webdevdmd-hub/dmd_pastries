@@ -9,7 +9,15 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { useConfirm } from "@/components/app/confirm-provider";
-import { EmptyState } from "@/components/shared/collection-state";
+import { TaxRateDetailsDrawer } from "@/components/settings/tax-rate-details-drawer";
+import { TaxRatesCardGrid } from "@/components/settings/tax-rates-card-grid";
+import { TaxRatesTable } from "@/components/settings/tax-rates-table";
+import {
+  defaultTaxRateFilters,
+  type TaxRateFilters,
+  TaxRatesToolbar,
+} from "@/components/settings/tax-rates-toolbar";
+import { EmptyState, FilteredState } from "@/components/shared/collection-state";
 import { CollectionStateRow } from "@/components/shared/collection-state-row";
 import { PageHeader } from "@/components/shared/page-header";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
@@ -777,105 +785,6 @@ function TaxRateDialog({
   );
 }
 
-function TaxRatesTable({
-  canManage,
-  onDeactivate,
-  onEdit,
-  onStatusChange,
-  taxRates,
-}: {
-  canManage: boolean;
-  onDeactivate: (taxRate: TaxRate) => void;
-  onEdit: (taxRate: TaxRate) => void;
-  onStatusChange: (taxRate: TaxRate, status: RecordStatus) => void;
-  taxRates: TaxRate[];
-}): JSX.Element {
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Rate</TableHead>
-              <TableHead>Region</TableHead>
-              <TableHead>Inclusive</TableHead>
-              <TableHead>Default</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {taxRates.length === 0 ? (
-              <CollectionStateRow colSpan={8}>
-                <EmptyState
-                  description="A tax rate is the VAT percentage applied to a sale or purchase. Without one, documents post at zero tax."
-                  icon={Percent}
-                  title="No tax rates yet"
-                />
-              </CollectionStateRow>
-            ) : null}
-            {taxRates.map((taxRate) => (
-              <TableRow key={taxRate.id}>
-                <TableCell className="font-medium">{taxRate.taxName}</TableCell>
-                <TableCell>{taxRate.taxType}</TableCell>
-                <TableCell>{taxRate.ratePercentage}%</TableCell>
-                <TableCell>
-                  {taxRate.country}
-                  {taxRate.region ? ` - ${taxRate.region}` : ""}
-                </TableCell>
-                <TableCell>{taxRate.isInclusive ? "Yes" : "No"}</TableCell>
-                <TableCell>{taxRate.isDefault ? "Yes" : "No"}</TableCell>
-                <TableCell>
-                  <StatusBadge status={taxRate.status} />
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        aria-label={`Open actions for ${taxRate.taxName}`}
-                        size="icon"
-                        variant="ghost"
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem disabled={!canManage} onSelect={() => onEdit(taxRate)}>
-                        Edit tax rate
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        disabled={!canManage || taxRate.status === "active"}
-                        onSelect={() => onStatusChange(taxRate, "active")}
-                      >
-                        Activate
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        disabled={!canManage || taxRate.status === "inactive"}
-                        onSelect={() => onStatusChange(taxRate, "inactive")}
-                      >
-                        Mark inactive
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-danger-text focus:text-danger-text"
-                        disabled={!canManage}
-                        onSelect={() => onDeactivate(taxRate)}
-                      >
-                        Deactivate through delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-  );
-}
-
 function PaymentMethodsTable({
   canManage,
   methods,
@@ -1291,6 +1200,8 @@ export function SettingsDataPageClient({
   const [companyDialogOpen, setCompanyDialogOpen] = useState(false);
   const [taxRateDialogOpen, setTaxRateDialogOpen] = useState(false);
   const [selectedTaxRate, setSelectedTaxRate] = useState<TaxRate | null>(null);
+  const [drawerTaxRate, setDrawerTaxRate] = useState<TaxRate | null>(null);
+  const [taxRateFilters, setTaxRateFilters] = useState<TaxRateFilters>(defaultTaxRateFilters);
   const [paymentMethodDialogOpen, setPaymentMethodDialogOpen] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
   const companyQuery = useCompanySettings(canView && kind === "company");
@@ -1341,6 +1252,48 @@ export function SettingsDataPageClient({
   const openEditTaxRateDialog = (taxRate: TaxRate): void => {
     setSelectedTaxRate(taxRate);
     setTaxRateDialogOpen(true);
+  };
+
+  // A dialog on top of a sheet on top of the list is one layer too many, so
+  // the drawer closes before the form opens.
+  const openEditTaxRateFromDrawer = (taxRate: TaxRate): void => {
+    setDrawerTaxRate(null);
+    openEditTaxRateDialog(taxRate);
+  };
+
+  const allTaxRates = taxRatesQuery.data ?? [];
+  const taxTypes = Array.from(
+    new Set(allTaxRates.map((taxRate) => taxRate.taxType).filter(Boolean)),
+  ).sort();
+  const taxQuery = taxRateFilters.search.trim().toLowerCase();
+  const visibleTaxRates = allTaxRates.filter((taxRate) => {
+    const matchesQuery =
+      taxQuery.length === 0 ||
+      taxRate.taxName.toLowerCase().includes(taxQuery) ||
+      taxRate.taxType.toLowerCase().includes(taxQuery) ||
+      taxRate.country.toLowerCase().includes(taxQuery) ||
+      taxRate.region.toLowerCase().includes(taxQuery);
+    const matchesStatus =
+      taxRateFilters.status === "all" || taxRate.status === taxRateFilters.status;
+    const matchesType =
+      taxRateFilters.taxType === "all" || taxRate.taxType === taxRateFilters.taxType;
+
+    return matchesQuery && matchesStatus && matchesType;
+  });
+
+  const taxRateListHandlers = {
+    canManage,
+    onDeactivate: (taxRate: TaxRate) => {
+      setDrawerTaxRate(null);
+      void handleTaxRateDeactivate(taxRate);
+    },
+    onEdit: openEditTaxRateFromDrawer,
+    onStatusChange: (taxRate: TaxRate, status: RecordStatus) => {
+      setDrawerTaxRate(null);
+      void handleTaxRateStatusChange(taxRate, status);
+    },
+    onView: setDrawerTaxRate,
+    taxRates: visibleTaxRates,
   };
 
   const handleTaxRateSubmit = async (payload: CreateTaxRatePayload): Promise<void> => {
@@ -1540,29 +1493,56 @@ export function SettingsDataPageClient({
             ) : null
           }
         />
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-brand-espresso">
-              <Percent className="h-5 w-5" />
-              Active tax configuration
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        {taxRatesQuery.isLoading ? <LoadingCard /> : null}
-        {taxRatesQuery.error ? <ErrorCard>{getErrorMessage(taxRatesQuery.error)}</ErrorCard> : null}
-        {taxRatesQuery.data ? (
-          <TaxRatesTable
-            canManage={canManage}
-            taxRates={taxRatesQuery.data}
-            onDeactivate={(taxRate) => {
-              void handleTaxRateDeactivate(taxRate);
-            }}
-            onEdit={openEditTaxRateDialog}
-            onStatusChange={(taxRate, status) => {
-              void handleTaxRateStatusChange(taxRate, status);
-            }}
+        {/* A card that held a title, an icon and nothing else is gone. The
+            page heading already says what this screen is. */}
+        {allTaxRates.length > 0 ? (
+          <TaxRatesToolbar
+            filters={taxRateFilters}
+            onFiltersChange={setTaxRateFilters}
+            taxTypes={taxTypes}
           />
         ) : null}
+
+        {taxRatesQuery.isLoading ? <LoadingCard /> : null}
+        {taxRatesQuery.error ? <ErrorCard>{getErrorMessage(taxRatesQuery.error)}</ErrorCard> : null}
+
+        {!taxRatesQuery.isLoading && !taxRatesQuery.error && allTaxRates.length === 0 ? (
+          <EmptyState
+            description="A tax rate is the VAT percentage applied to a sale or purchase. Without one, documents post at zero tax."
+            icon={Percent}
+            title="No tax rates yet"
+          />
+        ) : null}
+
+        {allTaxRates.length > 0 && visibleTaxRates.length === 0 ? (
+          <FilteredState
+            noun="tax rates"
+            onClearFilters={() => setTaxRateFilters(defaultTaxRateFilters)}
+            query={taxRateFilters.search.trim() || undefined}
+          />
+        ) : null}
+
+        {visibleTaxRates.length > 0 ? (
+          <>
+            <div className="md:hidden">
+              <TaxRatesCardGrid {...taxRateListHandlers} />
+            </div>
+            <Card className="hidden overflow-hidden md:block">
+              <CardContent className="p-0">
+                <TaxRatesTable {...taxRateListHandlers} />
+              </CardContent>
+            </Card>
+          </>
+        ) : null}
+
+        <TaxRateDetailsDrawer
+          canManage={canManage}
+          onEdit={openEditTaxRateFromDrawer}
+          onOpenChange={(open) => (!open ? setDrawerTaxRate(null) : undefined)}
+          open={drawerTaxRate !== null}
+          taxRate={drawerTaxRate}
+        />
+
         <TaxRateDialog
           open={taxRateDialogOpen}
           submitting={taxRateSubmitting}
