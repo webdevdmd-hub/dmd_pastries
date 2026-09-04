@@ -97,9 +97,10 @@ export function palette(mode: PaletteMode = "light"): Palette {
  * Categorical series for Recharts.
  *
  * Leads with near-black rather than a colour: in a monochrome system the first
- * series should be the neutral one, and colour enters as a distinguisher rather
- * than a default (DESIGN.md §3.2). A single-series chart therefore renders black,
- * not green — green stays reserved for money.
+ * Colour now LEADS on analytical surfaces (DESIGN.md §1, changed 2026-09-04).
+ * A single-series revenue chart renders green, because on a dashboard green is
+ * the revenue series as well as the money accent. The neutrals moved to the back
+ * of the list rather than out of it — a six-series chart still needs them.
  *
  * Ordered for maximum adjacent separation, and that ordering is ASSERTED, not
  * asserted-in-a-comment: `scripts/check-chart-palette.mjs` simulates protanopia and
@@ -108,11 +109,11 @@ export function palette(mode: PaletteMode = "light"): Palette {
  * with nothing checking it.
  */
 export const chartSeries = [
-  "#171717", // primary — neutral first
-  "#00723B", // money
+  "#00723B", // money — colour leads now, see the note above
   "#3072C1", // info
   "#A66D00", // warning
   "#9E1618", // danger-TEXT, not danger-solid — see below
+  "#171717", // primary
   "#6E6A64", // foreground-muted
 ] as const;
 

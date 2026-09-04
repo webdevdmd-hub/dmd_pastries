@@ -55,9 +55,19 @@ v2's thesis, discipline, and structure are kept. Four things are new, and two v2
 
 ## 1. The thesis
 
-**Monochrome by default. Color means money.**
+**Colour carries the data. Saturation still carries the commitment.**
 
-Neutrals carry almost no chroma. The only saturated thing on any screen is the thing that takes payment, the thing that warns you, or the thing that broke.
+> Changed 2026-09-04 by the product owner, replacing "Monochrome by default. Color means money." The reference is the shadcnstore dashboard template. The rule below is what actually governs; v3's monochrome thesis is kept underneath for the reasoning, because the parts of it that were about *contrast* rather than *taste* still hold.
+
+Analytical surfaces — dashboards, charts, KPI cards, trend deltas — use a full categorical palette. A revenue series is green, an orders series is blue, a cost series is amber, and a KPI that moved up says so in green. Colour is now a **default** on those surfaces, not an exception earned by meaning.
+
+What did **not** change:
+
+- **The commit action is still the most saturated thing in its own view.** Charge, Post, Confirm payment, Close period. A dashboard full of coloured chart series does not get a green button competing with them.
+- **Every pair is still measured.** A palette is not a licence to ship 3:1 text. The contrast floors in §3.3 and §3.5 are engineering requirements and they are unchanged.
+- **Colour is still never the only carrier of state.** §9 still holds: a series needs a dash pattern or a label as well as a hue, and `scripts/check-chart-palette.mjs` still has to pass.
+
+The superseded rule, for the record: *neutrals carry almost no chroma; the only saturated thing on any screen is the thing that takes payment, the thing that warns you, or the thing that broke.* That is still the right rule for **transactional** screens — the register, forms, tables, the ledger. It is no longer the rule for **analytical** ones.
 
 Two people use this product and they want opposite things. The **cashier** stands at a counter with someone waiting: they tap without looking, and they confirm a total from a meter away. The **owner or accountant** sits down with a trial balance across 20+ report screens: they read, they do not tap.
 
@@ -208,7 +218,9 @@ The warm cast is deliberate and it is much subtler than v1's `#FBFAF8` cream. v1
 | `--money-text` | `#005E31` | **7.94** on card / **7.20** on tint |
 | `--money-tint` | `#EAF7EE` | — |
 
-Reserved for money-committing actions — Charge, Post, Confirm payment, Close period — and for reconciled/paid/posted states. **If two things on a screen are green, one of them is wrong.**
+Reserved for money-committing actions — Charge, Post, Confirm payment, Close period — and for reconciled/paid/posted states.
+
+**The "if two things on a screen are green, one of them is wrong" rule is now scoped to transactional screens.** On a dashboard, green is also the revenue series and an upward delta, and that is intended. The rule that survives is narrower and still absolute: *within one view, only one control commits money, and it is the only saturated **button**.* A green chart line does not compete with a Charge button, because one is a reading and the other is a decision.
 
 **There is no separate brand colour.** The primary CTA is near-black, and identity comes from the Fraunces wordmark. This was a deliberate call: giving the product its own hue would make green rarer and more meaningful, but it adds a third colour against a minimalism brief, and both Midday and Square ship a black CTA with no brand hue at all. If the product later needs an ownable colour, `#B4451D` burnt sugar was the candidate — add it as `--brand-*`, never as `--money-*`.
 
