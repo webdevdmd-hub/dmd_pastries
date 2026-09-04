@@ -342,7 +342,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
       {/* The forced 720px only makes sense once there is a second column to
           fill; on a phone it padded the page with empty card. */}
       <div className="grid overflow-hidden rounded-3xl border border-brand-cappuccino/70 bg-card shadow-sm lg:min-h-[720px] lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
-        <aside className="flex min-h-0 flex-col border-b border-brand-cappuccino/70 bg-card lg:border-b-0 lg:border-r">
+        <aside className="flex min-h-0 min-w-0 flex-col border-b border-brand-cappuccino/70 bg-card lg:border-b-0 lg:border-r">
           <div className="flex items-center justify-between gap-3 border-b border-brand-cappuccino/60 px-4 py-4">
             <div className="min-w-0">
               <h2 className="text-section font-medium text-brand-espresso">All accounts</h2>
