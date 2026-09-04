@@ -38,15 +38,21 @@ export function POSCartItem({ item, onQuantityChange, onRemove }: POSCartItemPro
             <PackagePlus className="h-5 w-5" />
           </div>
         )}
+        {/* The target stays 48px, which the counter register requires; only
+            the mark shrinks. Written as a small badge inside a large
+            transparent box because the button's own chrome at 48px was bigger
+            than the 56px thumbnail it sits on. */}
         <Button
           aria-label={`Remove ${item.productName}`}
-          className="absolute -bottom-1 -left-1 h-6 w-6 rounded-full border border-border bg-card p-0 text-danger-text shadow-sm hover:bg-danger-tint"
+          className="group/remove absolute -bottom-3 -left-3 h-12 w-12 rounded-full bg-transparent p-0 hover:bg-transparent"
           onClick={() => onRemove(item.cartItemId)}
           size="icon"
           type="button"
           variant="ghost"
         >
-          <X className="h-3.5 w-3.5" />
+          <span className="flex h-5 w-5 items-center justify-center rounded-full border border-border bg-card text-danger-text shadow-sm transition-colors group-hover/remove:border-danger group-hover/remove:bg-danger-tint">
+            <X className="h-3 w-3" />
+          </span>
         </Button>
       </div>
 
