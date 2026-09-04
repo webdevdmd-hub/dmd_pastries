@@ -30,6 +30,21 @@ export type ReportColumn<Row> = {
 };
 
 /**
+ * A card subtitle is worth a line only if it says something. A missing SKU or
+ * reference formats as "-" in a table column, where the header explains it;
+ * under a card's heading the same dash is just a stray mark.
+ */
+function hasSubtitle(value: ReactNode): boolean {
+  if (typeof value !== "string") {
+    return true;
+  }
+
+  const text = value.replaceAll("-", " ").trim();
+
+  return text.length > 0;
+}
+
+/**
  * A report table that survives a phone.
  *
  * Report tables run to ten columns. Inside the shared Table wrapper they get
@@ -98,7 +113,7 @@ export function ReportDataTable<Row>({
             {primary ? (
               <div className="grid gap-0.5 border-b border-workspace-border px-4 py-3">
                 <div className="text-cell font-medium">{primary.cell(row)}</div>
-                {secondary ? (
+                {secondary && hasSubtitle(secondary.cell(row)) ? (
                   <div className="text-meta text-foreground-muted">{secondary.cell(row)}</div>
                 ) : null}
               </div>
