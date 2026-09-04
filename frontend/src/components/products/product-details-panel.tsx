@@ -121,8 +121,6 @@ export function ProductDetailsPanel({
                 active={product.isPosVisible}
                 label={`POS: ${getProductPosVisibilityLabel(product)}`}
               />
-              <Flag active={product.isPurchasable} label="Purchasable" />
-              <Flag active={product.isStockTracked} label="Stock tracked" />
               <Flag active={product.isExpiryTracked} label="Expiry tracked" />
               <Flag active={product.isCustomOrderAvailable} label="Custom orders" />
             </div>

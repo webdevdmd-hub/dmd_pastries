@@ -100,7 +100,6 @@ export function QuantityValue({
 
 export function ProductAvailability({ product }: { product: Product }): JSX.Element {
   const items = [
-    { active: product.isPurchasable, label: "Purchase" },
     { active: product.isSellable, label: "Sell" },
     { active: isPosSelectableProduct(product), label: "POS" },
   ];

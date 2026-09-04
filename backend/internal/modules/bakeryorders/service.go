@@ -626,7 +626,11 @@ func (s *Service) ConvertItemToProduct(currentUser *utils.AuthContext, orderID, 
 			SalePrice:              roundMoney(req.SalePrice),
 			CostPrice:              req.CostPrice,
 			IsPOSVisible:           showInPOS,
-			IsStockTracked:         req.IsStockTracked,
+			// Same constant the product dialog now applies: a product created
+			// by converting an order line is stock tracked and purchasable
+			// like every other one.
+			IsPurchasable:          true,
+			IsStockTracked:         true,
 			IsExpiryTracked:        req.IsExpiryTracked,
 			IsCustomOrderAvailable: req.IsCustomOrderAvailable,
 			Status:                 status,

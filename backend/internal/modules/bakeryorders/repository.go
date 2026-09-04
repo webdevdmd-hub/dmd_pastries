@@ -34,6 +34,7 @@ type catalogProductCreate struct {
 	SalePrice              float64
 	CostPrice              *float64
 	IsPOSVisible           bool
+	IsPurchasable          bool
 	IsStockTracked         bool
 	IsExpiryTracked        bool
 	IsCustomOrderAvailable bool

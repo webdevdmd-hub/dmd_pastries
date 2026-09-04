@@ -91,8 +91,6 @@ const PRODUCT_FORM_STEP_FIELDS: readonly (readonly (keyof ProductSchema)[])[] = 
     "preparationTimeMinutes",
     "isSellable",
     "isPosVisible",
-    "isPurchasable",
-    "isStockTracked",
     "isExpiryTracked",
     "isCustomOrderAvailable",
   ],
@@ -118,17 +116,6 @@ function defaultSellableForProductType(productType: ProductSchema["productType"]
   return productType === "finished_product" || productType === "service";
 }
 
-function defaultPurchasableForProductType(productType: ProductSchema["productType"]): boolean {
-  return [
-    "ingredient",
-    "packaging",
-    "raw_material",
-    "semi_finished",
-    "consumable",
-    "equipment",
-  ].includes(productType);
-}
-
 function toDefaultValues(
   product: Product | null,
   defaults: ProductFormDefaults = {
@@ -138,7 +125,6 @@ function toDefaultValues(
 ): ProductSchema {
   const productType = product?.productType ?? defaults.defaultProductType ?? "finished_product";
   const defaultSellable = defaultSellableForProductType(productType);
-  const defaultPurchasable = defaultPurchasableForProductType(productType);
 
   return {
     productName: product?.productName ?? "",
@@ -161,8 +147,6 @@ function toDefaultValues(
     imageFileId: product?.imageFileId ?? "",
     isSellable: product?.isSellable ?? defaultSellable,
     isPosVisible: product?.isPosVisible ?? defaultSellable,
-    isPurchasable: product?.isPurchasable ?? defaultPurchasable,
-    isStockTracked: product?.isStockTracked ?? true,
     isExpiryTracked: product?.isExpiryTracked ?? false,
     isCustomOrderAvailable: product?.isCustomOrderAvailable ?? false,
     preparationTimeMinutes: product?.preparationTimeMinutes ?? null,
@@ -300,11 +284,6 @@ export function ProductFormDialog({
       shouldTouch: true,
       shouldValidate: true,
     });
-    form.setValue("isPurchasable", defaultPurchasableForProductType(value), {
-      shouldDirty: true,
-      shouldTouch: true,
-      shouldValidate: true,
-    });
 
     if (currentCategoryId && !categoryStillValid) {
       form.setValue("categoryId", "", {
@@ -404,8 +383,8 @@ export function ProductFormDialog({
       imageFileId,
       isSellable: values.isSellable,
       isPosVisible: values.isSellable && values.isPosVisible,
-      isPurchasable: values.isPurchasable,
-      isStockTracked: values.isStockTracked,
+      // Not sent: the server treats every product as purchasable and stock
+      // tracked, which is what all of them already were.
       isExpiryTracked: values.isExpiryTracked,
       isCustomOrderAvailable: values.isCustomOrderAvailable,
       preparationTimeMinutes: values.preparationTimeMinutes ?? null,
@@ -755,28 +734,6 @@ export function ProductFormDialog({
                         }
                       />
                       POS visible
-                    </label>
-                    <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
-                      <Checkbox
-                        checked={form.watch("isPurchasable")}
-                        onCheckedChange={(checked) =>
-                          form.setValue("isPurchasable", checked === true, {
-                            shouldDirty: true,
-                            shouldTouch: true,
-                            shouldValidate: true,
-                          })
-                        }
-                      />
-                      Purchasable
-                    </label>
-                    <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
-                      <Checkbox
-                        checked={form.watch("isStockTracked")}
-                        onCheckedChange={(checked) =>
-                          form.setValue("isStockTracked", checked === true)
-                        }
-                      />
-                      Stock tracked
                     </label>
                     <label className="flex items-center gap-2 rounded-xl bg-card/60 p-2 text-sm text-brand-espresso">
                       <Checkbox

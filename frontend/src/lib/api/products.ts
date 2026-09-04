@@ -772,8 +772,6 @@ export function toBackendProductPayload(
     ...(payload.imageFileId !== undefined ? { image_file_id: payload.imageFileId } : {}),
     ...(payload.isSellable !== undefined ? { is_sellable: payload.isSellable } : {}),
     ...(payload.isPosVisible !== undefined ? { is_pos_visible: payload.isPosVisible } : {}),
-    ...(payload.isPurchasable !== undefined ? { is_purchasable: payload.isPurchasable } : {}),
-    ...(payload.isStockTracked !== undefined ? { is_stock_tracked: payload.isStockTracked } : {}),
     ...(payload.isExpiryTracked !== undefined
       ? { is_expiry_tracked: payload.isExpiryTracked }
       : {}),

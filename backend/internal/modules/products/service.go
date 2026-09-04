@@ -90,10 +90,6 @@ func (s *Service) CreateProduct(currentUser *utils.AuthContext, req CreateProduc
 	if req.IsPOSVisible != nil {
 		isPOSVisible = *req.IsPOSVisible
 	}
-	isPurchasable := defaultPurchasableForProductType(req.ProductType)
-	if req.IsPurchasable != nil {
-		isPurchasable = *req.IsPurchasable
-	}
 	product := &Product{
 		ID:                     utils.NewUUID(),
 		BusinessID:             currentUser.BusinessID,
@@ -120,8 +116,14 @@ func (s *Service) CreateProduct(currentUser *utils.AuthContext, req CreateProduc
 		ImageFileID:            strings.TrimSpace(req.ImageFileID),
 		IsSellable:             isSellable,
 		IsPOSVisible:           isPOSVisible,
-		IsPurchasable:          isPurchasable,
-		IsStockTracked:         req.IsStockTracked,
+		// Both are constants now: the product dialog no longer asks, because
+		// every product in the catalogue had them on and neither was ever used
+		// to distinguish one product from another. Purchasing eligibility is
+		// carried by status, and stock tracking is what makes inventory counts
+		// and cost of sales work at all -- so "on" is the only value that keeps
+		// today's behaviour.
+		IsPurchasable:          true,
+		IsStockTracked:         true,
 		IsExpiryTracked:        req.IsExpiryTracked,
 		IsCustomOrderAvailable: req.IsCustomOrderAvailable,
 		PreparationTimeMinutes: req.PreparationTimeMinutes,
@@ -258,12 +260,6 @@ func (s *Service) UpdateProduct(currentUser *utils.AuthContext, id string, req U
 	if req.IsPOSVisible != nil {
 		updates["is_pos_visible"] = *req.IsPOSVisible
 	}
-	if req.IsPurchasable != nil {
-		updates["is_purchasable"] = *req.IsPurchasable
-	}
-	if req.IsStockTracked != nil {
-		updates["is_stock_tracked"] = *req.IsStockTracked
-	}
 	if req.IsExpiryTracked != nil {
 		updates["is_expiry_tracked"] = *req.IsExpiryTracked
 	}
@@ -310,7 +306,10 @@ func (s *Service) UpdateProductStatus(currentUser *utils.AuthContext, id string,
 	if req.Status != "active" {
 		updates["is_pos_visible"] = false
 		updates["is_sellable"] = false
-		updates["is_purchasable"] = false
+		// is_purchasable is deliberately NOT cleared. Purchasing already
+		// requires status = active, so clearing it bought nothing -- and with
+		// the checkbox gone there would be no way to set it back, leaving a
+		// reactivated product permanently unpurchasable.
 	}
 	changes := productChanges(*product, updates)
 	if err := s.updateWithAudit(currentUser, "product.status_updated", id, "Product status updated.", ipAddress, userAgent, audit.RecordMetadata(product.ProductName, map[string]interface{}{
@@ -352,7 +351,6 @@ func (s *Service) DeleteProduct(currentUser *utils.AuthContext, id string, ipAdd
 		"status":         "archived",
 		"is_pos_visible": false,
 		"is_sellable":    false,
-		"is_purchasable": false,
 		"updated_by":     currentUser.UserID,
 		"updated_at":     time.Now().UTC(),
 		"deleted_at":     gorm.DeletedAt{Time: time.Now().UTC(), Valid: true},
@@ -720,15 +718,6 @@ func validateProductType(value string) error {
 func defaultSellableForProductType(value string) bool {
 	switch strings.TrimSpace(value) {
 	case "finished_product", "service", "ready_to_sell", "made_to_order", "retail":
-		return true
-	default:
-		return false
-	}
-}
-
-func defaultPurchasableForProductType(value string) bool {
-	switch strings.TrimSpace(value) {
-	case "ingredient", "packaging", "raw_material", "semi_finished", "consumable", "equipment":
 		return true
 	default:
 		return false

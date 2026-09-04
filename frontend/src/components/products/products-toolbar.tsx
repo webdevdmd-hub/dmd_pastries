@@ -42,7 +42,6 @@ const defaultFilters: ProductListFilters = {
 const YES_NO_FILTERS = [
   { key: "isSellable", label: "Sellable" },
   { key: "isPosVisible", label: "POS visible" },
-  { key: "isPurchasable", label: "Purchasable" },
 ] as const;
 
 /**
@@ -68,8 +67,7 @@ export function ProductsToolbar({
     (filters.productType !== defaultFilters.productType ? 1 : 0) +
     (filters.itemStructure !== defaultFilters.itemStructure ? 1 : 0) +
     (filters.isSellable !== defaultFilters.isSellable ? 1 : 0) +
-    (filters.isPosVisible !== defaultFilters.isPosVisible ? 1 : 0) +
-    (filters.isPurchasable !== defaultFilters.isPurchasable ? 1 : 0);
+    (filters.isPosVisible !== defaultFilters.isPosVisible ? 1 : 0);
   const hasAnyFilter = hiddenFilterCount > 0 || filters.search.trim().length > 0;
 
   return (

@@ -163,8 +163,6 @@ export type CreateProductPayload = {
   imageFileId: string | null;
   isSellable: boolean;
   isPosVisible: boolean;
-  isPurchasable: boolean;
-  isStockTracked: boolean;
   isExpiryTracked: boolean;
   isCustomOrderAvailable: boolean;
   preparationTimeMinutes: number | null;
