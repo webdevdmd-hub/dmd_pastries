@@ -1,58 +1,58 @@
 import type { JSX } from "react";
 
+import { type ReportColumn, ReportDataTable } from "@/components/reports/report-data-table";
 import { formatDate } from "@/components/reports/sales/sales-report-format";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { ExpiryReportRow } from "@/types/inventory-reports";
 
 function expiryBadge(state: string, label: string): JSX.Element {
-  if (state === "expired") {
+  if (state === "expired" || state === "expires_today") {
     return <Badge className="border-danger/30 bg-danger-tint text-danger-text">{label}</Badge>;
   }
-  if (state === "expires_today") {
-    return <Badge className="border-danger/30 bg-danger-tint text-danger-text">{label}</Badge>;
-  }
+
   return <Badge className="border-warning/30 bg-warning-tint text-warning-text">{label}</Badge>;
 }
 
+const columns: ReportColumn<ExpiryReportRow>[] = [
+  { cell: (row) => row.itemName || "-", header: "Item", key: "item", primary: true },
+  { cell: (row) => row.branchName || "-", header: "Branch", key: "branch", secondary: true },
+  { cell: (row) => row.batchNumber || "-", header: "Batch", key: "batch" },
+  {
+    align: "right",
+    cell: (row) => (
+      <span className="tabular-nums">
+        {row.quantity} {row.unitSymbol}
+      </span>
+    ),
+    header: "Quantity",
+    key: "quantity",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatDate(row.receivedDate)}</span>,
+    header: "Received",
+    key: "received",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatDate(row.expiryDate)}</span>,
+    header: "Expiry",
+    key: "expiry",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{row.daysRemaining}</span>,
+    header: "Days left",
+    key: "days-left",
+  },
+  {
+    cell: (row) => expiryBadge(row.expiryState, row.expiryStateLabel),
+    header: "Status",
+    key: "status",
+    unlabelledOnCard: true,
+  },
+];
+
 export function ExpiryReportTable({ rows }: { rows: ExpiryReportRow[] }): JSX.Element {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Item</TableHead>
-          <TableHead>Branch</TableHead>
-          <TableHead>Batch</TableHead>
-          <TableHead>Quantity</TableHead>
-          <TableHead>Received</TableHead>
-          <TableHead>Expiry</TableHead>
-          <TableHead>Days Left</TableHead>
-          <TableHead>Status</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <TableRow key={row.batchId}>
-            <TableCell className="font-semibold">{row.itemName || "-"}</TableCell>
-            <TableCell>{row.branchName || "-"}</TableCell>
-            <TableCell>{row.batchNumber || "-"}</TableCell>
-            <TableCell>
-              {row.quantity} {row.unitSymbol}
-            </TableCell>
-            <TableCell>{formatDate(row.receivedDate)}</TableCell>
-            <TableCell>{formatDate(row.expiryDate)}</TableCell>
-            <TableCell>{row.daysRemaining}</TableCell>
-            <TableCell>{expiryBadge(row.expiryState, row.expiryStateLabel)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
+  return <ReportDataTable columns={columns} rowKey={(row) => row.batchId} rows={rows} />;
 }

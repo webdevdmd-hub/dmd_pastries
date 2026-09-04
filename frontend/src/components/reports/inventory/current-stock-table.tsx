@@ -1,15 +1,8 @@
 import type { JSX } from "react";
 
+import { type ReportColumn, ReportDataTable } from "@/components/reports/report-data-table";
 import { ReorderLevelHeader } from "@/components/shared/reorder-level-help";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { CurrentStockRow } from "@/types/inventory-reports";
 
 function stockBadge(row: CurrentStockRow): JSX.Element {
@@ -23,44 +16,58 @@ function stockBadge(row: CurrentStockRow): JSX.Element {
   return <Badge className="border-money/30 bg-money-tint text-money-text">Normal</Badge>;
 }
 
+const columns: ReportColumn<CurrentStockRow>[] = [
+  {
+    cell: (row) => row.itemName || "-",
+    header: "Item",
+    key: "item",
+    primary: true,
+  },
+  {
+    cell: (row) => row.itemCode || "-",
+    header: "Code",
+    key: "code",
+    secondary: true,
+  },
+  { cell: (row) => row.branchName || "-", header: "Branch", key: "branch" },
+  {
+    cell: (row) => <span className="capitalize">{row.itemType || "-"}</span>,
+    header: "Type",
+    key: "type",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{row.currentQuantity}</span>,
+    header: "Current",
+    key: "current",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{row.reservedQuantity}</span>,
+    header: "Reserved",
+    key: "reserved",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{row.availableQuantity}</span>,
+    header: "Available",
+    key: "available",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{row.reorderLevel}</span>,
+    header: <ReorderLevelHeader>Reorder</ReorderLevelHeader>,
+    key: "reorder",
+  },
+  { cell: (row) => row.unitSymbol || "-", header: "Unit", key: "unit" },
+  { cell: (row) => stockBadge(row), header: "Stock", key: "stock", unlabelledOnCard: true },
+  {
+    cell: (row) => <span className="capitalize">{row.status || "-"}</span>,
+    header: "Status",
+    key: "status",
+  },
+];
+
 export function CurrentStockTable({ rows }: { rows: CurrentStockRow[] }): JSX.Element {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Item</TableHead>
-          <TableHead>Branch</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Current</TableHead>
-          <TableHead>Reserved</TableHead>
-          <TableHead>Available</TableHead>
-          <TableHead>
-            <ReorderLevelHeader>Reorder</ReorderLevelHeader>
-          </TableHead>
-          <TableHead>Unit</TableHead>
-          <TableHead>Stock</TableHead>
-          <TableHead>Status</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <TableRow key={row.inventoryItemId}>
-            <TableCell>
-              <div className="font-semibold">{row.itemName || "-"}</div>
-              <div className="text-xs text-brand-mocha">{row.itemCode || "-"}</div>
-            </TableCell>
-            <TableCell>{row.branchName || "-"}</TableCell>
-            <TableCell className="capitalize">{row.itemType || "-"}</TableCell>
-            <TableCell>{row.currentQuantity}</TableCell>
-            <TableCell>{row.reservedQuantity}</TableCell>
-            <TableCell>{row.availableQuantity}</TableCell>
-            <TableCell>{row.reorderLevel}</TableCell>
-            <TableCell>{row.unitSymbol || "-"}</TableCell>
-            <TableCell>{stockBadge(row)}</TableCell>
-            <TableCell className="capitalize">{row.status || "-"}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
+  return <ReportDataTable columns={columns} rowKey={(row) => row.inventoryItemId} rows={rows} />;
 }

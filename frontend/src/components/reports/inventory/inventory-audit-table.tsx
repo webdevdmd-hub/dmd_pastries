@@ -1,50 +1,58 @@
 import type { JSX } from "react";
 
 import { AuditStatusBadge } from "@/components/reports/inventory/audit-status-badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { type ReportColumn, ReportDataTable } from "@/components/reports/report-data-table";
 import type { InventoryAuditRow } from "@/types/inventory-reports";
 
+const columns: ReportColumn<InventoryAuditRow>[] = [
+  {
+    cell: (row) => (
+      <>
+        <div>{row.itemName || "-"}</div>
+        {/* The whole point of this report is the unbalanced row, so it says
+            what to do about it rather than only flagging itself. */}
+        {row.isBalanced ? null : (
+          <div className="text-meta font-normal text-danger-text">
+            Investigate stock movements or post a correction adjustment.
+          </div>
+        )}
+      </>
+    ),
+    header: "Item",
+    key: "item",
+    primary: true,
+  },
+  { cell: (row) => row.branchName || "-", header: "Branch", key: "branch", secondary: true },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{row.currentQuantity}</span>,
+    header: "Current qty",
+    key: "current",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{row.calculatedQuantityFromMovements}</span>,
+    header: "Ledger qty",
+    key: "ledger",
+  },
+  {
+    align: "right",
+    cell: (row) => (
+      <span className={`tabular-nums ${row.isBalanced ? "" : "font-medium text-danger-text"}`}>
+        {row.difference}
+      </span>
+    ),
+    header: "Difference",
+    key: "difference",
+  },
+  {
+    cell: (row) => <AuditStatusBadge isBalanced={row.isBalanced} />,
+    header: "Audit status",
+    key: "status",
+    unlabelledOnCard: true,
+  },
+];
+
 export function InventoryAuditTable({ rows }: { rows: InventoryAuditRow[] }): JSX.Element {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Item</TableHead>
-          <TableHead>Branch</TableHead>
-          <TableHead>Current Qty</TableHead>
-          <TableHead>Ledger Qty</TableHead>
-          <TableHead>Difference</TableHead>
-          <TableHead>Audit Status</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <TableRow key={row.inventoryItemId}>
-            <TableCell>
-              <div className="font-semibold">{row.itemName || "-"}</div>
-              {!row.isBalanced ? (
-                <div className="text-xs text-danger-text">
-                  Investigate stock movements or perform correction adjustment.
-                </div>
-              ) : null}
-            </TableCell>
-            <TableCell>{row.branchName || "-"}</TableCell>
-            <TableCell>{row.currentQuantity}</TableCell>
-            <TableCell>{row.calculatedQuantityFromMovements}</TableCell>
-            <TableCell>{row.difference}</TableCell>
-            <TableCell>
-              <AuditStatusBadge isBalanced={row.isBalanced} />
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
+  return <ReportDataTable columns={columns} rowKey={(row) => row.inventoryItemId} rows={rows} />;
 }

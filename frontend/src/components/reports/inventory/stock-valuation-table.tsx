@@ -1,43 +1,40 @@
 import type { JSX } from "react";
 
+import { type ReportColumn, ReportDataTable } from "@/components/reports/report-data-table";
 import { formatCurrency } from "@/components/reports/sales/sales-report-format";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { StockValuationRow } from "@/types/inventory-reports";
 
+const columns: ReportColumn<StockValuationRow>[] = [
+  { cell: (row) => row.itemName || "-", header: "Item", key: "item", primary: true },
+  { cell: (row) => row.branchName || "-", header: "Branch", key: "branch", secondary: true },
+  {
+    cell: (row) => <span className="capitalize">{row.itemType || "-"}</span>,
+    header: "Type",
+    key: "type",
+  },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{row.currentQuantity}</span>,
+    header: "Current qty",
+    key: "quantity",
+  },
+  { align: "right", cell: (row) => row.unitSymbol || "-", header: "Unit", key: "unit" },
+  {
+    align: "right",
+    cell: (row) => <span className="tabular-nums">{formatCurrency(row.unitCost)}</span>,
+    header: "Unit cost",
+    key: "unit-cost",
+  },
+  {
+    align: "right",
+    cell: (row) => (
+      <span className="font-medium tabular-nums">{formatCurrency(row.stockValue)}</span>
+    ),
+    header: "Stock value",
+    key: "value",
+  },
+];
+
 export function StockValuationTable({ rows }: { rows: StockValuationRow[] }): JSX.Element {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Item</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Branch</TableHead>
-          <TableHead>Current Qty</TableHead>
-          <TableHead>Unit</TableHead>
-          <TableHead>Unit Cost</TableHead>
-          <TableHead>Stock Value</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <TableRow key={row.inventoryItemId}>
-            <TableCell className="font-semibold">{row.itemName || "-"}</TableCell>
-            <TableCell className="capitalize">{row.itemType || "-"}</TableCell>
-            <TableCell>{row.branchName || "-"}</TableCell>
-            <TableCell>{row.currentQuantity}</TableCell>
-            <TableCell>{row.unitSymbol || "-"}</TableCell>
-            <TableCell>{formatCurrency(row.unitCost)}</TableCell>
-            <TableCell>{formatCurrency(row.stockValue)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
+  return <ReportDataTable columns={columns} rowKey={(row) => row.inventoryItemId} rows={rows} />;
 }
