@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowRight,
   BookOpenText,
   CreditCard,
   FileMinus2,
@@ -15,36 +14,26 @@ import {
   WalletCards,
 } from "lucide-react";
 import Link from "next/link";
-import type { ComponentType, JSX } from "react";
+import type { JSX } from "react";
 import { useMemo } from "react";
 
 import { AccountingAccessDeniedCard } from "@/components/accounting/accounting-access-denied-card";
+import {
+  type AccountingHubItem,
+  AccountingHubList,
+  type AccountingHubSection,
+} from "@/components/accounting/accounting-hub-list";
 import { PageHeader } from "@/components/shared/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { usePermission } from "@/hooks/use-permission";
-import type { Permission } from "@/types/permission";
-
-type AccountingHubItem = {
-  description: string;
-  href: string;
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  permissionAny: readonly Permission[];
-  status?: string;
-};
-
-type AccountingHubSection = {
-  items: readonly AccountingHubItem[];
-  label: string;
-};
 
 const accountingSections = [
   {
     label: "Books",
+    description: "The account structure and every posted debit and credit that moves through it.",
     items: [
       {
         description:
@@ -52,6 +41,7 @@ const accountingSections = [
         href: ROUTES.accountingChartOfAccounts,
         icon: Landmark,
         label: "Chart of Accounts",
+        managePermission: PERMISSIONS.accountingAccountsManage,
         permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingAccountsManage],
       },
       {
@@ -66,18 +56,21 @@ const accountingSections = [
         href: ROUTES.accountingJournalEntries,
         icon: ListChecks,
         label: "Journal Entries",
+        managePermission: PERMISSIONS.accountingJournalEntriesManage,
         permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingJournalEntriesManage],
       },
     ],
   },
   {
     label: "Cash and settlements",
+    description: "Where money arrives, moves between accounts, and clears from platforms.",
     items: [
       {
         description: "Configure payment methods and the accounts where received money is recorded.",
         href: `${ROUTES.settingsPaymentSetup}?tab=accounts`,
         icon: CreditCard,
         label: "Payment Setup",
+        managePermission: PERMISSIONS.accountingAccountsManage,
         permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingAccountsManage],
       },
       {
@@ -85,6 +78,7 @@ const accountingSections = [
         href: ROUTES.accountingAccountTransfers,
         icon: WalletCards,
         label: "Bank / Cash Movements",
+        managePermission: PERMISSIONS.accountingJournalEntriesManage,
         permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingJournalEntriesManage],
       },
       {
@@ -92,6 +86,7 @@ const accountingSections = [
         href: ROUTES.accountingPlatformSettlements,
         icon: ReceiptText,
         label: "Platform Settlements",
+        managePermission: PERMISSIONS.accountingJournalEntriesManage,
         permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingJournalEntriesManage],
       },
       {
@@ -99,6 +94,7 @@ const accountingSections = [
         href: ROUTES.expenses,
         icon: FileMinus2,
         label: "Expenses",
+        managePermission: PERMISSIONS.expensesManage,
         permissionAny: [
           PERMISSIONS.accountingView,
           PERMISSIONS.expensesView,
@@ -109,6 +105,7 @@ const accountingSections = [
   },
   {
     label: "Financial statements",
+    description: "Calculated from posted entries only. Draft journals are excluded.",
     items: [
       {
         description: "Check account debit and credit balances before reviewing statements.",
@@ -145,12 +142,14 @@ const accountingSections = [
   },
   {
     label: "Recovery and controls",
+    description: "Setup, mappings, go-live balances, and the tools for repairing history.",
     items: [
       {
         description: "Set financial-year start rules used by backend accounting reports.",
         href: ROUTES.accountingSettings,
         icon: Settings2,
         label: "Accounting Settings",
+        managePermission: PERMISSIONS.accountingAccountsManage,
         permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingAccountsManage],
       },
       {
@@ -158,6 +157,7 @@ const accountingSections = [
         href: ROUTES.accountingAccountMappings,
         icon: ListChecks,
         label: "Account Mappings",
+        managePermission: PERMISSIONS.accountingAccountsManage,
         permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingAccountsManage],
       },
       {
@@ -165,6 +165,7 @@ const accountingSections = [
         href: ROUTES.accountingOpeningBalances,
         icon: Scale,
         label: "Opening Balances",
+        managePermission: PERMISSIONS.accountingAccountsManage,
         permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingAccountsManage],
       },
       {
@@ -179,46 +180,32 @@ const accountingSections = [
         href: ROUTES.accountingBackfill,
         icon: RefreshCw,
         label: "Journal Backfill",
+        managePermission: PERMISSIONS.accountingJournalEntriesManage,
         permissionAny: [PERMISSIONS.accountingView, PERMISSIONS.accountingJournalEntriesManage],
       },
     ],
   },
 ] as const satisfies readonly AccountingHubSection[];
 
-function AccountingCard({ item }: { item: AccountingHubItem }): JSX.Element {
-  const Icon = item.icon;
-
-  return (
-    <Link className="group block h-full" href={item.href}>
-      <Card className="h-full border-workspace-panel-border bg-workspace-panel shadow-sm transition hover:-translate-y-0.5 hover:border-brand-caramel hover:shadow-soft">
-        <CardContent className="flex h-full flex-col gap-4 p-5">
-          <div className="flex items-start justify-between gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-latte text-brand-mocha">
-              <Icon className="h-5 w-5" />
-            </span>
-            {item.status ? <Badge variant="secondary">{item.status}</Badge> : null}
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-base font-semibold text-brand-espresso">{item.label}</h3>
-            <p className="text-sm leading-6 text-brand-mocha">{item.description}</p>
-          </div>
-          <span className="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-brand-espresso">
-            Open
-            <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
-          </span>
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
+/**
+ * Three words the rest of the module uses without defining them. Kept from the
+ * card layout, but at cell size across the top rather than as a panel: it is
+ * orientation, not the thing you came here to open.
+ */
+const glossary = [
+  { term: "Account", meaning: "What receives the debit or the credit." },
+  { term: "Ledger", meaning: "That account's history and running balance." },
+  { term: "Source", meaning: "The sale, purchase, expense or payment that posted it." },
+];
 
 export function AccountingPageClient(): JSX.Element {
-  const { hasAnyPermission } = usePermission();
+  const { hasAnyPermission, hasPermission } = usePermission();
   const canViewAccounting = hasAnyPermission([PERMISSIONS.accountingView]);
   const visibleSections = useMemo(
     () =>
       accountingSections
         .map((section) => ({
+          description: section.description,
           label: section.label,
           items: section.items.filter((item) => hasAnyPermission([...item.permissionAny])),
         }))
@@ -230,49 +217,49 @@ export function AccountingPageClient(): JSX.Element {
     return <AccountingAccessDeniedCard message="You need `accounting.view` to open Accounting." />;
   }
 
+  const canManage = (item: AccountingHubItem): boolean =>
+    item.managePermission !== undefined && hasPermission(item.managePermission);
+
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-8">
       <PageHeader
         actions={
           <Button asChild>
             <Link href={ROUTES.accountingGeneralLedger}>Open General Ledger</Link>
           </Button>
         }
-        description="Use Accounting as the connected view of accounts, ledgers, journals, cash movement, settlements, and financial statements."
+        description="The connected view of accounts, ledgers, journals, cash movement, settlements, and financial statements."
         title="Accounting"
       />
 
-      <div className="rounded-2xl border border-brand-cappuccino/70 bg-card/80 p-4">
-        <div className="grid gap-3 md:grid-cols-3">
-          <div>
-            <p className="text-xs font-semibold text-brand-mocha">Account</p>
-            <p className="mt-1 text-sm text-brand-espresso">
-              The account that receives debit and credit entries.
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-brand-mocha">Ledger</p>
-            <p className="mt-1 text-sm text-brand-espresso">
-              The transaction history and running balance for that account.
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-brand-mocha">Source</p>
-            <p className="mt-1 text-sm text-brand-espresso">
-              POS, purchase, order, expense, payment, or settlement document that posted the entry.
-            </p>
-          </div>
-        </div>
+      {/* Scrolls on a phone rather than stacking three panels above the lists. */}
+      <div className="flex min-w-0 gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:pb-0">
+        {glossary.map((entry) => (
+          <Card className="w-52 shrink-0 sm:w-auto sm:min-w-0" key={entry.term}>
+            <CardContent className="p-4">
+              <p className="text-meta text-foreground-muted">{entry.term}</p>
+              <p className="mt-1 break-words text-cell">{entry.meaning}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {visibleSections.map((section) => (
-        <section className="grid gap-3" key={section.label}>
-          <h2 className="text-sm font-semibold text-brand-mocha">{section.label}</h2>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {section.items.map((item) => (
-              <AccountingCard item={item} key={item.href} />
-            ))}
+        <section
+          aria-labelledby={`accounting-${section.label.replaceAll(" ", "-")}`}
+          className="grid gap-4"
+          key={section.label}
+        >
+          <div className="grid gap-1">
+            <h2
+              className="text-section font-medium"
+              id={`accounting-${section.label.replaceAll(" ", "-")}`}
+            >
+              {section.label}
+            </h2>
+            <p className="max-w-3xl text-cell text-foreground-muted">{section.description}</p>
           </div>
+          <AccountingHubList canManage={canManage} items={section.items} />
         </section>
       ))}
     </div>
