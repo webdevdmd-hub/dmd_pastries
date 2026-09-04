@@ -15,15 +15,17 @@ import type { JSX, ReactNode } from "react";
  * enough, so those keep scrolling at every width rather than being squeezed
  * into slivers.
  *
- * Children are sized from here rather than inside ReportKpiCard, which is also
- * used on its own and should not carry a row's layout.
+ * Cards are given a floor rather than a fixed width, so a long money figure
+ * takes the room it needs instead of coming apart mid-number. Sizing lives here
+ * rather than in ReportKpiCard, which is also used on its own and should not
+ * carry a row's layout.
  */
 const gridFrom: Record<number, string> = {
-  2: "sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:pb-0 sm:[&>*]:w-auto",
-  3: "sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:pb-0 sm:[&>*]:w-auto",
-  4: "sm:grid sm:grid-cols-4 sm:gap-4 sm:overflow-visible sm:pb-0 sm:[&>*]:w-auto",
-  5: "md:grid md:grid-cols-5 md:gap-4 md:overflow-visible md:pb-0 md:[&>*]:w-auto",
-  6: "md:grid md:grid-cols-6 md:gap-4 md:overflow-visible md:pb-0 md:[&>*]:w-auto",
+  2: "sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:pb-0 sm:[&>*]:min-w-0",
+  3: "sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:pb-0 sm:[&>*]:min-w-0",
+  4: "sm:grid sm:grid-cols-4 sm:gap-4 sm:overflow-visible sm:pb-0 sm:[&>*]:min-w-0",
+  5: "md:grid md:grid-cols-5 md:gap-4 md:overflow-visible md:pb-0 md:[&>*]:min-w-0",
+  6: "md:grid md:grid-cols-6 md:gap-4 md:overflow-visible md:pb-0 md:[&>*]:min-w-0",
 };
 
 export function ReportKpiRow({
@@ -36,7 +38,7 @@ export function ReportKpiRow({
 }): JSX.Element {
   return (
     <div
-      className={`scrollbar-hidden flex min-w-0 gap-3 overflow-x-auto pb-1 [&>*]:w-40 [&>*]:shrink-0 ${
+      className={`scrollbar-hidden flex min-w-0 gap-3 overflow-x-auto pb-1 [&>*]:min-w-44 [&>*]:shrink-0 ${
         gridFrom[count] ?? ""
       }`}
     >
