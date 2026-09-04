@@ -34,7 +34,7 @@ export function ReportKpiGrid({
 }): JSX.Element {
   if (isLoading && !summary) {
     return (
-      <ReportKpiRow columns={10}>
+      <ReportKpiRow count={10}>
         {Array.from({ length: 10 }).map((_, index) => (
           <Skeleton className="h-32 rounded-2xl" key={index} />
         ))}
@@ -43,7 +43,7 @@ export function ReportKpiGrid({
   }
 
   return (
-    <ReportKpiRow columns={10}>
+    <ReportKpiRow count={10}>
       <ReportKpiCard
         icon={ReceiptText}
         label="Total Sales"

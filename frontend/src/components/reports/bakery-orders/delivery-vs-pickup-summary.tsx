@@ -12,7 +12,7 @@ export function DeliveryVsPickupSummary({
   report: DeliveryVsPickupReport | undefined;
 }): JSX.Element {
   return (
-    <ReportKpiRow columns={4}>
+    <ReportKpiRow count={4}>
       <ReportKpiCard
         icon={CakeSlice}
         label="Pickup Count"

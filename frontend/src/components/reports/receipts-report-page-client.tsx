@@ -417,7 +417,7 @@ export function ReceiptsReportPageClient(): JSX.Element {
         </>
       </ReportFilterPopover>
 
-      <ReportKpiRow columns={4}>
+      <ReportKpiRow count={4}>
         <ReportKpiCard icon={ReceiptText} label="Receipts in view" value={String(rows.length)} />
         <ReportKpiCard
           icon={ReceiptText}

@@ -16,7 +16,7 @@ export function DiscountSummaryCard({
   report: DiscountReport | undefined;
 }): JSX.Element {
   return (
-    <ReportKpiRow columns={5}>
+    <ReportKpiRow count={5}>
       <ReportKpiCard
         icon={BadgePercent}
         label="Total Discount"

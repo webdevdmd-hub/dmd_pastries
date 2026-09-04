@@ -15,7 +15,7 @@ import type { SalesSummary } from "@/types/sales-reports";
 
 export function SalesSummaryCards({ summary }: { summary: SalesSummary | undefined }): JSX.Element {
   return (
-    <ReportKpiRow columns={4}>
+    <ReportKpiRow count={8}>
       <ReportKpiCard
         icon={ReceiptText}
         label="Gross Sales"

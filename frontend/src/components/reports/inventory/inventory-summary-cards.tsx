@@ -20,7 +20,7 @@ export function InventorySummaryCards({
   summary: InventorySummary | undefined;
 }): JSX.Element {
   return (
-    <ReportKpiRow columns={4}>
+    <ReportKpiRow count={7}>
       <ReportKpiCard
         icon={Boxes}
         label="Total Items"

@@ -12,7 +12,7 @@ export function BakeryOrdersSummaryCards({
   summary: BakeryOrdersSummary | undefined;
 }): JSX.Element {
   return (
-    <ReportKpiRow columns={4}>
+    <ReportKpiRow count={8}>
       <ReportKpiCard
         icon={CakeSlice}
         label="Total Orders"

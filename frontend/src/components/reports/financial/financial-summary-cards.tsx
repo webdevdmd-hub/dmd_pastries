@@ -58,7 +58,7 @@ export function FinancialSummaryCards({
         </p>
       ) : null}
       {shouldShowCards ? (
-        <ReportKpiRow columns={4}>
+        <ReportKpiRow count={10}>
           <ReportKpiCard
             icon={ReceiptText}
             label="Gross Sales"

@@ -16,7 +16,7 @@ export function ManufacturingSummaryCards({
   summary: ManufacturingSummary | undefined;
 }): JSX.Element {
   return (
-    <ReportKpiRow columns={4}>
+    <ReportKpiRow count={8}>
       <ReportKpiCard
         icon={Factory}
         label="Total Batches"
