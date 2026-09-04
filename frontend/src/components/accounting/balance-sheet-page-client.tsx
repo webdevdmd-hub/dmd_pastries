@@ -139,7 +139,7 @@ function AmountCell({ strong = false, value }: { strong?: boolean; value: number
   return (
     <td
       className={cn(
-        "w-28 px-3 py-3 sm:w-52 sm:px-6 text-right tabular-nums",
+        "w-24 px-3 py-3 sm:w-52 sm:px-6 text-right tabular-nums",
         strong ? "font-bold text-foreground" : "font-medium text-info-text",
       )}
     >
@@ -166,7 +166,7 @@ function BalanceSheetRows({
       {groups.map((group) => (
         <Fragment key={`${title}-${group.group}`}>
           <tr className="border-b border-border">
-            <td className="px-10 py-3 font-bold text-foreground">{group.group}</td>
+            <td className="pl-6 pr-3 py-3 sm:px-10 font-bold text-foreground">{group.group}</td>
             <AmountCell value={0} />
           </tr>
           {group.items.map((item, itemIndex) => (
@@ -174,7 +174,7 @@ function BalanceSheetRows({
               className="border-b border-border transition-colors hover:bg-muted"
               key={getBalanceSheetItemKey(item, itemIndex, group.group, title)}
             >
-              <td className="px-14 py-3">
+              <td className="pl-9 pr-3 py-3 sm:px-14">
                 <span
                   className={cn(
                     "inline-flex items-center gap-2 font-medium",
@@ -193,7 +193,9 @@ function BalanceSheetRows({
             </tr>
           ))}
           <tr className="border-b border-border">
-            <td className="px-10 py-3 font-bold text-foreground">Total for {group.group}</td>
+            <td className="pl-6 pr-3 py-3 sm:px-10 font-bold text-foreground">
+              Total for {group.group}
+            </td>
             <AmountCell strong value={group.amount} />
           </tr>
         </Fragment>

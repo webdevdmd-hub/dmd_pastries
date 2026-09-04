@@ -77,7 +77,7 @@ function StatementAmount({
   return (
     <td
       className={cn(
-        "w-28 px-3 py-3 sm:w-44 sm:px-6 text-right tabular-nums",
+        "w-24 px-3 py-3 sm:w-44 sm:px-6 text-right tabular-nums",
         strong ? "font-bold text-foreground" : "font-medium text-info-text",
       )}
     >
@@ -131,7 +131,7 @@ function SectionRows({
         <Fragment key={`${title}-${group.group}`}>
           {showGroupHeadings ? (
             <tr className="border-b border-border">
-              <td className="px-10 py-3 font-bold text-foreground">{group.group}</td>
+              <td className="pl-6 pr-3 py-3 sm:px-10 font-bold text-foreground">{group.group}</td>
               <td />
             </tr>
           ) : null}
@@ -143,7 +143,7 @@ function SectionRows({
               <td
                 className={cn(
                   "py-3 font-medium text-info-text",
-                  showGroupHeadings ? "px-14" : "px-10",
+                  showGroupHeadings ? "pl-9 pr-3 sm:px-14" : "pl-6 pr-3 sm:px-10",
                 )}
               >
                 {item.accountName}
@@ -153,7 +153,9 @@ function SectionRows({
           ))}
           {showGroupHeadings ? (
             <tr className="border-b border-border">
-              <td className="px-10 py-3 font-bold text-foreground">Total for {group.group}</td>
+              <td className="pl-6 pr-3 py-3 sm:px-10 font-bold text-foreground">
+                Total for {group.group}
+              </td>
               <StatementAmount strong value={group.amount} />
             </tr>
           ) : null}

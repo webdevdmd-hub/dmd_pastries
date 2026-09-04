@@ -148,7 +148,7 @@ function groupTrialBalanceItems(items: readonly TrialBalanceItem[]): TrialBalanc
 
 function AmountCell({ value }: { value: number }): JSX.Element {
   return (
-    <td className="w-28 px-3 py-3 sm:w-40 sm:px-6 text-right tabular-nums text-info-text">
+    <td className="w-24 px-3 py-3 sm:w-40 sm:px-6 text-right tabular-nums text-info-text">
       {money(value)}
     </td>
   );
@@ -345,7 +345,7 @@ export function TrialBalancePageClient(): JSX.Element {
                         {section.groups.map((group) => (
                           <Fragment key={`${section.type}-${group.group}`}>
                             <tr className="border-b border-border">
-                              <td className="px-10 py-3 font-semibold text-foreground">
+                              <td className="pl-6 pr-3 py-3 sm:px-10 font-semibold text-foreground">
                                 {formatGroupName(group.group)}
                               </td>
                               <AmountCell value={0} />
@@ -356,7 +356,7 @@ export function TrialBalancePageClient(): JSX.Element {
                                 className="border-b border-border transition-colors hover:bg-muted"
                                 key={item.accountId}
                               >
-                                <td className="px-14 py-3 font-medium text-info-text">
+                                <td className="pl-9 pr-3 py-3 sm:px-14 font-medium text-info-text">
                                   {item.accountName}
                                 </td>
                                 <AmountCell value={item.closingDebit} />
@@ -364,7 +364,7 @@ export function TrialBalancePageClient(): JSX.Element {
                               </tr>
                             ))}
                             <tr className="border-b border-border">
-                              <td className="px-10 py-3 font-bold text-foreground">
+                              <td className="pl-6 pr-3 py-3 sm:px-10 font-bold text-foreground">
                                 Total for {formatGroupName(group.group)}
                               </td>
                               <AmountCell value={group.closingDebit} />
