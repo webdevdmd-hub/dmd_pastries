@@ -7,7 +7,6 @@ import {
   MoreHorizontal,
   Plus,
   RefreshCcw,
-  Search,
   Trash2,
 } from "lucide-react";
 import type { JSX } from "react";
@@ -15,15 +14,12 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AccountingAccessDeniedCard } from "@/components/accounting/accounting-access-denied-card";
-import {
-  ChartAccountStatusBadge,
-  ChartAccountTypeBadge,
-} from "@/components/accounting/chart-account-badges";
+import { ChartAccountDetailPanel } from "@/components/accounting/chart-account-detail-panel";
 import { ChartAccountFormDialog } from "@/components/accounting/chart-account-form-dialog";
 import { LedgerDetailsDrawer } from "@/components/accounting/ledger-details-drawer";
+import { FilterField, FilterToolbar } from "@/components/shared/filter-toolbar";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -40,7 +36,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -48,16 +43,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PERMISSIONS } from "@/constants/permissions";
 import {
   useChartAccounts,
@@ -107,24 +100,11 @@ type PendingAction =
   | { account: ChartAccount; status: AccountingAccountStatus; type: "status" }
   | null;
 
-function money(value: number): string {
-  return new Intl.NumberFormat("en-AE", {
-    currency: "AED",
-    style: "currency",
-  }).format(value);
-}
-
 function formatAccountingLabel(value: string): string {
   return value
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-function formatDate(value: string): string {
-  return value
-    ? new Intl.DateTimeFormat("en-AE", { dateStyle: "medium" }).format(new Date(value))
-    : "-";
 }
 
 export function ChartOfAccountsPageClient(): JSX.Element {
@@ -144,6 +124,9 @@ export function ChartOfAccountsPageClient(): JSX.Element {
   const [editingAccount, setEditingAccount] = useState<ChartAccount | null>(null);
   const [ledgerAccount, setLedgerAccount] = useState<ChartAccount | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  // Below lg the detail has no column to live in, so tapping a row opens it
+  // over the list instead of parking it under a full page of accounts.
+  const [detailOpen, setDetailOpen] = useState(false);
   const accountsQuery = useChartAccounts(filters, canView && Boolean(filters.branchId));
   const seedMutation = useSeedDefaultChartAccounts();
   const createMutation = useCreateChartAccount();
@@ -173,8 +156,13 @@ export function ChartOfAccountsPageClient(): JSX.Element {
     canView && selectedAccount !== null,
   );
   const ledgerPreview = ledgerPreviewQuery.data;
-  const displayAccount = ledgerPreview?.account ?? selectedAccount;
-  const recentTransactions = ledgerPreview?.transactions ?? [];
+  const displayAccount = selectedAccount;
+  // Branch is scope, not a filter, and never counts toward the badge.
+  const hiddenFilterCount =
+    (filters.accountType === "all" ? 0 : 1) +
+    (filters.status === "all" ? 0 : 1) +
+    (filters.sortBy === defaultFilters.sortBy ? 0 : 1);
+  const hasAnyFilter = hiddenFilterCount > 0 || filters.search.length > 0;
 
   useEffect(() => {
     const branchID = branchScope.effectiveBranchId ?? "";
@@ -283,9 +271,47 @@ export function ChartOfAccountsPageClient(): JSX.Element {
 
   const openFullLedger = (): void => {
     if (displayAccount) {
+      setDetailOpen(false);
       setLedgerAccount(displayAccount);
     }
   };
+
+  const resetFilters = (): void => {
+    updateFilters({
+      accountType: defaultFilters.accountType,
+      search: "",
+      sortBy: defaultFilters.sortBy,
+      status: defaultFilters.status,
+    });
+  };
+
+  /** One set of handlers for both the inline panel and the phone drawer. */
+  const detailPanelProps = (account: ChartAccount) => ({
+    account,
+    canManage,
+    isLoading: ledgerPreviewQuery.isLoading,
+    ledgerError: ledgerPreviewQuery.error,
+    ledgerErrorMessage: ledgerPreviewQuery.error ? getErrorMessage(ledgerPreviewQuery.error) : "",
+    ledgerPreview,
+    onDelete: () => {
+      setDetailOpen(false);
+      setPendingAction({ account, type: "delete" });
+    },
+    onEdit: () => {
+      setDetailOpen(false);
+      openEditAccount(account);
+    },
+    onRetryLedger: () => void ledgerPreviewQuery.refetch(),
+    onShowFullLedger: openFullLedger,
+    onToggleStatus: () => {
+      setDetailOpen(false);
+      setPendingAction({
+        account,
+        status: account.status === "active" ? "inactive" : "active",
+        type: "status",
+      });
+    },
+  });
 
   return (
     <div className="mx-auto flex max-w-[1600px] flex-col gap-5">
@@ -313,35 +339,14 @@ export function ChartOfAccountsPageClient(): JSX.Element {
         title="Chart of Accounts"
       />
 
-      <div className="grid min-h-[720px] overflow-hidden rounded-3xl border border-brand-cappuccino/70 bg-card shadow-sm lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
+      {/* The forced 720px only makes sense once there is a second column to
+          fill; on a phone it padded the page with empty card. */}
+      <div className="grid overflow-hidden rounded-3xl border border-brand-cappuccino/70 bg-card shadow-sm lg:min-h-[720px] lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
         <aside className="flex min-h-0 flex-col border-b border-brand-cappuccino/70 bg-card lg:border-b-0 lg:border-r">
           <div className="flex items-center justify-between gap-3 border-b border-brand-cappuccino/60 px-4 py-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold text-brand-espresso">All Accounts</h2>
-                <Select
-                  onValueChange={(accountType: ChartAccountsFilters["accountType"]) =>
-                    updateFilters({ accountType })
-                  }
-                  value={filters.accountType}
-                >
-                  <SelectTrigger
-                    aria-label="Filter account type"
-                    className="h-8 w-9 border-0 bg-transparent p-0 shadow-none"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All types</SelectItem>
-                    {accountTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <p className="text-xs text-brand-mocha">
+            <div className="min-w-0">
+              <h2 className="text-section font-medium text-brand-espresso">All accounts</h2>
+              <p className="text-meta tabular-nums text-brand-mocha">
                 Showing {accounts.length} of {totalAccounts} accounts
               </p>
             </div>
@@ -375,72 +380,74 @@ export function ChartOfAccountsPageClient(): JSX.Element {
             ) : null}
           </div>
 
-          <div className="border-b border-brand-cappuccino/60 bg-brand-latte/25 p-4">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mocha" />
-              <Input
-                aria-label="Search chart accounts"
-                className="pl-9"
-                onChange={(event) => updateFilters({ search: event.target.value })}
-                placeholder="Search account name or code..."
-                value={filters.search}
-              />
-            </div>
-            {filters.search ? (
-              <div className="mt-3 rounded-2xl border border-money/30 bg-money-tint/80 p-3 text-sm text-money-text">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold italic">Search Criteria</p>
-                    <ul className="mt-1 list-disc pl-4 text-xs">
-                      <li>
-                        Account Name contains <strong>{filters.search}</strong>
-                      </li>
-                      <li>
-                        Account Code contains <strong>{filters.search}</strong>
-                      </li>
-                    </ul>
-                  </div>
-                  <Button
-                    aria-label="Clear search"
-                    className="h-7 w-7"
-                    onClick={() => updateFilters({ search: "" })}
-                    size="icon"
-                    type="button"
-                    variant="ghost"
-                  >
-                    ×
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Select
-                onValueChange={(status: ChartAccountsFilters["status"]) =>
-                  updateFilters({ status })
-                }
-                value={filters.status}
-              >
-                <SelectTrigger aria-label="Filter status">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select onValueChange={(sortBy) => updateFilters({ sortBy })} value={filters.sortBy}>
-                <SelectTrigger aria-label="Sort accounts">
-                  <SelectValue placeholder="Sort" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="account_code">Code</SelectItem>
-                  <SelectItem value="account_name">Name</SelectItem>
-                  <SelectItem value="account_type">Type</SelectItem>
-                  <SelectItem value="created_at">Created</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="min-w-0 border-b border-brand-cappuccino/60 bg-brand-latte/25 p-4">
+            <FilterToolbar
+              hasAnyFilter={hasAnyFilter}
+              hiddenFilterCount={hiddenFilterCount}
+              hideDensityBelowMd
+              onReset={resetFilters}
+              onSearchChange={(search) => updateFilters({ search })}
+              popoverTitle="Filter accounts"
+              searchAriaLabel="Search chart accounts"
+              searchPlaceholder="Search name or code..."
+              searchValue={filters.search}
+            >
+              <FilterField htmlFor="account-type-filter" label="Account type">
+                <Select
+                  onValueChange={(accountType: ChartAccountsFilters["accountType"]) =>
+                    updateFilters({ accountType })
+                  }
+                  value={filters.accountType}
+                >
+                  <SelectTrigger id="account-type-filter">
+                    <SelectValue placeholder="All types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All types</SelectItem>
+                    {accountTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+
+              <FilterField htmlFor="account-status-filter" label="Status">
+                <Select
+                  onValueChange={(status: ChartAccountsFilters["status"]) =>
+                    updateFilters({ status })
+                  }
+                  value={filters.status}
+                >
+                  <SelectTrigger id="account-status-filter">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+
+              <FilterField htmlFor="account-sort" label="Sort by">
+                <Select
+                  onValueChange={(sortBy) => updateFilters({ sortBy })}
+                  value={filters.sortBy}
+                >
+                  <SelectTrigger id="account-sort">
+                    <SelectValue placeholder="Sort" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="account_code">Code</SelectItem>
+                    <SelectItem value="account_name">Name</SelectItem>
+                    <SelectItem value="account_type">Type</SelectItem>
+                    <SelectItem value="created_at">Created</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            </FilterToolbar>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
@@ -492,7 +499,10 @@ export function ChartOfAccountsPageClient(): JSX.Element {
                         isSelected ? "bg-brand-latte/60" : "bg-card"
                       }`}
                       key={account.id}
-                      onClick={() => setSelectedAccountId(account.id)}
+                      onClick={() => {
+                        setSelectedAccountId(account.id);
+                        setDetailOpen(true);
+                      }}
                       type="button"
                     >
                       <span
@@ -545,36 +555,47 @@ export function ChartOfAccountsPageClient(): JSX.Element {
           </div>
         </aside>
 
-        <section className="min-w-0 bg-card">
+        <section className="hidden min-w-0 bg-card lg:block">
           {!displayAccount ? (
             <div className="flex min-h-[620px] flex-col items-center justify-center gap-3 p-8 text-center">
               <BookOpenText className="h-12 w-12 text-brand-mocha" />
-              <p className="text-xl font-semibold text-brand-espresso">Select an account</p>
-              <p className="max-w-md text-sm text-brand-mocha">
+              <p className="text-section font-medium text-brand-espresso">Select an account</p>
+              <p className="max-w-md text-cell text-brand-mocha">
                 Choose an account from the left to view balances and recent ledger transactions.
               </p>
             </div>
           ) : (
-            <div className="flex min-h-full flex-col">
-              <div className="flex flex-col gap-4 border-b border-brand-cappuccino/60 bg-brand-latte/20 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-brand-mocha">
-                    {formatAccountingLabel(displayAccount.accountType)}
-                  </p>
-                  <h2 className="mt-1 text-3xl font-bold tracking-tight text-brand-espresso">
-                    {displayAccount.accountName}
-                  </h2>
-                  <p className="mt-1 text-sm text-brand-mocha">
-                    Account code {displayAccount.accountCode}
-                    {displayAccount.parentAccountName
-                      ? ` · Parent ${displayAccount.parentAccountName}`
-                      : ""}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
+            <ChartAccountDetailPanel {...detailPanelProps(displayAccount)} />
+          )}
+        </section>
+      </div>
+
+      {/* The same panel as the desktop column, over the list. */}
+      <Sheet onOpenChange={setDetailOpen} open={detailOpen && displayAccount !== null}>
+        <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-xl lg:hidden" side="right">
+          {displayAccount ? (
+            <>
+              <SheetHeader className="space-y-0 border-b border-brand-cappuccino/60 bg-brand-latte/20 px-4 py-5">
+                <p className="text-meta font-medium text-brand-mocha">
+                  {formatAccountingLabel(displayAccount.accountType)}
+                </p>
+                <SheetTitle className="break-words text-section">
+                  {displayAccount.accountName}
+                </SheetTitle>
+                <SheetDescription className="text-cell text-brand-mocha">
+                  Account code {displayAccount.accountCode}
+                  {displayAccount.parentAccountName
+                    ? ` - Parent ${displayAccount.parentAccountName}`
+                    : ""}
+                </SheetDescription>
+                <div className="flex flex-wrap gap-2 pt-3">
                   <Button
                     disabled={!canManage}
-                    onClick={() => openEditAccount(displayAccount)}
+                    onClick={() => {
+                      setDetailOpen(false);
+                      openEditAccount(displayAccount);
+                    }}
+                    size="sm"
                     type="button"
                     variant="outline"
                   >
@@ -584,20 +605,26 @@ export function ChartOfAccountsPageClient(): JSX.Element {
                   {canManage ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button aria-label="Account actions" type="button" variant="outline">
+                        <Button
+                          aria-label="Account actions"
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                        >
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Account actions</DropdownMenuLabel>
                         <DropdownMenuItem
-                          onClick={() =>
+                          onClick={() => {
+                            setDetailOpen(false);
                             setPendingAction({
                               account: displayAccount,
                               status: displayAccount.status === "active" ? "inactive" : "active",
                               type: "status",
-                            })
-                          }
+                            });
+                          }}
                         >
                           {displayAccount.status === "active" ? "Deactivate" : "Activate"}
                         </DropdownMenuItem>
@@ -605,9 +632,10 @@ export function ChartOfAccountsPageClient(): JSX.Element {
                         <DropdownMenuItem
                           className="text-danger-text focus:text-danger-text"
                           disabled={displayAccount.isSystemAccount}
-                          onClick={() =>
-                            setPendingAction({ account: displayAccount, type: "delete" })
-                          }
+                          onClick={() => {
+                            setDetailOpen(false);
+                            setPendingAction({ account: displayAccount, type: "delete" });
+                          }}
                         >
                           <Trash2 className="h-4 w-4" />
                           Delete account
@@ -616,184 +644,18 @@ export function ChartOfAccountsPageClient(): JSX.Element {
                     </DropdownMenu>
                   ) : null}
                 </div>
-              </div>
-
-              <div className="grid gap-6 px-6 py-6">
-                <div>
-                  <p className="text-xs font-semibold text-brand-mocha">Closing Balance</p>
-                  {ledgerPreviewQuery.isLoading ? (
-                    <Skeleton className="mt-2 h-10 w-64 rounded-xl" />
-                  ) : (
-                    <p className="mt-1 text-4xl font-semibold tracking-tight text-brand-caramel">
-                      {money(ledgerPreview?.summary.closingBalance ?? 0)}
-                      <span className="ml-2 text-lg text-brand-mocha">
-                        ({ledgerPreview?.summary.balanceLabel ?? displayAccount.normalBalance})
-                      </span>
-                    </p>
-                  )}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <ChartAccountTypeBadge accountType={displayAccount.accountType} />
-                    <ChartAccountStatusBadge status={displayAccount.status} />
-                    <span className="rounded-full border border-brand-cappuccino/70 px-3 py-1 text-xs font-medium text-brand-mocha">
-                      {formatAccountingLabel(
-                        displayAccount.accountGroup ? displayAccount.accountGroup : "No group",
-                      )}
-                    </span>
-                    <span className="rounded-full border border-brand-cappuccino/70 px-3 py-1 text-xs font-medium text-brand-mocha">
-                      {displayAccount.allowManualPosting
-                        ? "Manual posting allowed"
-                        : "Control account"}
-                    </span>
-                  </div>
-                  {displayAccount.description ? (
-                    <p className="mt-5 max-w-4xl text-base text-brand-espresso">
-                      <span className="font-semibold italic">Description :</span>{" "}
-                      {displayAccount.description}
-                    </p>
-                  ) : (
-                    <p className="mt-5 max-w-4xl text-base text-brand-mocha">
-                      No description is set for this account.
-                    </p>
-                  )}
-                </div>
-
-                <Separator className="border-dashed bg-transparent" />
-
-                <div className="grid gap-3 md:grid-cols-4">
-                  {[
-                    ["Opening", ledgerPreview?.summary.openingBalance ?? 0],
-                    ["Debit", ledgerPreview?.summary.periodDebit ?? 0],
-                    ["Credit", ledgerPreview?.summary.periodCredit ?? 0],
-                    ["Closing", ledgerPreview?.summary.closingBalance ?? 0],
-                  ].map(([label, value]) => (
-                    <div
-                      className="rounded-2xl border border-brand-cappuccino/60 bg-brand-latte/20 p-4"
-                      key={label}
-                    >
-                      <p className="text-xs font-semibold text-brand-mocha">{label}</p>
-                      <p className="mt-2 text-lg font-bold text-brand-espresso">
-                        {money(Number(value))}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                <Card className="overflow-hidden border-brand-cappuccino/70 bg-card shadow-none">
-                  <CardContent className="p-0">
-                    <div className="flex flex-col gap-3 border-b border-brand-cappuccino/60 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h3 className="text-xl font-semibold text-brand-espresso">
-                          Recent Transactions
-                        </h3>
-                        <p className="text-sm text-brand-mocha">
-                          Latest posted ledger activity for this account.
-                        </p>
-                      </div>
-                      <Button
-                        disabled={ledgerPreviewQuery.isLoading || ledgerPreviewQuery.isError}
-                        onClick={openFullLedger}
-                        type="button"
-                        variant="outline"
-                      >
-                        Show more details
-                      </Button>
-                    </div>
-
-                    {ledgerPreviewQuery.isLoading ? (
-                      <div className="grid gap-2 p-4">
-                        <Skeleton className="h-12 rounded-xl" />
-                        <Skeleton className="h-12 rounded-xl" />
-                        <Skeleton className="h-12 rounded-xl" />
-                      </div>
-                    ) : null}
-
-                    {!ledgerPreviewQuery.isLoading && ledgerPreviewQuery.error ? (
-                      <div className="flex min-h-40 flex-col items-center justify-center gap-3 p-6 text-center">
-                        <p className="font-semibold text-brand-espresso">
-                          Unable to load recent transactions
-                        </p>
-                        <p className="text-sm text-brand-mocha">
-                          {getErrorMessage(ledgerPreviewQuery.error)}
-                        </p>
-                        <Button
-                          onClick={() => void ledgerPreviewQuery.refetch()}
-                          type="button"
-                          variant="outline"
-                        >
-                          Retry
-                        </Button>
-                      </div>
-                    ) : null}
-
-                    {!ledgerPreviewQuery.isLoading && !ledgerPreviewQuery.error ? (
-                      recentTransactions.length === 0 ? (
-                        <div className="flex min-h-40 flex-col items-center justify-center gap-2 p-6 text-center">
-                          <BookOpenText className="h-9 w-9 text-brand-mocha" />
-                          <p className="font-semibold text-brand-espresso">
-                            No posted transactions yet.
-                          </p>
-                          <p className="text-sm text-brand-mocha">
-                            Draft journals are excluded until posted.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Transaction Details</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead className="text-right">Debit</TableHead>
-                                <TableHead className="text-right">Credit</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {recentTransactions.map((transaction) => (
-                                <TableRow
-                                  key={`${transaction.entryId}-${String(transaction.runningBalance)}`}
-                                >
-                                  <TableCell>{formatDate(transaction.entryDate)}</TableCell>
-                                  <TableCell>
-                                    <p className="font-medium text-brand-espresso">
-                                      {transaction.narration.trim().length > 0
-                                        ? transaction.narration
-                                        : transaction.lineDescription.trim().length > 0
-                                          ? transaction.lineDescription
-                                          : "--"}
-                                    </p>
-                                    <p className="text-xs text-brand-mocha">
-                                      {transaction.entryNumber}
-                                      {transaction.referenceNumber
-                                        ? ` - Ref ${transaction.referenceNumber}`
-                                        : ""}
-                                    </p>
-                                  </TableCell>
-                                  <TableCell>
-                                    {formatAccountingLabel(transaction.accountType)}
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    {transaction.debitAmount ? money(transaction.debitAmount) : "-"}
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    {transaction.creditAmount
-                                      ? money(transaction.creditAmount)
-                                      : "-"}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      )
-                    ) : null}
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+              </SheetHeader>
+              <ChartAccountDetailPanel {...detailPanelProps(displayAccount)} showHeader={false} />
+            </>
+          ) : (
+            // Radix requires a title on every open sheet.
+            <SheetHeader className="p-4">
+              <SheetTitle className="sr-only">Account</SheetTitle>
+              <SheetDescription>No account selected.</SheetDescription>
+            </SheetHeader>
           )}
-        </section>
-      </div>
+        </SheetContent>
+      </Sheet>
 
       <ChartAccountFormDialog
         account={editingAccount}
