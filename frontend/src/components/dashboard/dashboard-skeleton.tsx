@@ -7,10 +7,10 @@ export function DashboardSkeleton(): JSX.Element {
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 8 }).map((_, index) => (
-          <Skeleton className="h-32 rounded-2xl" key={index} />
+          <Skeleton className="h-32 rounded-lg" key={index} />
         ))}
       </div>
-      <Skeleton className="h-72 rounded-2xl" />
+      <Skeleton className="h-72 rounded-lg" />
     </div>
   );
 }

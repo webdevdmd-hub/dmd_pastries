@@ -9,7 +9,7 @@ import type { DashboardAlert } from "@/types/dashboard";
 function severityClass(severity: DashboardAlert["severity"]): string {
   if (severity === "critical") return "border-danger/30 bg-danger-tint text-danger-text";
   if (severity === "warning") return "border-warning/30 bg-warning-tint text-warning-text";
-  return "border-brand-cappuccino bg-brand-latte/70 text-brand-espresso";
+  return "border-border bg-muted/70 text-foreground";
 }
 
 export function DashboardAlertsPanel({
@@ -24,19 +24,21 @@ export function DashboardAlertsPanel({
   onRetry: () => void;
 }): JSX.Element {
   return (
-    <Card className="bg-card/85 shadow-soft">
+    <Card className="bg-card shadow-xs">
       <CardHeader>
-        <CardTitle className="text-brand-espresso">Operational Alerts</CardTitle>
+        <CardTitle className="text-foreground">Operational Alerts</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {error ? (
           <DashboardErrorState description={getErrorMessage(error)} onRetry={onRetry} />
         ) : null}
-        {!error && isLoading ? <p className="text-sm text-brand-mocha">Loading alerts...</p> : null}
+        {!error && isLoading ? (
+          <p className="text-sm text-foreground-muted">Loading alerts...</p>
+        ) : null}
         {!error && !isLoading && alerts && alerts.length > 0
           ? alerts.map((alert) => (
               <article
-                className={`rounded-2xl border p-4 ${severityClass(alert.severity)}`}
+                className={`rounded-lg border p-4 ${severityClass(alert.severity)}`}
                 key={`${alert.alertType}-${alert.referenceId}-${alert.title}`}
               >
                 <div className="flex items-start justify-between gap-3">

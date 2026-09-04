@@ -194,10 +194,10 @@ function SectionHeader({
   title: string;
 }): JSX.Element {
   return (
-    <div className="flex flex-col gap-3 border-b border-workspace-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h2 className="text-lg font-semibold text-brand-espresso">{title}</h2>
-        <p className="mt-1 text-sm text-workspace-muted">{description}</p>
+        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+        <p className="mt-1 text-sm text-foreground-muted">{description}</p>
       </div>
       {action}
     </div>
@@ -221,10 +221,10 @@ function AttentionQueue({
   const criticalCount = alerts?.filter((alert) => alert.severity === "critical").length ?? 0;
 
   return (
-    <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
+    <section className="overflow-hidden rounded-md border border-border bg-card">
       <SectionHeader
         action={
-          <span className="text-xs font-semibold uppercase text-workspace-muted">
+          <span className="text-meta font-medium text-foreground-muted">
             {criticalCount > 0 ? `${String(criticalCount)} critical` : "Live queue"}
           </span>
         }
@@ -247,16 +247,16 @@ function AttentionQueue({
         {!error && !isLoading && orderedAlerts.length > 0
           ? orderedAlerts.map((alert) => (
               <Link
-                className="group grid grid-cols-[4px_minmax(0,1fr)_auto] items-center gap-4 border-b border-workspace-border px-5 py-3.5 last:border-b-0 hover:bg-muted"
+                className="group grid grid-cols-[4px_minmax(0,1fr)_auto] items-center gap-4 border-b border-border px-5 py-3.5 last:border-b-0 hover:bg-muted"
                 href={alertHref(alert)}
                 key={`${alert.alertType}-${alert.referenceId}-${alert.title}`}
               >
                 <span className={`h-9 w-1 rounded-full ${severityStyle(alert.severity)}`} />
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-brand-espresso">
+                  <span className="block truncate text-sm font-semibold text-foreground">
                     {alert.title || "Operational alert"}
                   </span>
-                  <span className="mt-0.5 block truncate text-xs text-workspace-muted">
+                  <span className="mt-0.5 block truncate text-xs text-foreground-muted">
                     {alert.description}
                   </span>
                 </span>
@@ -288,7 +288,7 @@ function ActivityTable({
   const rows = activities?.slice(0, 8) ?? [];
 
   return (
-    <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
+    <section className="overflow-hidden rounded-md border border-border bg-card">
       <SectionHeader
         description="Recent operational events across the active business scope."
         title="Recent activity"
@@ -302,7 +302,7 @@ function ActivityTable({
       {!error && !isLoading && rows.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="bg-muted text-xs font-semibold uppercase text-workspace-muted">
+            <thead className="bg-muted text-meta font-medium text-foreground-muted">
               <tr>
                 <th className="px-5 py-3">Activity</th>
                 <th className="px-4 py-3">Module</th>
@@ -314,25 +314,25 @@ function ActivityTable({
             <tbody>
               {rows.map((activity, index) => (
                 <tr
-                  className="border-t border-workspace-border text-brand-espresso"
+                  className="border-t border-border text-foreground"
                   key={`${activity.activityType}-${activity.referenceNumber}-${activity.createdAt}-${String(index)}`}
                 >
                   <td className="max-w-sm px-5 py-3">
                     <p className="font-semibold">{activity.title || "Activity"}</p>
-                    <p className="mt-0.5 truncate text-xs text-workspace-muted">
+                    <p className="mt-0.5 truncate text-xs text-foreground-muted">
                       {activity.description}
                     </p>
                   </td>
-                  <td className="px-4 py-3 text-workspace-muted">
+                  <td className="px-4 py-3 text-foreground-muted">
                     {activity.moduleLabel || activity.entityType || "-"}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs">
                     {activity.referenceNumber || activity.recordLabel || "-"}
                   </td>
-                  <td className="px-4 py-3 text-workspace-muted">
+                  <td className="px-4 py-3 text-foreground-muted">
                     {activity.createdBy || "System"}
                   </td>
-                  <td className="whitespace-nowrap px-5 py-3 text-right text-xs text-workspace-muted">
+                  <td className="whitespace-nowrap px-5 py-3 text-right text-xs text-foreground-muted">
                     {formatActivityDate(activity.createdAt)}
                   </td>
                 </tr>
@@ -539,11 +539,11 @@ export function AdminDashboardClient(): JSX.Element {
 
   return (
     <div className="mx-auto flex max-w-[92rem] flex-col gap-5">
-      <header className="flex flex-col gap-4 border-b border-workspace-border pb-5 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase text-workspace-muted">Admin workspace</p>
-          <h1 className="mt-2 text-3xl font-semibold text-brand-espresso">Operations overview</h1>
-          <p className="mt-2 text-sm text-workspace-muted">
+          <p className="text-meta font-medium text-foreground-muted">Admin workspace</p>
+          <h1 className="mt-2 text-3xl font-semibold text-foreground">Operations overview</h1>
+          <p className="mt-2 text-sm text-foreground-muted">
             {branchScope.effectiveBranchName ?? "All branches"} · {appliedFilters.dateFrom} to{" "}
             {appliedFilters.dateTo}
           </p>
@@ -590,15 +590,13 @@ export function AdminDashboardClient(): JSX.Element {
 
           <DashboardKpiGrid items={decisionMetrics} />
 
-          <section className="flex flex-wrap items-center gap-2 border-y border-workspace-border py-3">
-            <span className="mr-2 text-xs font-semibold uppercase text-workspace-muted">
-              Quick actions
-            </span>
+          <section className="flex flex-wrap items-center gap-2 border-y border-border py-3">
+            <span className="mr-2 text-meta font-medium text-foreground-muted">Quick actions</span>
             {actions.map((action) => {
               const Icon = action.icon;
               return (
                 <Link
-                  className="inline-flex h-9 items-center gap-2 rounded-md border border-workspace-border bg-card px-3 text-sm font-semibold text-brand-espresso hover:bg-muted"
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-semibold text-foreground hover:bg-muted"
                   href={action.href}
                   key={action.href}
                 >
@@ -617,7 +615,7 @@ export function AdminDashboardClient(): JSX.Element {
               onRetry={() => void alertsQuery.refetch()}
             />
 
-            <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
+            <section className="overflow-hidden rounded-md border border-border bg-card">
               <SectionHeader
                 description="Current workload across daily operations."
                 title="Operational health"
@@ -625,18 +623,18 @@ export function AdminDashboardClient(): JSX.Element {
               <div>
                 {healthRows.map((row) => (
                   <Link
-                    className="group flex items-center justify-between gap-4 border-b border-workspace-border px-5 py-3.5 last:border-b-0 hover:bg-muted"
+                    className="group flex items-center justify-between gap-4 border-b border-border px-5 py-3.5 last:border-b-0 hover:bg-muted"
                     href={row.href}
                     key={row.label}
                   >
                     <span>
-                      <span className="block text-sm font-semibold text-brand-espresso">
+                      <span className="block text-sm font-semibold text-foreground">
                         {row.label}
                       </span>
-                      <span className="mt-0.5 block text-xs text-workspace-muted">{row.note}</span>
+                      <span className="mt-0.5 block text-xs text-foreground-muted">{row.note}</span>
                     </span>
                     <span className="flex items-center gap-3">
-                      <strong className="text-lg text-brand-espresso">{row.value}</strong>
+                      <strong className="text-lg text-foreground">{row.value}</strong>
                       <ArrowRight className="h-4 w-4 text-foreground-muted transition-transform group-hover:translate-x-0.5" />
                     </span>
                   </Link>
@@ -648,23 +646,26 @@ export function AdminDashboardClient(): JSX.Element {
           <section>
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-brand-espresso">Performance workspace</h2>
-                <p className="mt-1 text-sm text-workspace-muted">
+                <h2 className="text-lg font-semibold text-foreground">Performance workspace</h2>
+                <p className="mt-1 text-sm text-foreground-muted">
                   Switch between connected views without leaving the dashboard.
                 </p>
               </div>
               <div
                 aria-label="Performance view"
-                className="flex max-w-full gap-1 overflow-x-auto rounded-md border border-workspace-border bg-card p-1"
+                className="scrollbar-hidden flex max-w-full gap-1 overflow-x-auto rounded-lg bg-muted p-1"
                 role="group"
               >
                 {performanceViews.map((view) => (
                   <button
                     aria-pressed={performanceView === view}
-                    className={`h-8 whitespace-nowrap rounded px-3 text-xs font-semibold transition-colors ${
+                    /* A muted track with a raised card thumb, so the selected
+                       view reads as "one of these is current" rather than as
+                       several competing primary buttons. */
+                    className={`text-meta h-9 whitespace-nowrap rounded-md px-3.5 font-medium transition-colors ${
                       performanceView === view
-                        ? "bg-primary text-primary-foreground"
-                        : "text-workspace-muted hover:bg-muted hover:text-brand-espresso"
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-foreground-muted hover:text-foreground"
                     }`}
                     key={view}
                     onClick={() => setPerformanceView(view)}
@@ -751,7 +752,7 @@ export function AdminDashboardClient(): JSX.Element {
             onRetry={() => void activityQuery.refetch()}
           />
 
-          <div className="grid gap-3 border-t border-workspace-border pt-4 text-xs text-workspace-muted sm:grid-cols-3">
+          <div className="grid gap-3 border-t border-border pt-4 text-xs text-foreground-muted sm:grid-cols-3">
             <span className="flex items-center gap-2">
               <Clock3 className="h-4 w-4" /> Refreshes every 60 seconds
             </span>

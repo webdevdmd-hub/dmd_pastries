@@ -163,17 +163,17 @@ export function GettingStartedChecklist({
   };
 
   return (
-    <section className="overflow-hidden rounded-md border border-workspace-border bg-card">
-      <div className="flex items-start justify-between gap-3 border-b border-workspace-border px-5 py-4">
+    <section className="overflow-hidden rounded-md border border-border bg-card">
+      <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
         <div>
-          <h2 className="text-lg font-semibold text-brand-espresso">Get your bakery ready</h2>
-          <p className="mt-1 text-sm text-workspace-muted">
+          <h2 className="text-lg font-semibold text-foreground">Get your bakery ready</h2>
+          <p className="mt-1 text-sm text-foreground-muted">
             {completedCount} of {steps.length} steps done — finish these to start selling.
           </p>
         </div>
         <button
           aria-label="Dismiss getting started"
-          className="rounded-md p-1 text-foreground-muted transition-colors hover:bg-muted hover:text-brand-espresso"
+          className="rounded-md p-1 text-foreground-muted transition-colors hover:bg-muted hover:text-foreground"
           onClick={handleDismiss}
           type="button"
         >
@@ -181,7 +181,7 @@ export function GettingStartedChecklist({
         </button>
       </div>
 
-      <div className="h-1.5 w-full bg-brand-latte">
+      <div className="h-1.5 w-full bg-muted">
         <div
           className="h-full bg-brand-caramel transition-all"
           style={{ width: `${String(progressPercent)}%` }}
@@ -195,7 +195,7 @@ export function GettingStartedChecklist({
 
           return (
             <li
-              className="flex items-center gap-4 border-b border-workspace-border px-5 py-3.5 last:border-b-0"
+              className="flex items-center gap-4 border-b border-border px-5 py-3.5 last:border-b-0"
               key={step.key}
             >
               <StatusIcon
@@ -204,24 +204,24 @@ export function GettingStartedChecklist({
                   step.complete ? "text-brand-caramel" : "text-foreground-muted",
                 )}
               />
-              <span className="hidden rounded-lg bg-brand-latte/70 p-2 text-brand-mocha sm:block">
+              <span className="hidden rounded-lg bg-muted/70 p-2 text-foreground-muted sm:block">
                 <StepIcon className="h-4 w-4" />
               </span>
               <span className="min-w-0 flex-1">
                 <span
                   className={cn(
                     "block text-sm font-semibold",
-                    step.complete ? "text-workspace-muted line-through" : "text-brand-espresso",
+                    step.complete ? "text-foreground-muted line-through" : "text-foreground",
                   )}
                 >
                   {step.title}
                 </span>
-                <span className="mt-0.5 block truncate text-xs text-workspace-muted">
+                <span className="mt-0.5 block truncate text-xs text-foreground-muted">
                   {step.description}
                 </span>
               </span>
               {step.complete ? (
-                <span className="text-xs font-semibold uppercase text-brand-caramel">Done</span>
+                <span className="text-meta font-medium text-money-text">Done</span>
               ) : (
                 <Button asChild size="sm" variant="outline">
                   <Link href={step.href}>

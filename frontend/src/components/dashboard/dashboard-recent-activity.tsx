@@ -26,36 +26,36 @@ export function DashboardRecentActivity({
   onRetry: () => void;
 }): JSX.Element {
   return (
-    <Card className="bg-card/85 shadow-soft">
+    <Card className="bg-card shadow-xs">
       <CardHeader>
-        <CardTitle className="text-brand-espresso">Recent Activity</CardTitle>
+        <CardTitle className="text-foreground">Recent Activity</CardTitle>
       </CardHeader>
       <CardContent>
         {error ? (
           <DashboardErrorState description={getErrorMessage(error)} onRetry={onRetry} />
         ) : null}
         {!error && isLoading ? (
-          <p className="text-sm text-brand-mocha">Loading recent activity...</p>
+          <p className="text-sm text-foreground-muted">Loading recent activity...</p>
         ) : null}
         {!error && !isLoading && activities && activities.length > 0 ? (
           <div className="scrollbar-hidden max-h-[28rem] space-y-3 overflow-y-auto pr-1">
             {activities.map((activity, index) => (
               <article
-                className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-4"
+                className="rounded-lg border border-border bg-muted/60 p-4"
                 key={`${activity.activityType}-${activity.referenceNumber}-${activity.createdAt}-${String(index)}`}
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-brand-espresso">
-                    {activity.title || "Activity"}
-                  </p>
+                  <p className="font-semibold text-foreground">{activity.title || "Activity"}</p>
                   {activity.referenceNumber ? (
-                    <span className="rounded-full border border-brand-cinnamon/30 bg-card px-2 py-0.5 text-xs font-semibold text-brand-espresso">
+                    <span className="rounded-full border border-brand-cinnamon/30 bg-card px-2 py-0.5 text-xs font-semibold text-foreground">
                       {activity.referenceNumber}
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-1 text-sm leading-6 text-brand-mocha">{activity.description}</p>
-                <p className="mt-2 text-xs text-brand-mocha">
+                <p className="mt-1 text-sm leading-6 text-foreground-muted">
+                  {activity.description}
+                </p>
+                <p className="mt-2 text-xs text-foreground-muted">
                   {activity.createdBy || "System"} - {formatDate(activity.createdAt)}
                 </p>
               </article>

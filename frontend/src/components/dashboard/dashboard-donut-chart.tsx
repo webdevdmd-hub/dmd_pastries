@@ -60,14 +60,14 @@ export function DashboardDonutChart({ chart }: { chart: ReportChartData }): JSX.
             className="flex items-center justify-between gap-3 border-b border-border px-3 py-2 text-sm last:border-b-0"
             key={point.label}
           >
-            <span className="flex items-center gap-2 text-brand-mocha">
+            <span className="flex items-center gap-2 text-foreground-muted">
               <span
                 className="h-2.5 w-2.5 rounded-full"
                 style={{ backgroundColor: colors[index % colors.length] }}
               />
               {point.label}
             </span>
-            <strong className="text-brand-espresso">{point.value.toLocaleString("en-AE")}</strong>
+            <strong className="text-foreground">{point.value.toLocaleString("en-AE")}</strong>
           </div>
         ))}
       </div>

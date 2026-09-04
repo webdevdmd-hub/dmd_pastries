@@ -16,20 +16,20 @@ export function DashboardQuickActions({
   actions: DashboardQuickAction[];
 }): JSX.Element {
   return (
-    <Card className="bg-card/85 shadow-soft">
+    <Card className="bg-card shadow-xs">
       <CardHeader>
-        <CardTitle className="text-brand-espresso">Quick Actions</CardTitle>
+        <CardTitle className="text-foreground">Quick Actions</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-2">
         {actions.map((action) => {
           const Icon = action.icon;
           return (
             <Link
-              className="flex items-center gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-4 font-semibold text-brand-espresso transition hover:-translate-y-0.5 hover:bg-brand-cappuccino/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel"
+              className="flex items-center gap-3 rounded-lg border border-border bg-muted/60 p-4 font-semibold text-foreground transition hover:-translate-y-0.5 hover:bg-brand-cappuccino/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel"
               href={action.href}
               key={action.href}
             >
-              <Icon className="h-5 w-5 text-brand-mocha" aria-hidden="true" />
+              <Icon className="h-5 w-5 text-foreground-muted" aria-hidden="true" />
               {action.label}
             </Link>
           );
