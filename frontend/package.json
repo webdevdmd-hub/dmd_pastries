@@ -18,6 +18,7 @@
     "format:check": "prettier --check .",
     "check:no-any": "node scripts/check-no-any.mjs",
     "check:tokens": "node scripts/check-token-agreement.mjs",
+    "check:type-scale": "node scripts/check-type-scale.mjs",
     "verify": "pnpm typecheck && pnpm lint && pnpm check:no-any && pnpm check:tokens && pnpm check:chart-palette && pnpm format:check && pnpm test",
     "test": "pnpm test:pos-cart-totals && pnpm test:product-pos-labels && pnpm test:product-unit-payload && pnpm test:recipe-cost-preview && pnpm test:sales-return-refund-preview && pnpm test:purchase-order-quantities",
     "visual:baseline": "node scripts/visual/capture.mjs --out baseline",

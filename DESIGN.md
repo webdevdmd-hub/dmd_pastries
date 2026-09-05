@@ -179,6 +179,7 @@ The current build's 78 uses of `font-black` are why everything shouts and the to
 | `text-meta` | 12.5 / 16 | 400 | 0 | Metadata, captions, badges |
 | `text-cell` | 13.5 / 18 | 400 | −0.008em | Table body |
 | `text-body` | 14.5 / 22 | 400 | −0.011em | Prose, inputs, labels |
+| `text-section` | 16 / 22 | 500 | −0.015em | Section headings, compact stat values |
 | `text-title` | 18 / 24 | 500 | −0.02em | Card and panel titles |
 | `text-page` | 28 / 32 | 600 | −0.03em | Page headings |
 | `text-kpi` | 28 / 30 | 500 | −0.04em | Dashboard stat values, tabular |

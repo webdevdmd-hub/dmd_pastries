@@ -147,6 +147,11 @@ const config: Config = {
         meta: ["0.78125rem", { lineHeight: "1rem" }], // 12.5/16
         cell: ["0.84375rem", { lineHeight: "1.125rem", letterSpacing: "-0.008em" }], // 13.5/18
         body: ["0.90625rem", { lineHeight: "1.375rem", letterSpacing: "-0.011em" }], // 14.5/22
+        // The step between body and title. Section headings and compact stat
+        // values sat on a `text-section` class that was never declared here or
+        // in DESIGN.md, so 27 files silently rendered at inherited size.
+        // scripts/check-type-scale.mjs now fails the build on a repeat.
+        section: ["1rem", { lineHeight: "1.375rem", letterSpacing: "-0.015em", fontWeight: "500" }],
         title: ["1.125rem", { lineHeight: "1.5rem", letterSpacing: "-0.02em", fontWeight: "500" }],
         page: ["1.75rem", { lineHeight: "2rem", letterSpacing: "-0.03em", fontWeight: "600" }],
         kpi: [
