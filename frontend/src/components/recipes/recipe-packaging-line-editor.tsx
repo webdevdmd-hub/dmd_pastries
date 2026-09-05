@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isRecipeComponentProduct } from "@/lib/selectors/eligibility";
+import { isRecipeSelectableProduct } from "@/lib/selectors/eligibility";
 import { packagingLineSchema } from "@/lib/validators/recipes.schema";
 import { PRODUCT_TYPE_LABELS } from "@/types/product";
 import type {
@@ -55,7 +55,7 @@ export function RecipePackagingLineEditor({
   const packagingOptions = useMemo<SearchableComboboxOption[]>(
     () =>
       componentProducts
-        .filter((item) => isRecipeComponentProduct(item, parentProductId))
+        .filter((item) => isRecipeSelectableProduct(item, parentProductId))
         .map((item) => ({
           value: item.id,
           label: item.productName,

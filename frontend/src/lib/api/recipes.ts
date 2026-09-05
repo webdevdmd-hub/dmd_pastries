@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/api/client";
+import { RECIPE_SELECTABLE_PRODUCT_TYPES } from "@/lib/selectors/eligibility";
 import { PRODUCT_TYPES, type ProductType } from "@/types/product";
 import type {
   CreateRecipePayload,
@@ -22,14 +23,6 @@ import type {
 
 const PRODUCT_LOOKUP_PAGE_LIMIT = 100;
 const RECIPE_OUTPUT_PRODUCT_TYPES: readonly ProductType[] = ["finished_product", "semi_finished"];
-const RECIPE_COMPONENT_PRODUCT_TYPES: readonly ProductType[] = [
-  "ingredient",
-  "raw_material",
-  "semi_finished",
-  "finished_product",
-  "consumable",
-  "packaging",
-];
 
 type BackendRecipePayload = {
   product_id?: string;
@@ -806,7 +799,7 @@ export async function getRecipeProducts(): Promise<RecipeProductOption[]> {
 
 export async function getRecipeComponentProducts(): Promise<RecipeProductOption[]> {
   const products = await Promise.all(
-    RECIPE_COMPONENT_PRODUCT_TYPES.map((productType) =>
+    RECIPE_SELECTABLE_PRODUCT_TYPES.map((productType) =>
       getRecipeProductPages({
         status: "active",
         product_type: productType,
@@ -817,7 +810,7 @@ export async function getRecipeComponentProducts(): Promise<RecipeProductOption[
   return mergeRecipeProductOptions(
     products
       .flat()
-      .filter((product) => RECIPE_COMPONENT_PRODUCT_TYPES.includes(product.productType)),
+      .filter((product) => RECIPE_SELECTABLE_PRODUCT_TYPES.includes(product.productType)),
   );
 }
 
@@ -833,7 +826,7 @@ export async function getRecipeProductCatalog(): Promise<{
   products: RecipeProductOption[];
 }> {
   const productTypes = Array.from(
-    new Set([...RECIPE_OUTPUT_PRODUCT_TYPES, ...RECIPE_COMPONENT_PRODUCT_TYPES]),
+    new Set([...RECIPE_OUTPUT_PRODUCT_TYPES, ...RECIPE_SELECTABLE_PRODUCT_TYPES]),
   );
   const pages = await Promise.all(
     productTypes.map((productType) =>
@@ -844,7 +837,7 @@ export async function getRecipeProductCatalog(): Promise<{
 
   return {
     componentProducts: mergeRecipeProductOptions(
-      all.filter((product) => RECIPE_COMPONENT_PRODUCT_TYPES.includes(product.productType)),
+      all.filter((product) => RECIPE_SELECTABLE_PRODUCT_TYPES.includes(product.productType)),
     ),
     products: mergeRecipeProductOptions(
       all.filter((product) => RECIPE_OUTPUT_PRODUCT_TYPES.includes(product.productType)),

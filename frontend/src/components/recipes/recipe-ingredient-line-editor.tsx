@@ -9,7 +9,7 @@ import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isRecipeComponentProduct } from "@/lib/selectors/eligibility";
+import { isRecipeSelectableProduct } from "@/lib/selectors/eligibility";
 import { ingredientLineSchema } from "@/lib/validators/recipes.schema";
 import { PRODUCT_TYPE_LABELS } from "@/types/product";
 import type {
@@ -55,7 +55,7 @@ export function RecipeIngredientLineEditor({
   const componentOptions = useMemo<SearchableComboboxOption[]>(
     () =>
       componentProducts
-        .filter((item) => isRecipeComponentProduct(item, parentProductId))
+        .filter((item) => isRecipeSelectableProduct(item, parentProductId))
         .map((item) => ({
           value: item.id,
           label: item.productName,

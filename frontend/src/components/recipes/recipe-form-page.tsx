@@ -64,6 +64,10 @@ import {
   RECIPE_SELF_REFERENCE_MESSAGE,
 } from "@/lib/recipes/self-reference";
 import {
+  RECIPE_COMPONENT_PRODUCT_TYPES,
+  RECIPE_PACKAGING_PRODUCT_TYPES,
+} from "@/lib/selectors/eligibility";
+import {
   type CreateRecipeFormValues,
   type CreateRecipeInputValues,
   createRecipeSchema,
@@ -367,21 +371,16 @@ export function RecipeFormPage({
       data.componentProducts.filter(
         (product) =>
           product.id !== selectedProductId &&
-          [
-            "finished_product",
-            "ingredient",
-            "raw_material",
-            "semi_finished",
-            "consumable",
-            "equipment",
-          ].includes(product.productType),
+          RECIPE_COMPONENT_PRODUCT_TYPES.includes(product.productType),
       ),
     [data.componentProducts, selectedProductId],
   );
   const packagingComponentProducts = useMemo(
     () =>
       data.componentProducts.filter(
-        (product) => product.id !== selectedProductId && product.productType === "packaging",
+        (product) =>
+          product.id !== selectedProductId &&
+          RECIPE_PACKAGING_PRODUCT_TYPES.includes(product.productType),
       ),
     [data.componentProducts, selectedProductId],
   );

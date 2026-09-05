@@ -14,13 +14,38 @@ export type SelectorContext =
   | "branch_scope"
   | "user_assignment";
 
-const RECIPE_COMPONENT_PRODUCT_TYPES = new Set<ProductType>([
+/**
+ * What a recipe may contain, and how the builder splits it.
+ *
+ * These three lists were previously three separate literals -- one in
+ * lib/api/recipes.ts deciding what to fetch, one in recipe-form-page.tsx
+ * deciding what the Ingredients tab offers, and one here deciding what the
+ * dropdown accepts -- and they disagreed. A consumable was fetched and offered
+ * by the tab, then silently dropped by the dropdown, so it was invisible with
+ * no explanation. Equipment was offered by the tab but never fetched.
+ *
+ * PACKAGING and COMPONENT partition SELECTABLE, and everything derives from the
+ * two halves, so they cannot drift apart again.
+ *
+ * Equipment and service are deliberately absent: a mixer is a durable asset,
+ * not something a batch consumes, and a service has no stock to relieve.
+ */
+export const RECIPE_COMPONENT_PRODUCT_TYPES: readonly ProductType[] = [
   "ingredient",
-  "packaging",
   "raw_material",
   "semi_finished",
   "finished_product",
-]);
+  "consumable",
+];
+
+export const RECIPE_PACKAGING_PRODUCT_TYPES: readonly ProductType[] = ["packaging"];
+
+export const RECIPE_SELECTABLE_PRODUCT_TYPES: readonly ProductType[] = [
+  ...RECIPE_COMPONENT_PRODUCT_TYPES,
+  ...RECIPE_PACKAGING_PRODUCT_TYPES,
+];
+
+const recipeSelectableProductTypes = new Set<ProductType>(RECIPE_SELECTABLE_PRODUCT_TYPES);
 
 export type RecipeComponentCandidate = {
   id: string;
@@ -118,7 +143,12 @@ export function isPurchasableProduct(product: Product | PurchasableProductCandid
   return (product.status === undefined || product.status === "active") && product.isPurchasable;
 }
 
-export function isRecipeComponentProduct(
+/**
+ * Whether a product can be picked in a recipe at all -- either tab. Both the
+ * ingredient and the packaging line editors use this; the tabs then narrow it
+ * with RECIPE_COMPONENT_PRODUCT_TYPES / RECIPE_PACKAGING_PRODUCT_TYPES.
+ */
+export function isRecipeSelectableProduct(
   product: Product | RecipeComponentCandidate,
   parentProductId?: string | null,
 ): boolean {
@@ -126,7 +156,7 @@ export function isRecipeComponentProduct(
     (product.status === undefined || product.status === "active") &&
     product.id !== parentProductId &&
     product.isStockTracked &&
-    RECIPE_COMPONENT_PRODUCT_TYPES.has(product.productType)
+    recipeSelectableProductTypes.has(product.productType)
   );
 }
 
