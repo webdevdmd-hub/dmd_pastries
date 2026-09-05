@@ -4,7 +4,7 @@ import type { JSX } from "react";
 import { PurchaseReturnsPageClient } from "@/components/purchasing/purchase-returns-page-client";
 
 export const metadata: Metadata = {
-  title: "Purchase Returns | Pastries POS",
+  title: "Vendor Credits | Pastries POS",
 };
 
 export default function PurchaseReturnsPage(): JSX.Element {
