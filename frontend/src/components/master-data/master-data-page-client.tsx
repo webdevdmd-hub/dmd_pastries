@@ -118,7 +118,7 @@ import { getErrorMessage } from "@/lib/api/client";
 import { formatLabel } from "@/lib/format/label";
 import type { ProductCategoryIconKey } from "@/lib/product-category-icons";
 import {
-  getProductCategoryIconForMetadata,
+  getProductCategoryEmojiForMetadata,
   getProductCategoryIconKey,
   getProductCategoryIconKeyFromMetadata,
   productCategoryIconOptions,
@@ -406,22 +406,31 @@ function ProductCategoryIconPicker({
         {filteredOptions.length > 0 ? (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
             {filteredOptions.map((option) => {
-              const Icon = option.icon;
               const isSelected = selectedKey === option.key;
 
               return (
-                <Button
+                /* A plain button, not the Button component: that one sets
+                   whitespace-nowrap, which fought line-clamp-2 and left every
+                   label clipped mid-descender inside the fixed height. */
+                <button
                   aria-pressed={isSelected}
-                  className="h-20 flex-col gap-2 rounded-xl px-2 text-xs"
+                  className={`flex min-h-[5.5rem] flex-col items-center justify-start gap-1.5 rounded-lg border px-2 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                    isSelected
+                      ? "border-foreground bg-muted text-foreground"
+                      : "border-border bg-card text-foreground-muted hover:bg-muted hover:text-foreground"
+                  }`}
                   key={option.key}
                   onClick={() => onChange(option.key)}
                   title={option.label}
                   type="button"
-                  variant={isSelected ? "default" : "outline"}
                 >
-                  <Icon className="h-5 w-5 shrink-0" />
-                  <span className="line-clamp-2 leading-tight">{option.label}</span>
-                </Button>
+                  <span aria-hidden className="text-2xl leading-none">
+                    {option.emoji}
+                  </span>
+                  <span className="text-meta w-full whitespace-normal break-words text-center leading-tight">
+                    {option.label}
+                  </span>
+                </button>
               );
             })}
           </div>
@@ -1135,14 +1144,14 @@ function ProductCategoriesTable({
           </CollectionStateRow>
         ) : null}
         {categories.map((category) => {
-          const Icon = getProductCategoryIconForMetadata(category);
+          const emoji = getProductCategoryEmojiForMetadata(category);
 
           return (
             <TableRow className="cursor-pointer" key={category.id} onClick={() => onView(category)}>
               <TableCell className="font-medium">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-latte text-brand-mocha">
-                    <Icon className="h-4 w-4" />
+                  <span aria-hidden className="text-xl leading-none">
+                    {emoji}
                   </span>
                   <span>{category.categoryName}</span>
                 </div>

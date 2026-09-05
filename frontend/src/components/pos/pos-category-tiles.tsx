@@ -1,9 +1,8 @@
 "use client";
 
-import { LayoutGrid } from "lucide-react";
 import type { JSX } from "react";
 
-import { getProductCategoryIconForMetadata } from "@/lib/product-category-icons";
+import { getProductCategoryEmojiForMetadata } from "@/lib/product-category-icons";
 import type { ProductCategory } from "@/types/master-data";
 
 type POSCategoryTilesProps = {
@@ -32,9 +31,9 @@ export function POSCategoryTiles({
 }: POSCategoryTilesProps): JSX.Element {
   const isRow = layout === "row";
   const entries = [
-    { icon: LayoutGrid, id: "all", label: "All" },
+    { emoji: "🧾", id: "all", label: "All" },
     ...categories.map((category) => ({
-      icon: getProductCategoryIconForMetadata(category),
+      emoji: getProductCategoryEmojiForMetadata(category),
       id: category.id,
       label: category.categoryName,
     })),
@@ -51,7 +50,6 @@ export function POSCategoryTiles({
       aria-label="Product categories"
     >
       {entries.map((entry) => {
-        const Icon = entry.icon;
         const isSelected = selectedCategoryId === entry.id;
 
         return (
@@ -68,7 +66,9 @@ export function POSCategoryTiles({
             onClick={() => onSelect(entry.id)}
             type="button"
           >
-            <Icon className="h-5 w-5 shrink-0" />
+            <span aria-hidden className="text-xl leading-none">
+              {entry.emoji}
+            </span>
             <span className="text-meta w-full truncate text-center font-medium">{entry.label}</span>
           </button>
         );
