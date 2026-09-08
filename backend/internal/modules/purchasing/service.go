@@ -3807,6 +3807,7 @@ func (s *Service) invoiceResponse(businessID string, invoice PurchaseInvoice, in
 	receiveLines, receiveStatus, canReceive := s.invoiceReceiveState(businessID, invoice, items)
 	response.ReceiveStatus = receiveStatus
 	response.CanReceiveStock = canReceive
+	response.CanEdit, response.EditBlockedReason = invoiceEditability(invoice, receiveStatus)
 	if includeItems {
 		for _, item := range items {
 			unitID := deref(item.UnitID)
@@ -3827,6 +3828,32 @@ type invoiceReceiveLineState struct {
 	Received   float64
 	Remaining  float64
 	CanReceive bool
+}
+
+// invoiceEditability mirrors ensurePostedInvoiceCanBeEdited using values the
+// response already holds, so the list does not pay three extra queries a row.
+// It is a hint for the UI, never a substitute: the guard inside the update
+// transaction is what actually decides, and it re-checks all three conditions.
+func invoiceEditability(invoice PurchaseInvoice, receiveStatus string) (bool, string) {
+	switch invoice.Status {
+	case "draft":
+		return true, ""
+	case "cancelled":
+		return false, "A cancelled bill cannot be edited."
+	case "posted":
+	default:
+		return false, ""
+	}
+	if invoice.PaidAmount > 0 {
+		return false, "This bill has supplier payments against it, so it cannot be edited."
+	}
+	if invoice.CreditedAmount > 0 {
+		return false, "This bill has vendor credits against it, so it cannot be edited."
+	}
+	if receiveStatus != "" && receiveStatus != "not_received" {
+		return false, "Stock has been received against this bill, so it cannot be edited."
+	}
+	return true, ""
 }
 
 func (s *Service) invoiceReceiveState(businessID string, invoice PurchaseInvoice, items []PurchaseInvoiceItem) (map[string]invoiceReceiveLineState, string, bool) {

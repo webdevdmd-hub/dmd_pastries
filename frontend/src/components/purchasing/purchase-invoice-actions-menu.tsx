@@ -66,9 +66,16 @@ export function PurchaseInvoiceActionsMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {canManage ? (
+          // A posted bill stays editable while it is untouched -- no payments,
+          // no vendor credits, no stock received -- and the backend decides
+          // that, not this component. Gating only on "cancelled" offered Edit
+          // on a fully received bill, which opened the form and then failed on
+          // save. The title carries the backend's reason so the greyed row
+          // says why.
           <DropdownMenuItem
-            disabled={invoice.status === "cancelled"}
+            disabled={!invoice.canEdit}
             onSelect={() => onEdit(invoice)}
+            title={invoice.canEdit ? undefined : invoice.editBlockedReason}
           >
             Edit
           </DropdownMenuItem>

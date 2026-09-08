@@ -587,6 +587,10 @@ function parseInvoice(value: unknown): PurchaseInvoice {
       typeof value.can_receive_stock === "boolean"
         ? value.can_receive_stock
         : isInvoiceStatus(value.status) && value.status === "posted",
+    // Default true so an older payload keeps the previous behaviour rather
+    // than silently hiding Edit everywhere.
+    canEdit: typeof value.can_edit === "boolean" ? value.can_edit : true,
+    editBlockedReason: stringValue(value.edit_blocked_reason),
     notes: optionalString(value.notes),
     cancelledAt: optionalString(value.cancelled_at),
     cancelledByUserId: optionalString(value.cancelled_by_user_id),
@@ -889,6 +893,8 @@ function parseDocumentChainInvoice(value: unknown): PurchaseInvoice {
       ? value.receive_status
       : "not_received",
     canReceiveStock: typeof value.can_receive_stock === "boolean" ? value.can_receive_stock : false,
+    canEdit: typeof value.can_edit === "boolean" ? value.can_edit : true,
+    editBlockedReason: stringValue(value.edit_blocked_reason),
     reversalJournalEntryId: optionalString(value.reversal_journal_entry_id),
     status: isInvoiceStatus(value.status) ? value.status : "draft",
     subtotalAmount: 0,

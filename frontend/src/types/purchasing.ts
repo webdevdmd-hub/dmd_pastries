@@ -191,6 +191,9 @@ export type PurchaseInvoice = {
   balanceAmount: number;
   receiveStatus: "not_received" | "partially_received" | "received";
   canReceiveStock: boolean;
+  /** Advisory hint from the backend; the server still decides on submit. */
+  canEdit: boolean;
+  editBlockedReason: string;
   notes: string | null;
   cancelledAt: string | null;
   cancelledByUserId: string | null;

@@ -993,11 +993,30 @@ func (r *Repository) ListReceipts(businessID string, query ListQuery) ([]Purchas
 	return rows, total, err
 }
 
+// ActiveReceiptCountForInvoice counts the receipts that account for a bill.
+//
+// purchase_receipts.purchase_invoice_id is only set when the receipt is
+// created from the bill itself. Receive against the purchase order instead --
+// the usual flow -- and the receipt links to the order, not the bill, so
+// matching on that column alone found nothing and the "posted bill has
+// received stock history" guard never fired for stock that had plainly been
+// received. Same link, same fallback, as the inventory reconciliation.
 func (r *Repository) ActiveReceiptCountForInvoice(tx *gorm.DB, businessID, invoiceID string) (int64, error) {
 	var count int64
-	err := tx.Model(&PurchaseReceipt{}).
-		Where("business_id = ? AND purchase_invoice_id = ? AND status <> ? AND deleted_at IS NULL", businessID, invoiceID, "cancelled").
-		Count(&count).Error
+	err := tx.Raw(`
+		SELECT COUNT(*)
+		FROM purchase_receipts pr
+		JOIN purchase_invoices pi
+		  ON pi.id = ?
+		 AND pi.business_id = pr.business_id
+		 AND pi.deleted_at IS NULL
+		WHERE pr.business_id = ?
+		  AND pr.status <> 'cancelled'
+		  AND pr.deleted_at IS NULL
+		  AND (
+			(pr.purchase_invoice_id IS NOT NULL AND pr.purchase_invoice_id = pi.id)
+			OR (pr.purchase_invoice_id IS NULL AND pr.purchase_order_id IS NOT NULL AND pr.purchase_order_id = pi.purchase_order_id)
+		  )`, invoiceID, businessID).Scan(&count).Error
 	return count, err
 }
 
