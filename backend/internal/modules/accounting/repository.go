@@ -3106,7 +3106,7 @@ func (r *Repository) ListInventoryReconciliationDetailRows(businessID, inventory
 				EXISTS (
 					SELECT 1
 					FROM purchase_receipts pr
-					JOIN purchase_invoices pi ON pi.id = pr.purchase_invoice_id
+					JOIN purchase_invoices pi ON `+receiptBilledLinkSQL+`
 						AND pi.business_id = pr.business_id
 						AND pi.deleted_at IS NULL
 						AND pi.status = 'posted'
@@ -3286,6 +3286,25 @@ func (r *Repository) ListUnassignedInventoryJournalLines(businessID, inventoryAc
 	return rows, nil
 }
 
+// receiptBilledLinkSQL matches a goods receipt to the supplier bill that
+// accounts for it, for use in a query that has purchase_receipts aliased pr
+// and purchase_invoices aliased pi.
+//
+// Nothing writes purchase_receipts.purchase_invoice_id -- a bill is created
+// against the purchase order, and the column stays NULL -- so matching on it
+// alone finds no bill for any receipt. Every posted bill's Inventory / Stock
+// lines then showed as unassigned, and every received item stayed "Pending
+// bill posting" for good, which is precisely what the reconciliation report
+// exists to rule out.
+//
+// The purchase-order fallback is the rule the inventory module already used
+// (internal/modules/inventory/repository.go), which is why the Inventory
+// screen cleared the flag while this report did not. Keep the two in step.
+const receiptBilledLinkSQL = `(
+			(pr.purchase_invoice_id IS NOT NULL AND pi.id = pr.purchase_invoice_id)
+			OR (pr.purchase_invoice_id IS NULL AND pr.purchase_order_id IS NOT NULL AND pi.purchase_order_id = pr.purchase_order_id)
+		)`
+
 const unassignedInventoryJournalLinesSQL = `
 	SELECT
 		je.id AS journal_entry_id,
@@ -3336,7 +3355,7 @@ const unassignedInventoryJournalLinesSQL = `
 	  AND NOT EXISTS (
 	    SELECT 1
 	    FROM purchase_invoices pi
-	    JOIN purchase_receipts pr ON pr.purchase_invoice_id = pi.id
+	    JOIN purchase_receipts pr ON ` + receiptBilledLinkSQL + `
 	      AND pr.business_id = pi.business_id
 	      AND pr.deleted_at IS NULL
 	    WHERE pi.business_id = jel.business_id
