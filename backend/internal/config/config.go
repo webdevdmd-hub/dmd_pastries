@@ -32,6 +32,7 @@ type Config struct {
 	AppwriteAPIKey           string
 	SupabaseProjectRef       string
 	SupabaseJWTSecret        string
+	SupabaseServiceRoleKey   string
 	E2EAuthToken             string
 	RequireEmailVerification bool
 	PasswordResetURL         string
@@ -58,6 +59,9 @@ func Load() Config {
 	// code change. mustEnv here would make the migration a flag day.
 	cfg.SupabaseProjectRef = getEnv("SUPABASE_PROJECT_REF", "")
 	cfg.SupabaseJWTSecret = getEnv("SUPABASE_JWT_SECRET", "")
+	// Unrestricted database access, including the auth schema. Never goes to
+	// the frontend and never appears in an error returned to a caller.
+	cfg.SupabaseServiceRoleKey = getEnv("SUPABASE_SERVICE_ROLE_KEY", "")
 	cfg.E2EAuthToken = getEnv("E2E_AUTH_TOKEN", "")
 	cfg.RequireEmailVerification = getEnvBool("REQUIRE_EMAIL_VERIFICATION", false)
 	cfg.PasswordResetURL = getEnv("PASSWORD_RESET_URL", "http://localhost:3000/reset-password")
