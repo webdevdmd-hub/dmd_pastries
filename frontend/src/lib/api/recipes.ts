@@ -159,7 +159,13 @@ function parseRecipe(value: unknown): Recipe {
     description: optionalString(value.description),
     batchYieldQuantity: numberValue(value.batch_yield_quantity),
     batchYieldUnitId: stringValue(value.batch_yield_unit_id),
-    batchYieldUnitName: stringValue(value.batch_yield_unit_name, "Unit"),
+    // The recipes API sends batch_yield_unit_symbol. Reading a field it never
+    // sends meant the fallback always won, so every yield rendered as
+    // "10 Unit" instead of "10 pcs".
+    batchYieldUnitName: stringValue(
+      value.batch_yield_unit_symbol,
+      stringValue(value.batch_yield_unit_name, "Unit"),
+    ),
     preparationTimeMinutes:
       typeof value.preparation_time_minutes === "number" ? value.preparation_time_minutes : null,
     instructions: optionalString(value.instructions),

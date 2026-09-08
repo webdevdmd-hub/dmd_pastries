@@ -490,7 +490,11 @@ func (r *Repository) locationBalanceBaseQuery(businessID string) *gorm.DB {
 				WHEN ii.item_type = 'product_variant' THEN CONCAT(p.product_name, ' - ', pv.variant_name)
 				ELSE COALESCE(p.product_name, ing.ingredient_name, pi.packaging_name, '')
 			END AS item_name,
-			COALESCE(NULLIF(pv.sku, ''), p.sku, ing.ingredient_code, pi.packaging_code, '') AS item_code,
+			-- product_code is NOT NULL, so an item backed by a product always has
+			-- an identifier; without it the list printed "No code" beside products
+			-- the Products screen lists as PRD-000002. Reports already coalesced
+			-- this way. NULLIF on every branch, or an empty sku wins over the rest.
+			COALESCE(NULLIF(pv.sku, ''), NULLIF(p.sku, ''), NULLIF(p.product_code, ''), NULLIF(ing.ingredient_code, ''), NULLIF(pi.packaging_code, ''), '') AS item_code,
 			ii.product_id,
 			ii.product_variant_id,
 			COALESCE(pv.variant_name, '') AS variant_name,
@@ -734,7 +738,7 @@ func (r *Repository) ExpiryAlerts(businessID, branchID, itemType, productType, s
 				WHEN ii.item_type = 'packaging' THEN COALESCE(NULLIF(pi.packaging_name, ''), 'Deleted packaging item')
 				ELSE 'Item details unavailable'
 			END AS item_name,
-			COALESCE(NULLIF(pv.sku, ''), NULLIF(p.sku, ''), NULLIF(ing.ingredient_code, ''), NULLIF(pi.packaging_code, ''), '') AS item_code,
+			COALESCE(NULLIF(pv.sku, ''), NULLIF(p.sku, ''), NULLIF(p.product_code, ''), NULLIF(ing.ingredient_code, ''), NULLIF(pi.packaging_code, ''), '') AS item_code,
 			COALESCE(NULLIF(pv.sku, ''), NULLIF(p.sku, ''), '') AS sku,
 			COALESCE(p.product_type, '') AS product_type,
 			COALESCE(pc.category_name, ic.category_name, pac.category_name, '') AS category_name,

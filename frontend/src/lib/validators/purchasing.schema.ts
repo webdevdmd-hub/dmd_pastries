@@ -81,8 +81,11 @@ export const purchaseInvoiceSchema = z.object({
   branchId: z.string().min(1, "Branch is required."),
   supplierId: z.string().min(1, "Supplier is required."),
   purchaseOrderId: optionalNullableString,
-  invoiceNumber: z.string().min(1, "Invoice number is required."),
-  invoiceDate: z.string().min(1, "Invoice date is required."),
+  // The screen calls these Bill number and Bill date, and so does the nav.
+  // "Invoice" is the internal name for the record and should not surface in a
+  // validation message the user reads next to a field labelled Bill.
+  invoiceNumber: z.string().min(1, "Bill number is required."),
+  invoiceDate: z.string().min(1, "Bill date is required."),
   dueDate: optionalNullableString,
   items: z.array(purchaseItemLineSchema).min(1, "At least one item is required."),
   billDiscountAmount: z.coerce.number().min(0, "Bill discount cannot be negative.").optional(),

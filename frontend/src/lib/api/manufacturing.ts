@@ -433,7 +433,13 @@ function parseRecipe(value: unknown): ManufacturingRecipeOption {
     productVariantName: optionalString(value.product_variant_name),
     versionNumber: numberValue(value.version_number),
     batchYieldQuantity: numberValue(value.batch_yield_quantity),
-    batchYieldUnitName: stringValue(value.batch_yield_unit_name, "Unit"),
+    // The recipes API sends batch_yield_unit_symbol. Reading a field it never
+    // sends meant the fallback always won, so every yield rendered as
+    // "10 Unit" instead of "10 pcs".
+    batchYieldUnitName: stringValue(
+      value.batch_yield_unit_symbol,
+      stringValue(value.batch_yield_unit_name, "Unit"),
+    ),
     componentCount: firstOptionalNumber(
       value.component_count,
       value.components_count,
