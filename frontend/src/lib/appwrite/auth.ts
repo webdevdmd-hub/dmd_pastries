@@ -25,15 +25,21 @@ let jwtRateLimitUntil = 0;
 const e2eSessionKey = "pastries-pos:e2e-session";
 
 /**
- * The JWT and the rate-limit marker survive a reload within the tab.
+ * The JWT and the rate-limit marker are shared by every tab on the device.
  *
  * Appwrite allows a fixed number of JWT creations per user per hour, and the
  * app asks for one on every full page load. Held only in module memory, a
  * refresh, a shared link or a run through forty report pages each cost a
  * fresh token, and one afternoon of QA locked the account out for the rest of
- * the hour. A 15-minute token in sessionStorage costs one request per tab
- * instead. The Appwrite session itself already sits in localStorage as
- * `cookieFallback`, so this adds no new exposure class.
+ * the hour. sessionStorage fixed the reload but not the tab: an owner with the
+ * dashboard, the register and a report open spent three times the budget of
+ * one, and every reopened tab started again from nothing.
+ *
+ * localStorage makes the 15-minute token device-wide, so the hourly budget is
+ * spent per device instead of per tab. The rate-limit marker moves with it, so
+ * a device that has hit the limit does not retry from a second tab and re-arm
+ * the same bucket. The Appwrite session itself already sits in localStorage as
+ * `cookieFallback` and outlives this token by far, so nothing new is exposed.
  */
 const jwtStorageKey = "pastries-pos:appwrite-jwt";
 const jwtRateLimitStorageKey = "pastries-pos:appwrite-jwt-rate-limit-until";
@@ -56,7 +62,7 @@ function readStorage(key: string): string | null {
     return null;
   }
   try {
-    return window.sessionStorage.getItem(key);
+    return window.localStorage.getItem(key);
   } catch {
     return null;
   }
@@ -68,9 +74,9 @@ function writeStorage(key: string, value: string | null): void {
   }
   try {
     if (value === null) {
-      window.sessionStorage.removeItem(key);
+      window.localStorage.removeItem(key);
     } else {
-      window.sessionStorage.setItem(key, value);
+      window.localStorage.setItem(key, value);
     }
   } catch {
     // Private mode or blocked storage: memory caching still applies.
@@ -97,6 +103,14 @@ function readPersistedJwt(): CachedJwt | null {
   }
   writeStorage(jwtStorageKey, null);
   return null;
+}
+
+/**
+ * The 60s margin keeps a token that is about to expire from being handed to a
+ * request that has not been sent yet.
+ */
+function isJwtUsable(candidate: CachedJwt | null): candidate is CachedJwt {
+  return candidate !== null && candidate.expiresAt - Date.now() > 60_000;
 }
 
 function readPersistedRateLimitUntil(): number {
@@ -275,10 +289,20 @@ export async function createAppwriteJwt(): Promise<string> {
     return getE2EAuthToken();
   }
 
-  // A fresh module scope after a reload starts from whatever the tab saved.
+  // A fresh module scope after a reload starts from whatever the device saved.
   cachedJwt ??= readPersistedJwt();
 
-  if (cachedJwt && cachedJwt.expiresAt - Date.now() > 60_000) {
+  // The token is shared across tabs, so another tab may have refreshed it since
+  // this module scope cached its copy. Look again before spending a request out
+  // of an hourly budget that every tab draws from.
+  if (!isJwtUsable(cachedJwt)) {
+    const persisted = readPersistedJwt();
+    if (isJwtUsable(persisted)) {
+      cachedJwt = persisted;
+    }
+  }
+
+  if (isJwtUsable(cachedJwt)) {
     return cachedJwt.jwt;
   }
 

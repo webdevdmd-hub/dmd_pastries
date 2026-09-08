@@ -20,7 +20,7 @@
     "check:tokens": "node scripts/check-token-agreement.mjs",
     "check:type-scale": "node scripts/check-type-scale.mjs",
     "verify": "pnpm typecheck && pnpm lint && pnpm check:no-any && pnpm check:tokens && pnpm check:chart-palette && pnpm format:check && pnpm test",
-    "test": "pnpm test:pos-cart-totals && pnpm test:product-pos-labels && pnpm test:product-unit-payload && pnpm test:recipe-cost-preview && pnpm test:sales-return-refund-preview && pnpm test:purchase-order-quantities && pnpm test:ledger-header-accounts && pnpm test:dialog-form-reset",
+    "test": "pnpm test:pos-cart-totals && pnpm test:product-pos-labels && pnpm test:product-unit-payload && pnpm test:recipe-cost-preview && pnpm test:sales-return-refund-preview && pnpm test:purchase-order-quantities && pnpm test:ledger-header-accounts && pnpm test:dialog-form-reset && pnpm test:jwt-cache-storage",
     "visual:baseline": "node scripts/visual/capture.mjs --out baseline",
     "visual:capture": "node scripts/visual/capture.mjs --out current",
     "visual:diff": "node scripts/visual/compare.mjs baseline current --open",
@@ -33,7 +33,8 @@
     "test:recipe-cost-preview": "node scripts/check-recipe-cost-preview.mjs",
     "test:sales-return-refund-preview": "node scripts/check-sales-return-refund-preview.mjs",
     "prepare": "node scripts/install-hooks.mjs",
-    "check:chart-palette": "node scripts/check-chart-palette.mjs"
+    "check:chart-palette": "node scripts/check-chart-palette.mjs",
+    "test:jwt-cache-storage": "node scripts/check-jwt-cache-storage.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs,json,md,css}": [
