@@ -19,13 +19,13 @@ import (
 )
 
 type Service struct {
-	db             *gorm.DB
-	appwriteClient *utils.AppwriteClient
-	repo           *Repository
-	roleRepo       *roles.Repository
-	branchRepo     *branches.Repository
-	businessRepo   *businesses.Repository
-	auditRepo      *audit.Repository
+	db           *gorm.DB
+	identities   *utils.IdentityManager
+	repo         *Repository
+	roleRepo     *roles.Repository
+	branchRepo   *branches.Repository
+	businessRepo *businesses.Repository
+	auditRepo    *audit.Repository
 }
 
 const selfPrivilegedFieldUpdateMessage = "You cannot modify your own role, status, or branch."
@@ -33,7 +33,7 @@ const selfDestructiveActionMessage = "You cannot deactivate, suspend, or delete 
 
 func NewService(
 	db *gorm.DB,
-	appwriteClient *utils.AppwriteClient,
+	identities *utils.IdentityManager,
 	repo *Repository,
 	roleRepo *roles.Repository,
 	branchRepo *branches.Repository,
@@ -41,13 +41,13 @@ func NewService(
 	auditRepo *audit.Repository,
 ) *Service {
 	return &Service{
-		db:             db,
-		appwriteClient: appwriteClient,
-		repo:           repo,
-		roleRepo:       roleRepo,
-		branchRepo:     branchRepo,
-		businessRepo:   businessRepo,
-		auditRepo:      auditRepo,
+		db:           db,
+		identities:   identities,
+		repo:         repo,
+		roleRepo:     roleRepo,
+		branchRepo:   branchRepo,
+		businessRepo: businessRepo,
+		auditRepo:    auditRepo,
 	}
 }
 
@@ -349,15 +349,16 @@ func (s *Service) AcceptInvitation(req AcceptInvitationRequest, ipAddress, userA
 		return nil, apperrors.Conflict("user already exists in this business", nil)
 	}
 
-	appwriteUserID, err := s.appwriteClient.CreateUser(invite.Email, req.Password, invite.FullName, invite.Phone)
+	ids, err := s.identities.CreateUser(invite.Email, req.Password, invite.FullName, invite.Phone)
 	if err != nil {
-		message, details := utils.FriendlyAppwriteCreateUserError(err)
+		message, details := utils.FriendlyCreateUserError(err)
 		return nil, apperrors.BadRequest(message, details)
 	}
 
 	user := &User{
 		ID:              utils.NewUUID(),
-		AppwriteUserID:  appwriteUserID,
+		AppwriteUserID:  ids.Appwrite,
+		SupabaseUserID:  ids.SupabaseOrNil(),
 		BusinessID:      invite.BusinessID,
 		BranchID:        invite.BranchID,
 		CurrentBranchID: invite.BranchID,
@@ -487,17 +488,18 @@ func (s *Service) CreateUser(currentUser *utils.AuthContext, req CreateUserReque
 		}
 	}
 
-	appwriteUserID, err := s.appwriteClient.CreateUser(req.Email, req.Password, req.FullName, req.Phone)
+	ids, err := s.identities.CreateUser(req.Email, req.Password, req.FullName, req.Phone)
 	if err != nil {
 		tx.Rollback()
-		message, details := utils.FriendlyAppwriteCreateUserError(err)
+		message, details := utils.FriendlyCreateUserError(err)
 		return nil, apperrors.BadRequest(message, details)
 	}
-	user.AppwriteUserID = appwriteUserID
-	if err := s.repo.UpdateAppwriteUserID(tx, user.ID, appwriteUserID); err != nil {
+	user.AppwriteUserID = ids.Appwrite
+	user.SupabaseUserID = ids.SupabaseOrNil()
+	if err := s.repo.UpdateProviderIDs(tx, user.ID, ids); err != nil {
 		tx.Rollback()
-		_ = s.appwriteClient.DeleteUser(appwriteUserID)
-		return nil, apperrors.Internal("failed to link Appwrite user")
+		_ = s.identities.DeleteUser(ids)
+		return nil, apperrors.Internal("failed to link identity provider user")
 	}
 
 	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{
@@ -558,15 +560,16 @@ func (s *Service) InviteUser(currentUser *utils.AuthContext, req InviteUserReque
 		return nil, apperrors.Internal("failed to generate temporary password")
 	}
 
-	appwriteUserID, err := s.appwriteClient.CreateUser(req.Email, temporaryPassword, req.FullName, req.Phone)
+	ids, err := s.identities.CreateUser(req.Email, temporaryPassword, req.FullName, req.Phone)
 	if err != nil {
-		message, details := utils.FriendlyAppwriteCreateUserError(err)
+		message, details := utils.FriendlyCreateUserError(err)
 		return nil, apperrors.BadRequest(message, details)
 	}
 
 	user := &User{
 		ID:              utils.NewUUID(),
-		AppwriteUserID:  appwriteUserID,
+		AppwriteUserID:  ids.Appwrite,
+		SupabaseUserID:  ids.SupabaseOrNil(),
 		BusinessID:      currentUser.BusinessID,
 		BranchID:        req.BranchID,
 		CurrentBranchID: req.BranchID,
@@ -790,8 +793,8 @@ func (s *Service) DeleteUser(currentUser *utils.AuthContext, userID string, ipAd
 		return nil, apperrors.Internal("failed to commit user deletion")
 	}
 
-	_ = s.appwriteClient.DeleteUserSessions(user.AppwriteUserID)
-	_ = s.appwriteClient.SetUserStatus(user.AppwriteUserID, false)
+	s.identities.RevokeSessions(user.ProviderIDs())
+	_ = s.identities.SetUserStatus(user.ProviderIDs(), false)
 
 	deleted, err := s.repo.FindByIDAndBusinessIDUnscoped(user.ID, currentUser.BusinessID)
 	if err != nil {
@@ -841,7 +844,7 @@ func (s *Service) RestoreUser(currentUser *utils.AuthContext, userID string, ipA
 		return nil, apperrors.Internal("failed to commit user restore")
 	}
 
-	_ = s.appwriteClient.SetUserStatus(user.AppwriteUserID, true)
+	_ = s.identities.SetUserStatus(user.ProviderIDs(), true)
 
 	restored, err := s.repo.FindByIDAndBusinessID(user.ID, currentUser.BusinessID)
 	if err != nil {

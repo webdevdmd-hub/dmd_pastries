@@ -6,6 +6,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"pastries-pos/internal/shared/utils"
+
 	apperrors "pastries-pos/internal/shared/errors"
 )
 
@@ -81,6 +83,20 @@ func (r *Repository) UpdateAuthSync(tx *gorm.DB, userID string, emailVerified bo
 
 func (r *Repository) UpdateAppwriteUserID(tx *gorm.DB, userID, appwriteUserID string) error {
 	return tx.Model(&User{}).Where("id = ?", userID).Update("appwrite_user_id", appwriteUserID).Error
+}
+
+// UpdateProviderIDs links a local user to their account in every live identity
+// provider. Written together so a row can never carry one id and not the other
+// after a partially applied update.
+func (r *Repository) UpdateProviderIDs(tx *gorm.DB, userID string, ids utils.ProviderIDs) error {
+	updates := map[string]interface{}{"appwrite_user_id": ids.Appwrite}
+	// Only touch supabase_user_id when there is one: before cutover it must
+	// stay NULL, and the partial unique index treats NULLs as distinct while an
+	// empty string would collide on the second user.
+	if supabaseID := ids.SupabaseOrNil(); supabaseID != nil {
+		updates["supabase_user_id"] = *supabaseID
+	}
+	return tx.Model(&User{}).Where("id = ?", userID).Updates(updates).Error
 }
 
 func (r *Repository) UpdateEmailVerified(tx *gorm.DB, userID string, emailVerified bool) error {

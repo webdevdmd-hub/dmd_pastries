@@ -28,6 +28,7 @@ type Service struct {
 	cfg              config.Config
 	appwriteClient   *utils.AppwriteClient
 	supabaseVerifier *utils.SupabaseVerifier
+	identities       *utils.IdentityManager
 	repo             *Repository
 	userRepo         *users.Repository
 	businessRepo     *businesses.Repository
@@ -68,6 +69,7 @@ func NewService(
 		cfg:              cfg,
 		appwriteClient:   appwriteClient,
 		supabaseVerifier: utils.NewSupabaseVerifier(cfg),
+		identities:       utils.NewIdentityManager(appwriteClient, utils.NewSupabaseAdminClient(cfg), cfg.AuthPrimaryProvider),
 		repo:             repo,
 		userRepo:         userRepo,
 		businessRepo:     businessRepo,
@@ -83,15 +85,15 @@ func (s *Service) RegisterOwner(req RegisterOwnerRequest, ipAddress, userAgent s
 		return nil, apperrors.BadRequest("password and confirm_password must match", nil)
 	}
 
-	appwriteUserID, err := s.appwriteClient.CreateUser(req.Email, req.Password, req.FullName, req.Phone)
+	ids, err := s.identities.CreateUser(req.Email, req.Password, req.FullName, req.Phone)
 	if err != nil {
-		message, details := utils.FriendlyAppwriteCreateUserError(err)
+		message, details := utils.FriendlyCreateUserError(err)
 		return nil, apperrors.BadRequest(message, details)
 	}
 	registrationCommitted := false
 	defer func() {
 		if !registrationCommitted {
-			_ = s.appwriteClient.DeleteUser(appwriteUserID)
+			_ = s.identities.DeleteUser(ids)
 		}
 	}()
 
@@ -199,7 +201,8 @@ func (s *Service) RegisterOwner(req RegisterOwnerRequest, ipAddress, userAgent s
 
 	localUser := &users.User{
 		ID:                   userID,
-		AppwriteUserID:       appwriteUserID,
+		AppwriteUserID:       ids.Appwrite,
+		SupabaseUserID:       ids.SupabaseOrNil(),
 		BusinessID:           businessID,
 		BranchID:             &branchID,
 		CurrentBranchID:      &branchID,
@@ -309,7 +312,7 @@ func (s *Service) RegisterOwner(req RegisterOwnerRequest, ipAddress, userAgent s
 	return &RegisterOwnerResponse{
 		BusinessID:         businessID,
 		UserID:             userID,
-		AppwriteUserID:     appwriteUserID,
+		AppwriteUserID:     ids.Appwrite,
 		RoleID:             roleID,
 		SubscriptionStatus: subscription.Status,
 	}, nil
@@ -644,7 +647,7 @@ func (s *Service) Me(currentUser *utils.AuthContext) (interface{}, error) {
 
 func (s *Service) RequestPasswordReset(req PasswordResetRequest) error {
 	email := strings.ToLower(strings.TrimSpace(req.Email))
-	if err := s.appwriteClient.CreatePasswordRecovery(email, s.cfg.PasswordResetURL); err != nil {
+	if err := s.identities.CreatePasswordRecovery(email, s.cfg.PasswordResetURL); err != nil {
 		return apperrors.BadRequest("failed to request password reset", err.Error())
 	}
 	return nil
@@ -654,7 +657,7 @@ func (s *Service) CompletePasswordReset(req PasswordResetCompleteRequest) error 
 	if !utils.PasswordsMatch(req.Password, req.ConfirmPassword) {
 		return apperrors.BadRequest("password and confirm_password must match", nil)
 	}
-	if err := s.appwriteClient.CompletePasswordRecovery(req.UserID, req.Secret, req.Password); err != nil {
+	if err := s.identities.CompletePasswordRecovery(req.UserID, req.Secret, req.Token, req.Password); err != nil {
 		return apperrors.BadRequest("failed to complete password reset", err.Error())
 	}
 	return nil

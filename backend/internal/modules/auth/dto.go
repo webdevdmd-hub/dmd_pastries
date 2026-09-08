@@ -19,9 +19,17 @@ type PasswordResetRequest struct {
 	Email string `json:"email" binding:"required,email"`
 }
 
+// PasswordResetCompleteRequest accepts either provider's proof of identity.
+//
+// Appwrite sends a user id plus a secret; Supabase sends a single-use token.
+// None of the three is individually required because which ones arrive depends
+// on who sent the email, and the service rejects a request carrying neither
+// pair. Marking them required at the binding layer would reject the other
+// provider's perfectly valid link with a validation error.
 type PasswordResetCompleteRequest struct {
-	UserID          string `json:"user_id" binding:"required"`
-	Secret          string `json:"secret" binding:"required"`
+	UserID          string `json:"user_id"`
+	Secret          string `json:"secret"`
+	Token           string `json:"token"`
 	Password        string `json:"password" binding:"required,min=8"`
 	ConfirmPassword string `json:"confirm_password" binding:"required"`
 }

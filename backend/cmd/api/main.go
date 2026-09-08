@@ -102,6 +102,10 @@ func main() {
 	}
 
 	appwriteClient := utils.NewAppwriteClient(cfg)
+	supabaseAdmin := utils.NewSupabaseAdminClient(cfg)
+	// One coordinator for account writes across whichever providers are live.
+	// Token verification does not go through it: a token names its own issuer.
+	identities := utils.NewIdentityManager(appwriteClient, supabaseAdmin, cfg.AuthPrimaryProvider)
 
 	authService := auth.NewService(
 		db,
@@ -119,7 +123,7 @@ func main() {
 
 	userService := users.NewService(
 		db,
-		appwriteClient,
+		identities,
 		userRepo,
 		roleRepo,
 		branchRepo,

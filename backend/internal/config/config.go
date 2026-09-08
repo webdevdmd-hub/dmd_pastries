@@ -33,6 +33,7 @@ type Config struct {
 	SupabaseProjectRef       string
 	SupabaseJWTSecret        string
 	SupabaseServiceRoleKey   string
+	AuthPrimaryProvider      string
 	E2EAuthToken             string
 	RequireEmailVerification bool
 	PasswordResetURL         string
@@ -62,6 +63,10 @@ func Load() Config {
 	// Unrestricted database access, including the auth schema. Never goes to
 	// the frontend and never appears in an error returned to a caller.
 	cfg.SupabaseServiceRoleKey = getEnv("SUPABASE_SERVICE_ROLE_KEY", "")
+	// The cutover switch. Both providers keep verifying tokens either way;
+	// this decides which one issues sessions for new sign-ins and therefore
+	// which one sends password reset emails. Flipping it back is the rollback.
+	cfg.AuthPrimaryProvider = getEnv("AUTH_PRIMARY_PROVIDER", "appwrite")
 	cfg.E2EAuthToken = getEnv("E2E_AUTH_TOKEN", "")
 	cfg.RequireEmailVerification = getEnvBool("REQUIRE_EMAIL_VERIFICATION", false)
 	cfg.PasswordResetURL = getEnv("PASSWORD_RESET_URL", "http://localhost:3000/reset-password")
