@@ -70,6 +70,31 @@ func (r *Repository) ListBatches(businessID string, query BatchListQuery) ([]Pro
 	return batches, total, err
 }
 
+// ComponentWastageByBatch sums each batch's declared component loss in one
+// query, so a list of batches costs one round trip rather than one per row.
+func (r *Repository) ComponentWastageByBatch(businessID string, batchIDs []string) (map[string]float64, error) {
+	result := map[string]float64{}
+	if len(batchIDs) == 0 {
+		return result, nil
+	}
+	var rows []struct {
+		ProductionBatchID string
+		Total             float64
+	}
+	err := r.db.Table("production_ingredient_consumptions").
+		Select("production_batch_id, COALESCE(SUM(wastage_quantity), 0) AS total").
+		Where("business_id = ? AND production_batch_id IN ?", businessID, batchIDs).
+		Group("production_batch_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.ProductionBatchID] = roundQuantity(row.Total)
+	}
+	return result, nil
+}
+
 // Ingredients, Packaging and Output take the caller's handle rather than r.db
 // so a caller inside an open transaction can read the rows it just wrote. A
 // one-click production creates the batch and completes it in a single

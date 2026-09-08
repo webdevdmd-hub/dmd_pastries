@@ -25,6 +25,8 @@ export type ProductionBatch = {
   plannedQuantity: number;
   producedQuantity: number;
   wastageQuantity: number;
+  /** Component loss declared by the recipe, separate from spoiled output. */
+  componentWastageQuantity: number;
   batchUnitId: string;
   batchUnitName: string;
   status: BatchStatus;

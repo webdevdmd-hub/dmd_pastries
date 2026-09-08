@@ -284,7 +284,14 @@ export function BatchesPageClient(): JSX.Element {
     planned: batches.reduce((total, batch) => total + batch.plannedQuantity, 0),
     produced: batches.reduce((total, batch) => total + batch.producedQuantity, 0),
     total: batches.length,
-    wastage: batches.reduce((total, batch) => total + batch.wastageQuantity, 0),
+    // Both kinds of loss: output an operator marked spoiled, and the
+    // component loss a recipe line declares, which production consumes as its
+    // own wastage movement and expenses to Wastage Expense. Counting only the
+    // first made this read zero for a batch that had just wasted ingredients.
+    wastage: batches.reduce(
+      (total, batch) => total + batch.wastageQuantity + batch.componentWastageQuantity,
+      0,
+    ),
   };
   const metricCards = [
     { label: "Total Batches", meta: "visible", value: formatMetric(batchMetrics.total) },

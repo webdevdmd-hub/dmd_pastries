@@ -92,43 +92,49 @@ type PaginatedBatchResponse struct {
 }
 
 type ProductionBatchResponse struct {
-	ID                    string                         `json:"id"`
-	BusinessID            string                         `json:"business_id"`
-	BranchID              string                         `json:"branch_id"`
-	BranchName            string                         `json:"branch_name"`
-	RecipeID              string                         `json:"recipe_id"`
-	RecipeName            string                         `json:"recipe_name"`
-	RecipeVersionNumber   int                            `json:"recipe_version_number"`
-	ProductID             string                         `json:"product_id"`
-	ProductName           string                         `json:"product_name"`
-	ProductVariantID      *string                        `json:"product_variant_id"`
-	ProductVariantName    string                         `json:"product_variant_name"`
-	ProductionBatchNumber string                         `json:"production_batch_number"`
-	PlannedQuantity       float64                        `json:"planned_quantity"`
-	ProducedQuantity      float64                        `json:"produced_quantity"`
-	YieldUnitID           string                         `json:"yield_unit_id"`
-	YieldUnitSymbol       string                         `json:"yield_unit_symbol"`
-	Status                string                         `json:"status"`
-	ProductionDate        time.Time                      `json:"production_date"`
-	StartedAt             *time.Time                     `json:"started_at"`
-	CompletedAt           *time.Time                     `json:"completed_at"`
-	CancelledAt           *time.Time                     `json:"cancelled_at"`
-	IngredientCost        float64                        `json:"ingredient_cost"`
-	PackagingCost         float64                        `json:"packaging_cost"`
-	TotalProductionCost   float64                        `json:"total_production_cost"`
-	CostPerUnit           float64                        `json:"cost_per_unit"`
-	WastageQuantity       float64                        `json:"wastage_quantity"`
-	WastageReason         string                         `json:"wastage_reason"`
-	Notes                 string                         `json:"notes"`
-	CreatedByUserID       string                         `json:"created_by_user_id"`
-	CreatedByUserName     string                         `json:"created_by_user_name"`
-	CompletedByUserID     *string                        `json:"completed_by_user_id"`
-	Ingredients           []ProductionIngredientResponse `json:"ingredients,omitempty"`
-	Packaging             []ProductionPackagingResponse  `json:"packaging,omitempty"`
-	Output                *ProductionOutputResponse      `json:"output,omitempty"`
-	StockMovementIDs      []string                       `json:"stock_movement_ids,omitempty"`
-	CreatedAt             time.Time                      `json:"created_at"`
-	UpdatedAt             time.Time                      `json:"updated_at"`
+	ID                    string     `json:"id"`
+	BusinessID            string     `json:"business_id"`
+	BranchID              string     `json:"branch_id"`
+	BranchName            string     `json:"branch_name"`
+	RecipeID              string     `json:"recipe_id"`
+	RecipeName            string     `json:"recipe_name"`
+	RecipeVersionNumber   int        `json:"recipe_version_number"`
+	ProductID             string     `json:"product_id"`
+	ProductName           string     `json:"product_name"`
+	ProductVariantID      *string    `json:"product_variant_id"`
+	ProductVariantName    string     `json:"product_variant_name"`
+	ProductionBatchNumber string     `json:"production_batch_number"`
+	PlannedQuantity       float64    `json:"planned_quantity"`
+	ProducedQuantity      float64    `json:"produced_quantity"`
+	YieldUnitID           string     `json:"yield_unit_id"`
+	YieldUnitSymbol       string     `json:"yield_unit_symbol"`
+	Status                string     `json:"status"`
+	ProductionDate        time.Time  `json:"production_date"`
+	StartedAt             *time.Time `json:"started_at"`
+	CompletedAt           *time.Time `json:"completed_at"`
+	CancelledAt           *time.Time `json:"cancelled_at"`
+	IngredientCost        float64    `json:"ingredient_cost"`
+	PackagingCost         float64    `json:"packaging_cost"`
+	TotalProductionCost   float64    `json:"total_production_cost"`
+	CostPerUnit           float64    `json:"cost_per_unit"`
+	WastageQuantity       float64    `json:"wastage_quantity"`
+	// Finished output an operator marks as spoiled is WastageQuantity. This is
+	// the other kind: component loss a recipe line declares, consumed as its
+	// own wastage movement and expensed to Wastage Expense. The batches screen
+	// totals both, having previously reported only the first and so read zero
+	// for a batch that had just wasted ingredients.
+	ComponentWastageQuantity float64                        `json:"component_wastage_quantity"`
+	WastageReason            string                         `json:"wastage_reason"`
+	Notes                    string                         `json:"notes"`
+	CreatedByUserID          string                         `json:"created_by_user_id"`
+	CreatedByUserName        string                         `json:"created_by_user_name"`
+	CompletedByUserID        *string                        `json:"completed_by_user_id"`
+	Ingredients              []ProductionIngredientResponse `json:"ingredients,omitempty"`
+	Packaging                []ProductionPackagingResponse  `json:"packaging,omitempty"`
+	Output                   *ProductionOutputResponse      `json:"output,omitempty"`
+	StockMovementIDs         []string                       `json:"stock_movement_ids,omitempty"`
+	CreatedAt                time.Time                      `json:"created_at"`
+	UpdatedAt                time.Time                      `json:"updated_at"`
 }
 
 type ProductionIngredientResponse struct {

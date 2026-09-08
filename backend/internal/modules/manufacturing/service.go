@@ -60,8 +60,18 @@ func (s *Service) ListBatches(currentUser *utils.AuthContext, query BatchListQue
 		return nil, apperrors.Internal("failed to list production batches")
 	}
 	items := make([]ProductionBatchResponse, 0, len(batches))
+	batchIDs := make([]string, 0, len(batches))
 	for _, batch := range batches {
-		items = append(items, s.batchResponse(currentUser.BusinessID, batch, false))
+		batchIDs = append(batchIDs, batch.ID)
+	}
+	componentWastage, err := s.repo.ComponentWastageByBatch(currentUser.BusinessID, batchIDs)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load production wastage")
+	}
+	for _, batch := range batches {
+		item := s.batchResponse(currentUser.BusinessID, batch, false)
+		item.ComponentWastageQuantity = componentWastage[batch.ID]
+		items = append(items, item)
 	}
 	return &PaginatedBatchResponse{Items: items, Pagination: PaginationResponse{Page: query.Page, Limit: query.Limit, Total: total, TotalPages: totalPages(total, query.Limit)}}, nil
 }

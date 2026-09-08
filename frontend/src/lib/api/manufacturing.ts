@@ -207,6 +207,7 @@ function parseBatch(value: unknown): ProductionBatch {
     plannedQuantity: numberValue(value.planned_quantity),
     producedQuantity: numberValue(value.produced_quantity),
     wastageQuantity: numberValue(value.wastage_quantity),
+    componentWastageQuantity: numberValue(value.component_wastage_quantity),
     batchUnitId: stringValue(value.yield_unit_id, stringValue(value.batch_unit_id)),
     batchUnitName: stringValue(value.yield_unit_symbol, stringValue(value.batch_unit_name, "Unit")),
     status: isBatchStatus(value.status) ? value.status : "draft",
