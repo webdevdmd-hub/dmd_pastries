@@ -150,10 +150,19 @@ export function SupplierFormDialog({
   });
   const [status, setStatus] = useState<SupplierStatus>(supplier?.status ?? "active");
 
+  // Reset on every opening, not only when the record changes. The add path
+  // passes a null record each time, so without `open` in the deps nothing
+  // changed between closing and reopening and this never re-ran: the next
+  // form inherited whatever the last one left behind. Guarded on open so a
+  // closing dialog does not visibly blank its fields mid-animation.
   useEffect(() => {
+    if (!open) {
+      return;
+    }
+
     form.reset(defaultValues(supplier));
     setStatus(supplier?.status ?? "active");
-  }, [form, supplier]);
+  }, [form, open, supplier]);
 
   // Every opening starts on Details, whichever tab the last one closed on.
   useEffect(() => {

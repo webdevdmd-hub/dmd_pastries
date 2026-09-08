@@ -86,10 +86,19 @@ export function ProductVariantFormDialog({
   const watchedPricingPercent = form.watch("pricingPercent");
   const watchedPricingType = form.watch("pricingType");
 
+  // Reset on every opening, not only when the record changes. The add path
+  // passes a null record each time, so without `open` in the deps nothing
+  // changed between closing and reopening and this never re-ran: the next
+  // form inherited whatever the last one left behind. Guarded on open so a
+  // closing dialog does not visibly blank its fields mid-animation.
   useEffect(() => {
+    if (!open) {
+      return;
+    }
+
     form.reset(toDefaultValues(variant));
     setSelectedImage(null);
-  }, [form, variant]);
+  }, [form, open, variant]);
 
   const previewUrl = useMemo(() => {
     if (selectedImage) {

@@ -105,9 +105,18 @@ export function CustomerFormDialog({
     defaultValues: defaultValues(customer),
   });
 
+  // Reset on every opening, not only when the record changes. The add path
+  // passes a null record each time, so without `open` in the deps nothing
+  // changed between closing and reopening and this never re-ran: the next
+  // form inherited whatever the last one left behind. Guarded on open so a
+  // closing dialog does not visibly blank its fields mid-animation.
   useEffect(() => {
+    if (!open) {
+      return;
+    }
+
     form.reset(defaultValues(customer));
-  }, [customer, form]);
+  }, [customer, form, open]);
 
   // Every opening starts on Details, whichever tab the last one closed on.
   useEffect(() => {

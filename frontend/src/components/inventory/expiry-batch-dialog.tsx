@@ -47,9 +47,18 @@ export function ExpiryBatchDialog({
     },
   });
 
+  // Reset on every opening, not only when the record changes. The add path
+  // passes a null record each time, so without `open` in the deps nothing
+  // changed between closing and reopening and this never re-ran: the next
+  // form inherited whatever the last one left behind. Guarded on open so a
+  // closing dialog does not visibly blank its fields mid-animation.
   useEffect(() => {
+    if (!open) {
+      return;
+    }
+
     form.reset({ batchNumber: "", quantity: 1, receivedDate: "", expiryDate: "" });
-  }, [form, item]);
+  }, [form, item, open]);
 
   const handleSubmit = async (values: CreateExpiryBatchSchema): Promise<void> => {
     if (!item) return;

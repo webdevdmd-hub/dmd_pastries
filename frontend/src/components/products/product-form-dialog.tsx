@@ -196,10 +196,23 @@ export function ProductFormDialog({
     ? watchedCategoryId
     : "";
 
+  // Reset on every opening, not only when the product changes. Adding a
+  // product passes product === undefined each time, so with `open` missing
+  // from the deps nothing changed between closing and reopening and this never
+  // re-ran: the next Add Product inherited the last one's name, cost price,
+  // unit and category. Editing looked fine only because `product` differs per
+  // row. Entering a catalogue in one sitting silently wrote the previous
+  // item's cost onto the next, and cost feeds recipe costing, inventory
+  // valuation and COGS. Guarded on open so a closing dialog does not visibly
+  // blank its own fields mid-animation.
   useEffect(() => {
+    if (!open) {
+      return;
+    }
+
     form.reset(toDefaultValues(product, { defaultItemStructure, defaultProductType }));
     setSelectedImage(null);
-  }, [defaultItemStructure, defaultProductType, form, product]);
+  }, [defaultItemStructure, defaultProductType, form, open, product]);
 
   // Every opening starts on Identity, whichever tab the last one closed on.
   useEffect(() => {
