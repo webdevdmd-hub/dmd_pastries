@@ -22,12 +22,31 @@ type AppwriteClient struct {
 	e2eToken  string
 }
 
+// Provider names for AppwriteIdentity.Provider.
+const (
+	ProviderAppwrite = "appwrite"
+	ProviderSupabase = "supabase"
+)
+
 type AppwriteIdentity struct {
+	// Provider says which system vouched for this identity, and therefore
+	// which column on users resolves it: appwrite_user_id or
+	// supabase_user_id. During the migration both are live at once, and
+	// resolving against the wrong column silently finds nobody.
+	//
+	// An empty value means Appwrite, so identities built before this field
+	// existed keep their old behaviour.
+	Provider      string
 	ID            string
 	Email         string
 	Phone         string
 	Name          string
 	EmailVerified bool
+}
+
+// IsSupabase reports whether this identity came from Supabase.
+func (i *AppwriteIdentity) IsSupabase() bool {
+	return i != nil && i.Provider == ProviderSupabase
 }
 
 func NewAppwriteClient(cfg config.Config) *AppwriteClient {
@@ -218,6 +237,7 @@ func (c *AppwriteClient) VerifyJWT(jwt string) (*AppwriteIdentity, error) {
 	}
 
 	return &AppwriteIdentity{
+		Provider:      ProviderAppwrite,
 		ID:            account.Id,
 		Email:         account.Email,
 		Phone:         account.Phone,

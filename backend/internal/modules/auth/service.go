@@ -27,6 +27,7 @@ type Service struct {
 	db               *gorm.DB
 	cfg              config.Config
 	appwriteClient   *utils.AppwriteClient
+	supabaseVerifier *utils.SupabaseVerifier
 	repo             *Repository
 	userRepo         *users.Repository
 	businessRepo     *businesses.Repository
@@ -66,6 +67,7 @@ func NewService(
 		db:               db,
 		cfg:              cfg,
 		appwriteClient:   appwriteClient,
+		supabaseVerifier: utils.NewSupabaseVerifier(cfg),
 		repo:             repo,
 		userRepo:         userRepo,
 		businessRepo:     businessRepo,
@@ -609,9 +611,9 @@ func allPermissionKeys() []string {
 }
 
 func (s *Service) LoginSync(jwt, ipAddress, userAgent string) (interface{}, error) {
-	identity, err := s.appwriteClient.VerifyJWT(jwt)
+	identity, err := s.verifyIdentity(jwt)
 	if err != nil {
-		return nil, apperrors.Unauthorized("invalid Appwrite token")
+		return nil, err
 	}
 
 	if err := s.ensureEmailVerification(identity); err != nil {
@@ -670,9 +672,9 @@ func workspaceClosedMessage(status string) string {
 }
 
 func (s *Service) AuthenticateToken(token string) (*utils.AuthContext, error) {
-	identity, err := s.appwriteClient.VerifyJWT(token)
+	identity, err := s.verifyIdentity(token)
 	if err != nil {
-		return nil, apperrors.Unauthorized("invalid Appwrite token")
+		return nil, err
 	}
 	if err := s.ensureEmailVerification(identity); err != nil {
 		return nil, err
@@ -836,7 +838,59 @@ func (s *Service) syncProfile(identity *utils.AppwriteIdentity, ipAddress, userA
 	return s.buildProfileByUserID(user.ID, user.BusinessID)
 }
 
+// verifyIdentity routes a bearer token to whichever provider issued it.
+//
+// Both providers issue JWTs, so the route is chosen by reading the token's
+// issuer without verifying it -- safe because that answer decides nothing but
+// the route, and whichever verifier receives the token still checks it in full.
+// A token claiming to be Supabase must survive signature, issuer, audience,
+// expiry, role and subject checks; anything else goes to Appwrite, which
+// rejects it on its own terms.
+//
+// Before cutover the Supabase verifier is unconfigured, OwnsToken is always
+// false, and every token takes the Appwrite path exactly as before.
+func (s *Service) verifyIdentity(token string) (*utils.AppwriteIdentity, error) {
+	if s.supabaseVerifier != nil && s.supabaseVerifier.OwnsToken(token) {
+		identity, err := s.supabaseVerifier.VerifyToken(token)
+		if err != nil {
+			return nil, apperrors.Unauthorized("invalid Supabase token")
+		}
+		return identity, nil
+	}
+
+	identity, err := s.appwriteClient.VerifyJWT(token)
+	if err != nil {
+		return nil, apperrors.Unauthorized("invalid Appwrite token")
+	}
+	return identity, nil
+}
+
 func (s *Service) resolveLocalUserForIdentity(tx *gorm.DB, identity *utils.AppwriteIdentity) (*users.User, error) {
+	// Supabase identities resolve against their own column, and stop there.
+	//
+	// No email fallback on this path, deliberately. The fallback below exists
+	// to bootstrap Appwrite users whose local row predates their provider
+	// account; a Supabase user always arrives with a row already backfilled by
+	// the migration, so the fallback would have nothing legitimate to do and
+	// two illegitimate ones. It would relink users.supabase_user_id on every
+	// login where the two providers disagree, flipping the column back and
+	// forth; and because it matches on email alone, anyone able to create a
+	// Supabase account with a staff member's address would inherit that
+	// person's business, role and permissions.
+	if identity.IsSupabase() {
+		var supabaseUser users.User
+		err := tx.Preload("Role").
+			Where("supabase_user_id = ?", identity.ID).
+			First(&supabaseUser).Error
+		if err == nil {
+			return &supabaseUser, nil
+		}
+		if err != gorm.ErrRecordNotFound {
+			return nil, apperrors.Internal("failed to load local user")
+		}
+		return nil, apperrors.Unauthorized("authenticated user is not linked to a local employee account")
+	}
+
 	var user users.User
 	err := tx.Preload("Role").
 		Where("appwrite_user_id = ?", identity.ID).
@@ -1003,6 +1057,20 @@ func (s *Service) isSuperAdminIdentity(identity *utils.AppwriteIdentity) bool {
 
 	email := strings.ToLower(strings.TrimSpace(identity.Email))
 	if email == "" {
+		return false
+	}
+
+	// Platform admin is granted on an email match alone, which was defensible
+	// while Appwrite's account.Get() was the source of that email: it came from
+	// the server on every request. A locally verified Supabase JWT carries
+	// whatever the token says, and a user can change their own address, so an
+	// unverified email here is a self-service route to platform admin for
+	// anyone who guesses an allowlisted address.
+	//
+	// Requiring confirmation raises the bar to controlling that mailbox. It is
+	// not the whole fix -- the project must also have self-service email change
+	// locked down -- but it closes the free version of the attack.
+	if identity.IsSupabase() && !identity.EmailVerified {
 		return false
 	}
 

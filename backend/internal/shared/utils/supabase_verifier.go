@@ -62,6 +62,33 @@ func (v *SupabaseVerifier) Issuer() string {
 	return v.issuer
 }
 
+// OwnsToken reports whether a token claims to come from our Supabase project,
+// so the caller knows which verifier to hand it to. Both providers issue JWTs,
+// and sending an Appwrite token through signature verification would reject a
+// perfectly good session.
+//
+// This reads the issuer WITHOUT verifying the signature, which is safe only
+// because the answer is used for routing and nothing else: a token that lies
+// about its issuer to reach this path still has to survive VerifyToken, and a
+// token that lies the other way falls through to Appwrite, which will reject it
+// on its own terms. Never let an unverified claim decide anything but the route.
+func (v *SupabaseVerifier) OwnsToken(token string) bool {
+	if !v.Configured() {
+		return false
+	}
+
+	claims := &jwt.RegisteredClaims{}
+	if _, _, err := jwt.NewParser().ParseUnverified(strings.TrimSpace(token), claims); err != nil {
+		return false
+	}
+
+	issuer, err := claims.GetIssuer()
+	if err != nil {
+		return false
+	}
+	return issuer == v.issuer
+}
+
 // supabaseClaims is the subset of a Supabase access token this app relies on.
 // Anything not listed here is deliberately ignored; user_metadata in particular
 // is user-writable and must never be used for authorization.
@@ -90,6 +117,10 @@ func (v *SupabaseVerifier) VerifyToken(token string) (*AppwriteIdentity, error) 
 	// here rather than inherited from a caller.
 	if v.appEnv == "e2e" && v.e2eToken != "" && token == v.e2eToken {
 		return &AppwriteIdentity{
+			// Appwrite, deliberately: the E2E seed rows live in
+			// appwrite_user_id, so tagging this Supabase would resolve
+			// against an empty column.
+			Provider:      ProviderAppwrite,
 			ID:            "e2e-owner",
 			Email:         "owner.e2e@pastries.local",
 			Phone:         "+971500000000",
@@ -147,6 +178,7 @@ func (v *SupabaseVerifier) VerifyToken(token string) (*AppwriteIdentity, error) 
 	}
 
 	return &AppwriteIdentity{
+		Provider:      ProviderSupabase,
 		ID:            subject,
 		Email:         strings.TrimSpace(claims.Email),
 		Phone:         strings.TrimSpace(claims.Phone),
