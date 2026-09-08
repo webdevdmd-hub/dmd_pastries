@@ -499,7 +499,13 @@ export function BatchFormDialog({
     }
   };
   const isCreateDisabled = isSubmitting || selectedRecipeIsKnownInactive;
-  const isProduceDisabled = isSubmitting || isCheckingPreview;
+  // The shortage panel above already says production cannot be posted, and the
+  // backend refuses it, but the button stayed live: you could press it, wait,
+  // and get an error toast repeating what was on screen. Only disable on a
+  // preview we actually have -- an undefined preview means we have not checked
+  // yet, and the submit handler refetches before posting either way.
+  const isProduceDisabled =
+    isSubmitting || isCheckingPreview || productionPreview?.hasShortage === true;
 
   return (
     <Dialog

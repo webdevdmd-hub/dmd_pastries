@@ -159,13 +159,21 @@ type RecipePackagingResponse struct {
 }
 
 type CostResponse struct {
-	EstimatedIngredientCost float64                    `json:"estimated_ingredient_cost"`
-	EstimatedPackagingCost  float64                    `json:"estimated_packaging_cost"`
-	EstimatedTotalCost      float64                    `json:"estimated_total_cost"`
-	BatchYieldQuantity      float64                    `json:"batch_yield_quantity"`
-	CostPerYieldUnit        float64                    `json:"cost_per_yield_unit"`
-	Ingredients             []RecipeIngredientResponse `json:"ingredients"`
-	Packaging               []RecipePackagingResponse  `json:"packaging"`
+	EstimatedIngredientCost float64 `json:"estimated_ingredient_cost"`
+	EstimatedPackagingCost  float64 `json:"estimated_packaging_cost"`
+	EstimatedTotalCost      float64 `json:"estimated_total_cost"`
+	BatchYieldQuantity      float64 `json:"batch_yield_quantity"`
+	CostPerYieldUnit        float64 `json:"cost_per_yield_unit"`
+	// A recipe line's wastage percentage lifts its cost, so CostPerYieldUnit
+	// is what a batch costs to make including expected loss -- the number to
+	// price against. Production expenses that loss to Wastage Expense instead
+	// of capitalising it, so finished goods land in stock at the lower
+	// InventoryValuePerYieldUnit. Both are real; showing one without the other
+	// is what made the recipe screen and the ledger look like they disagreed.
+	EstimatedWastageCost       float64                    `json:"estimated_wastage_cost"`
+	InventoryValuePerYieldUnit float64                    `json:"inventory_value_per_yield_unit"`
+	Ingredients                []RecipeIngredientResponse `json:"ingredients"`
+	Packaging                  []RecipePackagingResponse  `json:"packaging"`
 }
 
 type VersionResponse struct {

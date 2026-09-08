@@ -87,12 +87,39 @@ export function RecipeCostCard({
             {formatCurrency(livePreview?.estimatedTotalCost ?? 0)}
           </strong>
         </div>
+        {livePreview?.estimatedWastageCost ? (
+          <div className="flex justify-between pl-3 text-meta">
+            <span>of which wastage, expensed</span>
+            <strong className="tabular-nums text-brand-espresso">
+              {formatCurrency(livePreview.estimatedWastageCost)}
+            </strong>
+          </div>
+        ) : null}
         <div className="flex justify-between">
-          <span>Cost per yield unit</span>
+          <span>
+            {livePreview?.estimatedWastageCost
+              ? "Cost per unit (incl. wastage)"
+              : "Cost per yield unit"}
+          </span>
           <strong className="tabular-nums text-brand-espresso">
             {formatCurrency(livePreview?.costPerYieldUnit ?? 0)}
           </strong>
         </div>
+        {/*
+         * A wastage percentage lifts what the batch costs to make, but
+         * production expenses that part to Wastage Expense instead of
+         * capitalising it, so a finished unit enters stock lower. Showing only
+         * the first number is what made this screen look like it disagreed
+         * with the ledger, so both appear whenever they differ.
+         */}
+        {livePreview?.estimatedWastageCost ? (
+          <div className="flex justify-between">
+            <span>Inventory value per unit</span>
+            <strong className="tabular-nums text-brand-espresso">
+              {formatCurrency(livePreview.inventoryValuePerYieldUnit)}
+            </strong>
+          </div>
+        ) : null}
         {!livePreview?.hasLines ? (
           <p className="rounded-2xl border border-brand-cappuccino bg-brand-latte/60 p-3">
             Add ingredients or packaging to preview recipe cost.
@@ -125,11 +152,23 @@ export function RecipeCostCard({
               </strong>
             </div>
             <div className="flex justify-between">
-              <span>Cost per yield unit</span>
+              <span>
+                {cost?.estimatedWastageCost
+                  ? "Cost per unit (incl. wastage)"
+                  : "Cost per yield unit"}
+              </span>
               <strong className="tabular-nums text-brand-espresso">
                 {formatCurrency(cost?.costPerYieldUnit ?? 0)}
               </strong>
             </div>
+            {cost?.estimatedWastageCost ? (
+              <div className="flex justify-between">
+                <span>Inventory value per unit</span>
+                <strong className="tabular-nums text-brand-espresso">
+                  {formatCurrency(cost.inventoryValuePerYieldUnit)}
+                </strong>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </CardContent>

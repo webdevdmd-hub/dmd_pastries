@@ -72,8 +72,13 @@ export type RecipeCost = {
   estimatedIngredientCost: number;
   estimatedPackagingCost: number;
   estimatedTotalCost: number;
+  /** The part of the cost production expenses rather than capitalises. */
+  estimatedWastageCost: number;
   batchYieldQuantity: number;
+  /** What a unit costs to make, wastage included. */
   costPerYieldUnit: number;
+  /** What a finished unit is carried at in stock, wastage excluded. */
+  inventoryValuePerYieldUnit: number;
 };
 
 export type RecipeVersion = {

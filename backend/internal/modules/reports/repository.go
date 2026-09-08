@@ -1712,7 +1712,17 @@ func (r *Repository) ManufacturingReportSummary(filter *shared.ResolvedFilter) (
 			COUNT(*) FILTER (WHERE pb.status = 'cancelled') AS cancelled_batches,
 			COALESCE(SUM(pb.planned_quantity),0) AS total_planned_quantity,
 			COALESCE(SUM(pb.produced_quantity),0) AS total_produced_quantity,
-			COALESCE(SUM(pb.wastage_quantity),0) AS total_wastage_quantity,
+			-- Wastage arrives from two places and this KPI must agree with the
+			-- Wastage tab below it, which unions both: pb.wastage_quantity is
+			-- finished output spoiled, pic.wastage_quantity is the component
+			-- loss a recipe line declares. Counting only the first read zero
+			-- for a batch that wasted ingredients and expensed them to 5080.
+			COALESCE(SUM(pb.wastage_quantity),0) + COALESCE(SUM((
+				SELECT COALESCE(SUM(pic.wastage_quantity),0)
+				FROM production_ingredient_consumptions pic
+				WHERE pic.production_batch_id = pb.id
+				  AND pic.business_id = pb.business_id
+			)),0) AS total_wastage_quantity,
 			COALESCE(SUM(pb.total_production_cost),0) AS estimated_production_cost
 		FROM production_batches pb
 		WHERE pb.business_id = ? AND pb.production_date >= ? AND pb.production_date <= ? AND pb.deleted_at IS NULL`

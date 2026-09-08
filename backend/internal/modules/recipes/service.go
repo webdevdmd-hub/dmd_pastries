@@ -413,7 +413,31 @@ func (s *Service) Cost(currentUser *utils.AuthContext, recipeID string) (*CostRe
 	}
 	ingredients, _ := s.repo.Ingredients(recipeID, currentUser.BusinessID, branchID)
 	packaging, _ := s.repo.Packaging(recipeID, currentUser.BusinessID, branchID)
-	return &CostResponse{EstimatedIngredientCost: roundMoney(recipe.EstimatedIngredientCost), EstimatedPackagingCost: roundMoney(recipe.EstimatedPackagingCost), EstimatedTotalCost: roundMoney(recipe.EstimatedTotalCost), BatchYieldQuantity: roundQuantity(recipe.BatchYieldQuantity), CostPerYieldUnit: roundQuantity(recipe.CostPerYieldUnit), Ingredients: s.repo.ToIngredientResponses(ingredients), Packaging: s.repo.ToPackagingResponses(packaging)}, nil
+	wastageCost := recipeWastageCost(ingredients)
+	inventoryTotal := roundMoney(recipe.EstimatedTotalCost - wastageCost)
+	inventoryPerUnit := 0.0
+	if recipe.BatchYieldQuantity > 0 {
+		inventoryPerUnit = roundQuantity(inventoryTotal / recipe.BatchYieldQuantity)
+	}
+	return &CostResponse{EstimatedIngredientCost: roundMoney(recipe.EstimatedIngredientCost), EstimatedPackagingCost: roundMoney(recipe.EstimatedPackagingCost), EstimatedTotalCost: roundMoney(recipe.EstimatedTotalCost), BatchYieldQuantity: roundQuantity(recipe.BatchYieldQuantity), CostPerYieldUnit: roundQuantity(recipe.CostPerYieldUnit), EstimatedWastageCost: wastageCost, InventoryValuePerYieldUnit: inventoryPerUnit, Ingredients: s.repo.ToIngredientResponses(ingredients), Packaging: s.repo.ToPackagingResponses(packaging)}, nil
+}
+
+// recipeWastageCost is the part of a recipe's cost that production expenses
+// rather than capitalises. A line's stored total_cost already includes its
+// wastage uplift (quantity * (1 + wastage%) * unit cost), so the uplift is
+// that total less the same line costed without wastage. Rounded per line,
+// the way the line totals themselves are, so the two reconcile exactly.
+func recipeWastageCost(ingredients []RecipeIngredient) float64 {
+	total := 0.0
+	for _, line := range ingredients {
+		if line.WastagePercentage <= 0 {
+			continue
+		}
+		withWastage := roundMoney(line.QuantityRequired * (1 + line.WastagePercentage/100) * line.UnitCostSnapshot)
+		withoutWastage := roundMoney(line.QuantityRequired * line.UnitCostSnapshot)
+		total = roundMoney(total + roundMoney(withWastage-withoutWastage))
+	}
+	return total
 }
 
 func (s *Service) RecalculateCost(currentUser *utils.AuthContext, recipeID, ipAddress, userAgent string) (*CostResponse, error) {

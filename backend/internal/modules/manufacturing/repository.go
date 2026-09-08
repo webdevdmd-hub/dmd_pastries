@@ -250,7 +250,18 @@ func (r *Repository) Summary(businessID string, query BatchListQuery) (*Manufact
 	if err := base().Select("COALESCE(SUM(total_production_cost), 0)").Where("status = ?", "completed").Scan(&response.TotalProductionCost).Error; err != nil {
 		return nil, err
 	}
-	if err := base().Select("COALESCE(SUM(wastage_quantity), 0)").Scan(&response.TotalWastageQuantity).Error; err != nil {
+	// Wastage has two sources: the finished output an operator records as
+	// spoiled, and the component loss a recipe line declares, which production
+	// consumes as a separate wastage movement and expenses to 5080. Counting
+	// only the first left this KPI reading zero for a batch that had just
+	// wasted ingredients, and disagreed with the Wastage tab in Reports, which
+	// unions both.
+	if err := base().Select(`COALESCE(SUM(wastage_quantity), 0) + COALESCE(SUM((
+			SELECT COALESCE(SUM(pic.wastage_quantity), 0)
+			FROM production_ingredient_consumptions pic
+			WHERE pic.production_batch_id = production_batches.id
+			  AND pic.business_id = production_batches.business_id
+		)), 0)`).Scan(&response.TotalWastageQuantity).Error; err != nil {
 		return nil, err
 	}
 	response.TotalProducedQuantity = roundQuantity(response.TotalProducedQuantity)

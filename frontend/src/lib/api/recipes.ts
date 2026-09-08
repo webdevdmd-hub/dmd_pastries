@@ -259,8 +259,10 @@ function parseRecipeCost(value: unknown): RecipeCost {
     estimatedIngredientCost: numberValue(value.estimated_ingredient_cost),
     estimatedPackagingCost: numberValue(value.estimated_packaging_cost),
     estimatedTotalCost: numberValue(value.estimated_total_cost),
+    estimatedWastageCost: numberValue(value.estimated_wastage_cost),
     batchYieldQuantity: numberValue(value.batch_yield_quantity),
     costPerYieldUnit: numberValue(value.cost_per_yield_unit),
+    inventoryValuePerYieldUnit: numberValue(value.inventory_value_per_yield_unit),
   };
 }
 

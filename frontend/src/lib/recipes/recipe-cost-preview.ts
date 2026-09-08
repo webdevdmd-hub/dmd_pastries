@@ -29,9 +29,18 @@ export type RecipeLiveCostPreview = {
   estimatedIngredientCost: number;
   estimatedPackagingCost: number;
   estimatedTotalCost: number;
+  /**
+   * The part of the cost a wastage percentage adds. Production expenses it to
+   * Wastage Expense rather than capitalising it, so finished goods enter stock
+   * at inventoryValuePerYieldUnit while costPerYieldUnit is what the batch
+   * costs to make. Both are real numbers; the recipe screen showing only the
+   * first is what made it look like it disagreed with the ledger.
+   */
+  estimatedWastageCost: number;
   hasLines: boolean;
   hasUnitMismatch: boolean;
   hasZeroCostComponents: boolean;
+  inventoryValuePerYieldUnit: number;
   yieldQuantityValid: boolean;
 };
 
@@ -125,6 +134,7 @@ export function calculateRecipeLiveCostPreview({
   packaging: RecipeCostPackagingInput[];
 }): RecipeLiveCostPreview {
   const normalizedYieldQuantity = numberOrZero(batchYieldQuantity);
+  let wastageCost = 0;
   const ingredientCost = ingredients.reduce((total, line) => {
     const unitCost = unitCostForLine(
       componentProducts,
@@ -135,7 +145,13 @@ export function calculateRecipeLiveCostPreview({
     const quantityRequired = numberOrZero(line.quantityRequired);
     const wastagePercentage = numberOrZero(line.wastagePercentage);
     const effectiveQuantity = quantityRequired * (1 + wastagePercentage / 100);
-    return total + roundMoney(effectiveQuantity * unitCost);
+    const lineCost = roundMoney(effectiveQuantity * unitCost);
+    if (wastagePercentage > 0) {
+      wastageCost = roundMoney(
+        wastageCost + roundMoney(lineCost - roundMoney(quantityRequired * unitCost)),
+      );
+    }
+    return total + lineCost;
   }, 0);
 
   const packagingCost = packaging.reduce((total, line) => {
@@ -180,15 +196,22 @@ export function calculateRecipeLiveCostPreview({
       lineHasUnitMismatch(componentProducts, line.componentProductId, line.unitId),
     );
 
+  const roundedWastageCost = roundMoney(wastageCost);
+  const inventoryValueTotal = roundMoney(totalCost - roundedWastageCost);
+
   return {
     batchYieldQuantity: yieldQuantityValid ? normalizedYieldQuantity : 0,
     costPerYieldUnit: yieldQuantityValid ? roundQuantity(totalCost / normalizedYieldQuantity) : 0,
     estimatedIngredientCost: roundedIngredientCost,
     estimatedPackagingCost: roundedPackagingCost,
     estimatedTotalCost: totalCost,
+    estimatedWastageCost: roundedWastageCost,
     hasLines: ingredients.length > 0 || packaging.length > 0,
     hasUnitMismatch,
     hasZeroCostComponents,
+    inventoryValuePerYieldUnit: yieldQuantityValid
+      ? roundQuantity(inventoryValueTotal / normalizedYieldQuantity)
+      : 0,
     yieldQuantityValid,
   };
 }
