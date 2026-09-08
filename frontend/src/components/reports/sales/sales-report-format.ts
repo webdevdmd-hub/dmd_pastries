@@ -34,6 +34,18 @@ export function formatNumber(value: number): string {
   }).format(value);
 }
 
+/**
+ * For measured amounts rather than counts: kilograms, litres, fractional
+ * yields. formatNumber drops the fraction, which is right for a batch count
+ * and wrong for 0.4 kg of wasted flour -- it rendered that as "0" and made a
+ * fixed wastage KPI still look broken. Integers are unaffected.
+ */
+export function formatQuantity(value: number): string {
+  return new Intl.NumberFormat("en-AE", {
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 export function formatPercent(value: number): string {
   return `${new Intl.NumberFormat("en-AE", {
     maximumFractionDigits: 2,

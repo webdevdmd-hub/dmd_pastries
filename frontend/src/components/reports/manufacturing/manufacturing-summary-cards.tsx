@@ -7,6 +7,7 @@ import {
   formatCurrency,
   formatNumber,
   formatPercent,
+  formatQuantity,
 } from "@/components/reports/sales/sales-report-format";
 import type { ManufacturingSummary } from "@/types/manufacturing-reports";
 
@@ -35,12 +36,12 @@ export function ManufacturingSummaryCards({
       <ReportKpiCard
         icon={Scale}
         label="Planned Qty"
-        value={formatNumber(summary?.totalPlannedQuantity ?? 0)}
+        value={formatQuantity(summary?.totalPlannedQuantity ?? 0)}
       />
       <ReportKpiCard
         icon={Scale}
         label="Produced Qty"
-        value={formatNumber(summary?.totalProducedQuantity ?? 0)}
+        value={formatQuantity(summary?.totalProducedQuantity ?? 0)}
       />
       <ReportKpiCard
         icon={PackageCheck}
@@ -50,7 +51,7 @@ export function ManufacturingSummaryCards({
       <ReportKpiCard
         icon={Trash2}
         label="Wastage Qty"
-        value={formatNumber(summary?.totalWastageQuantity ?? 0)}
+        value={formatQuantity(summary?.totalWastageQuantity ?? 0)}
       />
       <ReportKpiCard
         icon={CircleDollarSign}
