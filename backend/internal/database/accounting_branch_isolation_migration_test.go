@@ -12,7 +12,13 @@ func TestAccountingBranchIsolationDropsLegacyIndexesBeforeCloning(t *testing.T) 
 		t.Fatalf("read accounting branch isolation migration: %v", err)
 	}
 
-	sql := string(source)
+	// The assertions below match statements that span a line break, so they
+	// depend on which line ending the file was checked out with. Git hands
+	// Windows working trees CRLF, and "payment\nSET" cannot match
+	// "payment\r\nSET": this test failed on Windows and passed on CI for a
+	// migration whose SQL was never in question. Normalise so the assertions
+	// are about statement order, which is what they are for.
+	sql := strings.ReplaceAll(string(source), "\r\n", "\n")
 	assertStatementOrder(t, sql,
 		"DROP INDEX IF EXISTS idx_chart_of_accounts_business_code;",
 		"INSERT INTO chart_of_accounts (",
