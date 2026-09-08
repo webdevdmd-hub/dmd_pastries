@@ -1076,23 +1076,23 @@ func (key saleStockKey) variantIDPointer() *string {
 
 // outOfStockError states a shortfall the way a cashier facing a customer
 // needs to hear it: which product, how many the sale needs, how many are
-// there. The structured details carry the same figures for any caller that
-// wants to render it differently.
+// there.
+//
+// It carries no details map on purpose. The client joins the string values of
+// an error's details onto the end of its message (normalizeBackendError in
+// frontend/src/lib/api/client.ts), so a reason code and an item name would
+// reach the counter as "... before selling it.: QA Latte, insufficient_stock".
+// Everything a cashier needs is in the sentence; add details here only
+// alongside a client that renders them instead of appending them.
 func outOfStockError(itemName string, required, available float64) error {
-	details := map[string]interface{}{
-		"reason":             "insufficient_stock",
-		"item_name":          itemName,
-		"required_quantity":  required,
-		"available_quantity": available,
-	}
 	if available <= 0 {
 		return apperrors.BadRequest(fmt.Sprintf(
 			"%s is out of stock. This sale needs %s, and there is none on hand. Receive stock or produce a batch before selling it.",
-			itemName, formatSaleQuantity(required)), details)
+			itemName, formatSaleQuantity(required)), nil)
 	}
 	return apperrors.BadRequest(fmt.Sprintf(
 		"Not enough stock for %s. This sale needs %s, but only %s is available.",
-		itemName, formatSaleQuantity(required), formatSaleQuantity(available)), details)
+		itemName, formatSaleQuantity(required), formatSaleQuantity(available)), nil)
 }
 
 // formatSaleQuantity prints a quantity the way a person writes it: 2 rather

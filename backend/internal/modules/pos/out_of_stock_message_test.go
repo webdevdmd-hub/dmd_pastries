@@ -47,15 +47,20 @@ func TestOutOfStockErrorDistinguishesPartialStock(t *testing.T) {
 		t.Errorf("message should carry both figures: %s", appErr.Message)
 	}
 
-	details, ok := appErr.Details.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Details is %T, want map[string]interface{}", appErr.Details)
-	}
-	if details["reason"] != "insufficient_stock" {
-		t.Errorf("reason = %v, want insufficient_stock", details["reason"])
-	}
-	if details["available_quantity"] != 3.0 || details["required_quantity"] != 5.0 {
-		t.Errorf("details carry the wrong figures: %v", details)
+}
+
+// The client appends the string values of an error's details to its message
+// (normalizeBackendError in frontend/src/lib/api/client.ts). Attaching a
+// reason code and an item name here put "...: QA Latte, insufficient_stock"
+// on the counter screen behind the sentence a cashier actually reads.
+func TestOutOfStockErrorCarriesNoAppendableDetails(t *testing.T) {
+	for _, err := range []error{
+		outOfStockError("QA Latte", 1, 0),
+		outOfStockError("QA Flour T55", 5, 3),
+	} {
+		if details := err.(*apperrors.AppError).Details; details != nil {
+			t.Errorf("details %v would be appended to the cashier's message", details)
+		}
 	}
 }
 
