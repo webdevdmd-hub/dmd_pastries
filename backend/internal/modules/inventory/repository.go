@@ -1145,34 +1145,48 @@ func (r *Repository) LoadMovementResponse(movement StockMovement) (StockMovement
 	return responses[0], nil
 }
 
+// firstNonEmpty returns the first value that is not blank. A plain fallback
+// chain does not do this: an empty string is still a value, so it wins over
+// every later option and the caller shows nothing.
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func (r *Repository) loadItemIdentity(businessID string, item InventoryItem) (string, string, string, string) {
 	if item.ItemType == "product" && item.ProductID != nil {
 		var row struct {
 			ProductName string
 			SKU         string
+			ProductCode string
 			Barcode     string
 		}
-		_ = r.db.Table("products").Select("product_name, sku, barcode").Where("id = ? AND business_id = ?", *item.ProductID, businessID).Scan(&row).Error
-		return row.ProductName, row.SKU, row.Barcode, ""
+		_ = r.db.Table("products").Select("product_name, sku, product_code, barcode").Where("id = ? AND business_id = ?", *item.ProductID, businessID).Scan(&row).Error
+		// Most products carry no SKU, and this is the only identifier the
+		// inventory list shows, so it printed "No code" beside items the
+		// Products screen lists as PRD-000002. product_code is NOT NULL.
+		return row.ProductName, firstNonEmpty(row.SKU, row.ProductCode), row.Barcode, ""
 	}
 	if item.ItemType == "product_variant" && item.ProductID != nil && item.ProductVariantID != nil {
 		var row struct {
 			ProductName string
 			ProductSKU  string
+			ProductCode string
 			VariantName string
 			VariantSKU  string
 			Barcode     string
 		}
 		_ = r.db.Table("product_variants pv").
-			Select("p.product_name, p.sku AS product_sku, pv.variant_name, pv.sku AS variant_sku, pv.barcode").
+			Select("p.product_name, p.sku AS product_sku, p.product_code, pv.variant_name, pv.sku AS variant_sku, pv.barcode").
 			Joins("JOIN products p ON p.id = pv.product_id AND p.business_id = pv.business_id").
 			Where("pv.id = ? AND pv.product_id = ? AND pv.business_id = ?", *item.ProductVariantID, *item.ProductID, businessID).
 			Scan(&row).Error
-		sku := row.VariantSKU
-		if strings.TrimSpace(sku) == "" {
-			sku = row.ProductSKU
-		}
-		return strings.TrimSpace(row.ProductName + " - " + row.VariantName), sku, row.Barcode, row.VariantName
+		return strings.TrimSpace(row.ProductName + " - " + row.VariantName),
+			firstNonEmpty(row.VariantSKU, row.ProductSKU, row.ProductCode), row.Barcode, row.VariantName
 	}
 	if item.ItemType == "ingredient" {
 		if item.IngredientID != nil {

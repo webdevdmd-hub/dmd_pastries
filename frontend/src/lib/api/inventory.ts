@@ -83,6 +83,20 @@ function stringValue(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }
 
+/**
+ * First value that is actually present. stringValue treats "" as a value, so a
+ * blank sku won its own fallback chain and the item code behind it never got a
+ * look in -- which is how items with a product code still rendered "No code".
+ */
+function firstNonEmptyString(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return "";
+}
+
 function nullableString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
@@ -209,7 +223,7 @@ function parseInventoryItem(value: unknown): InventoryItem {
     packagingItemId: nullableString(value.packaging_item_id),
     itemType: isInventoryItemType(value.item_type) ? value.item_type : "product",
     itemName: stringValue(value.item_name, "Inventory item"),
-    itemCode: stringValue(value.sku, stringValue(value.item_code, stringValue(value.barcode))),
+    itemCode: firstNonEmptyString(value.sku, value.item_code, value.barcode),
     currentQuantity: numberValue(value.current_quantity),
     reservedQuantity: numberValue(value.reserved_quantity),
     availableQuantity: numberValue(value.available_quantity),
