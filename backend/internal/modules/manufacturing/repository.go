@@ -70,21 +70,26 @@ func (r *Repository) ListBatches(businessID string, query BatchListQuery) ([]Pro
 	return batches, total, err
 }
 
-func (r *Repository) Ingredients(batchID, businessID string) ([]ProductionIngredientConsumption, error) {
+// Ingredients, Packaging and Output take the caller's handle rather than r.db
+// so a caller inside an open transaction can read the rows it just wrote. A
+// one-click production creates the batch and completes it in a single
+// transaction; reading these on the pooled connection returns nothing, because
+// the inserts are not committed yet. Pass s.db from a plain read path.
+func (r *Repository) Ingredients(tx *gorm.DB, batchID, businessID string) ([]ProductionIngredientConsumption, error) {
 	var items []ProductionIngredientConsumption
-	err := r.db.Where("production_batch_id = ? AND business_id = ?", batchID, businessID).Order("created_at ASC").Find(&items).Error
+	err := tx.Where("production_batch_id = ? AND business_id = ?", batchID, businessID).Order("created_at ASC").Find(&items).Error
 	return items, err
 }
 
-func (r *Repository) Packaging(batchID, businessID string) ([]ProductionPackagingConsumption, error) {
+func (r *Repository) Packaging(tx *gorm.DB, batchID, businessID string) ([]ProductionPackagingConsumption, error) {
 	var items []ProductionPackagingConsumption
-	err := r.db.Where("production_batch_id = ? AND business_id = ?", batchID, businessID).Order("created_at ASC").Find(&items).Error
+	err := tx.Where("production_batch_id = ? AND business_id = ?", batchID, businessID).Order("created_at ASC").Find(&items).Error
 	return items, err
 }
 
-func (r *Repository) Output(batchID, businessID string) (*ProductionOutput, error) {
+func (r *Repository) Output(tx *gorm.DB, batchID, businessID string) (*ProductionOutput, error) {
 	var output ProductionOutput
-	result := r.db.Where("production_batch_id = ? AND business_id = ?", batchID, businessID).Limit(1).Find(&output)
+	result := tx.Where("production_batch_id = ? AND business_id = ?", batchID, businessID).Limit(1).Find(&output)
 	if result.Error != nil {
 		return nil, result.Error
 	}

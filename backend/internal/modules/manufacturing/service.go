@@ -326,7 +326,7 @@ func (s *Service) UpdateIngredient(currentUser *utils.AuthContext, batchID, line
 		if !batchCanEditConsumption(batch.Status) {
 			return apperrors.BadRequest("consumption lines cannot be edited for this batch status", nil)
 		}
-		lines, err := s.repo.Ingredients(batchID, currentUser.BusinessID)
+		lines, err := s.repo.Ingredients(tx, batchID, currentUser.BusinessID)
 		if err != nil {
 			return err
 		}
@@ -374,7 +374,7 @@ func (s *Service) UpdatePackaging(currentUser *utils.AuthContext, batchID, lineI
 		if !batchCanEditConsumption(batch.Status) {
 			return apperrors.BadRequest("consumption lines cannot be edited for this batch status", nil)
 		}
-		lines, err := s.repo.Packaging(batchID, currentUser.BusinessID)
+		lines, err := s.repo.Packaging(tx, batchID, currentUser.BusinessID)
 		if err != nil {
 			return err
 		}
@@ -502,7 +502,7 @@ func (s *Service) GetOutputs(currentUser *utils.AuthContext, id string) (*Produc
 		YieldUnitSymbol:    s.repo.UnitSymbol(batch.YieldUnitID),
 	}
 
-	output, err := s.repo.Output(batch.ID, currentUser.BusinessID)
+	output, err := s.repo.Output(s.db, batch.ID, currentUser.BusinessID)
 	if err != nil {
 		return nil, err
 	}
@@ -522,7 +522,7 @@ func (s *Service) GetWastage(currentUser *utils.AuthContext, id string) (*Produc
 		return nil, err
 	}
 
-	ingredients, err := s.repo.Ingredients(id, currentUser.BusinessID)
+	ingredients, err := s.repo.Ingredients(s.db, id, currentUser.BusinessID)
 	if err != nil {
 		return nil, err
 	}
@@ -611,15 +611,15 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	if notes == "" {
 		notes = batch.Notes
 	}
-	ingredients, err := s.repo.Ingredients(id, currentUser.BusinessID)
+	ingredients, err := s.repo.Ingredients(tx, id, currentUser.BusinessID)
 	if err != nil {
 		return err
 	}
-	packaging, err := s.repo.Packaging(id, currentUser.BusinessID)
+	packaging, err := s.repo.Packaging(tx, id, currentUser.BusinessID)
 	if err != nil {
 		return err
 	}
-	if output, err := s.repo.Output(id, currentUser.BusinessID); err != nil {
+	if output, err := s.repo.Output(tx, id, currentUser.BusinessID); err != nil {
 		return err
 	} else if output != nil {
 		return apperrors.BadRequest("production output already exists for this batch", productionBatchIssueDetails("duplicate_output", batch))
@@ -720,7 +720,7 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	if err := s.recalculateBatchCosts(tx, currentUser.BusinessID, id); err != nil {
 		return err
 	}
-	ingredientCost, packagingCost, err := s.costTotals(id, currentUser.BusinessID)
+	ingredientCost, packagingCost, err := s.costTotals(tx, id, currentUser.BusinessID)
 	if err != nil {
 		return err
 	}
@@ -794,7 +794,7 @@ func (s *Service) ListIngredients(currentUser *utils.AuthContext, batchID string
 	if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
 		return nil, err
 	}
-	lines, err := s.repo.Ingredients(batchID, currentUser.BusinessID)
+	lines, err := s.repo.Ingredients(s.db, batchID, currentUser.BusinessID)
 	return s.ingredientResponses(lines), err
 }
 
@@ -806,7 +806,7 @@ func (s *Service) ListPackaging(currentUser *utils.AuthContext, batchID string) 
 	if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
 		return nil, err
 	}
-	lines, err := s.repo.Packaging(batchID, currentUser.BusinessID)
+	lines, err := s.repo.Packaging(s.db, batchID, currentUser.BusinessID)
 	return s.packagingResponses(lines), err
 }
 
@@ -1035,7 +1035,7 @@ func (s *Service) resolveRecipePackagingInventoryItem(tx *gorm.DB, businessID, b
 }
 
 func (s *Service) recalculateBatchCosts(tx *gorm.DB, businessID, batchID string) error {
-	ingredientCost, packagingCost, err := s.costTotals(batchID, businessID)
+	ingredientCost, packagingCost, err := s.costTotals(tx, batchID, businessID)
 	if err != nil {
 		return err
 	}
@@ -1051,12 +1051,12 @@ func (s *Service) recalculateBatchCosts(tx *gorm.DB, businessID, batchID string)
 	return s.repo.UpdateBatch(tx, batchID, businessID, map[string]interface{}{"ingredient_cost": ingredientCost, "packaging_cost": packagingCost, "total_production_cost": total, "cost_per_unit": roundQuantity(total / denominator), "updated_at": time.Now().UTC()})
 }
 
-func (s *Service) costTotals(batchID, businessID string) (float64, float64, error) {
-	ingredients, err := s.repo.Ingredients(batchID, businessID)
+func (s *Service) costTotals(tx *gorm.DB, batchID, businessID string) (float64, float64, error) {
+	ingredients, err := s.repo.Ingredients(tx, batchID, businessID)
 	if err != nil {
 		return 0, 0, err
 	}
-	packaging, err := s.repo.Packaging(batchID, businessID)
+	packaging, err := s.repo.Packaging(tx, batchID, businessID)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -1181,8 +1181,8 @@ func (s *Service) batchResponse(businessID string, batch ProductionBatch, includ
 	branchName, recipeName, recipeVersionNumber, productName, productVariantName, createdByName := s.repo.NameLookups(businessID, batch)
 	response := ProductionBatchResponse{ID: batch.ID, BusinessID: batch.BusinessID, BranchID: batch.BranchID, BranchName: branchName, RecipeID: batch.RecipeID, RecipeName: recipeName, RecipeVersionNumber: recipeVersionNumber, ProductID: batch.ProductID, ProductName: productName, ProductVariantID: batch.ProductVariantID, ProductVariantName: productVariantName, ProductionBatchNumber: batch.ProductionBatchNumber, PlannedQuantity: roundQuantity(batch.PlannedQuantity), ProducedQuantity: roundQuantity(batch.ProducedQuantity), YieldUnitID: batch.YieldUnitID, YieldUnitSymbol: s.repo.UnitSymbol(batch.YieldUnitID), Status: batch.Status, ProductionDate: batch.ProductionDate, StartedAt: batch.StartedAt, CompletedAt: batch.CompletedAt, CancelledAt: batch.CancelledAt, IngredientCost: roundMoney(batch.IngredientCost), PackagingCost: roundMoney(batch.PackagingCost), TotalProductionCost: roundMoney(batch.TotalProductionCost), CostPerUnit: roundQuantity(batch.CostPerUnit), WastageQuantity: roundQuantity(batch.WastageQuantity), WastageReason: batch.WastageReason, Notes: batch.Notes, CreatedByUserID: batch.CreatedByUserID, CreatedByUserName: createdByName, CompletedByUserID: batch.CompletedByUserID, CreatedAt: batch.CreatedAt, UpdatedAt: batch.UpdatedAt}
 	if includeDetails {
-		ingredients, _ := s.repo.Ingredients(batch.ID, businessID)
-		packaging, _ := s.repo.Packaging(batch.ID, businessID)
+		ingredients, _ := s.repo.Ingredients(s.db, batch.ID, businessID)
+		packaging, _ := s.repo.Packaging(s.db, batch.ID, businessID)
 		response.Ingredients = s.ingredientResponses(ingredients)
 		response.Packaging = s.packagingResponses(packaging)
 		for _, line := range response.Ingredients {
@@ -1195,7 +1195,7 @@ func (s *Service) batchResponse(businessID string, batch ProductionBatch, includ
 				response.StockMovementIDs = append(response.StockMovementIDs, *line.StockMovementID)
 			}
 		}
-		if output, err := s.repo.Output(batch.ID, businessID); err == nil && output != nil {
+		if output, err := s.repo.Output(s.db, batch.ID, businessID); err == nil && output != nil {
 			dto := s.outputResponse(*output)
 			response.Output = &dto
 			if output.StockMovementID != nil {
