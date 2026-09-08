@@ -1,0 +1,31 @@
+# Root build context, used by backend/Dockerfile.
+#
+# Without this file the backend build shipped the entire repo plus .git --
+# 22MB of context for a 4MB Go service, most of it the frontend and git
+# history that the image never touches.
+#
+# The production frontend builds with nixpacks, not frontend/Dockerfile, so
+# nothing else consumes this file today. If the frontend ever moves to a
+# root-context Docker build, drop the frontend/ line below first.
+
+.git
+.gitattributes
+.claude
+.gstack
+frontend/
+docs/
+*.md
+
+# Backend build leftovers and secrets. Mirrors backend/.dockerignore, which
+# Docker ignores for a root-context build.
+backend/.env
+backend/.env.*
+!backend/.env.example
+!backend/.env.production.example
+backend/tmp
+backend/bin
+backend/.gocache
+backend/coverage.out
+backend/.codex-run
+**/*.log
+**/node_modules
