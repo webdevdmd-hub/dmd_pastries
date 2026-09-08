@@ -51,6 +51,8 @@ func main() {
 		log.Fatalf("database connection failed: %v", err)
 	}
 
+	database.StartPoolStatsLogger(db, cfg)
+
 	if cfg.AutoRunMigrations {
 		if result, err := database.RunMigrations(db, cfg.MigrationsPath); err != nil {
 			log.Fatalf("database migration failed: %v", err)

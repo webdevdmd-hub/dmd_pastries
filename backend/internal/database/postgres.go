@@ -2,6 +2,8 @@ package database
 
 import (
 	"fmt"
+	"log"
+	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -11,12 +13,75 @@ import (
 )
 
 func NewPostgres(cfg config.Config) (*gorm.DB, error) {
-	return gorm.Open(postgres.New(postgres.Config{
-		DSN:                  cfg.PostgresDSN(),
+	db, err := gorm.Open(postgres.New(postgres.Config{
+		DSN: cfg.PostgresDSN(),
+		// Load-bearing twice over, and neither reason is obvious from here.
+		//
+		// It is why NUMERIC arrives as text, which is what lets money.Amount
+		// scan an exact decimal instead of a float that has already lost the
+		// fils. It is also what keeps the connection free of server-side
+		// prepared statements, which is the precondition for ever putting a
+		// transaction-mode pooler in front of this.
+		//
+		// "Turn this off to get prepared statements back" is a plausible
+		// optimisation that would silently break the money path and the
+		// pooler together. Don't, without replacing both guarantees.
 		PreferSimpleProtocol: true,
 	}), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Warn),
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("resolve sql.DB handle: %w", err)
+	}
+
+	sqlDB.SetMaxOpenConns(cfg.DBMaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.DBMaxIdleConns)
+	sqlDB.SetConnMaxLifetime(time.Duration(cfg.DBConnMaxLifetimeMinutes) * time.Minute)
+	sqlDB.SetConnMaxIdleTime(time.Duration(cfg.DBConnMaxIdleMinutes) * time.Minute)
+
+	return db, nil
+}
+
+// StartPoolStatsLogger prints connection-pool counters on an interval, and does
+// nothing unless DB_STATS_LOG_SECONDS is set.
+//
+// The numbers only mean something once you know what a quiet morning looks
+// like, so this exists to be switched on before a database move rather than
+// after one. WaitCount climbing is the pool being too small; InUse sitting at
+// MaxOpenConns is the pool being exhausted, which against a managed Postgres
+// arrives as refused connections rather than as queueing.
+func StartPoolStatsLogger(db *gorm.DB, cfg config.Config) {
+	if cfg.DBStatsLogSeconds <= 0 {
+		return
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Printf("pool stats logger disabled: %v", err)
+		return
+	}
+
+	interval := time.Duration(cfg.DBStatsLogSeconds) * time.Second
+
+	go func() {
+		for range time.Tick(interval) {
+			stats := sqlDB.Stats()
+			log.Printf(
+				"db pool: open=%d in_use=%d idle=%d wait_count=%d wait_total=%s max_open=%d",
+				stats.OpenConnections,
+				stats.InUse,
+				stats.Idle,
+				stats.WaitCount,
+				stats.WaitDuration,
+				stats.MaxOpenConnections,
+			)
+		}
+	}()
 }
 
 func VerifySchema(db *gorm.DB) error {

@@ -22,6 +22,11 @@ type Config struct {
 	PostgresDB               string
 	PostgresSSLMode          string
 	PostgresTimezone         string
+	DBMaxOpenConns           int
+	DBMaxIdleConns           int
+	DBConnMaxLifetimeMinutes int
+	DBConnMaxIdleMinutes     int
+	DBStatsLogSeconds        int
 	AppwriteEndpoint         string
 	AppwriteProjectID        string
 	AppwriteAPIKey           string
@@ -78,6 +83,24 @@ func loadDatabaseConfig() Config {
 		PostgresDB:       getEnv("POSTGRES_DB", ""),
 		PostgresSSLMode:  getEnv("POSTGRES_SSLMODE", "disable"),
 		PostgresTimezone: getEnv("POSTGRES_TIMEZONE", "UTC"),
+
+		// Go's database/sql defaults are unlimited open connections and two
+		// idle ones. On a Postgres sharing the Docker bridge that only ever
+		// showed up as a busy afternoon opening more connections than anyone
+		// counted. Against a managed Postgres reached over the internet both
+		// halves bite: unlimited open exhausts the provider's client limit and
+		// starts refusing connections instead of queueing, and an idle cap of
+		// two means almost every query re-runs the TCP and TLS handshake --
+		// three extra round trips, on a connection that used to be free.
+		//
+		// Idle is held equal to open so a connection that has been paid for
+		// stays paid for; the lifetime and idle timeouts below are what
+		// actually retire them.
+		DBMaxOpenConns:           getEnvInt("DB_MAX_OPEN_CONNS", 25),
+		DBMaxIdleConns:           getEnvInt("DB_MAX_IDLE_CONNS", 25),
+		DBConnMaxLifetimeMinutes: getEnvInt("DB_CONN_MAX_LIFETIME_MINUTES", 30),
+		DBConnMaxIdleMinutes:     getEnvInt("DB_CONN_MAX_IDLE_MINUTES", 5),
+		DBStatsLogSeconds:        getEnvInt("DB_STATS_LOG_SECONDS", 0),
 	}
 }
 
