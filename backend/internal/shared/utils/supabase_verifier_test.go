@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	testProjectRef = "zpyoxptzcbzsbtkhddwb"
+	testProjectRef = "examplerefnotreal01"
 	testSecret     = "test-jwt-secret-not-a-real-one"
 	testIssuer     = "https://" + testProjectRef + ".supabase.co/auth/v1"
 	testSubject    = "6f1e2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b"
@@ -46,7 +46,7 @@ func validClaims() jwt.MapClaims {
 		"aud":   "authenticated",
 		"role":  "authenticated",
 		"sub":   testSubject,
-		"email": "owner@dmdpastries.com",
+		"email": "owner@test.invalid",
 		"exp":   time.Now().Add(time.Hour).Unix(),
 		"user_metadata": map[string]any{
 			"email_verified": true,
@@ -63,7 +63,7 @@ func TestAcceptsAGenuineUserSession(t *testing.T) {
 	if identity.ID != testSubject {
 		t.Errorf("ID = %q, want the sub claim %q", identity.ID, testSubject)
 	}
-	if identity.Email != "owner@dmdpastries.com" {
+	if identity.Email != "owner@test.invalid" {
 		t.Errorf("Email = %q", identity.Email)
 	}
 	if identity.Name != "Bakery Owner" {
