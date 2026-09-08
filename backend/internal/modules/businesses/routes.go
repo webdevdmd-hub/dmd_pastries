@@ -14,6 +14,9 @@ func RegisterRoutes(
 	businessGroup.GET("", settingsView, handler.GetBusiness)
 	businessGroup.PATCH("", settingsManage, handler.UpdateBusiness)
 	businessGroup.GET("/onboarding-status", settingsView, handler.GetOnboardingStatus)
+	// Ownership is checked in the service: there is no owner-only permission
+	// key, and settings-manage alone must not be enough to close a workspace.
+	businessGroup.POST("/close", settingsManage, handler.CloseBusiness)
 
 	settingsGroup := router.Group("/api/v1/settings")
 	settingsGroup.Use(authGuard)

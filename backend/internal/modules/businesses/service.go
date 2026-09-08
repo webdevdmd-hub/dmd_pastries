@@ -63,9 +63,6 @@ func (s *Service) UpdateBusiness(currentUser *utils.AuthContext, req UpdateBusin
 	if req.VATNumber != "" {
 		updates["vat_number"] = strings.TrimSpace(req.VATNumber)
 	}
-	if req.Status != "" {
-		updates["status"] = req.Status
-	}
 	if len(updates) == 0 {
 		return nil, apperrors.BadRequest("no updatable fields provided", nil)
 	}
@@ -97,6 +94,78 @@ func (s *Service) UpdateBusiness(currentUser *utils.AuthContext, req UpdateBusin
 	}
 
 	return s.GetBusiness(currentUser)
+}
+
+// CloseBusiness closes the caller's own workspace.
+//
+// Owner-only and confirmation-gated, because it is one-way from inside: once
+// status leaves "active" the auth guard refuses every member of the business,
+// so nobody here can reopen it. Only a platform admin can, through the
+// superadmin business action that already exists. Nothing is deleted -- the
+// ledger, stock and documents stay exactly as they were -- so reopening
+// restores the workspace intact.
+func (s *Service) CloseBusiness(currentUser *utils.AuthContext, req CloseBusinessRequest, ipAddress, userAgent string) error {
+	business, err := s.repo.FindByID(currentUser.BusinessID)
+	if err != nil {
+		return apperrors.Internal("failed to load workspace")
+	}
+
+	if business.OwnerUserID == nil || *business.OwnerUserID != currentUser.UserID {
+		return apperrors.Forbidden("only the workspace owner can close the workspace")
+	}
+	if business.Status != "active" {
+		return apperrors.BadRequest("workspace is already closed", map[string]interface{}{
+			"reason":           "workspace_not_active",
+			"workspace_status": business.Status,
+		})
+	}
+	// Typing the name is the confirmation. A yes/no dialog is too easy to
+	// click through for something only support can undo.
+	if strings.TrimSpace(req.Confirmation) != strings.TrimSpace(business.BusinessName) {
+		return apperrors.BadRequest("type the workspace name exactly to confirm", map[string]interface{}{
+			"reason":         "confirmation_mismatch",
+			"expected_value": business.BusinessName,
+		})
+	}
+
+	tx := s.db.Begin()
+	if tx.Error != nil {
+		return apperrors.Internal("failed to start transaction")
+	}
+	if err := s.repo.UpdateByID(tx, currentUser.BusinessID, map[string]interface{}{
+		"status":     "inactive",
+		"updated_at": time.Now().UTC(),
+	}); err != nil {
+		tx.Rollback()
+		return apperrors.Internal("failed to close workspace")
+	}
+	// Written before the commit so the reason survives in the same transaction
+	// as the closure; after this the owner cannot sign in to explain it.
+	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{
+		BusinessID:  currentUser.BusinessID,
+		ActorUserID: currentUser.UserID,
+		EventType:   "business.closed",
+		EntityType:  "business",
+		EntityID:    currentUser.BusinessID,
+		Summary:     closureSummary(req.Reason),
+		IPAddress:   ipAddress,
+		UserAgent:   userAgent,
+	}); err != nil {
+		tx.Rollback()
+		return apperrors.Internal("failed to create activity log")
+	}
+	if err := tx.Commit().Error; err != nil {
+		return apperrors.Internal("failed to commit workspace closure")
+	}
+	return nil
+}
+
+func closureSummary(reason string) string {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return "Workspace closed by the owner."
+	}
+	return "Workspace closed by the owner: " + reason
 }
 
 func (s *Service) GetSettings(currentUser *utils.AuthContext) (*BusinessSettingsResponse, error) {

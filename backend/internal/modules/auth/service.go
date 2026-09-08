@@ -2,6 +2,7 @@ package auth
 
 import (
 	"log"
+	"net/http"
 	"strings"
 	"time"
 
@@ -657,6 +658,17 @@ func (s *Service) CompletePasswordReset(req PasswordResetCompleteRequest) error 
 	return nil
 }
 
+// workspaceClosedMessage tells the person in front of the screen what happened
+// and who can undo it. "forbidden" alone reads like a permissions bug and
+// sends them to their admin, who cannot help: only a platform admin can
+// reopen a closed workspace.
+func workspaceClosedMessage(status string) string {
+	if status == "suspended" {
+		return "This workspace has been suspended. Contact support to restore access."
+	}
+	return "This workspace has been closed. Contact support to reopen it."
+}
+
 func (s *Service) AuthenticateToken(token string) (*utils.AuthContext, error) {
 	identity, err := s.appwriteClient.VerifyJWT(token)
 	if err != nil {
@@ -695,6 +707,26 @@ func (s *Service) AuthenticateToken(token string) (*utils.AuthContext, error) {
 	if user.Status != "active" {
 		tx.Rollback()
 		return nil, apperrors.Forbidden("user is inactive")
+	}
+
+	// businesses.status has accepted active / inactive / suspended since the
+	// first migration and superadmin can set it, but nothing ever read it: a
+	// suspended workspace kept working exactly as before, so the control was
+	// decorative. A closed workspace has to stop answering, the same way an
+	// inactive user does just above. Platform admins never reach this code --
+	// they return earlier -- so closing a business cannot lock out the people
+	// who need to reopen it.
+	business, err := s.businessRepo.FindByID(user.BusinessID)
+	if err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("failed to load workspace")
+	}
+	if business.Status != "active" {
+		tx.Rollback()
+		return nil, apperrors.New(http.StatusForbidden, workspaceClosedMessage(business.Status), map[string]interface{}{
+			"reason":           "workspace_not_active",
+			"workspace_status": business.Status,
+		})
 	}
 
 	if user.EmailVerified != identity.EmailVerified {
@@ -754,6 +786,26 @@ func (s *Service) syncProfile(identity *utils.AppwriteIdentity, ipAddress, userA
 	if user.Status != "active" {
 		tx.Rollback()
 		return nil, apperrors.Forbidden("user is inactive")
+	}
+
+	// businesses.status has accepted active / inactive / suspended since the
+	// first migration and superadmin can set it, but nothing ever read it: a
+	// suspended workspace kept working exactly as before, so the control was
+	// decorative. A closed workspace has to stop answering, the same way an
+	// inactive user does just above. Platform admins never reach this code --
+	// they return earlier -- so closing a business cannot lock out the people
+	// who need to reopen it.
+	business, err := s.businessRepo.FindByID(user.BusinessID)
+	if err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("failed to load workspace")
+	}
+	if business.Status != "active" {
+		tx.Rollback()
+		return nil, apperrors.New(http.StatusForbidden, workspaceClosedMessage(business.Status), map[string]interface{}{
+			"reason":           "workspace_not_active",
+			"workspace_status": business.Status,
+		})
 	}
 
 	now := time.Now().UTC()

@@ -314,6 +314,29 @@ export async function updateBusinessProfile(
   return response.data;
 }
 
+/**
+ * Closes the caller's own workspace. One-way from inside the business: once it
+ * is closed the auth guard refuses every member, so only support can reopen
+ * it. Nothing is deleted -- reopening restores the workspace intact.
+ */
+export async function closeWorkspace(payload: {
+  confirmation: string;
+  reason?: string | undefined;
+}): Promise<void> {
+  const reason = payload.reason?.trim();
+
+  await apiRequest<null, { confirmation: string; reason?: string }>("/api/v1/business/close", {
+    method: "POST",
+    authMode: "appwrite",
+    // Omit reason entirely when blank rather than sending "", so the audit
+    // entry reads as "no reason given" instead of an empty one.
+    body: reason
+      ? { confirmation: payload.confirmation, reason }
+      : { confirmation: payload.confirmation },
+    parse: () => null,
+  });
+}
+
 export async function getOnboardingStatus(): Promise<OnboardingStatus> {
   const response = await apiRequest<OnboardingStatus>("/api/v1/business/onboarding-status", {
     authMode: "appwrite",

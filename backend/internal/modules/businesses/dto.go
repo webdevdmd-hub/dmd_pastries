@@ -19,7 +19,16 @@ type UpdateBusinessRequest struct {
 	Currency     string `json:"currency"`
 	Timezone     string `json:"timezone"`
 	VATNumber    string `json:"vat_number"`
-	Status       string `json:"status" binding:"omitempty,oneof=active inactive suspended"`
+}
+
+// CloseBusinessRequest closes a workspace. Deliberately not part of
+// UpdateBusinessRequest: that endpoint only needs settings-manage, so any
+// settings manager could have closed the workspace as a side effect of a
+// profile edit -- and once closed, nobody in the business can sign in to
+// reopen it. Closing is owner-only, typed-confirmation, and its own route.
+type CloseBusinessRequest struct {
+	Confirmation string `json:"confirmation" binding:"required"`
+	Reason       string `json:"reason"`
 }
 
 type BusinessSettingsResponse struct {

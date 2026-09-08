@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { toast } from "sonner";
 
 import { AccessDeniedCard } from "@/components/settings/access-denied-card";
+import { CloseWorkspaceCard } from "@/components/settings/close-workspace-card";
 import { SettingsEmptyState } from "@/components/settings/settings-empty-state";
 import { SettingsGrid } from "@/components/settings/settings-grid";
 import { SettingsSkeleton } from "@/components/settings/settings-skeleton";
@@ -14,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PERMISSIONS } from "@/constants/permissions";
 import { SETTINGS_SECTIONS } from "@/constants/settings";
 import { useAuth } from "@/hooks/use-auth";
+import { useBusinessProfile } from "@/hooks/use-business";
 import { useMasterDataOverview } from "@/hooks/use-master-data";
 import { usePermission } from "@/hooks/use-permission";
 import { useSettingsOverview } from "@/hooks/use-settings-data";
@@ -29,7 +31,8 @@ function isMasterDataSection(section: SettingsSection): boolean {
 
 export function SettingsPageClient(): JSX.Element {
   const router = useRouter();
-  const { status } = useAuth();
+  const { status, user } = useAuth();
+  const businessProfileQuery = useBusinessProfile();
   const { hasAnyPermission, hasPermission } = usePermission();
   const canViewSettings = hasPermission(PERMISSIONS.settingsView);
   const canManageSettings = hasAnyPermission([
@@ -208,6 +211,17 @@ export function SettingsPageClient(): JSX.Element {
           />
         </section>
       ) : null}
+
+      {/* Last on the page on purpose: it is the one action here nobody in the
+          business can undo. */}
+      <CloseWorkspaceCard
+        businessName={businessProfileQuery.data?.businessName ?? ""}
+        isOwner={Boolean(
+          businessProfileQuery.data?.ownerUserId &&
+          user?.id &&
+          businessProfileQuery.data.ownerUserId === user.id,
+        )}
+      />
     </div>
   );
 }

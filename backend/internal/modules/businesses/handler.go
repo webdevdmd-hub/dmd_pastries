@@ -42,6 +42,21 @@ func (h *Handler) UpdateBusiness(c *gin.Context) {
 	response.Success(c, 200, "business updated successfully", business)
 }
 
+func (h *Handler) CloseBusiness(c *gin.Context) {
+	var req CloseBusinessRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+
+	currentUser := utils.MustAuthContext(c)
+	if err := h.service.CloseBusiness(currentUser, req, c.ClientIP(), c.Request.UserAgent()); err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "workspace closed", nil)
+}
+
 func (h *Handler) GetOnboardingStatus(c *gin.Context) {
 	currentUser := utils.MustAuthContext(c)
 	status, err := h.service.GetOnboardingStatus(currentUser)
