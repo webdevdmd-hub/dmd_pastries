@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"pastries-pos/internal/shared/money"
+	"strconv"
 	"strings"
 	"time"
 
@@ -965,11 +966,19 @@ func (s *Service) deductInventoryForSale(tx *gorm.DB, currentUser *utils.AuthCon
 			continue
 		}
 		itemName := stockName(stock)
+		// No inventory item means the product has never had a stock movement,
+		// so there is nothing on hand. That is a zero balance, not a broken
+		// record: the sale is refused for the same reason and in the same
+		// words as any other shortfall. It used to surface the missing row to
+		// the cashier as "inventory item not found for stock-tracked product",
+		// which named an internal table and offered no way forward -- and
+		// because every product is created stock-tracked, it met anyone
+		// selling a product for the first time.
 		if stock.InventoryItemID == nil || strings.TrimSpace(*stock.InventoryItemID) == "" {
-			return apperrors.BadRequest("inventory item not found for stock-tracked product "+itemName, nil)
+			return outOfStockError(itemName, quantity, 0)
 		}
 		if quantity > stock.AvailableQuantity+0.0001 {
-			return apperrors.BadRequest(fmt.Sprintf("insufficient stock for %s. Required %.4f, available %.4f", itemName, quantity, stock.AvailableQuantity), nil)
+			return outOfStockError(itemName, quantity, stock.AvailableQuantity)
 		}
 		if _, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{
 			BusinessID:      sale.BusinessID,
@@ -1063,6 +1072,40 @@ func (key saleStockKey) variantIDPointer() *string {
 	}
 	variantID := key.ProductVariantID
 	return &variantID
+}
+
+// outOfStockError states a shortfall the way a cashier facing a customer
+// needs to hear it: which product, how many the sale needs, how many are
+// there. The structured details carry the same figures for any caller that
+// wants to render it differently.
+func outOfStockError(itemName string, required, available float64) error {
+	details := map[string]interface{}{
+		"reason":             "insufficient_stock",
+		"item_name":          itemName,
+		"required_quantity":  required,
+		"available_quantity": available,
+	}
+	if available <= 0 {
+		return apperrors.BadRequest(fmt.Sprintf(
+			"%s is out of stock. This sale needs %s, and there is none on hand. Receive stock or produce a batch before selling it.",
+			itemName, formatSaleQuantity(required)), details)
+	}
+	return apperrors.BadRequest(fmt.Sprintf(
+		"Not enough stock for %s. This sale needs %s, but only %s is available.",
+		itemName, formatSaleQuantity(required), formatSaleQuantity(available)), details)
+}
+
+// formatSaleQuantity prints a quantity the way a person writes it: 2 rather
+// than 2.0000, 1.5 rather than 1.5000.
+func formatSaleQuantity(quantity float64) string {
+	text := strconv.FormatFloat(quantity, 'f', -1, 64)
+	if len(text) > 12 {
+		text = strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.4f", quantity), "0"), ".")
+	}
+	if text == "" || text == "-0" {
+		return "0"
+	}
+	return text
 }
 
 func stockName(stock *ProductInventoryStockRow) string {
