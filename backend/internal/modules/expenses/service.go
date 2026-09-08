@@ -433,6 +433,22 @@ func (s *Service) validateExpenseInput(tx *gorm.DB, businessID, branchID, expens
 	if expenseAccount.AccountType != "expense" && expenseAccount.AccountType != "cogs" {
 		return apperrors.BadRequest("expense_account_id must be an expense or cogs account", nil)
 	}
+	// A header account groups other accounts and carries no postings of its
+	// own. buildJournalLines refuses one for a manual journal; this path builds
+	// its lines by hand and has to refuse it too, or the two disagree about
+	// what a valid account is. The seeded chart offers four of them -- 50, 60,
+	// 62, 63 -- and the picker listed 60 first, so posting rent to a header was
+	// the path of least resistance. The resulting journal balances, but the
+	// trial balance had no row to put it on and reported a mismatch.
+	if expenseAccount.IsHeader {
+		return apperrors.BadRequest(
+			"header accounts group other accounts and cannot be posted to. Choose a specific expense account under it.",
+			map[string]interface{}{
+				"reason":       "expense_account_is_header",
+				"account_id":   expenseAccount.ID,
+				"account_code": expenseAccount.AccountCode,
+			})
+	}
 	if !expenseAccount.AllowManualPosting {
 		return apperrors.BadRequest("expense account does not allow manual posting", nil)
 	}

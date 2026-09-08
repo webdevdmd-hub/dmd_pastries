@@ -195,6 +195,17 @@ export function isLedgerAllowedForContext(
     return false;
   }
 
+  // A header account groups other accounts and carries no postings of its own.
+  // Offering one is offering a posting the ledger cannot represent: the seeded
+  // chart has four (50, 60, 62, 63), the expense picker sorted 60 to the top,
+  // and an expense recorded against it produced a balanced journal that the
+  // trial balance had no row for, so the report announced a debit/credit
+  // mismatch on a correct ledger. Every context here posts, so none of them
+  // should list a header.
+  if (account.isHeader) {
+    return false;
+  }
+
   if (context === "purchase_line_account") {
     return (
       account.accountType === "asset" ||

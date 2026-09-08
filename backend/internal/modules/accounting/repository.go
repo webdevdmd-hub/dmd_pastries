@@ -2791,7 +2791,22 @@ func (r *Repository) ListTrialBalanceRows(businessID string, query TrialBalanceQ
 		LEFT JOIN account_totals at ON at.account_id = coa.id
 		WHERE coa.business_id = ?
 		  AND coa.deleted_at IS NULL
-		  AND coa.is_header = false
+		  -- Header accounts group other accounts and carry no postings, so they
+		  -- are normally noise on a trial balance. Excluding them outright hid
+		  -- a real balance: an expense posted to 60 - Operating Expenses showed
+		  -- its bank credit and not its expense debit, and the report announced
+		  -- a debit/credit mismatch for a ledger that was correct. A trial
+		  -- balance must never drop a balance -- that is the one thing it is
+		  -- for. Headers now appear when, and only when, they carry one, which
+		  -- keeps the ordinary report clean and makes stray postings visible
+		  -- and fixable. Deliberately independent of include_zero_balances:
+		  -- ticking that should not list every empty header.
+		  AND (
+		  	coa.is_header = false
+		  	OR ABS(COALESCE(at.opening_balance, 0)) > 0.004
+		  	OR ABS(COALESCE(at.period_debit, 0)) > 0.004
+		  	OR ABS(COALESCE(at.period_credit, 0)) > 0.004
+		  )
 		  `+accountBranchFilter+`
 		  AND (? = true OR ABS(COALESCE(at.opening_balance, 0)) > 0.004 OR ABS(COALESCE(at.period_debit, 0)) > 0.004 OR ABS(COALESCE(at.period_credit, 0)) > 0.004)
 		ORDER BY coa.account_code ASC
