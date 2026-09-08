@@ -1090,8 +1090,11 @@ func outOfStockError(itemName string, required, available float64) error {
 			"%s is out of stock. This sale needs %s, and there is none on hand. Receive stock or produce a batch before selling it.",
 			itemName, formatSaleQuantity(required)), nil)
 	}
+	// "needed / available" rather than a sentence, because a sentence has to
+	// agree with the number: "only 3 is available" is wrong, and "only 1 are
+	// available" is wrong the other way.
 	return apperrors.BadRequest(fmt.Sprintf(
-		"Not enough stock for %s. This sale needs %s, but only %s is available.",
+		"Not enough stock for %s: %s needed, %s available.",
 		itemName, formatSaleQuantity(required), formatSaleQuantity(available)), nil)
 }
 

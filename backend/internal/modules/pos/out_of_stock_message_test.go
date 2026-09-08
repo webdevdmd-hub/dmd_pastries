@@ -43,8 +43,13 @@ func TestOutOfStockErrorDistinguishesPartialStock(t *testing.T) {
 	if strings.Contains(appErr.Message, "out of stock") {
 		t.Errorf("3 available is not out of stock: %s", appErr.Message)
 	}
-	if !strings.Contains(appErr.Message, "5") || !strings.Contains(appErr.Message, "3") {
+	if !strings.Contains(appErr.Message, "5 needed") || !strings.Contains(appErr.Message, "3 available") {
 		t.Errorf("message should carry both figures: %s", appErr.Message)
+	}
+	// A sentence here would have to agree with the number, and cannot: "only
+	// 3 is available" and "only 1 are available" are both wrong.
+	if strings.Contains(appErr.Message, " is available") || strings.Contains(appErr.Message, " are available") {
+		t.Errorf("message reintroduced a number-agreement trap: %s", appErr.Message)
 	}
 
 }
