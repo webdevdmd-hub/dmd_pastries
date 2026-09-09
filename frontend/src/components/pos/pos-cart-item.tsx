@@ -2,7 +2,7 @@ import { Minus, PackagePlus, Plus, X } from "lucide-react";
 import type { JSX } from "react";
 
 import { Button } from "@/components/ui/button";
-import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
+import { getProductImageUrl } from "@/lib/storage/files";
 import type { CartItem } from "@/types/pos";
 
 type POSCartItemProps = {
@@ -26,7 +26,7 @@ function formatMoney(value: number): string {
  * at a counter, "one fewer" and "none at all" must not be neighbours.
  */
 export function POSCartItem({ item, onQuantityChange, onRemove }: POSCartItemProps): JSX.Element {
-  const imageUrl = getProductImagePreviewUrl(item.imageFileId) ?? item.imageUrl;
+  const imageUrl = getProductImageUrl(item) ?? item.imageUrl;
 
   return (
     <div className="flex items-center gap-3 py-3">

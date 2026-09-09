@@ -14,8 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
 import { isPosSelectableProduct } from "@/lib/selectors/eligibility";
+import { getProductImageUrl } from "@/lib/storage/files";
 import type { Product, ProductStatus } from "@/types/product";
 
 export type ProductInventorySummary = {
@@ -171,7 +171,7 @@ export function ProductsTable({
                   <Avatar className="h-10 w-10">
                     <AvatarImage
                       alt={product.productName}
-                      src={getProductImagePreviewUrl(product.imageFileId) ?? product.imageUrl ?? ""}
+                      src={getProductImageUrl(product) ?? product.imageUrl ?? ""}
                     />
                     <AvatarFallback className="bg-brand-cappuccino text-brand-espresso">
                       {productInitials(product.productName)}

@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getProductImagePreviewUrl, uploadProductImage } from "@/lib/appwrite/storage";
+import { getProductImageUrl, uploadProductImage } from "@/lib/storage/files";
 import {
   type CreatePackagingFormValues,
   createPackagingSchema,
@@ -104,8 +104,8 @@ export function PackagingFormDialog({
       return URL.createObjectURL(selectedImage);
     }
 
-    return getProductImagePreviewUrl(item?.imageFileId ?? null) ?? item?.imageUrl ?? null;
-  }, [item?.imageFileId, item?.imageUrl, selectedImage]);
+    return getProductImageUrl(item ?? null) ?? item?.imageUrl ?? null;
+  }, [item, selectedImage]);
 
   useEffect(() => {
     if (!selectedImage || !previewUrl) {

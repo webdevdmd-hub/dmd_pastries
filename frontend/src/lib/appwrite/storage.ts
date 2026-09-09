@@ -4,8 +4,7 @@ import { ID } from "appwrite";
 
 import { appwriteStorage } from "@/lib/appwrite/client";
 import { getPublicEnvValue } from "@/lib/public-env";
-
-type StorageBucketKey = "businessAssets" | "documents" | "productImages" | "userAvatars";
+import type { StorageBucketKey } from "@/lib/storage/buckets";
 
 type AppwriteErrorLike = {
   code?: unknown;

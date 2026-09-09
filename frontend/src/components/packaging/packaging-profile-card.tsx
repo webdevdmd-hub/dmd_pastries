@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ROUTES } from "@/constants/routes";
-import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
+import { getProductImageUrl } from "@/lib/storage/files";
 import type { PackagingItem } from "@/types/packaging";
 
 function formatCurrency(value: number): string {
@@ -39,7 +39,7 @@ function Detail({
 }
 
 export function PackagingProfileCard({ item }: { item: PackagingItem }): JSX.Element {
-  const imageUrl = getProductImagePreviewUrl(item.imageFileId) ?? item.imageUrl;
+  const imageUrl = getProductImageUrl(item) ?? item.imageUrl;
 
   return (
     <Card className="bg-card/80">

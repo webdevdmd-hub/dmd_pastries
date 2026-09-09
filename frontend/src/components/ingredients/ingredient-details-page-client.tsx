@@ -28,7 +28,7 @@ import {
 } from "@/hooks/use-ingredients";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
-import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
+import { getProductImageUrl } from "@/lib/storage/files";
 import type { UpdateIngredientPayload } from "@/types/ingredient";
 
 type IngredientDetailsPageClientProps = {
@@ -103,7 +103,7 @@ export function IngredientDetailsPageClient({
         : (categories.find((category) => category.id === item.ingredientCategoryId)?.categoryName ??
           item.ingredientCategoryName),
   };
-  const imageUrl = getProductImagePreviewUrl(displayItem.imageFileId) ?? displayItem.imageUrl;
+  const imageUrl = getProductImageUrl(displayItem) ?? displayItem.imageUrl;
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">

@@ -30,14 +30,22 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const srcDir = resolve(here, "..", "src");
 
-const IMPLEMENTATION_DIRS = [join("lib", "auth"), join("lib", "appwrite"), join("lib", "supabase")];
+const IMPLEMENTATION_DIRS = [
+  join("lib", "auth"),
+  join("lib", "storage"),
+  join("lib", "appwrite"),
+  join("lib", "supabase"),
+];
 
-// Auth only. lib/appwrite/storage is Phase 2 and legitimately provider-bound.
+// Auth and storage both have seams now, so neither provider module may be
+// imported directly from outside lib/.
 const FORBIDDEN_IMPORTS = [
   { pattern: /@\/lib\/appwrite\/auth/, name: "@/lib/appwrite/auth" },
   { pattern: /@\/lib\/appwrite\/client/, name: "@/lib/appwrite/client" },
   { pattern: /@\/lib\/supabase\/auth/, name: "@/lib/supabase/auth" },
   { pattern: /@\/lib\/supabase\/client/, name: "@/lib/supabase/client" },
+  { pattern: /@\/lib\/appwrite\/storage/, name: "@/lib/appwrite/storage" },
+  { pattern: /@\/lib\/supabase\/storage/, name: "@/lib/supabase/storage" },
   { pattern: /from "appwrite"/, name: "the appwrite SDK" },
   { pattern: /from "@supabase\/supabase-js"/, name: "the supabase SDK" },
 ];

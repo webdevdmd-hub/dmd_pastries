@@ -1,7 +1,7 @@
 import { PackagePlus, ShoppingCart } from "lucide-react";
 import type { JSX } from "react";
 
-import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
+import { getProductImageUrl } from "@/lib/storage/files";
 import type { POSProduct } from "@/types/pos";
 
 type POSProductCardProps = {
@@ -37,7 +37,7 @@ export function POSProductCard({
   product,
   showPrices,
 }: POSProductCardProps): JSX.Element {
-  const imageUrl = getProductImagePreviewUrl(product.imageFileId) ?? product.imageUrl;
+  const imageUrl = getProductImageUrl(product) ?? product.imageUrl;
   const hasVariants = product.variants.length > 0;
   const isOutOfStock =
     product.availableStockQuantity !== null && product.availableStockQuantity <= 0;

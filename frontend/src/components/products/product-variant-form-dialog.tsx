@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getProductImagePreviewUrl, uploadProductImage } from "@/lib/appwrite/storage";
+import { getProductImageUrl, uploadProductImage } from "@/lib/storage/files";
 import { type ProductVariantSchema, productVariantSchema } from "@/lib/validators/product.schema";
 import type {
   CreateProductVariantPayload,
@@ -105,8 +105,8 @@ export function ProductVariantFormDialog({
       return URL.createObjectURL(selectedImage);
     }
 
-    return getProductImagePreviewUrl(variant?.imageFileId ?? null) ?? variant?.imageUrl ?? null;
-  }, [selectedImage, variant?.imageFileId, variant?.imageUrl]);
+    return getProductImageUrl(variant ?? null) ?? variant?.imageUrl ?? null;
+  }, [selectedImage, variant]);
 
   useEffect(() => {
     if (!selectedImage || !previewUrl) {

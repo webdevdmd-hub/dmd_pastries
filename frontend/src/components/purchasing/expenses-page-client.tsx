@@ -48,8 +48,8 @@ import {
 import { usePermission } from "@/hooks/use-permission";
 import { usePurchasingBranches, usePurchasingSuppliers } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
-import { uploadStorageFile } from "@/lib/appwrite/storage";
 import { isLedgerAllowedForContext, isPaymentAccountForBranch } from "@/lib/selectors/eligibility";
+import { uploadFile } from "@/lib/storage/files";
 import type { AccountingAccountType, ChartAccount, PaymentAccount } from "@/types/accounting";
 import type { Customer } from "@/types/customer";
 import type {
@@ -482,7 +482,7 @@ function ExpenseFormDialog({
     if (receiptFile) {
       try {
         setIsUploadingReceipt(true);
-        payload.receiptFileId = await uploadStorageFile("documents", receiptFile);
+        payload.receiptFileId = await uploadFile("documents", receiptFile);
       } catch (error) {
         setError(getErrorMessage(error));
         return;

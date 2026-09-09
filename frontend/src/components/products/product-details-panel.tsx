@@ -9,8 +9,8 @@ import {
 } from "@/components/products/product-detail-view-tabs";
 import { ProductVariantsSection } from "@/components/products/product-variants-section";
 import { Badge } from "@/components/ui/badge";
-import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
 import { getProductPosVisibilityLabel } from "@/lib/selectors/eligibility";
+import { getProductImageUrl } from "@/lib/storage/files";
 import {
   COST_UPDATE_POLICY_LABELS,
   ITEM_STRUCTURE_LABELS,
@@ -74,7 +74,7 @@ export function ProductDetailsPanel({
   product,
   variants,
 }: ProductDetailsPanelProps): JSX.Element {
-  const imageUrl = getProductImagePreviewUrl(product.imageFileId) ?? product.imageUrl;
+  const imageUrl = getProductImageUrl(product) ?? product.imageUrl;
 
   return (
     <div className="grid gap-6">

@@ -78,8 +78,8 @@ import {
 } from "@/hooks/use-settings-data";
 import { getPaymentAccounts } from "@/lib/api/accounting";
 import { getErrorMessage } from "@/lib/api/client";
-import { getBusinessAssetPreviewUrl, uploadBusinessAsset } from "@/lib/appwrite/storage";
 import { formatLabel } from "@/lib/format/label";
+import { getBusinessAssetUrl, uploadBusinessAsset } from "@/lib/storage/files";
 import {
   type CompanySettingsSchema,
   companySettingsSchema,
@@ -322,7 +322,7 @@ function CompanySettingsDialog({
       return URL.createObjectURL(selectedLogo);
     }
 
-    return getBusinessAssetPreviewUrl(form.watch("logoUrl") || null);
+    return getBusinessAssetUrl({ logoFileId: form.watch("logoUrl") || null });
   }, [form, selectedLogo]);
 
   useEffect(() => {

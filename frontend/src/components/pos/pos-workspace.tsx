@@ -45,8 +45,8 @@ import {
   usePOSReferenceData,
 } from "@/hooks/use-pos-products";
 import { getErrorMessage } from "@/lib/api/client";
-import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
 import { type CheckoutFeedback, resolveCheckoutBlocker } from "@/lib/pos/checkout-feedback";
+import { getProductImageUrl } from "@/lib/storage/files";
 import { createUuid } from "@/lib/uuid";
 import { checkoutSchema } from "@/lib/validators/pos.schema";
 import type { ProductCategory } from "@/types/master-data";
@@ -815,11 +815,9 @@ export function POSWorkspace(): JSX.Element {
                 const availableQuantity = variant.availableStockQuantity;
                 const isOutOfStock = availableQuantity !== null && availableQuantity <= 0;
                 const parentImageUrl =
-                  getProductImagePreviewUrl(variantProduct.imageFileId) ?? variantProduct.imageUrl;
+                  getProductImageUrl(variantProduct) ?? variantProduct.imageUrl;
                 const variantImageUrl =
-                  getProductImagePreviewUrl(variant.imageFileId) ??
-                  variant.imageUrl ??
-                  parentImageUrl;
+                  getProductImageUrl(variant) ?? variant.imageUrl ?? parentImageUrl;
                 const stockLabel =
                   availableQuantity !== null
                     ? `${availableQuantity.toLocaleString(undefined, {

@@ -14,7 +14,7 @@ import {
 } from "@/components/products/products-table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
-import { getProductImagePreviewUrl } from "@/lib/appwrite/storage";
+import { getProductImageUrl } from "@/lib/storage/files";
 
 /**
  * The catalogue as cards, for phones: an eight-column table has no honest
@@ -56,7 +56,7 @@ export function ProductsCardGrid({
                 <Avatar className="h-10 w-10">
                   <AvatarImage
                     alt={product.productName}
-                    src={getProductImagePreviewUrl(product.imageFileId) ?? product.imageUrl ?? ""}
+                    src={getProductImageUrl(product) ?? product.imageUrl ?? ""}
                   />
                   <AvatarFallback className="bg-brand-cappuccino text-brand-espresso">
                     {productInitials(product.productName)}

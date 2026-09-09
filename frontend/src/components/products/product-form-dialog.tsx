@@ -27,8 +27,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getProductImagePreviewUrl, uploadProductImage } from "@/lib/appwrite/storage";
 import { isSelectableTaxRate } from "@/lib/selectors/eligibility";
+import { getProductImageUrl, uploadProductImage } from "@/lib/storage/files";
 import { cn } from "@/lib/utils/cn";
 import { type ProductSchema, productSchema } from "@/lib/validators/product.schema";
 import type { ProductReferenceData } from "@/types/product";
@@ -247,8 +247,8 @@ export function ProductFormDialog({
       return URL.createObjectURL(selectedImage);
     }
 
-    return getProductImagePreviewUrl(product?.imageFileId ?? null) ?? product?.imageUrl ?? null;
-  }, [product?.imageFileId, product?.imageUrl, selectedImage]);
+    return getProductImageUrl(product ?? null) ?? product?.imageUrl ?? null;
+  }, [product, selectedImage]);
 
   useEffect(() => {
     if (!selectedImage || !previewUrl) {

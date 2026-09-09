@@ -11,6 +11,9 @@ export type PublicEnvKey =
   // migration, so the cutover is these two variables flipping together, and the
   // rollback is flipping them back.
   | "NEXT_PUBLIC_AUTH_PROVIDER"
+  // Storage moves separately from auth: they share nothing but a provider
+  // name, and one window debugging two migrations is one too many.
+  | "NEXT_PUBLIC_STORAGE_PROVIDER"
   | "NEXT_PUBLIC_SUPABASE_URL"
   // Public by design -- it is the key the browser is meant to hold, and it
   // grants only what RLS and the exposed schemas allow. It is not the
