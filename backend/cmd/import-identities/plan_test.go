@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"pastries-pos/internal/shared/utils"
 )
 
 func exportedFixture(id, email, hash string) exportedUser {
@@ -30,13 +32,13 @@ func localFixture(appwriteID, email string) localUser {
 // the backfill checkable rather than trusted, and what makes a lost
 // identity_migration_map an inconvenience instead of a disaster.
 func TestSupabaseIDsAreDeterministic(t *testing.T) {
-	first := supabaseUserID("65f1a2b3c4d5e6f7a8b9")
-	second := supabaseUserID("65f1a2b3c4d5e6f7a8b9")
+	first := utils.SupabaseUserIDForAppwriteID("65f1a2b3c4d5e6f7a8b9")
+	second := utils.SupabaseUserIDForAppwriteID("65f1a2b3c4d5e6f7a8b9")
 
 	if first != second {
 		t.Fatalf("same input produced %s then %s", first, second)
 	}
-	if first == supabaseUserID("65f1a2b3c4d5e6f7a8ba") {
+	if first == utils.SupabaseUserIDForAppwriteID("65f1a2b3c4d5e6f7a8ba") {
 		t.Error("different Appwrite ids collided")
 	}
 	if len(first) != 36 {
@@ -53,7 +55,7 @@ func TestAMatchedUserIsPlanned(t *testing.T) {
 	if len(issues.blocking) != 0 {
 		t.Fatalf("blocked a clean import: %v", issues.blocking)
 	}
-	if len(planned) != 1 || planned[0].supabaseID != supabaseUserID("aw1") {
+	if len(planned) != 1 || planned[0].supabaseID != utils.SupabaseUserIDForAppwriteID("aw1") {
 		t.Fatalf("planned = %+v", planned)
 	}
 }
@@ -158,7 +160,7 @@ func TestAnAppwriteOnlyAccountIsSkippedNotBlocked(t *testing.T) {
 // Re-running after a partial import must be safe: already-linked users are
 // planned again and the executor treats an existing account as success.
 func TestAlreadyLinkedUsersArePlannedAgainForIdempotency(t *testing.T) {
-	existing := supabaseUserID("aw1")
+	existing := utils.SupabaseUserIDForAppwriteID("aw1")
 	local := localFixture("aw1", "staff@test.invalid")
 	local.SupabaseUserID = &existing
 

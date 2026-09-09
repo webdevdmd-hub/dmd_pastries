@@ -98,7 +98,15 @@ func (m *IdentityManager) CreateUser(email, password, name, phone string) (Provi
 		return ids, nil
 	}
 
-	supabaseID, err := m.supabase.CreateUser(email, password, name, phone)
+	// Derived from the Appwrite id, never left to Supabase to invent. This is
+	// the same function the bulk import uses, so an employee hired during the
+	// migration window lands at exactly the address the import would have given
+	// them -- which is what makes the import safe to re-run afterwards, and
+	// what makes "recompute every id and compare" a real verification rather
+	// than one that skips whoever joined most recently.
+	supabaseID, err := m.supabase.CreateUser(
+		SupabaseUserIDForAppwriteID(appwriteID), email, password, name, phone,
+	)
 	if err != nil {
 		_ = m.appwrite.DeleteUser(appwriteID)
 		return ProviderIDs{}, err

@@ -55,7 +55,7 @@ func TestCreateUserPostsToTheAdminEndpoint(t *testing.T) {
 	var seen capture
 	client := fakeGoTrue(t, http.StatusOK, `{"id":"11111111-2222-4333-8444-555555555555"}`, &seen)
 
-	id, err := client.CreateUser("Owner@DMD.example", "hunter2hunter2", "Bakery Owner", " +971500000000 ")
+	id, err := client.CreateUser("11111111-2222-4333-8444-555555555555", "Owner@DMD.example", "hunter2hunter2", "Bakery Owner", " +971500000000 ")
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
@@ -246,7 +246,7 @@ func TestErrorsKeepSupabasesOwnMessage(t *testing.T) {
 	client := fakeGoTrue(t, http.StatusUnprocessableEntity,
 		`{"code":422,"error_code":"email_address_invalid","msg":"Email address \"x@example.com\" is invalid"}`, &seen)
 
-	_, err := client.CreateUser("x@example.com", "hunter2hunter2", "X", "")
+	_, err := client.CreateUser("", "x@example.com", "hunter2hunter2", "X", "")
 	if err == nil {
 		t.Fatal("a 422 was reported as success")
 	}
@@ -268,7 +268,7 @@ func TestDuplicateEmailGetsItsOwnMessage(t *testing.T) {
 	client := fakeGoTrue(t, http.StatusUnprocessableEntity,
 		`{"msg":"A user with this email address has already been registered"}`, &seen)
 
-	_, err := client.CreateUser("taken@dmd.example", "hunter2hunter2", "X", "")
+	_, err := client.CreateUser("", "taken@dmd.example", "hunter2hunter2", "X", "")
 	message, _ := FriendlySupabaseCreateUserError(err)
 	if !strings.Contains(message, "already exists") {
 		t.Errorf("message = %q", message)
@@ -284,7 +284,7 @@ func TestUnconfiguredClientIsInert(t *testing.T) {
 	if client.Configured() {
 		t.Error("Configured() is true with no project ref or service key")
 	}
-	if _, err := client.CreateUser("a@b.example", "pw", "n", ""); err == nil {
+	if _, err := client.CreateUser("", "a@b.example", "pw", "n", ""); err == nil {
 		t.Error("CreateUser succeeded with no configuration")
 	}
 	if err := client.DeleteUser("x"); err == nil {

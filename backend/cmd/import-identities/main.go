@@ -39,27 +39,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"pastries-pos/internal/config"
 	"pastries-pos/internal/database"
 	"pastries-pos/internal/shared/utils"
 )
-
-// identityNamespace seeds the UUIDv5 that becomes each user's Supabase id.
-//
-// Arbitrary, and it must never change. Every Supabase id is derived from it, so
-// a different namespace would mint different ids and orphan every row already
-// linked. Fixing it here means the whole mapping can be recomputed from the
-// Appwrite ids alone -- the backfill is checkable rather than merely trusted,
-// and a lost identity_migration_map is an inconvenience instead of a disaster.
-var identityNamespace = uuid.MustParse("3f2a1c58-9d4e-5b7a-8c16-2e9d4f7a1b03")
-
-// supabaseUserID is the one place an Appwrite id becomes a Supabase id.
-func supabaseUserID(appwriteUserID string) string {
-	return uuid.NewSHA1(identityNamespace, []byte(appwriteUserID)).String()
-}
 
 type exportedUser struct {
 	Email         string `json:"email"`
@@ -243,7 +228,7 @@ func plan(exported []exportedUser, locals map[string]localUser) ([]plannedImport
 		result = append(result, plannedImport{
 			exported:   user,
 			local:      local,
-			supabaseID: supabaseUserID(user.ID),
+			supabaseID: utils.SupabaseUserIDForAppwriteID(user.ID),
 		})
 	}
 

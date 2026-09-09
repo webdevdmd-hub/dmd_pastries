@@ -59,8 +59,19 @@ func (c *SupabaseAdminClient) isE2E() bool {
 // an admin adding an employee, or an invitation being accepted. Requiring the
 // new employee to confirm an address their manager just typed adds a failure
 // point without adding a check, and the invitation itself is the proof.
-func (c *SupabaseAdminClient) CreateUser(email, password, name, phone string) (string, error) {
+// CreateUser makes an account from a plaintext password.
+//
+// userID is the caller's deterministic id and is sent as-is, for the same
+// reason CreateUserWithPasswordHash takes one: an account created here during
+// the migration window must land at the same address the bulk import would have
+// given it, or the two routes disagree and re-running the import corrupts the
+// link. Empty is allowed -- Supabase then invents one -- but only callers with
+// no Appwrite id to derive from should pass it.
+func (c *SupabaseAdminClient) CreateUser(userID, email, password, name, phone string) (string, error) {
 	if c.isE2E() {
+		if trimmed := strings.TrimSpace(userID); trimmed != "" {
+			return trimmed, nil
+		}
 		return e2eSupabaseUserID(email), nil
 	}
 
@@ -69,6 +80,9 @@ func (c *SupabaseAdminClient) CreateUser(email, password, name, phone string) (s
 		"password":      password,
 		"email_confirm": true,
 		"user_metadata": map[string]any{"full_name": name},
+	}
+	if trimmed := strings.TrimSpace(userID); trimmed != "" {
+		body["id"] = trimmed
 	}
 	if trimmed := strings.TrimSpace(phone); trimmed != "" {
 		body["phone"] = trimmed
@@ -95,6 +109,13 @@ func (c *SupabaseAdminClient) CreateUser(email, password, name, phone string) (s
 // the mapping reproducible from scratch instead of trusting one backfill run.
 func (c *SupabaseAdminClient) CreateUserWithPasswordHash(userID, email, passwordHash, name, phone string) (string, error) {
 	if c.isE2E() {
+		// The caller's id, not one derived from the email: runImport treats a
+		// returned id that differs from the one it asked for as a hard error,
+		// so echoing the email-derived stub would fail the import in E2E for a
+		// reason that has nothing to do with the import.
+		if trimmed := strings.TrimSpace(userID); trimmed != "" {
+			return trimmed, nil
+		}
 		return e2eSupabaseUserID(email), nil
 	}
 
