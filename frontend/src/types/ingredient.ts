@@ -37,6 +37,7 @@ export type Ingredient = {
   description: string | null;
   imageUrl: string | null;
   imageFileId: string | null;
+  imageStoragePath: string | null;
   status: IngredientStatus;
   createdByUserName: string;
   createdAt: string;

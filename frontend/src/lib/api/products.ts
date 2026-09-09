@@ -110,6 +110,7 @@ type BackendProduct = {
   average_inventory_cost?: unknown;
   image_url?: unknown;
   image_file_id?: unknown;
+  image_storage_path?: unknown;
   is_sellable?: unknown;
   is_pos_visible?: unknown;
   is_purchasable?: unknown;
@@ -145,6 +146,7 @@ type BackendVariant = {
   average_inventory_cost?: unknown;
   image_url?: unknown;
   image_file_id?: unknown;
+  image_storage_path?: unknown;
   sort_order?: unknown;
   status?: unknown;
   created_at?: unknown;
@@ -368,6 +370,7 @@ function parseVariantWithFallbacks(value: unknown, fallbacks: VariantFallbacks):
     averageInventoryCost: nullableNumber(variant.average_inventory_cost),
     imageUrl: nullableString(variant.image_url),
     imageFileId: nullableString(variant.image_file_id) ?? nullableString(variant.image_url),
+    imageStoragePath: nullableString(variant.image_storage_path),
     sortOrder: requiredNumber(variant.sort_order, "Variant sort order"),
     status: variant.status,
     createdAt:
@@ -466,6 +469,7 @@ function parseProduct(value: unknown): Product {
     averageInventoryCost: nullableNumber(product.average_inventory_cost),
     imageUrl: nullableString(product.image_url),
     imageFileId: nullableString(product.image_file_id) ?? nullableString(product.image_url),
+    imageStoragePath: nullableString(product.image_storage_path),
     isSellable: optionalBoolean(product.is_sellable, false),
     isPosVisible: requiredBoolean(product.is_pos_visible, "POS visible"),
     isPurchasable: optionalBoolean(product.is_purchasable, false),

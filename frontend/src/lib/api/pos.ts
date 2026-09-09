@@ -51,6 +51,7 @@ type BackendPOSProductVariant = {
   available_quantity?: number | null;
   image_url?: string | null;
   image_file_id?: string | null;
+  image_storage_path?: string | null;
   status?: string;
 };
 
@@ -83,6 +84,7 @@ type BackendPOSProduct = {
   available_quantity?: number | null;
   image_url?: string | null;
   image_file_id?: string | null;
+  image_storage_path?: string | null;
   is_sellable?: boolean;
   is_pos_visible?: boolean;
   variants?: unknown;
@@ -528,6 +530,7 @@ function parseVariant(value: unknown): POSProductVariant {
     ),
     imageUrl: optionalString(variant.image_url),
     imageFileId: optionalString(variant.image_file_id),
+    imageStoragePath: optionalString(variant.image_storage_path),
     status: isRecordStatus(variant.status) ? variant.status : "active",
   };
 }
@@ -644,6 +647,7 @@ function parseProduct(value: unknown): POSProduct {
     ),
     imageUrl: optionalString(product.image_url),
     imageFileId: optionalString(product.image_file_id),
+    imageStoragePath: optionalString(product.image_storage_path),
     isSellable: product.is_sellable === true,
     isPosVisible: product.is_pos_visible !== false,
     variants,

@@ -37,6 +37,7 @@ export type PackagingItem = {
   description: string | null;
   imageUrl: string | null;
   imageFileId: string | null;
+  imageStoragePath: string | null;
   status: PackagingStatus;
   createdByUserName: string;
   createdAt: string;

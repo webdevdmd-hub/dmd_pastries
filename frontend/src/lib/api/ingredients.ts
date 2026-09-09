@@ -105,6 +105,7 @@ function parseIngredient(value: unknown): Ingredient {
     description: optionalString(value.description),
     imageUrl: optionalString(value.image_url),
     imageFileId: optionalString(value.image_file_id),
+    imageStoragePath: optionalString(value.image_storage_path),
     status: isIngredientStatus(value.status) ? value.status : "active",
     createdByUserName: stringValue(value.created_by_user_name, "User"),
     createdAt: stringValue(value.created_at),

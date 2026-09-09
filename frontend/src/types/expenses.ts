@@ -31,6 +31,7 @@ export type Expense = {
   paidThroughAccountId: string;
   paidThroughAccountName: string;
   receiptFileId: string | null;
+  receiptStoragePath: string | null;
   referenceNumber: string | null;
   reversalJournalEntryId: string | null;
   status: ExpenseStatus;

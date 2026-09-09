@@ -87,6 +87,7 @@ function parseExpense(value: unknown): Expense {
     paidThroughAccountId: stringValue(value.paid_through_account_id),
     paidThroughAccountName: stringValue(value.paid_through_account_name, "Paid through"),
     receiptFileId: optionalString(value.receipt_file_id),
+    receiptStoragePath: optionalString(value.receipt_storage_path),
     referenceNumber: optionalString(value.reference_number),
     reversalJournalEntryId: optionalString(value.reversal_journal_entry_id),
     status: statusValue(value.status),

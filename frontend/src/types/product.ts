@@ -74,6 +74,7 @@ export type ProductVariant = {
   averageInventoryCost: number | null;
   imageUrl: string | null;
   imageFileId: string | null;
+  imageStoragePath: string | null;
   sortOrder: number;
   status: RecordStatus;
   createdAt: string;
@@ -113,6 +114,7 @@ export type Product = {
   averageInventoryCost: number | null;
   imageUrl: string | null;
   imageFileId: string | null;
+  imageStoragePath: string | null;
   isSellable: boolean;
   isPosVisible: boolean;
   isPurchasable: boolean;
