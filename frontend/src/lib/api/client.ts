@@ -1,5 +1,5 @@
 import { classifyApiMonitorStatus, recordApiMonitorEvent } from "@/lib/api-monitor/store";
-import { clearCachedAppwriteJwt, createAppwriteJwt } from "@/lib/appwrite/auth";
+import { clearCachedAccessToken, getAccessToken } from "@/lib/auth/session";
 import { notifySessionExpired } from "@/lib/auth/session-events";
 import { getPublicEnvValue } from "@/lib/public-env";
 import type { ApiFailure, ApiResponse, ApiSuccess, FieldErrorMap } from "@/types/api";
@@ -245,13 +245,13 @@ async function buildHeaders(authMode: AuthMode): Promise<HeadersInit> {
   });
 
   if (authMode === "appwrite") {
-    const jwt = await createAppwriteJwt();
+    const jwt = await getAccessToken();
 
     if (!jwt) {
       notifySessionExpired();
 
       throw new ApiError({
-        message: "Unable to create an Appwrite JWT for the backend request.",
+        message: "Unable to obtain an access token for the backend request.",
         status: 401,
       });
     }
@@ -359,7 +359,7 @@ export async function apiRequest<TResponse, TBody = undefined>(
     if (response.status === 401) {
       // Drop the cached JWT so the next request mints a fresh one instead of
       // replaying the rejected token until it expires.
-      clearCachedAppwriteJwt();
+      clearCachedAccessToken();
       notifySessionExpired();
     }
 
@@ -476,7 +476,7 @@ export async function apiBlobRequest<TBody = undefined>(
     }
 
     if (response.status === 401) {
-      clearCachedAppwriteJwt();
+      clearCachedAccessToken();
       notifySessionExpired();
     }
 

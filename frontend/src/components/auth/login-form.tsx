@@ -24,8 +24,8 @@ import { Input } from "@/components/ui/input";
 import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
-import { AppwriteRateLimitError, AppwriteSessionAlreadyExistsError } from "@/lib/appwrite/auth";
 import { authenticatedHomeRoute } from "@/lib/auth/routes";
+import { AuthRateLimitError, SessionAlreadyExistsError } from "@/lib/auth/session";
 import { type LoginSchema, loginSchema } from "@/validators/auth.schema";
 
 export function LoginForm(): JSX.Element {
@@ -69,7 +69,7 @@ export function LoginForm(): JSX.Element {
     };
   }, [isCooldownActive, rateLimited]);
 
-  function applyRateLimit(error: AppwriteRateLimitError): void {
+  function applyRateLimit(error: AuthRateLimitError): void {
     setRateLimited(true);
     setSubmitError(error.message);
     setCooldownNow(Date.now());
@@ -86,12 +86,12 @@ export function LoginForm(): JSX.Element {
       toast.success("Welcome back. Redirecting to your workspace.");
       router.replace(authenticatedHomeRoute(profile));
     } catch (error) {
-      if (error instanceof AppwriteSessionAlreadyExistsError) {
+      if (error instanceof SessionAlreadyExistsError) {
         setSessionConflict(true);
         return;
       }
 
-      if (error instanceof AppwriteRateLimitError) {
+      if (error instanceof AuthRateLimitError) {
         applyRateLimit(error);
         return;
       }
@@ -119,7 +119,7 @@ export function LoginForm(): JSX.Element {
       toast.success("Session restored. Redirecting to your workspace.");
       router.replace(authenticatedHomeRoute(profile));
     } catch (error) {
-      if (error instanceof AppwriteRateLimitError) {
+      if (error instanceof AuthRateLimitError) {
         applyRateLimit(error);
       } else {
         setSubmitError(getErrorMessage(error));
@@ -148,7 +148,7 @@ export function LoginForm(): JSX.Element {
       toast.success("Welcome back. Redirecting to your workspace.");
       router.replace(authenticatedHomeRoute(profile));
     } catch (error) {
-      if (error instanceof AppwriteRateLimitError) {
+      if (error instanceof AuthRateLimitError) {
         applyRateLimit(error);
       } else {
         setSubmitError(getErrorMessage(error));

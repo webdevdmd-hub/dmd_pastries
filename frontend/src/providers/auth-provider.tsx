@@ -15,20 +15,20 @@ import {
 } from "@/lib/api/auth";
 import { switchBranch } from "@/lib/api/business";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
-import {
-  AppwriteRateLimitError,
-  AppwriteSessionAlreadyExistsError,
-  clearCachedAppwriteJwt,
-  clearStoredAppwriteSession,
-  getCurrentAppwriteAccount,
-  getCurrentAppwriteSession,
-  hasStoredAppwriteSession,
-  loginWithAppwrite,
-  logoutFromAppwrite,
-  sendEmailVerification,
-  verifyEmailWithSecret,
-} from "@/lib/appwrite/auth";
 import { authenticatedHomeRoute } from "@/lib/auth/routes";
+import {
+  AuthRateLimitError,
+  clearCachedAccessToken,
+  clearStoredSession,
+  getCurrentAccount,
+  hasLiveSession,
+  hasStoredSession,
+  sendEmailVerification,
+  SessionAlreadyExistsError,
+  signIn,
+  signOut,
+  verifyEmailWithSecret,
+} from "@/lib/auth/session";
 import { onSessionExpired } from "@/lib/auth/session-events";
 import type {
   AuthStatus,
@@ -149,13 +149,13 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
     setStatus("loading");
 
     try {
-      if (!hasStoredAppwriteSession()) {
+      if (!hasStoredSession()) {
         setUser(null);
         setStatus("unauthenticated");
         return;
       }
 
-      const session = await getCurrentAppwriteSession();
+      const session = await hasLiveSession();
 
       if (!session) {
         setUser(null);
@@ -163,7 +163,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
         return;
       }
 
-      const account = await getCurrentAppwriteAccount();
+      const account = await getCurrentAccount();
 
       if (!account) {
         setUser(null);
@@ -178,7 +178,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
 
       if (isDefinitiveAuthFailure) {
         try {
-          await logoutFromAppwrite();
+          await signOut();
         } catch {
           // Swallow logout cleanup failure and reset local state.
         }
@@ -242,10 +242,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       }
 
       const sessionExpirationPromise = (async () => {
-        const [session, account] = await Promise.all([
-          getCurrentAppwriteSession(),
-          getCurrentAppwriteAccount(),
-        ]);
+        const [session, account] = await Promise.all([hasLiveSession(), getCurrentAccount()]);
 
         if (session || account) {
           // The Appwrite session is still valid, so this 401 came from the backend
@@ -254,7 +251,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
           // auth error, the session is unusable and keeping it would leave the
           // user silently stuck.
           try {
-            clearCachedAppwriteJwt();
+            clearCachedAccessToken();
             await refreshCurrentProfile();
             return;
           } catch (error) {
@@ -270,7 +267,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
         }
 
         try {
-          await logoutFromAppwrite();
+          await signOut();
         } catch {
           // Session is already invalid; continue with local state cleanup.
         }
@@ -302,10 +299,10 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       isAuthenticated: status === "authenticated" && user !== null,
       async login(input) {
         return runAuthOperation(async () => {
-          const existingSession = await getCurrentAppwriteSession();
+          const existingSession = await hasLiveSession();
 
           if (existingSession) {
-            const account = await getCurrentAppwriteAccount();
+            const account = await getCurrentAccount();
 
             if (account?.email.toLowerCase() === input.email.trim().toLowerCase()) {
               // The user already holds a live Appwrite session for this same
@@ -314,25 +311,25 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
                 await loginSync();
                 return await refreshCurrentProfile();
               } catch (error) {
-                if (error instanceof AppwriteRateLimitError) {
+                if (error instanceof AuthRateLimitError) {
                   throw error;
                 }
 
-                throw new AppwriteSessionAlreadyExistsError();
+                throw new SessionAlreadyExistsError();
               }
             }
 
-            throw new AppwriteSessionAlreadyExistsError();
+            throw new SessionAlreadyExistsError();
           }
 
-          await loginWithAppwrite(input.email, input.password);
+          await signIn(input.email, input.password);
           await loginSync();
           return refreshCurrentProfile();
         });
       },
       async continueCurrentSession() {
         return runAuthOperation(async () => {
-          const account = await getCurrentAppwriteAccount();
+          const account = await getCurrentAccount();
 
           if (!account) {
             throw new Error("No active Appwrite session was found. Please restart login.");
@@ -345,12 +342,12 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       async restartLogin(input) {
         return runAuthOperation(async () => {
           try {
-            await logoutFromAppwrite();
+            await signOut();
           } catch {
             // Continue with a fresh login attempt even if session cleanup is already done.
           }
 
-          await loginWithAppwrite(input.email, input.password);
+          await signIn(input.email, input.password);
           await loginSync();
           return refreshCurrentProfile();
         });
@@ -366,12 +363,12 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
           // throw user_session_already_exists and strands the freshly created
           // account, so clear it first (mirrors restartLogin).
           try {
-            await logoutFromAppwrite();
+            await signOut();
           } catch {
             // No session to clean up.
           }
 
-          await loginWithAppwrite(input.email, input.password);
+          await signIn(input.email, input.password);
           await loginSync();
           const profile = await refreshCurrentProfile();
 
@@ -403,12 +400,12 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
           }
 
           try {
-            await logoutFromAppwrite();
+            await signOut();
           } catch {
             // Appwrite is unreachable — drop the stored session credentials so
             // restoreSession cannot silently sign the user back in on a shared
             // terminal.
-            clearStoredAppwriteSession();
+            clearStoredSession();
           }
         } finally {
           setUser(null);

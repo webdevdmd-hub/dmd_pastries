@@ -3,6 +3,7 @@
 import type { Models } from "appwrite";
 
 import { appwriteAccount, getAppwriteProjectId, isAppwriteConfigured } from "@/lib/appwrite/client";
+import { AuthRateLimitError, SessionAlreadyExistsError } from "@/lib/auth/errors";
 import { getPublicEnvValue } from "@/lib/public-env";
 
 function requireAccount() {
@@ -119,23 +120,26 @@ function readPersistedRateLimitUntil(): number {
   return Number.isFinite(until) ? until : 0;
 }
 
-export class AppwriteSessionAlreadyExistsError extends Error {
+/**
+ * Appwrite-flavoured constructors over the shared error types.
+ *
+ * The classes themselves live in `lib/auth/errors` so that Supabase throws the
+ * same ones: the components catching these use `instanceof`, which would stop
+ * matching the moment a second provider defined its own lookalike. Only the
+ * default messages and the hourly-bucket retry window are Appwrite's.
+ */
+class AppwriteSessionAlreadyExistsError extends SessionAlreadyExistsError {
   constructor(message = "An Appwrite session is already active in this browser.") {
     super(message);
-    this.name = "AppwriteSessionAlreadyExistsError";
   }
 }
 
-export class AppwriteRateLimitError extends Error {
-  readonly retryAfterMs: number;
-
+class AppwriteRateLimitError extends AuthRateLimitError {
   constructor(
     message = "Appwrite limits sign-in attempts per hour, and this browser has reached the limit. It resets at the top of the hour; retrying sooner counts against the same limit.",
     retryAfterMs = rateLimitRetryAfterMs(),
   ) {
-    super(message);
-    this.name = "AppwriteRateLimitError";
-    this.retryAfterMs = retryAfterMs;
+    super(message, retryAfterMs);
   }
 }
 

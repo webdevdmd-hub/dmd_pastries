@@ -6,6 +6,16 @@ export type PublicEnvKey =
   | "NEXT_PUBLIC_APPWRITE_PRODUCT_IMAGES_BUCKET_ID"
   | "NEXT_PUBLIC_APPWRITE_PROJECT_ID"
   | "NEXT_PUBLIC_APPWRITE_USER_AVATARS_BUCKET_ID"
+  // Which identity provider issues sessions in this build. Mirrors the
+  // backend's AUTH_PRIMARY_PROVIDER: the backend verifies both throughout the
+  // migration, so the cutover is these two variables flipping together, and the
+  // rollback is flipping them back.
+  | "NEXT_PUBLIC_AUTH_PROVIDER"
+  | "NEXT_PUBLIC_SUPABASE_URL"
+  // Public by design -- it is the key the browser is meant to hold, and it
+  // grants only what RLS and the exposed schemas allow. It is not the
+  // service_role key, which must never reach a bundle.
+  | "NEXT_PUBLIC_SUPABASE_ANON_KEY"
   | "NEXT_PUBLIC_E2E_AUTH_ENABLED"
   | "NEXT_PUBLIC_E2E_AUTH_TOKEN";
 

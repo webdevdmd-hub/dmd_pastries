@@ -1,6 +1,6 @@
 import { ROUTES } from "@/constants/routes";
 import { apiRequest } from "@/lib/api/client";
-import { createAppwriteJwt } from "@/lib/appwrite/auth";
+import { getAccessToken } from "@/lib/auth/session";
 import type {
   ForgotPasswordInput,
   LoginSyncResult,
@@ -313,7 +313,7 @@ export async function registerOwner(input: RegisterOwnerInput): Promise<Register
 }
 
 export async function loginSync(): Promise<LoginSyncResult> {
-  const jwt = await createAppwriteJwt();
+  const jwt = await getAccessToken();
 
   const response = await apiRequest<SafeUserProfile, { jwt: string }>("/api/v1/auth/login-sync", {
     method: "POST",
