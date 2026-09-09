@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -10,6 +11,7 @@ import (
 	"gorm.io/gorm/logger"
 
 	"pastries-pos/internal/config"
+	"pastries-pos/internal/shared/telemetry"
 )
 
 func NewPostgres(cfg config.Config) (*gorm.DB, error) {
@@ -68,8 +70,15 @@ func StartPoolStatsLogger(db *gorm.DB, cfg config.Config) {
 
 	interval := time.Duration(cfg.DBStatsLogSeconds) * time.Second
 
+	// Round trips a managed Postgres might plausibly sit at. Printing the
+	// projection for each removes the arithmetic from whoever reads this, and
+	// makes the go/no-go readable without the plan in front of them.
+	candidateRTTs := []time.Duration{5 * time.Millisecond, 20 * time.Millisecond, 40 * time.Millisecond}
+
+	telemetry.TakeSample(time.Now()) // establish the baseline; discard the partial interval
+
 	go func() {
-		for range time.Tick(interval) {
+		for now := range time.Tick(interval) {
 			stats := sqlDB.Stats()
 			log.Printf(
 				"db pool: open=%d in_use=%d idle=%d wait_count=%d wait_total=%s max_open=%d",
@@ -80,6 +89,30 @@ func StartPoolStatsLogger(db *gorm.DB, cfg config.Config) {
 				stats.WaitDuration,
 				stats.MaxOpenConnections,
 			)
+
+			sample := telemetry.TakeSample(now)
+			if sample.Requests == 0 {
+				log.Printf("db load: no requests in the last %s", sample.Interval.Round(time.Second))
+				continue
+			}
+
+			log.Printf(
+				"db load: requests=%d statements=%d stmt_errors=%d statements_per_request=%.1f mean_latency=%s",
+				sample.Requests,
+				sample.Statements,
+				sample.StatementErrors,
+				sample.StatementsPerReq,
+				sample.MeanRequestLatency.Round(time.Millisecond),
+			)
+
+			// The Phase 0 gate for moving the database off this host.
+			projections := make([]string, 0, len(candidateRTTs))
+			for _, rtt := range candidateRTTs {
+				projections = append(projections, fmt.Sprintf(
+					"+%s@%s", sample.ProjectedOverhead(rtt).Round(time.Millisecond), rtt))
+			}
+			log.Printf("db load: projected added latency per request if the database were remote: %s",
+				strings.Join(projections, "  "))
 		}
 	}()
 }

@@ -51,6 +51,9 @@ func main() {
 		log.Fatalf("database connection failed: %v", err)
 	}
 
+	if err := database.InstrumentQueries(db); err != nil {
+		log.Fatalf("query instrumentation failed: %v", err)
+	}
 	database.StartPoolStatsLogger(db, cfg)
 
 	if cfg.AutoRunMigrations {

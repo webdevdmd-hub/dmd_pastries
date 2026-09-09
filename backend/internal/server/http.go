@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"pastries-pos/internal/config"
+	"pastries-pos/internal/middleware"
 	"pastries-pos/internal/shared/response"
 )
 
@@ -18,6 +19,9 @@ func NewRouter(cfg config.Config) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
+	// Counts requests so statements-per-request can be derived. See
+	// internal/shared/telemetry: it is the gate for moving the database.
+	router.Use(middleware.RequestStats())
 	// CORS_ALLOWED_ORIGINS restricts browser access to known frontends;
 	// an empty list falls back to allowing every origin so local setups keep working.
 	allowedOrigins := cfg.CORSAllowedOrigins
