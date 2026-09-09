@@ -81,8 +81,18 @@ func main() {
 
 	cfg := config.Load()
 	admin := utils.NewSupabaseAdminClient(cfg)
-	if !admin.Configured() && !*verify {
-		log.Fatal("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set")
+
+	// Only the real import needs Supabase. Planning reads the export file and
+	// the local users table; verification recomputes ids and checks the
+	// database. Neither sends a request.
+	//
+	// This used to demand the credentials up front, which made the one step
+	// that writes nothing the hardest to start: the operator had to put a
+	// service-role key on the container first, and doing that is itself the
+	// moment account creation begins writing to both providers. Requiring a
+	// secret in order to preview is how a dry run gets skipped.
+	if *confirm && !admin.Configured() {
+		log.Fatal("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set to run the import")
 	}
 
 	db, err := database.NewPostgres(cfg)
