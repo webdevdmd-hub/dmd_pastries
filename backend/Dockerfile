@@ -27,6 +27,12 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/migrate ./cmd/migrate
 # automatically; see the run instructions below.
 RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/import-identities ./cmd/import-identities
 
+# Same reasoning for the storage copy, plus one of its own: it reads from
+# Appwrite and writes to Supabase, so running it from a laptop would pull every
+# file down a domestic connection and push it back up again. In the container it
+# is a datacentre-to-datacentre copy.
+RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/copy-storage ./cmd/copy-storage
+
 FROM alpine:3.22
 
 RUN adduser -D -g '' appuser
@@ -35,6 +41,7 @@ WORKDIR /app
 COPY --from=builder /bin/api /app/api
 COPY --from=builder /bin/migrate /app/migrate
 COPY --from=builder /bin/import-identities /app/import-identities
+COPY --from=builder /bin/copy-storage /app/copy-storage
 COPY backend/migrations /app/migrations
 
 EXPOSE 8080
@@ -53,4 +60,13 @@ USER appuser
 # Supabase credentials. Deliberately absent from CMD: an import that ran on
 # every container start would re-run itself on an unrelated restart, mid-shift,
 # with nobody watching.
+#
+# The storage copy runs the same way, and can run while the shop is open --
+# every read falls back to Appwrite until NEXT_PUBLIC_STORAGE_PROVIDER is
+# flipped, so a file it has not reached yet is indistinguishable from one it
+# will never see. Bucket ids are the NEXT_PUBLIC_APPWRITE_*_BUCKET_ID values
+# from the frontend environment:
+#
+#     docker exec <container> /app/copy-storage -product-images <id> -business-assets <id> -documents <id>
+#     ... then the same command with -confirm, and later with -verify.
 CMD ["/bin/sh", "-c", "/app/migrate && /app/api"]
