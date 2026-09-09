@@ -31,6 +31,7 @@ const posProductSelect = `
 	p.item_structure,
 	p.sale_price,
 	p.image_file_id,
+	p.image_storage_path,
 	p.is_sellable,
 	p.is_pos_visible,
 	p.is_stock_tracked,
@@ -123,7 +124,7 @@ func (r *Repository) withCheckoutReadyPaymentAccount(db *gorm.DB, branchID strin
 func (r *Repository) ListPOSProductCategories(businessID, branchID string) ([]POSProductCategoryOption, error) {
 	var rows []POSProductCategoryOption
 	err := r.db.Table("product_categories").
-		Select("id, business_id, branch_id, parent_category_id, category_name, category_code, description, image_file_id, sort_order, status, created_at, updated_at").
+		Select("id, business_id, branch_id, parent_category_id, category_name, category_code, description, image_file_id, image_storage_path, sort_order, status, created_at, updated_at").
 		Where("business_id = ? AND branch_id = ? AND status = ? AND deleted_at IS NULL", businessID, branchID, "active").
 		Order("sort_order ASC, category_name ASC").
 		Scan(&rows).Error
@@ -762,32 +763,33 @@ func (r *Repository) UpdateHeldSale(tx *gorm.DB, businessID, heldSaleID string, 
 }
 
 type ProductRow struct {
-	ID             string
-	BusinessID     string
-	BranchID       string
-	CategoryID     string
-	UnitID         string
-	TaxRateID      *string
-	ProductName    string
-	ProductCode    string
-	SKU            string
-	Barcode        string
-	ProductType    string
-	ItemStructure  string
-	SalePrice      float64
-	ImageFileID    string
-	IsSellable     bool
-	IsPOSVisible   bool
-	IsStockTracked bool
-	Status         string
-	CategoryName   string
-	CategoryCode   string
-	UnitName       string
-	Symbol         string
-	TaxName        string
-	TaxType        string
-	RatePercentage float64
-	IsInclusive    bool
+	ID               string
+	BusinessID       string
+	BranchID         string
+	CategoryID       string
+	UnitID           string
+	TaxRateID        *string
+	ProductName      string
+	ProductCode      string
+	SKU              string
+	Barcode          string
+	ProductType      string
+	ItemStructure    string
+	SalePrice        float64
+	ImageFileID      string
+	ImageStoragePath string
+	IsSellable       bool
+	IsPOSVisible     bool
+	IsStockTracked   bool
+	Status           string
+	CategoryName     string
+	CategoryCode     string
+	UnitName         string
+	Symbol           string
+	TaxName          string
+	TaxType          string
+	RatePercentage   float64
+	IsInclusive      bool
 }
 
 type ProductInventoryStockRow struct {
@@ -809,6 +811,7 @@ type VariantRow struct {
 	Barcode                string
 	SalePrice              float64
 	ImageFileID            string
+	ImageStoragePath       string
 	CurrentStockQuantity   float64
 	AvailableStockQuantity float64
 	Status                 string

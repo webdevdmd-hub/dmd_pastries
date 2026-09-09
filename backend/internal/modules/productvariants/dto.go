@@ -60,6 +60,7 @@ type VariantResponse struct {
 	LastProductionDate     *time.Time `json:"last_production_date"`
 	AverageInventoryCost   *float64   `json:"average_inventory_cost"`
 	ImageFileID            string     `json:"image_file_id"`
+	ImageStoragePath       string     `json:"image_storage_path"`
 	SortOrder              int        `json:"sort_order"`
 	Status                 string     `json:"status"`
 	CreatedAt              time.Time  `json:"created_at"`

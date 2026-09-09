@@ -388,6 +388,7 @@ func toVariantResponse(variant ProductVariant) VariantResponse {
 		LastProductionDate:     variant.LastProductionDate,
 		AverageInventoryCost:   variant.AverageInventoryCost,
 		ImageFileID:            variant.ImageFileID,
+		ImageStoragePath:       variant.ImageStoragePath,
 		SortOrder:              variant.SortOrder,
 		Status:                 variant.Status,
 		CreatedAt:              variant.CreatedAt,

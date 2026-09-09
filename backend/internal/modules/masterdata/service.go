@@ -1060,6 +1060,7 @@ func (s *Service) copyProductCategoriesTx(tx *gorm.DB, businessID, sourceBranchI
 				CategoryCode:     category.CategoryCode,
 				Description:      category.Description,
 				ImageFileID:      category.ImageFileID,
+				ImageStoragePath: category.ImageStoragePath,
 				SortOrder:        category.SortOrder,
 				Status:           category.Status,
 			}
@@ -1233,6 +1234,7 @@ func toProductCategoryResponse(category ProductCategory, allowedProductTypes []s
 		CategoryCode:        category.CategoryCode,
 		Description:         category.Description,
 		ImageFileID:         category.ImageFileID,
+		ImageStoragePath:    category.ImageStoragePath,
 		SortOrder:           category.SortOrder,
 		AllowedProductTypes: allowedProductTypes,
 		Status:              category.Status,

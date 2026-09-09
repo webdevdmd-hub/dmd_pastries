@@ -15,6 +15,7 @@ type ProductCategory struct {
 	CategoryCode     string         `gorm:"size:100;not null" json:"category_code"`
 	Description      string         `gorm:"size:500" json:"description"`
 	ImageFileID      string         `gorm:"size:500" json:"image_file_id"`
+	ImageStoragePath string         `gorm:"size:500" json:"image_storage_path"`
 	SortOrder        int            `gorm:"not null;default:0" json:"sort_order"`
 	Status           string         `gorm:"size:50;not null;default:active" json:"status"`
 	CreatedAt        time.Time      `json:"created_at"`

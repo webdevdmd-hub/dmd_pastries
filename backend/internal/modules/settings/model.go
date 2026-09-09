@@ -11,6 +11,7 @@ type CompanySettings struct {
 	BusinessID          string         `gorm:"type:uuid;not null;uniqueIndex" json:"business_id"`
 	BusinessDisplayName string         `gorm:"size:255;not null" json:"business_display_name"`
 	LogoFileID          string         `gorm:"size:500" json:"logo_file_id"`
+	LogoStoragePath     string         `gorm:"size:500" json:"logo_storage_path"`
 	Address             string         `gorm:"size:500" json:"address"`
 	Phone               string         `gorm:"size:100" json:"phone"`
 	Email               string         `gorm:"size:255" json:"email"`

@@ -144,6 +144,7 @@ type POSProductCategoryOption struct {
 	CategoryCode     string    `json:"category_code"`
 	Description      string    `json:"description"`
 	ImageFileID      string    `json:"image_file_id"`
+	ImageStoragePath string    `json:"image_storage_path"`
 	SortOrder        int       `json:"sort_order"`
 	Status           string    `json:"status"`
 	CreatedAt        time.Time `json:"created_at"`
@@ -224,23 +225,24 @@ type PaginationResponse struct {
 }
 
 type POSProductResponse struct {
-	ID             string               `json:"id"`
-	ProductName    string               `json:"product_name"`
-	ProductCode    string               `json:"product_code"`
-	SKU            string               `json:"sku"`
-	Barcode        string               `json:"barcode"`
-	Category       LookupInfo           `json:"category"`
-	Unit           UnitInfo             `json:"unit"`
-	TaxRate        *TaxRateInfo         `json:"tax_rate"`
-	ProductType    string               `json:"product_type"`
-	ItemStructure  string               `json:"item_structure"`
-	SalePrice      float64              `json:"sale_price"`
-	ImageFileID    string               `json:"image_file_id"`
-	IsSellable     bool                 `json:"is_sellable"`
-	IsPOSVisible   bool                 `json:"is_pos_visible"`
-	Variants       []POSVariantResponse `json:"variants"`
-	IsStockTracked bool                 `json:"is_stock_tracked"`
-	Status         string               `json:"status"`
+	ID               string               `json:"id"`
+	ProductName      string               `json:"product_name"`
+	ProductCode      string               `json:"product_code"`
+	SKU              string               `json:"sku"`
+	Barcode          string               `json:"barcode"`
+	Category         LookupInfo           `json:"category"`
+	Unit             UnitInfo             `json:"unit"`
+	TaxRate          *TaxRateInfo         `json:"tax_rate"`
+	ProductType      string               `json:"product_type"`
+	ItemStructure    string               `json:"item_structure"`
+	SalePrice        float64              `json:"sale_price"`
+	ImageFileID      string               `json:"image_file_id"`
+	ImageStoragePath string               `json:"image_storage_path"`
+	IsSellable       bool                 `json:"is_sellable"`
+	IsPOSVisible     bool                 `json:"is_pos_visible"`
+	Variants         []POSVariantResponse `json:"variants"`
+	IsStockTracked   bool                 `json:"is_stock_tracked"`
+	Status           string               `json:"status"`
 }
 
 type POSVariantResponse struct {
@@ -250,6 +252,7 @@ type POSVariantResponse struct {
 	Barcode                string  `json:"barcode"`
 	SalePrice              float64 `json:"sale_price"`
 	ImageFileID            string  `json:"image_file_id"`
+	ImageStoragePath       string  `json:"image_storage_path"`
 	CurrentStockQuantity   float64 `json:"current_stock_quantity"`
 	AvailableStockQuantity float64 `json:"available_stock_quantity"`
 	Status                 string  `json:"status"`

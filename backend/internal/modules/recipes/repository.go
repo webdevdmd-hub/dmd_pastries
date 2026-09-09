@@ -151,7 +151,7 @@ func (r *Repository) Product(tx *gorm.DB, businessID, branchID, productID string
 func (r *Repository) ProductVariant(tx *gorm.DB, businessID, branchID, productID, variantID string) (*ProductVariantInfo, error) {
 	var variant ProductVariantInfo
 	err := tx.Table("product_variants pv").
-		Select("pv.id, pv.business_id, pv.product_id, pv.variant_name, pv.sku, pv.barcode, pv.sale_price, pv.cost_price, pv.image_file_id, pv.sort_order, pv.status").
+		Select("pv.id, pv.business_id, pv.product_id, pv.variant_name, pv.sku, pv.barcode, pv.sale_price, pv.cost_price, pv.image_file_id, pv.image_storage_path, pv.sort_order, pv.status").
 		Joins("JOIN products p ON p.id = pv.product_id AND p.business_id = pv.business_id").
 		Where("pv.id = ? AND pv.product_id = ? AND pv.business_id = ? AND p.branch_id = ? AND pv.deleted_at IS NULL", variantID, productID, businessID, branchID).
 		Take(&variant).Error
@@ -422,17 +422,18 @@ type ProductInfo struct {
 }
 
 type ProductVariantInfo struct {
-	ID          string
-	BusinessID  string
-	ProductID   string
-	VariantName string
-	SKU         string
-	Barcode     string
-	SalePrice   float64
-	CostPrice   *float64
-	ImageFileID string
-	SortOrder   int
-	Status      string
+	ID               string
+	BusinessID       string
+	ProductID        string
+	VariantName      string
+	SKU              string
+	Barcode          string
+	SalePrice        float64
+	CostPrice        *float64
+	ImageFileID      string
+	ImageStoragePath string
+	SortOrder        int
+	Status           string
 }
 
 type InventoryItemInfo struct {

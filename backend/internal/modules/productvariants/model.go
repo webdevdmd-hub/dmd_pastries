@@ -28,6 +28,7 @@ type ProductVariant struct {
 	LastProductionDate     *time.Time     `json:"last_production_date"`
 	AverageInventoryCost   *float64       `json:"average_inventory_cost"`
 	ImageFileID            string         `gorm:"size:500" json:"image_file_id"`
+	ImageStoragePath       string         `gorm:"size:500" json:"image_storage_path"`
 	SortOrder              int            `gorm:"not null;default:0" json:"sort_order"`
 	Status                 string         `gorm:"size:50;not null;default:active" json:"status"`
 	CreatedAt              time.Time      `json:"created_at"`

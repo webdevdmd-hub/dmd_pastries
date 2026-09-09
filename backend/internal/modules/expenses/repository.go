@@ -208,6 +208,7 @@ func (r *Repository) LoadResponses(businessID string, expenses []Expense) ([]Exp
 			ReferenceNumber:        expense.ReferenceNumber,
 			Notes:                  expense.Notes,
 			ReceiptFileID:          expense.ReceiptFileID,
+			ReceiptStoragePath:     expense.ReceiptStoragePath,
 			IsBillable:             expense.IsBillable,
 			Status:                 expense.Status,
 			JournalEntryID:         expense.JournalEntryID,

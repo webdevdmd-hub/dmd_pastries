@@ -22,6 +22,7 @@ type Expense struct {
 	ReferenceNumber        string         `gorm:"size:255" json:"reference_number"`
 	Notes                  string         `json:"notes"`
 	ReceiptFileID          string         `gorm:"size:500" json:"receipt_file_id"`
+	ReceiptStoragePath     string         `gorm:"size:500" json:"receipt_storage_path"`
 	IsBillable             bool           `gorm:"not null;default:false" json:"is_billable"`
 	Status                 string         `gorm:"size:50;not null;default:posted" json:"status"`
 	JournalEntryID         *string        `gorm:"type:uuid;index" json:"journal_entry_id"`

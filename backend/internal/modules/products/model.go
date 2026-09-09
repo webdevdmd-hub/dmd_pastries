@@ -36,6 +36,7 @@ type Product struct {
 	LastProductionDate     *time.Time     `json:"last_production_date"`
 	AverageInventoryCost   *float64       `json:"average_inventory_cost"`
 	ImageFileID            string         `gorm:"size:500" json:"image_file_id"`
+	ImageStoragePath       string         `gorm:"size:500" json:"image_storage_path"`
 	IsSellable             bool           `gorm:"not null;default:false" json:"is_sellable"`
 	IsPOSVisible           bool           `gorm:"not null;default:true" json:"is_pos_visible"`
 	IsPurchasable          bool           `gorm:"not null;default:false" json:"is_purchasable"`
@@ -84,18 +85,19 @@ func (ProductPriceSuggestion) TableName() string {
 }
 
 type ProductMedia struct {
-	ID         string         `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID string         `gorm:"type:uuid;not null;index" json:"business_id"`
-	BranchID   string         `gorm:"type:uuid;index" json:"branch_id"`
-	ProductID  string         `gorm:"type:uuid;not null;index" json:"product_id"`
-	FileID     string         `gorm:"size:500;not null" json:"file_id"`
-	BucketID   string         `gorm:"size:150" json:"bucket_id"`
-	FileType   string         `gorm:"size:100;not null" json:"file_type"`
-	AltText    string         `gorm:"size:255" json:"alt_text"`
-	SortOrder  int            `gorm:"not null;default:0" json:"sort_order"`
-	CreatedAt  time.Time      `json:"created_at"`
-	UpdatedAt  time.Time      `json:"updated_at"`
-	DeletedAt  gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	ID          string         `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID  string         `gorm:"type:uuid;not null;index" json:"business_id"`
+	BranchID    string         `gorm:"type:uuid;index" json:"branch_id"`
+	ProductID   string         `gorm:"type:uuid;not null;index" json:"product_id"`
+	FileID      string         `gorm:"size:500;not null" json:"file_id"`
+	StoragePath string         `gorm:"size:500" json:"storage_path"`
+	BucketID    string         `gorm:"size:150" json:"bucket_id"`
+	FileType    string         `gorm:"size:100;not null" json:"file_type"`
+	AltText     string         `gorm:"size:255" json:"alt_text"`
+	SortOrder   int            `gorm:"not null;default:0" json:"sort_order"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 func (ProductMedia) TableName() string {

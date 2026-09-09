@@ -82,6 +82,7 @@ type PackagingResponse struct {
 	ReorderLevel        money.Amount `json:"reorder_level"`
 	ImageURL            *string      `json:"image_url"`
 	ImageFileID         string       `json:"image_file_id"`
+	ImageStoragePath    string       `json:"image_storage_path"`
 	Status              string       `json:"status"`
 	InventoryItemID     *string      `json:"inventory_item_id,omitempty"`
 	CreatedAt           time.Time    `json:"created_at"`

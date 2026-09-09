@@ -26,6 +26,7 @@ type User struct {
 	Email                string         `gorm:"size:255;not null;index" json:"email"`
 	Phone                string         `gorm:"size:100" json:"phone"`
 	AvatarFileID         string         `gorm:"size:500" json:"avatar_file_id"`
+	AvatarStoragePath    string         `gorm:"size:500" json:"avatar_storage_path"`
 	Status               string         `gorm:"size:50;not null;default:active" json:"status"`
 	EmailVerified        bool           `gorm:"not null;default:false" json:"email_verified"`
 	LastLoginAt          *time.Time     `json:"last_login_at"`

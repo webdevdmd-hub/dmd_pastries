@@ -262,7 +262,7 @@ func (r *Repository) LoadProductResponse(businessID string, product Product) (Pr
 
 	var variants []ProductVariantInfo
 	if err := r.db.Table("product_variants").
-		Select("id, variant_name, sku, barcode, sale_price, cost_price, cost_update_policy, pricing_type, pricing_percent, minimum_sale_price, suggested_sale_price, auto_price_update_enabled, sale_price_locked, last_purchase_cost, last_purchase_date, last_production_cost, last_production_date, average_inventory_cost, image_file_id, sort_order, status").
+		Select("id, variant_name, sku, barcode, sale_price, cost_price, cost_update_policy, pricing_type, pricing_percent, minimum_sale_price, suggested_sale_price, auto_price_update_enabled, sale_price_locked, last_purchase_cost, last_purchase_date, last_production_cost, last_production_date, average_inventory_cost, image_file_id, image_storage_path, sort_order, status").
 		Where("product_id = ? AND business_id = ? AND deleted_at IS NULL", product.ID, businessID).
 		Order("sort_order ASC, variant_name ASC").
 		Scan(&variants).Error; err != nil {
@@ -294,11 +294,12 @@ func (r *Repository) FindVariantLookup(businessID, branchID, field, value string
 		LastProductionDate     *time.Time
 		AverageInventoryCost   *float64
 		ImageFileID            string
+		ImageStoragePath       string
 		SortOrder              int
 		Status                 string
 	}
 	if err := r.db.Table("product_variants").
-		Select("id, product_id, variant_name, sku, barcode, sale_price, cost_price, cost_update_policy, pricing_type, pricing_percent, minimum_sale_price, suggested_sale_price, auto_price_update_enabled, sale_price_locked, last_purchase_cost, last_purchase_date, last_production_cost, last_production_date, average_inventory_cost, image_file_id, sort_order, status").
+		Select("id, product_id, variant_name, sku, barcode, sale_price, cost_price, cost_update_policy, pricing_type, pricing_percent, minimum_sale_price, suggested_sale_price, auto_price_update_enabled, sale_price_locked, last_purchase_cost, last_purchase_date, last_production_cost, last_production_date, average_inventory_cost, image_file_id, image_storage_path, sort_order, status").
 		Where("business_id = ? AND status = ? AND deleted_at IS NULL", businessID, "active").
 		Where(variantLookupEligibleProductSubquery(), businessID, branchID, "active", true, true).
 		Where(field+" = ?", value).
@@ -325,6 +326,7 @@ func (r *Repository) FindVariantLookup(businessID, branchID, field, value string
 		LastProductionDate:     row.LastProductionDate,
 		AverageInventoryCost:   row.AverageInventoryCost,
 		ImageFileID:            row.ImageFileID,
+		ImageStoragePath:       row.ImageStoragePath,
 		SortOrder:              row.SortOrder,
 		Status:                 row.Status,
 	}, row.ProductID, nil

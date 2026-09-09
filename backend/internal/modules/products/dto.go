@@ -124,6 +124,7 @@ type ProductResponse struct {
 	AverageInventoryCost   *float64             `json:"average_inventory_cost"`
 	Description            string               `json:"description"`
 	ImageFileID            string               `json:"image_file_id"`
+	ImageStoragePath       string               `json:"image_storage_path"`
 	IsSellable             bool                 `json:"is_sellable"`
 	IsPOSVisible           bool                 `json:"is_pos_visible"`
 	IsPurchasable          bool                 `json:"is_purchasable"`
@@ -178,6 +179,7 @@ type ProductVariantInfo struct {
 	LastProductionDate     *time.Time `json:"last_production_date"`
 	AverageInventoryCost   *float64   `json:"average_inventory_cost"`
 	ImageFileID            string     `json:"image_file_id"`
+	ImageStoragePath       string     `json:"image_storage_path"`
 	SortOrder              int        `json:"sort_order"`
 	Status                 string     `json:"status"`
 }

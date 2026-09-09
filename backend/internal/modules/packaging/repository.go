@@ -176,7 +176,7 @@ func (r *Repository) ToResponse(businessID string, item PackagingItem) Packaging
 		SupplierID: item.SupplierID, SupplierName: supplierName, PackagingName: item.PackagingName, PackagingCode: item.PackagingCode,
 		Description: item.Description, UnitID: item.UnitID, UnitName: unitName, UnitSymbol: unitSymbol, CostPerUnit: item.CostPerUnit.Round2(),
 		IsStockTracked: item.IsStockTracked, IsConsumable: item.IsConsumable, ReorderLevel: item.ReorderLevel.Round4(),
-		ImageURL: item.ImageURL, ImageFileID: item.ImageFileID, Status: item.Status, InventoryItemID: inventoryID, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
+		ImageURL: item.ImageURL, ImageFileID: item.ImageFileID, ImageStoragePath: item.ImageStoragePath, Status: item.Status, InventoryItemID: inventoryID, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
 	}
 }
 

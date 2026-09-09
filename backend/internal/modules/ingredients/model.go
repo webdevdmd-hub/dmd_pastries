@@ -23,6 +23,7 @@ type Ingredient struct {
 	ReorderLevel         money.Amount   `gorm:"not null;default:0" json:"reorder_level"`
 	ImageURL             *string        `gorm:"size:500" json:"image_url"`
 	ImageFileID          string         `gorm:"size:500" json:"image_file_id"`
+	ImageStoragePath     string         `gorm:"size:500" json:"image_storage_path"`
 	Status               string         `gorm:"size:50;not null;default:active" json:"status"`
 	CreatedByUserID      string         `gorm:"type:uuid;not null;index" json:"created_by_user_id"`
 	UpdatedByUserID      string         `gorm:"type:uuid;index" json:"updated_by_user_id"`

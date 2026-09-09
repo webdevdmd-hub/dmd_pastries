@@ -862,6 +862,7 @@ func toProductResponse(product Product, category ProductCategoryInfo, unit Produ
 		AverageInventoryCost:   product.AverageInventoryCost,
 		Description:            product.Description,
 		ImageFileID:            product.ImageFileID,
+		ImageStoragePath:       product.ImageStoragePath,
 		IsSellable:             product.IsSellable,
 		IsPOSVisible:           product.IsPOSVisible,
 		IsPurchasable:          product.IsPurchasable,
