@@ -29,6 +29,7 @@ import {
   verifyEmailWithSecret as verifyAppwriteEmailWithSecret,
 } from "@/lib/appwrite/auth";
 import { getPublicEnvValue } from "@/lib/public-env";
+import * as supabase from "@/lib/supabase/auth";
 
 export { AuthRateLimitError, SessionAlreadyExistsError } from "@/lib/auth/errors";
 
@@ -57,6 +58,18 @@ export type AuthAccount = {
  */
 export function activeAuthProvider(): AuthProviderName {
   return getPublicEnvValue("NEXT_PUBLIC_AUTH_PROVIDER") === "supabase" ? "supabase" : "appwrite";
+}
+
+/**
+ * Whether the Supabase path is both selected AND usable.
+ *
+ * Selection alone is not enough. A deployment that sets the provider but not
+ * the URL or key would otherwise route every call into a client that cannot
+ * be built, turning a missing environment variable into a login page that
+ * throws. Falling back to Appwrite keeps a half-configured deploy working.
+ */
+function supabaseIsActive(): boolean {
+  return activeAuthProvider() === "supabase" && supabase.isConfigured();
 }
 
 /**
@@ -115,11 +128,11 @@ export function purgeInactiveProviderState(): void {
 }
 
 export async function signIn(email: string, password: string): Promise<void> {
-  return loginWithAppwrite(email, password);
+  return supabaseIsActive() ? supabase.signIn(email, password) : loginWithAppwrite(email, password);
 }
 
 export async function signOut(): Promise<void> {
-  return logoutFromAppwrite();
+  return supabaseIsActive() ? supabase.signOut() : logoutFromAppwrite();
 }
 
 /**
@@ -130,7 +143,7 @@ export async function signOut(): Promise<void> {
  * on every page load.
  */
 export function hasStoredSession(): boolean {
-  return hasStoredAppwriteSession();
+  return supabaseIsActive() ? supabase.hasStoredSession() : hasStoredAppwriteSession();
 }
 
 /**
@@ -141,15 +154,26 @@ export function hasStoredSession(): boolean {
  * session just because the sign-out request failed.
  */
 export function clearStoredSession(): void {
+  if (supabaseIsActive()) {
+    supabase.clearStoredSession();
+    return;
+  }
   clearStoredAppwriteSession();
 }
 
 /** Whether the provider still considers this browser's session live. */
 export async function hasLiveSession(): Promise<boolean> {
+  if (supabaseIsActive()) {
+    return supabase.hasLiveSession();
+  }
   return (await getCurrentAppwriteSession()) !== null;
 }
 
 export async function getCurrentAccount(): Promise<AuthAccount | null> {
+  if (supabaseIsActive()) {
+    return supabase.getCurrentAccount();
+  }
+
   const account = await getCurrentAppwriteAccount();
   if (!account) {
     return null;
@@ -170,18 +194,29 @@ export async function getCurrentAccount(): Promise<AuthAccount | null> {
  * implementations cache and reuse rather than minting per request.
  */
 export async function getAccessToken(): Promise<string> {
-  return createAppwriteJwt();
+  return supabaseIsActive() ? supabase.getAccessToken() : createAppwriteJwt();
 }
 
 /** Drop the cached token, so the next call mints a fresh one. */
 export function clearCachedAccessToken(): void {
+  if (supabaseIsActive()) {
+    // Nothing to drop. Appwrite cached a JWT that a 401 had to invalidate;
+    // Supabase owns its own token lifecycle, and tearing down the session here
+    // would sign the user out over a backend error that had nothing to do with
+    // their credentials.
+    return;
+  }
   clearCachedAppwriteJwt();
 }
 
 export async function sendEmailVerification(redirectUrl: string): Promise<void> {
-  return sendAppwriteEmailVerification(redirectUrl);
+  return supabaseIsActive()
+    ? supabase.sendEmailVerification(redirectUrl)
+    : sendAppwriteEmailVerification(redirectUrl);
 }
 
 export async function verifyEmailWithSecret(userId: string, secret: string): Promise<void> {
-  return verifyAppwriteEmailWithSecret(userId, secret);
+  return supabaseIsActive()
+    ? supabase.verifyEmailWithSecret(userId, secret)
+    : verifyAppwriteEmailWithSecret(userId, secret);
 }

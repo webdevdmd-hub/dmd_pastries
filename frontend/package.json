@@ -20,7 +20,7 @@
     "check:tokens": "node scripts/check-token-agreement.mjs",
     "check:type-scale": "node scripts/check-type-scale.mjs",
     "verify": "pnpm typecheck && pnpm lint && pnpm check:no-any && pnpm check:tokens && pnpm check:chart-palette && pnpm format:check && pnpm test",
-    "test": "pnpm test:pos-cart-totals && pnpm test:product-pos-labels && pnpm test:product-unit-payload && pnpm test:recipe-cost-preview && pnpm test:sales-return-refund-preview && pnpm test:purchase-order-quantities && pnpm test:ledger-header-accounts && pnpm test:dialog-form-reset && pnpm test:jwt-cache-storage && pnpm test:auth-provider-seam && pnpm test:password-reset-link",
+    "test": "pnpm test:pos-cart-totals && pnpm test:product-pos-labels && pnpm test:product-unit-payload && pnpm test:recipe-cost-preview && pnpm test:sales-return-refund-preview && pnpm test:purchase-order-quantities && pnpm test:ledger-header-accounts && pnpm test:dialog-form-reset && pnpm test:jwt-cache-storage && pnpm test:auth-provider-seam && pnpm test:password-reset-link && pnpm test:auth-dispatch",
     "visual:baseline": "node scripts/visual/capture.mjs --out baseline",
     "visual:capture": "node scripts/visual/capture.mjs --out current",
     "visual:diff": "node scripts/visual/compare.mjs baseline current --open",
@@ -36,7 +36,8 @@
     "check:chart-palette": "node scripts/check-chart-palette.mjs",
     "test:jwt-cache-storage": "node scripts/check-jwt-cache-storage.mjs",
     "test:auth-provider-seam": "node scripts/check-auth-provider-seam.mjs",
-    "test:password-reset-link": "node scripts/check-password-reset-link.mjs"
+    "test:password-reset-link": "node scripts/check-password-reset-link.mjs",
+    "test:auth-dispatch": "node scripts/check-auth-dispatch.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs,json,md,css}": [
@@ -58,6 +59,7 @@
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@supabase/supabase-js": "^2.116.0",
     "@tanstack/react-query": "^5.74.4",
     "@tanstack/react-query-devtools": "^5.74.4",
     "appwrite": "^17.0.2",
