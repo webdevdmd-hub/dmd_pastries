@@ -37,10 +37,18 @@ function bucketName(bucket: StorageBucketKey): string | null {
 /**
  * The public URL for an object.
  *
- * Buckets are public-read, which matches how Appwrite serves these today:
- * getFilePreview returns an unauthenticated URL that goes straight into a src
- * attribute. Making them private would mean signed URLs with expiries on every
- * product tile, which is a different feature, not a like-for-like move.
+ * product-images and business-assets are public-read, which matches how
+ * Appwrite serves them today: getFilePreview returns an unauthenticated URL
+ * that goes straight into a src attribute. Making those private would mean
+ * signed URLs with expiries on every product tile, which is a different
+ * feature, not a like-for-like move.
+ *
+ * documents is private, and deliberately not symmetrical. It holds expense
+ * receipts -- financial records -- and nothing in the app renders one: the
+ * expense screen prints the file id as text. So a public documents bucket would
+ * expose every receipt to anyone holding a URL and buy nothing back. If
+ * receipts are ever displayed, that wants a signed URL, which is a change here
+ * rather than a change to the bucket.
  *
  * Returns null rather than throwing when unconfigured, so the seam can fall
  * back to Appwrite instead of blanking a product grid.
