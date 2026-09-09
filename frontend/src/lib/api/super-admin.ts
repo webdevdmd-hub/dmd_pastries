@@ -27,6 +27,7 @@ import type { SafeUserProfile } from "@/types/user";
 type BackendSuperAdminProfile = {
   account_type?: string;
   appwrite_user_id?: string;
+  supabase_user_id?: string | null;
   full_name?: string;
   email?: string;
   email_verified?: boolean;
@@ -73,16 +74,20 @@ function parseSuperAdminProfile(value: unknown): SafeUserProfile {
   const profile = value as BackendSuperAdminProfile;
   const appwriteUserId =
     typeof profile.appwrite_user_id === "string" ? profile.appwrite_user_id : "";
+  const providerUserId =
+    typeof profile.supabase_user_id === "string" && profile.supabase_user_id
+      ? profile.supabase_user_id
+      : appwriteUserId;
   const fullName = typeof profile.full_name === "string" ? profile.full_name : "";
   const email = typeof profile.email === "string" ? profile.email : "";
 
-  if (profile.account_type !== "platform_admin" || !appwriteUserId || !fullName || !email) {
+  if (profile.account_type !== "platform_admin" || !providerUserId || !fullName || !email) {
     throw new Error("Backend super admin payload is missing required fields.");
   }
 
   return {
     accountType: "platform_admin",
-    id: appwriteUserId,
+    id: providerUserId,
     businessId: "",
     fullName,
     email,
@@ -144,6 +149,7 @@ function parseUserSummary(value: unknown): SuperAdminUserSummary {
   return {
     id: stringValue(value.id),
     appwriteUserId: stringValue(value.appwrite_user_id),
+    supabaseUserId: nullableStringValue(value.supabase_user_id),
     businessId: stringValue(value.business_id),
     businessName: stringValue(value.business_name),
     branchId: nullableStringValue(value.branch_id),

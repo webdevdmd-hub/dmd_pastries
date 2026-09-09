@@ -656,7 +656,8 @@ func (s *Service) listUsers(filters UserFilters) ([]UserSummaryResponse, error) 
 	query := s.db.Table("users u").
 		Select(`
 			u.id,
-			u.appwrite_user_id,
+			COALESCE(u.appwrite_user_id, '') AS appwrite_user_id,
+			u.supabase_user_id,
 			u.business_id,
 			b.business_name,
 			u.branch_id,
@@ -685,7 +686,10 @@ func (s *Service) listUsers(filters UserFilters) ([]UserSummaryResponse, error) 
 	if normalized := strings.TrimSpace(filters.Search); normalized != "" {
 		pattern := "%" + strings.ToLower(normalized) + "%"
 		query = query.Where(
-			"LOWER(u.full_name) LIKE ? OR LOWER(u.email) LIKE ? OR LOWER(u.appwrite_user_id) LIKE ? OR LOWER(b.business_name) LIKE ?",
+			// Either provider's id. The column is labelled "Provider ID" in the
+			// UI, so the search has to match both or the label is a lie.
+			"LOWER(u.full_name) LIKE ? OR LOWER(u.email) LIKE ? OR LOWER(u.appwrite_user_id) LIKE ? OR LOWER(u.supabase_user_id::text) LIKE ? OR LOWER(b.business_name) LIKE ?",
+			pattern,
 			pattern,
 			pattern,
 			pattern,
@@ -1224,7 +1228,8 @@ func (s *Service) getUserDetailWithDB(db *gorm.DB, userID string) (*UserDetailRe
 	query := db.Table("users u").
 		Select(`
 			u.id,
-			u.appwrite_user_id,
+			COALESCE(u.appwrite_user_id, '') AS appwrite_user_id,
+			u.supabase_user_id,
 			u.business_id,
 			b.business_name,
 			u.branch_id,
@@ -1309,7 +1314,8 @@ func (s *Service) validateBusinessOwnerCandidate(businessID, userID string) erro
 	if err := s.db.Table("users u").
 		Select(`
 			u.id,
-			u.appwrite_user_id,
+			COALESCE(u.appwrite_user_id, '') AS appwrite_user_id,
+			u.supabase_user_id,
 			u.business_id,
 			b.business_name,
 			u.branch_id,

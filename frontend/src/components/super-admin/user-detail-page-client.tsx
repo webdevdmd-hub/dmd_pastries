@@ -89,7 +89,10 @@ export function SuperAdminUserDetailPageClient({ userId }: UserDetailPageClientP
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <KeyValue label="User ID" value={detail.user.id} />
-            <KeyValue label="Appwrite ID" value={detail.user.appwriteUserId} />
+            <KeyValue
+              label="Provider ID"
+              value={detail.user.supabaseUserId ?? (detail.user.appwriteUserId || "Not linked")}
+            />
             <KeyValue label="Phone" value={detail.user.phone || "Not set"} />
             <KeyValue label="Email verified" value={detail.user.emailVerified ? "Yes" : "No"} />
             <KeyValue label="Last login" value={formatDateTime(detail.user.lastLoginAt)} />

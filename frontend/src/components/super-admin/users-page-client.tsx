@@ -44,7 +44,7 @@ export function SuperAdminUsersPageClient(): JSX.Element {
           <p className="text-xs font-semibold text-foreground-muted">Platform Identity</p>
           <h2 className="mt-1 text-2xl font-semibold text-brand-espresso">Users</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-foreground-muted">
-            Search every tenant user by name, email, Appwrite ID, or business.
+            Search every tenant user by name, email, provider ID, or business.
           </p>
         </div>
         <Button
@@ -65,7 +65,7 @@ export function SuperAdminUsersPageClient(): JSX.Element {
           <Input
             className="pl-9"
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search user, email, Appwrite ID, or business"
+            placeholder="Search user, email, provider ID, or business"
             value={search}
           />
         </div>
@@ -105,7 +105,7 @@ export function SuperAdminUsersPageClient(): JSX.Element {
                   <TableHead>Status</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Last login</TableHead>
-                  <TableHead>Appwrite ID</TableHead>
+                  <TableHead>Provider ID</TableHead>
                   <TableHead className="text-right">Open</TableHead>
                 </TableRow>
               </TableHeader>
@@ -131,7 +131,9 @@ export function SuperAdminUsersPageClient(): JSX.Element {
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{formatDateTime(user.lastLoginAt)}</TableCell>
-                    <TableCell className="font-mono text-xs">{user.appwriteUserId}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {user.supabaseUserId ?? (user.appwriteUserId || "—")}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button asChild size="sm" variant="outline">
                         <Link href={`${ROUTES.superAdmin}/users/${user.id}`}>

@@ -416,6 +416,7 @@ func (s *Service) AcceptInvitation(req AcceptInvitationRequest, ipAddress, userA
 	return &AcceptInvitationResponse{
 		UserID:         user.ID,
 		AppwriteUserID: user.AppwriteID(),
+		SupabaseUserID: user.SupabaseUserID,
 		BusinessID:     user.BusinessID,
 		BranchID:       user.BranchID,
 		RoleID:         user.RoleID,
@@ -1041,6 +1042,7 @@ func toUserResponse(user User) UserResponse {
 	return UserResponse{
 		ID:             user.ID,
 		AppwriteUserID: user.AppwriteID(),
+		SupabaseUserID: user.SupabaseUserID,
 		BusinessID:     user.BusinessID,
 		BranchID:       user.BranchID,
 		RoleID:         user.RoleID,

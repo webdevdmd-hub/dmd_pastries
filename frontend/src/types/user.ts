@@ -27,6 +27,7 @@ export type DeletedUserStatus = "deleted";
 export type User = {
   id: string;
   appwriteUserId: string;
+  supabaseUserId: string | null;
   businessId: string;
   branchId: string | null;
   roleId: string;

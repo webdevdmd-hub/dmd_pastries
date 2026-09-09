@@ -51,6 +51,7 @@ type UpdateUserStatusRequest struct {
 type UserResponse struct {
 	ID             string     `json:"id"`
 	AppwriteUserID string     `json:"appwrite_user_id"`
+	SupabaseUserID *string    `json:"supabase_user_id,omitempty"`
 	BusinessID     string     `json:"business_id"`
 	BranchID       *string    `json:"branch_id"`
 	RoleID         string     `json:"role_id"`
@@ -99,6 +100,7 @@ type InvitationActionResponse struct {
 type AcceptInvitationResponse struct {
 	UserID         string  `json:"user_id"`
 	AppwriteUserID string  `json:"appwrite_user_id"`
+	SupabaseUserID *string `json:"supabase_user_id,omitempty"`
 	BusinessID     string  `json:"business_id"`
 	BranchID       *string `json:"branch_id"`
 	RoleID         string  `json:"role_id"`

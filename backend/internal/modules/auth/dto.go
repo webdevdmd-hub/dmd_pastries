@@ -38,6 +38,7 @@ type AuthProfileResponse struct {
 	AccountType          string     `json:"account_type"`
 	UserID               string     `json:"user_id"`
 	AppwriteUserID       string     `json:"appwrite_user_id"`
+	SupabaseUserID       *string    `json:"supabase_user_id,omitempty"`
 	BusinessID           string     `json:"business_id"`
 	CurrentBranchID      *string    `json:"current_branch_id"`
 	CurrentBranchName    *string    `json:"current_branch_name"`
@@ -60,6 +61,7 @@ type AuthProfileResponse struct {
 type PlatformAdminProfileResponse struct {
 	AccountType      string   `json:"account_type"`
 	AppwriteUserID   string   `json:"appwrite_user_id"`
+	SupabaseUserID   *string  `json:"supabase_user_id,omitempty"`
 	FullName         string   `json:"full_name"`
 	Email            string   `json:"email"`
 	EmailVerified    bool     `json:"email_verified"`
@@ -68,9 +70,10 @@ type PlatformAdminProfileResponse struct {
 }
 
 type RegisterOwnerResponse struct {
-	BusinessID         string `json:"business_id"`
-	UserID             string `json:"user_id"`
-	AppwriteUserID     string `json:"appwrite_user_id"`
-	RoleID             string `json:"role_id"`
-	SubscriptionStatus string `json:"subscription_status"`
+	BusinessID         string  `json:"business_id"`
+	UserID             string  `json:"user_id"`
+	AppwriteUserID     string  `json:"appwrite_user_id"`
+	SupabaseUserID     *string `json:"supabase_user_id,omitempty"`
+	RoleID             string  `json:"role_id"`
+	SubscriptionStatus string  `json:"subscription_status"`
 }

@@ -313,6 +313,7 @@ func (s *Service) RegisterOwner(req RegisterOwnerRequest, ipAddress, userAgent s
 		BusinessID:         businessID,
 		UserID:             userID,
 		AppwriteUserID:     ids.Appwrite,
+		SupabaseUserID:     ids.SupabaseOrNil(),
 		RoleID:             roleID,
 		SubscriptionStatus: subscription.Status,
 	}, nil
@@ -1118,9 +1119,17 @@ func (s *Service) isSuperAdminIdentity(identity *utils.AppwriteIdentity) bool {
 }
 
 func (s *Service) platformAdminProfile(identity *utils.AppwriteIdentity) *PlatformAdminProfileResponse {
+	// A platform admin has no local users row, so the identity's own id is
+	// the only id there is. It is reported under whichever provider issued it.
+	var supabaseUserID *string
+	if identity.IsSupabase() {
+		id := identity.ID
+		supabaseUserID = &id
+	}
 	return &PlatformAdminProfileResponse{
 		AccountType:      "platform_admin",
 		AppwriteUserID:   identity.ID,
+		SupabaseUserID:   supabaseUserID,
 		FullName:         identity.Name,
 		Email:            strings.ToLower(strings.TrimSpace(identity.Email)),
 		EmailVerified:    identity.EmailVerified,
@@ -1180,6 +1189,7 @@ func (s *Service) buildProfileByUserID(userID, businessID string) (*AuthProfileR
 		AccountType:          "tenant_user",
 		UserID:               user.ID,
 		AppwriteUserID:       user.AppwriteID(),
+		SupabaseUserID:       user.SupabaseUserID,
 		BusinessID:           user.BusinessID,
 		CurrentBranchID:      branchScope.CurrentBranchID,
 		CurrentBranchName:    currentBranchName,

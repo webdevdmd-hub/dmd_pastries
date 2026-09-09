@@ -20,6 +20,7 @@ export type SuperAdminBusinessSummary = {
 export type SuperAdminUserSummary = {
   id: string;
   appwriteUserId: string;
+  supabaseUserId: string | null;
   businessId: string;
   businessName: string;
   branchId: string | null;

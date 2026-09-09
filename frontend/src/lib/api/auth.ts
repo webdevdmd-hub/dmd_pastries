@@ -17,6 +17,7 @@ type RegisterOwnerApiResult = {
   business_id?: string;
   user_id?: string;
   appwrite_user_id?: string;
+  supabase_user_id?: string | null;
   role_id?: string;
   subscription_status?: string;
   redirectTo?: string;
@@ -52,6 +53,7 @@ type BackendAuthProfile = {
   account_type?: string;
   user_id?: string;
   appwrite_user_id?: string;
+  supabase_user_id?: string | null;
   business_id?: string;
   branch_id?: string | null;
   assigned_branch_id?: string | null;
@@ -113,6 +115,12 @@ function parseSafeUserProfile(value: unknown): SafeUserProfile {
   const id = typeof backendValue.user_id === "string" ? backendValue.user_id : "";
   const appwriteUserId =
     typeof backendValue.appwrite_user_id === "string" ? backendValue.appwrite_user_id : "";
+  // Whichever provider issued the identity. A platform admin has no local
+  // users row, so this is the only id they have.
+  const providerUserId =
+    typeof backendValue.supabase_user_id === "string" && backendValue.supabase_user_id
+      ? backendValue.supabase_user_id
+      : appwriteUserId;
   const businessId = typeof backendValue.business_id === "string" ? backendValue.business_id : "";
   const fullName = typeof backendValue.full_name === "string" ? backendValue.full_name : "";
   const email = typeof value.email === "string" ? value.email : "";
@@ -132,13 +140,13 @@ function parseSafeUserProfile(value: unknown): SafeUserProfile {
     typeof backendValue.current_branch_name === "string" ? backendValue.current_branch_name : null;
 
   if (accountType === "platform_admin") {
-    if (!appwriteUserId || !fullName || !email) {
+    if (!providerUserId || !fullName || !email) {
       throw new Error("Backend platform admin payload is missing required fields.");
     }
 
     return {
       accountType,
-      id: appwriteUserId,
+      id: providerUserId,
       businessId: "",
       fullName,
       email,

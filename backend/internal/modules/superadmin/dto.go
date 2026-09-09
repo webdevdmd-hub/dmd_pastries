@@ -48,6 +48,7 @@ type BusinessActionResponse struct {
 type UserSummaryResponse struct {
 	ID                   string     `json:"id"`
 	AppwriteUserID       string     `json:"appwrite_user_id"`
+	SupabaseUserID       *string    `json:"supabase_user_id,omitempty"`
 	BusinessID           string     `json:"business_id"`
 	BusinessName         string     `json:"business_name"`
 	BranchID             *string    `json:"branch_id"`

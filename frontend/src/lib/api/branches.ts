@@ -55,6 +55,7 @@ type BackendAssignUserBranchPayload = {
 type BackendUser = {
   id?: string;
   appwrite_user_id?: string;
+  supabase_user_id?: string | null;
   business_id?: string;
   branch_id?: string | null;
   role_id?: string;
@@ -170,7 +171,6 @@ function parseUser(value: unknown): User {
 
   if (
     !id ||
-    !appwriteUserId ||
     !businessId ||
     !roleId ||
     !roleName ||
@@ -186,6 +186,8 @@ function parseUser(value: unknown): User {
   return {
     id,
     appwriteUserId,
+    supabaseUserId:
+      typeof backendUser.supabase_user_id === "string" ? backendUser.supabase_user_id : null,
     businessId,
     branchId: typeof backendUser.branch_id === "string" ? backendUser.branch_id : null,
     roleId,
