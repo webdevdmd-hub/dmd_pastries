@@ -9,4 +9,16 @@
  * from an environment variable; Supabase maps each to a plain bucket name.
  * Neither mapping leaks past its own module.
  */
-export type StorageBucketKey = "businessAssets" | "documents" | "productImages" | "userAvatars";
+/**
+ * userAvatars was removed on 2026-09-09. Nothing ever uploaded to it and
+ * nothing ever rendered from it: the user screens use Avatar with
+ * AvatarFallback and no AvatarImage, so every avatar in the app is initials.
+ * Carrying it into Supabase would have meant creating a bucket, copying
+ * nothing into it, and verifying it on every migration afterwards.
+ *
+ * users.avatar_file_id and the API fields around it are deliberately kept.
+ * This removes a bucket, not the ability to store an avatar -- if staff
+ * avatars are ever built, the column is still there and the bucket is one
+ * line to add back.
+ */
+export type StorageBucketKey = "businessAssets" | "documents" | "productImages";

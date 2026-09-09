@@ -5,7 +5,6 @@ export type PublicEnvKey =
   | "NEXT_PUBLIC_APPWRITE_ENDPOINT"
   | "NEXT_PUBLIC_APPWRITE_PRODUCT_IMAGES_BUCKET_ID"
   | "NEXT_PUBLIC_APPWRITE_PROJECT_ID"
-  | "NEXT_PUBLIC_APPWRITE_USER_AVATARS_BUCKET_ID"
   // Which identity provider issues sessions in this build. Mirrors the
   // backend's AUTH_PRIMARY_PROVIDER: the backend verifies both throughout the
   // migration, so the cutover is these two variables flipping together, and the
@@ -51,13 +50,13 @@ const buildTimePublicEnv = createPublicEnv([
     process.env.NEXT_PUBLIC_APPWRITE_BUSINESS_ASSETS_BUCKET_ID,
   ],
   [
-    "NEXT_PUBLIC_APPWRITE_USER_AVATARS_BUCKET_ID",
-    process.env.NEXT_PUBLIC_APPWRITE_USER_AVATARS_BUCKET_ID,
-  ],
-  [
     "NEXT_PUBLIC_APPWRITE_DOCUMENTS_BUCKET_ID",
     process.env.NEXT_PUBLIC_APPWRITE_DOCUMENTS_BUCKET_ID,
   ],
+  ["NEXT_PUBLIC_AUTH_PROVIDER", process.env.NEXT_PUBLIC_AUTH_PROVIDER],
+  ["NEXT_PUBLIC_STORAGE_PROVIDER", process.env.NEXT_PUBLIC_STORAGE_PROVIDER],
+  ["NEXT_PUBLIC_SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL],
+  ["NEXT_PUBLIC_SUPABASE_ANON_KEY", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY],
   ["NEXT_PUBLIC_E2E_AUTH_ENABLED", process.env.NEXT_PUBLIC_E2E_AUTH_ENABLED],
   ["NEXT_PUBLIC_E2E_AUTH_TOKEN", process.env.NEXT_PUBLIC_E2E_AUTH_TOKEN],
 ]);

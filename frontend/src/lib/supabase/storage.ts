@@ -8,19 +8,14 @@ import { getSupabaseClient } from "@/lib/supabase/client";
  * The Supabase half of the storage seam.
  *
  * Buckets are named rather than id'd. Appwrite generates an opaque bucket id
- * per bucket, which is why the Appwrite module reads four separate environment
+ * per bucket, which is why the Appwrite module reads three separate environment
  * variables; Supabase buckets have plain names, so the mapping is a constant
  * and there is nothing to configure per deployment.
- *
- * userAvatars is deliberately absent. It is declared in the Appwrite module and
- * never called from anywhere in the app -- carrying a dead bucket forward would
- * mean creating it, copying nothing into it, and verifying it forever.
  */
 const BUCKETS: Record<StorageBucketKey, string | null> = {
   businessAssets: "business-assets",
   documents: "documents",
   productImages: "product-images",
-  userAvatars: null,
 };
 
 export function isConfigured(): boolean {
