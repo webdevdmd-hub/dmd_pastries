@@ -1612,6 +1612,7 @@ func toCompanySettingsResponse(settings CompanySettings) CompanySettingsResponse
 		BusinessID:          settings.BusinessID,
 		BusinessDisplayName: settings.BusinessDisplayName,
 		LogoFileID:          settings.LogoFileID,
+		LogoURL:             settings.LogoURL,
 		LogoStoragePath:     settings.LogoStoragePath,
 		Address:             settings.Address,
 		Phone:               settings.Phone,

@@ -41,6 +41,9 @@ export type CompanySettings = {
   id: string;
   businessId: string;
   businessDisplayName: string;
+  logoFileId: string;
+  logoStoragePath: string;
+  /** Legacy column, read-only fallback for logos set before file ids. */
   logoUrl: string;
   address: string;
   phone: string;
@@ -57,6 +60,9 @@ export type CompanySettings = {
 
 export type UpdateCompanySettingsPayload = {
   businessDisplayName: string;
+  logoFileId: string;
+  logoStoragePath: string;
+  /** Legacy column, read-only fallback for logos set before file ids. */
   logoUrl: string;
   address: string;
   phone: string;

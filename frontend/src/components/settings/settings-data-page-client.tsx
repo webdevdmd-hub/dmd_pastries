@@ -259,6 +259,8 @@ function CompanySettingsView({ settings }: { settings: CompanySettings }): JSX.E
 function toCompanySettingsDefaults(settings: CompanySettings): CompanySettingsSchema {
   return {
     businessDisplayName: settings.businessDisplayName,
+    logoFileId: settings.logoFileId,
+    logoStoragePath: settings.logoStoragePath,
     logoUrl: settings.logoUrl,
     address: settings.address,
     phone: settings.phone,
@@ -275,6 +277,8 @@ function toCompanySettingsDefaults(settings: CompanySettings): CompanySettingsSc
 function blankCompanySettingsDefaults(): CompanySettingsSchema {
   return {
     businessDisplayName: "",
+    logoFileId: "",
+    logoStoragePath: "",
     logoUrl: "",
     address: "",
     phone: "",
@@ -322,7 +326,11 @@ function CompanySettingsDialog({
       return URL.createObjectURL(selectedLogo);
     }
 
-    return getBusinessAssetUrl({ logoFileId: form.watch("logoUrl") || null });
+    return getBusinessAssetUrl({
+      logoFileId: form.watch("logoFileId") || null,
+      logoStoragePath: form.watch("logoStoragePath") || null,
+      logoUrl: form.watch("logoUrl") || null,
+    });
   }, [form, selectedLogo]);
 
   useEffect(() => {
@@ -334,31 +342,15 @@ function CompanySettingsDialog({
   }, [previewUrl, selectedLogo]);
 
   const handleSubmit = async (values: CompanySettingsSchema): Promise<void> => {
-    let logoFileId = values.logoUrl.trim();
+    let logoFileId = values.logoFileId.trim();
+    let logoStoragePath = values.logoStoragePath.trim();
 
     if (selectedLogo) {
       setIsUploadingLogo(true);
       try {
         const uploaded = await uploadBusinessAsset(selectedLogo);
-        if (!uploaded.fileId) {
-          // The one screen that cannot follow the others yet, and the reason is
-          // older than this migration: it keeps the logo in company_settings
-          // .logo_url and passes that value in as a file id. logo_file_id and
-          // logo_storage_path both exist and both stay empty for it.
-          //
-          // Moving it means changing where this screen stores an image and
-          // migrating the ids already sitting in logo_url, which is a change to
-          // settings rather than a field on an upload. Failing here is the
-          // honest option: writing a Supabase path into logo_url would render
-          // through Appwrite's preview endpoint and show a broken logo on every
-          // invoice and receipt.
-          throw new Error(
-            "The company logo still uploads to Appwrite. This screen stores it in " +
-              "logo_url rather than logo_file_id, so it needs its own change before " +
-              "it can move; leave NEXT_PUBLIC_STORAGE_PROVIDER unset to change the logo.",
-          );
-        }
-        logoFileId = uploaded.fileId;
+        logoFileId = uploaded.fileId ?? "";
+        logoStoragePath = uploaded.storagePath ?? "";
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Unable to upload company logo.");
         return;
@@ -369,7 +361,8 @@ function CompanySettingsDialog({
 
     await onSubmit({
       ...values,
-      logoUrl: logoFileId,
+      logoFileId,
+      logoStoragePath,
     });
   };
 
@@ -484,7 +477,7 @@ function CompanySettingsDialog({
             />
             <FormField
               control={form.control}
-              name="logoUrl"
+              name="logoFileId"
               render={({ field }) => (
                 <FormItem className="md:col-span-2">
                   <FormLabel>Company logo</FormLabel>

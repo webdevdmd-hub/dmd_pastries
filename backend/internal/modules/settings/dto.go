@@ -10,6 +10,7 @@ type CompanySettingsResponse struct {
 	BusinessID          string    `json:"business_id"`
 	BusinessDisplayName string    `json:"business_display_name"`
 	LogoFileID          string    `json:"logo_file_id"`
+	LogoURL             string    `json:"logo_url"`
 	LogoStoragePath     string    `json:"logo_storage_path"`
 	Address             string    `json:"address"`
 	Phone               string    `json:"phone"`

@@ -24,6 +24,8 @@ type BackendCompanySettings = {
   id?: string;
   business_id?: string;
   business_display_name?: string;
+  logo_file_id?: string;
+  logo_storage_path?: string;
   logo_url?: string;
   address?: string;
   phone?: string;
@@ -49,7 +51,8 @@ type BackendSettingsOverview = {
 
 type BackendUpdateCompanySettingsPayload = {
   business_display_name: string;
-  logo_url: string;
+  logo_file_id: string;
+  logo_storage_path: string;
   address: string;
   phone: string;
   email: string;
@@ -295,6 +298,8 @@ function parseCompanySettings(value: unknown): CompanySettings {
       settings.business_display_name,
       "Company display name is missing.",
     ),
+    logoFileId: optionalString(settings.logo_file_id),
+    logoStoragePath: optionalString(settings.logo_storage_path),
     logoUrl: optionalString(settings.logo_url),
     address: requiredString(settings.address, "Company address is missing."),
     phone: requiredString(settings.phone, "Company phone is missing."),
@@ -518,7 +523,8 @@ function toBackendCompanySettingsPayload(
 ): BackendUpdateCompanySettingsPayload {
   return {
     business_display_name: payload.businessDisplayName,
-    logo_url: payload.logoUrl,
+    logo_file_id: payload.logoFileId,
+    logo_storage_path: payload.logoStoragePath,
     address: payload.address,
     phone: payload.phone,
     email: payload.email,

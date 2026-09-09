@@ -7,23 +7,26 @@ import (
 )
 
 type CompanySettings struct {
-	ID                  string         `gorm:"type:uuid;primaryKey" json:"id"`
-	BusinessID          string         `gorm:"type:uuid;not null;uniqueIndex" json:"business_id"`
-	BusinessDisplayName string         `gorm:"size:255;not null" json:"business_display_name"`
-	LogoFileID          string         `gorm:"size:500" json:"logo_file_id"`
-	LogoStoragePath     string         `gorm:"size:500" json:"logo_storage_path"`
-	Address             string         `gorm:"size:500" json:"address"`
-	Phone               string         `gorm:"size:100" json:"phone"`
-	Email               string         `gorm:"size:255" json:"email"`
-	Website             string         `gorm:"size:255" json:"website"`
-	VATNumber           string         `gorm:"size:100" json:"vat_number"`
-	Currency            string         `gorm:"size:10;not null" json:"currency"`
-	Timezone            string         `gorm:"size:100;not null" json:"timezone"`
-	InvoiceFooter       string         `gorm:"size:500" json:"invoice_footer"`
-	ReceiptFooter       string         `gorm:"size:500" json:"receipt_footer"`
-	CreatedAt           time.Time      `json:"created_at"`
-	UpdatedAt           time.Time      `json:"updated_at"`
-	DeletedAt           gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	ID                  string `gorm:"type:uuid;primaryKey" json:"id"`
+	BusinessID          string `gorm:"type:uuid;not null;uniqueIndex" json:"business_id"`
+	BusinessDisplayName string `gorm:"size:255;not null" json:"business_display_name"`
+	LogoFileID          string `gorm:"size:500" json:"logo_file_id"`
+	// The column that predates file ids. Nothing writes it any more; it is
+	// carried so a row whose logo was set before that change still renders.
+	LogoURL         string         `gorm:"column:logo_url;size:500" json:"logo_url"`
+	LogoStoragePath string         `gorm:"size:500" json:"logo_storage_path"`
+	Address         string         `gorm:"size:500" json:"address"`
+	Phone           string         `gorm:"size:100" json:"phone"`
+	Email           string         `gorm:"size:255" json:"email"`
+	Website         string         `gorm:"size:255" json:"website"`
+	VATNumber       string         `gorm:"size:100" json:"vat_number"`
+	Currency        string         `gorm:"size:10;not null" json:"currency"`
+	Timezone        string         `gorm:"size:100;not null" json:"timezone"`
+	InvoiceFooter   string         `gorm:"size:500" json:"invoice_footer"`
+	ReceiptFooter   string         `gorm:"size:500" json:"receipt_footer"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 func (CompanySettings) TableName() string {
