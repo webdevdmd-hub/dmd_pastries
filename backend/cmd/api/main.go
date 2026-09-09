@@ -46,6 +46,14 @@ import (
 func main() {
 	cfg := config.Load()
 
+	// Printed before anything else so it survives a boot that fails later, and
+	// so it is the first thing visible when someone opens the logs wondering
+	// why a feature does nothing. PASSWORD_RESET_URL sat on its localhost
+	// default in production long enough for staff to build a workaround.
+	if banner := config.DevDefaultsBanner(cfg.DevDefaultsInUse()); banner != "" {
+		log.Println(banner)
+	}
+
 	db, err := database.NewPostgres(cfg)
 	if err != nil {
 		log.Fatalf("database connection failed: %v", err)
