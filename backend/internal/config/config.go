@@ -65,6 +65,14 @@ func Load() Config {
 	// inert and the cutover is a deploy-time environment change rather than a
 	// code change. mustEnv here would make the migration a flag day.
 	cfg.SupabaseURL = getEnv("SUPABASE_URL", "")
+	// Optional, and unused on most projects. Supabase projects created since
+	// 2025 sign access tokens with an asymmetric key and publish the public
+	// half at /auth/v1/.well-known/jwks.json, which the verifier fetches on its
+	// own. This secret is consulted only for HS256 tokens, i.e. a project still
+	// on the legacy shared secret. Leaving it unset on an asymmetric project is
+	// the correct configuration: the backend then holds no signing secret at
+	// all, and an HS256 token is refused outright rather than checked against
+	// an empty key.
 	cfg.SupabaseJWTSecret = getEnv("SUPABASE_JWT_SECRET", "")
 	// Unrestricted database access, including the auth schema. Never goes to
 	// the frontend and never appears in an error returned to a caller.
