@@ -10,8 +10,11 @@ import (
 )
 
 type User struct {
-	ID             string `gorm:"type:uuid;primaryKey" json:"id"`
-	AppwriteUserID string `gorm:"size:100;not null;uniqueIndex" json:"appwrite_user_id"`
+	ID string `gorm:"type:uuid;primaryKey" json:"id"`
+	// Null for an account that only exists in Supabase. A pointer for the same
+	// reason SupabaseUserID is one: the unique index treats NULLs as distinct
+	// and an empty string would collide on the second such account.
+	AppwriteUserID *string `gorm:"size:100;uniqueIndex" json:"appwrite_user_id,omitempty"`
 	// Null until this account exists in Supabase: backfilled for everyone by
 	// the migration, and set at creation for anyone hired during the dual-run
 	// window. A pointer because the partial unique index treats NULLs as
@@ -45,9 +48,19 @@ func (User) TableName() string {
 // provider untouched would let a deactivated employee keep signing in through
 // it, and dual-verify would accept the result.
 func (u User) ProviderIDs() utils.ProviderIDs {
-	ids := utils.ProviderIDs{Appwrite: u.AppwriteUserID}
+	ids := utils.ProviderIDs{Appwrite: u.AppwriteID()}
 	if u.SupabaseUserID != nil {
 		ids.Supabase = *u.SupabaseUserID
 	}
 	return ids
+}
+
+// AppwriteID is the Appwrite account id, or "" for an account that has none.
+// Callers that only display or log the value want the string; the pointer
+// exists for the database.
+func (u User) AppwriteID() string {
+	if u.AppwriteUserID == nil {
+		return ""
+	}
+	return *u.AppwriteUserID
 }

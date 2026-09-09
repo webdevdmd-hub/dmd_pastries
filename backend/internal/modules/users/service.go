@@ -357,7 +357,7 @@ func (s *Service) AcceptInvitation(req AcceptInvitationRequest, ipAddress, userA
 
 	user := &User{
 		ID:              utils.NewUUID(),
-		AppwriteUserID:  ids.Appwrite,
+		AppwriteUserID:  ids.AppwriteOrNil(),
 		SupabaseUserID:  ids.SupabaseOrNil(),
 		BusinessID:      invite.BusinessID,
 		BranchID:        invite.BranchID,
@@ -415,7 +415,7 @@ func (s *Service) AcceptInvitation(req AcceptInvitationRequest, ipAddress, userA
 
 	return &AcceptInvitationResponse{
 		UserID:         user.ID,
-		AppwriteUserID: user.AppwriteUserID,
+		AppwriteUserID: user.AppwriteID(),
 		BusinessID:     user.BusinessID,
 		BranchID:       user.BranchID,
 		RoleID:         user.RoleID,
@@ -454,7 +454,6 @@ func (s *Service) CreateUser(currentUser *utils.AuthContext, req CreateUserReque
 	userID := utils.NewUUID()
 	user := &User{
 		ID:              userID,
-		AppwriteUserID:  "pending-" + userID,
 		BusinessID:      currentUser.BusinessID,
 		BranchID:        req.BranchID,
 		CurrentBranchID: req.BranchID,
@@ -494,7 +493,7 @@ func (s *Service) CreateUser(currentUser *utils.AuthContext, req CreateUserReque
 		message, details := utils.FriendlyCreateUserError(err)
 		return nil, apperrors.BadRequest(message, details)
 	}
-	user.AppwriteUserID = ids.Appwrite
+	user.AppwriteUserID = ids.AppwriteOrNil()
 	user.SupabaseUserID = ids.SupabaseOrNil()
 	if err := s.repo.UpdateProviderIDs(tx, user.ID, ids); err != nil {
 		tx.Rollback()
@@ -568,7 +567,7 @@ func (s *Service) InviteUser(currentUser *utils.AuthContext, req InviteUserReque
 
 	user := &User{
 		ID:              utils.NewUUID(),
-		AppwriteUserID:  ids.Appwrite,
+		AppwriteUserID:  ids.AppwriteOrNil(),
 		SupabaseUserID:  ids.SupabaseOrNil(),
 		BusinessID:      currentUser.BusinessID,
 		BranchID:        req.BranchID,
@@ -1041,7 +1040,7 @@ func (s *Service) UpdateUserStatus(currentUser *utils.AuthContext, userID string
 func toUserResponse(user User) UserResponse {
 	return UserResponse{
 		ID:             user.ID,
-		AppwriteUserID: user.AppwriteUserID,
+		AppwriteUserID: user.AppwriteID(),
 		BusinessID:     user.BusinessID,
 		BranchID:       user.BranchID,
 		RoleID:         user.RoleID,

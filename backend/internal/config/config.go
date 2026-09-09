@@ -52,9 +52,14 @@ func Load() Config {
 	loadDotEnv()
 
 	cfg := loadDatabaseConfig()
-	cfg.AppwriteEndpoint = mustEnv("APPWRITE_ENDPOINT")
-	cfg.AppwriteProjectID = mustEnv("APPWRITE_PROJECT_ID")
-	cfg.AppwriteAPIKey = mustEnv("APPWRITE_API_KEY")
+	// Optional since 2026-09-09. A deployment that sets none of these runs on
+	// Supabase alone: accounts are created there, tokens that are not Supabase
+	// tokens are rejected without a network call, and the Appwrite SDK is never
+	// invoked. Setting all three keeps the dual-provider behaviour for a
+	// deployment that still has an Appwrite to talk to.
+	cfg.AppwriteEndpoint = getEnv("APPWRITE_ENDPOINT", "")
+	cfg.AppwriteProjectID = getEnv("APPWRITE_PROJECT_ID", "")
+	cfg.AppwriteAPIKey = getEnv("APPWRITE_API_KEY", "")
 	// Optional on purpose. While these are empty the Supabase verifier refuses
 	// every token and the app runs exactly as it did before, so this ships
 	// inert and the cutover is a deploy-time environment change rather than a

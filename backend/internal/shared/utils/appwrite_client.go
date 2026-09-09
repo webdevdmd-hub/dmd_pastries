@@ -59,6 +59,24 @@ func NewAppwriteClient(cfg config.Config) *AppwriteClient {
 	}
 }
 
+// Configured reports whether this client can reach an Appwrite at all.
+//
+// E2E counts as configured: it answers without a network and the tests rely
+// on that. Otherwise all three settings are needed -- an endpoint with no key
+// can verify tokens but not create users, which is a half-state nothing here
+// is written to handle.
+func (c *AppwriteClient) Configured() bool {
+	if c == nil {
+		return false
+	}
+	if c.isE2E() {
+		return true
+	}
+	return strings.TrimSpace(c.endpoint) != "" &&
+		strings.TrimSpace(c.projectID) != "" &&
+		strings.TrimSpace(c.apiKey) != ""
+}
+
 func (c *AppwriteClient) CreateUser(email, password, name, phone string) (string, error) {
 	if c.isE2E() {
 		return e2eAppwriteUserID(email), nil

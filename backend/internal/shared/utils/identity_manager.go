@@ -17,6 +17,14 @@ type ProviderIDs struct {
 // one. users.supabase_user_id is uuid with a partial unique index: NULLs are
 // treated as distinct, an empty string is not, so writing "" would collide on
 // the second account created before cutover.
+func (ids ProviderIDs) AppwriteOrNil() *string {
+	if strings.TrimSpace(ids.Appwrite) == "" {
+		return nil
+	}
+	value := ids.Appwrite
+	return &value
+}
+
 func (ids ProviderIDs) SupabaseOrNil() *string {
 	if strings.TrimSpace(ids.Supabase) == "" {
 		return nil
@@ -74,10 +82,20 @@ func (m *IdentityManager) supabaseLive() bool {
 	return m.supabase != nil && m.supabase.Configured()
 }
 
+// appwriteLive reports whether there is an Appwrite to write to at all.
+func (m *IdentityManager) appwriteLive() bool {
+	return m.appwrite != nil && m.appwrite.Configured()
+}
+
 // PrimaryIsSupabase reports which provider issues sessions for new sign-ins.
 // Both continue to verify; this only decides where a password reset email comes
 // from, so that the link a user clicks matches the system they log in to.
 func (m *IdentityManager) PrimaryIsSupabase() bool {
+	// With no Appwrite there is nothing else to be primary. The flag still
+	// decides between them when both exist.
+	if !m.appwriteLive() {
+		return m.supabaseLive()
+	}
 	return m.primary == primarySupabase && m.supabaseLive()
 }
 
@@ -88,6 +106,19 @@ func (m *IdentityManager) PrimaryIsSupabase() bool {
 // Appwrite and the operator is stuck with an account they cannot finish
 // creating and cannot see to delete.
 func (m *IdentityManager) CreateUser(email, password, name, phone string) (ProviderIDs, error) {
+	// Supabase only: the ordinary case for a fresh deployment. No Appwrite id
+	// exists to derive a deterministic Supabase id from, so Supabase mints one.
+	if !m.appwriteLive() {
+		if !m.supabaseLive() {
+			return ProviderIDs{}, fmt.Errorf("no identity provider is configured")
+		}
+		supabaseID, err := m.supabase.CreateUser("", email, password, name, phone)
+		if err != nil {
+			return ProviderIDs{}, err
+		}
+		return ProviderIDs{Supabase: supabaseID}, nil
+	}
+
 	appwriteID, err := m.appwrite.CreateUser(email, password, name, phone)
 	if err != nil {
 		return ProviderIDs{}, err
@@ -124,7 +155,7 @@ func (m *IdentityManager) CreateUser(email, password, name, phone string) (Provi
 func (m *IdentityManager) DeleteUser(ids ProviderIDs) error {
 	var failures []string
 
-	if ids.Appwrite != "" {
+	if ids.Appwrite != "" && m.appwriteLive() {
 		if err := m.appwrite.DeleteUser(ids.Appwrite); err != nil {
 			failures = append(failures, "appwrite: "+err.Error())
 		}
@@ -148,7 +179,7 @@ func (m *IdentityManager) DeleteUser(ids ProviderIDs) error {
 func (m *IdentityManager) SetUserStatus(ids ProviderIDs, enabled bool) error {
 	var failures []string
 
-	if ids.Appwrite != "" {
+	if ids.Appwrite != "" && m.appwriteLive() {
 		if err := m.appwrite.SetUserStatus(ids.Appwrite, enabled); err != nil {
 			failures = append(failures, "appwrite: "+err.Error())
 		}
@@ -174,7 +205,7 @@ func (m *IdentityManager) SetUserStatus(ids ProviderIDs, enabled bool) error {
 // next request regardless of the token they hold. This is a tidy-up, not the
 // control.
 func (m *IdentityManager) RevokeSessions(ids ProviderIDs) {
-	if ids.Appwrite != "" {
+	if ids.Appwrite != "" && m.appwriteLive() {
 		_ = m.appwrite.DeleteUserSessions(ids.Appwrite)
 	}
 }
@@ -205,6 +236,9 @@ func (m *IdentityManager) CompletePasswordRecovery(userID, secret, recoveryToken
 
 	if strings.TrimSpace(userID) == "" || strings.TrimSpace(secret) == "" {
 		return fmt.Errorf("password reset link is incomplete")
+	}
+	if !m.appwriteLive() {
+		return fmt.Errorf("password reset links of this kind are not enabled")
 	}
 	return m.appwrite.CompletePasswordRecovery(userID, secret, password)
 }

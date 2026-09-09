@@ -35,10 +35,25 @@ func TestSupabaseIdentitiesResolveByTheirOwnColumn(t *testing.T) {
 	// Supabase path it would relink the column on every login where the two
 	// providers disagree, and would hand anyone who can register a Supabase
 	// account with a staff address that person's business, role and permissions.
-	for _, forbidden := range []string{"LOWER(email)", "UpdateAppwriteUserID", "provisionInvitedUserForIdentity"} {
+	for _, forbidden := range []string{"LOWER(email)", "UpdateAppwriteUserID"} {
 		if strings.Contains(supabaseBranch, forbidden) {
 			t.Errorf("the Supabase branch reaches %q; it must resolve by provider id only", forbidden)
 		}
+	}
+
+	// Invitation provisioning is not that fallback, and the distinction is the
+	// whole point. It creates a row only when a pending, unexpired invitation
+	// exists for the exact address -- an admin has to have invited this person
+	// first. It used to be on the forbidden list above, which meant an invited
+	// employee signing in through Supabase for the first time got a 401 and
+	// could never be activated. The Supabase branch must reach it.
+	// The call, not the name: a comment that mentions the function would
+	// otherwise satisfy this after the call itself was deleted. That is exactly
+	// how the first version of this assertion passed a mutation it should have
+	// caught.
+	if !strings.Contains(supabaseBranch, "s.provisionInvitedUserForIdentity(") {
+		t.Error("the Supabase branch never tries invitation provisioning; an invited " +
+			"employee's first Supabase sign-in is rejected and they can never activate")
 	}
 }
 

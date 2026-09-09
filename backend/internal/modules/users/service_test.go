@@ -24,9 +24,10 @@ func TestGenerateTemporaryPassword(t *testing.T) {
 }
 
 func TestToUserResponseIncludesAvatarFileID(t *testing.T) {
+	appwriteID := "appwrite-id"
 	user := User{
 		ID:             "user-id",
-		AppwriteUserID: "appwrite-id",
+		AppwriteUserID: &appwriteID,
 		BusinessID:     "business-id",
 		RoleID:         "role-id",
 		FullName:       "Test User",

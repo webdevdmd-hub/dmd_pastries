@@ -201,7 +201,7 @@ func (s *Service) RegisterOwner(req RegisterOwnerRequest, ipAddress, userAgent s
 
 	localUser := &users.User{
 		ID:                   userID,
-		AppwriteUserID:       ids.Appwrite,
+		AppwriteUserID:       ids.AppwriteOrNil(),
 		SupabaseUserID:       ids.SupabaseOrNil(),
 		BusinessID:           businessID,
 		BranchID:             &branchID,
@@ -758,7 +758,7 @@ func (s *Service) AuthenticateToken(token string) (*utils.AuthContext, error) {
 
 	return &utils.AuthContext{
 		UserID:               user.ID,
-		AppwriteUserID:       user.AppwriteUserID,
+		AppwriteUserID:       user.AppwriteID(),
 		BusinessID:           user.BusinessID,
 		RoleID:               user.RoleID,
 		RoleName:             user.Role.RoleName,
@@ -861,6 +861,13 @@ func (s *Service) verifyIdentity(token string) (*utils.AppwriteIdentity, error) 
 		return identity, nil
 	}
 
+	// A token the Supabase verifier does not own is an Appwrite token or
+	// garbage. With no Appwrite configured it is garbage by definition, and
+	// the SDK would otherwise try to reach an empty endpoint to find that out.
+	if s.appwriteClient == nil || !s.appwriteClient.Configured() {
+		return nil, apperrors.Unauthorized("unrecognised token")
+	}
+
 	identity, err := s.appwriteClient.VerifyJWT(token)
 	if err != nil {
 		return nil, apperrors.Unauthorized("invalid Appwrite token")
@@ -890,6 +897,20 @@ func (s *Service) resolveLocalUserForIdentity(tx *gorm.DB, identity *utils.Appwr
 		}
 		if err != gorm.ErrRecordNotFound {
 			return nil, apperrors.Internal("failed to load local user")
+		}
+
+		// Not the email fallback that was deliberately removed from this path.
+		// provisionInvitedUserForIdentity only creates a row when a pending,
+		// unexpired invitation exists for this exact address -- so an unknown
+		// Supabase id is either an invited employee signing in for the first
+		// time, or nobody. Without this, invitations could never be accepted
+		// through Supabase at all.
+		invited, err := s.provisionInvitedUserForIdentity(tx, identity)
+		if err != nil {
+			return nil, err
+		}
+		if invited != nil {
+			return invited, nil
 		}
 		return nil, apperrors.Unauthorized("authenticated user is not linked to a local employee account")
 	}
@@ -933,11 +954,12 @@ func (s *Service) resolveLocalUserForIdentity(tx *gorm.DB, identity *utils.Appwr
 	}
 
 	user = matches[0]
-	if user.AppwriteUserID != identity.ID {
+	if user.AppwriteID() != identity.ID {
 		if err := s.userRepo.UpdateAppwriteUserID(tx, user.ID, identity.ID); err != nil {
 			return nil, apperrors.Internal("failed to relink local user")
 		}
-		user.AppwriteUserID = identity.ID
+		linked := identity.ID
+		user.AppwriteUserID = &linked
 	}
 
 	return &user, nil
@@ -986,7 +1008,6 @@ func (s *Service) provisionInvitedUserForIdentity(tx *gorm.DB, identity *utils.A
 
 	user := &users.User{
 		ID:              utils.NewUUID(),
-		AppwriteUserID:  identity.ID,
 		BusinessID:      invite.BusinessID,
 		BranchID:        invite.BranchID,
 		CurrentBranchID: invite.BranchID,
@@ -996,6 +1017,16 @@ func (s *Service) provisionInvitedUserForIdentity(tx *gorm.DB, identity *utils.A
 		Phone:           firstNonEmptyString(strings.TrimSpace(identity.Phone), invite.Phone),
 		Status:          "active",
 		EmailVerified:   identity.EmailVerified,
+	}
+	// The row is linked to the provider that actually authenticated this
+	// person. Writing a Supabase UUID into appwrite_user_id, as this did
+	// before, satisfied the insert and then made the next login unresolvable:
+	// the Supabase path looks up supabase_user_id, which was never set.
+	providerID := identity.ID
+	if identity.IsSupabase() {
+		user.SupabaseUserID = &providerID
+	} else {
+		user.AppwriteUserID = &providerID
 	}
 	if err := s.userRepo.Create(tx, user); err != nil {
 		return nil, apperrors.Internal("failed to create invited local user")
@@ -1148,7 +1179,7 @@ func (s *Service) buildProfileByUserID(userID, businessID string) (*AuthProfileR
 	return &AuthProfileResponse{
 		AccountType:          "tenant_user",
 		UserID:               user.ID,
-		AppwriteUserID:       user.AppwriteUserID,
+		AppwriteUserID:       user.AppwriteID(),
 		BusinessID:           user.BusinessID,
 		CurrentBranchID:      branchScope.CurrentBranchID,
 		CurrentBranchName:    currentBranchName,
