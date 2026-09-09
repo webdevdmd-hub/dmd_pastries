@@ -33,17 +33,35 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email("Enter a valid email address."),
 });
 
+/**
+ * The two providers prove a reset request differently: Appwrite sends a user id
+ * plus a secret, Supabase sends a single-use token. Both shapes are accepted
+ * for as long as both providers are live, so a link that was emailed before the
+ * cutover still works after it -- reset emails outlive the deploy that sent
+ * them, and invalidating them would strand whoever asked for one that morning.
+ *
+ * Neither pair is individually required, because which one arrives depends on
+ * who sent the email. The refine below rejects a submission carrying neither.
+ */
 export const resetPasswordSchema = z
   .object({
     password: passwordSchema,
     confirmPassword: z.string(),
-    userId: z.string().min(1, "Reset link is missing a user ID."),
-    secret: z.string().min(1, "Reset link is missing a secret."),
+    userId: z.string(),
+    secret: z.string(),
+    token: z.string(),
   })
   .refine((value) => value.password === value.confirmPassword, {
     path: ["confirmPassword"],
     message: "Passwords do not match.",
-  });
+  })
+  .refine(
+    (value) => value.token.length > 0 || (value.userId.length > 0 && value.secret.length > 0),
+    {
+      path: ["password"],
+      message: "This reset link is incomplete. Request a new one.",
+    },
+  );
 
 export type SignupSchema = z.infer<typeof signupSchema>;
 export type LoginSchema = z.infer<typeof loginSchema>;

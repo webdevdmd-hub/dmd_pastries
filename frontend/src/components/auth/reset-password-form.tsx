@@ -29,10 +29,11 @@ import { type ResetPasswordSchema, resetPasswordSchema } from "@/validators/auth
 
 type ResetPasswordFormProps = {
   secret: string;
+  token: string;
   userId: string;
 };
 
-export function ResetPasswordForm({ secret, userId }: ResetPasswordFormProps): JSX.Element {
+export function ResetPasswordForm({ secret, token, userId }: ResetPasswordFormProps): JSX.Element {
   const router = useRouter();
   const { resetPassword } = useAuth();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -43,13 +44,15 @@ export function ResetPasswordForm({ secret, userId }: ResetPasswordFormProps): J
       confirmPassword: "",
       userId,
       secret,
+      token,
     },
   });
 
   useEffect(() => {
     form.setValue("userId", userId);
     form.setValue("secret", secret);
-  }, [form, secret, userId]);
+    form.setValue("token", token);
+  }, [form, secret, token, userId]);
 
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitError(null);
@@ -63,7 +66,10 @@ export function ResetPasswordForm({ secret, userId }: ResetPasswordFormProps): J
     }
   });
 
-  const linkIsValid = secret.length > 0 && userId.length > 0;
+  // Either provider's proof will do. Requiring Appwrite's pair would reject
+  // every Supabase link with "invalid reset link", which reads as a broken
+  // product rather than a configuration mismatch.
+  const linkIsValid = token.length > 0 || (secret.length > 0 && userId.length > 0);
 
   return (
     <Card className="border-brand-cappuccino/80">

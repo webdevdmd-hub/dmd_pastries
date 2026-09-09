@@ -59,6 +59,61 @@ export function activeAuthProvider(): AuthProviderName {
   return getPublicEnvValue("NEXT_PUBLIC_AUTH_PROVIDER") === "supabase" ? "supabase" : "appwrite";
 }
 
+/**
+ * Local storage belonging to whichever provider is not in charge.
+ *
+ * Appwrite keeps its session in `cookieFallback` and its cached token under the
+ * two `pastries-pos:appwrite-*` keys. Supabase keeps its session under
+ * `sb-<project ref>-auth-token`, matched by pattern rather than by name so this
+ * does not silently stop working if the project ref changes.
+ */
+const APPWRITE_LOCAL_KEYS = [
+  "cookieFallback",
+  "pastries-pos:appwrite-jwt",
+  "pastries-pos:appwrite-jwt-rate-limit-until",
+];
+const SUPABASE_SESSION_KEY = /^sb-.+-auth-token$/;
+
+/**
+ * Clear the credentials of the provider that is not currently in charge.
+ *
+ * Every terminal that was signed in before the cutover still holds an Appwrite
+ * session, and it does not disappear on its own. Left in place, a browser
+ * carries two sets of credentials and the answer to "is this person signed in"
+ * depends on which one you ask -- a half-authenticated state that reproduces
+ * only on the machines that were working yesterday, which is the hardest kind
+ * to debug and the most likely to appear at 7am on the register.
+ *
+ * Rolling back costs those terminals one sign-in. That is the right trade: a
+ * pre-cutover session silently resurrecting is worse than a login prompt,
+ * because the session it resurrects may belong to someone since deactivated.
+ */
+export function purgeInactiveProviderState(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const supabaseIsActive = activeAuthProvider() === "supabase";
+
+    if (supabaseIsActive) {
+      for (const key of APPWRITE_LOCAL_KEYS) {
+        window.localStorage.removeItem(key);
+      }
+      return;
+    }
+
+    for (const key of Object.keys(window.localStorage)) {
+      if (SUPABASE_SESSION_KEY.test(key)) {
+        window.localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // Private mode or blocked storage. Nothing to purge, and nothing that
+    // reads these keys will find anything either.
+  }
+}
+
 export async function signIn(email: string, password: string): Promise<void> {
   return loginWithAppwrite(email, password);
 }

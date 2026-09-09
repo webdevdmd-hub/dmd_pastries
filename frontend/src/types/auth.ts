@@ -21,8 +21,11 @@ export type ForgotPasswordInput = {
 export type ResetPasswordInput = {
   password: string;
   confirmPassword: string;
+  /** Appwrite's proof: a user id paired with a secret. */
   userId: string;
   secret: string;
+  /** Supabase's proof: a single-use recovery token. */
+  token: string;
 };
 
 export type RegisterOwnerResult = {

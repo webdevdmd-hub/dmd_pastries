@@ -23,6 +23,7 @@ import {
   getCurrentAccount,
   hasLiveSession,
   hasStoredSession,
+  purgeInactiveProviderState,
   sendEmailVerification,
   SessionAlreadyExistsError,
   signIn,
@@ -147,6 +148,12 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
 
   const restoreSession = useCallback(async (): Promise<void> => {
     setStatus("loading");
+
+    // Before asking whether anyone is signed in, make sure only one provider
+    // can answer. Terminals that were signed in before the cutover still hold
+    // the old provider's credentials, and two sets of credentials means the
+    // answer depends on which one you ask.
+    purgeInactiveProviderState();
 
     try {
       if (!hasStoredSession()) {

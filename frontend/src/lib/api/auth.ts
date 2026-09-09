@@ -38,8 +38,12 @@ type BackendPasswordResetRequestInput = {
 };
 
 type BackendPasswordResetCompleteInput = {
+  // Appwrite proves the request with these two...
   user_id: string;
   secret: string;
+  // ...Supabase with a single-use token. The backend accepts either and
+  // rejects a request carrying neither, so both are sent as-is.
+  token: string;
   password: string;
   confirm_password: string;
 };
@@ -363,6 +367,7 @@ export async function completePasswordReset(
       body: {
         user_id: input.userId,
         secret: input.secret,
+        token: input.token,
         password: input.password,
         confirm_password: input.confirmPassword,
       },
