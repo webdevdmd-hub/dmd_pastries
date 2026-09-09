@@ -23,6 +23,7 @@ type CreateProductRequest struct {
 	Barcode                string   `json:"barcode"`
 	Description            string   `json:"description"`
 	ImageFileID            string   `json:"image_file_id"`
+	ImageStoragePath       string   `json:"image_storage_path"`
 	IsSellable             *bool    `json:"is_sellable"`
 	IsPOSVisible           *bool    `json:"is_pos_visible"`
 	IsPurchasable          *bool    `json:"is_purchasable"`
@@ -52,6 +53,7 @@ type UpdateProductRequest struct {
 	SKU                    string   `json:"sku"`
 	Barcode                string   `json:"barcode"`
 	ImageFileID            string   `json:"image_file_id"`
+	ImageStoragePath       string   `json:"image_storage_path"`
 	IsSellable             *bool    `json:"is_sellable"`
 	IsPOSVisible           *bool    `json:"is_pos_visible"`
 	IsPurchasable          *bool    `json:"is_purchasable"`

@@ -18,6 +18,7 @@ type BackendExpensePayload = {
   notes?: string | null;
   paid_through_account_id?: string;
   receipt_file_id?: string | null;
+  receipt_storage_path?: string | null;
   reference_number?: string | null;
   supplier_id?: string | null;
 };
@@ -160,6 +161,8 @@ function expensePayload(
     nextPayload.paid_through_account_id = payload.paidThroughAccountId;
   }
   if (payload.receiptFileId !== undefined) nextPayload.receipt_file_id = payload.receiptFileId;
+  if (payload.receiptStoragePath !== undefined)
+    nextPayload.receipt_storage_path = payload.receiptStoragePath;
   if (payload.referenceNumber !== undefined) {
     nextPayload.reference_number = payload.referenceNumber;
   }

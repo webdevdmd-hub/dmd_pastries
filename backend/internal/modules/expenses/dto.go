@@ -33,6 +33,7 @@ type CreateExpenseRequest struct {
 	ReferenceNumber      string       `json:"reference_number"`
 	Notes                string       `json:"notes"`
 	ReceiptFileID        string       `json:"receipt_file_id"`
+	ReceiptStoragePath   string       `json:"receipt_storage_path"`
 	IsBillable           bool         `json:"is_billable"`
 }
 
@@ -47,6 +48,7 @@ type UpdateExpenseRequest struct {
 	ReferenceNumber      *string       `json:"reference_number"`
 	Notes                *string       `json:"notes"`
 	ReceiptFileID        *string       `json:"receipt_file_id"`
+	ReceiptStoragePath   *string       `json:"receipt_storage_path"`
 	IsBillable           *bool         `json:"is_billable"`
 }
 

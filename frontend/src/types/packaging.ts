@@ -67,6 +67,7 @@ export type CreatePackagingPayload = {
   description: string | null;
   imageUrl: string | null;
   imageFileId: string | null;
+  imageStoragePath: string | null;
 };
 
 export type UpdatePackagingPayload = Partial<CreatePackagingPayload>;

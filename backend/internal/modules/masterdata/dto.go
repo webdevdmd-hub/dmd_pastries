@@ -8,6 +8,7 @@ type CreateProductCategoryRequest struct {
 	CategoryCode        string   `json:"category_code"`
 	Description         string   `json:"description"`
 	ImageFileID         string   `json:"image_file_id"`
+	ImageStoragePath    string   `json:"image_storage_path"`
 	SortOrder           int      `json:"sort_order"`
 	AllowedProductTypes []string `json:"allowed_product_types"`
 }
@@ -18,6 +19,7 @@ type UpdateProductCategoryRequest struct {
 	CategoryCode        string   `json:"category_code"`
 	Description         string   `json:"description"`
 	ImageFileID         string   `json:"image_file_id"`
+	ImageStoragePath    string   `json:"image_storage_path"`
 	SortOrder           *int     `json:"sort_order"`
 	AllowedProductTypes []string `json:"allowed_product_types"`
 }

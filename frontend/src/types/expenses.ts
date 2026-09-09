@@ -73,6 +73,7 @@ export type CreateExpensePayload = {
   notes: string | null;
   paidThroughAccountId: string;
   receiptFileId: string | null;
+  receiptStoragePath: string | null;
   referenceNumber: string | null;
   supplierId: string | null;
 };

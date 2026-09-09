@@ -133,11 +133,17 @@ export function ProductVariantFormDialog({
 
   const onSubmit = async (values: ProductVariantSchema): Promise<void> => {
     let imageFileId = values.imageFileId?.trim() ? values.imageFileId : null;
+    // Left null unless this submit actually uploaded something. The API treats
+    // an absent path as "leave it alone", so an edit that does not touch the
+    // image keeps whatever the copy already linked.
+    let imageStoragePath: string | null = null;
 
     if (selectedImage) {
       setIsUploadingImage(true);
       try {
-        imageFileId = await uploadProductImage(selectedImage);
+        const uploaded = await uploadProductImage(selectedImage);
+        imageFileId = uploaded.fileId;
+        imageStoragePath = uploaded.storagePath;
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to upload variant image.";
         toast.error(message);
@@ -161,6 +167,7 @@ export function ProductVariantFormDialog({
       salePriceLocked: values.salePriceLocked,
       imageUrl: null,
       imageFileId,
+      imageStoragePath,
       sortOrder: values.sortOrder,
       status: values.status,
     };

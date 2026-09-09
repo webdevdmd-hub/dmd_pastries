@@ -59,6 +59,7 @@ func (s *Service) CreateVariant(currentUser *utils.AuthContext, productID string
 		AutoPriceUpdateEnabled: req.AutoPriceUpdateEnabled,
 		SalePriceLocked:        req.SalePriceLocked,
 		ImageFileID:            strings.TrimSpace(req.ImageFileID),
+		ImageStoragePath:       strings.TrimSpace(req.ImageStoragePath),
 		SortOrder:              req.SortOrder,
 		Status:                 "active",
 	}
@@ -141,6 +142,9 @@ func (s *Service) UpdateVariant(currentUser *utils.AuthContext, productID, varia
 	}
 	if req.SalePriceLocked != nil {
 		updates["sale_price_locked"] = *req.SalePriceLocked
+	}
+	if req.ImageStoragePath != "" {
+		updates["image_storage_path"] = strings.TrimSpace(req.ImageStoragePath)
 	}
 	if req.ImageFileID != "" {
 		updates["image_file_id"] = strings.TrimSpace(req.ImageFileID)

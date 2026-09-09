@@ -163,6 +163,7 @@ export type CreateProductPayload = {
   description: string | null;
   imageUrl: string | null;
   imageFileId: string | null;
+  imageStoragePath: string | null;
   isSellable: boolean;
   isPosVisible: boolean;
   isExpiryTracked: boolean;
@@ -190,6 +191,7 @@ export type CreateProductVariantPayload = {
   salePriceLocked: boolean;
   imageUrl: string | null;
   imageFileId: string | null;
+  imageStoragePath: string | null;
   sortOrder: number;
   status: RecordStatus;
 };

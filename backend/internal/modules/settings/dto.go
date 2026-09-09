@@ -27,6 +27,7 @@ type CompanySettingsResponse struct {
 type UpdateCompanySettingsRequest struct {
 	BusinessDisplayName string `json:"business_display_name"`
 	LogoFileID          string `json:"logo_file_id"`
+	LogoStoragePath     string `json:"logo_storage_path"`
 	Address             string `json:"address"`
 	Phone               string `json:"phone"`
 	Email               string `json:"email" binding:"omitempty,email"`

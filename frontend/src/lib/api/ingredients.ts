@@ -25,6 +25,7 @@ type BackendIngredientPayload = {
   description?: string | null;
   image_url?: string | null;
   image_file_id?: string | null;
+  image_storage_path?: string | null;
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -171,6 +172,8 @@ function ingredientPayload(
   if (payload.description !== undefined) nextPayload.description = payload.description;
   if (payload.imageUrl !== undefined) nextPayload.image_url = payload.imageUrl;
   if (payload.imageFileId !== undefined) nextPayload.image_file_id = payload.imageFileId;
+  if (payload.imageStoragePath !== undefined)
+    nextPayload.image_storage_path = payload.imageStoragePath;
 
   return nextPayload;
 }

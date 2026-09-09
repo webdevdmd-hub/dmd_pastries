@@ -96,6 +96,7 @@ func (s *Service) Create(currentUser *utils.AuthContext, req CreateExpenseReques
 			ReferenceNumber:      normalized.ReferenceNumber,
 			Notes:                normalized.Notes,
 			ReceiptFileID:        normalized.ReceiptFileID,
+			ReceiptStoragePath:   normalized.ReceiptStoragePath,
 			IsBillable:           normalized.IsBillable,
 			Status:               "posted",
 			CreatedByUserID:      currentUser.UserID,
@@ -181,6 +182,7 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateEx
 			"reference_number":        normalized.ReferenceNumber,
 			"notes":                   normalized.Notes,
 			"receipt_file_id":         normalized.ReceiptFileID,
+			"receipt_storage_path":    normalized.ReceiptStoragePath,
 			"is_billable":             normalized.IsBillable,
 			"updated_by_user_id":      currentUser.UserID,
 			"updated_at":              now,
@@ -196,6 +198,7 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateEx
 		updated.ReferenceNumber = normalized.ReferenceNumber
 		updated.Notes = normalized.Notes
 		updated.ReceiptFileID = normalized.ReceiptFileID
+		updated.ReceiptStoragePath = normalized.ReceiptStoragePath
 		updated.IsBillable = normalized.IsBillable
 		updated.UpdatedByUserID = &currentUser.UserID
 		updated.UpdatedAt = now
@@ -302,6 +305,7 @@ func expenseChanges(existing, updated Expense) []audit.AuditChange {
 	audit.AddChange(&changes, "reference_number", "Reference number", existing.ReferenceNumber, updated.ReferenceNumber)
 	audit.AddChange(&changes, "notes", "Notes", existing.Notes, updated.Notes)
 	audit.AddChange(&changes, "receipt_file_id", "Receipt file", existing.ReceiptFileID, updated.ReceiptFileID)
+	audit.AddChange(&changes, "receipt_storage_path", "Receipt file", existing.ReceiptStoragePath, updated.ReceiptStoragePath)
 	audit.AddChange(&changes, "is_billable", "Billable", existing.IsBillable, updated.IsBillable)
 	return changes
 }
@@ -317,6 +321,7 @@ type normalizedExpenseInput struct {
 	ReferenceNumber      string
 	Notes                string
 	ReceiptFileID        string
+	ReceiptStoragePath   string
 	IsBillable           bool
 }
 
@@ -344,6 +349,7 @@ func (s *Service) normalizeCreateRequest(currentUser *utils.AuthContext, req Cre
 		ReferenceNumber:      strings.TrimSpace(req.ReferenceNumber),
 		Notes:                strings.TrimSpace(req.Notes),
 		ReceiptFileID:        strings.TrimSpace(req.ReceiptFileID),
+		ReceiptStoragePath:   strings.TrimSpace(req.ReceiptStoragePath),
 		IsBillable:           req.IsBillable,
 	}, nil
 }
@@ -392,6 +398,10 @@ func (s *Service) normalizeUpdateRequest(currentUser *utils.AuthContext, existin
 	if req.ReceiptFileID != nil {
 		receiptFileID = strings.TrimSpace(*req.ReceiptFileID)
 	}
+	receiptStoragePath := existing.ReceiptStoragePath
+	if req.ReceiptStoragePath != nil {
+		receiptStoragePath = strings.TrimSpace(*req.ReceiptStoragePath)
+	}
 	isBillable := existing.IsBillable
 	if req.IsBillable != nil {
 		isBillable = *req.IsBillable
@@ -415,6 +425,7 @@ func (s *Service) normalizeUpdateRequest(currentUser *utils.AuthContext, existin
 		ReferenceNumber:      referenceNumber,
 		Notes:                notes,
 		ReceiptFileID:        receiptFileID,
+		ReceiptStoragePath:   receiptStoragePath,
 		IsBillable:           isBillable,
 	}, nil
 }

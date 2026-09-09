@@ -35,6 +35,7 @@ type CreatePackagingRequest struct {
 	Description         string       `json:"description"`
 	ImageURL            string       `json:"image_url"`
 	ImageFileID         string       `json:"image_file_id"`
+	ImageStoragePath    string       `json:"image_storage_path"`
 }
 
 type UpdatePackagingRequest struct {
@@ -49,6 +50,7 @@ type UpdatePackagingRequest struct {
 	Description         string        `json:"description"`
 	ImageURL            *string       `json:"image_url"`
 	ImageFileID         string        `json:"image_file_id"`
+	ImageStoragePath    string        `json:"image_storage_path"`
 	Status              string        `json:"status"`
 }
 

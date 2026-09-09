@@ -15,6 +15,7 @@ type CreateVariantRequest struct {
 	AutoPriceUpdateEnabled bool     `json:"auto_price_update_enabled"`
 	SalePriceLocked        bool     `json:"sale_price_locked"`
 	ImageFileID            string   `json:"image_file_id"`
+	ImageStoragePath       string   `json:"image_storage_path"`
 	SortOrder              int      `json:"sort_order"`
 }
 
@@ -31,6 +32,7 @@ type UpdateVariantRequest struct {
 	AutoPriceUpdateEnabled *bool    `json:"auto_price_update_enabled"`
 	SalePriceLocked        *bool    `json:"sale_price_locked"`
 	ImageFileID            string   `json:"image_file_id"`
+	ImageStoragePath       string   `json:"image_storage_path"`
 	SortOrder              *int     `json:"sort_order"`
 }
 

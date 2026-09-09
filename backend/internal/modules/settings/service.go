@@ -44,6 +44,9 @@ func (s *Service) UpdateCompanySettings(currentUser *utils.AuthContext, req Upda
 	if req.BusinessDisplayName != "" {
 		updates["business_display_name"] = strings.TrimSpace(req.BusinessDisplayName)
 	}
+	if req.LogoStoragePath != "" {
+		updates["logo_storage_path"] = strings.TrimSpace(req.LogoStoragePath)
+	}
 	if req.LogoFileID != "" {
 		updates["logo_file_id"] = strings.TrimSpace(req.LogoFileID)
 	}

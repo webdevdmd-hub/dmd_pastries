@@ -114,6 +114,7 @@ func (s *Service) CreateProduct(currentUser *utils.AuthContext, req CreateProduc
 		AutoPriceUpdateEnabled: req.AutoPriceUpdateEnabled,
 		SalePriceLocked:        req.SalePriceLocked,
 		ImageFileID:            strings.TrimSpace(req.ImageFileID),
+		ImageStoragePath:       strings.TrimSpace(req.ImageStoragePath),
 		IsSellable:             isSellable,
 		IsPOSVisible:           isPOSVisible,
 		// Both are constants now: the product dialog no longer asks, because
@@ -250,6 +251,9 @@ func (s *Service) UpdateProduct(currentUser *utils.AuthContext, id string, req U
 	}
 	if req.Barcode != "" {
 		updates["barcode"] = strings.TrimSpace(req.Barcode)
+	}
+	if req.ImageStoragePath != "" {
+		updates["image_storage_path"] = strings.TrimSpace(req.ImageStoragePath)
 	}
 	if req.ImageFileID != "" {
 		updates["image_file_id"] = strings.TrimSpace(req.ImageFileID)

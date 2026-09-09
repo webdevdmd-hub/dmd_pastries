@@ -774,6 +774,9 @@ export function toBackendProductPayload(
     ...(payload.description !== undefined ? { description: payload.description } : {}),
     ...(payload.imageUrl !== undefined ? { image_url: payload.imageUrl } : {}),
     ...(payload.imageFileId !== undefined ? { image_file_id: payload.imageFileId } : {}),
+    ...(payload.imageStoragePath !== undefined
+      ? { image_storage_path: payload.imageStoragePath }
+      : {}),
     ...(payload.isSellable !== undefined ? { is_sellable: payload.isSellable } : {}),
     ...(payload.isPosVisible !== undefined ? { is_pos_visible: payload.isPosVisible } : {}),
     ...(payload.isExpiryTracked !== undefined
@@ -813,6 +816,9 @@ function toBackendVariantPayload(
       : {}),
     ...(payload.imageUrl !== undefined ? { image_url: payload.imageUrl } : {}),
     ...(payload.imageFileId !== undefined ? { image_file_id: payload.imageFileId } : {}),
+    ...(payload.imageStoragePath !== undefined
+      ? { image_storage_path: payload.imageStoragePath }
+      : {}),
     ...(payload.sortOrder !== undefined ? { sort_order: payload.sortOrder } : {}),
     ...(payload.status !== undefined ? { status: payload.status } : {}),
   };

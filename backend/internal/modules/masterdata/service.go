@@ -690,6 +690,7 @@ func (s *Service) CreateProductCategory(currentUser *utils.AuthContext, req Crea
 		CategoryCode:     code,
 		Description:      strings.TrimSpace(req.Description),
 		ImageFileID:      strings.TrimSpace(req.ImageFileID),
+		ImageStoragePath: strings.TrimSpace(req.ImageStoragePath),
 		SortOrder:        req.SortOrder,
 		Status:           "active",
 	}
@@ -768,6 +769,9 @@ func (s *Service) UpdateProductCategory(currentUser *utils.AuthContext, id strin
 	}
 	if req.Description != "" {
 		updates["description"] = strings.TrimSpace(req.Description)
+	}
+	if req.ImageStoragePath != "" {
+		updates["image_storage_path"] = strings.TrimSpace(req.ImageStoragePath)
 	}
 	if req.ImageFileID != "" {
 		updates["image_file_id"] = strings.TrimSpace(req.ImageFileID)

@@ -229,6 +229,7 @@ function buildPayload(state: ExpenseFormState): CreateExpensePayload {
     notes: textOrNull(state.notes),
     paidThroughAccountId: state.paidThroughAccountId,
     receiptFileId: textOrNull(state.receiptFileId),
+    receiptStoragePath: null,
     referenceNumber: textOrNull(state.referenceNumber),
     supplierId: textOrNull(state.supplierId),
   };
@@ -482,7 +483,9 @@ function ExpenseFormDialog({
     if (receiptFile) {
       try {
         setIsUploadingReceipt(true);
-        payload.receiptFileId = await uploadFile("documents", receiptFile);
+        const uploaded = await uploadFile("documents", receiptFile);
+        payload.receiptFileId = uploaded.fileId;
+        payload.receiptStoragePath = uploaded.storagePath;
       } catch (error) {
         setError(getErrorMessage(error));
         return;

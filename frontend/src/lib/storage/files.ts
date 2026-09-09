@@ -65,29 +65,40 @@ export function getFileUrl(bucket: StorageBucketKey, file: StoredFile): string |
 }
 
 /**
- * Upload a file, returning its Appwrite id.
+ * Where a freshly uploaded file went.
  *
- * Reads and writes move at different times, and the comment inside says why.
+ * Both fields exist so the caller never has to ask which provider is live. It
+ * writes whichever it was given to the matching column, and the one that is
+ * null stays null -- which is exactly what the read fallback expects.
+ *
+ * Returning a bare string would have forced every form to branch on the
+ * provider, putting back the knowledge this module exists to hold.
  */
-export async function uploadFile(bucket: StorageBucketKey, file: File): Promise<string> {
+export type UploadedFile = {
+  fileId: string | null;
+  storagePath: string | null;
+};
+
+/**
+ * Upload a file to whichever store is live.
+ *
+ * A new upload lands in one provider, not both. There is no dual-write here and
+ * there should not be: unlike an identity, a file that exists in only one place
+ * still renders, because the row carries both addresses and the read prefers
+ * whichever is populated.
+ *
+ * The rollback cost is worth stating plainly. Images uploaded while Supabase is
+ * live have a path and no Appwrite id, so switching the provider back makes
+ * them fall through to whatever the row held before -- the old image, or none.
+ * Everything uploaded before the cutover is unaffected, because the copy gave
+ * those rows both addresses.
+ */
+export async function uploadFile(bucket: StorageBucketKey, file: File): Promise<UploadedFile> {
   if (supabaseIsActive()) {
-    // Reads can move before writes do, and they should: the copy runs for
-    // hours and every read falls back, so nothing breaks while it does. Writes
-    // cannot, because persisting a Supabase object path needs an API that
-    // accepts one, and every upload path here still writes to a *_file_id
-    // column.
-    //
-    // Failing loudly is the point. Returning the path would put it in a column
-    // read as an Appwrite id, and returning "" would write an empty id -- both
-    // silent, both only visible later as a broken image nobody can trace back
-    // to the day storage was switched over.
-    throw new Error(
-      "Uploads still go to Appwrite. Supabase storage is read-only until the API " +
-        "accepts a storage path; leave NEXT_PUBLIC_STORAGE_PROVIDER unset for uploads.",
-    );
+    return { fileId: null, storagePath: await supabaseStorage.upload(bucket, file) };
   }
 
-  return uploadToAppwrite(bucket, file);
+  return { fileId: await uploadToAppwrite(bucket, file), storagePath: null };
 }
 
 /** Which store new uploads go to. */
@@ -138,10 +149,10 @@ export function getBusinessAssetUrl(source: LogoSource): string | null {
 }
 
 /** Convenience wrappers so call sites name the bucket by intent, not by key. */
-export async function uploadProductImage(file: File): Promise<string> {
+export async function uploadProductImage(file: File): Promise<UploadedFile> {
   return uploadFile("productImages", file);
 }
 
-export async function uploadBusinessAsset(file: File): Promise<string> {
+export async function uploadBusinessAsset(file: File): Promise<UploadedFile> {
   return uploadFile("businessAssets", file);
 }

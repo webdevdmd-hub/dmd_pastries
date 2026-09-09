@@ -36,6 +36,7 @@ type CreateIngredientRequest struct {
 	Description          string       `json:"description"`
 	ImageURL             string       `json:"image_url"`
 	ImageFileID          string       `json:"image_file_id"`
+	ImageStoragePath     string       `json:"image_storage_path"`
 }
 
 type UpdateIngredientRequest struct {
@@ -50,6 +51,7 @@ type UpdateIngredientRequest struct {
 	Description          string        `json:"description"`
 	ImageURL             *string       `json:"image_url"`
 	ImageFileID          string        `json:"image_file_id"`
+	ImageStoragePath     string        `json:"image_storage_path"`
 	Status               string        `json:"status"`
 }
 

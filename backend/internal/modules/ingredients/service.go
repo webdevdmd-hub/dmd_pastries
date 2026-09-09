@@ -102,6 +102,7 @@ func (s *Service) Create(currentUser *utils.AuthContext, req CreateIngredientReq
 			ReorderLevel:         req.ReorderLevel,
 			ImageURL:             nullableString(req.ImageURL),
 			ImageFileID:          strings.TrimSpace(req.ImageFileID),
+			ImageStoragePath:     strings.TrimSpace(req.ImageStoragePath),
 			Status:               "active",
 			CreatedByUserID:      currentUser.UserID,
 			UpdatedByUserID:      currentUser.UserID,
@@ -212,6 +213,9 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateIn
 		}
 		if req.ImageURL != nil {
 			updates["image_url"] = nullableString(*req.ImageURL)
+		}
+		if strings.TrimSpace(req.ImageStoragePath) != "" {
+			updates["image_storage_path"] = strings.TrimSpace(req.ImageStoragePath)
 		}
 		if strings.TrimSpace(req.ImageFileID) != "" {
 			updates["image_file_id"] = strings.TrimSpace(req.ImageFileID)
