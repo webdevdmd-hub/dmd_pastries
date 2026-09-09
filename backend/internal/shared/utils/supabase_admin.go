@@ -33,13 +33,8 @@ type SupabaseAdminClient struct {
 }
 
 func NewSupabaseAdminClient(cfg config.Config) *SupabaseAdminClient {
-	baseURL := ""
-	if ref := strings.TrimSpace(cfg.SupabaseProjectRef); ref != "" {
-		baseURL = fmt.Sprintf("https://%s.supabase.co/auth/v1", ref)
-	}
-
 	return &SupabaseAdminClient{
-		baseURL:    baseURL,
+		baseURL:    supabaseAuthBaseURL(cfg.SupabaseURL),
 		serviceKey: strings.TrimSpace(cfg.SupabaseServiceRoleKey),
 		httpClient: &http.Client{Timeout: 20 * time.Second},
 		appEnv:     cfg.AppEnv,

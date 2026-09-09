@@ -43,7 +43,7 @@ func fakeGoTrue(t *testing.T, status int, response string, seen *capture) *Supab
 	t.Cleanup(server.Close)
 
 	client := NewSupabaseAdminClient(config.Config{
-		SupabaseProjectRef:     "examplerefnotreal01",
+		SupabaseURL:            "https://examplerefnotreal01.supabase.co",
 		SupabaseServiceRoleKey: "service-role-not-real",
 		AppEnv:                 "production",
 	})
@@ -198,7 +198,7 @@ func TestCompletePasswordRecoveryActsAsTheUserNotTheServiceRole(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := NewSupabaseAdminClient(config.Config{
-		SupabaseProjectRef:     "examplerefnotreal01",
+		SupabaseURL:            "https://examplerefnotreal01.supabase.co",
 		SupabaseServiceRoleKey: "service-role-not-real",
 		AppEnv:                 "production",
 	})

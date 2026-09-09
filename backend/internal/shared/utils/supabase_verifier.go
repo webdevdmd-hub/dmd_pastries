@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -35,14 +36,40 @@ type SupabaseVerifier struct {
 // treats it as "not a Supabase token" and falls through to Appwrite.
 var ErrSupabaseNotConfigured = errors.New("supabase verification is not configured")
 
-func NewSupabaseVerifier(cfg config.Config) *SupabaseVerifier {
-	issuer := ""
-	if ref := strings.TrimSpace(cfg.SupabaseProjectRef); ref != "" {
-		issuer = fmt.Sprintf("https://%s.supabase.co/auth/v1", ref)
+// supabaseAuthBaseURL turns SUPABASE_URL into the GoTrue base, and returns ""
+// for anything it cannot make sense of.
+//
+// Failing closed matters here. This value is both the base for admin calls and
+// the issuer a token must claim, and the issuer check is a security control --
+// a malformed URL that silently became a malformed issuer would either reject
+// every good token or, worse, match something unintended. An empty return makes
+// Configured() false, which is the same inert state as no configuration at all.
+//
+// Accepts the project URL with or without a trailing slash, and with or without
+// the /auth/v1 suffix already on it, because both are things people paste.
+func supabaseAuthBaseURL(raw string) string {
+	trimmed := strings.TrimRight(strings.TrimSpace(raw), "/")
+	if trimmed == "" {
+		return ""
 	}
 
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Host == "" {
+		return ""
+	}
+	if parsed.Scheme != "https" && parsed.Scheme != "http" {
+		return ""
+	}
+
+	if strings.HasSuffix(parsed.Path, "/auth/v1") {
+		return trimmed
+	}
+	return trimmed + "/auth/v1"
+}
+
+func NewSupabaseVerifier(cfg config.Config) *SupabaseVerifier {
 	return &SupabaseVerifier{
-		issuer:    issuer,
+		issuer:    supabaseAuthBaseURL(cfg.SupabaseURL),
 		jwtSecret: []byte(strings.TrimSpace(cfg.SupabaseJWTSecret)),
 		appEnv:    cfg.AppEnv,
 		e2eToken:  cfg.E2EAuthToken,

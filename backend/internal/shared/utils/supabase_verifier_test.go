@@ -12,19 +12,19 @@ import (
 )
 
 const (
-	testProjectRef = "examplerefnotreal01"
-	testSecret     = "test-jwt-secret-not-a-real-one"
-	testIssuer     = "https://" + testProjectRef + ".supabase.co/auth/v1"
-	testSubject    = "6f1e2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b"
+	testURL     = "https://examplerefnotreal01.supabase.co"
+	testSecret  = "test-jwt-secret-not-a-real-one"
+	testIssuer  = testURL + "/auth/v1"
+	testSubject = "6f1e2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b"
 )
 
 func testVerifier(t *testing.T, appEnv, e2eToken string) *SupabaseVerifier {
 	t.Helper()
 	return NewSupabaseVerifier(config.Config{
-		SupabaseProjectRef: testProjectRef,
-		SupabaseJWTSecret:  testSecret,
-		AppEnv:             appEnv,
-		E2EAuthToken:       e2eToken,
+		SupabaseURL:       testURL,
+		SupabaseJWTSecret: testSecret,
+		AppEnv:            appEnv,
+		E2EAuthToken:      e2eToken,
 	})
 }
 
@@ -244,7 +244,73 @@ func TestUnconfiguredVerifierIsInert(t *testing.T) {
 
 func TestIssuerIsDerivedFromTheProjectRef(t *testing.T) {
 	got := testVerifier(t, "production", "").Issuer()
-	if !strings.Contains(got, testProjectRef) || !strings.HasSuffix(got, "/auth/v1") {
+	if !strings.Contains(got, testURL) || !strings.HasSuffix(got, "/auth/v1") {
 		t.Errorf("Issuer() = %q", got)
+	}
+}
+
+// SUPABASE_URL is pasted by a human, and whatever it becomes is both the admin
+// base URL and the issuer a token must match. A wrong value here either rejects
+// every valid session or, worse, trusts an issuer nobody intended -- so the
+// normalisation is worth pinning, including the shapes that must be refused.
+func TestSupabaseURLNormalisation(t *testing.T) {
+	const want = "https://examplerefnotreal01.supabase.co/auth/v1"
+
+	accepted := map[string]string{
+		"plain project url":    "https://examplerefnotreal01.supabase.co",
+		"trailing slash":       "https://examplerefnotreal01.supabase.co/",
+		"several slashes":      "https://examplerefnotreal01.supabase.co///",
+		"surrounding space":    "  https://examplerefnotreal01.supabase.co  ",
+		"suffix already there": "https://examplerefnotreal01.supabase.co/auth/v1",
+		"suffix plus slash":    "https://examplerefnotreal01.supabase.co/auth/v1/",
+		"custom domain":        "https://auth.dmd.example",
+	}
+	for name, input := range accepted {
+		t.Run(name, func(t *testing.T) {
+			got := supabaseAuthBaseURL(input)
+			if name == "custom domain" {
+				if got != "https://auth.dmd.example/auth/v1" {
+					t.Errorf("got %q", got)
+				}
+				return
+			}
+			if got != want {
+				t.Errorf("got %q, want %q", got, want)
+			}
+		})
+	}
+
+	// Anything unparseable must fail closed. Returning a half-formed issuer
+	// would be worse than returning nothing, because nothing is simply inert.
+	refused := map[string]string{
+		"empty":          "",
+		"whitespace":     "   ",
+		"no scheme":      "examplerefnotreal01.supabase.co",
+		"scheme only":    "https://",
+		"not a url":      "://///",
+		"wrong protocol": "ftp://examplerefnotreal01.supabase.co",
+	}
+	for name, input := range refused {
+		t.Run("refuses "+name, func(t *testing.T) {
+			if got := supabaseAuthBaseURL(input); got != "" {
+				t.Errorf("got %q, want \"\" so the verifier stays inert", got)
+			}
+		})
+	}
+}
+
+// A malformed URL must make the whole verifier inert rather than half-working.
+func TestMalformedURLLeavesTheVerifierInert(t *testing.T) {
+	verifier := NewSupabaseVerifier(config.Config{
+		SupabaseURL:       "not-a-url",
+		SupabaseJWTSecret: testSecret,
+		AppEnv:            "production",
+	})
+
+	if verifier.Configured() {
+		t.Error("Configured() is true with an unparseable SUPABASE_URL")
+	}
+	if _, err := verifier.VerifyToken(sign(t, validClaims())); !errors.Is(err, ErrSupabaseNotConfigured) {
+		t.Errorf("err = %v, want ErrSupabaseNotConfigured", err)
 	}
 }

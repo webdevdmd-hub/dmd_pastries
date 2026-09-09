@@ -30,7 +30,7 @@ type Config struct {
 	AppwriteEndpoint         string
 	AppwriteProjectID        string
 	AppwriteAPIKey           string
-	SupabaseProjectRef       string
+	SupabaseURL              string
 	SupabaseJWTSecret        string
 	SupabaseServiceRoleKey   string
 	AuthPrimaryProvider      string
@@ -58,7 +58,7 @@ func Load() Config {
 	// every token and the app runs exactly as it did before, so this ships
 	// inert and the cutover is a deploy-time environment change rather than a
 	// code change. mustEnv here would make the migration a flag day.
-	cfg.SupabaseProjectRef = getEnv("SUPABASE_PROJECT_REF", "")
+	cfg.SupabaseURL = getEnv("SUPABASE_URL", "")
 	cfg.SupabaseJWTSecret = getEnv("SUPABASE_JWT_SECRET", "")
 	// Unrestricted database access, including the auth schema. Never goes to
 	// the frontend and never appears in an error returned to a caller.
