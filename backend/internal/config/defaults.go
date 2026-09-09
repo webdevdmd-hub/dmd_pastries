@@ -20,9 +20,16 @@ type DevDefault struct {
 // by being one deploy away from it. The list is deliberately short: a warning
 // that names ten things gets skimmed, and the one that mattered goes with it.
 var dangerousDefaults = []struct {
-	key         string
-	fallback    string
-	actual      func(Config) string
+	key      string
+	fallback string
+	actual   func(Config) string
+	// unsafe reports whether the current value is the dangerous one.
+	//
+	// nil means "equal to fallback", which is the ordinary case: a setting
+	// nobody configured. It exists for the settings where the dangerous value
+	// is one somebody chose -- those cannot be caught by comparing against a
+	// default, and they are the ones most likely to be believed safe.
+	unsafe      func(string) bool
 	consequence string
 }{
 	{
@@ -59,6 +66,29 @@ var dangerousDefaults = []struct {
 		// nothing about the app changes at that moment to say so.
 		consequence: "database traffic is unencrypted, which is only safe while the database is on this host",
 	},
+	{
+		key:      "POSTGRES_SSLMODE",
+		fallback: "verify-full",
+		actual:   func(c Config) string { return c.PostgresSSLMode },
+		// The dangerous middle. `require` encrypts and verifies nothing, so it
+		// silences the warning above while leaving the connection open to
+		// anything that can answer for the database host -- and it is the value
+		// people reach for, because it reads like the secure one.
+		//
+		// `prefer` and `allow` are worse again: they fall back to plaintext
+		// without saying so, so the connection can be unencrypted while the
+		// setting claims otherwise.
+		unsafe: func(value string) bool {
+			switch strings.ToLower(strings.TrimSpace(value)) {
+			case "require", "prefer", "allow":
+				return true
+			default:
+				return false
+			}
+		},
+		consequence: "traffic is encrypted but the server certificate is never checked, " +
+			"so anything that can answer for the database host can read and rewrite every query",
+	},
 }
 
 // DevDefaultsInUse lists the settings still on their fallback values.
@@ -71,13 +101,24 @@ func (c Config) DevDefaultsInUse() []DevDefault {
 	found := make([]DevDefault, 0, len(dangerousDefaults))
 
 	for _, candidate := range dangerousDefaults {
-		if candidate.actual(c) == candidate.fallback {
-			found = append(found, DevDefault{
-				Key:         candidate.key,
-				Value:       candidate.fallback,
-				Consequence: candidate.consequence,
-			})
+		value := candidate.actual(c)
+
+		dangerous := value == candidate.fallback
+		if candidate.unsafe != nil {
+			dangerous = candidate.unsafe(value)
 		}
+		if !dangerous {
+			continue
+		}
+
+		// The actual value, not the fallback. They are the same thing for an
+		// unset setting and different for a chosen one, and printing the
+		// fallback there would report a value nobody set.
+		found = append(found, DevDefault{
+			Key:         candidate.key,
+			Value:       value,
+			Consequence: candidate.consequence,
+		})
 	}
 
 	return found

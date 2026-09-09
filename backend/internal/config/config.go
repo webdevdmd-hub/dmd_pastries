@@ -21,6 +21,7 @@ type Config struct {
 	PostgresPassword         string
 	PostgresDB               string
 	PostgresSSLMode          string
+	PostgresSSLRootCert      string
 	PostgresTimezone         string
 	DBMaxOpenConns           int
 	DBMaxIdleConns           int
@@ -99,7 +100,12 @@ func loadDatabaseConfig() Config {
 		PostgresPassword: getEnv("POSTGRES_PASSWORD", ""),
 		PostgresDB:       getEnv("POSTGRES_DB", ""),
 		PostgresSSLMode:  getEnv("POSTGRES_SSLMODE", "disable"),
-		PostgresTimezone: getEnv("POSTGRES_TIMEZONE", "UTC"),
+		// No fallback on purpose. An empty sslrootcert is not the same as an
+		// absent one -- libpq treats it as a path to a file that is not there
+		// and refuses the connection, so a default here would break every
+		// deployment that never sets it.
+		PostgresSSLRootCert: getEnv("POSTGRES_SSLROOTCERT", ""),
+		PostgresTimezone:    getEnv("POSTGRES_TIMEZONE", "UTC"),
 
 		// Go's database/sql defaults are unlimited open connections and two
 		// idle ones. On a Postgres sharing the Docker bridge that only ever
@@ -134,7 +140,7 @@ func (c Config) PostgresDSN() string {
 		panic("missing database configuration: set DATABASE_URL or all required POSTGRES_* variables")
 	}
 
-	return fmt.Sprintf(
+	dsn := fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
 		c.PostgresHost,
 		c.PostgresUser,
@@ -144,6 +150,20 @@ func (c Config) PostgresDSN() string {
 		c.PostgresSSLMode,
 		c.PostgresTimezone,
 	)
+
+	// Appended rather than added to the format string, so a deployment that
+	// does not set it gets the exact DSN it got before.
+	//
+	// Only needed when the server's certificate is signed by an authority the
+	// image does not already trust. The runtime image now installs
+	// ca-certificates, so a publicly signed certificate verifies without this;
+	// it exists for a provider that hands out its own root, which is how
+	// Supabase's direct connection is documented.
+	if root := strings.TrimSpace(c.PostgresSSLRootCert); root != "" {
+		dsn += " sslrootcert=" + root
+	}
+
+	return dsn
 }
 
 func getEnv(key, fallback string) string {

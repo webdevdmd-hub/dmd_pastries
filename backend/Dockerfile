@@ -35,6 +35,13 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/copy-storage ./cmd/copy-storage
 
 FROM alpine:3.22
 
+# Alpine ships no trust store, so every TLS verification fails on an image
+# without this -- including sslmode=verify-full against a managed Postgres,
+# which is the whole point of setting it. Without the certificates the failure
+# is a connection refused at boot with an x509 message, and the tempting fix is
+# to drop back to sslmode=require, which silently gives up verification.
+RUN apk add --no-cache ca-certificates
+
 RUN adduser -D -g '' appuser
 WORKDIR /app
 
