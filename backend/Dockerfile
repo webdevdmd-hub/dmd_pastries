@@ -35,6 +35,12 @@ WORKDIR /app
 COPY --from=builder /bin/api /app/api
 COPY --from=builder /bin/migrate /app/migrate
 COPY backend/migrations /app/migrations
+# Supabase's own root CA. The pooler's certificate is issued by Supabase, not
+# by a public authority, so the system trust store cannot verify it and
+# sslmode=verify-full fails with "certificate signed by unknown authority".
+# This is a public certificate, not a secret; the backend uses it for any
+# *.supabase.com / *.supabase.co host unless POSTGRES_SSLROOTCERT overrides it.
+COPY backend/certs /app/certs
 
 EXPOSE 8080
 

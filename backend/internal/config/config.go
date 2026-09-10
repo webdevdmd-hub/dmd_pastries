@@ -172,7 +172,7 @@ func (c Config) PostgresDSN() string {
 	// ca-certificates, so a publicly signed certificate verifies without this;
 	// it exists for a provider that hands out its own root, which is how
 	// Supabase's direct connection is documented.
-	if root := strings.TrimSpace(c.PostgresSSLRootCert); root != "" {
+	if root := c.sslRootCert(); root != "" {
 		dsn += " sslrootcert=" + root
 	}
 
