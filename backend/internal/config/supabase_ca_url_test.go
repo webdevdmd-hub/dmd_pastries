@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -18,8 +19,11 @@ func TestADatabaseURLForSupabaseGetsTheBundledCA(t *testing.T) {
 	withBundledCA(t, true)
 
 	dsn := Config{DatabaseURL: poolerURL}.PostgresDSN()
-	if !strings.HasSuffix(dsn, "?sslrootcert="+bundledSupabaseCA) {
-		t.Errorf("DSN = %q, want the bundled CA appended as the first query parameter", dsn)
+	// The path is URL-escaped on the way in, which matters on Windows where the
+	// temp path carries a drive letter and backslashes -- and which is exactly
+	// what the first version of this assertion forgot.
+	if !strings.HasSuffix(dsn, "?sslrootcert="+url.QueryEscape(bundledSupabaseCA)) {
+		t.Errorf("DSN = %q, want the bundled CA appended, escaped, as the first query parameter", dsn)
 	}
 }
 
