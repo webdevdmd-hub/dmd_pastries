@@ -61,3 +61,29 @@ func isSupabaseHost(host string) bool {
 	host = strings.ToLower(strings.TrimSpace(host))
 	return strings.HasSuffix(host, ".supabase.com") || strings.HasSuffix(host, ".supabase.co")
 }
+
+// withRootCert applies the same root-certificate decision to a DATABASE_URL
+// that PostgresDSN applies to the POSTGRES_* form.
+//
+// It exists because the first version did not: PostgresDSN returned
+// DATABASE_URL verbatim, before the line that adds the certificate, so a
+// deployment configured by URL failed verify-full with the very x509 error the
+// bundled CA was shipped to fix. The unit test at the time checked the helper
+// rather than the whole function, and passed.
+//
+// The parameter is added only when the URL does not already carry one -- an
+// operator who wrote sslrootcert themselves meant it -- and only when
+// sslRootCert has something to add, so a URL for a non-Supabase host comes
+// back byte-identical.
+func (c Config) withRootCert(rawURL string) string {
+	root := c.sslRootCert()
+	if root == "" || strings.Contains(rawURL, "sslrootcert=") {
+		return rawURL
+	}
+
+	separator := "?"
+	if strings.Contains(rawURL, "?") {
+		separator = "&"
+	}
+	return rawURL + separator + "sslrootcert=" + url.QueryEscape(root)
+}

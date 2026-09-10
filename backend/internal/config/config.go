@@ -146,7 +146,7 @@ func loadDotEnv() {
 
 func (c Config) PostgresDSN() string {
 	if c.DatabaseURL != "" {
-		return c.DatabaseURL
+		return c.withRootCert(c.DatabaseURL)
 	}
 
 	if c.PostgresHost == "" || c.PostgresUser == "" || c.PostgresPassword == "" || c.PostgresDB == "" {
