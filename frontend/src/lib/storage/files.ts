@@ -19,6 +19,7 @@ import {
 } from "@/lib/appwrite/storage";
 import { getPublicEnvValue } from "@/lib/public-env";
 import type { StorageBucketKey } from "@/lib/storage/buckets";
+import { compressImage } from "@/lib/storage/compress-image";
 import * as supabaseStorage from "@/lib/supabase/storage";
 
 export type { StorageBucketKey } from "@/lib/storage/buckets";
@@ -94,11 +95,16 @@ export type UploadedFile = {
  * those rows both addresses.
  */
 export async function uploadFile(bucket: StorageBucketKey, file: File): Promise<UploadedFile> {
+  // Photos are shrunk before they leave the browser. Receipts are not: the
+  // documents bucket holds PDFs and scans that must stay byte-for-byte what
+  // was handed in, and a compressed receipt is not a receipt.
+  const upload = bucket === "documents" ? file : await compressImage(file);
+
   if (supabaseIsActive()) {
-    return { fileId: null, storagePath: await supabaseStorage.upload(bucket, file) };
+    return { fileId: null, storagePath: await supabaseStorage.upload(bucket, upload) };
   }
 
-  return { fileId: await uploadToAppwrite(bucket, file), storagePath: null };
+  return { fileId: await uploadToAppwrite(bucket, upload), storagePath: null };
 }
 
 /** Which store new uploads go to. */

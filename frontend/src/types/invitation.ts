@@ -32,7 +32,9 @@ export type AcceptStaffInvitationPayload = {
 
 export type AcceptStaffInvitationResult = {
   userId: string;
+  /** Empty on a Supabase-only deployment. */
   appwriteUserId: string;
+  supabaseUserId: string | null;
   businessId: string;
   branchId: string | null;
   roleId: string;

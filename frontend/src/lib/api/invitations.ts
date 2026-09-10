@@ -49,6 +49,7 @@ type BackendAcceptStaffInvitationPayload = {
 type BackendAcceptStaffInvitationResult = {
   user_id?: string;
   appwrite_user_id?: string;
+  supabase_user_id?: string | null;
   business_id?: string;
   branch_id?: string | null;
   role_id?: string;
@@ -167,16 +168,23 @@ function parseAcceptStaffInvitationResult(value: unknown): AcceptStaffInvitation
   const result = value as BackendAcceptStaffInvitationResult;
   const userId = typeof result.user_id === "string" ? result.user_id : "";
   const appwriteUserId = typeof result.appwrite_user_id === "string" ? result.appwrite_user_id : "";
+  const supabaseUserId =
+    typeof result.supabase_user_id === "string" ? result.supabase_user_id : null;
   const businessId = typeof result.business_id === "string" ? result.business_id : "";
   const roleId = typeof result.role_id === "string" ? result.role_id : "";
 
-  if (!userId || !appwriteUserId || !businessId || !roleId || result.status !== "active") {
+  // Either provider id proves the account was created. On a Supabase-only
+  // deployment the Appwrite one is an empty string, and insisting on it turned
+  // a committed, working account into an error message on the accept page.
+  const hasProviderId = appwriteUserId !== "" || supabaseUserId !== null;
+  if (!userId || !hasProviderId || !businessId || !roleId || result.status !== "active") {
     throw new Error("Backend accept invitation payload is missing required fields.");
   }
 
   return {
     userId,
     appwriteUserId,
+    supabaseUserId,
     businessId,
     branchId: typeof result.branch_id === "string" ? result.branch_id : null,
     roleId,
