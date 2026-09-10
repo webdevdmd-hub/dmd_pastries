@@ -18,6 +18,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  type InvitationLink,
+  InvitationLinkDialog,
+} from "@/components/users/invitation-link-dialog";
 import { InviteUserDialog } from "@/components/users/invite-user-dialog";
 import { PendingInvitationsPanel } from "@/components/users/pending-invitations-panel";
 import { UserDetailsDrawer } from "@/components/users/user-details-drawer";
@@ -139,6 +143,7 @@ export function UsersPageClient(): JSX.Element {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [createFormError, setCreateFormError] = useState<string | null>(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [invitationLink, setInvitationLink] = useState<InvitationLink | null>(null);
   const [statusDialogState, setStatusDialogState] = useState<{
     nextStatus: UserStatus;
     user: User;
@@ -339,12 +344,12 @@ export function UsersPageClient(): JSX.Element {
   const handleInvite = async (payload: CreateStaffInvitationPayload): Promise<void> => {
     try {
       const invitation = await createInvitationMutation.mutateAsync(payload);
-      if (invitation.token) {
-        toast.success("Invitation created. Backend returned an activation token for delivery.");
-      } else {
-        toast.success("Invitation sent successfully.");
-      }
       closeInviteDialog();
+      if (invitation.token) {
+        setInvitationLink({ email: invitation.email, token: invitation.token });
+      } else {
+        toast.success("Invitation created.");
+      }
     } catch (mutationError) {
       toast.error(getErrorMessage(mutationError));
     }
@@ -354,7 +359,7 @@ export function UsersPageClient(): JSX.Element {
     try {
       const result = await resendInvitationMutation.mutateAsync(invitation.id);
       if (result.token) {
-        toast.success("Invitation resent. Backend returned a refreshed activation token.");
+        setInvitationLink({ email: invitation.email, token: result.token });
       } else {
         toast.success("Invitation resent.");
       }
@@ -683,6 +688,8 @@ export function UsersPageClient(): JSX.Element {
         open={inviteDialogOpen}
         roleOptions={roleOptions}
       />
+
+      <InvitationLinkDialog link={invitationLink} onClose={() => setInvitationLink(null)} />
 
       <Dialog
         open={statusDialogState !== null}
