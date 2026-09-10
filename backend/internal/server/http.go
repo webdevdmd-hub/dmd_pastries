@@ -48,6 +48,13 @@ func NewRouter(cfg config.Config) *gin.Engine {
 		response.Success(c, 200, "ok", gin.H{
 			"service": cfg.AppName,
 			"status":  "healthy",
+			// Which backends this process was configured for. Added during the
+			// Supabase cutover, when "the site is up" kept being mistaken for
+			// "the switch worked": a deploy that fails at boot leaves the previous
+			// container serving, and nothing distinguishes the two from outside.
+			// This does, in one unauthenticated request, without a database
+			// round trip and without naming internal hosts.
+			"config": configSummary(cfg),
 		})
 	})
 
