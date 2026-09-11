@@ -120,6 +120,11 @@ func main() {
 	// Token verification does not go through it: a token names its own issuer.
 	identities := utils.NewIdentityManager(appwriteClient, supabaseAdmin, cfg.AuthPrimaryProvider)
 
+	// Live updates: a tab tells the API what it changed; the API relays it to
+	// the business's other tabs over SSE. Public endpoints announce through
+	// the services themselves. In-memory, one replica.
+	changeHub := sharedevents.NewHub()
+
 	authService := auth.NewService(
 		db,
 		cfg,
@@ -211,9 +216,8 @@ func main() {
 
 	router := server.NewRouter(cfg)
 	auth.RegisterRoutes(router, authHandler, authMiddleware.RequireAuth())
-	// Live updates: a tab tells the API what it changed; the API relays it to
-	// the business's other tabs over SSE. In-memory, one replica.
-	changeHub := sharedevents.NewHub()
+	authService.SetPublisher(changeHub)
+	userService.SetPublisher(changeHub)
 	events.RegisterRoutes(router, events.NewHandler(changeHub), authMiddleware.RequireAuth())
 	users.RegisterPublicAuthRoutes(router, userHandler)
 	users.RegisterRoutes(

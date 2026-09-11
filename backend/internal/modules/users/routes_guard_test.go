@@ -3,6 +3,7 @@ package users
 import (
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -29,27 +30,74 @@ func TestPasswordResetLinkRouteRequiresUsersEdit(t *testing.T) {
 	}
 }
 
+// funcBody returns the source of one top-level function, so an assertion
+// about "this function calls X" cannot be satisfied by a call in a later
+// function. A (?s).*? regex in RE2 walks straight across function
+// boundaries; this does not. The first version of these guards had exactly
+// that hole and passed with the call removed.
+func funcBody(t *testing.T, source []byte, signature string) string {
+	t.Helper()
+	src := string(source)
+	start := strings.Index(src, signature)
+	if start < 0 {
+		t.Fatalf("%s not found", signature)
+	}
+	rest := src[start+len(signature):]
+	if end := strings.Index(rest, "\nfunc "); end >= 0 {
+		return rest[:end]
+	}
+	return rest
+}
+
+func readSource(t *testing.T, path string) []byte {
+	t.Helper()
+	source, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	return source
+}
+
 // A reset request is a tag that must come off once it has been answered.
 // Two things answer it: a manager issuing the link, and the user signing in.
-// Both are asserted as calls in the source, so a refactor that drops either
-// one fails here instead of leaving stale "reset requested" tags on the
-// Staff page forever.
+// Both are asserted as calls inside their own function, so a refactor that
+// drops either one fails here instead of leaving stale "reset requested"
+// tags on the Staff page forever.
 func TestAnsweringAResetRequestClearsTheTag(t *testing.T) {
-	users, err := os.ReadFile("service.go")
-	if err != nil {
-		t.Fatalf("read service.go: %v", err)
-	}
-	link := regexp.MustCompile(`(?s)func \(s \*Service\) CreatePasswordResetLink\(.*?s\.repo\.ClearPasswordResetRequest\(`)
-	if !link.Match(users) {
+	users := readSource(t, "service.go")
+	if !strings.Contains(funcBody(t, users, "func (s *Service) CreatePasswordResetLink("), "s.repo.ClearPasswordResetRequest(") {
 		t.Error("CreatePasswordResetLink no longer clears password_reset_requested_at")
 	}
 
-	auth, err := os.ReadFile("../auth/service.go")
-	if err != nil {
-		t.Fatalf("read auth/service.go: %v", err)
-	}
-	login := regexp.MustCompile(`(?s)func \(s \*Service\) syncProfile\(.*?s\.userRepo\.ClearPasswordResetRequest\(`)
-	if !login.Match(auth) {
+	auth := readSource(t, "../auth/service.go")
+	if !strings.Contains(funcBody(t, auth, "func (s *Service) syncProfile("), "s.userRepo.ClearPasswordResetRequest(") {
 		t.Error("syncProfile (login) no longer clears password_reset_requested_at")
+	}
+}
+
+// Public endpoints change data from a browser that is not signed in, so no
+// tab can announce the change to the business's other tabs; the service
+// must. Each site is asserted inside its own function body.
+func TestPublicEndpointsAnnounceTheirChanges(t *testing.T) {
+	users := readSource(t, "service.go")
+	if !strings.Contains(
+		funcBody(t, users, "func (s *Service) AcceptInvitation("),
+		`sharedevents.Announce(s.events, invite.BusinessID, "users", "invitations")`,
+	) {
+		t.Error("AcceptInvitation no longer announces users+invitations to the inviter's open tabs")
+	}
+
+	auth := readSource(t, "../auth/service.go")
+	if !strings.Contains(
+		funcBody(t, auth, "func (s *Service) RequestAdminPasswordReset("),
+		`sharedevents.Announce(s.events, user.BusinessID, "users")`,
+	) {
+		t.Error("RequestAdminPasswordReset no longer announces -- the manager's Staff page will not update until reload")
+	}
+	if !strings.Contains(
+		funcBody(t, auth, "func (s *Service) syncProfile("),
+		`sharedevents.Announce(s.events, user.BusinessID, "users")`,
+	) {
+		t.Error("a sign-in that clears a reset request no longer announces it")
 	}
 }

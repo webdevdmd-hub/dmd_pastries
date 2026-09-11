@@ -98,3 +98,19 @@ func (h *Hub) Subscribers(businessID string) int {
 	defer h.mu.Unlock()
 	return len(h.subs[businessID])
 }
+
+// Publisher is what services hold: enough to announce a change, nothing
+// more. The hub satisfies it; tests use a recorder.
+type Publisher interface {
+	Publish(businessID string, change Change) int
+}
+
+// Announce is the one-liner services call after a change made outside a
+// signed-in tab -- a public endpoint, or a job -- where no browser can
+// announce it. Roots are the frontend's query-root names.
+func Announce(publisher Publisher, businessID string, roots ...string) {
+	if publisher == nil || businessID == "" || len(roots) == 0 {
+		return
+	}
+	publisher.Publish(businessID, Change{Roots: roots, At: time.Now().UTC()})
+}

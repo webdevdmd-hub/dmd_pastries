@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"net/url"
+	sharedevents "pastries-pos/internal/shared/events"
 	"strings"
 	"time"
 
@@ -30,6 +31,15 @@ type Service struct {
 	// Where a manager-issued reset link points; the same page the emailed
 	// link uses, so one form serves both routes in.
 	passwordResetURL string
+	// Announces changes made from public endpoints (accepting an invitation),
+	// where no signed-in tab can announce them. Nil until SetPublisher.
+	events sharedevents.Publisher
+}
+
+// SetPublisher wires the live-update hub. A setter rather than a constructor
+// argument so the service can be built without it, as every test does.
+func (s *Service) SetPublisher(publisher sharedevents.Publisher) {
+	s.events = publisher
 }
 
 const selfPrivilegedFieldUpdateMessage = "You cannot modify your own role, status, or branch."
@@ -419,6 +429,11 @@ func (s *Service) AcceptInvitation(req AcceptInvitationRequest, ipAddress, userA
 	if err := tx.Commit().Error; err != nil {
 		return nil, apperrors.Internal("failed to commit invitation acceptance")
 	}
+
+	// The new colleague accepted from a browser that is not signed in, so no
+	// tab announces this; the Staff page of whoever invited them must hear it
+	// from here.
+	sharedevents.Announce(s.events, invite.BusinessID, "users", "invitations")
 
 	return &AcceptInvitationResponse{
 		UserID:         user.ID,

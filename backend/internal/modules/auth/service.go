@@ -3,6 +3,7 @@ package auth
 import (
 	"log"
 	"net/http"
+	sharedevents "pastries-pos/internal/shared/events"
 	"strings"
 	"time"
 
@@ -36,6 +37,13 @@ type Service struct {
 	permissionRepo   *permissions.Repository
 	subscriptionRepo *subscriptions.Repository
 	auditRepo        *audit.Repository
+	// Announces changes made from public endpoints (a reset request, a sign-in
+	// that clears one), where no signed-in tab can announce them.
+	events sharedevents.Publisher
+}
+
+func (s *Service) SetPublisher(publisher sharedevents.Publisher) {
+	s.events = publisher
 }
 
 type defaultRolePreset struct {
@@ -694,6 +702,9 @@ func (s *Service) RequestAdminPasswordReset(req PasswordResetRequest, ipAddress,
 		if err := tx.Commit().Error; err != nil {
 			return apperrors.Internal("failed to record the password reset request")
 		}
+		// The requester is not signed in, so this is the only way the
+		// manager's open Staff page learns of it.
+		sharedevents.Announce(s.events, user.BusinessID, "users")
 	}
 	return nil
 }
@@ -864,7 +875,8 @@ func (s *Service) syncProfile(identity *utils.AppwriteIdentity, ipAddress, userA
 		return nil, apperrors.Internal("failed to update auth sync state")
 	}
 	// Signing in is proof the reset is no longer needed.
-	if user.PasswordResetRequestedAt != nil {
+	clearedResetRequest := user.PasswordResetRequestedAt != nil
+	if clearedResetRequest {
 		if err := s.userRepo.ClearPasswordResetRequest(tx, user.ID); err != nil {
 			tx.Rollback()
 			return nil, apperrors.Internal("failed to clear the password reset request")
@@ -888,6 +900,10 @@ func (s *Service) syncProfile(identity *utils.AppwriteIdentity, ipAddress, userA
 
 	if err := tx.Commit().Error; err != nil {
 		return nil, apperrors.Internal("failed to commit login sync")
+	}
+	if clearedResetRequest {
+		// The tag came off because they signed in; tell the manager's tab.
+		sharedevents.Announce(s.events, user.BusinessID, "users")
 	}
 
 	return s.buildProfileByUserID(user.ID, user.BusinessID)
