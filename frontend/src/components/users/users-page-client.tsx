@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -199,6 +200,12 @@ export function UsersPageClient(): JSX.Element {
     [canViewSettings, canAccessAllBranches, hasMultipleAllowedBranches].some(Boolean);
 
   const users = useMemo(() => (data ? filterUsers(data, filters) : []), [data, filters]);
+  // Counted over every user, not the filtered view, so a request never hides
+  // behind a branch or status filter.
+  const resetRequestCount = useMemo(
+    () => (data ?? []).filter((u) => u.passwordResetRequestedAt !== null).length,
+    [data],
+  );
   // Branch is scope, not a filter: it always carries a value, and for staff
   // without all-branch access it is forced to their own branch. Counting it
   // would mean a tenant with no staff records never sees the empty state.
@@ -582,6 +589,20 @@ export function UsersPageClient(): JSX.Element {
           ) : undefined
         }
       />
+
+      {resetRequestCount > 0 ? (
+        <Alert className="border-warning/30 bg-warning-tint text-warning-text">
+          <AlertTitle>
+            {resetRequestCount === 1
+              ? "1 staff member has asked for a password reset"
+              : `${String(resetRequestCount)} staff members have asked for a password reset`}
+          </AlertTitle>
+          <AlertDescription>
+            Look for the &ldquo;Reset requested&rdquo; tag, open the user&rsquo;s menu and choose
+            Password reset link to hand one over.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <UserFilters
         allowAllBranches={branchScope.canAccessAllBranches}

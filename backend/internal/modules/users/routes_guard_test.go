@@ -28,3 +28,28 @@ func TestPasswordResetLinkRouteRequiresUsersEdit(t *testing.T) {
 		t.Fatal("the reset-link route is registered on the public, unauthenticated group")
 	}
 }
+
+// A reset request is a tag that must come off once it has been answered.
+// Two things answer it: a manager issuing the link, and the user signing in.
+// Both are asserted as calls in the source, so a refactor that drops either
+// one fails here instead of leaving stale "reset requested" tags on the
+// Staff page forever.
+func TestAnsweringAResetRequestClearsTheTag(t *testing.T) {
+	users, err := os.ReadFile("service.go")
+	if err != nil {
+		t.Fatalf("read service.go: %v", err)
+	}
+	link := regexp.MustCompile(`(?s)func \(s \*Service\) CreatePasswordResetLink\(.*?s\.repo\.ClearPasswordResetRequest\(`)
+	if !link.Match(users) {
+		t.Error("CreatePasswordResetLink no longer clears password_reset_requested_at")
+	}
+
+	auth, err := os.ReadFile("../auth/service.go")
+	if err != nil {
+		t.Fatalf("read auth/service.go: %v", err)
+	}
+	login := regexp.MustCompile(`(?s)func \(s \*Service\) syncProfile\(.*?s\.userRepo\.ClearPasswordResetRequest\(`)
+	if !login.Match(auth) {
+		t.Error("syncProfile (login) no longer clears password_reset_requested_at")
+	}
+}

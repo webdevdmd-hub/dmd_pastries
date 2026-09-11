@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { ResetRequestedBadge } from "@/components/users/reset-requested-badge";
 import { UserActionsMenu } from "@/components/users/user-actions-menu";
 import { formatUserRelativeDate, userInitials } from "@/components/users/user-details-drawer";
 import { UserStatusBadge } from "@/components/users/user-status-badge";
@@ -50,7 +51,10 @@ export function UsersCardGrid({
           </div>
 
           <div className="grid gap-2 px-4 py-3">
-            <UserStatusBadge status={user.status} />
+            <div className="flex flex-wrap items-center gap-2">
+              <UserStatusBadge status={user.status} />
+              <ResetRequestedBadge requestedAt={user.passwordResetRequestedAt} />
+            </div>
             <p className="break-words text-cell">{user.email}</p>
             <p className="text-cell tabular-nums text-foreground-muted">
               {user.phone || "No phone"}

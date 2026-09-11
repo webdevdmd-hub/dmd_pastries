@@ -39,6 +39,8 @@ export type User = {
   status: UserStatus;
   emailVerified: boolean;
   lastLoginAt: string | null;
+  /** When the user asked a manager for a reset; null when nothing is pending. */
+  passwordResetRequestedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };

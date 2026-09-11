@@ -654,6 +654,50 @@ func (s *Service) RequestPasswordReset(req PasswordResetRequest) error {
 	return nil
 }
 
+// RequestAdminPasswordReset flags the account so a manager sees "reset
+// requested" in Staff Management and can hand over a reset link -- the path
+// that works when email does not. Same neutral answer whether or not the
+// address exists: this endpoint is unauthenticated and must not confirm
+// which emails are registered.
+func (s *Service) RequestAdminPasswordReset(req PasswordResetRequest, ipAddress, userAgent string) error {
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	matches, err := s.userRepo.ListActiveByEmail(email)
+	if err != nil {
+		return apperrors.Internal("failed to record the password reset request")
+	}
+
+	now := time.Now().UTC()
+	for i := range matches {
+		user := matches[i]
+		tx := s.db.Begin()
+		if tx.Error != nil {
+			return apperrors.Internal("failed to start transaction")
+		}
+		if err := s.userRepo.MarkPasswordResetRequested(tx, user.ID, now); err != nil {
+			tx.Rollback()
+			return apperrors.Internal("failed to record the password reset request")
+		}
+		if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{
+			BusinessID:   user.BusinessID,
+			ActorUserID:  user.ID,
+			TargetUserID: &user.ID,
+			EventType:    "user.password_reset_requested",
+			EntityType:   "user",
+			EntityID:     user.ID,
+			Summary:      "User asked a manager for a password reset.",
+			IPAddress:    ipAddress,
+			UserAgent:    userAgent,
+		}); err != nil {
+			tx.Rollback()
+			return apperrors.Internal("failed to create activity log")
+		}
+		if err := tx.Commit().Error; err != nil {
+			return apperrors.Internal("failed to record the password reset request")
+		}
+	}
+	return nil
+}
+
 func (s *Service) CompletePasswordReset(req PasswordResetCompleteRequest) error {
 	if !utils.PasswordsMatch(req.Password, req.ConfirmPassword) {
 		return apperrors.BadRequest("password and confirm_password must match", nil)
@@ -818,6 +862,13 @@ func (s *Service) syncProfile(identity *utils.AppwriteIdentity, ipAddress, userA
 	if err := s.userRepo.UpdateAuthSync(tx, user.ID, identity.EmailVerified, now); err != nil {
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to update auth sync state")
+	}
+	// Signing in is proof the reset is no longer needed.
+	if user.PasswordResetRequestedAt != nil {
+		if err := s.userRepo.ClearPasswordResetRequest(tx, user.ID); err != nil {
+			tx.Rollback()
+			return nil, apperrors.Internal("failed to clear the password reset request")
+		}
 	}
 
 	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{

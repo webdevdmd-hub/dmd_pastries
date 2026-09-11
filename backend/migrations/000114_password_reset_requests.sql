@@ -1,0 +1,12 @@
+-- 000114: a staff member can ask their manager for a password reset
+--
+-- The app sends no email, and the reset email Supabase sends is limited to a
+-- couple of messages an hour on the plan this runs on. A cashier locked out at
+-- the counter needs a way to say "I need a reset" that reaches the manager
+-- inside the app, where the manager can issue a reset link on the spot.
+--
+-- One nullable timestamp: when the request was made, or NULL when there is
+-- none. Cleared when a manager issues a reset link or when the user signs in
+-- again (either way, they no longer need it). It is deliberately not a status
+-- value: the user's status stays what it was, and this is a flag beside it.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_requested_at TIMESTAMPTZ NULL;

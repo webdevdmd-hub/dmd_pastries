@@ -228,3 +228,22 @@ func (r *Repository) ExistsPendingInvitation(email, businessID string) (bool, er
 func (r *Repository) UpdateInvitation(tx *gorm.DB, invitationID string, updates map[string]interface{}) error {
 	return tx.Model(&UserInvitation{}).Where("id = ?", invitationID).Updates(updates).Error
 }
+
+// ListActiveByEmail returns every live account with this address across
+// businesses. Email is not unique across tenants, so a reset request from a
+// login page that knows no business must reach each one.
+func (r *Repository) ListActiveByEmail(email string) ([]User, error) {
+	var found []User
+	err := r.db.
+		Where("LOWER(email) = LOWER(?) AND status IN ('active', 'invited')", email).
+		Find(&found).Error
+	return found, err
+}
+
+func (r *Repository) MarkPasswordResetRequested(tx *gorm.DB, userID string, at time.Time) error {
+	return tx.Model(&User{}).Where("id = ?", userID).Update("password_reset_requested_at", at).Error
+}
+
+func (r *Repository) ClearPasswordResetRequest(tx *gorm.DB, userID string) error {
+	return tx.Model(&User{}).Where("id = ?", userID).Update("password_reset_requested_at", nil).Error
+}

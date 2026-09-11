@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ResetRequestedBadge } from "@/components/users/reset-requested-badge";
 import { type UserActionHandlers, UserActionsMenu } from "@/components/users/user-actions-menu";
 import { formatUserRelativeDate, userInitials } from "@/components/users/user-details-drawer";
 import { UserStatusBadge } from "@/components/users/user-status-badge";
@@ -102,7 +103,10 @@ export function UsersTable({
               )}
             </TableCell>
             <TableCell>
-              <UserStatusBadge status={user.status} />
+              <div className="flex flex-wrap items-center gap-2">
+                <UserStatusBadge status={user.status} />
+                <ResetRequestedBadge requestedAt={user.passwordResetRequestedAt} />
+              </div>
             </TableCell>
             <TableCell className="tabular-nums text-foreground-muted">
               {formatUserRelativeDate(user.lastLoginAt)}

@@ -1063,6 +1063,8 @@ func toUserResponse(user User) UserResponse {
 		LastLoginAt:    user.LastLoginAt,
 		CreatedAt:      user.CreatedAt,
 		UpdatedAt:      user.UpdatedAt,
+
+		PasswordResetRequestedAt: user.PasswordResetRequestedAt,
 	}
 }
 
@@ -1203,6 +1205,10 @@ func (s *Service) CreatePasswordResetLink(currentUser *utils.AuthContext, userID
 	if err != nil {
 		return nil, apperrors.BadRequest(err.Error(), nil)
 	}
+
+	// The manager has answered the request; the tag comes off. Not fatal if
+	// it fails -- the link is already minted and the person is waiting.
+	_ = s.repo.ClearPasswordResetRequest(s.db, user.ID)
 
 	if err := s.auditRepo.CreateActivity(s.db, audit.ActivityInput{
 		BusinessID:   currentUser.BusinessID,

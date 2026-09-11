@@ -395,3 +395,23 @@ export async function logoutSync(): Promise<LogoutSyncResult> {
 
   return response.data;
 }
+
+// The no-email route: flags the account so a manager sees "reset requested"
+// in Staff Management and hands over a reset link. Same neutral reply as the
+// email path, so neither reveals whether the address is registered.
+export async function requestAdminPasswordReset(
+  input: ForgotPasswordInput,
+): Promise<PasswordResetRequestResult> {
+  const response = await apiRequest<PasswordResetRequestResult, BackendPasswordResetRequestInput>(
+    "/api/v1/auth/password-reset/request-admin",
+    {
+      method: "POST",
+      body: {
+        email: input.email,
+      },
+      parse: parsePasswordResetRequestResult,
+    },
+  );
+
+  return response.data;
+}

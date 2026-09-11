@@ -67,6 +67,7 @@ type BackendUser = {
   status?: string;
   email_verified?: boolean;
   last_login_at?: string | null;
+  password_reset_requested_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -200,6 +201,10 @@ function parseUser(value: unknown): User {
     emailVerified:
       typeof backendUser.email_verified === "boolean" ? backendUser.email_verified : false,
     lastLoginAt: typeof backendUser.last_login_at === "string" ? backendUser.last_login_at : null,
+    passwordResetRequestedAt:
+      typeof backendUser.password_reset_requested_at === "string"
+        ? backendUser.password_reset_requested_at
+        : null,
     createdAt,
     updatedAt,
   };

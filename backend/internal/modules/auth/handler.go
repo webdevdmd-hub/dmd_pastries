@@ -112,3 +112,22 @@ func handleError(c *gin.Context, err error) {
 	}
 	response.Error(c, 500, "internal server error", err.Error())
 }
+
+func (h *Handler) RequestAdminPasswordReset(c *gin.Context) {
+	var req PasswordResetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
+		return
+	}
+
+	if err := h.service.RequestAdminPasswordReset(req, c.ClientIP(), c.Request.UserAgent()); err != nil {
+		handleError(c, err)
+		return
+	}
+
+	// Same shape and wording as the email path: neither reveals whether the
+	// address is registered.
+	response.Success(c, 200, "password reset requested successfully", gin.H{
+		"sent": true,
+	})
+}

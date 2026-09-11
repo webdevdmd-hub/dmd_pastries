@@ -49,22 +49,23 @@ type UpdateUserStatusRequest struct {
 }
 
 type UserResponse struct {
-	ID             string     `json:"id"`
-	AppwriteUserID string     `json:"appwrite_user_id"`
-	SupabaseUserID *string    `json:"supabase_user_id,omitempty"`
-	BusinessID     string     `json:"business_id"`
-	BranchID       *string    `json:"branch_id"`
-	RoleID         string     `json:"role_id"`
-	RoleName       string     `json:"role_name"`
-	FullName       string     `json:"full_name"`
-	Email          string     `json:"email"`
-	Phone          string     `json:"phone"`
-	AvatarFileID   string     `json:"avatar_file_id"`
-	Status         string     `json:"status"`
-	EmailVerified  bool       `json:"email_verified"`
-	LastLoginAt    *time.Time `json:"last_login_at"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID                       string     `json:"id"`
+	AppwriteUserID           string     `json:"appwrite_user_id"`
+	SupabaseUserID           *string    `json:"supabase_user_id,omitempty"`
+	BusinessID               string     `json:"business_id"`
+	BranchID                 *string    `json:"branch_id"`
+	RoleID                   string     `json:"role_id"`
+	RoleName                 string     `json:"role_name"`
+	FullName                 string     `json:"full_name"`
+	Email                    string     `json:"email"`
+	Phone                    string     `json:"phone"`
+	AvatarFileID             string     `json:"avatar_file_id"`
+	Status                   string     `json:"status"`
+	EmailVerified            bool       `json:"email_verified"`
+	LastLoginAt              *time.Time `json:"last_login_at"`
+	PasswordResetRequestedAt *time.Time `json:"password_reset_requested_at"`
+	CreatedAt                time.Time  `json:"created_at"`
+	UpdatedAt                time.Time  `json:"updated_at"`
 }
 
 type InviteUserResponse struct {
