@@ -126,3 +126,11 @@ type UserActivityResponse struct {
 	UserAgent   string    `json:"user_agent"`
 	CreatedAt   time.Time `json:"created_at"`
 }
+
+// PasswordResetLinkResponse is shown once; the URL is not stored anywhere.
+type PasswordResetLinkResponse struct {
+	UserID    string    `json:"user_id"`
+	Email     string    `json:"email"`
+	URL       string    `json:"url"`
+	ExpiresAt time.Time `json:"expires_at"`
+}

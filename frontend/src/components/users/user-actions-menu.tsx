@@ -20,6 +20,7 @@ export type UserActionHandlers = {
   onChangeStatus: (user: User, status: UserStatus) => void;
   onDelete: (user: User) => void;
   onEdit: (user: User) => void;
+  onResetPassword: (user: User) => void;
 };
 
 /**
@@ -34,6 +35,7 @@ export function UserActionsMenu({
   onChangeStatus,
   onDelete,
   onEdit,
+  onResetPassword,
   user,
 }: UserActionHandlers & { user: User }): JSX.Element | null {
   const isCurrentUser = currentUserId === user.id;
@@ -54,6 +56,11 @@ export function UserActionsMenu({
       <DropdownMenuContent align="end">
         {canEdit ? (
           <DropdownMenuItem onSelect={() => onEdit(user)}>Edit user</DropdownMenuItem>
+        ) : null}
+        {canManageStatus && (user.status === "active" || user.status === "invited") ? (
+          <DropdownMenuItem onSelect={() => onResetPassword(user)}>
+            Password reset link
+          </DropdownMenuItem>
         ) : null}
         {canManageStatus ? (
           <>

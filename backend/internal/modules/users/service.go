@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"net/url"
 	"strings"
 	"time"
 
@@ -26,6 +27,9 @@ type Service struct {
 	branchRepo   *branches.Repository
 	businessRepo *businesses.Repository
 	auditRepo    *audit.Repository
+	// Where a manager-issued reset link points; the same page the emailed
+	// link uses, so one form serves both routes in.
+	passwordResetURL string
 }
 
 const selfPrivilegedFieldUpdateMessage = "You cannot modify your own role, status, or branch."
@@ -39,6 +43,7 @@ func NewService(
 	branchRepo *branches.Repository,
 	businessRepo *businesses.Repository,
 	auditRepo *audit.Repository,
+	passwordResetURL string,
 ) *Service {
 	return &Service{
 		db:           db,
@@ -48,6 +53,8 @@ func NewService(
 		branchRepo:   branchRepo,
 		businessRepo: businessRepo,
 		auditRepo:    auditRepo,
+
+		passwordResetURL: passwordResetURL,
 	}
 }
 
@@ -1165,4 +1172,56 @@ func generateInvitationToken() (string, string, error) {
 func hashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
+}
+
+// CreatePasswordResetLink mints a reset link for a manager to hand to a staff
+// member -- the password-reset twin of an invitation link, for the same
+// reason: the app sends no email, and a cashier locked out at the counter
+// cannot wait for one.
+//
+// The link is shown once and never stored: only Supabase holds the token, and
+// only as a hash. It is single-use and expires on Supabase's recovery-token
+// clock, one hour by default. Issuing one is an audited action, because it is
+// exactly as powerful as knowing someone's password.
+func (s *Service) CreatePasswordResetLink(currentUser *utils.AuthContext, userID, ipAddress, userAgent string) (*PasswordResetLinkResponse, error) {
+	if currentUser.UserID == userID {
+		return nil, apperrors.Forbidden("Use Forgot password on the login page to reset your own password.")
+	}
+
+	user, err := s.repo.FindByIDAndBusinessID(userID, currentUser.BusinessID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.NotFound("user not found")
+		}
+		return nil, err
+	}
+	if user.Status != "active" && user.Status != "invited" {
+		return nil, apperrors.BadRequest("only active or invited users can be given a reset link", map[string]interface{}{"status": user.Status})
+	}
+
+	token, err := s.identities.CreatePasswordResetToken(user.ProviderIDs(), user.Email)
+	if err != nil {
+		return nil, apperrors.BadRequest(err.Error(), nil)
+	}
+
+	if err := s.auditRepo.CreateActivity(s.db, audit.ActivityInput{
+		BusinessID:   currentUser.BusinessID,
+		ActorUserID:  currentUser.UserID,
+		TargetUserID: &user.ID,
+		EventType:    "user.password_reset_link_created",
+		EntityType:   "user",
+		EntityID:     user.ID,
+		Summary:      "A password reset link was issued for the user.",
+		IPAddress:    ipAddress,
+		UserAgent:    userAgent,
+	}); err != nil {
+		return nil, apperrors.Internal("failed to create activity log")
+	}
+
+	return &PasswordResetLinkResponse{
+		UserID:    user.ID,
+		Email:     user.Email,
+		URL:       s.passwordResetURL + "?token_hash=" + url.QueryEscape(token) + "&type=recovery",
+		ExpiresAt: time.Now().UTC().Add(time.Hour),
+	}, nil
 }

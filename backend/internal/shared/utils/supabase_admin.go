@@ -192,6 +192,35 @@ func (c *SupabaseAdminClient) CreatePasswordRecovery(email, redirectURL string) 
 	}, nil)
 }
 
+// GenerateRecoveryToken mints a password-reset token without sending any
+// email, for a manager to hand over in person -- the same shape as an
+// invitation link. It is the admin-side twin of CreatePasswordRecovery: same
+// token, same expiry, same /verify exchange on the way back in; only the
+// delivery differs.
+//
+// Needed because the app has no mailer of its own and Supabase's built-in
+// one is limited to a couple of messages an hour. A bakery cannot wait an
+// hour to let a cashier back in.
+func (c *SupabaseAdminClient) GenerateRecoveryToken(email string) (string, error) {
+	if c.isE2E() {
+		return "e2e-recovery-" + e2eSupabaseUserID(email), nil
+	}
+
+	var link struct {
+		HashedToken string `json:"hashed_token"`
+	}
+	if err := c.do(http.MethodPost, "/admin/generate_link", map[string]any{
+		"type":  "recovery",
+		"email": strings.ToLower(strings.TrimSpace(email)),
+	}, &link); err != nil {
+		return "", err
+	}
+	if link.HashedToken == "" {
+		return "", fmt.Errorf("supabase returned a recovery link without a token")
+	}
+	return link.HashedToken, nil
+}
+
 // CompletePasswordRecovery exchanges a recovery token for a session and sets the
 // new password with it.
 //

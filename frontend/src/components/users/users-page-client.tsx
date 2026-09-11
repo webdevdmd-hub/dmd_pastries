@@ -18,12 +18,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  type InvitationLink,
-  InvitationLinkDialog,
-} from "@/components/users/invitation-link-dialog";
 import { InviteUserDialog } from "@/components/users/invite-user-dialog";
 import { PendingInvitationsPanel } from "@/components/users/pending-invitations-panel";
+import {
+  invitationLink,
+  passwordResetLink,
+  type ShareLink,
+  ShareLinkDialog,
+} from "@/components/users/share-link-dialog";
 import { UserDetailsDrawer } from "@/components/users/user-details-drawer";
 import {
   allBranchesFilterValue,
@@ -50,6 +52,7 @@ import {
 import { useRoles } from "@/hooks/use-roles";
 import {
   useAssignUserBranch,
+  useCreatePasswordResetLink,
   useCreateUser,
   useSoftDeleteUser,
   useUpdateUser,
@@ -143,7 +146,7 @@ export function UsersPageClient(): JSX.Element {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [createFormError, setCreateFormError] = useState<string | null>(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [invitationLink, setInvitationLink] = useState<InvitationLink | null>(null);
+  const [shareLink, setShareLink] = useState<ShareLink | null>(null);
   const [statusDialogState, setStatusDialogState] = useState<{
     nextStatus: UserStatus;
     user: User;
@@ -156,6 +159,7 @@ export function UsersPageClient(): JSX.Element {
   const updateUserMutation = useUpdateUser();
   const assignUserBranchMutation = useAssignUserBranch();
   const updateUserStatusMutation = useUpdateUserStatus();
+  const createPasswordResetLinkMutation = useCreatePasswordResetLink();
   const deleteUserMutation = useSoftDeleteUser();
   const createInvitationMutation = useCreateStaffInvitation();
   const resendInvitationMutation = useResendStaffInvitation();
@@ -346,7 +350,7 @@ export function UsersPageClient(): JSX.Element {
       const invitation = await createInvitationMutation.mutateAsync(payload);
       closeInviteDialog();
       if (invitation.token) {
-        setInvitationLink({ email: invitation.email, token: invitation.token });
+        setShareLink(invitationLink(invitation.email, invitation.token));
       } else {
         toast.success("Invitation created.");
       }
@@ -359,10 +363,20 @@ export function UsersPageClient(): JSX.Element {
     try {
       const result = await resendInvitationMutation.mutateAsync(invitation.id);
       if (result.token) {
-        setInvitationLink({ email: invitation.email, token: result.token });
+        setShareLink(invitationLink(invitation.email, result.token));
       } else {
         toast.success("Invitation resent.");
       }
+    } catch (mutationError) {
+      toast.error(getErrorMessage(mutationError));
+    }
+  };
+
+  const handleResetPasswordLink = async (targetUser: User): Promise<void> => {
+    try {
+      const link = await createPasswordResetLinkMutation.mutateAsync(targetUser.id);
+      setDrawerUser(null);
+      setShareLink(passwordResetLink(link.email, link.url));
     } catch (mutationError) {
       toast.error(getErrorMessage(mutationError));
     }
@@ -475,6 +489,9 @@ export function UsersPageClient(): JSX.Element {
     },
     onDelete: deleteFromDrawer,
     onEdit: editFromDrawer,
+    onResetPassword: (targetUser: User) => {
+      void handleResetPasswordLink(targetUser);
+    },
     onView: setDrawerUser,
     users,
   };
@@ -689,7 +706,7 @@ export function UsersPageClient(): JSX.Element {
         roleOptions={roleOptions}
       />
 
-      <InvitationLinkDialog link={invitationLink} onClose={() => setInvitationLink(null)} />
+      <ShareLinkDialog link={shareLink} onClose={() => setShareLink(null)} />
 
       <Dialog
         open={statusDialogState !== null}

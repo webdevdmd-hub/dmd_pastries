@@ -28,6 +28,7 @@ func RegisterRoutes(
 	group.PATCH("/:id", usersEdit, handler.UpdateUser)
 	group.PATCH("/:id/branch", usersEdit, handler.AssignUserBranch)
 	group.PATCH("/:id/status", usersEdit, handler.UpdateUserStatus)
+	group.POST("/:id/password-reset-link", usersEdit, handler.CreatePasswordResetLink)
 	group.PATCH("/:id/restore", usersDelete, handler.RestoreUser)
 	group.DELETE("/:id", usersDelete, handler.DeleteUser)
 }

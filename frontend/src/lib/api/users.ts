@@ -328,3 +328,47 @@ export async function restoreUser(id: string): Promise<User> {
 
   return response.data;
 }
+
+export type PasswordResetLink = {
+  userId: string;
+  email: string;
+  url: string;
+  expiresAt: string;
+};
+
+type BackendPasswordResetLink = {
+  user_id?: string;
+  email?: string;
+  url?: string;
+  expires_at?: string;
+};
+
+function parsePasswordResetLink(value: unknown): PasswordResetLink {
+  if (!isObject(value)) {
+    throw new Error("Backend password reset link payload is invalid.");
+  }
+  const link = value as BackendPasswordResetLink;
+  if (
+    typeof link.user_id !== "string" ||
+    typeof link.email !== "string" ||
+    typeof link.url !== "string" ||
+    typeof link.expires_at !== "string" ||
+    !link.url
+  ) {
+    throw new Error("Backend password reset link payload is missing required fields.");
+  }
+  return { userId: link.user_id, email: link.email, url: link.url, expiresAt: link.expires_at };
+}
+
+// A reset link for a manager to hand over, mirroring the invitation link:
+// the app sends no email, and a cashier locked out at the counter cannot wait
+// for one. Shown once; the backend keeps only Supabase's hash of the token.
+export async function createPasswordResetLink(id: string): Promise<PasswordResetLink> {
+  const response = await apiRequest<PasswordResetLink>(`/api/v1/users/${id}/password-reset-link`, {
+    method: "POST",
+    authMode: "appwrite",
+    parse: parsePasswordResetLink,
+  });
+
+  return response.data;
+}

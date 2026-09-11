@@ -140,6 +140,7 @@ func main() {
 		branchRepo,
 		businessRepo,
 		auditRepo,
+		cfg.PasswordResetURL,
 	)
 	userHandler := users.NewHandler(userService)
 

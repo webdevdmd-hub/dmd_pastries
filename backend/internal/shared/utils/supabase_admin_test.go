@@ -299,3 +299,37 @@ func TestUnconfiguredClientIsInert(t *testing.T) {
 		t.Error("DeleteUser succeeded with no configuration")
 	}
 }
+
+// A manager-issued reset link is minted through the admin generate_link call,
+// never by sending mail: the hashed token is what the reset page hands back to
+// /verify, so it -- not the action_link -- is the value that matters.
+func TestGenerateRecoveryTokenUsesGenerateLink(t *testing.T) {
+	var seen capture
+	client := fakeGoTrue(t, http.StatusOK, `{"action_link":"https://x/verify?token=abc","hashed_token":"hash-abc","verification_type":"recovery"}`, &seen)
+
+	token, err := client.GenerateRecoveryToken("Cashier@DMD.example")
+	if err != nil {
+		t.Fatalf("GenerateRecoveryToken: %v", err)
+	}
+	if token != "hash-abc" {
+		t.Errorf("token = %q, want the hashed_token from the response", token)
+	}
+	if seen.path != "/admin/generate_link" || seen.method != http.MethodPost {
+		t.Errorf("%s %s, want POST /admin/generate_link", seen.method, seen.path)
+	}
+	if seen.body["type"] != "recovery" {
+		t.Errorf("type = %v, want recovery", seen.body["type"])
+	}
+	if seen.body["email"] != "cashier@dmd.example" {
+		t.Errorf("email = %v, want lower-cased and trimmed", seen.body["email"])
+	}
+}
+
+func TestGenerateRecoveryTokenRefusesAnEmptyToken(t *testing.T) {
+	var seen capture
+	client := fakeGoTrue(t, http.StatusOK, `{"action_link":"https://x/verify"}`, &seen)
+
+	if _, err := client.GenerateRecoveryToken("cashier@dmd.example"); err == nil {
+		t.Fatal("a response with no hashed_token produced a link that could never verify")
+	}
+}

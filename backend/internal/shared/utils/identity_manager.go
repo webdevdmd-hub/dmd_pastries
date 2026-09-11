@@ -219,6 +219,17 @@ func (m *IdentityManager) CreatePasswordRecovery(email, redirectURL string) erro
 	return m.appwrite.CreatePasswordRecovery(email, redirectURL)
 }
 
+// CreatePasswordResetToken mints a reset token for a link a manager hands over,
+// bypassing email entirely. Supabase only: Appwrite has no equivalent, and an
+// account that exists only there gets an error rather than a link that would
+// never verify.
+func (m *IdentityManager) CreatePasswordResetToken(ids ProviderIDs, email string) (string, error) {
+	if !m.supabaseLive() || strings.TrimSpace(ids.Supabase) == "" {
+		return "", fmt.Errorf("password reset links are only available for Supabase accounts")
+	}
+	return m.supabase.GenerateRecoveryToken(email)
+}
+
 // CompletePasswordRecovery finishes a reset.
 //
 // The two providers prove identity differently -- Appwrite with a user id plus

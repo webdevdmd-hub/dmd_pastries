@@ -2,8 +2,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import type { PasswordResetLink } from "@/lib/api/users";
 import {
   assignUserBranch,
+  createPasswordResetLink,
   createUser,
   getUserById,
   getUsers,
@@ -141,5 +143,11 @@ export function useRestoreUser() {
       queryClient.setQueryData([usersQueryKey, "detail", restoredUser.id], restoredUser);
       await invalidateUsers(queryClient);
     },
+  });
+}
+
+export function useCreatePasswordResetLink() {
+  return useMutation<PasswordResetLink, Error, string>({
+    mutationFn: async (id) => createPasswordResetLink(id),
   });
 }

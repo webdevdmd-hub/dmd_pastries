@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 
@@ -108,5 +109,29 @@ func TestLifecycleSkipsAnAbsentAppwrite(t *testing.T) {
 
 	if err := manager.CompletePasswordRecovery("user", "secret", "", "newpassword123"); err == nil {
 		t.Error("an Appwrite-shaped reset link completed with no Appwrite to complete it")
+	}
+}
+
+// A reset link only verifies against Supabase, so an account that exists
+// only in Appwrite must be refused up front -- not handed a link that fails
+// an hour later at the counter.
+func TestResetLinkNeedsASupabaseAccount(t *testing.T) {
+	var seen capture
+	client := fakeGoTrue(t, http.StatusOK, `{"hashed_token":"hash-1"}`, &seen)
+	manager := NewIdentityManager(noAppwrite(), client, primaryAppwrite)
+
+	if _, err := manager.CreatePasswordResetToken(ProviderIDs{Appwrite: "legacy-only"}, "a@test.invalid"); err == nil {
+		t.Fatal("an Appwrite-only account was given a Supabase reset token")
+	}
+	if seen.path != "" {
+		t.Errorf("Supabase was called (%s) for an account it does not hold", seen.path)
+	}
+
+	token, err := manager.CreatePasswordResetToken(ProviderIDs{Supabase: "bbbbbbbb-0000-4000-8000-000000000002"}, "a@test.invalid")
+	if err != nil {
+		t.Fatalf("CreatePasswordResetToken: %v", err)
+	}
+	if token != "hash-1" || seen.path != "/admin/generate_link" {
+		t.Errorf("token = %q via %s, want hash-1 via /admin/generate_link", token, seen.path)
 	}
 }

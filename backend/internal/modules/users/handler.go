@@ -221,3 +221,13 @@ func handleError(c *gin.Context, err error) {
 	}
 	response.Error(c, 500, "internal server error", err.Error())
 }
+
+func (h *Handler) CreatePasswordResetLink(c *gin.Context) {
+	currentUser := utils.MustAuthContext(c)
+	link, err := h.service.CreatePasswordResetLink(currentUser, c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "password reset link created", link)
+}
