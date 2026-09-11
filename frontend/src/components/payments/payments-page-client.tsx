@@ -64,16 +64,10 @@ const defaultFilters: PaymentFilters = {
   branchId: "",
 };
 
-function hasApproverRole(user: User): boolean {
-  const roleName = user.roleName.toLowerCase();
-
-  return roleName.includes("owner") || roleName.includes("admin") || roleName.includes("manager");
-}
-
-function isOwnerOrAdminRole(roleName: string): boolean {
-  const normalizedRoleName = roleName.toLowerCase();
-
-  return normalizedRoleName.includes("owner") || normalizedRoleName.includes("admin");
+// The approver named on a refund is a record of who signed it off, chosen
+// from active colleagues. It is not decided by what their role is called.
+function isActiveUser(user: User): boolean {
+  return user.status === "active";
 }
 
 function selectReceiptLayout(
@@ -120,8 +114,7 @@ export function PaymentsPageClient(): JSX.Element {
   const canAdd = hasAnyPermission([PERMISSIONS.paymentsAdd]);
   const canRefund = hasAnyPermission([PERMISSIONS.paymentsRefund]);
   const canViewUsers = hasPermission(PERMISSIONS.usersView);
-  const canSelectRefundApprover =
-    hasAnyPermission([PERMISSIONS.paymentsRefund]) || user?.roles.some(isOwnerOrAdminRole) === true;
+  const canSelectRefundApprover = hasAnyPermission([PERMISSIONS.paymentsRefund]);
   const timezone = useMemo(resolveDashboardTimezone, []);
   const summaryParams: PaymentSummaryParams = {
     branchId: filters.branchId,
@@ -178,7 +171,7 @@ export function PaymentsPageClient(): JSX.Element {
     filters.paymentStatus !== defaultFilters.paymentStatus ||
     filters.dateFrom.length > 0 ||
     filters.dateTo.length > 0;
-  const approverOptions = (usersQuery.data ?? []).filter(hasApproverRole).map((approver) => ({
+  const approverOptions = (usersQuery.data ?? []).filter(isActiveUser).map((approver) => ({
     id: approver.id,
     label: `${approver.fullName} (${approver.roleName})`,
   }));

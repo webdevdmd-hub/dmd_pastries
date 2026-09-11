@@ -189,7 +189,7 @@ export function RecipeFormPage({
   const router = useRouter();
   const { hasAnyPermission, hasPermission } = usePermission();
   // TODO: Remove products.* fallback once recipes.* permissions are seeded for every tenant.
-  const canView = hasAnyPermission([PERMISSIONS.recipesView, PERMISSIONS.productsView]);
+  const canView = hasAnyPermission([PERMISSIONS.recipesView]);
   const isCreate = recipeId === null;
   const canCreateRecipe = hasPermission(PERMISSIONS.recipesCreate);
   const canEditRecipe = hasPermission(PERMISSIONS.recipesEdit);

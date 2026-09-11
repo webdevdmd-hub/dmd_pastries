@@ -29,7 +29,7 @@ import type { UpdatePackagingPayload } from "@/types/packaging";
 
 export function PackagingDetailsPageClient({ packagingId }: { packagingId: string }): JSX.Element {
   const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.packagingView, PERMISSIONS.masterDataView]);
+  const canView = hasAnyPermission([PERMISSIONS.packagingView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.packagingEdit,
     PERMISSIONS.packagingStatusUpdate,

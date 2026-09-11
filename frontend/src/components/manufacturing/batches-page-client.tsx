@@ -74,7 +74,7 @@ export function BatchesPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
   const { normalizeBranchId } = branchScope;
-  const canView = hasAnyPermission([PERMISSIONS.manufacturingView, PERMISSIONS.inventoryView]);
+  const canView = hasAnyPermission([PERMISSIONS.manufacturingView]);
   const canCreate = hasAnyPermission([PERMISSIONS.manufacturingBatchesCreate]);
   const canEdit = hasAnyPermission([PERMISSIONS.manufacturingBatchesEdit]);
   const canProduce = hasAnyPermission([PERMISSIONS.manufacturingBatchesProduce]);

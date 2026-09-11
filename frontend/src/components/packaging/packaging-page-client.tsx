@@ -68,7 +68,7 @@ type PendingAction =
 
 export function PackagingPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.packagingView, PERMISSIONS.masterDataView]);
+  const canView = hasAnyPermission([PERMISSIONS.packagingView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.packagingCreate,
     PERMISSIONS.packagingEdit,

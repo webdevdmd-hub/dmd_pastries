@@ -68,7 +68,7 @@ type PendingAction =
 
 export function IngredientsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.ingredientsView, PERMISSIONS.inventoryView]);
+  const canView = hasAnyPermission([PERMISSIONS.ingredientsView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.ingredientsCreate,
     PERMISSIONS.ingredientsEdit,

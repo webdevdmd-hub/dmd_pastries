@@ -11,6 +11,7 @@ func RegisterRoutes(
 	usersView gin.HandlerFunc,
 	usersCreate gin.HandlerFunc,
 	usersEdit gin.HandlerFunc,
+	branchAccessManage gin.HandlerFunc,
 	usersDelete gin.HandlerFunc,
 ) {
 	group := router.Group("/api/v1/users")
@@ -26,7 +27,7 @@ func RegisterRoutes(
 	group.GET("/:id", usersView, handler.GetUser)
 	group.GET("/:id/activity", usersView, handler.GetUserActivity)
 	group.PATCH("/:id", usersEdit, handler.UpdateUser)
-	group.PATCH("/:id/branch", usersEdit, handler.AssignUserBranch)
+	group.PATCH("/:id/branch", branchAccessManage, handler.AssignUserBranch)
 	group.PATCH("/:id/status", usersEdit, handler.UpdateUserStatus)
 	group.POST("/:id/password-reset-link", usersEdit, handler.CreatePasswordResetLink)
 	group.PATCH("/:id/restore", usersDelete, handler.RestoreUser)

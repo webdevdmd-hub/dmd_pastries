@@ -56,7 +56,7 @@ export function ReconciliationPageClient(): JSX.Element {
   });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [lastCreated, setLastCreated] = useState<CreateReconciliationPayload | null>(null);
-  const canView = hasAnyPermission([PERMISSIONS.reportsView, PERMISSIONS.paymentsReconcile]);
+  const canView = hasAnyPermission([PERMISSIONS.paymentsReconcile]);
   const canManage = hasAnyPermission([PERMISSIONS.paymentsReconcile]);
   const reconciliationsQuery = useReconciliations(filters, canView && branchScope.hasBranchScope);
   const methodsQuery = usePaymentMethods(canView);

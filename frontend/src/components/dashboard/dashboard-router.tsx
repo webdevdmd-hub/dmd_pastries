@@ -9,27 +9,19 @@ import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-heade
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
-import { useAuth } from "@/hooks/use-auth";
 import { usePermission } from "@/hooks/use-permission";
-
-function hasRole(roles: string[], roleName: string): boolean {
-  return roles.some((role) => role.toLowerCase().includes(roleName));
-}
 
 export function DashboardRouter(): JSX.Element {
   const router = useRouter();
-  const { user } = useAuth();
   const { hasAnyPermission } = usePermission();
-  const roles = user?.roles ?? [];
-  const isAdmin =
-    hasRole(roles, "owner") ||
-    hasRole(roles, "admin") ||
-    hasAnyPermission([
-      PERMISSIONS.usersView,
-      PERMISSIONS.rolesView,
-      PERMISSIONS.settingsView,
-      PERMISSIONS.reportsView,
-    ]);
+  // Personas come from permissions only. A role called "admin" with a
+  // products-only box set is a products role, whatever its name.
+  const isAdmin = hasAnyPermission([
+    PERMISSIONS.usersView,
+    PERMISSIONS.rolesView,
+    PERMISSIONS.settingsView,
+    PERMISSIONS.reportsView,
+  ]);
   const isCashier = hasAnyPermission([
     PERMISSIONS.posView,
     PERMISSIONS.posSell,

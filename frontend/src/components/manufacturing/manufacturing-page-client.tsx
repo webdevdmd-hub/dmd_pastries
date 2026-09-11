@@ -35,7 +35,7 @@ const actions = [
 
 export function ManufacturingPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.manufacturingView, PERMISSIONS.inventoryView]);
+  const canView = hasAnyPermission([PERMISSIONS.manufacturingView]);
   const summaryQuery = useManufacturingSummary(canView);
 
   if (!canView) {

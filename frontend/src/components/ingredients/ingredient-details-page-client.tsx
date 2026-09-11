@@ -51,7 +51,7 @@ export function IngredientDetailsPageClient({
   ingredientId,
 }: IngredientDetailsPageClientProps): JSX.Element {
   const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.ingredientsView, PERMISSIONS.inventoryView]);
+  const canView = hasAnyPermission([PERMISSIONS.ingredientsView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.ingredientsEdit,
     PERMISSIONS.ingredientsStatusUpdate,

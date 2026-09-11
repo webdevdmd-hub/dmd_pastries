@@ -133,12 +133,7 @@ export const appNavigationGroups = [
         href: ROUTES.settingsPaymentSetup,
         icon: WalletCards,
         label: "Payment Setup",
-        permissionAny: [
-          PERMISSIONS.settingsView,
-          PERMISSIONS.settingsPaymentMethodsManage,
-          PERMISSIONS.accountingView,
-          PERMISSIONS.accountingAccountsManage,
-        ],
+        permissionAny: [PERMISSIONS.settingsView, PERMISSIONS.settingsPaymentMethodsManage],
       },
     ],
   },
@@ -215,7 +210,6 @@ export const appNavigationGroups = [
           PERMISSIONS.expensesCreate,
           PERMISSIONS.expensesEdit,
           PERMISSIONS.expensesManage,
-          PERMISSIONS.purchasingView,
         ],
       },
     ],
@@ -227,12 +221,10 @@ export const appNavigationGroups = [
         href: ROUTES.recipes,
         icon: ListChecks,
         label: "Recipes / BOM",
-        // TODO: Remove products fallback once recipes.* permissions are seeded for every tenant.
         permissionAny: [
           PERMISSIONS.recipesView,
           PERMISSIONS.recipesCreate,
           PERMISSIONS.recipesEdit,
-          PERMISSIONS.productsView,
         ],
       },
       {
@@ -243,7 +235,6 @@ export const appNavigationGroups = [
           PERMISSIONS.manufacturingView,
           PERMISSIONS.manufacturingBatchesCreate,
           PERMISSIONS.manufacturingBatchesEdit,
-          PERMISSIONS.inventoryView,
         ],
       },
     ],

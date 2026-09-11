@@ -54,7 +54,7 @@ type PendingAction =
 export function RecipesPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   // TODO: Remove products.* fallback once recipes.* permissions are seeded for every tenant.
-  const canView = hasAnyPermission([PERMISSIONS.recipesView, PERMISSIONS.productsView]);
+  const canView = hasAnyPermission([PERMISSIONS.recipesView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.recipesCreate,
     PERMISSIONS.recipesEdit,

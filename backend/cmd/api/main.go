@@ -4,6 +4,8 @@ import (
 	"log"
 	_ "time/tzdata"
 
+	"github.com/gin-gonic/gin"
+
 	"pastries-pos/internal/config"
 	"pastries-pos/internal/database"
 	"pastries-pos/internal/middleware"
@@ -213,6 +215,7 @@ func main() {
 	authMiddleware := middleware.NewAuthMiddleware(authService)
 	permissionMiddleware := middleware.NewPermissionMiddleware()
 	permit := permissionMiddleware.RequireAnyPermission
+	anySignedIn := func(c *gin.Context) { c.Next() }
 
 	router := server.NewRouter(cfg)
 	auth.RegisterRoutes(router, authHandler, authMiddleware.RequireAuth())
@@ -226,21 +229,26 @@ func main() {
 		authMiddleware.RequireAuth(),
 		permit("users.view"),
 		permit("users.create", "users.invite"),
-		permit("users.edit", "users.status.update", "users.invitation.resend", "users.invitation.cancel", "branches.access.manage"),
+		permit("users.edit", "users.status.update", "users.invitation.resend", "users.invitation.cancel"),
+		// Assigning a user to a branch is branch access management; this is the
+		// one users route that permission -- and not users.edit alone -- unlocks.
+		permit("branches.access.manage", "users.edit"),
 		permit("users.delete"),
 	)
 	branches.RegisterRoutes(
 		router,
 		branchHandler,
 		authMiddleware.RequireAuth(),
-		permit("branches.view", "settings.view"),
-		permit("branches.create", "branches.edit", "branches.status.update", "branches.manage", "settings.manage"),
+		permit("branches.view"),
+		permit("branches.create", "branches.edit", "branches.status.update", "branches.manage"),
 	)
 	businesses.RegisterRoutes(
 		router,
 		businessHandler,
 		authMiddleware.RequireAuth(),
-		permit("settings.view", "branches.switch"),
+		// Reading one's own business profile is not a permission: the app header
+		// shows it to every signed-in user. authGuard alone.
+		anySignedIn,
 		permit("settings.company.update", "settings.manage"),
 	)
 	settings.RegisterRoutes(
@@ -261,8 +269,8 @@ func main() {
 		router,
 		packagingHandler,
 		authMiddleware.RequireAuth(),
-		permit("packaging.view", "master_data.view"),
-		permit("packaging.create", "packaging.edit", "packaging.delete", "packaging.status.update", "packaging.usage_rules.manage", "master_data.manage"),
+		permit("packaging.view"),
+		permit("packaging.create", "packaging.edit", "packaging.delete", "packaging.status.update", "packaging.usage_rules.manage"),
 	)
 	products.RegisterRoutes(
 		router,
@@ -306,8 +314,8 @@ func main() {
 		permit("payments.view"),
 		permit("payments.add", "payments.manage"),
 		permit("payments.refund"),
-		permit("payments.summary.view", "payments.view", "reports.view"),
-		permit("payments.reconcile", "reports.view"),
+		permit("payments.summary.view", "payments.view"),
+		permit("payments.reconcile"),
 	)
 	customers.RegisterRoutes(
 		router,
@@ -324,8 +332,8 @@ func main() {
 		router,
 		ingredientHandler,
 		authMiddleware.RequireAuth(),
-		permit("ingredients.view", "master_data.view"),
-		permit("ingredients.create", "ingredients.edit", "ingredients.delete", "ingredients.status.update", "master_data.manage"),
+		permit("ingredients.view"),
+		permit("ingredients.create", "ingredients.edit", "ingredients.delete", "ingredients.status.update"),
 	)
 	inventory.RegisterRoutes(
 		router,
@@ -342,36 +350,36 @@ func main() {
 		router,
 		inventoryHandler,
 		authMiddleware.RequireAuth(),
-		permit("stock_movements.view", "inventory.movements.view", "inventory.view"),
-		permit("stock_movements.manual_create", "stock_movements.reverse", "inventory.manage"),
+		permit("stock_movements.view", "inventory.movements.view"),
+		permit("stock_movements.manual_create", "stock_movements.reverse"),
 	)
 	manufacturing.RegisterRoutes(
 		router,
 		manufacturingHandler,
 		authMiddleware.RequireAuth(),
-		permit("manufacturing.view", "inventory.view"),
-		permit("manufacturing.batches.create", "manufacturing.batches.edit", "manufacturing.batches.start", "manufacturing.batches.consume", "manufacturing.batches.produce", "manufacturing.batches.wastage", "manufacturing.batches.complete", "manufacturing.batches.cancel", "manufacturing.manage", "inventory.manage"),
+		permit("manufacturing.view"),
+		permit("manufacturing.batches.create", "manufacturing.batches.edit", "manufacturing.batches.start", "manufacturing.batches.consume", "manufacturing.batches.produce", "manufacturing.batches.wastage", "manufacturing.batches.complete", "manufacturing.batches.cancel", "manufacturing.manage"),
 	)
 	suppliers.RegisterRoutes(
 		router,
 		supplierHandler,
 		authMiddleware.RequireAuth(),
 		permit("suppliers.view"),
-		permit("suppliers.create", "suppliers.edit", "suppliers.delete", "suppliers.status.update", "suppliers.contacts.manage", "suppliers.notes.manage", "suppliers.manage", "inventory.manage"),
+		permit("suppliers.create", "suppliers.edit", "suppliers.delete", "suppliers.status.update", "suppliers.contacts.manage", "suppliers.notes.manage", "suppliers.manage"),
 	)
 	purchasing.RegisterRoutes(
 		router,
 		purchasingHandler,
 		authMiddleware.RequireAuth(),
 		permit("purchasing.view", "purchasing.returns.view"),
-		permit("purchasing.orders.create", "purchasing.orders.edit", "purchasing.orders.delete", "purchasing.orders.status.update", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.invoices.post", "purchasing.invoices.cancel", "purchasing.receipts.create", "purchasing.receipts.post", "purchasing.receipts.cancel", "purchasing.returns.create", "purchasing.returns.edit", "purchasing.returns.post", "purchasing.returns.cancel", "purchasing.returns.manage", "purchasing.receive_stock", "purchasing.manage", "inventory.manage"),
+		permit("purchasing.orders.create", "purchasing.orders.edit", "purchasing.orders.delete", "purchasing.orders.status.update", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.invoices.post", "purchasing.invoices.cancel", "purchasing.receipts.create", "purchasing.receipts.post", "purchasing.receipts.cancel", "purchasing.returns.create", "purchasing.returns.edit", "purchasing.returns.post", "purchasing.returns.cancel", "purchasing.returns.manage", "purchasing.receive_stock", "purchasing.manage"),
 	)
 	recipes.RegisterRoutes(
 		router,
 		recipeHandler,
 		authMiddleware.RequireAuth(),
-		permit("recipes.view", "products.view"),
-		permit("recipes.create", "recipes.edit", "recipes.delete", "recipes.status.update", "recipes.ingredients.manage", "recipes.packaging.manage", "recipes.cost.recalculate", "recipes.versions.create", "recipes.manage", "products.manage"),
+		permit("recipes.view"),
+		permit("recipes.create", "recipes.edit", "recipes.delete", "recipes.status.update", "recipes.ingredients.manage", "recipes.packaging.manage", "recipes.cost.recalculate", "recipes.versions.create", "recipes.manage"),
 	)
 	bakeryorders.RegisterRoutes(
 		router,
@@ -410,16 +418,16 @@ func main() {
 		router,
 		expenseHandler,
 		authMiddleware.RequireAuth(),
-		permit("expenses.view", "accounting.view"),
-		permit("expenses.create", "expenses.manage", "accounting.journal_entries.manage"),
-		permit("expenses.edit", "expenses.manage", "accounting.journal_entries.manage"),
-		permit("expenses.delete", "expenses.manage", "accounting.journal_entries.manage"),
+		permit("expenses.view"),
+		permit("expenses.create", "expenses.manage"),
+		permit("expenses.edit", "expenses.manage"),
+		permit("expenses.delete", "expenses.manage"),
 	)
 	audit.RegisterRoutes(
 		router,
 		auditHandler,
 		authMiddleware.RequireAuth(),
-		permit("audit_logs.view", "settings.manage"),
+		permit("audit_logs.view"),
 	)
 	roles.RegisterRoutes(
 		router,

@@ -37,7 +37,7 @@ import type { WastagePayload } from "@/types/manufacturing";
 export function BatchDetailsPageClient({ batchId }: { batchId: string }): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const [wastageOpen, setWastageOpen] = useState(false);
-  const canView = hasAnyPermission([PERMISSIONS.manufacturingView, PERMISSIONS.inventoryView]);
+  const canView = hasAnyPermission([PERMISSIONS.manufacturingView]);
   const canProduce = hasAnyPermission([PERMISSIONS.manufacturingBatchesProduce]);
   const canRecordWastage = hasAnyPermission([PERMISSIONS.manufacturingBatchesWastage]);
   const router = useRouter();

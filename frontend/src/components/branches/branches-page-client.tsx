@@ -44,19 +44,17 @@ function filterBranches(branches: Branch[], search: string): Branch[] {
   );
 }
 
-function isManagerRole(user: User): boolean {
-  const roleName = user.roleName.toLowerCase();
-
-  return (
-    user.status === "active" &&
-    (roleName.includes("manager") || roleName.includes("admin") || roleName.includes("owner"))
-  );
+// Any active colleague can be named as a branch manager. What a role is
+// called says nothing about what it may do; permissions do, and being a
+// branch manager is a fact recorded on the branch, not a permission.
+function isAssignableManager(user: User): boolean {
+  return user.status === "active";
 }
 
 export function BranchesPageClient(): JSX.Element {
   const { refreshProfile } = useAuth();
   const { hasAnyPermission, hasPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.branchesView, PERMISSIONS.settingsView]);
+  const canView = hasAnyPermission([PERMISSIONS.branchesView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.branchesCreate,
     PERMISSIONS.branchesEdit,
@@ -79,7 +77,7 @@ export function BranchesPageClient(): JSX.Element {
     [branchesQuery.data, search],
   );
   const managerOptions = useMemo(
-    () => (canManage && canViewUsers ? (usersQuery.data ?? []).filter(isManagerRole) : []),
+    () => (canManage && canViewUsers ? (usersQuery.data ?? []).filter(isAssignableManager) : []),
     [canManage, canViewUsers, usersQuery.data],
   );
 
