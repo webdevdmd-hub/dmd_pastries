@@ -9,6 +9,8 @@ func RegisterRoutes(
 	productsView gin.HandlerFunc,
 	productsManage gin.HandlerFunc,
 	posView gin.HandlerFunc,
+	// Unlocked by every permission whose form picks a product; see main.go.
+	picker gin.HandlerFunc,
 ) {
 	group := router.Group("/api/v1/products")
 	group.Use(authGuard)
@@ -17,6 +19,7 @@ func RegisterRoutes(
 	group.POST("", productsManage, handler.CreateProduct)
 	group.GET("/pos", posView, handler.POSProducts)
 	group.GET("/lookup", posView, handler.LookupProduct)
+	group.GET("/picker", picker, handler.PickerProducts)
 	group.GET("/price-suggestions", productsView, handler.ListPriceSuggestions)
 	group.POST("/price-suggestions/bulk-apply", productsManage, handler.BulkApplyPriceSuggestions)
 	group.POST("/price-suggestions/:id/apply", productsManage, handler.ApplyPriceSuggestion)

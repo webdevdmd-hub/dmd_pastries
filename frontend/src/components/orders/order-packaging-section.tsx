@@ -9,31 +9,16 @@ import type { SearchableComboboxOption } from "@/components/shared/searchable-co
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useProductPicker } from "@/hooks/use-lookups";
 import { useAddOrderPackaging, useOrderPackaging } from "@/hooks/use-orders";
-import { useProducts } from "@/hooks/use-products";
 import { getErrorMessage } from "@/lib/api/client";
 import type { AddOrderPackagingPayload, BakeryOrder } from "@/types/orders";
-import type { Product, ProductListFilters } from "@/types/product";
+import type { Product } from "@/types/product";
 
 type PackagingOptionMeta = {
   product: Product;
   variantId: string | null;
   variantName: string | null;
-};
-
-const PACKAGING_PRODUCT_FILTERS: ProductListFilters = {
-  search: "",
-  categoryId: "all",
-  productType: "packaging",
-  itemStructure: "all",
-  status: "active",
-  isPosVisible: "all",
-  isSellable: "all",
-  isPurchasable: "all",
-  page: 1,
-  limit: 100,
-  sortBy: "product_name",
-  sortOrder: "asc",
 };
 
 function optionValue(productId: string, variantId: string | null): string {
@@ -67,7 +52,10 @@ export function OrderPackagingSection({
 }): JSX.Element {
   const [selectedPackagingValue, setSelectedPackagingValue] = useState("");
   const [quantityRequired, setQuantityRequired] = useState(1);
-  const packagingProductsQuery = useProducts(PACKAGING_PRODUCT_FILTERS, canManage);
+  const packagingProductsQuery = useProductPicker(
+    { productType: "packaging", limit: 100 },
+    canManage,
+  );
   const orderPackagingQuery = useOrderPackaging(order?.id ?? null, order !== null);
   const addPackagingMutation = useAddOrderPackaging();
   const packagingProducts = useMemo(

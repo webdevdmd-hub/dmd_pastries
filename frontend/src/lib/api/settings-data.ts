@@ -414,7 +414,7 @@ function parsePaymentMethod(value: unknown): PaymentMethod {
   };
 }
 
-function parseSalesChannel(value: unknown): SalesChannel {
+export function parseSalesChannel(value: unknown): SalesChannel {
   if (!isObject(value)) {
     throw new Error("Backend sales channel payload is invalid.");
   }

@@ -237,3 +237,16 @@ type ProductLookupResponse struct {
 	Variant   *ProductVariantInfo `json:"variant"`
 	MatchedBy string              `json:"matched_by"`
 }
+
+// PickerQuery is what a form's product dropdown may ask for. Status is
+// always active and the sort is by name; a picker offers choices, it does
+// not browse the catalogue.
+type PickerQuery struct {
+	Search        string
+	ProductType   string
+	ItemStructure string
+	IsSellable    *bool
+	IsPurchasable *bool
+	Page          int
+	Limit         int
+}

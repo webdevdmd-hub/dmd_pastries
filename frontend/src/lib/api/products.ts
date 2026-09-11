@@ -396,7 +396,7 @@ function parseVariants(value: unknown, fallbacks: VariantFallbacks = {}): Produc
   return value.map((variant) => parseVariantWithFallbacks(variant, fallbacks));
 }
 
-function parseProduct(value: unknown): Product {
+export function parseProduct(value: unknown): Product {
   if (!isObject(value)) {
     throw new Error("Product payload is invalid.");
   }
@@ -491,7 +491,7 @@ function parseProduct(value: unknown): Product {
   };
 }
 
-function parseProductsResponse(value: unknown): ProductListResponse {
+export function parseProductsResponse(value: unknown): ProductListResponse {
   if (Array.isArray(value)) {
     return {
       items: value.map(parseProduct),
@@ -614,7 +614,10 @@ function parsePriceSuggestionListResponse(value: unknown): ProductPriceSuggestio
   };
 }
 
-function parseReferenceList<TItem>(value: unknown, parser: (item: unknown) => TItem): TItem[] {
+export function parseReferenceList<TItem>(
+  value: unknown,
+  parser: (item: unknown) => TItem,
+): TItem[] {
   if (Array.isArray(value)) {
     return value.map(parser);
   }
@@ -634,7 +637,7 @@ function parseReferenceList<TItem>(value: unknown, parser: (item: unknown) => TI
   return [];
 }
 
-function parseProductCategoryReference(value: unknown): {
+export function parseProductCategoryReference(value: unknown): {
   allowedProductTypes: ProductType[];
   categoryName: string;
   id: string;
@@ -654,7 +657,7 @@ function parseProductCategoryReference(value: unknown): {
   };
 }
 
-function parseUnitReference(value: unknown): Unit {
+export function parseUnitReference(value: unknown): Unit {
   if (!isObject(value)) {
     throw new Error("Unit reference payload is invalid.");
   }
@@ -688,7 +691,7 @@ function parseUnitReference(value: unknown): Unit {
   };
 }
 
-function parseTaxRateReference(value: unknown): TaxRate {
+export function parseTaxRateReference(value: unknown): TaxRate {
   if (!isObject(value)) {
     throw new Error("Tax rate reference payload is invalid.");
   }
@@ -710,37 +713,6 @@ function parseTaxRateReference(value: unknown): TaxRate {
     createdAt: optionalString(taxRate.created_at) ?? "",
     updatedAt: optionalString(taxRate.updated_at) ?? "",
   };
-}
-
-async function getProductCategoryReferences(): Promise<
-  { allowedProductTypes: ProductType[]; categoryName: string; id: string }[]
-> {
-  const response = await apiRequest<
-    { allowedProductTypes: ProductType[]; categoryName: string; id: string }[]
-  >("/api/v1/master-data/product-categories", {
-    authMode: "appwrite",
-    parse: (data) => parseReferenceList(data, parseProductCategoryReference),
-  });
-
-  return response.data.filter((category) => category.id.length > 0);
-}
-
-async function getUnitReferences(): Promise<Unit[]> {
-  const response = await apiRequest<Unit[]>("/api/v1/master-data/units", {
-    authMode: "appwrite",
-    parse: (data) => parseReferenceList(data, parseUnitReference),
-  });
-
-  return response.data.filter((unit) => unit.id.length > 0);
-}
-
-async function getTaxRateReferences(): Promise<TaxRate[]> {
-  const response = await apiRequest<TaxRate[]>("/api/v1/settings/tax-rates?status=active", {
-    authMode: "appwrite",
-    parse: (data) => parseReferenceList(data, parseTaxRateReference),
-  });
-
-  return response.data.filter((taxRate) => taxRate.id.length > 0 && taxRate.status === "active");
 }
 
 export function toBackendProductPayload(
@@ -1063,16 +1035,28 @@ export async function deleteProductVariant(productId: string, variantId: string)
   });
 }
 
+// One call to the reference-lookup endpoint, which any signed-in user may
+// read. The module endpoints these used to hit require master_data.view and
+// settings.view, which a role built only to add products does not hold --
+// and should not need: naming a category is not managing categories.
 export async function getProductReferenceData(): Promise<ProductReferenceData> {
-  const [categoriesResult, unitsResult, taxRatesResult] = await Promise.allSettled([
-    getProductCategoryReferences(),
-    getUnitReferences(),
-    getTaxRateReferences(),
-  ]);
+  const response = await apiRequest<ProductReferenceData>(
+    "/api/v1/lookups?kinds=product_categories,units,tax_rates",
+    {
+      method: "GET",
+      authMode: "appwrite",
+      parse: (data) => {
+        if (!isObject(data)) {
+          throw new Error("Backend lookups payload is invalid.");
+        }
+        return {
+          categories: parseReferenceList(data.product_categories, parseProductCategoryReference),
+          units: parseReferenceList(data.units, parseUnitReference),
+          taxRates: parseReferenceList(data.tax_rates, parseTaxRateReference),
+        };
+      },
+    },
+  );
 
-  return {
-    categories: categoriesResult.status === "fulfilled" ? categoriesResult.value : [],
-    units: unitsResult.status === "fulfilled" ? unitsResult.value : [],
-    taxRates: taxRatesResult.status === "fulfilled" ? taxRatesResult.value : [],
-  };
+  return response.data;
 }

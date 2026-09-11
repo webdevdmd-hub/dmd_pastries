@@ -880,3 +880,33 @@ func toProductResponse(product Product, category ProductCategoryInfo, unit Produ
 		UpdatedAt:              product.UpdatedAt,
 	}
 }
+
+// pickerLimit caps what a form dropdown fetches. A picker searches; it does
+// not page through the catalogue.
+const pickerLimit = 100
+
+// PickerProducts is the product list a form's dropdown needs: active products
+// matching a search, capped. It is the same response shape as ListProducts so
+// callers reuse their parsers, but it is unlocked by the permissions whose
+// forms need to pick a product (orders, purchasing, recipes, manufacturing,
+// stock movements) rather than by products.view alone.
+func (s *Service) PickerProducts(currentUser *utils.AuthContext, query PickerQuery) (*ProductListResponse, error) {
+	if query.Limit <= 0 || query.Limit > pickerLimit {
+		query.Limit = pickerLimit
+	}
+	if query.Page <= 0 {
+		query.Page = 1
+	}
+	return s.ListProducts(currentUser, ProductListQuery{
+		Search:        query.Search,
+		ProductType:   query.ProductType,
+		ItemStructure: query.ItemStructure,
+		Status:        "active",
+		IsSellable:    query.IsSellable,
+		IsPurchasable: query.IsPurchasable,
+		Page:          query.Page,
+		Limit:         query.Limit,
+		SortBy:        "product_name",
+		SortOrder:     "asc",
+	})
+}

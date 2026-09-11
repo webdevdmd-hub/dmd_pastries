@@ -131,6 +131,47 @@ for (const file of walk(components)) {
   }
 }
 
+// --- 3. forms use the lookup tier, not other modules' list endpoints -------------
+// A form that may write a record must be able to name what the record refers
+// to, without holding the other module's view permission. The list hooks
+// below require that permission; forms outside their module must use
+// useLookups / useProductPicker (hooks/use-lookups.ts) instead. Module pages
+// and filters keep using the list hooks -- they are the module.
+const listHooks = {
+  "useProducts(": "products",
+  "useSuppliers(": "suppliers",
+  "useBranches(": "branches",
+  "useSalesChannels(": "settings",
+  "useUnits(": "master-data",
+  "useProductCategories(": "master-data",
+  "useTaxRates(": "settings",
+};
+// Push B converts these; until then they are known, not new.
+const pendingLookupConversion = new Set([
+  "accounting/ledger-details-drawer.tsx",
+  "accounting/accounting-recovery-pages.tsx",
+  "accounting/balance-sheet-page-client.tsx",
+  "accounting/general-ledger-page-client.tsx",
+  "accounting/journal-entries-page-client.tsx",
+  "accounting/profit-loss-page-client.tsx",
+  "accounting/trial-balance-page-client.tsx",
+]);
+for (const file of walk(components)) {
+  const rel = relative(components, file).replace(/\\/g, "/");
+  const dir = rel.split("/")[0];
+  if (!/(form|dialog|editor|drawer)[^/]*\.tsx$/.test(rel) || pendingLookupConversion.has(rel)) {
+    continue;
+  }
+  const text = readFileSync(file, "utf8");
+  for (const [hook, owner] of Object.entries(listHooks)) {
+    if (text.includes(hook) && dir !== owner) {
+      failures.push(
+        `${rel} calls ${hook}) -- a form outside ${owner} must use the lookup tier (hooks/use-lookups.ts)`,
+      );
+    }
+  }
+}
+
 if (failures.length > 0) {
   console.error("Permission fallback guard failed:");
   for (const failure of failures) {

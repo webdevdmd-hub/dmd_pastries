@@ -80,7 +80,7 @@ function isBranchStatus(value: unknown): value is BranchStatus {
   return value === "active" || value === "inactive";
 }
 
-function parseBranch(value: unknown): Branch {
+export function parseBranch(value: unknown): Branch {
   if (!isObject(value)) {
     throw new Error("Backend branch payload is invalid.");
   }

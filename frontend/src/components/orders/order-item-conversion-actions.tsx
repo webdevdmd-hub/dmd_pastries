@@ -18,8 +18,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useProductPicker } from "@/hooks/use-lookups";
 import { useConvertOrderItemToProduct, useConvertOrderItemToVariant } from "@/hooks/use-orders";
-import { useProductReferenceData, useProducts } from "@/hooks/use-products";
+import { useProductReferenceData } from "@/hooks/use-products";
 import { getErrorMessage } from "@/lib/api/client";
 import type {
   BakeryOrderItem,
@@ -143,23 +144,7 @@ export function OrderItemConversionActions({
   );
   const canConvert = item.itemSource === "custom" && (canConvertToProduct || canConvertToVariant);
   const referenceQuery = useProductReferenceData(canConvert);
-  const productsQuery = useProducts(
-    {
-      categoryId: "all",
-      isPosVisible: "all",
-      isSellable: "all",
-      isPurchasable: "all",
-      limit: 250,
-      page: 1,
-      productType: "all",
-      itemStructure: "all",
-      search: "",
-      sortBy: "product_name",
-      sortOrder: "asc",
-      status: "active",
-    },
-    canConvert,
-  );
+  const productsQuery = useProductPicker({ limit: 100 }, canConvert);
   const convertToProductMutation = useConvertOrderItemToProduct();
   const convertToVariantMutation = useConvertOrderItemToVariant();
   const categories = useMemo(

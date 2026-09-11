@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useBranchScope } from "@/hooks/use-branch-scope";
-import { useBranches } from "@/hooks/use-branches";
+import { useLookups, useProductPicker } from "@/hooks/use-lookups";
 import {
   useAddOrderPackaging,
   useCreateOrder,
@@ -37,8 +37,7 @@ import {
   useUpdateOrder,
 } from "@/hooks/use-orders";
 import { usePermission } from "@/hooks/use-permission";
-import { useProductReferenceData, useProducts } from "@/hooks/use-products";
-import { useSalesChannels } from "@/hooks/use-settings-data";
+import { useProductReferenceData } from "@/hooks/use-products";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import { toDateOnlyInputValue, todayDateOnly } from "@/lib/utils/date-only";
 import { createOrderSchema } from "@/lib/validators/orders.schema";
@@ -143,25 +142,12 @@ export function OrderFormPage({
   const isEdit = orderId !== null;
 
   const orderQuery = useOrder(orderId, canView && isEdit);
-  const branchesQuery = useBranches(canView);
-  const salesChannelsQuery = useSalesChannels(canView);
-  const productsQuery = useProducts(
-    {
-      categoryId: "",
-      isPosVisible: "all",
-      isSellable: "true",
-      isPurchasable: "all",
-      limit: 100,
-      page: 1,
-      productType: "all",
-      itemStructure: "all",
-      search: "",
-      sortBy: "product_name",
-      sortOrder: "asc",
-      status: "active",
-    },
-    canView,
-  );
+  // Dropdown sources come from the lookup tier, not the owning modules'
+  // list endpoints: being allowed to write an order is what unlocks them.
+  const lookupsQuery = useLookups(["branches", "sales_channels"], canView);
+  const branchesQuery = { ...lookupsQuery, data: lookupsQuery.data?.branches };
+  const salesChannelsQuery = { ...lookupsQuery, data: lookupsQuery.data?.salesChannels };
+  const productsQuery = useProductPicker({ isSellable: true, limit: 100 }, canView);
   const referenceQuery = useProductReferenceData(canView);
   const createMutation = useCreateOrder();
   const updateMutation = useUpdateOrder();

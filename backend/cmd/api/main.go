@@ -22,6 +22,7 @@ import (
 	"pastries-pos/internal/modules/expenses"
 	"pastries-pos/internal/modules/ingredients"
 	"pastries-pos/internal/modules/inventory"
+	"pastries-pos/internal/modules/lookups"
 	"pastries-pos/internal/modules/manufacturing"
 	"pastries-pos/internal/modules/masterdata"
 	"pastries-pos/internal/modules/packaging"
@@ -219,6 +220,8 @@ func main() {
 
 	router := server.NewRouter(cfg)
 	auth.RegisterRoutes(router, authHandler, authMiddleware.RequireAuth())
+	// Reference lists for forms: any signed-in member. See the package doc.
+	lookups.RegisterRoutes(router, lookups.NewHandler(masterDataService, settingsService, branchService), authMiddleware.RequireAuth())
 	authService.SetPublisher(changeHub)
 	userService.SetPublisher(changeHub)
 	events.RegisterRoutes(router, events.NewHandler(changeHub), authMiddleware.RequireAuth())
@@ -279,6 +282,9 @@ func main() {
 		permit("products.view"),
 		permit("products.create", "products.edit", "products.delete", "products.status.update", "products.images.manage", "products.manage"),
 		permit("products.view", "pos.view"),
+		// Product picker for forms that create or edit something that names a
+		// product. Being allowed to write the order is what unlocks the list.
+		permit("products.view", "orders.create", "orders.edit", "purchasing.orders.create", "purchasing.orders.edit", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.receipts.create", "recipes.create", "recipes.edit", "manufacturing.batches.create", "manufacturing.batches.edit", "stock_movements.manual_create", "inventory.adjust"),
 	)
 	productvariants.RegisterRoutes(
 		router,
@@ -366,6 +372,8 @@ func main() {
 		authMiddleware.RequireAuth(),
 		permit("suppliers.view"),
 		permit("suppliers.create", "suppliers.edit", "suppliers.delete", "suppliers.status.update", "suppliers.contacts.manage", "suppliers.notes.manage", "suppliers.manage"),
+		// Supplier picker for forms that name a supplier.
+		permit("suppliers.view", "purchasing.orders.create", "purchasing.orders.edit", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.receipts.create", "expenses.create", "expenses.edit", "accounting.journal_entries.manage"),
 	)
 	purchasing.RegisterRoutes(
 		router,

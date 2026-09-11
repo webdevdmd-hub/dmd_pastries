@@ -234,3 +234,37 @@ func handleError(c *gin.Context, err error) {
 	}
 	response.Error(c, 500, "internal server error", err.Error())
 }
+
+func (h *Handler) PickerProducts(c *gin.Context) {
+	currentUser := utils.MustAuthContext(c)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	result, err := h.service.PickerProducts(currentUser, PickerQuery{
+		Search:        c.Query("search"),
+		ProductType:   c.Query("product_type"),
+		ItemStructure: c.Query("item_structure"),
+		IsSellable:    boolFlag(c.Query("is_sellable")),
+		IsPurchasable: boolFlag(c.Query("is_purchasable")),
+		Page:          page,
+		Limit:         limit,
+	})
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "product picker fetched successfully", result)
+}
+
+// boolFlag reads an optional true/false query flag; absent or anything else
+// means "no filter".
+func boolFlag(raw string) *bool {
+	switch raw {
+	case "true":
+		v := true
+		return &v
+	case "false":
+		v := false
+		return &v
+	}
+	return nil
+}

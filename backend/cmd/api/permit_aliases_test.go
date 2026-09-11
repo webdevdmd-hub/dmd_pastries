@@ -28,6 +28,12 @@ var permitsAllowedToMixModules = map[string]string{
 	`permit("customers.quick_create", "customers.create", "customers.manage", "pos.sell")`: "the till adds a customer",
 	// PATCH /users/:id/branch is branch-access management by definition.
 	`permit("branches.access.manage", "users.edit")`: "assigning a user to a branch",
+	// Pickers: a form that may write a record needs to name the things the
+	// record refers to. Same response shape as the module list, capped and
+	// search-driven, unlocked by the writing permissions. /products/picker.
+	`permit("products.view", "orders.create", "orders.edit", "purchasing.orders.create", "purchasing.orders.edit", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.receipts.create", "recipes.create", "recipes.edit", "manufacturing.batches.create", "manufacturing.batches.edit", "stock_movements.manual_create", "inventory.adjust")`: "product picker for forms",
+	// /suppliers/picker.
+	`permit("suppliers.view", "purchasing.orders.create", "purchasing.orders.edit", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.receipts.create", "expenses.create", "expenses.edit", "accounting.journal_entries.manage")`: "supplier picker for forms",
 	// Two boxes for one feature: the Stock movements module and Inventory's
 	// own "movements view". Either is the real permission.
 	`permit("stock_movements.view", "inventory.movements.view")`: "stock movements has two equivalent boxes",
@@ -66,7 +72,9 @@ func TestEveryPermitUnlocksASingleModule(t *testing.T) {
 }
 
 // The only routes any signed-in user may call without a permission are the
-// ones that show them their own workspace. Everything else is behind permit().
+// ones that show them their own workspace: the business profile, and the
+// reference lookups (internal/modules/lookups). Everything else is behind
+// permit().
 func TestAnySignedInIsUsedOnlyForOwnBusinessProfile(t *testing.T) {
 	source, err := os.ReadFile("main.go")
 	if err != nil {

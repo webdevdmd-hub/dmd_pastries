@@ -2113,12 +2113,9 @@ export async function lookupSuppliers(search = ""): Promise<PurchasingSupplierOp
 
 async function getProductPage(page: number): Promise<PurchasingProductPage> {
   const response = await apiRequest<PurchasingProductPage>(
-    `/api/v1/products${toQueryString({
+    `/api/v1/products/picker${toQueryString({
       limit: 100,
       page,
-      sort_by: "product_name",
-      sort_order: "asc",
-      status: "active",
       is_purchasable: "true",
     })}`,
     {
@@ -2193,7 +2190,7 @@ export async function getTaxRates(): Promise<PurchasingTaxRateOption[]> {
 }
 
 export async function getBranches(): Promise<PurchasingBranchOption[]> {
-  const response = await apiRequest<PurchasingBranchOption[]>("/api/v1/branches", {
+  const response = await apiRequest<PurchasingBranchOption[]>("/api/v1/lookups?kinds=branches", {
     authMode: "appwrite",
     parse: (data) => parseList(data, parseBranch),
   });

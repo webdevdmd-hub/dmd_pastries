@@ -8,13 +8,15 @@ func RegisterRoutes(
 	authGuard gin.HandlerFunc,
 	view gin.HandlerFunc,
 	manage gin.HandlerFunc,
+	// Guards /lookup: unlocked by every permission whose form picks a supplier.
+	picker gin.HandlerFunc,
 ) {
 	group := router.Group("/api/v1/suppliers")
 	group.Use(authGuard)
 
 	group.GET("", view, handler.ListSuppliers)
 	group.POST("", manage, handler.CreateSupplier)
-	group.GET("/lookup", view, handler.LookupSuppliers)
+	group.GET("/lookup", picker, handler.LookupSuppliers)
 	group.GET("/:id/contacts", view, handler.ListContacts)
 	group.POST("/:id/contacts", manage, handler.CreateContact)
 	group.PATCH("/:id/contacts/:contactId", manage, handler.UpdateContact)
