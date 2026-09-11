@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -18,6 +19,7 @@ import (
 type capture struct {
 	method string
 	path   string
+	query  url.Values
 	apikey string
 	bearer string
 	body   map[string]any
@@ -29,6 +31,7 @@ func fakeGoTrue(t *testing.T, status int, response string, seen *capture) *Supab
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seen.method = r.Method
 		seen.path = r.URL.Path
+		seen.query = r.URL.Query()
 		seen.apikey = r.Header.Get("apikey")
 		seen.bearer = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 
@@ -167,8 +170,13 @@ func TestPasswordRecoveryUsesThePublicRecoverEndpoint(t *testing.T) {
 	if seen.body["email"] != "owner@dmd.example" {
 		t.Errorf("email = %v", seen.body["email"])
 	}
-	if seen.body["redirect_to"] != "https://app.example/reset" {
-		t.Errorf("redirect_to = %v", seen.body["redirect_to"])
+	// In the query string, where GoTrue reads it. In the body it is ignored and
+	// the link falls back to the Site URL root.
+	if got := seen.query.Get("redirect_to"); got != "https://app.example/reset" {
+		t.Errorf("redirect_to query = %q, want the reset URL", got)
+	}
+	if _, inBody := seen.body["redirect_to"]; inBody {
+		t.Errorf("redirect_to was sent in the body, where GoTrue ignores it")
 	}
 }
 
@@ -211,7 +219,7 @@ func TestCompletePasswordRecoveryActsAsTheUserNotTheServiceRole(t *testing.T) {
 	if len(calls) != 2 {
 		t.Fatalf("made %d calls, want 2 (verify then update)", len(calls))
 	}
-	if calls[0].path != "/verify" || calls[0].body["type"] != "recovery" {
+	if calls[0].path != "/verify" || calls[0].body["type"] != "recovery" || calls[0].body["token_hash"] != "recovery-token" {
 		t.Errorf("first call = %s %v", calls[0].path, calls[0].body)
 	}
 	if calls[1].path != "/user" || calls[1].method != http.MethodPut {

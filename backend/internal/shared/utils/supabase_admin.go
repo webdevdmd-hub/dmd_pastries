@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -182,9 +183,12 @@ func (c *SupabaseAdminClient) CreatePasswordRecovery(email, redirectURL string) 
 		return nil
 	}
 
-	return c.do(http.MethodPost, "/recover", map[string]any{
-		"email":       strings.ToLower(strings.TrimSpace(email)),
-		"redirect_to": redirectURL,
+	// GoTrue reads redirect_to from the query string, not the body. Sent in the
+	// body it is silently ignored and the link lands on the Site URL root, where
+	// nothing handles it -- which is how the first reset on Supabase ended up on
+	// the marketing page.
+	return c.do(http.MethodPost, "/recover?redirect_to="+url.QueryEscape(redirectURL), map[string]any{
+		"email": strings.ToLower(strings.TrimSpace(email)),
 	}, nil)
 }
 
@@ -203,9 +207,11 @@ func (c *SupabaseAdminClient) CompletePasswordRecovery(recoveryToken, newPasswor
 	var session struct {
 		AccessToken string `json:"access_token"`
 	}
+	// token_hash is the value the email link carries. "token" is the six-digit
+	// OTP form and needs an email alongside it; sent alone it is rejected.
 	if err := c.do(http.MethodPost, "/verify", map[string]any{
-		"type":  "recovery",
-		"token": recoveryToken,
+		"type":       "recovery",
+		"token_hash": recoveryToken,
 	}, &session); err != nil {
 		return err
 	}
