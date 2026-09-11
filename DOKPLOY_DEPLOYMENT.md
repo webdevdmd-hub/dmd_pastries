@@ -1,10 +1,10 @@
 # Dokploy Production Deployment
 
-Deploy three services in this order:
+Deploy two services in this order (the database is Supabase, not a Dokploy
+service, since 10 September 2026):
 
-1. `DMD_Pastries_Postgres`
-2. `DMD_Pastries_backend`
-3. `DMD_Pastries_frontend`
+1. `DMD_Pastries_backend`
+2. `DMD_Pastries_frontend`
 
 Use separate public domains, all under one registrable domain:
 
@@ -29,7 +29,112 @@ Seeing that on `localhost` in development is expected and not worth chasing:
 fallback is the only option there. Seeing it in production means the domains are
 wrong.
 
-## PostgreSQL Service
+## Supabase Project (current stack, since 10 September 2026)
+
+Production runs on one Supabase project for Postgres, Auth and Storage. The
+Dokploy Postgres and Appwrite sections further down describe the previous
+stack and are kept only until Appwrite is decommissioned; do not create those
+services for a new deployment.
+
+Create the project in the region closest to the Dokploy server (the current
+one is `ap-south-1`, Mumbai, same city as the server). Verify the region from
+the pooler host, not from the dashboard label: `aws-0-<region>.pooler.supabase.com`
+answers a wrong password with `password authentication failed`; any other
+region's pooler answers `tenant or user not found`.
+
+### Dashboard settings
+
+Every one of these was needed; each is a setting, not code, so it has to be
+repeated on any new project.
+
+| Where | Setting | Value | Why |
+| --- | --- | --- | --- |
+| Authentication → Sign In / Providers | Allow new users to sign up | **off** | Accounts are created only through the app (owner registration and invitations use the admin API, which ignores this switch). |
+| Authentication → Sessions | Access token (JWT) expiry time | **900** | Tokens are verified locally, so a disabled employee keeps access until the token expires. 15 minutes bounds that; the session still refreshes itself silently. |
+| Authentication → URL Configuration | Site URL | `https://app.<your-domain>` | Where Supabase sends anyone it redirects. The default `localhost:3000` lands users on nothing. |
+| Authentication → URL Configuration | Redirect URLs | `https://app.<your-domain>/**` | Without this, `redirect_to` on reset links is ignored and the Site URL is used instead. |
+| Authentication → Emails → SMTP Settings | Custom SMTP | your provider | The built-in mailer sends about two messages an hour and, on the free tier, will not let the reset email template be edited. Custom SMTP unlocks the template; set the recovery link to `{{ .SiteURL }}/reset-password?token_hash={{ .TokenHash }}&type=recovery`. Until then the app's manager-issued reset link is the working path. |
+| Settings → Data API | Exposed schemas | remove `public` | The frontend never queries the database directly. Belt and braces over RLS. |
+| Storage → Policies | three INSERT policies for `authenticated` | `bucket_id = '<bucket>'` | One each for `product-images`, `business-assets`, `documents`. Browser uploads 403 without them. Dashboard only: `storage.objects` is owned by the storage admin, so SQL as `postgres` cannot create them. |
+
+Buckets: `product-images` and `business-assets` public, `documents` private
+(expense receipts; nothing renders one). Create them in the dashboard or with
+`insert into storage.buckets (id, name, public) values (...)`.
+
+Run once in the SQL Editor after the first backend boot has created the
+tables:
+
+```sql
+revoke all on all tables in schema public from anon, authenticated;
+revoke all on all sequences in schema public from anon, authenticated;
+revoke usage on schema public from anon, authenticated;
+alter default privileges for role postgres in schema public revoke all on tables from anon, authenticated;
+```
+
+The project's `ensure_rls` event trigger already enables RLS on every table
+the migrations create, with no policies, which is what keeps the `anon` key
+out at the database. Two things must stay true or the app itself is locked
+out silently: every table stays owned by `postgres`, and no table ever gets
+`FORCE ROW LEVEL SECURITY`.
+
+### Backend environment
+
+```env
+POSTGRES_HOST=aws-0-<region>.pooler.supabase.com
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres.<project-ref>
+POSTGRES_PASSWORD=<database password>
+POSTGRES_DB=postgres
+POSTGRES_SSLMODE=verify-full
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service role key>
+AUTH_PRIMARY_PROVIDER=supabase
+PASSWORD_RESET_URL=https://app.<your-domain>/reset-password
+```
+
+Use the session pooler, not `db.<ref>.supabase.co`: the direct host has only
+an IPv6 address and does not even resolve from inside a Docker network.
+`verify-full` needs no certificate setting; Supabase's root CA ships in the
+image and is applied for any Supabase host. `SUPABASE_JWT_SECRET` stays unset;
+user tokens are verified against the project's published key. Both the legacy
+`eyJ…` service_role key and a new-style `sb_secret_…` key work unchanged.
+Leave the three `APPWRITE_*` variables out entirely.
+
+### Frontend environment
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon or sb_publishable_ key>
+NEXT_PUBLIC_AUTH_PROVIDER=supabase
+NEXT_PUBLIC_STORAGE_PROVIDER=supabase
+```
+
+Remove the five `NEXT_PUBLIC_APPWRITE_*` variables.
+
+### Dokploy traps that cost a day
+
+- The swarm service keeps the environment it was **created** with. After
+  changing a variable, a plain Deploy rebuilds the image but the new container
+  still gets the old values. Use **Stop** then **Deploy** (or the API's
+  `application.stop` followed by `application.deploy`).
+- The Environment page does nothing until its Save button is clicked; the
+  orange "(You have unsaved changes)" is easy to miss. The same is true of
+  Supabase's URL Configuration page.
+- The backend build needs Dockerfile path `backend/Dockerfile`, context path
+  `.` and build path `/`. Any other combination fails in seconds with
+  `COPY backend/...: not found`.
+- Dokploy builds one service at a time. After a push, the second service's
+  build starts only when the first finishes; a frontend that has a new button
+  before the backend has its route shows a 404 for those minutes.
+- The API keeps one Server-Sent Events stream open per signed-in tab
+  (`/api/v1/events/stream`) for live updates. Traefik streams it without
+  configuration; if a future proxy buffers, the Network tab shows the request
+  completing every 25 s instead of staying pending.
+
+## PostgreSQL Service (superseded)
+
+> Not used since 10 September 2026. Postgres is Supabase; see the section above.
+
 
 Create the Dokploy PostgreSQL service with:
 
@@ -52,9 +157,10 @@ Dokploy service settings:
 
 ```txt
 Service name: DMD_Pastries_backend
-Root directory: backend
 Build type: Dockerfile
-Dockerfile path: Dockerfile
+Dockerfile path: backend/Dockerfile
+Docker context path: .
+Build path: /
 Container port: 8080
 Health check path: /health
 Public domain: https://api.<your-domain>
@@ -69,6 +175,7 @@ backend/.env.production.example
 Set real secrets in Dokploy, not in Git:
 
 ```env
+# Superseded: see "Supabase Project" above for the current variables.
 POSTGRES_PASSWORD=<DOKPLOY_POSTGRES_PASSWORD>
 DATABASE_URL=postgresql://postgres:<DOKPLOY_POSTGRES_PASSWORD>@DMD_Pastries_Postgres:5432/pastries_pos?sslmode=disable
 APPWRITE_API_KEY=<APPWRITE_SERVER_API_KEY>
