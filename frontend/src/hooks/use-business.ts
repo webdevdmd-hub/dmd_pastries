@@ -11,6 +11,7 @@ import {
   updateBusinessProfile,
   updateBusinessSettings,
 } from "@/lib/api/business";
+import { invalidateRoot, QUERY_ROOTS } from "@/lib/query-invalidation";
 import type {
   BusinessProfile,
   BusinessSettings,
@@ -23,8 +24,6 @@ import type {
 const businessQueryKey = "business";
 const onboardingQueryKey = "onboarding-status";
 const settingsQueryKey = "business-settings";
-const branchesQueryKey = "branches";
-const usersQueryKey = "users";
 
 export function useBusinessProfile(enabled = true) {
   return useQuery({
@@ -57,8 +56,8 @@ export function useUpdateBusinessProfile() {
     mutationFn: async (payload) => updateBusinessProfile(payload),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: [businessQueryKey] }),
-        queryClient.invalidateQueries({ queryKey: [onboardingQueryKey] }),
+        invalidateRoot(queryClient, QUERY_ROOTS.business),
+        invalidateRoot(queryClient, QUERY_ROOTS.onboardingStatus),
       ]);
     },
   });
@@ -71,8 +70,8 @@ export function useUpdateBusinessSettings() {
     mutationFn: async (payload) => updateBusinessSettings(payload),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: [settingsQueryKey] }),
-        queryClient.invalidateQueries({ queryKey: [onboardingQueryKey] }),
+        invalidateRoot(queryClient, QUERY_ROOTS.businessSettings),
+        invalidateRoot(queryClient, QUERY_ROOTS.onboardingStatus),
       ]);
     },
   });
@@ -88,9 +87,9 @@ export function useSwitchBranch() {
       await refreshProfile();
       await Promise.all([
         queryClient.invalidateQueries(),
-        queryClient.invalidateQueries({ queryKey: [onboardingQueryKey] }),
-        queryClient.invalidateQueries({ queryKey: [branchesQueryKey] }),
-        queryClient.invalidateQueries({ queryKey: [usersQueryKey] }),
+        invalidateRoot(queryClient, QUERY_ROOTS.onboardingStatus),
+        invalidateRoot(queryClient, QUERY_ROOTS.branches),
+        invalidateRoot(queryClient, QUERY_ROOTS.users),
       ]);
     },
   });

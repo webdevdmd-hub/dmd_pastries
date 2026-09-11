@@ -31,7 +31,7 @@ func NewRouter(cfg config.Config) *gin.Engine {
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-Appwrite-Project", "X-Appwrite-JWT", "X-Appwrite-Response-Format", "Cache-Control", "Pragma"},
+		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-Appwrite-Project", "X-Appwrite-JWT", "X-Appwrite-Response-Format", "Cache-Control", "Pragma", "X-Client-Id"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,

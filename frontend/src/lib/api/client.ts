@@ -43,7 +43,7 @@ export class ApiError extends Error {
   }
 }
 
-function getApiBaseUrl(): string {
+export function getApiBaseUrl(): string {
   const baseUrl = getPublicEnvValue("NEXT_PUBLIC_API_BASE_URL");
 
   if (!baseUrl) {

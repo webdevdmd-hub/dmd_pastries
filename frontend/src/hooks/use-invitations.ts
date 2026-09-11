@@ -9,6 +9,7 @@ import {
   getStaffInvitations,
   resendStaffInvitation,
 } from "@/lib/api/invitations";
+import { invalidateRoot, QUERY_ROOTS } from "@/lib/query-invalidation";
 import type {
   AcceptStaffInvitationPayload,
   AcceptStaffInvitationResult,
@@ -19,7 +20,6 @@ import type {
 } from "@/types/invitation";
 
 const invitationsQueryKey = "staff-invitations";
-const usersQueryKey = "users";
 
 export function useStaffInvitations(status?: StaffInvitationStatus, enabled = true) {
   return useQuery({
@@ -31,8 +31,8 @@ export function useStaffInvitations(status?: StaffInvitationStatus, enabled = tr
 
 function invalidateInvitations(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
   return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [invitationsQueryKey] }),
-    queryClient.invalidateQueries({ queryKey: [usersQueryKey] }),
+    invalidateRoot(queryClient, QUERY_ROOTS.invitations),
+    invalidateRoot(queryClient, QUERY_ROOTS.users),
   ]);
 }
 

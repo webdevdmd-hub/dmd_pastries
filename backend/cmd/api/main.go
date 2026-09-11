@@ -16,6 +16,7 @@ import (
 	"pastries-pos/internal/modules/customers"
 	"pastries-pos/internal/modules/dashboard"
 	dashboardcache "pastries-pos/internal/modules/dashboard/cache"
+	"pastries-pos/internal/modules/events"
 	"pastries-pos/internal/modules/expenses"
 	"pastries-pos/internal/modules/ingredients"
 	"pastries-pos/internal/modules/inventory"
@@ -40,6 +41,7 @@ import (
 	"pastries-pos/internal/modules/systemhealth"
 	"pastries-pos/internal/modules/users"
 	"pastries-pos/internal/server"
+	sharedevents "pastries-pos/internal/shared/events"
 	"pastries-pos/internal/shared/utils"
 )
 
@@ -209,6 +211,10 @@ func main() {
 
 	router := server.NewRouter(cfg)
 	auth.RegisterRoutes(router, authHandler, authMiddleware.RequireAuth())
+	// Live updates: a tab tells the API what it changed; the API relays it to
+	// the business's other tabs over SSE. In-memory, one replica.
+	changeHub := sharedevents.NewHub()
+	events.RegisterRoutes(router, events.NewHandler(changeHub), authMiddleware.RequireAuth())
 	users.RegisterPublicAuthRoutes(router, userHandler)
 	users.RegisterRoutes(
 		router,

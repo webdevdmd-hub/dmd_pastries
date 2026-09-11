@@ -14,6 +14,7 @@ import {
   updateUser,
   updateUserStatus,
 } from "@/lib/api/users";
+import { invalidateRoot, QUERY_ROOTS } from "@/lib/query-invalidation";
 import type {
   AssignUserBranchPayload,
   AssignUserBranchResult,
@@ -51,8 +52,8 @@ export function useUser(userId: string | null) {
 
 function invalidateUsers(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
   return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [usersQueryKey] }),
-    queryClient.invalidateQueries({ queryKey: [usersQueryKey, "detail"] }),
+    invalidateRoot(queryClient, QUERY_ROOTS.users),
+    invalidateRoot(queryClient, QUERY_ROOTS.users),
   ]);
 }
 

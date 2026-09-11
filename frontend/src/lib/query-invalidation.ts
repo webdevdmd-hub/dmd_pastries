@@ -1,5 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 
+import { broadcastChanged } from "@/lib/live-broadcast";
+
 export const QUERY_ROOTS = {
   accounting: "accounting",
   bakeryOrderReports: "bakery-orders-reports",
@@ -32,19 +34,54 @@ export const QUERY_ROOTS = {
   settingsData: "settings-data",
   stockMovements: "stock-movements",
   suppliers: "suppliers",
+  // Staff and workspace roots. These hooks invalidated their keys directly
+  // before live updates existed; naming the roots here lets a change on one
+  // terminal reach the others.
+  users: "users",
+  roles: "roles",
+  invitations: "invitations",
+  onboardingStatus: "onboarding-status",
+  businessSettings: "business-settings",
 } as const;
 
 export type QueryRoot = (typeof QUERY_ROOTS)[keyof typeof QUERY_ROOTS];
 
-export function invalidateRoot(queryClient: QueryClient, root: QueryRoot): Promise<void> {
-  return queryClient.invalidateQueries({
-    queryKey: [root],
-    refetchType: "active",
-  });
+const knownRoots: ReadonlySet<string> = new Set<string>(Object.values(QUERY_ROOTS));
+
+export function isQueryRoot(value: unknown): value is QueryRoot {
+  return typeof value === "string" && knownRoots.has(value);
 }
 
+/**
+ * Invalidate in this tab only. This is what a notice from another tab runs:
+ * it must not announce again, or two terminals would ping-pong forever.
+ */
+export function invalidateRootsLocal(
+  queryClient: QueryClient,
+  roots: QueryRoot[],
+): Promise<void[]> {
+  return Promise.all(
+    Array.from(new Set(roots)).map((root) =>
+      queryClient.invalidateQueries({
+        queryKey: [root],
+        refetchType: "active",
+      }),
+    ),
+  );
+}
+
+/**
+ * Invalidate here and tell the business's other tabs to do the same. Every
+ * mutation helper in the app goes through this, which is what makes a change
+ * on one terminal show on the others without a reload.
+ */
 export function invalidateRoots(queryClient: QueryClient, roots: QueryRoot[]): Promise<void[]> {
-  return Promise.all(Array.from(new Set(roots)).map((root) => invalidateRoot(queryClient, root)));
+  broadcastChanged(roots);
+  return invalidateRootsLocal(queryClient, roots);
+}
+
+export function invalidateRoot(queryClient: QueryClient, root: QueryRoot): Promise<void> {
+  return invalidateRoots(queryClient, [root]).then(() => undefined);
 }
 
 export function invalidateProductData(queryClient: QueryClient): Promise<void[]> {

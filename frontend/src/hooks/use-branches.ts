@@ -10,6 +10,7 @@ import {
   updateBranch,
   updateBranchStatus,
 } from "@/lib/api/branches";
+import { invalidateRoot, QUERY_ROOTS } from "@/lib/query-invalidation";
 import type {
   AssignUserBranchPayload,
   Branch,
@@ -45,7 +46,7 @@ export function useBranch(id: string | null, enabled = true) {
 }
 
 function invalidateBranches(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
-  return Promise.all([queryClient.invalidateQueries({ queryKey: [branchesQueryKey] })]);
+  return Promise.all([invalidateRoot(queryClient, QUERY_ROOTS.branches)]);
 }
 
 export function useCreateBranch() {
@@ -109,7 +110,7 @@ export function useAssignUserBranch() {
     mutationFn: async ({ userId, payload }) => assignUserBranch(userId, payload),
     onSuccess: async (updatedUser) => {
       queryClient.setQueryData([usersQueryKey, "detail", updatedUser.id], updatedUser);
-      await queryClient.invalidateQueries({ queryKey: [usersQueryKey] });
+      await invalidateRoot(queryClient, QUERY_ROOTS.users);
     },
   });
 }

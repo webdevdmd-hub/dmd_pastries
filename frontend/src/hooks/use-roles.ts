@@ -11,6 +11,7 @@ import {
   updateRole,
   updateRolePermissions,
 } from "@/lib/api/roles";
+import { invalidateRoot, QUERY_ROOTS } from "@/lib/query-invalidation";
 import type {
   CreateRolePayload,
   DeleteRoleResult,
@@ -59,9 +60,9 @@ export function useRolePermissions(roleId: string | null) {
 
 function invalidateRoles(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown[]> {
   return Promise.all([
-    queryClient.invalidateQueries({ queryKey: [rolesQueryKey] }),
-    queryClient.invalidateQueries({ queryKey: [rolesQueryKey, "detail"] }),
-    queryClient.invalidateQueries({ queryKey: [rolesQueryKey, "permissions"] }),
+    invalidateRoot(queryClient, QUERY_ROOTS.roles),
+    invalidateRoot(queryClient, QUERY_ROOTS.roles),
+    invalidateRoot(queryClient, QUERY_ROOTS.roles),
   ]);
 }
 

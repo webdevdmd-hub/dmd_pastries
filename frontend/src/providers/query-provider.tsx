@@ -16,7 +16,10 @@ export function QueryProvider({ children }: QueryProviderProps): JSX.Element {
         defaultOptions: {
           queries: {
             retry: 1,
-            refetchOnWindowFocus: false,
+            // A tab that was hidden, or a terminal that lost wifi, catches up
+            // the moment it is looked at again. Live updates cover the rest.
+            refetchOnWindowFocus: true,
+            refetchOnReconnect: true,
             // Reference data (branches, tags, mappings, product lists) is read
             // by several components on one page. With staleTime 0 the second
             // one to mount after the first fetch settled refetched the same
