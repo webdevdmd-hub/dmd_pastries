@@ -28,7 +28,12 @@ import { authenticatedHomeRoute } from "@/lib/auth/routes";
 import { AuthRateLimitError, SessionAlreadyExistsError } from "@/lib/auth/session";
 import { type LoginSchema, loginSchema } from "@/validators/auth.schema";
 
-export function LoginForm(): JSX.Element {
+type LoginFormProps = {
+  /** Arrived from accept-invitation: the account exists and has never signed in. */
+  activated?: boolean;
+};
+
+export function LoginForm({ activated = false }: LoginFormProps): JSX.Element {
   const router = useRouter();
   const { continueCurrentSession, login, restartLogin } = useAuth();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -168,6 +173,15 @@ export function LoginForm(): JSX.Element {
               void onSubmit(event);
             }}
           >
+            {activated ? (
+              <Alert className="border-info/30 bg-info-tint text-info-text">
+                <AlertTitle>Your account is ready</AlertTitle>
+                <AlertDescription>
+                  Please log in with the email you were invited with.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
             {submitError && !rateLimited ? (
               <Alert
                 className="border-danger/30 bg-danger-tint text-danger-text"

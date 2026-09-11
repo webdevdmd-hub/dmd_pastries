@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -23,6 +22,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ROUTES } from "@/constants/routes";
+import { useAuth } from "@/hooks/use-auth";
 import { useAcceptStaffInvitation } from "@/hooks/use-invitations";
 import { getErrorMessage } from "@/lib/api/client";
 import { type AcceptInvitationSchema, acceptInvitationSchema } from "@/lib/validators/user.schema";
@@ -33,6 +33,7 @@ type AcceptInvitationFormProps = {
 
 export function AcceptInvitationForm({ token }: AcceptInvitationFormProps): JSX.Element {
   const router = useRouter();
+  const { isAuthenticated, logout } = useAuth();
   const acceptInvitationMutation = useAcceptStaffInvitation();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const form = useForm<AcceptInvitationSchema>({
@@ -53,8 +54,15 @@ export function AcceptInvitationForm({ token }: AcceptInvitationFormProps): JSX.
 
     try {
       await acceptInvitationMutation.mutateAsync(values);
-      toast.success("Invitation accepted. You can now sign in.");
-      router.replace(ROUTES.login);
+      // A manager often accepts on the new employee's behalf from a terminal
+      // where they are still signed in. Left alone, the login page would bounce
+      // straight back into the manager's dashboard and the new account would
+      // look "logged in" without ever having signed in. Clear that session
+      // first, so the next screen is always the login form.
+      if (isAuthenticated) {
+        await logout();
+      }
+      router.replace(`${ROUTES.login}?activated=1`);
     } catch (error) {
       setSubmitError(getErrorMessage(error));
     }
