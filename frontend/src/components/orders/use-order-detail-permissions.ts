@@ -15,19 +15,15 @@ export type OrderDetailPermissions = {
 export function useOrderDetailPermissions(): OrderDetailPermissions {
   const { hasAnyPermission, hasPermission } = usePermission();
   // TODO: Remove POS fallback after orders.* permissions are seeded for every tenant.
-  const canView = hasAnyPermission([PERMISSIONS.ordersView, PERMISSIONS.posView]);
+  const canView = hasAnyPermission([PERMISSIONS.ordersView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.ordersEdit,
     PERMISSIONS.ordersStatusUpdate,
     PERMISSIONS.ordersPaymentsManage,
     PERMISSIONS.ordersProductionAssign,
     PERMISSIONS.ordersPackagingManage,
-    PERMISSIONS.posSell,
   ]);
-  const canManageOrderCatalogLinks = hasAnyPermission([
-    PERMISSIONS.ordersEdit,
-    PERMISSIONS.posSell,
-  ]);
+  const canManageOrderCatalogLinks = hasAnyPermission([PERMISSIONS.ordersEdit]);
 
   return {
     canConvertToProduct: canManageOrderCatalogLinks && hasPermission(PERMISSIONS.productsCreate),

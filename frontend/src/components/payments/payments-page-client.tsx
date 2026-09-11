@@ -116,9 +116,9 @@ export function PaymentsPageClient(): JSX.Element {
   const [returnPayment, setReturnPayment] = useState<SalePayment | null>(null);
   const [receipt, setReceipt] = useState<SaleReceipt | null>(null);
   const [receiptBranchId, setReceiptBranchId] = useState<string | null>(null);
-  const canView = hasAnyPermission([PERMISSIONS.paymentsView, PERMISSIONS.posView]);
-  const canAdd = hasAnyPermission([PERMISSIONS.paymentsAdd, PERMISSIONS.posSell]);
-  const canRefund = hasAnyPermission([PERMISSIONS.paymentsRefund, PERMISSIONS.posRefund]);
+  const canView = hasAnyPermission([PERMISSIONS.paymentsView]);
+  const canAdd = hasAnyPermission([PERMISSIONS.paymentsAdd]);
+  const canRefund = hasAnyPermission([PERMISSIONS.paymentsRefund]);
   const canViewUsers = hasPermission(PERMISSIONS.usersView);
   const canSelectRefundApprover =
     hasAnyPermission([PERMISSIONS.paymentsRefund]) || user?.roles.some(isOwnerOrAdminRole) === true;

@@ -61,7 +61,7 @@ function isOrdersViewMode(value: string | null): value is OrdersViewMode {
 
 export function OrdersPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.ordersView, PERMISSIONS.posView]);
+  const canView = hasAnyPermission([PERMISSIONS.ordersView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.ordersCreate,
     PERMISSIONS.ordersEdit,
@@ -70,7 +70,6 @@ export function OrdersPageClient(): JSX.Element {
     PERMISSIONS.ordersPaymentsManage,
     PERMISSIONS.ordersProductionAssign,
     PERMISSIONS.ordersPackagingManage,
-    PERMISSIONS.posSell,
   ]);
   const [filters, setFilters] = useState<BakeryOrderFilters>(defaultFilters);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);

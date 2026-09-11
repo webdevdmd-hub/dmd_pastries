@@ -293,7 +293,7 @@ func main() {
 		router,
 		salesReturnHandler,
 		authMiddleware.RequireAuth(),
-		permit("sales_returns.view", "pos.view"),
+		permit("sales_returns.view"),
 		permit("sales_returns.create", "sales_returns.manage"),
 		permit("sales_returns.edit", "sales_returns.manage"),
 		permit("sales_returns.post", "sales_returns.manage"),
@@ -303,9 +303,9 @@ func main() {
 		router,
 		paymentHandler,
 		authMiddleware.RequireAuth(),
-		permit("payments.view", "pos.view"),
-		permit("payments.add", "payments.manage", "pos.sell"),
-		permit("payments.refund", "pos.refund"),
+		permit("payments.view"),
+		permit("payments.add", "payments.manage"),
+		permit("payments.refund"),
 		permit("payments.summary.view", "payments.view", "reports.view"),
 		permit("payments.reconcile", "reports.view"),
 	)
@@ -313,8 +313,12 @@ func main() {
 		router,
 		customerHandler,
 		authMiddleware.RequireAuth(),
-		permit("customers.view", "pos.view"),
-		permit("customers.create", "customers.edit", "customers.delete", "customers.status.update", "customers.notes.manage", "customers.tags.manage", "customers.quick_create", "customers.manage", "pos.sell"),
+		permit("customers.view"),
+		permit("customers.create", "customers.edit", "customers.delete", "customers.status.update", "customers.notes.manage", "customers.tags.manage", "customers.quick_create", "customers.manage"),
+		// What the till needs from customers, and only that: find a customer,
+		// or add one at the counter. pos.* never unlocks the customer list.
+		permit("customers.view", "pos.view", "pos.sell"),
+		permit("customers.quick_create", "customers.create", "customers.manage", "pos.sell"),
 	)
 	ingredients.RegisterRoutes(
 		router,
@@ -352,14 +356,14 @@ func main() {
 		router,
 		supplierHandler,
 		authMiddleware.RequireAuth(),
-		permit("suppliers.view", "inventory.view"),
+		permit("suppliers.view"),
 		permit("suppliers.create", "suppliers.edit", "suppliers.delete", "suppliers.status.update", "suppliers.contacts.manage", "suppliers.notes.manage", "suppliers.manage", "inventory.manage"),
 	)
 	purchasing.RegisterRoutes(
 		router,
 		purchasingHandler,
 		authMiddleware.RequireAuth(),
-		permit("purchasing.view", "purchasing.returns.view", "inventory.view"),
+		permit("purchasing.view", "purchasing.returns.view"),
 		permit("purchasing.orders.create", "purchasing.orders.edit", "purchasing.orders.delete", "purchasing.orders.status.update", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.invoices.post", "purchasing.invoices.cancel", "purchasing.receipts.create", "purchasing.receipts.post", "purchasing.receipts.cancel", "purchasing.returns.create", "purchasing.returns.edit", "purchasing.returns.post", "purchasing.returns.cancel", "purchasing.returns.manage", "purchasing.receive_stock", "purchasing.manage", "inventory.manage"),
 	)
 	recipes.RegisterRoutes(
@@ -373,8 +377,8 @@ func main() {
 		router,
 		bakeryOrderHandler,
 		authMiddleware.RequireAuth(),
-		permit("orders.view", "pos.view"),
-		permit("orders.create", "orders.edit", "orders.delete", "orders.status.update", "orders.payments.manage", "orders.production.assign", "orders.packaging.manage", "orders.manage", "pos.sell"),
+		permit("orders.view"),
+		permit("orders.create", "orders.edit", "orders.delete", "orders.status.update", "orders.payments.manage", "orders.production.assign", "orders.packaging.manage", "orders.manage"),
 		permit("products.create", "products.manage"),
 		permit("products.variants.manage", "products.manage"),
 	)
@@ -385,7 +389,7 @@ func main() {
 		permit("reports.view"),
 		permit("inventory.view"),
 		permit("manufacturing.view"),
-		permit("orders.view", "pos.view"),
+		permit("orders.view"),
 		permit("reports.export"),
 	)
 	dashboard.RegisterRoutes(

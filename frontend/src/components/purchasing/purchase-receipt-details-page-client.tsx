@@ -35,7 +35,7 @@ export function PurchaseReceiptDetailsPageClient({
   receiptId: string;
 }): JSX.Element {
   const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.purchasingView, PERMISSIONS.inventoryView]);
+  const canView = hasAnyPermission([PERMISSIONS.purchasingView]);
   const canPost = hasAnyPermission([
     PERMISSIONS.purchasingReceiptsPost,
     PERMISSIONS.purchasingReceiveStock,

@@ -97,7 +97,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
   const { normalizeBranchId } = branchScope;
-  const canView = hasAnyPermission([PERMISSIONS.purchasingView, PERMISSIONS.inventoryView]);
+  const canView = hasAnyPermission([PERMISSIONS.purchasingView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.purchasingInvoicesEdit,
     PERMISSIONS.purchasingInvoicesPost,

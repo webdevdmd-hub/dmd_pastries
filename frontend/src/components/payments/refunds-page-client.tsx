@@ -30,7 +30,7 @@ const defaultFilters: RefundFilters = {
 export function RefundsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const [filters, setFilters] = useState<RefundFilters>(defaultFilters);
-  const canView = hasAnyPermission([PERMISSIONS.paymentsView, PERMISSIONS.posView]);
+  const canView = hasAnyPermission([PERMISSIONS.paymentsView]);
   const refundsQuery = useRefunds(filters, canView);
   const methodsQuery = usePaymentMethods(canView);
   const isPermissionDenied =

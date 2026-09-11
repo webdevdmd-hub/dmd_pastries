@@ -131,7 +131,7 @@ export function OrderFormPage({
   const branchScope = useBranchScope();
   const { hasAnyPermission } = usePermission();
   // TODO: Remove POS fallback after orders.* permissions are seeded for every tenant.
-  const canView = hasAnyPermission([PERMISSIONS.ordersView, PERMISSIONS.posView]);
+  const canView = hasAnyPermission([PERMISSIONS.ordersView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.ordersCreate,
     PERMISSIONS.ordersEdit,
@@ -139,7 +139,6 @@ export function OrderFormPage({
     PERMISSIONS.ordersPaymentsManage,
     PERMISSIONS.ordersProductionAssign,
     PERMISSIONS.ordersPackagingManage,
-    PERMISSIONS.posSell,
   ]);
   const isEdit = orderId !== null;
 

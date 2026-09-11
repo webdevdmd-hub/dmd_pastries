@@ -105,13 +105,12 @@ export function SaleDetailPageClient({ saleId }: SaleDetailPageClientProps): JSX
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const canView = hasAnyPermission([PERMISSIONS.paymentsView, PERMISSIONS.posView]);
-  const canReturn = hasAnyPermission([PERMISSIONS.paymentsRefund, PERMISSIONS.posRefund]);
+  const canView = hasAnyPermission([PERMISSIONS.paymentsView]);
+  const canReturn = hasAnyPermission([PERMISSIONS.paymentsRefund]);
   const canReverse = hasAnyPermission([
     PERMISSIONS.salesReturnsReverse,
     PERMISSIONS.salesReturnsManage,
     PERMISSIONS.paymentsRefund,
-    PERMISSIONS.posRefund,
   ]);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);

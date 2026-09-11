@@ -8,14 +8,18 @@ func RegisterRoutes(
 	authGuard gin.HandlerFunc,
 	view gin.HandlerFunc,
 	manage gin.HandlerFunc,
+	// The two calls the till makes. Kept apart from view/manage so pos.* can
+	// unlock exactly these and nothing else in the customers module.
+	posLookup gin.HandlerFunc,
+	posQuickCreate gin.HandlerFunc,
 ) {
 	group := router.Group("/api/v1/customers")
 	group.Use(authGuard)
 
 	group.GET("", view, handler.ListCustomers)
 	group.POST("", manage, handler.CreateCustomer)
-	group.GET("/lookup", view, handler.LookupCustomers)
-	group.POST("/quick-create", manage, handler.QuickCreateCustomer)
+	group.GET("/lookup", posLookup, handler.LookupCustomers)
+	group.POST("/quick-create", posQuickCreate, handler.QuickCreateCustomer)
 
 	group.GET("/tags", view, handler.ListTags)
 	group.POST("/tags", manage, handler.CreateTag)

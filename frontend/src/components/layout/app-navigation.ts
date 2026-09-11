@@ -65,13 +65,7 @@ export const appNavigationGroups = [
         href: ROUTES.orders,
         icon: NotebookTabs,
         label: "Bakery Orders",
-        // TODO: Remove POS fallback once every tenant has orders.* permissions seeded.
-        permissionAny: [
-          PERMISSIONS.ordersView,
-          PERMISSIONS.ordersCreate,
-          PERMISSIONS.ordersEdit,
-          PERMISSIONS.posView,
-        ],
+        permissionAny: [PERMISSIONS.ordersView, PERMISSIONS.ordersCreate, PERMISSIONS.ordersEdit],
       },
       {
         href: ROUTES.products,
@@ -87,12 +81,10 @@ export const appNavigationGroups = [
         href: ROUTES.customers,
         icon: UserRound,
         label: "Customers",
-        // TODO: Remove POS fallback once every tenant has customers.* permissions seeded.
         permissionAny: [
           PERMISSIONS.customersView,
           PERMISSIONS.customersCreate,
           PERMISSIONS.customersEdit,
-          PERMISSIONS.posView,
         ],
       },
       {
@@ -118,13 +110,13 @@ export const appNavigationGroups = [
         href: ROUTES.payments,
         icon: Landmark,
         label: "Payments",
-        permissionAny: [PERMISSIONS.paymentsView, PERMISSIONS.paymentsAdd, PERMISSIONS.posView],
+        permissionAny: [PERMISSIONS.paymentsView, PERMISSIONS.paymentsAdd],
       },
       {
         href: ROUTES.purchasingPayments,
         icon: WalletCards,
         label: "Payments Made",
-        permissionAny: [PERMISSIONS.purchasingView, PERMISSIONS.inventoryView],
+        permissionAny: [PERMISSIONS.purchasingView],
       },
       {
         href: ROUTES.purchasingReturns,
@@ -135,7 +127,6 @@ export const appNavigationGroups = [
           PERMISSIONS.purchasingReturnsView,
           PERMISSIONS.purchasingReturnsCreate,
           PERMISSIONS.purchasingReturnsManage,
-          PERMISSIONS.inventoryView,
         ],
       },
       {
@@ -173,25 +164,21 @@ export const appNavigationGroups = [
         href: ROUTES.suppliers,
         icon: Truck,
         label: "Suppliers",
-        // TODO: Remove inventory fallback once every tenant has suppliers.* permissions seeded.
         permissionAny: [
           PERMISSIONS.suppliersView,
           PERMISSIONS.suppliersCreate,
           PERMISSIONS.suppliersEdit,
-          PERMISSIONS.inventoryView,
         ],
       },
       {
         href: ROUTES.purchasingOrders,
         icon: ShoppingCart,
         label: "Purchase Orders",
-        // TODO: Remove inventory fallback once purchasing.* permissions are seeded for every tenant.
         permissionAny: [
           PERMISSIONS.purchasingView,
           PERMISSIONS.purchasingOrdersCreate,
           PERMISSIONS.purchasingOrdersEdit,
           PERMISSIONS.purchasingOrdersStatusUpdate,
-          PERMISSIONS.inventoryView,
         ],
       },
       {
@@ -203,7 +190,6 @@ export const appNavigationGroups = [
           PERMISSIONS.purchasingInvoicesCreate,
           PERMISSIONS.purchasingInvoicesEdit,
           PERMISSIONS.purchasingInvoicesPost,
-          PERMISSIONS.inventoryView,
         ],
       },
       {
@@ -215,7 +201,6 @@ export const appNavigationGroups = [
           PERMISSIONS.purchasingReceiptsCreate,
           PERMISSIONS.purchasingReceiptsPost,
           PERMISSIONS.purchasingReceiveStock,
-          PERMISSIONS.inventoryView,
         ],
       },
       // "Payments Made" and "Vendor Credits" moved to the Money group. They are
@@ -254,7 +239,6 @@ export const appNavigationGroups = [
         href: ROUTES.manufacturingBatches,
         icon: Soup,
         label: "Manufacturing",
-        // TODO: Remove inventory fallback once manufacturing.* permissions are seeded for every tenant.
         permissionAny: [
           PERMISSIONS.manufacturingView,
           PERMISSIONS.manufacturingBatchesCreate,

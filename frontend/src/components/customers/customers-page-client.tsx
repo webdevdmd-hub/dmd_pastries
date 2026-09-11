@@ -61,7 +61,7 @@ type PendingAction =
 
 export function CustomersPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.customersView, PERMISSIONS.posView]);
+  const canView = hasAnyPermission([PERMISSIONS.customersView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.customersCreate,
     PERMISSIONS.customersEdit,
@@ -69,7 +69,6 @@ export function CustomersPageClient(): JSX.Element {
     PERMISSIONS.customersStatusUpdate,
     PERMISSIONS.customersNotesManage,
     PERMISSIONS.customersTagsManage,
-    PERMISSIONS.posSell,
   ]);
   const [filters, setFilters] = useState<CustomerFilters>(defaultFilters);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);

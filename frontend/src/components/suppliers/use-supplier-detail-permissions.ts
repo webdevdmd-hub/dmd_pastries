@@ -14,7 +14,7 @@ export function useSupplierDetailPermissions(): SupplierDetailPermissions {
   const { hasAnyPermission } = usePermission();
 
   return {
-    canView: hasAnyPermission([PERMISSIONS.suppliersView, PERMISSIONS.inventoryView]),
+    canView: hasAnyPermission([PERMISSIONS.suppliersView]),
     canManage: hasAnyPermission([
       PERMISSIONS.suppliersEdit,
       PERMISSIONS.suppliersStatusUpdate,

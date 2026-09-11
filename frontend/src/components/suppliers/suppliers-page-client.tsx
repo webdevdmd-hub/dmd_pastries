@@ -53,7 +53,7 @@ const PAGE_SIZE = 10;
 
 export function SuppliersPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.suppliersView, PERMISSIONS.inventoryView]);
+  const canView = hasAnyPermission([PERMISSIONS.suppliersView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.suppliersCreate,
     PERMISSIONS.suppliersEdit,

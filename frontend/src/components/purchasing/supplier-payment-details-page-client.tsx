@@ -38,7 +38,7 @@ export function SupplierPaymentDetailsPageClient({
 }): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const branchScope = useBranchScope();
-  const canView = hasAnyPermission([PERMISSIONS.purchasingView, PERMISSIONS.inventoryView]);
+  const canView = hasAnyPermission([PERMISSIONS.purchasingView]);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

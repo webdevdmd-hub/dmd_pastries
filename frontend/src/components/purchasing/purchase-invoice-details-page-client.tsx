@@ -139,7 +139,7 @@ export function PurchaseInvoiceDetailsPageClient({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.purchasingView, PERMISSIONS.inventoryView]);
+  const canView = hasAnyPermission([PERMISSIONS.purchasingView]);
   const canManage = hasAnyPermission([PERMISSIONS.purchasingInvoicesEdit]);
   const canEdit = hasAnyPermission([PERMISSIONS.purchasingInvoicesEdit]);
   const canPost = hasAnyPermission([PERMISSIONS.purchasingInvoicesPost]);

@@ -50,7 +50,7 @@ const documentCards = [
 
 export function PurchasingPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.purchasingView, PERMISSIONS.inventoryView]);
+  const canView = hasAnyPermission([PERMISSIONS.purchasingView]);
   const summaryQuery = usePurchasingSummary(canView);
 
   if (!canView) {

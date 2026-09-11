@@ -44,13 +44,12 @@ const defaultFilters: SalesReturnFilters = {
 export function SalesReturnsPageClient(): JSX.Element {
   const branchScope = useBranchScope();
   const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.paymentsView, PERMISSIONS.posView]);
-  const canManage = hasAnyPermission([PERMISSIONS.paymentsRefund, PERMISSIONS.posRefund]);
+  const canView = hasAnyPermission([PERMISSIONS.paymentsView]);
+  const canManage = hasAnyPermission([PERMISSIONS.paymentsRefund]);
   const canReverse = hasAnyPermission([
     PERMISSIONS.salesReturnsReverse,
     PERMISSIONS.salesReturnsManage,
     PERMISSIONS.paymentsRefund,
-    PERMISSIONS.posRefund,
   ]);
   const [filters, setFilters] = useState<SalesReturnFilters>(defaultFilters);
   const [reversalReturn, setReversalReturn] = useState<SalesReturn | null>(null);

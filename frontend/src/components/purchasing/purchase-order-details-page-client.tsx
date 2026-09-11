@@ -156,7 +156,7 @@ export function PurchaseOrderDetailsPageClient({ orderId }: { orderId: string })
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { hasAnyPermission } = usePermission();
-  const canView = hasAnyPermission([PERMISSIONS.purchasingView, PERMISSIONS.inventoryView]);
+  const canView = hasAnyPermission([PERMISSIONS.purchasingView]);
   const canConvert = hasAnyPermission([PERMISSIONS.purchasingInvoicesCreate]);
   const canCreate = hasAnyPermission([
     PERMISSIONS.purchasingOrdersCreate,

@@ -14,13 +14,12 @@ export function useCustomerDetailPermissions(): CustomerDetailPermissions {
   const { hasAnyPermission } = usePermission();
 
   return {
-    canView: hasAnyPermission([PERMISSIONS.customersView, PERMISSIONS.posView]),
+    canView: hasAnyPermission([PERMISSIONS.customersView]),
     canManage: hasAnyPermission([
       PERMISSIONS.customersEdit,
       PERMISSIONS.customersStatusUpdate,
       PERMISSIONS.customersNotesManage,
       PERMISSIONS.customersTagsManage,
-      PERMISSIONS.posSell,
     ]),
   };
 }
