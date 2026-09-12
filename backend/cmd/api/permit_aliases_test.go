@@ -33,7 +33,19 @@ var permitsAllowedToMixModules = map[string]string{
 	// search-driven, unlocked by the writing permissions. /products/picker.
 	`permit("products.view", "orders.create", "orders.edit", "purchasing.orders.create", "purchasing.orders.edit", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.receipts.create", "recipes.create", "recipes.edit", "manufacturing.batches.create", "manufacturing.batches.edit", "stock_movements.manual_create", "inventory.adjust")`: "product picker for forms",
 	// /suppliers/picker.
-	`permit("suppliers.view", "purchasing.orders.create", "purchasing.orders.edit", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.receipts.create", "expenses.create", "expenses.edit", "accounting.journal_entries.manage")`: "supplier picker for forms",
+	`permit("suppliers.view", "purchasing.orders.create", "purchasing.orders.edit", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.receipts.create", "expenses.create", "expenses.edit", "accounting.journal_entries.manage", "ingredients.create", "ingredients.edit", "packaging.create", "packaging.edit")`: "supplier picker for forms",
+	// /ingredients/lookup: recipe lines and purchase lines name an ingredient.
+	`permit("ingredients.view", "recipes.create", "recipes.edit", "recipes.ingredients.manage", "purchasing.orders.create", "purchasing.orders.edit", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.receipts.create")`: "ingredient picker for forms",
+	// /packaging/lookup: recipe and order packaging lines name a packaging item.
+	`permit("packaging.view", "recipes.create", "recipes.edit", "recipes.packaging.manage", "orders.create", "orders.edit", "orders.packaging.manage")`: "packaging picker for forms",
+	// /recipes/lookup and /recipes/product/:id: a batch names its recipe.
+	`permit("recipes.view", "manufacturing.batches.create", "manufacturing.batches.edit")`: "recipe picker for the batch form",
+	// /inventory/picker: a batch names what it consumes.
+	`permit("inventory.view", "manufacturing.batches.create", "manufacturing.batches.edit", "manufacturing.batches.consume")`: "inventory picker for the batch form",
+	// /users/picker: branch manager and refund approver fields name a colleague.
+	`permit("users.view", "branches.create", "branches.edit", "payments.refund", "payments.reconcile")`: "colleague picker for forms",
+	// /accounting/customer-credits: the till applies store credit at checkout.
+	`permit("accounting.view", "pos.sell", "pos.checkout")`: "the till reads store credit",
 	// Two boxes for one feature: the Stock movements module and Inventory's
 	// own "movements view". Either is the real permission.
 	`permit("stock_movements.view", "inventory.movements.view")`: "stock movements has two equivalent boxes",

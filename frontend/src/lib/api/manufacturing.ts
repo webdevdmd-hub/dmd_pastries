@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/api/client";
+import { pluckLookup } from "@/lib/api/lookups";
 import type {
   BatchFilters,
   BatchStatus,
@@ -812,10 +813,13 @@ export async function getProductionPreview({
 }
 
 export async function getManufacturingProducts(): Promise<ManufacturingProductOption[]> {
-  const response = await apiRequest<ManufacturingProductOption[]>("/api/v1/products?limit=100", {
-    authMode: "appwrite",
-    parse: (data) => parseList(data, parseProduct),
-  });
+  const response = await apiRequest<ManufacturingProductOption[]>(
+    "/api/v1/products/picker?limit=100",
+    {
+      authMode: "appwrite",
+      parse: (data) => parseList(data, parseProduct),
+    },
+  );
 
   return response.data.filter(
     (product) =>
@@ -847,27 +851,30 @@ export async function getManufacturingRecipeByProduct({
 }
 
 export async function getManufacturingInventory(): Promise<ManufacturingInventoryOption[]> {
-  const response = await apiRequest<ManufacturingInventoryOption[]>("/api/v1/inventory?limit=100", {
-    authMode: "appwrite",
-    parse: (data) => parseList(data, parseInventory),
-  });
+  const response = await apiRequest<ManufacturingInventoryOption[]>(
+    "/api/v1/inventory/picker?limit=100",
+    {
+      authMode: "appwrite",
+      parse: (data) => parseList(data, parseInventory),
+    },
+  );
 
   return response.data;
 }
 
 export async function getManufacturingUnits(): Promise<ManufacturingUnitOption[]> {
-  const response = await apiRequest<ManufacturingUnitOption[]>("/api/v1/master-data/units", {
+  const response = await apiRequest<ManufacturingUnitOption[]>("/api/v1/lookups?kinds=units", {
     authMode: "appwrite",
-    parse: (data) => parseList(data, parseUnit),
+    parse: (data) => parseList(pluckLookup(data, "units"), parseUnit),
   });
 
   return response.data;
 }
 
 export async function getManufacturingBranches(): Promise<ManufacturingBranchOption[]> {
-  const response = await apiRequest<ManufacturingBranchOption[]>("/api/v1/branches", {
+  const response = await apiRequest<ManufacturingBranchOption[]>("/api/v1/lookups?kinds=branches", {
     authMode: "appwrite",
-    parse: (data) => parseList(data, parseBranch),
+    parse: (data) => parseList(pluckLookup(data, "branches"), parseBranch),
   });
 
   return response.data;

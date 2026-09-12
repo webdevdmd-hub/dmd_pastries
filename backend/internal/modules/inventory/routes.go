@@ -8,6 +8,8 @@ func RegisterRoutes(
 	authGuard gin.HandlerFunc,
 	view gin.HandlerFunc,
 	manage gin.HandlerFunc,
+	// Guards /picker: a manufacturing batch names the inventory it consumes.
+	picker gin.HandlerFunc,
 	locationManage gin.HandlerFunc,
 	transferCreate gin.HandlerFunc,
 	transferComplete gin.HandlerFunc,
@@ -17,6 +19,7 @@ func RegisterRoutes(
 	group.Use(authGuard)
 
 	group.GET("", view, handler.ListInventory)
+	group.GET("/picker", picker, handler.PickerInventory)
 	group.POST("/opening-stock", manage, handler.CreateOpeningStock)
 	group.GET("/stock-locations", view, handler.ListStockLocations)
 	group.POST("/stock-locations", locationManage, handler.CreateStockLocation)

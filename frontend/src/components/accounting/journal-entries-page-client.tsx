@@ -77,7 +77,7 @@ import {
   useReverseJournalEntry,
   useUpdateJournalEntry,
 } from "@/hooks/use-accounting";
-import { useBranches } from "@/hooks/use-branches";
+import { useBranchOptions } from "@/hooks/use-lookups";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
@@ -918,7 +918,6 @@ export function JournalEntriesPageClient(): JSX.Element {
     PERMISSIONS.accountingJournalEntriesManage,
   ]);
   const canManage = hasAnyPermission([PERMISSIONS.accountingJournalEntriesManage]);
-  const canLoadBranches = hasAnyPermission([PERMISSIONS.branchesView, PERMISSIONS.branchesSwitch]);
   const [filters, setFilters] = useState<JournalEntriesFilters>(() => ({
     ...defaultFilters,
     search: urlSearch,
@@ -940,7 +939,7 @@ export function JournalEntriesPageClient(): JSX.Element {
     editingEntryId,
     formOpen && formMode === "edit" && editingEntryId !== null,
   );
-  const branchesQuery = useBranches(canView && canLoadBranches);
+  const branchesQuery = useBranchOptions(canView);
   const accountsQuery = useChartAccounts(
     {
       accountGroup: "",

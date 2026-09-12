@@ -31,7 +31,7 @@ import {
   useUpdatePaymentAccount,
   useUpdatePaymentAccountStatus,
 } from "@/hooks/use-accounting";
-import { useBranches } from "@/hooks/use-branches";
+import { useBranchOptions } from "@/hooks/use-lookups";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 import {
@@ -72,7 +72,7 @@ export function PaymentAccountsPanel(): JSX.Element {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const accountsQuery = usePaymentAccounts(filters, canView);
   // Form-only data: fetched once on first open and reused after that.
-  const branchesQuery = useBranches(canView && dialogOpen);
+  const branchesQuery = useBranchOptions(canView && dialogOpen);
   const assetAccountsQuery = useChartAccounts(
     {
       accountGroup: "",

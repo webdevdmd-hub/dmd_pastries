@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/api/client";
+import { pluckLookup } from "@/lib/api/lookups";
 import { RECIPE_SELECTABLE_PRODUCT_TYPES } from "@/lib/selectors/eligibility";
 import { PRODUCT_TYPES, type ProductType } from "@/types/product";
 import type {
@@ -442,7 +443,7 @@ async function getRecipeProductPages(
 
   do {
     const response = await apiRequest<ProductOptionPage>(
-      `/api/v1/products${queryString({
+      `/api/v1/products/picker${queryString({
         ...params,
         page,
         limit: PRODUCT_LOOKUP_PAGE_LIMIT,
@@ -854,9 +855,9 @@ export async function getRecipeProductCatalog(): Promise<{
 }
 
 export async function getRecipeUnits(): Promise<RecipeUnitOption[]> {
-  const response = await apiRequest<RecipeUnitOption[]>("/api/v1/master-data/units", {
+  const response = await apiRequest<RecipeUnitOption[]>("/api/v1/lookups?kinds=units", {
     authMode: "appwrite",
-    parse: (data) => parseList(data, parseUnitOption),
+    parse: (data) => parseList(pluckLookup(data, "units"), parseUnitOption),
   });
 
   return response.data;

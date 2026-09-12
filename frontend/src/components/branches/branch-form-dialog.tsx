@@ -31,14 +31,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { UserPickerOption } from "@/lib/api/lookups";
 import { type BranchSchema, branchSchema } from "@/lib/validators/branch.schema";
 import type { Branch, CreateBranchPayload } from "@/types/branch";
-import type { User } from "@/types/user";
 
 type BranchFormDialogProps = {
   branch: Branch | null;
   isSubmitting: boolean;
-  managerOptions: User[];
+  managerOptions: UserPickerOption[];
   mode: "create" | "edit";
   onOpenChange: (open: boolean) => void;
   onSubmit: (payload: CreateBranchPayload) => Promise<void>;

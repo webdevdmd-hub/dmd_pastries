@@ -6,9 +6,11 @@ import { useBranchQueryKey } from "@/hooks/use-branch-scope";
 import {
   getLookups,
   getProductPicker,
+  getUserPicker,
   type LookupKind,
   type Lookups,
   type ProductPickerParams,
+  type UserPickerOption,
 } from "@/lib/api/lookups";
 import { QUERY_ROOTS } from "@/lib/query-invalidation";
 import type { ProductListResponse } from "@/types/product";
@@ -37,4 +39,25 @@ export function useProductPicker(params: ProductPickerParams = {}, enabled = tru
     queryFn: async () => getProductPicker(params),
     enabled,
   });
+}
+
+/** Colleagues for a form's dropdown. Keyed under the users root. */
+export function useUserPicker(enabled = true) {
+  const branchQueryKey = useBranchQueryKey();
+
+  return useQuery<UserPickerOption[]>({
+    queryKey: [QUERY_ROOTS.users, branchQueryKey, "picker"],
+    queryFn: async () => getUserPicker(),
+    enabled,
+  });
+}
+
+/**
+ * Branch options for filters and forms outside the Branches module. Shaped
+ * like useBranches() so call sites swap in one line, but served by the
+ * lookup tier: filtering a report by branch needs no branches.view.
+ */
+export function useBranchOptions(enabled = true) {
+  const query = useLookups(["branches"], enabled);
+  return { ...query, data: query.data?.branches };
 }

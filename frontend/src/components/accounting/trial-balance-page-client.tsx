@@ -22,7 +22,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useTrialBalanceReport } from "@/hooks/use-accounting";
-import { useBranches } from "@/hooks/use-branches";
+import { useBranchOptions } from "@/hooks/use-lookups";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
@@ -157,10 +157,9 @@ function AmountCell({ value }: { value: number }): JSX.Element {
 export function TrialBalancePageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.accountingView]);
-  const canLoadBranches = hasAnyPermission([PERMISSIONS.branchesView, PERMISSIONS.branchesSwitch]);
   const [filters, setFilters] = useState<TrialBalanceFilters>(defaultTrialBalanceFilters);
   const trialBalanceQuery = useTrialBalanceReport(filters, canView);
-  const branchesQuery = useBranches(canView && canLoadBranches);
+  const branchesQuery = useBranchOptions(canView);
   const branches = (branchesQuery.data ?? []).filter((branch) => branch.status === "active");
   const trialBalance = trialBalanceQuery.data;
   const sections = groupTrialBalanceItems(trialBalance?.items ?? []);
@@ -192,7 +191,7 @@ export function TrialBalancePageClient(): JSX.Element {
             Filters
           </span>
           <Select
-            disabled={!canLoadBranches}
+            disabled={branchesQuery.isLoading}
             onValueChange={(value) => updateFilters({ branchId: value === allValue ? "" : value })}
             value={filters.branchId || allValue}
           >

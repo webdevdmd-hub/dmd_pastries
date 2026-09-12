@@ -52,7 +52,7 @@ import {
   useUpdatePeriodLock,
   useYearEndClosePreview,
 } from "@/hooks/use-accounting";
-import { useBranches } from "@/hooks/use-branches";
+import { useBranchOptions } from "@/hooks/use-lookups";
 import { usePermission } from "@/hooks/use-permission";
 import type {
   AccountingBackfillPayload,
@@ -855,11 +855,10 @@ function ReconciliationSection({
 export function AccountingReconciliationPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.accountingView]);
-  const canLoadBranches = hasAnyPermission([PERMISSIONS.branchesView, PERMISSIONS.branchesSwitch]);
   const [asOfDate, setAsOfDate] = useState(todayString());
   const [branchId, setBranchId] = useState("");
   const filters = useMemo(() => ({ asOfDate, branchId }), [asOfDate, branchId]);
-  const branchesQuery = useBranches(canView && canLoadBranches);
+  const branchesQuery = useBranchOptions(canView);
   const healthQuery = useAccountingReconciliationHealthCheck(filters, canView);
   const inventoryQuery = useAccountingReconciliationInventory(filters, canView);
   const apQuery = useAccountingReconciliationAp(filters, canView);
@@ -924,7 +923,7 @@ export function AccountingReconciliationPageClient(): JSX.Element {
           <div className="flex flex-col gap-2">
             <FieldLabel htmlFor="recovery-branch">Branch</FieldLabel>
             <Select
-              disabled={!canLoadBranches || branchesQuery.isLoading}
+              disabled={branchesQuery.isLoading}
               onValueChange={(value) => setBranchId(value === allBranchesValue ? "" : value)}
               value={branchId || allBranchesValue}
             >
@@ -1019,7 +1018,6 @@ export function AccountingReconciliationPageClient(): JSX.Element {
 export function AccountingBackfillPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const canManage = canManageAccounting(hasAnyPermission);
-  const canLoadBranches = hasAnyPermission([PERMISSIONS.branchesView, PERMISSIONS.branchesSwitch]);
   const [dateFrom, setDateFrom] = useState(`${String(new Date().getFullYear())}-01-01`);
   const [dateTo, setDateTo] = useState(todayString());
   const [branchId, setBranchId] = useState("");
@@ -1038,7 +1036,7 @@ export function AccountingBackfillPageClient(): JSX.Element {
     }),
     [branchId, dateFrom, dateTo, limit, selectedTargets],
   );
-  const branchesQuery = useBranches(canManage && canLoadBranches);
+  const branchesQuery = useBranchOptions(canManage);
   const readinessQuery = useAccountingBackfillReadiness(
     filters,
     canManage && selectedTargets.length > 0,
@@ -1145,7 +1143,7 @@ export function AccountingBackfillPageClient(): JSX.Element {
           <div className="flex flex-col gap-2">
             <FieldLabel htmlFor="recovery-branch-2">Branch</FieldLabel>
             <Select
-              disabled={!canLoadBranches || branchesQuery.isLoading}
+              disabled={branchesQuery.isLoading}
               onValueChange={(value) => {
                 resetDryRun();
                 setBranchId(value === allBranchesValue ? "" : value);

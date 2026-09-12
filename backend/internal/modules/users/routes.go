@@ -9,6 +9,8 @@ func RegisterRoutes(
 	handler *Handler,
 	authGuard gin.HandlerFunc,
 	usersView gin.HandlerFunc,
+	// Guards /picker: a form names a colleague (branch manager, refund approver).
+	picker gin.HandlerFunc,
 	usersCreate gin.HandlerFunc,
 	usersEdit gin.HandlerFunc,
 	branchAccessManage gin.HandlerFunc,
@@ -18,6 +20,7 @@ func RegisterRoutes(
 	group.Use(authGuard)
 
 	group.GET("", usersView, handler.ListUsers)
+	group.GET("/picker", picker, handler.PickerUsers)
 	group.POST("", usersCreate, handler.CreateUser)
 	group.POST("/invite", usersCreate, handler.InviteUser)
 	group.POST("/invitations", usersCreate, handler.CreateInvitation)

@@ -135,3 +135,12 @@ type PasswordResetLinkResponse struct {
 	URL       string    `json:"url"`
 	ExpiresAt time.Time `json:"expires_at"`
 }
+
+// UserPickerOption is what a dropdown shows for a colleague. No email, phone
+// or status: a picker names people, it does not describe them.
+type UserPickerOption struct {
+	ID       string  `json:"id"`
+	FullName string  `json:"full_name"`
+	RoleName string  `json:"role_name"`
+	BranchID *string `json:"branch_id"`
+}

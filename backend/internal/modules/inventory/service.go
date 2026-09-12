@@ -1980,3 +1980,15 @@ func toExpiryAlertResponses(batches []expiryBatchAlertRow, today time.Time, stat
 	}
 	return responses
 }
+
+const pickerLimit = 100
+
+// PickerInventory is the inventory list a form's dropdown needs: active items
+// matching a search, capped. Same shape as ListInventory; unlocked by the
+// permissions whose forms pick an inventory item (manufacturing batches).
+func (s *Service) PickerInventory(currentUser *utils.AuthContext, search string, limit int) (*PaginatedInventoryResponse, error) {
+	if limit <= 0 || limit > pickerLimit {
+		limit = pickerLimit
+	}
+	return s.ListInventory(currentUser, InventoryListQuery{Search: search, Status: "active", Page: 1, Limit: limit})
+}

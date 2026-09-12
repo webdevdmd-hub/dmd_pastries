@@ -24,11 +24,10 @@ import {
   useUpdateBranch,
   useUpdateBranchStatus,
 } from "@/hooks/use-branches";
+import { useUserPicker } from "@/hooks/use-lookups";
 import { usePermission } from "@/hooks/use-permission";
-import { useUsers } from "@/hooks/use-users";
 import { getErrorMessage } from "@/lib/api/client";
 import type { Branch, BranchStatus, CreateBranchPayload } from "@/types/branch";
-import type { User } from "@/types/user";
 
 function filterBranches(branches: Branch[], search: string): Branch[] {
   const query = search.trim().toLowerCase();
@@ -44,16 +43,9 @@ function filterBranches(branches: Branch[], search: string): Branch[] {
   );
 }
 
-// Any active colleague can be named as a branch manager. What a role is
-// called says nothing about what it may do; permissions do, and being a
-// branch manager is a fact recorded on the branch, not a permission.
-function isAssignableManager(user: User): boolean {
-  return user.status === "active";
-}
-
 export function BranchesPageClient(): JSX.Element {
   const { refreshProfile } = useAuth();
-  const { hasAnyPermission, hasPermission } = usePermission();
+  const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.branchesView]);
   const canManage = hasAnyPermission([
     PERMISSIONS.branchesCreate,
@@ -61,9 +53,8 @@ export function BranchesPageClient(): JSX.Element {
     PERMISSIONS.branchesStatusUpdate,
     PERMISSIONS.branchesAccessManage,
   ]);
-  const canViewUsers = hasPermission(PERMISSIONS.usersView);
   const branchesQuery = useBranches(canView);
-  const usersQuery = useUsers({ search: "", status: "all" }, canManage && canViewUsers);
+  const usersQuery = useUserPicker(canManage);
   const createBranchMutation = useCreateBranch();
   const updateBranchMutation = useUpdateBranch();
   const updateBranchStatusMutation = useUpdateBranchStatus();
@@ -77,8 +68,8 @@ export function BranchesPageClient(): JSX.Element {
     [branchesQuery.data, search],
   );
   const managerOptions = useMemo(
-    () => (canManage && canViewUsers ? (usersQuery.data ?? []).filter(isAssignableManager) : []),
-    [canManage, canViewUsers, usersQuery.data],
+    () => (canManage ? (usersQuery.data ?? []) : []),
+    [canManage, usersQuery.data],
   );
 
   const isSubmitting = createBranchMutation.isPending || updateBranchMutation.isPending;

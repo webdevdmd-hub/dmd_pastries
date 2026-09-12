@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/api/client";
+import { pluckLookup } from "@/lib/api/lookups";
 import { getProductCategories } from "@/lib/api/master-data";
 import type {
   CreatePackagingPayload,
@@ -381,9 +382,9 @@ export async function lookupSuppliers(search = ""): Promise<PackagingSupplierOpt
 }
 
 export async function getUnits(): Promise<PackagingUnitOption[]> {
-  const response = await apiRequest<PackagingUnitOption[]>("/api/v1/master-data/units", {
+  const response = await apiRequest<PackagingUnitOption[]>("/api/v1/lookups?kinds=units", {
     authMode: "appwrite",
-    parse: (data) => parseList(data, parseUnitOption),
+    parse: (data) => parseList(pluckLookup(data, "units"), parseUnitOption),
   });
 
   return response.data;

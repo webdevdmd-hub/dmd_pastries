@@ -68,7 +68,7 @@ import {
   useUpdatePaymentAccount,
   useUpdatePaymentAccountStatus,
 } from "@/hooks/use-accounting";
-import { useBranches } from "@/hooks/use-branches";
+import { useBranchOptions } from "@/hooks/use-lookups";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 import {
@@ -474,7 +474,7 @@ export function PaymentAccountsPageClient({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<PaymentAccount | null>(null);
   const accountsQuery = usePaymentAccounts(filters, canView);
-  const branchesQuery = useBranches(canView);
+  const branchesQuery = useBranchOptions(canView);
   const assetAccountsQuery = useChartAccounts(
     {
       accountGroup: "",
@@ -966,7 +966,7 @@ export function AccountTransfersPageClient(): JSX.Element {
   const transfersQuery = useAccountTransfers(filters, canView);
   const transfers = transfersQuery.data?.items ?? [];
   const paymentAccountsQuery = usePaymentAccounts(defaultPaymentAccountFilters, canView);
-  const branchesQuery = useBranches(canView);
+  const branchesQuery = useBranchOptions(canView);
   const createMutation = useCreateAccountTransfer();
 
   const submitTransfer = async (payload: AccountTransferPayload): Promise<void> => {
@@ -1361,7 +1361,7 @@ export function PlatformSettlementsPageClient(): JSX.Element {
   const settlementsQuery = usePlatformSettlements(filters, canView);
   const settlements = settlementsQuery.data?.items ?? [];
   const paymentAccountsQuery = usePaymentAccounts(defaultPaymentAccountFilters, canView);
-  const branchesQuery = useBranches(canView);
+  const branchesQuery = useBranchOptions(canView);
   const expenseAccountsQuery = useChartAccounts(
     {
       accountGroup: "",

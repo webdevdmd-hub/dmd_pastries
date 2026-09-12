@@ -1246,3 +1246,21 @@ func (s *Service) CreatePasswordResetLink(currentUser *utils.AuthContext, userID
 		ExpiresAt: time.Now().UTC().Add(time.Hour),
 	}, nil
 }
+
+// PickerUsers is the colleague list a form's dropdown needs -- active users
+// only, the fields a picker shows. Unlocked by the permissions whose forms
+// name a colleague rather than by users.view alone.
+func (s *Service) PickerUsers(currentUser *utils.AuthContext) ([]UserPickerOption, error) {
+	all, err := s.ListUsers(currentUser)
+	if err != nil {
+		return nil, err
+	}
+	options := make([]UserPickerOption, 0, len(all))
+	for _, u := range all {
+		if u.Status != "active" {
+			continue
+		}
+		options = append(options, UserPickerOption{ID: u.ID, FullName: u.FullName, RoleName: u.RoleName, BranchID: u.BranchID})
+	}
+	return options, nil
+}

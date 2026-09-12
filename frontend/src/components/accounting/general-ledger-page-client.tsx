@@ -30,7 +30,7 @@ import {
   useChartAccount,
   useGeneralLedgerReport,
 } from "@/hooks/use-accounting";
-import { useBranches } from "@/hooks/use-branches";
+import { useBranchOptions } from "@/hooks/use-lookups";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 import type { GeneralLedgerFilters, GeneralLedgerItem } from "@/types/accounting";
@@ -151,7 +151,6 @@ function isUuid(value: string): boolean {
 export function GeneralLedgerPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.accountingView]);
-  const canLoadBranches = hasAnyPermission([PERMISSIONS.branchesView, PERMISSIONS.branchesSwitch]);
   const [filters, setFilters] = useState<GeneralLedgerFilters>(defaultLedgerFilters);
   const hasInvalidAccountId = filters.accountId.length > 0 && !isUuid(filters.accountId);
   const ledgerQuery = useGeneralLedgerReport(filters, canView && !hasInvalidAccountId);
@@ -169,7 +168,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
     },
     canView,
   );
-  const branchesQuery = useBranches(canView && canLoadBranches);
+  const branchesQuery = useBranchOptions(canView);
   const accounts = useMemo(() => accountsQuery.data ?? [], [accountsQuery.data]);
   const selectedAccountMissingFromList =
     filters.accountId.length > 0 &&
@@ -292,7 +291,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
         <SearchableSelect
           ariaLabel="Filter General Ledger by branch"
           clearable={false}
-          disabled={!canLoadBranches}
+          disabled={branchesQuery.isLoading}
           emptyMessage="No branches found."
           loading={branchesQuery.isLoading}
           loadingMessage="Loading branches..."

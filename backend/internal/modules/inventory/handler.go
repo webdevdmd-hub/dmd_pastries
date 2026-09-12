@@ -548,3 +548,14 @@ func handleError(c *gin.Context, err error) {
 	}
 	response.Error(c, 500, "internal server error", err.Error())
 }
+
+func (h *Handler) PickerInventory(c *gin.Context) {
+	currentUser := utils.MustAuthContext(c)
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	result, err := h.service.PickerInventory(currentUser, c.Query("search"), limit)
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "inventory picker fetched successfully", result)
+}

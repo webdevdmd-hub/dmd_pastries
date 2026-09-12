@@ -9,6 +9,8 @@ func RegisterRoutes(
 	view gin.HandlerFunc,
 	manage gin.HandlerFunc,
 	periodLock gin.HandlerFunc,
+	// Guards /customer-credits: the till applies store credit at checkout.
+	customerCredits gin.HandlerFunc,
 ) {
 	group := router.Group("/api/v1/accounting")
 	group.Use(authGuard)
@@ -78,7 +80,7 @@ func RegisterRoutes(
 	group.GET("/reconciliation/payment-accounts", view, handler.GetPaymentAccountReconciliation)
 	group.GET("/reconciliation/customer-credits", view, handler.GetCustomerCreditReconciliation)
 
-	group.GET("/customer-credits", view, handler.ListCustomerCredits)
+	group.GET("/customer-credits", customerCredits, handler.ListCustomerCredits)
 
 	group.GET("/backfill-journals/readiness", manage, handler.GetBackfillReadiness)
 	group.POST("/backfill-journals", manage, handler.BackfillJournals)

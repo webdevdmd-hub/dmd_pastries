@@ -8,14 +8,16 @@ func RegisterRoutes(
 	authGuard gin.HandlerFunc,
 	view gin.HandlerFunc,
 	manage gin.HandlerFunc,
+	// Guards /lookup and /product/:id: a batch form names a recipe.
+	picker gin.HandlerFunc,
 ) {
 	group := router.Group("/api/v1/recipes")
 	group.Use(authGuard)
 
 	group.GET("", view, handler.List)
 	group.POST("", manage, handler.Create)
-	group.GET("/lookup", view, handler.Lookup)
-	group.GET("/product/:productId", view, handler.ProductRecipe)
+	group.GET("/lookup", picker, handler.Lookup)
+	group.GET("/product/:productId", picker, handler.ProductRecipe)
 	group.GET("/:id", view, handler.Get)
 	group.PATCH("/:id", manage, handler.Update)
 	group.PATCH("/:id/status", manage, handler.UpdateStatus)

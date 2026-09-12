@@ -135,3 +135,45 @@ export async function getProductPicker(
 
   return response.data;
 }
+
+/**
+ * The lookups endpoint answers with one key per kind. Module API files that
+ * used to parse a bare list from their own endpoint pluck their key and keep
+ * their parser.
+ */
+export function pluckLookup(data: unknown, kind: LookupKind): unknown {
+  if (!isObject(data)) {
+    throw new Error("Backend lookups payload is invalid.");
+  }
+  return data[kind] ?? [];
+}
+
+export type UserPickerOption = {
+  id: string;
+  fullName: string;
+  roleName: string;
+  branchId: string | null;
+};
+
+function parseUserPickerOption(value: unknown): UserPickerOption {
+  if (!isObject(value) || typeof value.id !== "string" || typeof value.full_name !== "string") {
+    throw new Error("Backend user picker payload is invalid.");
+  }
+  return {
+    id: value.id,
+    fullName: value.full_name,
+    roleName: typeof value.role_name === "string" ? value.role_name : "",
+    branchId: typeof value.branch_id === "string" ? value.branch_id : null,
+  };
+}
+
+/** Active colleagues for a form's dropdown (branch manager, refund approver). */
+export async function getUserPicker(): Promise<UserPickerOption[]> {
+  const response = await apiRequest<UserPickerOption[]>("/api/v1/users/picker", {
+    method: "GET",
+    authMode: "appwrite",
+    parse: (data) => parseReferenceList(data, parseUserPickerOption),
+  });
+
+  return response.data;
+}

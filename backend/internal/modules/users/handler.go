@@ -231,3 +231,13 @@ func (h *Handler) CreatePasswordResetLink(c *gin.Context) {
 	}
 	response.Success(c, 200, "password reset link created", link)
 }
+
+func (h *Handler) PickerUsers(c *gin.Context) {
+	currentUser := utils.MustAuthContext(c)
+	options, err := h.service.PickerUsers(currentUser)
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	response.Success(c, 200, "user picker fetched successfully", options)
+}

@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/api/client";
+import { pluckLookup } from "@/lib/api/lookups";
 import type { ItemStructure, ProductType } from "@/types/product";
 import { ITEM_STRUCTURES, PRODUCT_TYPES } from "@/types/product";
 import type {
@@ -2169,22 +2170,19 @@ export async function getIngredients(): Promise<PurchasingIngredientOption[]> {
 }
 
 export async function getUnits(): Promise<PurchasingUnitOption[]> {
-  const response = await apiRequest<PurchasingUnitOption[]>("/api/v1/master-data/units", {
+  const response = await apiRequest<PurchasingUnitOption[]>("/api/v1/lookups?kinds=units", {
     authMode: "appwrite",
-    parse: (data) => parseList(data, parseUnit),
+    parse: (data) => parseList(pluckLookup(data, "units"), parseUnit),
   });
 
   return response.data;
 }
 
 export async function getTaxRates(): Promise<PurchasingTaxRateOption[]> {
-  const response = await apiRequest<PurchasingTaxRateOption[]>(
-    "/api/v1/settings/tax-rates?status=active",
-    {
-      authMode: "appwrite",
-      parse: (data) => parseList(data, parseTaxRate),
-    },
-  );
+  const response = await apiRequest<PurchasingTaxRateOption[]>("/api/v1/lookups?kinds=tax_rates", {
+    authMode: "appwrite",
+    parse: (data) => parseList(pluckLookup(data, "tax_rates"), parseTaxRate),
+  });
 
   return response.data.filter((taxRate) => taxRate.id.length > 0 && taxRate.status === "active");
 }

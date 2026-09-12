@@ -35,11 +35,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PERMISSIONS } from "@/constants/permissions";
 import { ROUTES } from "@/constants/routes";
 import { useLedgerDetails } from "@/hooks/use-accounting";
-import { useBranches } from "@/hooks/use-branches";
-import { usePermission } from "@/hooks/use-permission";
+import { useBranchOptions } from "@/hooks/use-lookups";
 import { getErrorMessage } from "@/lib/api/client";
 import type { ChartAccount, LedgerDetailsFilters } from "@/types/accounting";
 
@@ -77,11 +75,9 @@ export function LedgerDetailsDrawer({
   onOpenChange,
   open,
 }: LedgerDetailsDrawerProps): JSX.Element {
-  const { hasAnyPermission } = usePermission();
-  const canLoadBranches = hasAnyPermission([PERMISSIONS.branchesView, PERMISSIONS.branchesSwitch]);
   const [filters, setFilters] = useState<LedgerDetailsFilters>(defaultFilters(account?.id ?? ""));
   const ledgerQuery = useLedgerDetails(filters, open && account !== null);
-  const branchesQuery = useBranches(open && canLoadBranches);
+  const branchesQuery = useBranchOptions(open);
   const branches = (branchesQuery.data ?? []).filter((branch) => branch.status === "active");
   const ledger = ledgerQuery.data;
   const displayAccount = ledger?.account ?? account;
@@ -190,7 +186,7 @@ export function LedgerDetailsDrawer({
 
             <div className="grid gap-3 rounded-2xl border border-brand-cappuccino/60 bg-card/80 p-4 lg:grid-cols-[1fr_1fr_1fr_0.8fr]">
               <Select
-                disabled={!canLoadBranches}
+                disabled={branchesQuery.isLoading}
                 onValueChange={(value) =>
                   updateFilters({ branchId: value === allValue ? "" : value })
                 }

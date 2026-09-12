@@ -231,6 +231,8 @@ func main() {
 		userHandler,
 		authMiddleware.RequireAuth(),
 		permit("users.view"),
+		// Colleague picker: branch manager and refund approver fields.
+		permit("users.view", "branches.create", "branches.edit", "payments.refund", "payments.reconcile"),
 		permit("users.create", "users.invite"),
 		permit("users.edit", "users.status.update", "users.invitation.resend", "users.invitation.cancel"),
 		// Assigning a user to a branch is branch access management; this is the
@@ -274,6 +276,8 @@ func main() {
 		authMiddleware.RequireAuth(),
 		permit("packaging.view"),
 		permit("packaging.create", "packaging.edit", "packaging.delete", "packaging.status.update", "packaging.usage_rules.manage"),
+		// Packaging picker: recipe and order packaging lines name a packaging item.
+		permit("packaging.view", "recipes.create", "recipes.edit", "recipes.packaging.manage", "orders.create", "orders.edit", "orders.packaging.manage"),
 	)
 	products.RegisterRoutes(
 		router,
@@ -340,6 +344,8 @@ func main() {
 		authMiddleware.RequireAuth(),
 		permit("ingredients.view"),
 		permit("ingredients.create", "ingredients.edit", "ingredients.delete", "ingredients.status.update"),
+		// Ingredient picker: recipe lines and purchase lines name an ingredient.
+		permit("ingredients.view", "recipes.create", "recipes.edit", "recipes.ingredients.manage", "purchasing.orders.create", "purchasing.orders.edit", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.receipts.create"),
 	)
 	inventory.RegisterRoutes(
 		router,
@@ -347,6 +353,8 @@ func main() {
 		authMiddleware.RequireAuth(),
 		permit("inventory.view"),
 		permit("inventory.opening_stock", "inventory.adjust", "inventory.expiry_batches.manage", "inventory.manage"),
+		// Inventory picker: a manufacturing batch names what it consumes.
+		permit("inventory.view", "manufacturing.batches.create", "manufacturing.batches.edit", "manufacturing.batches.consume"),
 		permit("inventory.locations.manage", "inventory.manage"),
 		permit("inventory.transfer.create", "inventory.manage"),
 		permit("inventory.transfer.complete", "inventory.manage"),
@@ -373,7 +381,7 @@ func main() {
 		permit("suppliers.view"),
 		permit("suppliers.create", "suppliers.edit", "suppliers.delete", "suppliers.status.update", "suppliers.contacts.manage", "suppliers.notes.manage", "suppliers.manage"),
 		// Supplier picker for forms that name a supplier.
-		permit("suppliers.view", "purchasing.orders.create", "purchasing.orders.edit", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.receipts.create", "expenses.create", "expenses.edit", "accounting.journal_entries.manage"),
+		permit("suppliers.view", "purchasing.orders.create", "purchasing.orders.edit", "purchasing.invoices.create", "purchasing.invoices.edit", "purchasing.receipts.create", "expenses.create", "expenses.edit", "accounting.journal_entries.manage", "ingredients.create", "ingredients.edit", "packaging.create", "packaging.edit"),
 	)
 	purchasing.RegisterRoutes(
 		router,
@@ -388,6 +396,8 @@ func main() {
 		authMiddleware.RequireAuth(),
 		permit("recipes.view"),
 		permit("recipes.create", "recipes.edit", "recipes.delete", "recipes.status.update", "recipes.ingredients.manage", "recipes.packaging.manage", "recipes.cost.recalculate", "recipes.versions.create", "recipes.manage"),
+		// Recipe picker: a manufacturing batch names the recipe it runs.
+		permit("recipes.view", "manufacturing.batches.create", "manufacturing.batches.edit"),
 	)
 	bakeryorders.RegisterRoutes(
 		router,
@@ -421,6 +431,8 @@ func main() {
 		permit("accounting.view"),
 		permit("accounting.accounts.manage", "accounting.journal_entries.manage"),
 		permit("accounting.period.lock"),
+		// Store credit at checkout: the till reads a customer's credit balance.
+		permit("accounting.view", "pos.sell", "pos.checkout"),
 	)
 	expenses.RegisterRoutes(
 		router,

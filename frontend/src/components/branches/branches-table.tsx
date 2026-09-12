@@ -21,13 +21,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { UserPickerOption } from "@/lib/api/lookups";
 import type { Branch, BranchStatus } from "@/types/branch";
-import type { User } from "@/types/user";
 
 type BranchesTableProps = {
   branches: Branch[];
   canManage: boolean;
-  managerUsers: User[];
+  managerUsers: UserPickerOption[];
   onEdit: (branch: Branch) => void;
   onStatusChange: (branch: Branch, status: BranchStatus) => void;
 };

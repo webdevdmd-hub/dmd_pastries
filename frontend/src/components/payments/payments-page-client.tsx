@@ -28,6 +28,7 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { useAuth } from "@/hooks/use-auth";
 import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useStockLocations } from "@/hooks/use-inventory";
+import { useUserPicker } from "@/hooks/use-lookups";
 import {
   useAddPaymentToSale,
   useDailyPaymentSummary,
@@ -40,7 +41,6 @@ import {
 import { usePermission } from "@/hooks/use-permission";
 import { useSaleReceipt } from "@/hooks/use-reports";
 import { useReceiptLayouts } from "@/hooks/use-settings-data";
-import { useUsers } from "@/hooks/use-users";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import { toastMoneyFailure } from "@/lib/money-failure-toast";
 import { resolveDashboardTimezone } from "@/lib/reports/dashboard-filters";
@@ -53,7 +53,6 @@ import type {
 } from "@/types/payment";
 import type { SaleReceipt } from "@/types/pos";
 import type { ReceiptLayout } from "@/types/settings";
-import type { User } from "@/types/user";
 
 const defaultFilters: PaymentFilters = {
   search: "",
@@ -63,12 +62,6 @@ const defaultFilters: PaymentFilters = {
   dateTo: "",
   branchId: "",
 };
-
-// The approver named on a refund is a record of who signed it off, chosen
-// from active colleagues. It is not decided by what their role is called.
-function isActiveUser(user: User): boolean {
-  return user.status === "active";
-}
 
 function selectReceiptLayout(
   layouts: ReceiptLayout[],
@@ -96,7 +89,7 @@ export function PaymentsPageClient(): JSX.Element {
   const { user } = useAuth();
   const branchScope = useBranchScope();
   const { normalizeBranchId } = branchScope;
-  const { hasAnyPermission, hasPermission } = usePermission();
+  const { hasAnyPermission } = usePermission();
   const [filters, setFilters] = useState<PaymentFilters>({
     ...defaultFilters,
     branchId: branchScope.defaultBranchId,
@@ -113,7 +106,6 @@ export function PaymentsPageClient(): JSX.Element {
   const canView = hasAnyPermission([PERMISSIONS.paymentsView]);
   const canAdd = hasAnyPermission([PERMISSIONS.paymentsAdd]);
   const canRefund = hasAnyPermission([PERMISSIONS.paymentsRefund]);
-  const canViewUsers = hasPermission(PERMISSIONS.usersView);
   const canSelectRefundApprover = hasAnyPermission([PERMISSIONS.paymentsRefund]);
   const timezone = useMemo(resolveDashboardTimezone, []);
   const summaryParams: PaymentSummaryParams = {
@@ -150,10 +142,7 @@ export function PaymentsPageClient(): JSX.Element {
     isRefundDialogOpen && canRefund && branchScope.hasBranchScope,
   );
   const receiptLayoutsQuery = useReceiptLayouts(canView && branchScope.hasBranchScope);
-  const usersQuery = useUsers(
-    { search: "", status: "active" },
-    isRefundDialogOpen && canRefund && canViewUsers,
-  );
+  const usersQuery = useUserPicker(isRefundDialogOpen && canRefund);
   const addPaymentMutation = useAddPaymentToSale();
   const refundMutation = useRefundPayment();
   const saleReceiptMutation = useSaleReceipt();
@@ -171,7 +160,7 @@ export function PaymentsPageClient(): JSX.Element {
     filters.paymentStatus !== defaultFilters.paymentStatus ||
     filters.dateFrom.length > 0 ||
     filters.dateTo.length > 0;
-  const approverOptions = (usersQuery.data ?? []).filter(isActiveUser).map((approver) => ({
+  const approverOptions = (usersQuery.data ?? []).map((approver) => ({
     id: approver.id,
     label: `${approver.fullName} (${approver.roleName})`,
   }));

@@ -146,20 +146,10 @@ const listHooks = {
   "useProductCategories(": "master-data",
   "useTaxRates(": "settings",
 };
-// Push B converts these; until then they are known, not new.
-const pendingLookupConversion = new Set([
-  "accounting/ledger-details-drawer.tsx",
-  "accounting/accounting-recovery-pages.tsx",
-  "accounting/balance-sheet-page-client.tsx",
-  "accounting/general-ledger-page-client.tsx",
-  "accounting/journal-entries-page-client.tsx",
-  "accounting/profit-loss-page-client.tsx",
-  "accounting/trial-balance-page-client.tsx",
-]);
 for (const file of walk(components)) {
   const rel = relative(components, file).replace(/\\/g, "/");
   const dir = rel.split("/")[0];
-  if (!/(form|dialog|editor|drawer)[^/]*\.tsx$/.test(rel) || pendingLookupConversion.has(rel)) {
+  if (!/(form|dialog|editor|drawer)[^/]*\.tsx$/.test(rel)) {
     continue;
   }
   const text = readFileSync(file, "utf8");
