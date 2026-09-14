@@ -242,7 +242,12 @@ type POSProductResponse struct {
 	IsPOSVisible     bool                 `json:"is_pos_visible"`
 	Variants         []POSVariantResponse `json:"variants"`
 	IsStockTracked   bool                 `json:"is_stock_tracked"`
-	Status           string               `json:"status"`
+	// nil for products that do not track stock (sell without limit); a number,
+	// possibly 0, for tracked products, so the register can show "Out of
+	// stock" before checkout refuses the sale.
+	CurrentStockQuantity   *float64 `json:"current_stock_quantity"`
+	AvailableStockQuantity *float64 `json:"available_stock_quantity"`
+	Status                 string   `json:"status"`
 }
 
 type POSVariantResponse struct {

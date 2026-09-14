@@ -43,7 +43,9 @@ const posProductSelect = `
 	COALESCE(tr.tax_name, '') AS tax_name,
 	COALESCE(tr.tax_type, '') AS tax_type,
 	COALESCE(tr.rate_percentage, 0) AS rate_percentage,
-	COALESCE(tr.is_inclusive, false) AS is_inclusive
+	COALESCE(tr.is_inclusive, false) AS is_inclusive,
+	COALESCE(ii.current_quantity, 0) AS current_stock_quantity,
+	COALESCE(ii.available_quantity, 0) AS available_stock_quantity
 `
 
 func NewRepository(db *gorm.DB) *Repository {
@@ -56,6 +58,7 @@ func (r *Repository) ListPOSProducts(businessID, branchID string, query POSProdu
 		Joins("JOIN product_categories pc ON pc.id = p.category_id AND pc.branch_id = p.branch_id").
 		Joins("JOIN units u ON u.id = p.unit_id").
 		Joins("LEFT JOIN tax_rates tr ON tr.id = p.tax_rate_id AND tr.business_id = p.business_id AND tr.status = ? AND tr.deleted_at IS NULL", "active").
+		Joins("LEFT JOIN inventory_items ii ON ii.business_id = p.business_id AND ii.branch_id = p.branch_id AND ii.item_type = ? AND ii.product_id = p.id AND ii.product_variant_id IS NULL AND ii.deleted_at IS NULL", "product").
 		Where("p.business_id = ? AND p.branch_id = ? AND p.status = ? AND p.is_pos_visible = ? AND p.is_sellable = ? AND p.deleted_at IS NULL", businessID, branchID, "active", true, true)
 	db = applyPOSProductFilters(db, query)
 
@@ -208,6 +211,7 @@ func (r *Repository) FindPOSProductByID(tx *gorm.DB, businessID, branchID, produ
 		Joins("JOIN product_categories pc ON pc.id = p.category_id AND pc.branch_id = p.branch_id").
 		Joins("JOIN units u ON u.id = p.unit_id").
 		Joins("LEFT JOIN tax_rates tr ON tr.id = p.tax_rate_id AND tr.business_id = p.business_id AND tr.status = ? AND tr.deleted_at IS NULL", "active").
+		Joins("LEFT JOIN inventory_items ii ON ii.business_id = p.business_id AND ii.branch_id = p.branch_id AND ii.item_type = ? AND ii.product_id = p.id AND ii.product_variant_id IS NULL AND ii.deleted_at IS NULL", "product").
 		Where("p.id = ? AND p.business_id = ? AND p.branch_id = ? AND p.status = ? AND p.is_pos_visible = ? AND p.is_sellable = ? AND p.deleted_at IS NULL", productID, businessID, branchID, "active", true, true).
 		Take(&row).Error
 	if err != nil {
@@ -790,6 +794,11 @@ type ProductRow struct {
 	TaxType          string
 	RatePercentage   float64
 	IsInclusive      bool
+	// Product-level stock from the same inventory_items row the checkout
+	// checks. Zero when the product has no row yet; meaningful only when
+	// IsStockTracked, and toPOSProduct nils it otherwise.
+	CurrentStockQuantity   float64
+	AvailableStockQuantity float64
 }
 
 type ProductInventoryStockRow struct {
