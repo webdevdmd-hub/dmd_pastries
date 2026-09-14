@@ -133,8 +133,6 @@ type BranchSalesReportItem struct {
 
 type DiscountReportResponse struct {
 	TotalDiscount                  float64              `json:"total_discount"`
-	SaleLevelDiscount              float64              `json:"sale_level_discount"`
-	LineLevelDiscount              float64              `json:"line_level_discount"`
 	DiscountedSalesCount           int64                `json:"discounted_sales_count"`
 	DiscountPercentageOfGrossSales float64              `json:"discount_percentage_of_gross_sales"`
 	Items                          []DiscountReportItem `json:"items"`
