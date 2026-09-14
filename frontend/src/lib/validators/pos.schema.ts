@@ -31,7 +31,20 @@ export const checkoutSchema = z.object({
   saleDiscountType: z.enum(["fixed", "percentage"]).nullable(),
   saleDiscountValue: z.coerce.number().min(0).nullable(),
   charges: documentChargesSchema,
-  payments: z.array(paymentSchema).min(1, "At least one payment is required."),
+  // No minimum. Whether a sale needs a tender depends on what it comes to,
+  // which this schema cannot see: a comp, a staff meal or a 100%-off promotion
+  // totals zero and takes no payment. "You must pay something" is a business
+  // rule, and two places already enforce it against the actual total --
+  // resolveCheckoutBlocker before submit ("Select payment"), and Checkout on
+  // the server, which refuses an empty list only when TotalAmount > 0. A
+  // blanket min(1) here just made a zero-total sale unsendable.
+  //
+  // Each payment still has to be a real tender: paymentSchema keeps
+  // amount.positive(), and submitCheckout drops zero-amount lines rather than
+  // sending them, because the server rejects a zero line.
+  //
+  // Regression: ISSUE-001 — a zero-total sale could not be completed.
+  payments: z.array(paymentSchema),
   salesChannelId: z.string().nullable(),
   externalOrderNumber: z.string().nullable(),
   notes: z.string().nullable(),
