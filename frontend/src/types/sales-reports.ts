@@ -96,8 +96,6 @@ export type DiscountReportItem = {
 
 export type DiscountReport = {
   totalDiscount: number;
-  saleLevelDiscount: number;
-  lineLevelDiscount: number;
   discountedSalesCount: number;
   discountPercentageOfGrossSales: number;
   items: DiscountReportItem[];

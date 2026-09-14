@@ -294,8 +294,6 @@ function parseDiscountReport(value: unknown): DiscountReport {
 
   return {
     totalDiscount: numberOrZero(report.total_discount),
-    saleLevelDiscount: numberOrZero(report.sale_level_discount),
-    lineLevelDiscount: numberOrZero(report.line_level_discount),
     discountedSalesCount: numberOrZero(report.discounted_sales_count),
     discountPercentageOfGrossSales: numberOrZero(report.discount_percentage_of_gross_sales),
     items: parseList(report.items, parseDiscountReportItem),

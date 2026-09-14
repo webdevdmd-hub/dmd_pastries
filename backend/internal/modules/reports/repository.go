@@ -1012,7 +1012,7 @@ func (r *Repository) DiscountReport(filter *shared.ResolvedFilter) (*DiscountRep
 	}{}
 	itemQuery := `
 		SELECT s.sale_number, u.full_name AS cashier, COALESCE(s.discount_type,'') AS discount_type,
-			(s.discount_amount + COALESCE(SUM(si.discount_amount),0)) AS discount_amount,
+			s.discount_amount AS discount_amount,
 			s.total_amount AS sale_total, s.sold_at
 		FROM sales s
 		JOIN users u ON u.id = s.cashier_user_id
@@ -1021,7 +1021,7 @@ func (r *Repository) DiscountReport(filter *shared.ResolvedFilter) (*DiscountRep
 		WHERE s.business_id = ? AND s.sold_at >= ? AND s.sold_at < ? AND ` + reportGrossSaleStatusCondition("s") + ` AND s.deleted_at IS NULL`
 	itemArgs := []interface{}{filter.BusinessID, filter.StartUTC, filter.EndUTC}
 	itemQuery, itemArgs = addSalesFilters(itemQuery, itemArgs, filter)
-	itemQuery += " GROUP BY s.id, s.sale_number, u.full_name, s.discount_type, s.discount_amount, s.total_amount, s.sold_at HAVING (s.discount_amount + COALESCE(SUM(si.discount_amount),0)) > 0 ORDER BY s.sold_at DESC LIMIT ? OFFSET ?"
+	itemQuery += " GROUP BY s.id, s.sale_number, u.full_name, s.discount_type, s.discount_amount, s.total_amount, s.sold_at HAVING s.discount_amount > 0 ORDER BY s.sold_at DESC LIMIT ? OFFSET ?"
 	itemArgs = append(itemArgs, filter.Limit, (filter.Page-1)*filter.Limit)
 	if err := r.db.Raw(itemQuery, itemArgs...).Scan(&rows).Error; err != nil {
 		return nil, err
@@ -1030,12 +1030,29 @@ func (r *Repository) DiscountReport(filter *shared.ResolvedFilter) (*DiscountRep
 	for _, row := range rows {
 		items = append(items, DiscountReportItem{SaleNumber: row.SaleNumber, Cashier: row.Cashier, DiscountType: row.DiscountType, DiscountAmount: row.DiscountAmount, SaleTotal: row.SaleTotal, SoldAt: row.SoldAt.Format(time.RFC3339)})
 	}
-	totalDiscount := summary.SaleLevelDiscount + summary.LineLevelDiscount
+	// The header amount IS the total, not half of it.
+	//
+	// sales.discount_amount is literally sumDiscounts(items) at checkout, and
+	// each line's discount_amount has the sale-level discount allocated INTO
+	// it (pos.calculateSale: items[i].DiscountAmount += allocatedSaleDiscount).
+	// So the header and the line sum are the same money at two granularities,
+	// and adding them reported exactly twice the discount ever given. A comped
+	// sale of 351.00 came out as 702.00 of discount on a sale totalling 0.00.
+	//
+	// The sale-level and line-level split is not recoverable from what is
+	// stored, because the allocation OVERWRITES the line's own discount rather
+	// than sitting beside it. Reporting one honest total beats reporting two
+	// figures that are each the whole amount under a label saying they are
+	// parts of it.
+	//
+	// Regression: ISSUE-013 — the discount report counted every discount twice
+	// Found by /qa on 2026-09-14
+	totalDiscount := summary.SaleLevelDiscount
 	percentage := 0.0
 	if summary.GrossSales > 0 {
 		percentage = (totalDiscount / summary.GrossSales) * 100
 	}
-	return &DiscountReportResponse{TotalDiscount: totalDiscount, SaleLevelDiscount: summary.SaleLevelDiscount, LineLevelDiscount: summary.LineLevelDiscount, DiscountedSalesCount: summary.DiscountedSalesCount, DiscountPercentageOfGrossSales: percentage, Items: items}, nil
+	return &DiscountReportResponse{TotalDiscount: totalDiscount, DiscountedSalesCount: summary.DiscountedSalesCount, DiscountPercentageOfGrossSales: percentage, Items: items}, nil
 }
 
 func (r *Repository) TaxReport(filter *shared.ResolvedFilter) ([]TaxReportItem, error) {
