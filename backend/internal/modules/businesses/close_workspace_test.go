@@ -74,18 +74,36 @@ func functionSource(t *testing.T, file, signature string) string {
 	return body
 }
 
+// functionSourceIn returns the source of one declaration: from its signature to
+// the next top-level declaration, or to its own closing brace.
+//
+// Line endings are normalised first, and that is the whole point of this
+// comment. The terminators are written with "\n". On a CRLF checkout "\nfunc "
+// still matches, because "\r\nfunc " ends in \n -- but "\n}\n" never can, since
+// the byte after "}" is "\r". dto.go declares no funcs, so the old version
+// missed the primary terminator, fell through to that unmatchable fallback, and
+// returned the entire rest of the file. TestGenericBusinessUpdateCannotChangeStatus
+// then found "Status" in a later struct and failed for eleven days over a
+// violation that was never there: UpdateBusinessRequest has never carried the
+// field and UpdateBusiness has never written it.
+//
+// Fixed 2026-09-14 (T-AF). A guard that reads source text has to be as careful
+// about its own parsing as about the rule it enforces; a false red is worse
+// than no test, because it trains people to ignore the suite.
 func functionSourceIn(source, signature string) string {
+	source = strings.ReplaceAll(source, "\r\n", "\n")
+
 	start := strings.Index(source, signature)
 	if start == -1 {
 		return ""
 	}
+
 	rest := source[start+len(signature):]
-	end := strings.Index(rest, "\nfunc ")
-	if end == -1 {
-		if e := strings.Index(rest, "\n}\n"); e != -1 {
-			return rest[:e]
+	end := len(rest)
+	for _, stop := range []string{"\nfunc ", "\ntype ", "\nconst ", "\nvar ", "\n}\n"} {
+		if i := strings.Index(rest, stop); i != -1 && i < end {
+			end = i
 		}
-		return rest
 	}
 	return rest[:end]
 }
