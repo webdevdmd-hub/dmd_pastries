@@ -229,6 +229,7 @@ export function SignupForm(): JSX.Element {
                       <FormControl>
                         <Input
                           className={inputClassName}
+                          autoComplete="organization"
                           placeholder="Golden Crust Bakery"
                           {...field}
                         />
