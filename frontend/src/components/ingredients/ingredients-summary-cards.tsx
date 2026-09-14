@@ -32,7 +32,7 @@ export function IngredientsSummaryCards({ items }: IngredientsSummaryCardsProps)
             <CardContent className="flex items-center justify-between p-5">
               <div>
                 <p className="text-sm text-brand-mocha">{card.label}</p>
-                <p className="mt-2 text-3xl font-bold text-brand-espresso">{stats[card.key]}</p>
+                <p className="mt-2 text-3xl font-semibold text-brand-espresso">{stats[card.key]}</p>
               </div>
               <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-latte text-brand-mocha">
                 <Icon className="h-6 w-6" />

@@ -34,6 +34,24 @@ func (r *Repository) FindByID(businessID string) (*Business, error) {
 	return &business, nil
 }
 
+// FindByIDTx reads the business on the caller's transaction.
+//
+// Auth opens a transaction per request, and until 2026-09-14 it then called
+// FindByID, which runs on the pool: every authenticated request briefly held
+// two connections, one for the open transaction and one for this read. Against
+// the Supabase session-mode pooler that second connection is refused once a
+// page load fans out ~20 requests at once, and the request died as a 500
+// "failed to load workspace" while the transaction sat idle. Reading on the
+// transaction needs no second connection. Any caller that already holds a
+// transaction should use this, not FindByID.
+func (r *Repository) FindByIDTx(tx *gorm.DB, businessID string) (*Business, error) {
+	var business Business
+	if err := tx.Where("id = ?", businessID).First(&business).Error; err != nil {
+		return nil, err
+	}
+	return &business, nil
+}
+
 func (r *Repository) UpdateByID(tx *gorm.DB, businessID string, updates map[string]interface{}) error {
 	result := tx.Model(&Business{}).Where("id = ?", businessID).Updates(updates)
 	if result.Error != nil {

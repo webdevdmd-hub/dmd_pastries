@@ -33,7 +33,7 @@ export function DashboardMetricPanel({
                 <Icon className="h-5 w-5" aria-hidden="true" />
               </span>
               <p className="text-xs font-semibold text-foreground-muted">{metric.label}</p>
-              <p className="mt-2 text-2xl font-bold text-foreground">{metric.value}</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{metric.value}</p>
             </div>
           );
         })}

@@ -38,13 +38,14 @@ import { useCustomerCredits } from "@/hooks/use-customer-credits";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePermission } from "@/hooks/use-permission";
 import { usePOSCart } from "@/hooks/use-pos-cart";
+import { usePOSCartDraft } from "@/hooks/use-pos-cart-draft";
 import { usePOSCheckout, useVerifyPOSCheckout } from "@/hooks/use-pos-checkout";
 import {
   usePOSPaymentMethods,
   usePOSProducts,
   usePOSReferenceData,
 } from "@/hooks/use-pos-products";
-import { getErrorMessage } from "@/lib/api/client";
+import { ApiError, getErrorMessage } from "@/lib/api/client";
 import { type CheckoutFeedback, resolveCheckoutBlocker } from "@/lib/pos/checkout-feedback";
 import { getProductImageUrl } from "@/lib/storage/files";
 import { createUuid } from "@/lib/uuid";
@@ -219,6 +220,7 @@ export function POSWorkspace(): JSX.Element {
   const checkoutMutation = usePOSCheckout();
   const verifyCheckoutMutation = useVerifyPOSCheckout();
   const cart = usePOSCart();
+  usePOSCartDraft(cart);
   const cartPayments = cart.payments;
   const cartTotal = cart.totals.total;
   const setCartPayments = cart.setPayments;
@@ -457,6 +459,19 @@ export function POSWorkspace(): JSX.Element {
       const checkedOut = await checkoutMutation.mutateAsync(payload);
       completeCheckout(checkedOut, receiptItemSnapshot);
     } catch (error) {
+      // Regression: ISSUE-011 — a 4xx is the server saying no (out of stock,
+      // validation, permission); no checkout exists to verify, and asking for
+      // one logged a 404 "checkout not found" after every refused sale. The
+      // verification below is for the unknown cases: network loss, timeouts,
+      // 5xx, where the sale may have gone through. Found by /qa on 2026-09-14.
+      if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+        showCheckoutFeedback({
+          message: getErrorMessage(error),
+          title: "Checkout failed",
+          tone: "error",
+        });
+        return;
+      }
       try {
         const verifiedCheckout = await verifyCheckoutMutation.mutateAsync(activeCheckoutReference);
 
@@ -734,8 +749,12 @@ export function POSWorkspace(): JSX.Element {
                   <CalendarPlus className="h-4 w-4" />
                   Create order
                 </Button>
-                <label className="text-meta min-h-tap flex w-full items-center justify-center gap-2 whitespace-nowrap rounded border border-border bg-card px-3 font-medium text-foreground-muted">
+                <label
+                  className="text-meta min-h-tap flex w-full items-center justify-center gap-2 whitespace-nowrap rounded border border-border bg-card px-3 font-medium text-foreground-muted"
+                  htmlFor="pos-show-prices"
+                >
                   <Checkbox
+                    id="pos-show-prices"
                     checked={showPrices}
                     onCheckedChange={(checked) => setShowPrices(checked === true)}
                   />

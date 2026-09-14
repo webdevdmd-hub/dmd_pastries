@@ -419,18 +419,28 @@ export function OpeningStockDialog({
             <div className="space-y-1">
               <Label htmlFor="openingQuantity">Opening quantity</Label>
               <Input
+                aria-describedby={
+                  form.formState.errors.quantity ? "openingQuantity-error" : undefined
+                }
+                aria-invalid={form.formState.errors.quantity ? true : undefined}
                 id="openingQuantity"
                 step="0.001"
                 type="number"
                 {...form.register("quantity")}
               />
               {form.formState.errors.quantity ? (
-                <p className="text-sm text-danger-text">{form.formState.errors.quantity.message}</p>
+                <p className="text-sm text-danger-text" id="openingQuantity-error">
+                  {form.formState.errors.quantity.message}
+                </p>
               ) : null}
             </div>
             <div className="space-y-1">
               <Label htmlFor="openingUnitCost">Opening cost</Label>
               <Input
+                aria-describedby={
+                  form.formState.errors.unitCost ? "openingUnitCost-error" : undefined
+                }
+                aria-invalid={form.formState.errors.unitCost ? true : undefined}
                 id="openingUnitCost"
                 min="0"
                 step="0.01"
@@ -438,7 +448,9 @@ export function OpeningStockDialog({
                 {...form.register("unitCost")}
               />
               {form.formState.errors.unitCost ? (
-                <p className="text-sm text-danger-text">{form.formState.errors.unitCost.message}</p>
+                <p className="text-sm text-danger-text" id="openingUnitCost-error">
+                  {form.formState.errors.unitCost.message}
+                </p>
               ) : (
                 <p className="text-xs text-foreground-muted">
                   Estimated opening value: {formatMoney(estimatedOpeningValue)}

@@ -46,7 +46,7 @@ export function ManufacturingPageClient(): JSX.Element {
     <div className="mx-auto flex max-w-7xl flex-col gap-8">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-bold text-foreground-muted">Production Hub</p>
+          <p className="text-xs font-semibold text-foreground-muted">Production Hub</p>
           <h1 className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
             Manufacturing
           </h1>
@@ -104,7 +104,7 @@ export function ManufacturingPageClient(): JSX.Element {
                   />
                   <h2 className="text-xl font-semibold">{action.label}</h2>
                 </div>
-                <span className="rounded-full bg-muted px-4 py-2 text-xs font-bold text-foreground-muted">
+                <span className="rounded-full bg-muted px-4 py-2 text-xs font-semibold text-foreground-muted">
                   Active workflow
                 </span>
               </div>

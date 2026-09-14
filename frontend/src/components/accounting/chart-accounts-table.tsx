@@ -71,7 +71,7 @@ export function ChartAccountsTable({
               <TableRow key={account.id}>
                 <TableCell>
                   <button
-                    className="block text-left font-bold text-brand-espresso underline-offset-4 transition-colors hover:text-brand-mocha hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel"
+                    className="block text-left font-semibold text-brand-espresso underline-offset-4 transition-colors hover:text-brand-mocha hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-caramel"
                     onClick={() => onViewLedger(account)}
                     type="button"
                   >

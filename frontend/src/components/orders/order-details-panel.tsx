@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { JSX } from "react";
+import { type JSX, useState } from "react";
 import { toast } from "sonner";
 
 import type { OrderDetailTabKey } from "@/components/orders/order-detail-tabs";
@@ -17,6 +17,14 @@ import { OrderProductionSection } from "@/components/orders/order-production-sec
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { OrderTimeline } from "@/components/orders/order-timeline";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ROUTES } from "@/constants/routes";
 import { useUpdateOrderStatus } from "@/hooks/use-orders";
 import { getErrorMessage } from "@/lib/api/client";
@@ -67,6 +75,21 @@ export function OrderDetailsPanel({
 }: OrderDetailsPanelProps): JSX.Element {
   const statusMutation = useUpdateOrderStatus();
   const selectedItem = order.items.find((item) => item.id === selectedItemId) ?? null;
+  // Regression: ISSUE-007 — "cancelled" fired its PATCH on a single click with
+  // no dialog, no toast and no undo; a mis-tap cancelled a customer's order.
+  // Found by /qa on 2026-09-14. Cancelling is the one transition here that
+  // cannot be walked back, so it alone asks first; the list page already
+  // confirms every status change through its own dialog.
+  const [confirmCancel, setConfirmCancel] = useState(false);
+
+  const applyStatus = async (status: OrderStatus): Promise<void> => {
+    try {
+      await statusMutation.mutateAsync({ id: order.id, payload: { status } });
+      toast.success(status === "cancelled" ? "Order cancelled." : "Order status updated.");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error));
+    }
+  };
 
   return (
     <>
@@ -118,14 +141,11 @@ export function OrderDetailsPanel({
                 }
                 key={status}
                 onClick={() => {
-                  void (async () => {
-                    try {
-                      await statusMutation.mutateAsync({ id: order.id, payload: { status } });
-                      toast.success("Order status updated.");
-                    } catch (error: unknown) {
-                      toast.error(getErrorMessage(error));
-                    }
-                  })();
+                  if (status === "cancelled") {
+                    setConfirmCancel(true);
+                    return;
+                  }
+                  void applyStatus(status);
                 }}
                 size="sm"
                 type="button"
@@ -163,6 +183,38 @@ export function OrderDetailsPanel({
           {activeTab === "timeline" ? <OrderTimeline status={order.orderStatus} /> : null}
         </div>
       </div>
+
+      <Dialog
+        onOpenChange={(open) => (!open ? setConfirmCancel(false) : undefined)}
+        open={confirmCancel}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel {order.orderNumber}?</DialogTitle>
+            <DialogDescription>
+              The order leaves every production and pickup list and cannot be reopened. Payments
+              already recorded stay on the order for refund handling.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setConfirmCancel(false)} type="button" variant="outline">
+              Keep order
+            </Button>
+            <Button
+              className="border-danger/30 bg-danger-tint text-danger-text hover:bg-danger-tint"
+              disabled={statusMutation.isPending}
+              onClick={() => {
+                setConfirmCancel(false);
+                void applyStatus("cancelled");
+              }}
+              type="button"
+              variant="outline"
+            >
+              Cancel order
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <OrderItemDetailsSheet
         canConvertToProduct={canConvertToProduct}

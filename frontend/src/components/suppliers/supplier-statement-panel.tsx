@@ -31,7 +31,7 @@ import { getErrorMessage } from "@/lib/api/client";
  * a statement exists to show. Date and Type now share the first cell with the
  * document number, which buys back the width without hiding anything.
  *
- * The four summary figures were 10.88px `font-bold`; both are outside the type
+ * The four summary figures were 10.88px `font-semibold`; both are outside the type
  * system (12px floor, weight 600 ceiling).
  */
 export function SupplierStatementPanel({

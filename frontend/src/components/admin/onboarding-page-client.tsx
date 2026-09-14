@@ -129,7 +129,7 @@ export function OnboardingPageClient(): JSX.Element {
           {onboardingQuery.data ? (
             <div className="mt-4 space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-brand-mocha">
-                <span>{String(onboardingQuery.data.completionPercent)}% complete</span>
+                <span>Setup {String(onboardingQuery.data.completionPercent)}% complete</span>
                 <Badge
                   className={
                     onboardingQuery.data.complete

@@ -13,7 +13,7 @@ export function BatchProgressCard({ batch }: { batch: ProductionBatch }): JSX.El
   return (
     <section className="rounded-2xl border border-border bg-card p-6">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-sm font-bold text-foreground">Production Progress</h2>
+        <h2 className="text-sm font-semibold text-foreground">Production Progress</h2>
         <p className="font-mono text-xl font-semibold text-foreground">{progress.toFixed(0)}%</p>
       </div>
       <div className="mt-5 space-y-5">

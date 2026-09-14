@@ -22,7 +22,7 @@ import { getErrorMessage } from "@/lib/api/client";
 /**
  * The ledger totals, plus what was actually bought.
  *
- * The four figures were `font-bold` (weight 700, outside the type system) and
+ * The four figures were `font-semibold` (weight 700, outside the type system) and
  * carried no `tabular-nums`, so the digits shifted column as values changed.
  */
 export function SupplierHistoryPanel({

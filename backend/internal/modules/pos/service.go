@@ -1652,6 +1652,15 @@ func auditFirstNonEmpty(values ...string) string {
 }
 
 func toPOSProduct(row ProductRow) POSProductResponse {
+	// Until 2026-09-14 the product-level response carried no stock at all;
+	// only variants did. The register therefore treated every single product
+	// as sellable and the cashier learned it was out of stock from the
+	// checkout error. Untracked products stay nil, meaning no limit.
+	var currentStock, availableStock *float64
+	if row.IsStockTracked {
+		current, available := row.CurrentStockQuantity, row.AvailableStockQuantity
+		currentStock, availableStock = &current, &available
+	}
 	var taxRate *TaxRateInfo
 	if row.TaxRateID != nil {
 		taxRate = &TaxRateInfo{
@@ -1678,16 +1687,18 @@ func toPOSProduct(row ProductRow) POSProductResponse {
 			UnitName: row.UnitName,
 			Symbol:   row.Symbol,
 		},
-		TaxRate:          taxRate,
-		ProductType:      row.ProductType,
-		ItemStructure:    defaultItemStructure(row.ItemStructure),
-		SalePrice:        row.SalePrice,
-		ImageFileID:      row.ImageFileID,
-		ImageStoragePath: row.ImageStoragePath,
-		IsSellable:       row.IsSellable,
-		IsPOSVisible:     row.IsPOSVisible,
-		IsStockTracked:   row.IsStockTracked,
-		Status:           row.Status,
+		TaxRate:                taxRate,
+		ProductType:            row.ProductType,
+		ItemStructure:          defaultItemStructure(row.ItemStructure),
+		SalePrice:              row.SalePrice,
+		ImageFileID:            row.ImageFileID,
+		ImageStoragePath:       row.ImageStoragePath,
+		IsSellable:             row.IsSellable,
+		IsPOSVisible:           row.IsPOSVisible,
+		IsStockTracked:         row.IsStockTracked,
+		CurrentStockQuantity:   currentStock,
+		AvailableStockQuantity: availableStock,
+		Status:                 row.Status,
 	}
 }
 

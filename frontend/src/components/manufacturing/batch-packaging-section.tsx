@@ -43,7 +43,7 @@ export function BatchPackagingSection({
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card">
       <div className="border-b border-border p-5">
-        <h2 className="text-sm font-bold text-foreground">Packaging Consumed</h2>
+        <h2 className="text-sm font-semibold text-foreground">Packaging Consumed</h2>
         <p className="mt-1 text-sm text-foreground-muted">
           Backend-generated packaging stock-out rows for this production.
         </p>

@@ -23,7 +23,7 @@ import { ROUTES } from "@/constants/routes";
  * - Two competing hero CTAs ("Start owner onboarding" and "See how it works").
  *   §7 is explicit: one --primary CTA, not two competing ones. A second link at
  *   equal weight is the visitor's cue that neither is the thing to do.
- * - font-bold / font-semibold throughout. 500 is the workhorse, 600 for page
+ * - Weight 700 and 600 throughout. 500 is the workhorse, 600 for page
  *   titles, nothing above (§2).
  * - No Fraunces anywhere, despite this being the one register that calls for it.
  *
@@ -87,7 +87,9 @@ export default function HomePage(): JSX.Element {
               which is both more modern and more honest than a cream background on a
               screen that runs a trial balance. */}
           <span className="font-serif text-title leading-none">Pastries POS</span>
-          <span className="text-meta text-foreground-muted">Bakery operations</span>
+          <span className="text-meta hidden text-foreground-muted sm:inline">
+            Bakery operations
+          </span>
         </Link>
 
         {/* Both of these are deliberately quiet. A filled --primary button here
@@ -103,11 +105,11 @@ export default function HomePage(): JSX.Element {
             Login
           </Link>
           <Link
-            className="text-body inline-flex h-10 items-center gap-2 whitespace-nowrap rounded border border-border bg-card px-4 font-medium text-foreground transition-colors hover:bg-muted"
+            className="text-body inline-flex h-10 items-center gap-2 whitespace-nowrap rounded border border-border bg-card px-3 font-medium text-foreground transition-colors hover:bg-muted sm:px-4"
             href={ROUTES.signup}
           >
             Create account
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="hidden h-4 w-4 sm:block" />
           </Link>
         </nav>
       </header>

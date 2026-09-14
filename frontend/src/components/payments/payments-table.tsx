@@ -91,8 +91,15 @@ export function PaymentsTable({
             <TableCell>
               <PaymentMethodBadge methodName={payment.paymentMethodNameSnapshot} />
             </TableCell>
-            <TableCell className="capitalize">
-              {orderPaymentTypeLabel(payment.paymentType)}
+            <TableCell>
+              {/* Regression: ISSUE-010 — a POS sale has no order payment stage, and
+                  the stage label fell through to "Not set", which read as a data
+                  gap on every counter sale. Found by /qa on 2026-09-14. */}
+              {payment.paymentType
+                ? orderPaymentTypeLabel(payment.paymentType)
+                : payment.sourceType === "bakery_order"
+                  ? "Not set"
+                  : "Sale payment"}
             </TableCell>
             <TableCell className="text-right font-medium tabular-nums">
               {formatPaymentMoney(payment.amount)}

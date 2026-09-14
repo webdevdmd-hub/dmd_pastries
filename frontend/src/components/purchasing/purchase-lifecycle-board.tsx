@@ -123,8 +123,8 @@ function StageCard({ stage }: { stage: LifecycleStage }): JSX.Element {
               <Icon className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-xs font-bold text-brand-mocha">Step {stage.step}</p>
-              <h3 className="text-base font-bold text-brand-espresso">{stage.label}</h3>
+              <p className="text-xs font-semibold text-brand-mocha">Step {stage.step}</p>
+              <h3 className="text-base font-semibold text-brand-espresso">{stage.label}</h3>
             </div>
           </div>
           <Badge className={toneClasses(stage.tone)} variant="outline">
@@ -155,7 +155,7 @@ export function PurchaseLifecycleBoard({
       <CardHeader className="border-b border-brand-cappuccino bg-card">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-bold text-brand-mocha">Purchase lifecycle</p>
+            <p className="text-xs font-semibold text-brand-mocha">Purchase lifecycle</p>
             <CardTitle className="mt-2 text-2xl text-brand-espresso">
               Convert documents instead of re-entering them
             </CardTitle>

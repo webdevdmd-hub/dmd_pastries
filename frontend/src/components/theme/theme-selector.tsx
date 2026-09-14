@@ -40,7 +40,7 @@ export function ThemeSelector(): JSX.Element {
               </span>
             </span>
             {theme === item.id ? (
-              <span className="text-xs font-bold text-brand-espresso">On</span>
+              <span className="text-xs font-semibold text-brand-espresso">On</span>
             ) : null}
           </button>
         ))}

@@ -311,7 +311,7 @@ export function BatchesPageClient(): JSX.Element {
     <div className="mx-auto flex max-w-7xl flex-col gap-7">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-bold text-foreground-muted">Manufacturing</p>
+          <p className="text-xs font-semibold text-foreground-muted">Manufacturing</p>
           <h1 className="mt-2 text-4xl font-semibold tracking-tight text-foreground">Production</h1>
           <p className="mt-2 max-w-2xl text-base text-foreground-muted">
             Choose a recipe and output quantity. Component consumption, packaging consumption,

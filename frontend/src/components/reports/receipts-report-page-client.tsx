@@ -460,7 +460,7 @@ export function ReceiptsReportPageClient(): JSX.Element {
             <div className="flex min-h-44 flex-col items-center justify-center gap-3 text-center">
               <ReceiptText className="h-10 w-10 text-brand-caramel" />
               <div>
-                <h2 className="text-xl font-bold text-brand-espresso">No receipts found</h2>
+                <h2 className="text-xl font-semibold text-brand-espresso">No receipts found</h2>
                 <p className="text-brand-mocha">
                   Completed POS sales will appear here with their saved receipt details.
                 </p>

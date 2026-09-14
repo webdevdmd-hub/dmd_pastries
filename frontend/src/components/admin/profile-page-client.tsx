@@ -69,7 +69,7 @@ export function ProfilePageClient(): JSX.Element {
                 </p>
               </div>
               <div className="rounded-3xl border border-brand-cappuccino bg-brand-latte/70 p-4">
-                <p className="text-xs text-brand-mocha">Default tax</p>
+                <p className="text-xs text-brand-mocha">Company default tax (settings)</p>
                 <p className="mt-2 font-medium text-brand-espresso">
                   {settings
                     ? `${String(settings.defaultTaxRate)}%`

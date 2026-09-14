@@ -260,9 +260,9 @@ export function LoginForm({ activated = false }: LoginFormProps): JSX.Element {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-sm font-medium text-foreground">Email</FormLabel>
-                  <FormControl>
-                    <div className="relative group">
-                      <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
+                  <div className="relative group">
+                    <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
+                    <FormControl>
                       <Input
                         autoComplete="email"
                         className="h-12 rounded-lg border-border bg-card pl-11 text-foreground shadow-none transition placeholder:text-foreground-disabled focus-visible:border-ring focus-visible:ring-ring/40"
@@ -270,8 +270,8 @@ export function LoginForm({ activated = false }: LoginFormProps): JSX.Element {
                         type="email"
                         {...field}
                       />
-                    </div>
-                  </FormControl>
+                    </FormControl>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
@@ -291,9 +291,9 @@ export function LoginForm({ activated = false }: LoginFormProps): JSX.Element {
                       Forgot password?
                     </Link>
                   </div>
-                  <FormControl>
-                    <div className="relative group">
-                      <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
+                  <div className="relative group">
+                    <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
+                    <FormControl>
                       <Input
                         autoComplete="current-password"
                         className="h-12 rounded-lg border-border bg-card pl-11 pr-11 text-foreground shadow-none transition placeholder:text-foreground-disabled focus-visible:border-ring focus-visible:ring-ring/40"
@@ -301,24 +301,20 @@ export function LoginForm({ activated = false }: LoginFormProps): JSX.Element {
                         type={showPassword ? "text" : "password"}
                         {...field}
                       />
-                      <button
-                        aria-label={showPassword ? "Hide password" : "Show password"}
-                        aria-pressed={showPassword}
-                        className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-foreground-muted transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
-                        onClick={() => {
-                          setShowPassword((current) => !current);
-                        }}
-                        title={showPassword ? "Hide password" : "Show password"}
-                        type="button"
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </FormControl>
+                    </FormControl>
+                    <button
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-pressed={showPassword}
+                      className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-foreground-muted transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
+                      onClick={() => {
+                        setShowPassword((current) => !current);
+                      }}
+                      title={showPassword ? "Hide password" : "Show password"}
+                      type="button"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}

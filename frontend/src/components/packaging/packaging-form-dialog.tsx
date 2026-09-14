@@ -183,7 +183,9 @@ export function PackagingFormDialog({
           }}
         >
           <section className="grid gap-4 md:grid-cols-2">
-            <h3 className="text-sm font-bold text-brand-mocha md:col-span-2">Basic Information</h3>
+            <h3 className="text-sm font-semibold text-brand-mocha md:col-span-2">
+              Basic Information
+            </h3>
             <div className="grid gap-2">
               <Label htmlFor="packaging-name">Packaging name</Label>
               <Input id="packaging-name" {...form.register("packagingName")} />
@@ -272,7 +274,7 @@ export function PackagingFormDialog({
           </section>
 
           <section className="grid gap-4 md:grid-cols-3">
-            <h3 className="text-sm font-bold text-brand-mocha md:col-span-3">Behavior</h3>
+            <h3 className="text-sm font-semibold text-brand-mocha md:col-span-3">Behavior</h3>
             <label className="flex items-center gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte p-3">
               <Checkbox
                 checked={form.watch("isStockTracked")}
@@ -300,7 +302,7 @@ export function PackagingFormDialog({
           </section>
 
           <section className="grid gap-4 md:grid-cols-2">
-            <h3 className="text-sm font-bold text-brand-mocha md:col-span-2">Media & Notes</h3>
+            <h3 className="text-sm font-semibold text-brand-mocha md:col-span-2">Media & Notes</h3>
             <div className="grid gap-2">
               <Label htmlFor="packaging-image">Packaging image</Label>
               <div className="flex flex-col gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-3 sm:flex-row sm:items-center">

@@ -574,7 +574,7 @@ export function OrderFormPage({
                         value={salesChannelId}
                       />
                       <button
-                        className="w-fit text-xs font-bold text-foreground-muted underline-offset-4 hover:text-foreground hover:underline"
+                        className="w-fit text-xs font-semibold text-foreground-muted underline-offset-4 hover:text-foreground hover:underline"
                         onClick={() => {
                           setSalesChannelId("");
                           setExternalOrderNumber("");
@@ -687,7 +687,7 @@ export function OrderFormPage({
                   <div className="flex items-center justify-between gap-3">
                     <h2 className="text-body font-medium text-foreground">Order Summary</h2>
                     {showPreviewLoading ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-foreground-muted">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-foreground-muted">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         Previewing
                       </span>
@@ -761,7 +761,7 @@ export function OrderFormPage({
                       <span className="font-mono text-title text-foreground">
                         {formatCurrency(summaryTotal)} AED
                       </span>
-                      <span className="rounded-full border border-border px-2 py-1 text-xs font-bold uppercase text-foreground-muted">
+                      <span className="rounded-full border border-border px-2 py-1 text-xs font-semibold uppercase text-foreground-muted">
                         {order?.paymentStatus ?? "Draft"}
                       </span>
                     </div>
@@ -804,7 +804,7 @@ export function OrderFormPage({
                   {isEdit ? "Save Changes" : "Save Bakery Order"}
                 </Button>
                 <Button
-                  className="h-12 w-full rounded-lg border-border bg-card text-base font-bold text-foreground hover:bg-muted"
+                  className="h-12 w-full rounded-lg border-border bg-card text-base font-semibold text-foreground hover:bg-muted"
                   onClick={closeForm}
                   type="button"
                   variant="outline"
