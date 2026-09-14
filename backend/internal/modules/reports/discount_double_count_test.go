@@ -55,6 +55,21 @@ func TestDiscountReportDoesNotDoubleCount(t *testing.T) {
 		t.Error("a discount report ROW adds the sale header to its own lines, so each row shows " +
 			"twice the discount that sale actually gave")
 	}
+
+	// The first fix here covered only the Discount Report, and the Sales
+	// overview kept showing 702.00 against the same 351.00 discount because it
+	// builds its own total in the daily query. Catch the SHAPE of the mistake
+	// anywhere it appears, not the one call site that was noticed first.
+	for _, doubled := range []string{
+		"COALESCE(SUM(ss.discount_amount),0) + COALESCE(MAX(lt.line_discount),0)",
+		"COALESCE(SUM(ss.discount_amount),0) + COALESCE(SUM(lt.line_discount),0)",
+		"SUM(s.discount_amount) + SUM(si.discount_amount)",
+	} {
+		if strings.Contains(source, doubled) {
+			t.Errorf("a discount total adds the sale header to a line sum (%s). The header IS the "+
+				"line sum, so this reports every discount twice wherever it appears", doubled)
+		}
+	}
 }
 
 // The split cards are gone from the response because the data cannot support

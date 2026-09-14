@@ -80,7 +80,7 @@ export function DiscountReportPageClient(): JSX.Element {
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <ReportSectionHeader
         title="Discount Report"
-        description="Review sale-level and line-level discounts."
+        description="Review discounts given on completed sales."
       />
       <SalesReportFilterBar
         branches={branchesQuery.data ?? []}
