@@ -8,13 +8,46 @@ function currency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
 }
 
+/**
+ * A customer's totals, or an honest statement that they could not be loaded.
+ *
+ * Every figure here used to fall back to `?? 0`, so a stats request that
+ * failed rendered as "Total Sales AED 0.00 … Last Purchase Never" -- which is
+ * exactly what a real customer who has never bought anything looks like. That
+ * is how ISSUE-011 survived: the endpoint was returning 500 for every customer
+ * on every request and the screen calmly reported zero.
+ *
+ * A zero is now only shown when a figure was actually received. If the request
+ * failed, this says so instead of inventing a number.
+ *
+ * Regression: ISSUE-011 — customer statistics returned 500 for every customer
+ * Found by /qa on 2026-09-14
+ */
 export function CustomerStatsCards({
   creditBalance,
+  error,
   stats,
 }: {
   creditBalance?: number;
+  error?: Error | null;
   stats: CustomerStats | undefined;
 }): JSX.Element {
+  if (error) {
+    return (
+      <Card className="border-danger/30 bg-danger-tint">
+        <CardContent className="p-5">
+          <p className="text-cell font-medium text-danger-text">
+            This customer&apos;s totals could not be loaded.
+          </p>
+          <p className="mt-1 text-cell text-danger-text">
+            Sales, payments and balances are unavailable right now, so nothing is shown rather than
+            a figure that might be wrong. Everything else on this page is unaffected.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const cards = [
     { label: "Total Sales", value: currency(stats?.totalSalesAmount ?? 0), icon: Banknote },
     {

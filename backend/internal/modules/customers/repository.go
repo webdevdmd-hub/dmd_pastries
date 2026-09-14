@@ -2,6 +2,7 @@ package customers
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"pastries-pos/internal/shared/money"
 	"strings"
@@ -144,6 +145,17 @@ func (r *Repository) LoadCustomerResponse(businessID string, customer Customer) 
 	stats, err := r.BasicStats(businessID, customer.BranchID, customer.ID)
 	if err == nil {
 		response.Stats = stats
+	} else {
+		// The list still renders without stats, so this stays non-fatal. But
+		// a dropped error here reads on screen as "Total sales AED 0.00, Last
+		// purchase Never" -- a customer who has never bought anything --
+		// which is why ISSUE-011 sat unnoticed: Stats() was failing for every
+		// customer on every request and the only symptom was a believable
+		// zero. Say so in the log.
+		log.Printf(
+			"customers: stats unavailable for %s, list shows zero totals (business_id=%s customer_id=%s): %v",
+			customer.CustomerCode, businessID, customer.ID, err,
+		)
 	}
 	return response, nil
 }
