@@ -1,6 +1,7 @@
 package accounting
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"pastries-pos/internal/shared/money"
@@ -2054,14 +2055,46 @@ func (s *Service) PostBakeryOrderCOGSJournal(tx *gorm.DB, currentUser *utils.Aut
 	if order.OrderStatus != "completed" {
 		return "", nil
 	}
-	costTotal, err := s.repo.SumStockMovementCostByReference(tx, currentUser.BusinessID, "bakery_order", order.ID, "out")
+	movedCost, err := s.repo.SumStockMovementCostByReference(tx, currentUser.BusinessID, "bakery_order", order.ID, "out")
 	if err != nil {
 		return "", apperrors.Internal("failed to calculate bakery order inventory cost")
 	}
-	costTotal = roundMoney(costTotal)
+	// Items that relieved no stock priced from the product record.
+	//
+	// Cost of sales is summed from movements, so a stock-tracked catalog
+	// product with no inventory item on the branch contributed nothing and the
+	// order posted revenue against no cost at all -- overstating margin by the
+	// item's cost, with nothing in inventory to mark the shortfall either. Only
+	// a server log said so, and it could not tell that case apart from a
+	// custom-only order, which legitimately costs nothing.
+	//
+	// The fallback prices exactly the product-backed, stock-tracked items that
+	// moved nothing. A mixed order still sums both halves, so partial
+	// consumption is costed once and in full. Custom items stay at zero.
+	//
+	// The ledger then relieves inventory that no stock record supports, which
+	// is the accepted trade (D2, option A, 2026-09-14): a correct margin with a
+	// visible gap beats a silent one. The warning below is what makes it
+	// visible, and it now names the amount rather than only the absence.
+	//
+	// Regression: ISSUE-007 — a completed order posted revenue with no cost of sales
+	// Found by /qa on 2026-09-14
+	uncostedCost, err := s.repo.SumBakeryOrderUncostedItemCost(tx, currentUser.BusinessID, order.ID, order.BranchID)
+	if err != nil {
+		return "", apperrors.Internal("failed to price bakery order items that relieved no stock")
+	}
+	uncostedCost = roundMoney(uncostedCost)
+	if uncostedCost > 0 {
+		log.Printf(
+			"accounting: bakery order %s relieved no stock for items costing %.2f; COGS posted from the product record instead (business_id=%s order_id=%s)",
+			order.OrderNumber, uncostedCost, currentUser.BusinessID, order.ID,
+		)
+	}
+	costTotal := roundMoney(movedCost + uncostedCost)
 	if costTotal <= 0 {
-		// Custom-only orders legitimately consume nothing; stock-tracked orders
-		// with zero cost are a COGS gap that must stay visible.
+		// Nothing to relieve and nothing to price: a custom-only order, which
+		// genuinely has no cost of sales. Still logged, because a stock-tracked
+		// order reaching here would mean the fallback missed it too.
 		log.Printf(
 			"accounting: bakery order %s has zero outbound cost; COGS journal skipped (business_id=%s order_id=%s)",
 			order.OrderNumber, currentUser.BusinessID, order.ID,
@@ -2076,9 +2109,17 @@ func (s *Service) PostBakeryOrderCOGSJournal(tx *gorm.DB, currentUser *utils.Aut
 	if err != nil {
 		return "", err
 	}
+	// When part of the cost came from the product record rather than a stock
+	// movement, the journal says so on its own lines. An accountant reading
+	// this entry can see that some of the inventory credit has no movement
+	// behind it without going back to the server log.
+	costNote := ""
+	if uncostedCost > 0 {
+		costNote = fmt.Sprintf(" (%.2f priced from the product record: no stock was relieved)", uncostedCost)
+	}
 	lines := []JournalEntryLineRequest{
-		{AccountID: cogsAccount.ID, DebitAmount: costTotal, Description: "COGS for bakery order " + order.OrderNumber},
-		{AccountID: inventoryAccount.ID, CreditAmount: costTotal, Description: "Inventory cost relieved for bakery order " + order.OrderNumber},
+		{AccountID: cogsAccount.ID, DebitAmount: costTotal, Description: "COGS for bakery order " + order.OrderNumber + costNote},
+		{AccountID: inventoryAccount.ID, CreditAmount: costTotal, Description: "Inventory cost relieved for bakery order " + order.OrderNumber + costNote},
 	}
 	journalID, err := s.createPostedSystemJournal(tx, currentUser, bakeryOrderEntryDate(order.EventDate), order.BranchID, "bakery_order_cogs", order.ID, order.OrderNumber, "Bakery order COGS "+order.OrderNumber, lines)
 	if err != nil {
