@@ -25,6 +25,7 @@ import {
 import { ROUTES } from "@/constants/routes";
 import { useOrder } from "@/hooks/use-orders";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { canEditOrder } from "@/lib/orders/status-rules";
 import type { BakeryOrder } from "@/types/orders";
 
 type OrderDetailsDrawerProps = {
@@ -151,12 +152,12 @@ function OrderDetailsDrawerBody({
               Open full page
             </Link>
           </Button>
-          {canManage && onEdit ? (
+          {canManage && canEditOrder(order.orderStatus) && onEdit ? (
             <Button onClick={() => onEdit(order)} size="sm" type="button" variant="outline">
               <Pencil className="h-4 w-4" />
               Edit order
             </Button>
-          ) : canManage ? (
+          ) : canManage && canEditOrder(order.orderStatus) ? (
             <Button asChild size="sm" variant="outline">
               <Link href={`${detailHref}?mode=edit`}>
                 <Pencil className="h-4 w-4" />

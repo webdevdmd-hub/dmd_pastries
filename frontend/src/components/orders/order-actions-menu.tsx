@@ -8,17 +8,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { allowedOrderTransitions, canEditOrder } from "@/lib/orders/status-rules";
 import type { BakeryOrder, OrderStatus } from "@/types/orders";
-
-const transitions: Record<OrderStatus, OrderStatus[]> = {
-  cancelled: [],
-  completed: [],
-  confirmed: ["in_production", "cancelled"],
-  delivered: ["completed", "cancelled"],
-  in_production: ["ready", "cancelled"],
-  new: ["confirmed", "cancelled"],
-  ready: ["delivered", "completed", "cancelled"],
-};
 
 function label(status: OrderStatus): string {
   return status
@@ -50,14 +41,14 @@ export function OrderActionsMenu({
       {/* Viewing is not in here: clicking the row or card itself opens the
           details drawer, so the menu holds only the actions. */}
       <DropdownMenuContent align="end" className="w-52">
-        {canManage ? (
+        {canManage && canEditOrder(order.orderStatus) ? (
           <DropdownMenuItem onClick={() => onEdit(order)}>
             <Edit className="mr-2 h-4 w-4" />
             Edit order
           </DropdownMenuItem>
         ) : null}
         {canManage
-          ? transitions[order.orderStatus].map((status) => (
+          ? allowedOrderTransitions(order.orderStatus).map((status) => (
               <DropdownMenuItem key={status} onClick={() => onStatusChange(order, status)}>
                 <PackageCheck className="mr-2 h-4 w-4" />
                 Mark {label(status)}
