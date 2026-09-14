@@ -1,6 +1,13 @@
 import type { CartTotals, PaymentInput } from "@/types/pos";
 import type { PaymentMethod, SalesChannel } from "@/types/settings";
 
+/**
+ * Money comparisons round to the fils, so "zero" means "under half a fils".
+ * Matches the tolerance the overpayment check below already uses and the
+ * 0.0001 the backend uses when comparing paid against total.
+ */
+export const ZERO_TOTAL_EPSILON = 0.0001;
+
 export type CheckoutFeedback = {
   message: string;
   // Only set for the "checkout status unknown" state: the request itself
@@ -70,7 +77,22 @@ export function resolveCheckoutBlocker({
     );
   }
 
-  if (payments.length === 0) {
+  // A sale can legitimately come to nothing: a comp, a staff meal, a 100%-off
+  // promotion. Nothing is owed, so there is nothing to tender, and demanding a
+  // payment method here is unsatisfiable -- the amount that would settle it is
+  // zero, which the "greater than zero" rule below then rejects. The cashier's
+  // only way through was to record taking cash and handing the same cash back,
+  // which writes a cash movement that never happened.
+  //
+  // The backend already expects this shape: Checkout only refuses an empty
+  // payments list when TotalAmount > 0 (pos/service.go). submitCheckout drops
+  // zero-amount tenders to match, because buildPayments rejects a zero line.
+  //
+  // Regression: ISSUE-001 — a zero-total sale could not be completed
+  // Found by /qa on 2026-09-14
+  const nothingDue = totals.total <= ZERO_TOTAL_EPSILON;
+
+  if (payments.length === 0 && !nothingDue) {
     return errorBlocker("Select payment", "Select a payment method before confirming the sale.");
   }
 
@@ -89,8 +111,13 @@ export function resolveCheckoutBlocker({
     );
   }
 
-  const invalidPayment = payments.find(
-    (payment) => !Number.isFinite(payment.amount) || payment.amount <= 0,
+  // When nothing is due, a zero tender is the correct amount rather than an
+  // error: the register auto-selects a method and fills 0, and submitCheckout
+  // drops it. A negative or non-finite amount is still wrong either way.
+  const invalidPayment = payments.find((payment) =>
+    nothingDue
+      ? !Number.isFinite(payment.amount) || payment.amount < 0
+      : !Number.isFinite(payment.amount) || payment.amount <= 0,
   );
 
   if (invalidPayment) {

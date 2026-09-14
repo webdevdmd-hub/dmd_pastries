@@ -435,7 +435,13 @@ export function POSWorkspace(): JSX.Element {
       saleDiscountType: cart.saleDiscountType,
       saleDiscountValue: cart.saleDiscountValue,
       charges: cart.charges,
-      payments: cart.payments,
+      // Drop zero tenders. On a sale that comes to nothing (a comp, a staff
+      // meal, a 100%-off promotion) the register still auto-selects a payment
+      // method and fills 0.00, but buildPayments rejects a zero line outright
+      // while Checkout accepts an empty list whenever the total is zero. So
+      // sending nothing is the shape the backend is built for.
+      // Regression: ISSUE-001 — a zero-total sale could not be completed.
+      payments: cart.payments.filter((payment) => payment.amount > 0),
       salesChannelId: salesChannelId || null,
       externalOrderNumber:
         externalOrderNumber.trim().length > 0 ? externalOrderNumber.trim() : null,

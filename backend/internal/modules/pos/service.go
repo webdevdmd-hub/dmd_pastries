@@ -1602,6 +1602,17 @@ func calculateDiscount(discountType *string, value, base float64) (float64, erro
 }
 
 func paymentStatus(paidAmount, totalAmount float64) string {
+	// Nothing owed is settled, not unpaid. A comp, a staff meal or a
+	// 100%-off promotion comes to zero and takes no tender, so paid and total
+	// are both zero -- and the paid <= 0 branch below used to call that
+	// "unpaid", leaving a sale that owes nothing sitting in outstanding
+	// balances forever. Order matters here: this has to be checked first.
+	//
+	// Regression: ISSUE-001 — a zero-total sale recorded as unpaid.
+	// Found by /qa on 2026-09-14.
+	if totalAmount <= 0.0001 {
+		return "paid"
+	}
 	if paidAmount <= 0 {
 		return "unpaid"
 	}
