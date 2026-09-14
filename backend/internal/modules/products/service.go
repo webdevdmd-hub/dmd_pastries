@@ -378,7 +378,42 @@ func (s *Service) POSProducts(currentUser *utils.AuthContext) ([]ProductResponse
 	if err != nil {
 		return nil, apperrors.Internal("failed to list POS products")
 	}
-	return s.repo.LoadProductResponses(currentUser.BusinessID, products)
+	responses, err := s.repo.LoadProductResponses(currentUser.BusinessID, products)
+	if err != nil {
+		return nil, err
+	}
+
+	// The register decides whether a tile is sellable from the quantity on the
+	// response. Without it every product reads as unlimited, and a cashier
+	// learns the shelf is empty only when checkout refuses the sale -- the
+	// defect this endpoint shipped with until 2026-09-14 (ISSUE-006).
+	//
+	// A stock-tracked product with no inventory row is 0, not nil: absent from
+	// the map means nobody has ever counted it, which for selling purposes is
+	// the same as none on hand. Untracked products stay nil, meaning no limit.
+	productIDs := make([]string, 0, len(responses))
+	for _, response := range responses {
+		if response.IsStockTracked {
+			productIDs = append(productIDs, response.ID)
+		}
+	}
+
+	stock, err := s.repo.ProductStockByProductID(currentUser.BusinessID, branchID, productIDs)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load POS product stock")
+	}
+
+	for index := range responses {
+		if !responses[index].IsStockTracked {
+			continue
+		}
+		row := stock[responses[index].ID]
+		current, available := row.CurrentQuantity, row.AvailableQuantity
+		responses[index].CurrentStockQuantity = &current
+		responses[index].AvailableStockQuantity = &available
+	}
+
+	return responses, nil
 }
 
 func (s *Service) LookupProduct(currentUser *utils.AuthContext, barcode, sku, productCode string) (*ProductLookupResponse, error) {

@@ -97,40 +97,47 @@ type PaginationResponse struct {
 }
 
 type ProductResponse struct {
-	ID                     string               `json:"id"`
-	BusinessID             string               `json:"business_id"`
-	BranchID               string               `json:"branch_id"`
-	ProductName            string               `json:"product_name"`
-	ProductCode            string               `json:"product_code"`
-	SKU                    string               `json:"sku"`
-	Barcode                string               `json:"barcode"`
-	Category               ProductCategoryInfo  `json:"category"`
-	Unit                   ProductUnitInfo      `json:"unit"`
-	TaxRate                *ProductTaxRateInfo  `json:"tax_rate"`
-	ProductType            string               `json:"product_type"`
-	ItemStructure          string               `json:"item_structure"`
-	SalePrice              float64              `json:"sale_price"`
-	CostPrice              *float64             `json:"cost_price"`
-	CompareAtPrice         *float64             `json:"compare_at_price"`
-	CostUpdatePolicy       string               `json:"cost_update_policy"`
-	PricingType            string               `json:"pricing_type"`
-	PricingPercent         float64              `json:"pricing_percent"`
-	MinimumSalePrice       *float64             `json:"minimum_sale_price"`
-	SuggestedSalePrice     *float64             `json:"suggested_sale_price"`
-	AutoPriceUpdateEnabled bool                 `json:"auto_price_update_enabled"`
-	SalePriceLocked        bool                 `json:"sale_price_locked"`
-	LastPurchaseCost       *float64             `json:"last_purchase_cost"`
-	LastPurchaseDate       *time.Time           `json:"last_purchase_date"`
-	LastProductionCost     *float64             `json:"last_production_cost"`
-	LastProductionDate     *time.Time           `json:"last_production_date"`
-	AverageInventoryCost   *float64             `json:"average_inventory_cost"`
-	Description            string               `json:"description"`
-	ImageFileID            string               `json:"image_file_id"`
-	ImageStoragePath       string               `json:"image_storage_path"`
-	IsSellable             bool                 `json:"is_sellable"`
-	IsPOSVisible           bool                 `json:"is_pos_visible"`
-	IsPurchasable          bool                 `json:"is_purchasable"`
-	IsStockTracked         bool                 `json:"is_stock_tracked"`
+	ID                     string              `json:"id"`
+	BusinessID             string              `json:"business_id"`
+	BranchID               string              `json:"branch_id"`
+	ProductName            string              `json:"product_name"`
+	ProductCode            string              `json:"product_code"`
+	SKU                    string              `json:"sku"`
+	Barcode                string              `json:"barcode"`
+	Category               ProductCategoryInfo `json:"category"`
+	Unit                   ProductUnitInfo     `json:"unit"`
+	TaxRate                *ProductTaxRateInfo `json:"tax_rate"`
+	ProductType            string              `json:"product_type"`
+	ItemStructure          string              `json:"item_structure"`
+	SalePrice              float64             `json:"sale_price"`
+	CostPrice              *float64            `json:"cost_price"`
+	CompareAtPrice         *float64            `json:"compare_at_price"`
+	CostUpdatePolicy       string              `json:"cost_update_policy"`
+	PricingType            string              `json:"pricing_type"`
+	PricingPercent         float64             `json:"pricing_percent"`
+	MinimumSalePrice       *float64            `json:"minimum_sale_price"`
+	SuggestedSalePrice     *float64            `json:"suggested_sale_price"`
+	AutoPriceUpdateEnabled bool                `json:"auto_price_update_enabled"`
+	SalePriceLocked        bool                `json:"sale_price_locked"`
+	LastPurchaseCost       *float64            `json:"last_purchase_cost"`
+	LastPurchaseDate       *time.Time          `json:"last_purchase_date"`
+	LastProductionCost     *float64            `json:"last_production_cost"`
+	LastProductionDate     *time.Time          `json:"last_production_date"`
+	AverageInventoryCost   *float64            `json:"average_inventory_cost"`
+	Description            string              `json:"description"`
+	ImageFileID            string              `json:"image_file_id"`
+	ImageStoragePath       string              `json:"image_storage_path"`
+	IsSellable             bool                `json:"is_sellable"`
+	IsPOSVisible           bool                `json:"is_pos_visible"`
+	IsPurchasable          bool                `json:"is_purchasable"`
+	IsStockTracked         bool                `json:"is_stock_tracked"`
+	// Branch stock for this product, from the same inventory_items row the POS
+	// checkout checks. nil means "no limit": either the product does not track
+	// stock, or the caller did not ask for quantities. A stock-tracked product
+	// with no inventory row yet reports 0, not nil, so the register can show
+	// "Out of stock" instead of letting the sale reach checkout and fail.
+	CurrentStockQuantity   *float64             `json:"current_stock_quantity"`
+	AvailableStockQuantity *float64             `json:"available_stock_quantity"`
 	IsExpiryTracked        bool                 `json:"is_expiry_tracked"`
 	IsCustomOrderAvailable bool                 `json:"is_custom_order_available"`
 	PreparationTimeMinutes *int                 `json:"preparation_time_minutes"`

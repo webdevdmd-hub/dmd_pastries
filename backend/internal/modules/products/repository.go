@@ -228,6 +228,49 @@ func (r *Repository) VariantBarcodeExists(businessID, branchID, value, excludeVa
 	return r.variantExists("barcode", businessID, branchID, value, excludeVariantID)
 }
 
+// ProductBranchStock is the product-level inventory row for one product at one
+// branch: the same row, matched the same way, that the POS checkout consults
+// before it allows a sale.
+type ProductBranchStock struct {
+	ProductID         string
+	CurrentQuantity   float64
+	AvailableQuantity float64
+}
+
+// ProductStockByProductID reads branch stock for many products in one query.
+//
+// One query, not one per product: LoadProductResponses already loops per
+// product, and the register asks for the whole catalogue at once. Adding a
+// per-product lookup there would multiply connection use on a page that
+// already fans out, which is exactly what starved the pooler in ISSUE-005.
+//
+// Products with no inventory row are simply absent from the map; the caller
+// decides whether that means zero or unknown.
+func (r *Repository) ProductStockByProductID(
+	businessID, branchID string,
+	productIDs []string,
+) (map[string]ProductBranchStock, error) {
+	stock := make(map[string]ProductBranchStock, len(productIDs))
+	if len(productIDs) == 0 {
+		return stock, nil
+	}
+
+	var rows []ProductBranchStock
+	err := r.db.Table("inventory_items").
+		Select("product_id, COALESCE(current_quantity, 0) AS current_quantity, COALESCE(available_quantity, 0) AS available_quantity").
+		Where("business_id = ? AND branch_id = ? AND item_type = ? AND product_variant_id IS NULL AND product_id IN ? AND deleted_at IS NULL",
+			businessID, branchID, "product", productIDs).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, row := range rows {
+		stock[row.ProductID] = row
+	}
+	return stock, nil
+}
+
 func (r *Repository) LoadProductResponses(businessID string, products []Product) ([]ProductResponse, error) {
 	responses := make([]ProductResponse, 0, len(products))
 	for _, product := range products {
