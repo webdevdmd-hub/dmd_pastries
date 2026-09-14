@@ -3149,12 +3149,33 @@ func financialPaymentsByMethodSQL(filter *shared.ResolvedFilter) (string, []inte
 		ORDER BY COALESCE(collected.total_collected,0) DESC`, args
 }
 
+// financialOutstandingSummarySQL is the LEDGER-COMPARABLE total: it counts
+// only what the receivables control account can already contain.
+//
+// An order that has not completed has recognised no revenue and therefore no
+// receivable -- any deposit against it sits in Customer Advance, a liability.
+// Summing the operational rows as they stand counted that backlog as drift
+// against account 1100 and warned on every ordinary booked order.
+//
+// The ROW list keeps the wider predicate on purpose: as a collections list,
+// "who owes us money" rightly includes an order that has not shipped yet.
+// The two answer different questions, which is why they are built separately.
+//
+// Regression: ISSUE-012 — the accounting consistency panel warned permanently on normal open orders
+// Found by /qa on 2026-09-14
 func financialOutstandingSummarySQL(filter *shared.ResolvedFilter) (string, []interface{}) {
-	rows, args := financialOutstandingRowsSQL(filter)
+	rows, args := financialOutstandingRowsSQLFiltered(filter, true)
 	return "SELECT COALESCE(SUM(balance_amount),0) FROM (" + rows + ") outstanding", args
 }
 
 func financialOutstandingRowsSQL(filter *shared.ResolvedFilter) (string, []interface{}) {
+	return financialOutstandingRowsSQLFiltered(filter, false)
+}
+
+// ledgerComparable restricts bakery orders to those whose revenue has actually
+// posted. Pass false for the operational collections list, true to compare
+// against the ledger.
+func financialOutstandingRowsSQLFiltered(filter *shared.ResolvedFilter, ledgerComparable bool) (string, []interface{}) {
 	parts := []string{}
 	args := []interface{}{}
 	if includesFinancialSource(filter, "pos_sale") {
@@ -3193,6 +3214,9 @@ func financialOutstandingRowsSQL(filter *shared.ResolvedFilter) (string, []inter
 			FROM bakery_orders bo
 			JOIN branches b ON b.id = bo.branch_id
 			WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.deleted_at IS NULL AND ` + shared.OutstandingBakeryOrderCondition("bo")
+		if ledgerComparable {
+			bakery += " AND " + shared.BakeryOrderCompletedCondition("bo")
+		}
 		args = append(args, filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02"))
 		if !filter.AllBranches {
 			bakery += " AND bo.branch_id = ?"
@@ -3241,10 +3265,22 @@ func financialGrossSalesSummarySQL(filter *shared.ResolvedFilter) (string, []int
 		parts = append(parts, pos)
 	}
 	if includesFinancialSource(filter, "bakery_order") {
+		// Completed orders only, because this figure exists to be compared
+		// against the ledger and a bakery order recognises revenue at
+		// completion (Phase 4 / W1: stock leaves, COGS posts and revenue posts
+		// on the same event). The predicate here used to be "not cancelled",
+		// which counts every booked order that has not shipped yet, so the
+		// cross-check reported the whole un-recognised backlog as ledger drift
+		// and told the operator to run a backfill that would find nothing
+		// missing. A bakery that takes orders in advance always has such a
+		// backlog, so the warning was permanent.
+		//
+		// Regression: ISSUE-012 — the accounting consistency panel warned permanently on normal open orders
+		// Found by /qa on 2026-09-14
 		bakery := `
 			SELECT COALESCE(SUM(bo.total_amount),0) AS gross_sales
 			FROM bakery_orders bo
-			WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.order_status <> 'cancelled' AND bo.deleted_at IS NULL`
+			WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND ` + shared.BakeryOrderCompletedCondition("bo") + ` AND bo.deleted_at IS NULL`
 		args = append(args, filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02"))
 		if filter.Status != "" && filter.Status != "completed" {
 			bakery += " AND 1 = 0"

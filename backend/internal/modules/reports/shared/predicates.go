@@ -72,10 +72,21 @@ func PurchaseInvoiceOutstandingCondition(alias string) string {
 
 // --- Bakery orders ---------------------------------------------------------
 
-func BakeryOrderRevenueCondition(alias string) string {
-	return qualify(alias, "order_status") + " <> 'cancelled'"
-}
-
+// BakeryOrderCompletedCondition is the bakery revenue-recognition point.
+//
+// A bakery order recognises revenue at completion, the same event that moves
+// stock and posts COGS (Phase 4 / W1). So this, not "not cancelled", is what
+// any figure compared against the ledger must use. The same warning the sales
+// predicates carry applies here: "not cancelled" admits the whole booked-but-
+// not-shipped backlog, which is an operational listing, never a revenue figure.
+//
+// A BakeryOrderRevenueCondition used to sit beside this one returning exactly
+// that broader predicate. Nothing called it, and its name invited precisely the
+// mistake that ISSUE-012 turned out to be, so it is gone rather than left as a
+// trap with a reassuring name.
+//
+// Regression: ISSUE-012 — the accounting consistency panel warned permanently on normal open orders
+// Found by /qa on 2026-09-14
 func BakeryOrderCompletedCondition(alias string) string {
 	return qualify(alias, "order_status") + " = 'completed'"
 }

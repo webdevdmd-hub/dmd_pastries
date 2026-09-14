@@ -136,6 +136,18 @@ func JournalConsistencyWarnings(db *gorm.DB, scope MetricScope, startUTC, endUTC
 				WHERE s.business_id = ?
 				  AND s.deleted_at IS NULL
 				  AND ` + SaleRevenueCondition("s") + `
+				  -- A comped sale, a staff meal or a 100%-off promotion comes
+				  -- to zero and has no revenue to recognise, so it correctly
+				  -- has no revenue journal. Counting it as a missing journal
+				  -- reported a fault that does not exist and sent the operator
+				  -- looking for a backfill to run.
+				  --
+				  -- Its COGS journal still posts and is still checked, because
+				  -- the goods did leave: that is a separate source_type.
+				  --
+				  -- Regression: ISSUE-012 — the accounting consistency panel warned permanently on normal open orders
+				  -- Found by /qa on 2026-09-14
+				  AND s.total_amount > 0
 				  AND s.sold_at >= ?
 				  AND s.sold_at < ?
 				  AND NOT EXISTS (
