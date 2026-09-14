@@ -719,8 +719,18 @@ export function ProductFormDialog({
               <CardContent className="p-4">
                 <div className="mb-4">
                   <h3 className="font-semibold text-brand-espresso">Operational behavior</h3>
+                  {/* This promised control over "how inventory should track it"
+                      and then offered none. Stock tracking is deliberately a
+                      constant -- the dialog stopped asking because every product
+                      had it on and it is what makes inventory counts and cost of
+                      sales work at all -- so the copy now says that instead of
+                      pointing at a control nobody can find.
+
+                      Regression: ISSUE-010 — the Behavior tab described a stock-tracking control that does not exist
+                      Found by /qa on 2026-09-14 */}
                   <p className="text-sm text-brand-mocha">
-                    Control whether this item appears in POS and how inventory should track it.
+                    Control whether this item is sold and how it appears at the register. Stock is
+                    tracked for every product and is not set here.
                   </p>
                 </div>
                 <div className="grid gap-4 md:grid-cols-[1fr_1.2fr]">

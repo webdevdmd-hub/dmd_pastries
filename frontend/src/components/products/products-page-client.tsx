@@ -118,6 +118,27 @@ const productInventoryFilters: InventoryFilters = {
   status: "all",
 };
 
+/**
+ * What a status change actually does to a product, in the words an operator
+ * would use. The dialog used to echo the raw value -- "Change status for
+ * Vanilla Cake to archived?" -- which names the field, not the consequence.
+ *
+ * Regression: ISSUE-009 — the product delete confirmation named no consequence
+ * Found by /qa on 2026-09-14
+ */
+function productStatusChangeMessage(status: string): string {
+  switch (status) {
+    case "active":
+      return "The product returns to the catalogue and can be sold and shown at the register again.";
+    case "inactive":
+      return "The product stays in the catalogue and its history, but cannot be sold or added to new orders.";
+    case "archived":
+      return "The product is retired: it leaves the register and price lists, and keeps its history. You can make it active again later.";
+    default:
+      return `The product's status changes to ${status}.`;
+  }
+}
+
 function formatMoney(value: number): string {
   return `AED ${value.toLocaleString("en-US", {
     minimumFractionDigits: 2,
@@ -749,12 +770,25 @@ export function ProductsPageClient(): JSX.Element {
       <Dialog onOpenChange={(open) => !open && setConfirmState(null)} open={confirmState !== null}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm action</DialogTitle>
-            <DialogDescription>
+            {/* One dialog covered deleting a product and changing its status,
+                and said nothing about either beyond the name. Deleting is not
+                what it sounds like -- the product is archived and pulled from
+                sale and from the register -- and a product carrying any sales,
+                orders or stock history cannot be deleted at all. None of that
+                reached the person about to click Delete.
+
+                Regression: ISSUE-009 — the product delete confirmation named no consequence
+                Found by /qa on 2026-09-14 */}
+            <DialogTitle>
               {confirmState?.action === "delete"
                 ? `Delete ${confirmState.product.productName}?`
+                : `Change status for ${confirmState?.product.productName ?? "this product"}?`}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmState?.action === "delete"
+                ? "The product is archived and removed from sale and from the register. A product with sales, orders or stock history cannot be deleted at all; deactivate it instead."
                 : confirmState?.nextStatus
-                  ? `Change status for ${confirmState.product.productName} to ${confirmState.nextStatus}?`
+                  ? productStatusChangeMessage(confirmState.nextStatus)
                   : "Confirm the selected product action."}
             </DialogDescription>
           </DialogHeader>
@@ -799,7 +833,15 @@ export function ProductsPageClient(): JSX.Element {
                     .catch((error: unknown) => toast.error(getErrorMessage(error)));
                 }
               }}
+              // Delete and a routine status change shared one default button,
+              // so the destructive action looked exactly like the harmless one.
+              className={
+                confirmState?.action === "delete"
+                  ? "border-danger/30 bg-danger-tint text-danger-text hover:bg-danger-tint"
+                  : undefined
+              }
               type="button"
+              variant={confirmState?.action === "delete" ? "outline" : "default"}
             >
               {confirmState?.action === "delete" ? "Delete" : "Confirm"}
             </Button>

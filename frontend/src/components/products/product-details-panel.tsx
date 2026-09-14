@@ -54,9 +54,31 @@ function DetailRow({ label, value }: { label: string; value: string }): JSX.Elem
   );
 }
 
-function Flag({ active, label }: { active: boolean; label: string }): JSX.Element {
-  return <Badge variant={active ? "money" : "outline"}>{label}</Badge>;
+/**
+ * A product capability, named for what it actually is.
+ *
+ * This used to render one label and swap only the badge colour, so a product
+ * that does NOT track expiry still read "Expiry tracked", in grey. Colour was
+ * the only thing carrying the meaning: to anyone who cannot separate a green
+ * tint from no tint, and to every screen reader, the badge asserted the exact
+ * opposite of the truth.
+ *
+ * The POS badge in the same row already had this right -- its label reads
+ * "POS: POS Visible" or "POS: Not Sellable" -- so the state belongs in the
+ * words here too, with the colour left to reinforce rather than to inform.
+ *
+ * Regression: ISSUE-008 — product flag badges read the same whether the flag was on or off
+ * Found by /qa on 2026-09-14
+ */
+function Flag({ active, offLabel, onLabel }: FlagProps): JSX.Element {
+  return <Badge variant={active ? "money" : "outline"}>{active ? onLabel : offLabel}</Badge>;
 }
+
+type FlagProps = {
+  active: boolean;
+  offLabel: string;
+  onLabel: string;
+};
 
 /**
  * The body of a product's details: the tab strip and whichever panel is
@@ -116,13 +138,22 @@ export function ProductDetailsPanel({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Flag active={product.isSellable} label="Sellable" />
+              <Flag active={product.isSellable} offLabel="Not sellable" onLabel="Sellable" />
               <Flag
                 active={product.isPosVisible}
-                label={`POS: ${getProductPosVisibilityLabel(product)}`}
+                offLabel={`POS: ${getProductPosVisibilityLabel(product)}`}
+                onLabel={`POS: ${getProductPosVisibilityLabel(product)}`}
               />
-              <Flag active={product.isExpiryTracked} label="Expiry tracked" />
-              <Flag active={product.isCustomOrderAvailable} label="Custom orders" />
+              <Flag
+                active={product.isExpiryTracked}
+                offLabel="No expiry tracking"
+                onLabel="Expiry tracked"
+              />
+              <Flag
+                active={product.isCustomOrderAvailable}
+                offLabel="No custom orders"
+                onLabel="Custom orders"
+              />
             </div>
 
             <div className="rounded-lg bg-muted px-3 py-2">
