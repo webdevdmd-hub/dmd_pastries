@@ -223,6 +223,7 @@ export function TrialBalancePageClient(): JSX.Element {
           />
           <Label className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-brand-cappuccino/70 bg-brand-latte px-4 text-sm text-brand-espresso sm:w-auto">
             <Checkbox
+              aria-label="Include zero balances"
               checked={filters.includeZeroBalances}
               onCheckedChange={(checked) =>
                 updateFilters({ includeZeroBalances: checked === true })
@@ -280,7 +281,7 @@ export function TrialBalancePageClient(): JSX.Element {
           <CardContent className="p-0">
             <div className="flex flex-wrap items-center justify-end gap-4 border-b border-workspace-panel-border px-4 py-3 text-sm text-brand-mocha">
               <Label className="flex items-center gap-2">
-                <Checkbox disabled />
+                <Checkbox aria-label="Collapse sub-accounts" disabled />
                 Collapse sub-accounts
               </Label>
               <span className="inline-flex items-center gap-2">

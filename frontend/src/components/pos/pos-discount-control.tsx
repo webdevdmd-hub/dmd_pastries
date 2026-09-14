@@ -48,6 +48,7 @@ export function POSDiscountControl({
           className="h-8 rounded-md border-border bg-card text-xs shadow-none focus-visible:ring-ring"
           disabled={!type}
           onValueChange={(nextValue) => onChange(type, nextValue)}
+          aria-label="Sale discount amount"
           placeholder="0.00"
           value={value}
         />

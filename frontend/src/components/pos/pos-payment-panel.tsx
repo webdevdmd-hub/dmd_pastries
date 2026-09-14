@@ -290,6 +290,7 @@ export function POSPaymentPanel({
                       : (amount ?? 0);
                     updatePayment(payment.paymentMethodId, { amount: nextAmount });
                   }}
+                  aria-label={`${payment.paymentMethodName} paid amount`}
                   placeholder="Paid amount"
                   value={payment.amount}
                 />
@@ -344,6 +345,7 @@ export function POSPaymentPanel({
                           [payment.paymentMethodId]: value,
                         }))
                       }
+                      aria-label="Cash handed over"
                       placeholder="Cash handed over"
                       value={tendered}
                     />

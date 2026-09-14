@@ -213,23 +213,48 @@ export function CustomerFormDialog({
               <section className="grid gap-4 md:grid-cols-2">
                 <div className="grid gap-2 md:col-span-2">
                   <Label htmlFor="customer-full-name">Full name</Label>
-                  <Input id="customer-full-name" {...form.register("fullName")} />
+                  <Input
+                    aria-describedby={
+                      fieldError("fullName") ? "customer-full-name-error" : undefined
+                    }
+                    aria-invalid={fieldError("fullName") ? true : undefined}
+                    id="customer-full-name"
+                    {...form.register("fullName")}
+                  />
                   {fieldError("fullName") ? (
-                    <span className="text-sm text-danger-text">{fieldError("fullName")}</span>
+                    <span className="text-sm text-danger-text" id="customer-full-name-error">
+                      {fieldError("fullName")}
+                    </span>
                   ) : null}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="customer-phone">Phone</Label>
-                  <Input id="customer-phone" inputMode="tel" {...form.register("phone")} />
+                  <Input
+                    aria-describedby={fieldError("phone") ? "customer-phone-error" : undefined}
+                    aria-invalid={fieldError("phone") ? true : undefined}
+                    id="customer-phone"
+                    inputMode="tel"
+                    {...form.register("phone")}
+                  />
                   {fieldError("phone") ? (
-                    <span className="text-sm text-danger-text">{fieldError("phone")}</span>
+                    <span className="text-sm text-danger-text" id="customer-phone-error">
+                      {fieldError("phone")}
+                    </span>
                   ) : null}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="customer-email">Email</Label>
-                  <Input id="customer-email" type="email" {...form.register("email")} />
+                  <Input
+                    aria-describedby={fieldError("email") ? "customer-email-error" : undefined}
+                    aria-invalid={fieldError("email") ? true : undefined}
+                    id="customer-email"
+                    type="email"
+                    {...form.register("email")}
+                  />
                   {fieldError("email") ? (
-                    <span className="text-sm text-danger-text">{fieldError("email")}</span>
+                    <span className="text-sm text-danger-text" id="customer-email-error">
+                      {fieldError("email")}
+                    </span>
                   ) : null}
                 </div>
                 <div className="grid gap-2">

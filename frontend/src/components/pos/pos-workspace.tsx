@@ -734,8 +734,12 @@ export function POSWorkspace(): JSX.Element {
                   <CalendarPlus className="h-4 w-4" />
                   Create order
                 </Button>
-                <label className="text-meta min-h-tap flex w-full items-center justify-center gap-2 whitespace-nowrap rounded border border-border bg-card px-3 font-medium text-foreground-muted">
+                <label
+                  className="text-meta min-h-tap flex w-full items-center justify-center gap-2 whitespace-nowrap rounded border border-border bg-card px-3 font-medium text-foreground-muted"
+                  htmlFor="pos-show-prices"
+                >
                   <Checkbox
+                    id="pos-show-prices"
                     checked={showPrices}
                     onCheckedChange={(checked) => setShowPrices(checked === true)}
                   />

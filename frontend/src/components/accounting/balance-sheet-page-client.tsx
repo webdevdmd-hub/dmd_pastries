@@ -325,7 +325,7 @@ export function BalanceSheetPageClient(): JSX.Element {
           <CardContent className="p-0">
             <div className="flex flex-wrap items-center justify-end gap-4 border-b border-workspace-panel-border px-4 py-3 text-sm text-brand-mocha">
               <Label className="flex items-center gap-2">
-                <Checkbox disabled />
+                <Checkbox aria-label="Collapse sub-accounts" disabled />
                 Collapse sub-accounts
               </Label>
               <span className="inline-flex items-center gap-2">
