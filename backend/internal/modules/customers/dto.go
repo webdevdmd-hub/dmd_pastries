@@ -176,7 +176,20 @@ type CustomerStatsResponse struct {
 	LastOrderAt         *time.Time                    `json:"last_order_at"`
 	OutstandingBalance  money.Amount                  `json:"outstanding_balance"`
 	PendingPayments     int64                         `json:"pending_payments"`
-	RecentTransactions  []CustomerTransactionResponse `json:"recent_transactions"`
+	// gorm:"-" or GORM treats this as a has-many and refuses to parse the
+	// struct at all: "invalid field found ... define a valid foreign key for
+	// relations or implement the Valuer/Scanner interface". Every Scan in
+	// Stats() parses this schema, so without the tag the FIRST query fails
+	// and the whole endpoint 500s for every customer. The transactions are
+	// loaded separately by CustomerRecentTransactions, never by a join.
+	//
+	// Its siblings here already do this: CustomerResponse.Tags and
+	// CustomerResponse.Stats both carry gorm:"-"; this field was the one
+	// that missed it.
+	//
+	// Regression: ISSUE-011 — customer statistics returned 500 for every customer
+	// Found by /qa on 2026-09-14
+	RecentTransactions  []CustomerTransactionResponse `json:"recent_transactions" gorm:"-"`
 }
 
 type CustomerTransactionResponse struct {

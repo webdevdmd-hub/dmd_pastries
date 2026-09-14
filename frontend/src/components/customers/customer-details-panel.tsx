@@ -82,6 +82,7 @@ export function CustomerDetailsPanel({
           <div className="grid gap-6">
             <CustomerStatsCards
               creditBalance={creditsQuery.data?.balance ?? 0}
+              error={statsQuery.error}
               stats={statsQuery.data}
             />
             <CustomerProfileCard customer={customer} />
